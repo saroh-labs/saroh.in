@@ -15,6 +15,8 @@ export interface WaitlistJoined {
     link?: { href: string; shown: string };
     /** Joined from outside India: Saroh opens there first. */
     outsideIndia?: boolean;
+    /** The gallery template saved with the entry, by name. */
+    template?: string;
 }
 
 /**
@@ -67,6 +69,18 @@ export function WaitlistDone({
                     ? ` ${content.offer.doneLine}`
                     : null}
             </p>
+            {joined.template ? (
+                <p
+                    data-testid="waitlist-template-saved"
+                    className="m-0 text-[15px] leading-[1.55] text-neutral-600"
+                >
+                    We&apos;ve saved the{" "}
+                    <strong className="font-semibold text-foreground">
+                        {joined.template}
+                    </strong>{" "}
+                    template for you.
+                </p>
+            ) : null}
             {joined.outsideIndia ? (
                 <p
                     data-testid="waitlist-outside-india"

@@ -7,6 +7,7 @@ import { Arrow } from "@/components/v2/arrow";
 import { WaitlistForm } from "@/components/v2/waitlist/waitlist-form";
 import { linkShown } from "@/content/resources";
 import { SAROH_HANDLE, SAROH_SOCIAL } from "@/content/social";
+import { galleryTemplates } from "@/content/templates";
 import type { WaitlistContent } from "@/content/waitlist";
 import {
     HERO_KINDS,
@@ -68,7 +69,8 @@ export const revalidate = 300;
  * sits outside the `(v2)` chrome. The launch offer is the API's (U31); with
  * none, the form says it is announced at launch. The page reads no query, so
  * it stays static: the form reads `?plan=`, `?src=` (the CTA builder,
- * `lib/links.ts`) and `?ref=` (a referral link) in the browser as it sends.
+ * `lib/links.ts`), `?ref=` (a referral link) and `?template=` (a gallery
+ * template's "Save … for early access") in the browser.
  */
 export default async function WaitlistPage() {
     const offer = await readLaunchOffer();
@@ -155,7 +157,13 @@ export default async function WaitlistPage() {
                 </div>
 
                 <div className="flex flex-col gap-5 rounded-mk-card border border-border bg-white p-[clamp(20px,3vw,32px)] shadow-[0_4px_12px_rgba(28,28,26,0.10)]">
-                    <WaitlistForm content={content} />
+                    <WaitlistForm
+                        content={content}
+                        templates={galleryTemplates().map((t) => ({
+                            slug: t.slug,
+                            name: t.name,
+                        }))}
+                    />
                 </div>
             </main>
 

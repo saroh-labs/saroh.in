@@ -45,6 +45,30 @@ describe("WaitlistService", () => {
         );
     });
 
+    it("stores a saved gallery template, and drops one it doesn't know", async () => {
+        await service.join({ ...V2, template: "Gym" });
+        expect(create).toHaveBeenLastCalledWith(
+            expect.objectContaining({
+                data: expect.objectContaining({ template: "gym" }),
+            }),
+        );
+
+        await service.join({ ...V2, template: "salon" });
+        expect(create).toHaveBeenLastCalledWith(
+            expect.objectContaining({
+                data: expect.objectContaining({ template: null }),
+            }),
+        );
+
+        // The V1 form (an email alone) saves no template, as it saves no kind.
+        await service.join({ email: "v1@example.test", template: "gym" });
+        expect(create).toHaveBeenLastCalledWith(
+            expect.objectContaining({
+                data: expect.objectContaining({ template: null, kind: null }),
+            }),
+        );
+    });
+
     it("stores a new entry and hands back its place and referral id", async () => {
         const result = await service.join({ ...V2, city: "Pune" });
 

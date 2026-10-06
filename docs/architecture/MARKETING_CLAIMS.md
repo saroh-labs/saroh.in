@@ -60,15 +60,16 @@ Two kinds of switch decide many rows:
 
 | Status     | Rows |
 | ---------- | ---: |
-| Backed     |   82 |
-| Fixed      |   89 |
-| Partly     |   21 |
+| Backed     |   85 |
+| Fixed      |   92 |
+| Partly     |   22 |
 | Not backed |    3 |
-| **Total**  |  195 |
+| **Total**  |  202 |
 
 Before the rewrites: 83 Backed, 81 Partly, 27 Not backed (191). Four rows
 were added for the new Insights copy (IN13–IN16). Two rows (SO5, SO10) only
-point to others and carry no status. All 21 screenshot captions in §9 now
+point to others and carry no status. Seven rows were added for the
+Templates gallery (TP1–TP7, §13). All 21 screenshot captions in §9 now
 read what the image shows; two copy questions in §10 are still open.
 
 What is still Partly or Not backed: the online shop (D5: H12, H19, PR1,
@@ -386,7 +387,7 @@ Product facts only; which plan names which is kept outside the repo.
 | ID    | Capability                                                               | Backed by                                                                                                                                                                                                                | Status     | What's missing                                                                                                                                                                                                            |
 | ----- | ------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ---------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | CAP1  | Your website on your own domain                                          | `domains/domains.service.ts`, `custom-domain.tsx`                                                                                                                                                                        | Partly     | The domain is never added to the hosting project and no certificate is issued in code: a manual step                                                                                                                      |
-| CAP2  | Change the site's theme and fonts, or pick another template              | `sites/site-style.ts`, `style-panel.tsx` (colours, spacing, typeface pairs)                                                                                                                                                           | Not backed | "Font choices aren't available yet"; a template is picked only when the site is made                                                                                                                                      |
+| CAP2  | Change the site's theme and fonts, or pick another template              | `sites/site-style.ts`, `style-panel.tsx` (colours, spacing, typeface pairs)                                                                                                                                              | Not backed | "Font choices aren't available yet"; a template is picked only when the site is made                                                                                                                                      |
 | CAP3  | Review changes with your team before they go live                        | Advisory review (DEC-047) live; test releases and required approval (DEC-071)                                                                                                                                            | Partly     | Required approval and test releases wait for `SITE_TEST_RELEASES`; advisory review is open to every business today                                                                                                        |
 | CAP4  | Custom roles                                                             | `organization-roles.service.ts`                                                                                                                                                                                          | Backed     | Open to every business today; no plan gates it                                                                                                                                                                            |
 | CAP5  | Team members (invitations)                                               | `organizations/:id/invitations`                                                                                                                                                                                          | Backed     | The team-size limit is not checked on invite                                                                                                                                                                              |
@@ -588,17 +589,35 @@ had already fixed; the entry ships the fixed wording, cited in the content
 file. The offer line reads the API's offer (`GET /public/waitlist/offer`),
 never a number in the repo.
 
-| #   | Claim (design)                                                                                                                 | Backed by                               | Status | Shipped words                                                                                       |
-| --- | ------------------------------------------------------------------------------------------------------------------------------ | --------------------------------------- | ------ | --------------------------------------------------------------------------------------------------- |
-| CL1 | Orders: "…Late ones are flagged, and every step tells the customer."                                                           | As OR1, OR11                            | Fixed  | "every step tells the customer" dropped                                                             |
-| CL2 | Products: "stock for each storefront"                                                                                          | PR8; DEC-069 vocabulary                 | Fixed  | "stock for each location"                                                                           |
-| CL3 | Bookings: "…pay a deposit if you ask for one, and get a reminder email."                                                       | As BK2                                  | Fixed  | Reminder dropped                                                                                    |
-| CL4 | Subscriptions: "renew by UPI Autopay or card … a failed payment is retried and shown to you"                                   | As SU2 (D1)                             | Fixed  | SU2's wording: renew on their day, Autopay where set up, a failed payment shown with a new pay link |
-| CL5 | Billing: "Every paid order, booking and renewal gets a numbered GST tax invoice, or a bill of supply if you don't charge GST." | As BI6, F2                              | Fixed  | Bookings and renewals with Payments on; bill of supply for GST-exempt sales                         |
-| CL6 | Payments: "Customers pay by UPI, card or netbanking … Saroh never holds it."                                                   | Providers, F3                           | Partly | Kept as designed; F3 names UPI or card only. Netbanking is the provider's checkout: confirm         |
-| CL7 | Emails: "Order updates, booking reminders and invoices go out by email…"                                                       | As BK2, OR11; `invoice-send.service.ts` | Fixed  | "Invoices and reminders to pay go to your customers by email, through your own email account…"      |
-| CL8 | Website: "Start from a template made for your kind of business" + "See templates"                                              | Plan U6 (industry templates not built)  | Fixed  | "Start from a template…"; no Templates link                                                         |
-| CL9 | "On the waitlist? Your invite is in your email, with your first 3 months of Grow free."                                        | `GET /public/waitlist/offer`            | Backed | The API's plan and days; without an offer, "Your invite is in your email."                          |
+| #   | Claim (design)                                                                                                                 | Backed by                                  | Status | Shipped words                                                                                                        |
+| --- | ------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------ | ------ | -------------------------------------------------------------------------------------------------------------------- |
+| CL1 | Orders: "…Late ones are flagged, and every step tells the customer."                                                           | As OR1, OR11                               | Fixed  | "every step tells the customer" dropped                                                                              |
+| CL2 | Products: "stock for each storefront"                                                                                          | PR8; DEC-069 vocabulary                    | Fixed  | "stock for each location"                                                                                            |
+| CL3 | Bookings: "…pay a deposit if you ask for one, and get a reminder email."                                                       | As BK2                                     | Fixed  | Reminder dropped                                                                                                     |
+| CL4 | Subscriptions: "renew by UPI Autopay or card … a failed payment is retried and shown to you"                                   | As SU2 (D1)                                | Fixed  | SU2's wording: renew on their day, Autopay where set up, a failed payment shown with a new pay link                  |
+| CL5 | Billing: "Every paid order, booking and renewal gets a numbered GST tax invoice, or a bill of supply if you don't charge GST." | As BI6, F2                                 | Fixed  | Bookings and renewals with Payments on; bill of supply for GST-exempt sales                                          |
+| CL6 | Payments: "Customers pay by UPI, card or netbanking … Saroh never holds it."                                                   | Providers, F3                              | Partly | Kept as designed; F3 names UPI or card only. Netbanking is the provider's checkout: confirm                          |
+| CL7 | Emails: "Order updates, booking reminders and invoices go out by email…"                                                       | As BK2, OR11; `invoice-send.service.ts`    | Fixed  | "Invoices and reminders to pay go to your customers by email, through your own email account…"                       |
+| CL8 | Website: "Start from a template made for your kind of business" + "See templates"                                              | `@saroh/templates` gallery templates (U13) | Fixed  | "Start from a template…" + "See templates" (shown with `/templates`); "made for your kind" not claimed: no salon yet |
+| CL9 | "On the waitlist? Your invite is in your email, with your first 3 months of Grow free."                                        | `GET /public/waitlist/offer`               | Backed | The API's plan and days; without an offer, "Your invite is in your email."                                           |
+
+## 13. Resources: Templates (`/templates`, `/templates/[slug]`)
+
+The gallery (industry templates plan U13, Resources plan U6) publishes on
+17 Oct 2026 with early access (`content/resources.ts`). It shows only
+templates in `@saroh/templates` that carry gallery metadata (kinds and a
+sample business), so every card is one a merchant can pick (KTD-6); Salon
+and Clinic appear only once built. Words in `apps/saroh.in/content/templates.ts`.
+
+| #   | Claim (design)                                                                                     | Backed by                                                                            | Status | Shipped words                                                                                                              |
+| --- | -------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------ | ------ | -------------------------------------------------------------------------------------------------------------------------- |
+| TP1 | "Eight templates, one for each kind of business, each with its own type and colours."              | `galleryTemplates()`; each manifest's `styles` and `fontPair`                        | Fixed  | The count is derived ("Seven templates, each made for a kind of business…"); not "one for each kind": no salon             |
+| TP2 | "Bookings, products and memberships are already wired in."                                         | Bound blocks the templates lay down (`booking`/APPOINTMENTS, `productGrid`, `plans`) | Backed | Each word only while a shown template lays that block down                                                                 |
+| TP3 | Card and frame images                                                                              | U14's 2× renders (`content/template-shots.ts`)                                       | Partly | Until a page is captured, a drawing from the template's own sections, colours and type; "Every business shown is a sample" |
+| TP4 | "Save {Name} for early access" + "Join the waitlist by the 16th and it's ready for you."           | `WaitlistSignup.template` (stored, gallery slugs only)                               | Fixed  | "…and we'll keep {Name} for you": stored with the entry; onboarding doesn't preselect it yet (plan "Later")                |
+| TP5 | "Pick one now. It's ready for you on 17 Oct." / "Start with {Name}. It's ready for you on 17 Oct." | The template is in the registry; early access opens 17 Oct                           | Backed | Shown before the day only (previews); from 17 Oct "Pick one, and start from it." / "Start with {Name}."                    |
+| TP6 | Facts: Pages, Uses, Type, Colours, Plan                                                            | The manifest's pages, `uses`, font pair and colourways                               | Fixed  | Plan row cut (public repo: no plan or price); Uses in product words, never module keys                                     |
+| TP7 | Notes: "runs on what you add"                                                                      | KTD-4: bound blocks read the business's data; empty ones render nothing              | Backed | "…come from what you add in Saroh… Until you add one, its section stays off the page."                                     |
 
 ## Keeping this current
 

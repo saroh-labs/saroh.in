@@ -3,6 +3,8 @@ import { describe, expect, it } from "vitest";
 import { resourceItems } from "@/components/v2/nav-items";
 import { indexedPaths } from "@/lib/site-pages";
 
+import { galleryTemplates } from "./templates";
+
 import type { PublishContext } from "./resources";
 import {
     RESOURCE_PAGES,
@@ -33,6 +35,8 @@ const ALL_ROUTES = [
     "/privacy",
     "/refunds",
     "/solutions/[slug]",
+    "/templates",
+    "/templates/[slug]",
     "/terms",
     "/tools/link-preview",
     "/waitlist",
@@ -110,6 +114,34 @@ describe("an unpublished page is in neither the nav nor the sitemap", () => {
         ]);
     });
 
+    it("Templates and every gallery template join the nav and sitemap on 17 Oct", () => {
+        const names = (ctx: PublishContext) =>
+            resourceItems(shownResources(ctx)).map((i) => i.name);
+        expect(names(before)).not.toContain("Templates");
+        expect(
+            indexedPaths("waitlist", before).filter((p) =>
+                p.startsWith("/templates"),
+            ),
+        ).toEqual([]);
+        expect(names(after)).toContain("Templates");
+        const paths = indexedPaths("waitlist", after);
+        expect(paths).toContain("/templates");
+        for (const t of galleryTemplates()) {
+            expect(paths).toContain(`/templates/${t.slug}`);
+        }
+        // The detail pages need their own route.
+        const noDetail = at(
+            "2026-10-16T18:31:00Z",
+            ALL_ROUTES.filter((r) => r !== "/templates/[slug]"),
+        );
+        expect(indexedPaths("waitlist", noDetail)).toContain("/templates");
+        expect(
+            indexedPaths("waitlist", noDetail).some((p) =>
+                p.startsWith("/templates/"),
+            ),
+        ).toBe(false);
+    });
+
     it("the launch entry joins the sitemap on its day", () => {
         expect(indexedPaths("waitlist", before)).toContain("/changelog");
         expect(indexedPaths("waitlist", before)).not.toContain(
@@ -136,7 +168,7 @@ describe("a page shows only once its route is built", () => {
 
     it("a listed page without its route is linked nowhere", () => {
         const ids = shownResources(ctx).map((p) => p.id);
-        expect(ids).toEqual(["help", "changelog"]);
+        expect(ids).toEqual(["help", "changelog", "templates"]);
         expect(resourcePaths(ctx)).not.toContain("/integrations");
         expect(resourcePaths(ctx)).not.toContain("/integrations/razorpay");
     });
@@ -161,8 +193,9 @@ describe("a page shows only once its route is built", () => {
 });
 
 describe("the list", () => {
-    it("never lists Templates while it is blocked (plan U6)", () => {
-        expect(RESOURCE_PAGES.map((p) => p.href)).not.toContain("/templates");
+    it("lists Templates with early access, 17 Oct (plan U6, industry templates U13)", () => {
+        const templates = RESOURCE_PAGES.find((p) => p.href === "/templates");
+        expect(templates?.publishOn).toBe("2026-10-17");
     });
 
     it("has one entry per address, each with a name and a line", () => {

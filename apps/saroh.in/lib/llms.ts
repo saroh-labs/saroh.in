@@ -5,12 +5,14 @@ import { helpHref, liveArticles } from "@/content/help";
 import { integrationHref, liveIntegrations } from "@/content/integrations";
 import type { PublishContext } from "@/content/resources";
 import { linkShown, shownLegal, shownResources } from "@/content/resources";
+import type { GalleryTemplate } from "@/content/templates";
+import { galleryTemplates, templateHref } from "@/content/templates";
 
 /**
  * `/llms.txt` (Resources plan U7, llmstxt.org): the site's name, one line
  * on what Saroh is, then the Resources and legal pages shown now, each with
- * a one-line description, Help's articles and the changelog's entries
- * under their page. It follows the same publish rule as the nav, the footer
+ * a one-line description, Help's articles, the changelog's entries and
+ * the gallery's templates under their page. It follows the same publish rule as the nav, the footer
  * and the sitemap (KTD-2): an unpublished page, or one whose route this
  * build lacks, is never listed, so the file never points at a 404.
  */
@@ -34,6 +36,10 @@ export function llmsText(
     ctx: PublishContext,
     articles: readonly LlmsArticle[],
     entries: readonly ChangelogEntry[] = liveEntries(ctx),
+    templates: readonly Pick<
+        GalleryTemplate,
+        "slug" | "name" | "description"
+    >[] = galleryTemplates(),
 ): string {
     const out: string[] = ["# Saroh", "", `> ${LLMS_SUMMARY}`];
 
@@ -77,6 +83,16 @@ export function llmsText(
         out.push("", "## Changelog", "");
         for (const e of changelog) {
             out.push(line(base, changelogHref(e.slug), e.title, e.description));
+        }
+    }
+
+    const gallery = resources.some((p) => p.id === "templates")
+        ? templates.filter((t) => linkShown(templateHref(t.slug), ctx))
+        : [];
+    if (gallery.length > 0) {
+        out.push("", "## Templates", "");
+        for (const t of gallery) {
+            out.push(line(base, templateHref(t.slug), t.name, t.description));
         }
     }
 

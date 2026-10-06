@@ -72,6 +72,7 @@ export class WaitlistController {
             plan: dto.plan,
             source: dto.source,
             ref: dto.ref,
+            template: dto.template,
             ipHash,
         });
 
