@@ -52,15 +52,40 @@ describe("movedTo", () => {
         expect(movedTo("/Getting-Started/", AFTER, WWW)).toBe(
             `${WWW}/help/create-your-business`,
         );
+        expect(movedTo("/selling", AFTER, WWW)).toBe(
+            `${WWW}/help/add-your-first-product`,
+        );
+        expect(movedTo("/bookings", AFTER, WWW)).toBe(
+            `${WWW}/help/set-your-teams-hours`,
+        );
+        expect(movedTo("/website", AFTER, WWW)).toBe(
+            `${WWW}/help/connect-your-own-domain`,
+        );
+    });
+
+    it("maps each old page as the app's help links do", () => {
+        const app = readFileSync(
+            path.resolve(__dirname, "../../app.saroh.in/lib/help/links.ts"),
+            "utf8",
+        );
+        const block = /TOPIC_ARTICLE[^{]*\{([\s\S]*?)\};/.exec(app)?.[1] ?? "";
+        const pairs = Array.from(
+            block.matchAll(/"?([a-z-]+)"?: (?:"([a-z-]+)"|null)/g),
+        );
+        expect(pairs.length).toBeGreaterThan(0);
+        for (const match of pairs) {
+            const topic: string = match[1];
+            const article: string | undefined = match[2];
+            expect(movedTo(`/${topic}`, AFTER, WWW), topic).toBe(
+                article ? `${WWW}/help/${article}` : `${WWW}/help`,
+            );
+        }
     });
 
     it("sends everything else to Help's home", () => {
         for (const p of [
             "/",
-            "/selling",
-            "/bookings",
             "/customers",
-            "/website",
             "/organisation",
             "/finding-your-way-around",
             "/what-your-business-needs",
