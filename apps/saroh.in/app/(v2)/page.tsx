@@ -15,6 +15,7 @@ import { faqItems, HOME_FAQ } from "@/content/faq";
 import { featureHref, featureList } from "@/content/features";
 import { home } from "@/content/home";
 import { solutionHref, solutionList } from "@/content/solutions";
+import { LAUNCH_MODE } from "@/lib/links";
 import { HOME_OG_ALT } from "@/lib/og-card";
 import {
     freePlanLine,
@@ -126,10 +127,15 @@ export default async function HomePage() {
                 </div>
             </Container>
 
-            <HomePricing
-                plans={homePlanTeasers(catalog)}
-                footnote={planTeaserFootnote(catalog)}
-            />
+            {/* Plans show once the site's launch switch opens: before
+                that Pricing waits at the waitlist (Gate W), so no page draws
+                a plan or links to it. */}
+            {LAUNCH_MODE === "open" ? (
+                <HomePricing
+                    plans={homePlanTeasers(catalog)}
+                    footnote={planTeaserFootnote(catalog)}
+                />
+            ) : null}
 
             <Faq items={faq} title={home.faqTitle} />
 

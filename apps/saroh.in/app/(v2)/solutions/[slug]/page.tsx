@@ -17,6 +17,7 @@ import {
     solutions,
 } from "@/content/solutions";
 import { SOLUTION_SLUGS } from "@/content/types";
+import { LAUNCH_MODE } from "@/lib/links";
 import {
     freePlanLine,
     planTeaserFootnote,
@@ -82,12 +83,15 @@ export default async function SolutionPage({ params }: Props) {
                 </div>
             </Container>
 
-            <SolutionPricing
-                title={s.pricing.title}
-                plans={solutionPlanTeasers(catalog, s.pricing)}
-                footnote={planTeaserFootnote(catalog)}
-                src={`solutions-${slug}-pricing`}
-            />
+            {/* Plans show once the launch switch opens (Gate W). */}
+            {LAUNCH_MODE === "open" ? (
+                <SolutionPricing
+                    title={s.pricing.title}
+                    plans={solutionPlanTeasers(catalog, s.pricing)}
+                    footnote={planTeaserFootnote(catalog)}
+                    src={`solutions-${slug}-pricing`}
+                />
+            ) : null}
 
             <Faq items={faqItems(solutionFaq(s.faq))} className="pt-[120px]" />
 

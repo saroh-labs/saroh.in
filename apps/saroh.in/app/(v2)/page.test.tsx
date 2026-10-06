@@ -16,6 +16,15 @@ vi.mock("@/lib/pricing", () => ({
     readLivePricing: () => Promise.resolve(read.catalog),
 }));
 
+/** The site's launch switch (plan KTD-16); the plan section shows once open. */
+const launch = vi.hoisted(() => ({ mode: "open" as "waitlist" | "open" }));
+vi.mock("@/lib/links", async (importOriginal) => ({
+    ...(await importOriginal<typeof import("@/lib/links")>()),
+    get LAUNCH_MODE() {
+        return launch.mode;
+    },
+}));
+
 function section(container: HTMLElement, id: string): HTMLElement {
     const el = container.querySelector<HTMLElement>(`#${id}`);
     if (!el) throw new Error(`no #${id}`);
@@ -28,9 +37,18 @@ const RUPEE = new RegExp("\\u20B9");
 afterEach(() => {
     cleanup();
     read.catalog = null;
+    launch.mode = "open";
 });
 
 describe("/ (Home)", () => {
+    it("before launch draws no plan and no link to Pricing (Gate W)", async () => {
+        launch.mode = "waitlist";
+        read.catalog = fakeCatalog();
+        const { container } = render(await HomePage());
+        expect(container.querySelector("#pricing")).toBeNull();
+        expect(container.querySelector('a[href^="/pricing"]')).toBeNull();
+    });
+
     it("reads the headline whole and has the anchors other pages link to", async () => {
         const { container } = render(await HomePage());
         expect(

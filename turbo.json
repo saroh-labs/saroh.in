@@ -80,6 +80,9 @@
         "DEV_REDIRECT_ORIGIN",
         "VERCEL_GIT_COMMIT_REF",
         "NEXT_PUBLIC_GA_MEASUREMENT_ID",
+        // saroh.in's launch switch (plan KTD-16): Pricing, its links and the
+        // plan sections appear once it is "open"; read at build.
+        "NEXT_PUBLIC_LAUNCH_MODE",
         // saroh.in: the build's page routes, written by its next.config.js
         // (routes.config.js), never set by hand.
         "SAROH_BUILT_ROUTES",
