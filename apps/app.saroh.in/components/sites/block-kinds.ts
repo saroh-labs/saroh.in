@@ -32,6 +32,8 @@ export const BOUND_BLOCKS: Record<SectionType, BoundSource | null> = {
     contact: null,
     // The merchant's own work, typed here: there is nothing to read (K11).
     projects: null,
+    // A practitioner in the merchant's own words (U2): nothing to read.
+    person: null,
     servicesList: {
         reads: "Reads your services live, so names, durations and prices are never out of date here.",
         notice: "What each service is called and what it costs follow Services — change them there, and this block follows.",
@@ -67,6 +69,18 @@ export const BOUND_BLOCKS: Record<SectionType, BoundSource | null> = {
         notice: "Products live in Sell › Products. Which products appear follows the catalogue — add or hide them there, and this block follows. Only published products at the location your online shop sells from show.",
         href: "/commerce/products",
         linkLabel: "Open Products",
+    },
+    timetable: {
+        reads: "Reads your classes and their places live, so the week is never out of date here.",
+        notice: "Which classes run, when, and who takes them follow Services and your class times — change them there, and this block follows. Only classes shown on your booking page appear.",
+        href: "/services",
+        linkLabel: "Open Services",
+    },
+    hours: {
+        reads: "Reads your opening hours live, so they're never out of date here.",
+        notice: "The hours are set in Settings › Hours — change them there, and this block follows.",
+        href: "/settings/organization?section=hours",
+        linkLabel: "Open Hours",
     },
     booking: {
         reads: "Reads your services and their availability live, so a visitor can only book what you actually offer.",

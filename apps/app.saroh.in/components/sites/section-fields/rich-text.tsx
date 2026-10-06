@@ -94,6 +94,7 @@ export function RichTextFields({
             </Field>
             <TextPhotoFields
                 value={{ image: c.image, imageSide: c.imageSide }}
+                brief={c.imageBrief}
                 onChange={(photo) => {
                     // Rebuilt rather than spread, so Remove leaves no
                     // empty `image` or stray side behind in the content.

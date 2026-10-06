@@ -10,6 +10,7 @@ import { MediaPicker } from "@/components/sites/media-picker";
 import type { RichTextContent } from "@/lib/sites/service";
 
 import { Field } from "./field";
+import { ImageBrief } from "./image-brief";
 
 type Photo = Pick<RichTextContent, "image" | "imageSide">;
 
@@ -30,9 +31,12 @@ type Photo = Pick<RichTextContent, "image" | "imageSide">;
  */
 export function TextPhotoFields({
     value,
+    brief,
     onChange,
 }: {
     value: Photo;
+    /** A template's brief for the photo (KTD-5), shown until there is one. */
+    brief?: string;
     /** The block's photo fields as they should now be; `{}` removes them. */
     onChange: (next: Photo) => void;
 }) {
@@ -73,6 +77,7 @@ export function TextPhotoFields({
                         }
                     />
                 </div>
+                <ImageBrief brief={brief} hasImage={image !== undefined} />
                 <div className="flex items-center justify-between gap-2">
                     <p className="text-xs text-muted-foreground">
                         Beside the text. On a phone it sits above it.

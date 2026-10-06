@@ -186,7 +186,7 @@ interface Show {
 }
 
 function uniqueDays(sessions: TimetableSession[]): string[] {
-    return [...new Set(sessions.map((s) => s.date))].sort();
+    return Array.from(new Set(sessions.map((s) => s.date))).sort();
 }
 
 const focusRing =
@@ -381,7 +381,7 @@ function WeekGrid({
     week: PublicTimetable;
     show: Show;
 }) {
-    const times = [...new Set(week.sessions.map((s) => s.time))].sort();
+    const times = Array.from(new Set(week.sessions.map((s) => s.time))).sort();
     return (
         <table className="w-full table-fixed border-separate border-spacing-1.5 text-left">
             <caption className="sr-only">

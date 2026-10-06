@@ -28,6 +28,9 @@ export const SECTION_LABELS: Record<SectionType, string> = {
     packs: "Class packs",
     productGrid: "Product grid",
     projects: "Projects",
+    timetable: "Timetable",
+    hours: "Opening hours",
+    person: "Person",
 };
 
 /**
@@ -57,6 +60,10 @@ export const SECTION_HINTS: Record<SectionType, string> = {
     packs: "Your class packs on sale, with the price per class. A new pack shows up on its own.",
     productGrid: "Reads the catalogue. Stays current on its own.",
     projects: "Your own work, each with a photo, a line about it and a link.",
+    timetable:
+        "This week's classes by day, with who takes each and the places left, always up to date.",
+    hours: "Your opening hours as a table, with Open now, always up to date.",
+    person: "One person: a photo, their name, what they do, their qualifications and a few lines.",
 };
 
 /** Preview widths. The phone value is a real handset, not a breakpoint. */
@@ -115,6 +122,7 @@ export const SECTION_ORDER: SectionType[] = [
     "cta",
     "gallery",
     "projects",
+    "person",
     "enquiry",
     "booking",
     "features",
@@ -123,6 +131,8 @@ export const SECTION_ORDER: SectionType[] = [
     "contact",
     "servicesList",
     "visitUs",
+    "hours",
+    "timetable",
     "journal",
     "plans",
     "packs",
