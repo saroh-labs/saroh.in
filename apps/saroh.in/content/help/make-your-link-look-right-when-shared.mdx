@@ -1,0 +1,75 @@
+---
+# Every label below was checked against the real screens on 6 Oct 2026
+# (R7), in the code and in the captured shots. Sources, from the repo root:
+#   NAV   apps/app.saroh.in/components/shared/nav-items.tsx (Presence ›
+#         Website); components/sites/website-header.tsx (Settings tab)
+#   SHARE apps/app.saroh.in/components/sites/site-settings.tsx ("Social
+#         share image", "Used when someone posts a link to your site.",
+#         Image, "Nothing set yet", "1200×630 works everywhere.", "Add" /
+#         "Replace", "Save", "Cancel", "or paste an image address", "When
+#         shared"; toast "Share image saved. Publish to make it public.");
+#         components/media-picker.tsx ("Choose a photo", "or drop one here")
+#   CARDS packages/ui/src/components/ui/share-cards.tsx (WhatsApp,
+#         Facebook, LinkedIn, X, Slack, Google; Instagram "shows the link as
+#         text"); packages/ui/src/lib/share-facts.ts (warnings: "No share
+#         image yet. Without one, WhatsApp, Slack and X show the link as
+#         text."; under 1200×630 "they will show it small or blurred";
+#         "Cards are cut to about 1.91:1"; "WhatsApp drops the large
+#         picture for files over 300 KB")
+#   SEO   site-settings.tsx ("Search", "What people see before they
+#         click.", Title, Description, "Edit", "… of about 155 characters.",
+#         Preview)
+#   LIVE  site-settings.tsx ("These settings are part of your draft. They
+#         reach your live site the next time you publish.");
+#         app/(shell)/sites/[siteId]/(tabs)/pages/page.tsx ("Waiting to be
+#         published: …", "Review and publish"); the renderer reads only the
+#         published snapshot (apps/saroh.app/app/[domain]/layout.tsx)
+#   TOOL  apps/saroh.in/content/link-preview.ts (/tools/link-preview, "Link
+#         preview checker"); MARKETING_CLAIMS LP6
+# Where the design said otherwise, the app won: content/help/README.md. The
+# design's "Share preview" is the setting "Social share image" (LP6). The
+# picture is one for the whole site; each page's card takes that page's
+# title, and the site's description.
+# No demo site has a share image, and an upload on this stack isn't kept,
+# so the shots show the empty state and its warning, not a picture.
+title: Make your link look right when shared
+slug: make-your-link-look-right-when-shared
+area: Website
+group: Your website
+order: 20
+intro: "When someone posts a link to your site on WhatsApp, Facebook or LinkedIn, the app draws a card: a picture, a title and a line about you. You choose the picture and the words in your website's settings. This takes about five minutes."
+description: "Choose the picture, title and description people see when a link to your Saroh site is shared on WhatsApp, Facebook, LinkedIn or X."
+readMinutes: 3
+updated: "2026-10-06"
+publishOn: "2026-10-17"
+steps:
+    # NAV, SHARE, CARDS.
+    - title: Find Social share image
+      body: "In Saroh, open Website in the sidebar, choose the Settings tab and scroll to Social share image. Under When shared you can see how your link looks on WhatsApp, Facebook, LinkedIn, X, Slack and Google right now. Without a picture, WhatsApp, Slack and X show the link as plain text."
+      shot: help-share-image-1
+      caption: "Social share image at Northwind Supply (demo store): nothing set yet, and how the link looks on each app."
+      marker: Add
+    # SHARE, CARDS.
+    - title: Add a picture
+      body: "Press Add, then Choose a photo, drop one on the box, or paste an image address. Make it 1200 × 630 pixels: that works everywhere. Keep it under 300 KB, or WhatsApp shows it small. Press Save. The cards under When shared change as you choose, and warn you if the picture is too small or will be cropped."
+      shot: help-share-image-2
+      caption: "Adding a share image at Northwind Supply (demo store)."
+      tip: "Apps cut the picture to about 1.91 to 1, a wide rectangle. Keep your name and anything important away from the edges."
+      marker: Choose a photo
+    # SEO.
+    - title: Write the title and description
+      body: "The card's words come from Search, just above. Press Edit beside Description and write a line about your business: about 155 characters is what most apps show. Press Save. Set a Title the same way, or leave it and your site's name is used. Each page's card takes that page's own title."
+      shot: help-share-image-3
+      caption: "Writing a description under Search at Northwind Supply (demo store)."
+      marker: Description
+    # LIVE.
+    - title: Publish your site
+      body: "These settings are part of your draft: they reach your live site the next time you publish. On the Pages tab, Saroh lists what's waiting to be published. Press Review and publish and publish your site."
+      shot: help-share-image-4
+      caption: "Changes waiting to be published on the website of Northwind Supply (demo store)."
+      tip: "Apps keep a card for a while once they've seen a link. After you change the picture, ask Facebook's Sharing Debugger or LinkedIn's Post Inspector to look at the link again; both are linked under When shared."
+      marker: Review and publish
+next: [connect-your-own-domain]
+---
+
+To see how any link looks on WhatsApp, Facebook, LinkedIn, X, Slack and Google once it's published, paste it into the [Link preview checker](/tools/link-preview).

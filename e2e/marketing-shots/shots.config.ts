@@ -39,7 +39,7 @@ export const BUSINESSES = {
     northwind: {
         id: "seed_org",
         name: "Northwind Supply",
-        site: "northwind-supply",
+        site: "northwind",
     },
 } as const;
 
@@ -215,6 +215,388 @@ const HELP_SHOTS: Shot[] = [
         mark: '[aria-labelledby="sec-stock"] [role="switch"]',
         alt: "Variants and Stock for the Sourdough loaf at Rye & Co. (demo bakery): 800g and 400g with their own SKU and price, and Track stock on with On hand and Warn at for each",
         caption: "The Sourdough loaf's sizes and stock, with Track stock on",
+    },
+];
+
+/* "Set your team's hours": Pulse Fitness's Availability, looked at only.
+ * Picking a person, opening "+ Hours" and adding a range there are the
+ * page's own draft; nothing is saved (Save hours is never pressed). */
+const AVAILABILITY = "/bookings/availability";
+const PICK = (name: string): Step => ({
+    click: `[role="radiogroup"][aria-label="Team member"] [role="radio"]:has-text("${name}")`,
+});
+const SATURDAY_HOURS: Step[] = [
+    PICK("Ritu Kapoor"),
+    {
+        click: 'section[aria-labelledby="weekly-hours"] li:has-text("Saturday") button:has-text("Hours")',
+    },
+    {
+        waitFor:
+            'section[aria-labelledby="weekly-hours"] button:text-is("Add")',
+    },
+];
+
+/* "Take a deposit when they book": Kavi Dental's root canal, looked at
+ * (a chip clicked, never saved); the booking page of Northwind, whose
+ * Warehouse walkthrough was set to a 50% deposit on the throwaway
+ * database, walked to its Paying step and never booked. */
+const KAVI_ROOT_CANAL = "/services/seed_sc_kavi_service_2";
+const KAVI_PRICE = 'section:has(h2:text-is("Price"))';
+
+/* "Set up a monthly plan": Rye & Co.'s plans and subscribers, looked at;
+ * the dialog is opened and closed unsent. The draft plan to publish is
+ * Northwind's ("Packing supplies, monthly", made on the throwaway
+ * database), opened from its card and never published. */
+const RYE_PLANS = "/billing/subscriptions?tab=plans";
+
+/* "Connect your own domain" and "Make your link look right when shared":
+ * Northwind's site settings. Its seeded domain, northwindsupply.in, waits
+ * for DNS; the domain box is typed into and never added. */
+const NW_SETTINGS = "/sites/seed_site_0/settings";
+const DOMAIN = 'section:has(h2:text-is("Your own domain"))';
+const SHARE = 'section:has(h2:text-is("Social share image"))';
+const SEARCH = 'section:has(h2:text-is("Search"))';
+
+const HELP_SHOTS_B: Shot[] = [
+    // ── Set your team's hours (Pulse Fitness) ──────────────────────────
+    {
+        key: "help-team-hours-1",
+        business: "pulse",
+        role: "owner",
+        route: AVAILABILITY,
+        viewport: { width: 1280, height: 720 },
+        steps: [PICK("Ritu Kapoor")],
+        mark: '[role="radiogroup"][aria-label="Team member"] [role="radio"]:has-text("Ritu Kapoor")',
+        alt: "Availability at Pulse Fitness (demo gym): the team across the top, Ritu Kapoor picked, her weekly hours, time off and the booking rules",
+        caption: "Availability at Pulse Fitness, with Ritu Kapoor picked",
+    },
+    {
+        key: "help-team-hours-2",
+        business: "pulse",
+        role: "owner",
+        route: AVAILABILITY,
+        viewport: { width: 1280, height: 1000 },
+        steps: SATURDAY_HOURS,
+        clip: { selector: 'section[aria-labelledby="weekly-hours"]', pad: 12 },
+        mark: 'section[aria-labelledby="weekly-hours"] button:text-is("Add")',
+        alt: "Ritu Kapoor's weekly hours at Pulse Fitness (demo gym), a day at a time, with new hours being added on Saturday",
+        caption: "Ritu Kapoor's weekly hours, with + Hours open on Saturday",
+    },
+    {
+        key: "help-team-hours-3",
+        business: "pulse",
+        role: "owner",
+        route: AVAILABILITY,
+        viewport: { width: 1280, height: 720 },
+        steps: [
+            ...SATURDAY_HOURS,
+            {
+                click: 'section[aria-labelledby="weekly-hours"] button:text-is("Add")',
+            },
+            { waitFor: 'button:has-text("Save hours")' },
+        ],
+        mark: 'button:has-text("Save hours")',
+        alt: "Availability at Pulse Fitness (demo gym) with a change not saved yet, and the bar with Discard and Save hours",
+        caption: "A change to Ritu Kapoor's hours, waiting for Save hours",
+    },
+    {
+        key: "help-team-hours-4",
+        business: "pulse",
+        role: "owner",
+        route: AVAILABILITY,
+        viewport: { width: 1280, height: 1000 },
+        steps: [PICK("Sameer Khan")],
+        clip: { selector: 'section:has(h2:text-is("Time off"))', pad: 12 },
+        mark: 'section:has(h2:text-is("Time off")) button:has-text("Add day off")',
+        alt: "Time off for Sameer Khan at Pulse Fitness (demo gym): his days off for a wedding, and the form to add more",
+        caption: "Sameer Khan's time off, and the form to add a day off",
+    },
+    {
+        key: "help-team-hours-5",
+        business: "pulse",
+        role: "owner",
+        route: AVAILABILITY,
+        viewport: { width: 1280, height: 1000 },
+        clip: { selector: 'section[aria-labelledby="booking-rules"]', pad: 12 },
+        mark: '[aria-label="How far ahead people can book"]',
+        alt: "Booking rules at Pulse Fitness (demo gym): how far ahead people can book, the latest they can book, free cancellation and refunds",
+        caption: "Pulse Fitness's booking rules, for the whole business",
+    },
+
+    // ── Take a deposit when they book (Kavi Dental, Northwind) ─────────
+    {
+        key: "help-take-deposit-1",
+        business: "kavi",
+        role: "owner",
+        route: "/services",
+        viewport: { width: 1024, height: 760 },
+        mark: 'a[aria-label="Edit Root canal treatment"]',
+        alt: "Services at Kavi Dental (demo clinic): each with its price, length and who takes it, and an Edit button",
+        caption: "Services at Kavi Dental, with Edit on the root canal",
+    },
+    {
+        key: "help-take-deposit-2",
+        business: "kavi",
+        role: "owner",
+        route: KAVI_ROOT_CANAL,
+        viewport: { width: 1280, height: 1400 },
+        clip: { selector: KAVI_PRICE, pad: 12 },
+        mark: 'section:has(h2:text-is("Price")) [role="radio"][aria-checked="true"]',
+        alt: "The root canal's price at Kavi Dental (demo clinic), with At booking, they pay set to a 50% deposit and what that means",
+        caption: "The root canal's price, with a 50% deposit at booking",
+    },
+    {
+        key: "help-take-deposit-3",
+        business: "kavi",
+        role: "owner",
+        route: KAVI_ROOT_CANAL,
+        viewport: { width: 1024, height: 560 },
+        steps: [
+            {
+                click: 'section:has(h2:text-is("Price")) [role="radio"]:has-text("25% deposit")',
+            },
+        ],
+        mark: 'button:has-text("Save changes")',
+        alt: "The root canal at Kavi Dental (demo clinic) with a change not saved yet, and Save changes at the top right",
+        caption: "A change to the root canal, waiting for Save changes",
+    },
+    {
+        key: "help-take-deposit-4",
+        business: "northwind",
+        role: "owner",
+        route: "site:/book?service=seed_service_1",
+        viewport: { width: 1280, height: 2000 },
+        steps: [
+            {
+                click: 'button:text-matches("^\\\\d\\\\d:\\\\d\\\\d$") >> nth=2',
+            },
+            { fill: 'input[autocomplete="name"]', value: "Meena Iyer" },
+            { waitFor: '[role="radiogroup"][aria-label="Paying"]' },
+        ],
+        clip: {
+            selector: 'div:has(> [role="radiogroup"][aria-label="Paying"])',
+            pad: 16,
+        },
+        mark: '[role="radiogroup"][aria-label="Paying"] [role="radio"] >> nth=0',
+        alt: "The booking page of Northwind Supply (demo store), at Paying: a deposit now and the rest at the visit, or the full price now",
+        caption:
+            "Paying on Northwind Supply's booking page: the deposit, or the full price",
+    },
+    {
+        key: "help-take-deposit-5",
+        business: "kavi",
+        role: "owner",
+        route: "site:/book?service=seed_sc_kavi_service_2",
+        viewport: { width: 1280, height: 900 },
+        clip: { selector: 'aside[aria-label="Your booking"]', pad: 12 },
+        mark: 'aside[aria-label="Your booking"] p[role="status"]',
+        alt: "The booking summary on the site of Kavi Dental (demo clinic), saying it can't take the deposit online right now",
+        caption:
+            "Kavi Dental's booking page, with no way to take the deposit online",
+    },
+
+    // ── Set up a monthly plan (Rye & Co., Northwind) ──────────────────
+    {
+        key: "help-monthly-plan-1",
+        business: "rye",
+        role: "owner",
+        route: RYE_PLANS,
+        viewport: { width: 1024, height: 560 },
+        mark: 'a:has-text("New plan")',
+        alt: "Plans at Rye & Co. (demo bakery): a weekly loaf and a monthly one, each with its subscribers, and the New plan button",
+        caption: "Plans at Rye & Co., with New plan",
+    },
+    {
+        key: "help-monthly-plan-2",
+        business: "rye",
+        role: "owner",
+        route: "/billing/plans/seed_sc_rc_plan_1/edit",
+        viewport: { width: 1280, height: 1000 },
+        clip: {
+            selector: 'section:has(h2:text-is("Details"))',
+            until: 'section:has(h2:text-is("Price and billing"))',
+            pad: 12,
+        },
+        mark: '[role="radio"]:has-text("Every month")',
+        alt: "The monthly sourdough plan at Rye & Co. (demo bakery): its name, what's included, the price and Charged every month",
+        caption:
+            "Rye & Co.'s monthly plan: name, what's included, price, charged every month",
+    },
+    {
+        key: "help-monthly-plan-3",
+        business: "northwind",
+        role: "owner",
+        route: "/billing/subscriptions?tab=plans",
+        viewport: { width: 1024, height: 560 },
+        steps: [
+            { click: 'a[aria-label="Edit Packing supplies, monthly"]' },
+            { waitFor: 'button:text-is("Publish")' },
+        ],
+        mark: 'button:text-is("Publish"):visible',
+        alt: "A new monthly plan at Northwind Supply (demo store), saved as a draft that nobody can join yet, with the Publish button",
+        caption: "A draft plan at Northwind Supply, waiting for Publish",
+    },
+    {
+        key: "help-monthly-plan-4",
+        business: "rye",
+        role: "owner",
+        route: "/billing/subscriptions?subscribe=1",
+        viewport: { width: 1024, height: 760 },
+        steps: [
+            { waitFor: '[role="dialog"]' },
+            {
+                click: '[role="dialog"] [role="combobox"]:has-text("Sourdough")',
+            },
+            { click: '[role="option"]:has-text("Sourdough, monthly")' },
+            // Out of the fields, so no focus ring is in the picture.
+            { click: '[role="dialog"] h2' },
+        ],
+        mark: '[role="dialog"] button:has-text("Subscribe")',
+        alt: "Subscribe someone at Rye & Co. (demo bakery): who, the plan and the start date, with when the first invoice is issued",
+        caption: "Subscribe someone at Rye & Co.",
+    },
+    {
+        key: "help-monthly-plan-5",
+        business: "rye",
+        role: "owner",
+        route: "/billing/subscriptions/seed_sc_rc_sub_sana",
+        viewport: { width: 1280, height: 1000 },
+        clip: { selector: 'section[aria-labelledby="charges-title"]', pad: 12 },
+        mark: 'section[aria-labelledby="charges-title"] a[href^="/billing/invoices/"] >> nth=0',
+        alt: "Sana Qureshi's monthly plan at Rye & Co. (demo bakery): a paid invoice for each month",
+        caption:
+            "Sana Qureshi's charges at Rye & Co.: an invoice for each month",
+    },
+    {
+        key: "help-monthly-plan-6",
+        business: "rye",
+        role: "owner",
+        route: "/billing/subscriptions/seed_sc_rc_sub_arjun",
+        viewport: { width: 1024, height: 560 },
+        mark: 'button:has-text("Retry with a new pay link")',
+        alt: "Arjun Mehta's subscription at Rye & Co. (demo bakery): a renewal not paid, with Retry with a new pay link",
+        caption: "Arjun Mehta's renewal at Rye & Co., not paid yet",
+    },
+
+    // ── Connect your own domain (Northwind) ───────────────────────────
+    {
+        key: "help-own-domain-1",
+        business: "northwind",
+        role: "owner",
+        route: NW_SETTINGS,
+        viewport: { width: 1024, height: 560 },
+        mark: 'nav[aria-label="Website"] a:has-text("Settings")',
+        alt: "The website of Northwind Supply (demo store) in Saroh, on its Settings tab",
+        caption: "Northwind Supply's website, on Settings",
+    },
+    {
+        key: "help-own-domain-2",
+        business: "northwind",
+        role: "owner",
+        route: NW_SETTINGS,
+        viewport: { width: 1280, height: 1400 },
+        steps: [
+            {
+                fill: '[aria-label="Domain to add"]',
+                value: "www.northwindsupply.in",
+            },
+            { click: `${DOMAIN} h2` },
+        ],
+        clip: { selector: DOMAIN, pad: 12 },
+        mark: `${DOMAIN} button:has-text("Add domain")`,
+        alt: "Your own domain at Northwind Supply (demo store): a second domain typed in, ready for Add domain",
+        caption: "Your own domain at Northwind Supply, a domain typed in",
+    },
+    {
+        key: "help-own-domain-3",
+        business: "northwind",
+        role: "owner",
+        route: NW_SETTINGS,
+        viewport: { width: 1280, height: 1400 },
+        clip: { selector: DOMAIN, pad: 12 },
+        mark: `${DOMAIN} code[title^="_saroh-verification"]`,
+        alt: "The TXT record Northwind Supply (demo store) is asked to add at its registrar: its type, name and value, each with Copy",
+        caption: "The record that proves Northwind Supply owns its domain",
+    },
+    {
+        key: "help-own-domain-4",
+        business: "northwind",
+        role: "owner",
+        route: NW_SETTINGS,
+        viewport: { width: 1280, height: 1400 },
+        clip: { selector: DOMAIN, pad: 12 },
+        mark: `${DOMAIN} button:has-text("Check now")`,
+        alt: "Northwind Supply's (demo store) domain waiting for DNS, with Check now",
+        caption: "Northwind Supply's domain, waiting for DNS",
+    },
+    {
+        key: "help-own-domain-5",
+        business: "northwind",
+        role: "owner",
+        route: NW_SETTINGS,
+        viewport: { width: 1280, height: 1400 },
+        clip: { selector: DOMAIN, pad: 12 },
+        mark: `${DOMAIN} code:text-is("CNAME")`,
+        alt: "A verified domain at Northwind Supply (demo store), with the CNAME record that sends visitors to the site",
+        caption:
+            "Northwind Supply's domain once verified, and the record that sends visitors",
+    },
+
+    // ── Make your link look right when shared (Northwind) ─────────────
+    {
+        key: "help-share-image-1",
+        business: "northwind",
+        role: "owner",
+        route: NW_SETTINGS,
+        viewport: { width: 1280, height: 3000 },
+        clip: { selector: SHARE, pad: 12 },
+        mark: `${SHARE} button:text-is("Add")`,
+        alt: "Social share image at Northwind Supply (demo store): nothing set yet, and how the link looks on each app without one",
+        caption: "Social share image at Northwind Supply, nothing set yet",
+    },
+    {
+        key: "help-share-image-2",
+        business: "northwind",
+        role: "owner",
+        route: NW_SETTINGS,
+        viewport: { width: 1280, height: 3000 },
+        steps: [{ click: `${SHARE} button:text-is("Add")` }],
+        clip: {
+            selector: `${SHARE} div.grid:has(> div:text-is("Image"))`,
+            pad: 12,
+        },
+        mark: `${SHARE} button:has-text("Choose a photo")`,
+        alt: "Adding a social share image at Northwind Supply (demo store): Choose a photo, or paste an image address, then Save",
+        caption: "Adding a share image at Northwind Supply",
+    },
+    {
+        key: "help-share-image-3",
+        business: "northwind",
+        role: "owner",
+        route: NW_SETTINGS,
+        viewport: { width: 1280, height: 3000 },
+        steps: [
+            { click: `${SEARCH} button:text-is("Edit") >> nth=1` },
+            {
+                fill: '[aria-label="Search description"]',
+                value: "Packaging, cleaning and workshop supplies for small manufacturers in Peenya, Bengaluru. Order by phone or online.",
+            },
+            { click: `${SEARCH} h2` },
+        ],
+        clip: { selector: SEARCH, pad: 12 },
+        mark: '[aria-label="Search description"]',
+        alt: "Search at Northwind Supply (demo store): a description being written, and the preview of how it reads",
+        caption: "Writing Northwind Supply's description under Search",
+    },
+    {
+        key: "help-share-image-4",
+        business: "northwind",
+        role: "owner",
+        route: "/sites/seed_site_0/pages",
+        viewport: { width: 1024, height: 560 },
+        mark: 'a:has-text("Review and publish")',
+        alt: "The website of Northwind Supply (demo store), with changes waiting to be published and Review and publish",
+        caption: "Northwind Supply's changes, waiting to be published",
     },
 ];
 
@@ -611,4 +993,5 @@ export const SHOTS: Shot[] = [
             "Kavi Dental's own site on Saroh: free times today and Book an appointment",
     },
     ...HELP_SHOTS,
+    ...HELP_SHOTS_B,
 ];

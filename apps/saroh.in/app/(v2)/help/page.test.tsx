@@ -3,6 +3,8 @@ import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import type { AnchorHTMLAttributes } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
+import { HELP_GROUPS } from "@/content/help";
+
 import HelpPage from "./page";
 
 /**
@@ -54,7 +56,16 @@ describe("/help", () => {
         const groups = screen
             .getAllByRole("heading", { level: 3 })
             .map((h) => h.textContent);
-        expect(groups).toEqual(["Sell products"]);
+        // In the home's order; a group with no article isn't drawn.
+        expect(groups).toEqual(HELP_GROUPS.filter((g) => groups.includes(g)));
+        expect(groups).toEqual(
+            expect.arrayContaining([
+                "Sell products",
+                "Take bookings",
+                "Monthly plans",
+                "Your website",
+            ]),
+        );
         expect(
             screen
                 .getByRole("link", { name: "Add your first product" })
