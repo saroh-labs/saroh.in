@@ -47,6 +47,24 @@ describe("waitlistContext", () => {
             "abcdefgh",
         );
     });
+
+    it("keeps a template only when it is one of the gallery's (U13)", () => {
+        const known = ["gym", "bakery"];
+        expect(waitlistContext({ template: "gym" }, known).template).toBe(
+            "gym",
+        );
+        expect(waitlistContext({ template: " Gym " }, known).template).toBe(
+            "gym",
+        );
+        expect(
+            waitlistContext({ template: "salon" }, known).template,
+        ).toBeUndefined();
+        expect(
+            waitlistContext({ template: "<script>" }, known).template,
+        ).toBeUndefined();
+        // No list, no template: the form never sends one it can't name.
+        expect(waitlistContext({ template: "gym" }).template).toBeUndefined();
+    });
 });
 
 describe("waitlistSchema", () => {

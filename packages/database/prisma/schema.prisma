@@ -5135,6 +5135,10 @@ model WaitlistSignup {
   country      String?
   // The plan a "Get early access · ‹Plan›" button named, if one did.
   plan         String?
+  // The gallery template a "Save ‹Template› for early access" button saved
+  // (saroh.in/templates, industry templates U13): one of the gallery's slugs
+  // (`waitlistTemplate` in the API), never free text. Null when none was.
+  template     String?
 
   // Where the signup came from: the page's `?src=`, "direct" when none (V2),
   // "saroh.in" from the V1 form. Free text, never trusted for authorization.

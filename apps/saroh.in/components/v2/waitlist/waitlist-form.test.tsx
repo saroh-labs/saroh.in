@@ -49,10 +49,15 @@ function answer(body: unknown, status = 200) {
     });
 }
 
+const TEMPLATES = [
+    { slug: "gym", name: "Gym" },
+    { slug: "bakery", name: "Bakery" },
+];
+
 /** The form on `/waitlist` with `query` in the address bar. */
 function renderForm(query = "", content: WaitlistContent = WAITLIST) {
     window.history.replaceState(null, "", `/waitlist${query}`);
-    return render(<WaitlistForm content={content} />);
+    return render(<WaitlistForm content={content} templates={TEMPLATES} />);
 }
 
 function fill({
@@ -83,6 +88,44 @@ async function submit() {
 }
 
 describe("WaitlistForm", () => {
+    it("saves a gallery template from ?template=: says so, sends it, and the done state names it (U13)", async () => {
+        answer({ status: "success", created: true, position: 3 });
+        renderForm("?template=gym&src=templates-gym");
+        expect(
+            (await screen.findByTestId("waitlist-template")).textContent,
+        ).toBe("Saving the Gym template for your invite.");
+        fill({ business: "Iron & Oak", kind: "Gym or studio" });
+        await submit();
+
+        await screen.findByText("Iron & Oak is #3 on the list.");
+        const sent = JSON.parse(
+            (fetchMock.mock.calls[0]?.[1] as RequestInit).body as string,
+        ) as Record<string, unknown>;
+        expect(sent).toMatchObject({ template: "gym", src: "templates-gym" });
+        expect(screen.getByTestId("waitlist-template-saved").textContent).toBe(
+            "We've saved the Gym template for you.",
+        );
+        expect(gtag).toHaveBeenCalledWith(
+            "event",
+            "waitlist_join",
+            expect.objectContaining({ template: "gym" }),
+        );
+    });
+
+    it("ignores a template the gallery doesn't have", async () => {
+        answer({ status: "success", created: true, position: 4 });
+        renderForm("?template=salon");
+        fill();
+        await submit();
+
+        await screen.findByText("Glow Studio is #4 on the list.");
+        expect(screen.queryByTestId("waitlist-template-saved")).toBeNull();
+        const sent = JSON.parse(
+            (fetchMock.mock.calls[0]?.[1] as RequestInit).body as string,
+        ) as Record<string, unknown>;
+        expect(sent.template).toBeUndefined();
+    });
+
     it("shows the design's three messages and sends nothing", async () => {
         renderForm();
         await submit();

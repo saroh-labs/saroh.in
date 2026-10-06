@@ -10,6 +10,7 @@ import {
     newRefCode,
     normaliseEmail,
     REF_CODE_PATTERN,
+    waitlistTemplate,
 } from "./waitlist-keys";
 
 export interface JoinWaitlistInput {
@@ -24,6 +25,8 @@ export interface JoinWaitlistInput {
     source?: string;
     /** The referral id from the visitor's link. */
     ref?: string;
+    /** A gallery template's slug; one the gallery doesn't show is dropped. */
+    template?: string;
     ipHash?: string;
 }
 
@@ -83,6 +86,8 @@ export class WaitlistService {
             city: textOrNull(input.city),
             country: input.country ?? null,
             plan: input.plan ?? null,
+            // Saved with a business, as the kind is: the V1 form has neither.
+            template: businessName ? waitlistTemplate(input.template) : null,
             source: cleanSource(input.source),
             referredById,
             ipHash: input.ipHash ?? null,
