@@ -7,7 +7,9 @@ import { Textarea } from "@saroh/ui/textarea";
 import { useId } from "react";
 
 import { Chip, Eyebrow } from "@/components/bookings/calendar/parts";
+import type { PlanLock } from "@/lib/billing/access";
 import { currencySymbol } from "@/lib/format/money";
+import type { DepositMode } from "@/lib/services/service";
 import type { ServiceDraft } from "@/lib/services/service-editor";
 import {
     bookingPageNote,
@@ -160,7 +162,15 @@ export function PriceSection({
     draft,
     set,
     currency,
-}: Edit & { currency: string }) {
+    savedDeposit,
+    paymentsLock = null,
+}: Edit & {
+    currency: string;
+    /** The deposit the service has saved. */
+    savedDeposit?: DepositMode;
+    /** The plan's lock on online payments (deposits are taken online). */
+    paymentsLock?: PlanLock | null;
+}) {
     const id = useId();
     return (
         <Section title="Price">
@@ -179,6 +189,8 @@ export function PriceSection({
                 price={draft.price}
                 currency={currency}
                 visits={draftVisits(draft)}
+                saved={savedDeposit}
+                paymentsLock={paymentsLock}
                 onChange={(deposit) => set({ deposit })}
             />
         </Section>

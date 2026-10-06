@@ -436,6 +436,13 @@ export function depositNote(
     return `${split} Refunded if they cancel in time.`;
 }
 
+/**
+ * The note under "At booking, they pay" for a deposit the plan can't take
+ * online: kept, and not taken until it can (6 Oct 2026).
+ */
+export const depositPausedNote =
+    "Paused: customers book and pay at the visit, and nothing is taken when booking.";
+
 /** The note under Where. */
 export function whereNote(where: LocationType): string {
     if (where === "IN_PERSON") return "They come to you.";

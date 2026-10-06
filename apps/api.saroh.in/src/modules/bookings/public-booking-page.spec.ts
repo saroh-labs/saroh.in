@@ -66,7 +66,9 @@ import {
 } from "@nestjs/common";
 import { prisma } from "@saroh/database";
 
+import { fakePaymentsRow } from "../../../test/fixtures/pricing-catalog";
 import { validationPipeOptions } from "../../common/validation";
+import { planMeter } from "../billing/metering.service";
 import { hashPayToken } from "../invoices/pay-token";
 import { BookServiceDto } from "./dto";
 import { PublicBookingsService } from "./public-bookings.service";
@@ -539,6 +541,125 @@ describe("a deposit at booking (E8)", () => {
             null,
         ]);
     });
+});
+
+describe("a stored deposit on a plan without online payments (6 Oct 2026)", () => {
+    const half = () => service({ depositMode: "PERCENT_50" });
+
+    function onPlan(plan: "free" | "grow") {
+        jest.spyOn(planMeter, "enforcedRow").mockImplementation(
+            (_org: string, moduleId: string) =>
+                // Only the Payments rows: every other row isn't enforced.
+                Promise.resolve(
+                    moduleId === "payments" || moduleId === "subscriptions"
+                        ? fakePaymentsRow(plan, moduleId)
+                        : null,
+                ),
+        );
+    }
+    afterEach(() => jest.restoreAllMocks());
+
+    it("books it to pay at the desk, like a service with no deposit, keeping the row", async () => {
+        onPlan("free");
+        db.service.findUnique.mockResolvedValue(half());
+        const out = await new PublicBookingsService().bookOnline(
+            "svc_1",
+            input({ pay: "DESK" }),
+            "iphash",
+            NOW,
+        );
+        const data = db.booking.create.mock.calls[0][0].data;
+        expect(data).toMatchObject({ status: "CONFIRMED", paidWith: "DESK" });
+        // Booked as it was offered: no deposit.
+        expect(data.snapshot.service.depositMode).toBe("NONE");
+        expect(data.snapshot.deposit).toBeUndefined();
+        expect(db.invoice.create).not.toHaveBeenCalled();
+        expect(out.payToken).toBeNull();
+        // The service itself is never written: its deposit returns on an upgrade.
+        expect(db.service.update).toBeUndefined();
+    });
+
+    it("offers no deposit, and no pay now", async () => {
+        onPlan("free");
+        db.service.findUnique.mockResolvedValue(half());
+        await expect(
+            new PublicBookingsService().bookOnline(
+                "svc_1",
+                input({ pay: "DEPOSIT" }),
+                "iphash",
+                NOW,
+            ),
+        ).rejects.toBeInstanceOf(BadRequestException);
+        await expect(
+            new PublicBookingsService().bookOnline(
+                "svc_1",
+                input({ pay: "NOW" }),
+                "iphash",
+                NOW,
+            ),
+        ).rejects.toMatchObject({
+            response: {
+                message:
+                    "This business isn't taking payment online right now. Book it to pay at the desk.",
+            },
+        });
+        expect(db.booking.create).not.toHaveBeenCalled();
+    });
+
+    it("on a plan with online payments, the deposit is taken as before", async () => {
+        onPlan("grow");
+        db.service.findUnique.mockResolvedValue(half());
+        await expect(
+            new PublicBookingsService().bookOnline(
+                "svc_1",
+                input({ pay: "DESK" }),
+                "iphash",
+                NOW,
+            ),
+        ).rejects.toBeInstanceOf(BadRequestException);
+        await new PublicBookingsService().bookOnline(
+            "svc_1",
+            input({ pay: "DEPOSIT" }),
+            "iphash",
+            NOW,
+        );
+        expect(
+            db.booking.create.mock.calls[0][0].data.snapshot.deposit,
+        ).toEqual({ cents: 40_000 });
+    });
+
+    it.each([
+        ["free", null, false],
+        ["grow", 112_500, true],
+    ] as const)(
+        "the page serves the deposit on %s as %p, paying online %p",
+        async (plan, deposit, payOnline) => {
+            onPlan(plan);
+            db.site.findFirst.mockResolvedValue({
+                organizationId: "org_1",
+                organization: { name: "Kavi Dental" },
+            });
+            db.service.findMany.mockResolvedValue([
+                {
+                    id: "svc_1",
+                    name: "Root canal",
+                    description: null,
+                    durationMinutes: 60,
+                    capacity: 1,
+                    priceCents: 450_000,
+                    currency: "INR",
+                    locationType: "IN_PERSON",
+                    depositMode: "PERCENT_25",
+                    staffServices: [],
+                },
+            ]);
+            const page = await new PublicBookingsService().publicBookingPage(
+                "site_1",
+            );
+            expect(page.payOnline).toBe(payOnline);
+            expect(page.services[0].depositCents).toBe(deposit);
+        },
+    );
 });
 
 describe("pay at the desk (U19)", () => {

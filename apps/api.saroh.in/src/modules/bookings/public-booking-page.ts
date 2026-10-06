@@ -295,7 +295,7 @@ export async function publicBookingPage(
     if (!site) throw new NotFoundException("Site not found");
     const organizationId = site.organizationId;
     const open = await appointmentsOpen(organizationId);
-    const [services, rules, zone, online] = await Promise.all([
+    const [services, rules, zone, online, planOnline] = await Promise.all([
         open
             ? prisma.service.findMany({
                   where: offeredOnSite(organizationId, siteId),
@@ -321,6 +321,7 @@ export async function publicBookingPage(
         loadBookingRules(prisma, organizationId),
         businessTimezone(prisma, organizationId),
         takesOnlinePayment(organizationId),
+        planTakesOnlinePayment(organizationId),
     ]);
     return {
         businessName: site.organization.name,
@@ -337,7 +338,12 @@ export async function publicBookingPage(
             capacity: svc.capacity,
             priceCents: svc.priceCents,
             currency: svc.currency,
-            depositCents: depositCents(svc.priceCents, svc.depositMode),
+            // A deposit the plan can't take online isn't served: the
+            // service books as one without (pay at the desk), so the page
+            // never shows a deposit it can't take (`deposit-plan.ts`).
+            depositCents: planOnline
+                ? depositCents(svc.priceCents, svc.depositMode)
+                : null,
             visits: svc.visits,
             online: svc.locationType === "ONLINE",
             // The page asks Where for EITHER (E7); anything unknown reads

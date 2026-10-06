@@ -12,6 +12,7 @@ import { StatePill } from "@/components/bookings/calendar/parts";
 import { LeaveDialog } from "@/components/commerce/product-editor-v2/editor-parts";
 import { ConfirmDialog } from "@/components/shared/confirm-dialog";
 import { useLeaveGuard } from "@/components/sites/use-leave-guard";
+import type { PlanLock } from "@/lib/billing/access";
 import {
     archiveService,
     createService,
@@ -73,6 +74,7 @@ export function ServiceEditor({
     kindUp,
     hasPage,
     hasStorefront = null,
+    paymentsLock = null,
 }: {
     /** Null while creating. */
     service: Service | null;
@@ -93,6 +95,12 @@ export function ServiceEditor({
     hasPage: boolean | null;
     /** A storefront to sell treatments from (E10); null when unknown. */
     hasStorefront?: boolean | null;
+    /**
+     * The plan's lock on online payments (`rowLock(…, "payments")`): a
+     * deposit is taken online, so it locks the deposits. Null when open,
+     * unknown or not enforced.
+     */
+    paymentsLock?: PlanLock | null;
 }) {
     const router = useRouter();
     const people = (staff ?? []).filter((p) => p.status === "ACTIVE");
@@ -340,7 +348,13 @@ export function ServiceEditor({
                         hasStaff={hasStaff}
                         noStorefront={noStorefront}
                     />
-                    <PriceSection draft={draft} set={set} currency={currency} />
+                    <PriceSection
+                        draft={draft}
+                        set={set}
+                        currency={currency}
+                        savedDeposit={saved.deposit}
+                        paymentsLock={paymentsLock}
+                    />
                     <WhoTakesIt
                         draft={draft}
                         set={set}
