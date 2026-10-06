@@ -1,10 +1,11 @@
 # help.saroh.in
 
-> **Moving to saroh.in/help on 17 Oct 2026.** From midnight in India that
-> day, `proxy.ts` sends every request here to its page on saroh.in/help with
-> a 308 (`lib/moved-to-saroh-in.ts`: the old-to-new map, and the day, which
-> mirrors Help's `publishOn` in `apps/saroh.in/content/resources.ts`). Before
-> then, this site behaves as it always has.
+> **Not deployed. help.saroh.in is served by the saroh.in project** (owner,
+> 6 Oct 2026): this app was never on Vercel, so the domain points at the
+> saroh.in project, whose `proxy.ts` sends it to the home page until Help
+> publishes (17 Oct) and to saroh.in/help after (`apps/saroh.in/lib/help-host.ts`,
+> the old-to-new map). This app's own `proxy.ts` does the same and is kept only
+> while the app is; the two maps are tested against the app's help links.
 
 Product help for the people **using** Saroh to run a business — not for
 developers contributing to the repo. (Developer docs live in

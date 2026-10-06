@@ -169,6 +169,14 @@ test("no Resources page scrolls sideways at 390", async ({ page, request }) => {
 test("the changelog's email joins the list, and the same address again is fine", async ({
     page,
 }, testInfo) => {
+    // Desk only: the waitlist takes 5 joins a minute per visitor, and every
+    // test here is one visitor (localhost). With desk and phone both posting,
+    // a run of only the marketing and Resources specs hit the limit (429).
+    // The form is the same on the phone; its layout is checked at 390 above.
+    test.skip(
+        testInfo.project.name.startsWith("phone"),
+        "the same request on the phone; the waitlist limits one visitor",
+    );
     const address = `${stamp(testInfo).toLowerCase()}@example.com`;
     for (const attempt of ["first", "again"]) {
         await page.goto(`${WEB}/changelog`);
@@ -195,4 +203,34 @@ test("the changelog's email joins the list, and the same address again is fine",
         ).toHaveText("Done. We'll email you when something ships.");
         await expect(page.locator("main").getByRole("alert")).toHaveCount(0);
     }
+});
+
+test("help.saroh.in is sent to Help on www, old pages to their article", async ({
+    request,
+}, testInfo) => {
+    test.skip(
+        testInfo.project.name.startsWith("phone"),
+        "a redirect is the same on the phone",
+    );
+    // The stack serves saroh.in on localhost; the proxy reads the Host
+    // header, so this asks for help.saroh.in on it.
+    const go = (path: string) =>
+        request.get(`${WEB}${path}`, {
+            headers: { host: "help.saroh.in" },
+            maxRedirects: 0,
+        });
+    const helpShown = (await request.get(`${WEB}/help`)).status() === 200;
+
+    const home = await go("/");
+    expect(home.status()).toBe(307);
+    expect(home.headers().location).toBe(
+        helpShown ? "https://www.saroh.in/help" : "https://www.saroh.in/",
+    );
+
+    const selling = await go("/selling");
+    expect(selling.headers().location).toBe(
+        helpShown
+            ? "https://www.saroh.in/help/add-your-first-product"
+            : "https://www.saroh.in/",
+    );
 });
