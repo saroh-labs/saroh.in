@@ -30,6 +30,7 @@ describe("diff", () => {
                 card: "122 things",
                 limit: 122,
                 per: "",
+                soft: false,
             };
             c.modules[3].cells.a = {
                 inc: true,
@@ -37,6 +38,7 @@ describe("diff", () => {
                 card: "Invoices",
                 limit: null,
                 per: "",
+                soft: false,
             };
             c.modules[4].cells.a = { inc: false, off: "locked" };
             c.modules.push({
@@ -55,6 +57,16 @@ describe("diff", () => {
             "Invoices added to Plan Zero",
             "Roles on Plan Zero: shown locked in the dashboard",
             "New module: Extra (coming soon)",
+        ]);
+    });
+
+    it("words a cap turning soft", () => {
+        const b = edit(fixture(), (c) => {
+            const cell = c.modules[1].cells.b;
+            if (cell?.inc) cell.soft = true;
+        });
+        expect(diff(fixture(), b)).toEqual([
+            "Things on Plan B: a soft cap, never refused",
         ]);
     });
 

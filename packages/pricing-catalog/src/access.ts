@@ -37,6 +37,8 @@ export interface ModuleAccess {
     /** The cap, or null for none. */
     limit: number | null;
     per: LimitPeriod;
+    /** A soft cap counts and notifies, never refuses (`includedCellSchema.soft`). */
+    soft: boolean;
     name: string;
     what: string;
     /** Why it differs from the plan, in the design's words; empty when it doesn't. */
@@ -83,6 +85,7 @@ export function resolveAccess(
         text: "",
         limit: null,
         per: "",
+        soft: false,
         name: mod?.name ?? moduleId,
         what: mod?.what ?? "",
         override: "",
@@ -102,6 +105,7 @@ export function resolveAccess(
               text: cell.text,
               limit: cell.limit,
               per: cell.per,
+              soft: cell.soft,
           }
         : { ...base, inc: false, off: cell.off };
 

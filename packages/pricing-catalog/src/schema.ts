@@ -57,6 +57,12 @@ export const includedCellSchema = z.object({
     /** A cap, or null for no cap. */
     limit: z.number().int().positive().nullable().default(null),
     per: z.enum(LIMIT_PERIODS).default(""),
+    /**
+     * A soft cap counts and tells the business when it's reached, and never
+     * refuses: storage and site visits, where turning a customer away is worse
+     * than a conversation about the bill.
+     */
+    soft: z.boolean().default(false),
 });
 
 export const excludedCellSchema = z.object({

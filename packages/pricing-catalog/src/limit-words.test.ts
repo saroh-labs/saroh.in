@@ -18,6 +18,13 @@ describe("limit words", () => {
         expect(limitWordsFor("orders")?.monthly).toBe(true);
     });
 
+    it("says nothing is blocked for the soft allowances", () => {
+        expect(limitWordsFor("storage")?.paused).toMatch(/^Nothing is blocked/);
+        expect(limitWordsFor("visits")?.paused).toMatch(/^Nothing is blocked/);
+        expect(limitWordsFor("visits")?.monthly).toBe(true);
+        expect(limitWordsFor("locations")?.what).toBe("places customers visit");
+    });
+
     it("has none for a switch or an unknown row", () => {
         expect(limitWordsFor("invoicing")).toBeNull();
         expect(limitWordsFor("toString")).toBeNull();

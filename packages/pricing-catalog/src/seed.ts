@@ -1,8 +1,9 @@
 // A SAMPLE catalogue for development, tests and the seed. These are not
 // Saroh's prices or limits: those live only in the database, entered and
 // published through the admin console's Plans screen. The numbers here are
-// made up, in the same shape (Free, Grow and Pro, amounts in paise), with
-// Pro's limits set high so no seeded demo business ever meets one.
+// made up, in the same shape (Free, Grow and Pro, amounts in paise, the plan
+// shape decided on 5 Oct 2026), with Pro's limits set high so no seeded demo
+// business ever meets one.
 //
 // Exported only through `@saroh/pricing-catalog/seed`, never the package root.
 
@@ -14,12 +15,14 @@ const C = (
     card = "",
     limit: number | null = null,
     per: "" | "month" = "",
+    soft = false,
 ) => ({
     inc: true as const,
     text,
     card,
     limit,
     per,
+    soft,
 });
 const X = (off: "locked" | "hidden" = "locked") => ({
     inc: false as const,
@@ -44,19 +47,21 @@ const input: CatalogInput = {
             id: "grow",
             name: "Grow",
             pricePaise: 20_000,
-            tagline: "For a business that sells, books and bills.",
+            tagline: "For one place that sells, books and bills.",
             cta: "Choose Grow",
             featured: true,
             retired: false,
+            trial: { on: true, days: 30 },
         },
         {
             id: "pro",
             name: "Pro",
             pricePaise: 60_000,
-            tagline: "For your own look and a bigger team.",
+            tagline: "For a business with more than one place.",
             cta: "Choose Pro",
             featured: false,
             retired: false,
+            trial: { on: true, days: 30 },
         },
     ],
     groups: [
@@ -64,7 +69,7 @@ const input: CatalogInput = {
         { id: "selling", name: "Selling" },
         { id: "money", name: "Money" },
         { id: "team", name: "Team" },
-        { id: "connect", name: "Connections" },
+        { id: "usage", name: "Space and traffic" },
     ],
     modules: [
         {
@@ -75,14 +80,42 @@ const input: CatalogInput = {
             menu: "website",
             what: "Your site, with its pages and booking page.",
             cells: {
-                free: C("1 site", "One website"),
+                free: C("On name.saroh.app", "One website"),
                 grow: C(
-                    "1 site on your own domain",
+                    "On your own domain",
                     "Your website on your own domain",
                 ),
                 pro: C(
-                    "1 site on your own domain",
-                    "Your website on your own domain",
+                    "On your own domains",
+                    "Your websites on your own domains",
+                ),
+            },
+        },
+        {
+            id: "sites",
+            name: "Websites",
+            group: "site",
+            pricing: "show",
+            what: "How many websites the business can run.",
+            cells: {
+                free: C("1", "", 1),
+                grow: C("1", "", 1),
+                pro: C("Up to 30", "Up to 30 websites", 30),
+            },
+        },
+        {
+            id: "locations",
+            name: "Places customers visit",
+            group: "selling",
+            pricing: "show",
+            what: "Shops, studios or clinics with an address. Each one's online shop comes with it.",
+            cells: {
+                free: C("1, plus your online shop", "", 1),
+                grow: C("1, plus your online shop", "", 1),
+                pro: C(
+                    "Up to 30, each with its online shop",
+                    "Up to 30 places",
+                    30,
                 ),
             },
         },
@@ -90,31 +123,17 @@ const input: CatalogInput = {
             id: "themes",
             name: "Themes, fonts and templates",
             group: "site",
-            pricing: "show",
+            pricing: "hidden",
             what: "Change the site's theme and fonts, or pick another template.",
-            cells: {
-                free: X("hidden"),
-                grow: X("hidden"),
-                pro: C(
-                    "Change the theme and fonts, or pick another template",
-                    "Change your site's theme and fonts, or pick another template",
-                ),
-            },
+            cells: { free: X("hidden"), grow: X("hidden"), pro: X("hidden") },
         },
         {
             id: "review",
-            name: "Review changes with your team",
+            name: "Required approval before changes go live",
             group: "site",
-            pricing: "show",
-            what: "Changes to the site wait for a teammate's review before they go live.",
-            cells: {
-                free: X("hidden"),
-                grow: X("hidden"),
-                pro: C(
-                    "Included",
-                    "Review changes with your team before they go live",
-                ),
-            },
+            pricing: "hidden",
+            what: "Changes to the site wait for a teammate's approval before they go live.",
+            cells: { free: X("hidden"), grow: X("hidden"), pro: X("hidden") },
         },
         {
             id: "blog",
@@ -124,8 +143,8 @@ const input: CatalogInput = {
             what: "Posts on your site's journal.",
             cells: {
                 free: C("3", "3 blog posts", 3),
-                grow: C("30", "30 blog posts", 30),
-                pro: C("Included", "Blog posts, no limit"),
+                grow: C("No limit", ""),
+                pro: C("No limit", ""),
             },
         },
         {
@@ -139,7 +158,7 @@ const input: CatalogInput = {
             cells: {
                 free: C("3", "3 products", 3),
                 grow: C("60", "60 products", 60),
-                pro: C("2,000", "2,000 products", 2000),
+                pro: C("20,000", "20,000 products", 20000),
             },
         },
         {
@@ -152,25 +171,13 @@ const input: CatalogInput = {
             what: "Every order from your site and the counter, in one list.",
             cells: {
                 free: C(
-                    "Up to 8 a month, paid offline",
-                    "Up to 8 orders a month, paid offline",
+                    "Up to 8 a month, at the counter",
+                    "Up to 8 orders a month",
                     8,
                     "month",
                 ),
-                grow: C("Included", "Orders, paid online or offline"),
-                pro: C("Included", "Orders, paid online or offline"),
-            },
-        },
-        {
-            id: "subscriptions",
-            name: "Subscriptions",
-            group: "selling",
-            pricing: "show",
-            what: "Plans and memberships that renew themselves.",
-            cells: {
-                free: X("locked"),
-                grow: C("Included", "Subscriptions"),
-                pro: C("Included", "Subscriptions"),
+                grow: C("No monthly cap", "Orders with no monthly cap"),
+                pro: C("No monthly cap", "Orders with no monthly cap"),
             },
         },
         {
@@ -183,25 +190,61 @@ const input: CatalogInput = {
             cells: {
                 free: C(
                     "Up to 8 a month",
-                    "Up to 8 bookings and appointments a month",
+                    "Up to 8 bookings a month",
                     8,
                     "month",
                 ),
-                grow: C("Included", "Bookings and appointments"),
-                pro: C("Included", "Bookings and appointments"),
+                grow: C("No monthly cap", "Bookings with no monthly cap"),
+                pro: C("No monthly cap", "Bookings with no monthly cap"),
+            },
+        },
+        {
+            id: "reviews",
+            name: "Product reviews",
+            group: "selling",
+            pricing: "show",
+            what: "Customers who bought something are invited to review it.",
+            cells: {
+                free: C("Included"),
+                grow: C("Included"),
+                pro: C("Included"),
+            },
+        },
+        {
+            id: "payments",
+            name: "Online payments",
+            group: "money",
+            pricing: "show",
+            what: "Customers pay online through your own Razorpay or Cashfree account. The money goes straight to you.",
+            cells: {
+                free: X("locked"),
+                grow: C("Included", "Online payments to your own account"),
+                pro: C("Included", "Online payments to your own account"),
+            },
+        },
+        {
+            id: "subscriptions",
+            name: "Memberships that renew",
+            group: "money",
+            pricing: "show",
+            what: "Plans and memberships that renew themselves.",
+            cells: {
+                free: X("locked"),
+                grow: C("Included", "Memberships that renew"),
+                pro: C("Included", "Memberships that renew"),
             },
         },
         {
             id: "invoicing",
-            name: "Billing and invoicing",
+            name: "Invoices and GST",
             group: "money",
             pricing: "show",
             menu: "paymentsx",
-            what: "Payments, GST invoices and bills of supply, made for you.",
+            what: "GST tax invoices and bills of supply, numbered for you.",
             cells: {
-                free: X("locked"),
-                grow: C("Included", "Billing and invoicing"),
-                pro: C("Included", "Billing and invoicing"),
+                free: C("Made by hand; orders invoiced for you"),
+                grow: C("Made for you: orders, renewals, packs and courses"),
+                pro: C("Made for you: orders, renewals, packs and courses"),
             },
         },
         {
@@ -209,11 +252,11 @@ const input: CatalogInput = {
             name: "Team members",
             group: "team",
             pricing: "show",
-            what: "People who can sign in to your dashboard.",
+            what: "People who sign in to your dashboard. Everyone on your calendar is one. Reviewers are free.",
             cells: {
-                free: C("1", "1 team member", 1),
-                grow: C("2", "2 team members", 2),
-                pro: C("20", "20 team members", 20),
+                free: C("2", "2 team members", 2),
+                grow: C("4", "4 team members", 4),
+                pro: C("200", "200 team members", 200),
             },
         },
         {
@@ -224,24 +267,44 @@ const input: CatalogInput = {
             what: "Roles you define, beyond Owner, Admin, Member and Reviewer.",
             cells: {
                 free: X("hidden"),
-                grow: X("hidden"),
+                grow: C("Included", "Custom roles"),
                 pro: C("Included", "Custom roles"),
             },
         },
         {
-            id: "integrations",
-            name: "Third-party integrations",
-            group: "connect",
+            id: "storage",
+            name: "Photos and videos",
+            group: "usage",
             pricing: "show",
-            what: "Connections to other tools.",
+            what: "Space for your media. Nothing is blocked past it; we get in touch.",
             cells: {
-                free: X("hidden"),
-                grow: C("Up to 3", "Up to 3 third-party connections", 3),
-                pro: C("Up to 100", "Up to 100 third-party connections", 100),
+                free: C("1 GB", "", 1, "", true),
+                grow: C("4 GB", "", 4, "", true),
+                pro: C("500 GB", "", 500, "", true),
             },
         },
+        {
+            id: "visits",
+            name: "Site visits",
+            group: "usage",
+            pricing: "show",
+            what: "Visits to your site in a month. Your site never goes down; past it, we get in touch.",
+            cells: {
+                free: C("3,000 a month", "", 3000, "month", true),
+                grow: C("40,000 a month", "", 40000, "month", true),
+                pro: C("90,00,000 a month", "", 9000000, "month", true),
+            },
+        },
+        {
+            id: "integrations",
+            name: "Third-party connections",
+            group: "team",
+            pricing: "hidden",
+            what: "Connections to other tools.",
+            cells: { free: X("hidden"), grow: X("hidden"), pro: X("hidden") },
+        },
     ],
-    yearly: { on: false, paid: 10 },
+    yearly: { on: true, paid: 10 },
     gst: { show: "excl" },
     addons: [],
 };

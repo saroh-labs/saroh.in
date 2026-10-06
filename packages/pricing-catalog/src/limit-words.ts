@@ -42,6 +42,26 @@ export const LIMIT_WORDS: Readonly<Record<string, LimitWords>> = {
         paused: "New invites are paused. Everyone already on the team keeps access.",
         monthly: false,
     },
+    shopLocations: {
+        what: "places customers visit",
+        paused: "You can't add another place customers visit.",
+        monthly: false,
+    },
+    sites: {
+        what: "websites",
+        paused: "You can't add another website.",
+        monthly: false,
+    },
+    storageGb: {
+        what: "GB of photos and videos",
+        paused: "Nothing is blocked: your uploads keep working, and we'll be in touch about the space you need.",
+        monthly: false,
+    },
+    visitsPerMonth: {
+        what: "site visits a month",
+        paused: "Nothing is blocked: your site keeps working, and we'll be in touch about your traffic.",
+        monthly: true,
+    },
     integrations: {
         what: "connections",
         paused: "You can't connect more tools.",

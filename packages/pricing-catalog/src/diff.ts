@@ -85,6 +85,10 @@ export function diff(a: Catalog, b: Catalog): string[] {
                 out.push(
                     `${m.name} on ${planName(b, p.id)}: ${x.text || "—"} → ${y.text || "—"}`,
                 );
+            } else if (x.inc && y.inc && x.soft !== y.soft) {
+                out.push(
+                    `${m.name} on ${planName(b, p.id)}: ${y.soft ? "a soft cap, never refused" : "a hard cap"}`,
+                );
             } else if (!x.inc && !y.inc && x.off !== y.off) {
                 out.push(
                     `${m.name} on ${planName(b, p.id)}: ${y.off === "hidden" ? "hidden" : "shown locked"} in the dashboard`,

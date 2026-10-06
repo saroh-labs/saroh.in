@@ -42,11 +42,29 @@ export const MODULE_MAP: Readonly<Record<string, ModuleMapEntry>> = {
         limitKey: null,
         legacyEntitlementKey: null,
     },
+    /** How many websites; `sites` was an unsold entitlement before (DEC-018). */
+    sites: {
+        registry: "WEBSITE",
+        limitKey: "sites",
+        legacyEntitlementKey: null,
+    },
+    /** Places customers visit (a `SHOP` location); an online-only one never counts. */
+    locations: {
+        registry: null,
+        limitKey: "shopLocations",
+        legacyEntitlementKey: null,
+    },
     themes: { registry: "WEBSITE", limitKey: null, legacyEntitlementKey: null },
     review: { registry: "WEBSITE", limitKey: null, legacyEntitlementKey: null },
     blog: {
         registry: "WEBSITE",
         limitKey: "blogPosts",
+        legacyEntitlementKey: null,
+    },
+    /** Site visits in a month: soft, so a busy site is never turned away. */
+    visits: {
+        registry: "WEBSITE",
+        limitKey: "visitsPerMonth",
         legacyEntitlementKey: null,
     },
     products: {
@@ -59,8 +77,24 @@ export const MODULE_MAP: Readonly<Record<string, ModuleMapEntry>> = {
         limitKey: "ordersPerMonth",
         legacyEntitlementKey: null,
     },
+    /** Invite-only product reviews, under Commerce on every plan. */
+    reviews: {
+        registry: "COMMERCE",
+        limitKey: null,
+        legacyEntitlementKey: null,
+    },
+    /**
+     * Taking money online through the business's own Razorpay or Cashfree.
+     * Off, new online payments stop; renewals a business already has go on.
+     */
+    payments: {
+        registry: "PAYMENTS",
+        limitKey: null,
+        legacyEntitlementKey: null,
+    },
+    /** Memberships that renew; they take money, so they sit under Payments. */
     subscriptions: {
-        registry: null,
+        registry: "PAYMENTS",
         limitKey: null,
         legacyEntitlementKey: null,
     },
@@ -69,7 +103,14 @@ export const MODULE_MAP: Readonly<Record<string, ModuleMapEntry>> = {
         limitKey: "bookingsPerMonth",
         legacyEntitlementKey: null,
     },
+    /** Invoicing needs no module (DEC-070); a row so the cards can say so. */
     invoicing: { registry: null, limitKey: null, legacyEntitlementKey: null },
+    /** Media storage in GB: soft. */
+    storage: {
+        registry: null,
+        limitKey: "storageGb",
+        legacyEntitlementKey: null,
+    },
     members: {
         registry: null,
         limitKey: "teamMembers",
