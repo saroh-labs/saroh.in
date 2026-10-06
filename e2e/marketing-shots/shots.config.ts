@@ -958,6 +958,197 @@ const CASHFREE_KEYS: Step[] = [
     { click: '[role="dialog"] h2:text-is("Payments")' },
 ];
 
+/* "Add sizes and options": Rye & Co.'s Product settings › Options and two
+ * of its loaves, looked at only. The Rye & caraway loaf sells as itself, so
+ * its Variants section shows Add variants; pressing it, picking sizes and
+ * Add to list only stage rows in the page (Save variants is never pressed).
+ * A value typed on the Size option is never entered (Enter would add it).
+ * The Sourdough loaf's 400g is sold only Online, which "Sell it at" shows. */
+const RYE_OPTIONS = "/commerce/products/settings?tab=options";
+const RYE_CARAWAY =
+    "/commerce/products/seed_sc_rc_product_1/edit?storefront=seed_sc_rc_store";
+const VARIANTS = 'section[aria-labelledby="sec-variants"]';
+const CARAWAY_SIZES: Step[] = [
+    { click: `${VARIANTS} button:has-text("Add variants")` },
+    { click: '[aria-label="New variant size"]' },
+    { click: '[role="option"]:has-text("800g")' },
+    { click: `${VARIANTS} button:has-text("Add to list")` },
+    { click: '[aria-label="New variant size"]' },
+    { click: '[role="option"]:has-text("400g")' },
+    {
+        fill: '[aria-label="New variant price, blank uses the product\'s"]',
+        value: "300",
+    },
+    // Out of the field, so no focus ring is in the picture.
+    { click: `${VARIANTS} h2` },
+];
+
+const SIZES_SHOTS: Shot[] = [
+    {
+        key: "help-add-sizes-1",
+        business: "rye",
+        role: "owner",
+        route: RYE_OPTIONS,
+        viewport: { width: 1024, height: 900 },
+        steps: [
+            { waitFor: 'input[aria-label="Add a value to Size"]' },
+            { fill: 'input[aria-label="Add a value to Size"]', value: "1kg" },
+            { click: 'h2:text-is("Options")' },
+        ],
+        clip: {
+            selector: 'section:has(input[aria-label="New option name"])',
+            pad: 12,
+        },
+        mark: 'input[aria-label="Add a value to Size"]',
+        alt: "Product settings › Options at Rye & Co. (demo bakery): Size, Grind and Pack with their values, and 1kg typed into Size's new value",
+        caption:
+            "Rye & Co.'s options: Size, Grind and Pack, each with its values",
+    },
+    {
+        key: "help-add-sizes-2",
+        business: "rye",
+        role: "owner",
+        route: RYE_CARAWAY,
+        viewport: { width: 1280, height: 1000 },
+        steps: [{ waitFor: `${VARIANTS} button:has-text("Add variants")` }],
+        clip: { selector: VARIANTS, pad: 12 },
+        mark: `${VARIANTS} button:has-text("Add variants")`,
+        alt: "Variants for the Rye & caraway loaf at Rye & Co. (demo bakery): sold as itself, with the Add variants button",
+        caption: "The Rye & caraway loaf, sold as itself, and Add variants",
+    },
+    {
+        key: "help-add-sizes-3",
+        business: "rye",
+        role: "owner",
+        route: RYE_CARAWAY,
+        viewport: { width: 1280, height: 1200 },
+        steps: CARAWAY_SIZES,
+        clip: { selector: VARIANTS, pad: 12 },
+        mark: `${VARIANTS} button:has-text("Add to list")`,
+        alt: "Variants for the Rye & caraway loaf at Rye & Co. (demo bakery): customers choose by Size, 800g in the list, and 400g with its suggested SKU and own price ready to add",
+        caption: "Choosing by Size: 800g in the list, 400g about to be added",
+    },
+    {
+        key: "help-add-sizes-4",
+        business: "rye",
+        role: "owner",
+        route: RYE_CARAWAY,
+        viewport: { width: 1280, height: 1200 },
+        steps: [
+            ...CARAWAY_SIZES,
+            { click: `${VARIANTS} button:has-text("Add to list")` },
+            { waitFor: `${VARIANTS} button:has-text("Save variants")` },
+        ],
+        clip: { selector: VARIANTS, pad: 12 },
+        mark: `${VARIANTS} button:has-text("Save variants")`,
+        alt: "Variants for the Rye & caraway loaf at Rye & Co. (demo bakery): 800g and 400g in the list, not saved yet, with Discard and Save variants",
+        caption: "Two sizes in the list, and Save variants",
+    },
+    {
+        key: "help-add-sizes-5",
+        business: "rye",
+        role: "owner",
+        route: RYE_SOURDOUGH,
+        viewport: { width: 1280, height: 1200 },
+        steps: [
+            { click: `${VARIANTS} li:nth-of-type(2) button:has-text("More")` },
+            { waitFor: `${VARIANTS} [role="group"][aria-label^="Where"]` },
+        ],
+        clip: { selector: VARIANTS, pad: 12 },
+        mark: `${VARIANTS} [role="group"][aria-label^="Where"]`,
+        alt: "Variants for the Sourdough loaf at Rye & Co. (demo bakery): the 400g opened, showing photo 2 when picked and sold only Online",
+        caption: "The Sourdough loaf's 400g: its own photo, sold only Online",
+    },
+];
+
+/* "Count and move stock": Rye & Co.'s Sell › Stock, looked at only. Rye
+ * sells at Hill Road and Online, so Move stock is offered. Count stock
+ * and the boxes typed into are the screen's own draft (Save count is
+ * never pressed); the Move stock dialog is filled and never moved. The
+ * Log's Moved entries are the seed's own move, from Hill Road to Online. */
+const RYE_STOCK = "/commerce/stock";
+const COUNTING: Step[] = [
+    { click: 'button:has-text("Count stock")' },
+    {
+        fill: '[aria-label="Almond croissant Single counted at Hill Road"]',
+        value: "12",
+    },
+    {
+        fill: '[aria-label="Almond croissant Box of 4 counted at Hill Road"]',
+        value: "4",
+    },
+    // Out of the box, so no focus ring is in the picture.
+    { click: 'h1:text-is("Stock")' },
+];
+
+const STOCK_SHOTS: Shot[] = [
+    {
+        key: "help-count-stock-1",
+        business: "rye",
+        role: "owner",
+        route: RYE_STOCK,
+        viewport: HELP_DESK,
+        mark: '[role="group"][aria-label="Which products"] a:has-text("Needs you")',
+        alt: "Stock at Rye & Co. (demo bakery): a row per product and size, a column each for Hill Road and Online, and Record stock, Move stock and Count stock",
+        caption: "Rye & Co.'s stock levels at Hill Road and Online",
+    },
+    {
+        key: "help-count-stock-2",
+        business: "rye",
+        role: "owner",
+        route: RYE_STOCK,
+        viewport: { width: 1024, height: 900 },
+        steps: COUNTING,
+        clip: {
+            selector: '[role="note"]:has-text("Counting.")',
+            until: '[role="listitem"]:has-text("Cinnamon bun") >> nth=0',
+            pad: 12,
+        },
+        mark: '[aria-label="Almond croissant Box of 4 counted at Hill Road"]',
+        alt: "Counting at Rye & Co. (demo bakery): a box per shelf with what the log says under it; one count matches the log, one is 1 short of it",
+        caption: "A count in progress: one matches the log, one is 1 under it",
+    },
+    {
+        key: "help-count-stock-3",
+        business: "rye",
+        role: "owner",
+        route: RYE_STOCK,
+        viewport: HELP_DESK,
+        steps: COUNTING,
+        mark: 'button:has-text("Save count")',
+        alt: "The count bar at Rye & Co. (demo bakery): 2 counted, 1 differs from the log, with Cancel and Save count",
+        caption: "2 counted, 1 differs from the log, and Save count",
+    },
+    {
+        key: "help-count-stock-4",
+        business: "rye",
+        role: "owner",
+        route: RYE_STOCK,
+        viewport: { width: 1024, height: 700 },
+        steps: [
+            { click: 'button:has-text("Move stock")' },
+            { click: "#mv-what" },
+            { click: '[role="option"]:has-text("Sourdough loaf 800g")' },
+            { fill: "#mv-units", value: "4" },
+            { click: '[role="dialog"] h2' },
+        ],
+        clip: { selector: '[role="dialog"]', pad: 12 },
+        mark: '[role="dialog"] button:text-is("Move")',
+        alt: "Move stock at Rye & Co. (demo bakery): 4 of the Sourdough loaf 800g from Hill Road to Online, with what each has",
+        caption: "Moving 4 Sourdough loaves from Hill Road to Online",
+    },
+    {
+        key: "help-count-stock-5",
+        business: "rye",
+        role: "owner",
+        route: `${RYE_STOCK}?tab=log&kind=moved`,
+        viewport: HELP_DESK,
+        mark: '[role="group"][aria-label="Kind of change"] a:text-is("Moved")',
+        alt: "The stock Log at Rye & Co. (demo bakery), showing moves: the Sourdough loaf 800g out of Hill Road and into Online",
+        caption: "Rye & Co.'s Log, showing a move from Hill Road to Online",
+    },
+];
+
 const PAYMENT_SHOTS: Shot[] = [
     {
         key: "help-connect-razorpay-1",
@@ -1481,4 +1672,6 @@ export const SHOTS: Shot[] = [
     ...GSTIN_SHOTS,
     ...ORDER_SHOTS,
     ...PAYMENT_SHOTS,
+    ...SIZES_SHOTS,
+    ...STOCK_SHOTS,
 ];
