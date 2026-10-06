@@ -217,6 +217,74 @@ export function inPageNavigation(
     return items;
 }
 
+/** A menu entry, as the merge below needs it. */
+export interface MenuEntry {
+    label: string;
+    href: string;
+    /** The module page it opens, when it opens one (G14). */
+    kind?: string;
+}
+
+/** An entry that jumps to a section of the home page (`/#visit`). */
+export function isInPageHref(href: string): boolean {
+    return href.startsWith("/#");
+}
+
+/** Two menu labels read as one entry: trimmed, case ignored. */
+export function sameMenuLabel(a: string, b: string): boolean {
+    return a.trim().toLocaleLowerCase() === b.trim().toLocaleLowerCase();
+}
+
+/**
+ * The menu with the home page's sections in front, less any section entry
+ * a page entry already names.
+ *
+ * A template can have both a Timetable page and a Timetable section on the
+ * home page; listing both reads "Timetable · … · Timetable". The PAGE entry
+ * stays — it is the fuller version — and the section's goes. Otherwise the
+ * order is kept: the remaining section entries, then the page entries, less
+ * any page entry whose address a section entry already is.
+ *
+ * `shadowsOnlyAlways`: a module page's entry (one with a `kind`) can leave
+ * the menu at view time while its module is off (G19). Publish passes true,
+ * so only an entry that is always there takes a section's place; the header
+ * then drops a section entry a module page still shadows when it draws
+ * ({@link withoutShadowedInPageEntries}).
+ */
+export function mergeInPageNavigation<T extends MenuEntry>(
+    inPage: readonly InPageNavItem[],
+    menu: readonly T[],
+    { shadowsOnlyAlways = false }: { shadowsOnlyAlways?: boolean } = {},
+): (T | InPageNavItem)[] {
+    const shadowing = menu.filter(
+        (item) => !isInPageHref(item.href) && !(shadowsOnlyAlways && item.kind),
+    );
+    const kept = inPage.filter(
+        (item) =>
+            !shadowing.some((page) => sameMenuLabel(page.label, item.label)),
+    );
+    const taken = new Set(kept.map((item) => item.href));
+    return [...kept, ...menu.filter((item) => !taken.has(item.href))];
+}
+
+/**
+ * The menu as drawn, less each section entry (`/#…`) whose label a page
+ * entry in the same menu also has — the rule of
+ * {@link mergeInPageNavigation}, applied to a menu already merged. The header
+ * runs it after the modules that are off have left the menu, so a section
+ * entry stands in for its module page only while that page is out.
+ */
+export function withoutShadowedInPageEntries<T extends MenuEntry>(
+    menu: readonly T[],
+): T[] {
+    const pages = menu.filter((item) => !isInPageHref(item.href));
+    return menu.filter(
+        (item) =>
+            !isInPageHref(item.href) ||
+            !pages.some((page) => sameMenuLabel(page.label, item.label)),
+    );
+}
+
 /**
  * A link name from a menu label ("Today's bread" → `todays-bread`), for the
  * editor to suggest when a section is given a label first. May still need a

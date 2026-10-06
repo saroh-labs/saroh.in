@@ -6,9 +6,11 @@ import {
     anchorProblem,
     IN_PAGE_NAV_MAX,
     inPageNavigation,
+    mergeInPageNavigation,
     parseSectionFrame,
     repeatedAnchor,
     sectionFrameOf,
+    withoutShadowedInPageEntries,
 } from "./section-frame";
 
 const text = (extra: Record<string, unknown>) => ({
@@ -180,6 +182,68 @@ describe("inPageNavigation", () => {
             content: { anchor: `s${i}`, navLabel: `S${i}` },
         }));
         expect(inPageNavigation(many)).toHaveLength(IN_PAGE_NAV_MAX);
+    });
+});
+
+describe("mergeInPageNavigation", () => {
+    const inPage = [
+        { label: "First visit", href: "/#first-visit" },
+        { label: "Timetable", href: "/#timetable" },
+        { label: " membership ", href: "/#membership" },
+        { label: "Trainers", href: "/#trainers" },
+    ];
+    const pages = [
+        { label: "Timetable", href: "/timetable" },
+        { label: "Trainers", href: "/trainers" },
+        { label: "Membership", href: "/membership" },
+    ];
+
+    it("keeps the page entry where a section has the same label, in order", () => {
+        expect(mergeInPageNavigation(inPage, pages)).toEqual([
+            { label: "First visit", href: "/#first-visit" },
+            ...pages,
+        ]);
+    });
+
+    it("keeps every entry when no labels repeat", () => {
+        const about = [{ label: "About", href: "/about" }];
+        expect(mergeInPageNavigation(inPage, about)).toEqual([
+            ...inPage,
+            ...about,
+        ]);
+    });
+
+    it("lets only an always-shown page take a section's place when asked", () => {
+        const book = [{ label: "Book", href: "/book", kind: "BOOK" }];
+        const section = [{ label: "Book", href: "/#book" }];
+        expect(
+            mergeInPageNavigation(section, book, { shadowsOnlyAlways: true }),
+        ).toEqual([...section, ...book]);
+        expect(mergeInPageNavigation(section, book)).toEqual(book);
+    });
+
+    it("still drops a page entry that is a section's own address", () => {
+        expect(
+            mergeInPageNavigation(
+                [{ label: "Visit", href: "/#visit" }],
+                [{ label: "Find us", href: "/#visit" }],
+            ),
+        ).toEqual([{ label: "Visit", href: "/#visit" }]);
+    });
+});
+
+describe("withoutShadowedInPageEntries", () => {
+    it("drops a section entry a page entry in the menu names", () => {
+        expect(
+            withoutShadowedInPageEntries([
+                { label: "Book", href: "/#book" },
+                { label: "Visit", href: "/#visit" },
+                { label: "book", href: "/book", kind: "BOOK" },
+            ]),
+        ).toEqual([
+            { label: "Visit", href: "/#visit" },
+            { label: "book", href: "/book", kind: "BOOK" },
+        ]);
     });
 });
 

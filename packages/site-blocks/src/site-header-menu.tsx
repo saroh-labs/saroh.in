@@ -65,12 +65,116 @@ function isCurrent(href: string, current: string | null): boolean {
     return samePath(path, current);
 }
 
+/*
+ * IN-PAGE ENTRIES WHOSE SECTION SHOWS NOTHING.
+ *
+ * A menu entry can jump to a section of the home page (`/#timetable`). A
+ * section bound to the business's data can draw nothing — a Timetable with
+ * no sessions this week, Services with none listed — and some of them only
+ * know once they have read in the browser. The server already leaves out
+ * what it knows (`section-empty.ts`); these hooks settle the rest by looking
+ * at the page itself.
+ *
+ * WHY THE DOM, AND ONE OBSERVER. The blocks already return null when they
+ * have nothing, which leaves their section's wrapper (`PageSections`, the
+ * element carrying the anchor as its id) with no children. Reading that is
+ * the one signal every block gives without each one reporting to a shared
+ * context, so a block added later is covered too. One MutationObserver on
+ * the body, shared by every subscriber (the row and the phone menu), tells
+ * React to look again when the page changes: a section finishing its read,
+ * or a client navigation bringing in another page. What is read is a short
+ * string, so a mutation that changes nothing re-renders nothing.
+ *
+ * The server's answer is every entry, and so is the first render in the
+ * browser (hydration), so the markup matches; an entry then leaves, the
+ * only shift being that link disappearing. A hidden entry is not rendered
+ * at all, so it is never in the focus order.
+ */
+
+const targetListeners = new Set<() => void>();
+let targetObserver: MutationObserver | null = null;
+
+function subscribeTargets(listener: () => void): () => void {
+    targetListeners.add(listener);
+    if (targetObserver === null && typeof MutationObserver !== "undefined") {
+        targetObserver = new MutationObserver(() => {
+            targetListeners.forEach((notify) => notify());
+        });
+        targetObserver.observe(document.body, {
+            childList: true,
+            subtree: true,
+            attributes: true,
+            attributeFilter: ["id"],
+        });
+    }
+    return () => {
+        targetListeners.delete(listener);
+        if (targetListeners.size === 0) {
+            targetObserver?.disconnect();
+            targetObserver = null;
+        }
+    };
+}
+
+/**
+ * Whether a menu entry may be shown, as far as the page in front of the
+ * visitor can tell. An entry that is not a jump within the page it is on is
+ * always shown: from /about, `/#visit` is on another page, which this one
+ * cannot see (the server already left out what it knew was empty there).
+ * On the page itself, the entry goes when its target is missing or empty.
+ */
+export function inPageTargetShown(
+    href: string,
+    doc: Document,
+    currentPath: string,
+): boolean {
+    const hash = href.indexOf("#");
+    if (hash < 0 || !href.startsWith("/")) return true;
+    if (!samePath(href.slice(0, hash), currentPath)) return true;
+    let id: string;
+    try {
+        id = decodeURIComponent(href.slice(hash + 1));
+    } catch {
+        return true;
+    }
+    if (id === "") return true;
+    const target = doc.getElementById(id);
+    if (!target) return false;
+    return target.childElementCount > 0 || target.textContent.trim() !== "";
+}
+
+/** The entries to draw: less each jump to a section that shows nothing. */
+export function useShownInPageItems<T extends SiteNavItem>(items: T[]): T[] {
+    // Re-read on a client navigation, as `useCurrentPath` does.
+    usePathname();
+    const shown = useSyncExternalStore(
+        subscribeTargets,
+        () =>
+            items
+                .map((item) =>
+                    inPageTargetShown(
+                        item.href,
+                        document,
+                        window.location.pathname,
+                    )
+                        ? "1"
+                        : "0",
+                )
+                .join(""),
+        () => null,
+    );
+    if (!shown?.includes("0")) return items;
+    return items.filter((_, i) => shown[i] !== "0");
+}
+
 /**
  * The menu as a row of pills, from 820px up. The page you are on is the
  * filled pill, and says so to a screen reader with `aria-current`.
  */
-export function SiteNavRow({ items }: { items: SiteNavItem[] }) {
+export function SiteNavRow({ items: all }: { items: SiteNavItem[] }) {
     const current = useCurrentPath();
+    const items = useShownInPageItems(all);
+    if (items.length === 0) return null;
     return (
         <nav
             aria-label="Site"
@@ -109,7 +213,7 @@ export function SiteNavRow({ items }: { items: SiteNavItem[] }) {
  * only open while that is still the path.
  */
 export function SiteMenu({
-    items,
+    items: all,
     action,
 }: {
     items: SiteNavItem[];
@@ -117,12 +221,15 @@ export function SiteMenu({
 }) {
     const current = useCurrentPath();
     const pathname = usePathname();
+    const items = useShownInPageItems(all);
     const [openedOn, setOpenedOn] = useState<string | null | undefined>(
         undefined,
     );
     const open = openedOn !== undefined && openedOn === pathname;
     const listId = useId();
     const close = () => setOpenedOn(undefined);
+    // Every entry gone and no main button: no menu to open.
+    if (items.length === 0 && action === null) return null;
 
     return (
         <>

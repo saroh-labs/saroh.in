@@ -1,6 +1,6 @@
 "use client";
 
-import { inPageNavigation } from "@saroh/block-contract";
+import { inPageNavigation, mergeInPageNavigation } from "@saroh/block-contract";
 import { Button } from "@saroh/ui/button";
 import type { RefObject, UIEvent } from "react";
 import { useEffect, useRef, useState } from "react";
@@ -73,10 +73,12 @@ export function canvasChromeFor({
     });
     return {
         name: siteName,
-        navigation: [
-            ...inPageNavigation(homeSections.filter((s) => !s.hidden)),
-            ...pageEntries,
-        ],
+        // A section entry a page entry already names is left out, as
+        // publish leaves it out (`mergeInPageNavigation`).
+        navigation: mergeInPageNavigation(
+            inPageNavigation(homeSections.filter((s) => !s.hidden)),
+            pageEntries,
+        ),
         // Sanitizing can leave nothing, which is no footer — unless it is
         // laid out on the left, which keeps its row (name, Runs on Saroh).
         footer:

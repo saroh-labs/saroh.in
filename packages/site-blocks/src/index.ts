@@ -20,6 +20,13 @@ export {
 export type { Section } from "./section-renderer";
 // A business's live data given to a whole page (template renders, U14).
 export type { SiteFixtures } from "./site-fixtures";
+// Server-safe: which sections are known to draw nothing, for the menu.
+export {
+    FEED_BACKED_SECTIONS,
+    sectionRendersNothing,
+    withoutEmptyInPageEntries,
+} from "./section-empty";
+export type { FeedsFor, SectionFeeds } from "./section-empty";
 
 export {
     BlockFixturePreview,

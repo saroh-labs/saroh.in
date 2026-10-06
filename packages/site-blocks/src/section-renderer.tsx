@@ -50,6 +50,7 @@ import VisitUsSection from "./blocks/visit-us";
 import type { ModulePageTopContent } from "./module-page-top";
 import { ModulePageTop } from "./module-page-top";
 import type { PricesActions } from "./prices/api";
+import { sectionRendersNothing } from "./section-empty";
 import type { SiteFixtures } from "./site-fixtures";
 
 /**
@@ -354,6 +355,12 @@ export function opensOverPhoto(section: Section): boolean {
  * marks every wrapper, for the rules that apply inside sections only (a
  * template's column width, definition lists). A section that sets none of it
  * gets no id and no band: the page is what it was.
+ *
+ * A section known on the server to draw nothing (a feed-backed block with
+ * nothing in its feed, `section-empty.ts`) gets no wrapper, so no anchor. A
+ * block that reads in the browser and settles on nothing leaves its wrapper
+ * empty. The header hides a menu entry whose target is missing or empty
+ * (`useShownInPageItems` in `site-header-menu.tsx`).
  */
 export function PageSections({
     sections,
@@ -415,6 +422,21 @@ export function PageSections({
         <>
             {top ? <ModulePageTop title={top.title} lead={top.lead} /> : null}
             {sections.map((section, i) => {
+                const frame = sectionFrameOf(section.content);
+                // A feed-backed block with nothing to show (`section-empty`):
+                // no wrapper and so no anchor to jump to. The layout already
+                // left its entry out of the menu, and the header drops one
+                // whose target is missing.
+                if (
+                    sectionRendersNothing(section, {
+                        journal,
+                        plans,
+                        packs,
+                        productGrid: productGrids?.[i],
+                    })
+                ) {
+                    return null;
+                }
                 const style = paddingOverride(section.content);
                 // Close under the page's title, not a section's padding away.
                 const className = top && i === 0 ? "[&>*]:!pt-5" : undefined;
@@ -434,7 +456,6 @@ export function PageSections({
                         modulePage={modulePage}
                     />
                 );
-                const frame = sectionFrameOf(section.content);
                 return (
                     <div
                         key={i}

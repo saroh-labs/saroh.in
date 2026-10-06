@@ -229,4 +229,29 @@ describe("withInPageNavigation", () => {
         expect(withInPageNavigation(menu, [{ content: {} }])).toEqual(menu);
         expect(withInPageNavigation([], [])).toEqual([]);
     });
+
+    it("drops a section entry a page entry already names, and keeps the order", () => {
+        // The Gym template: pages and home sections with the same names.
+        const pages = [
+            { label: "Timetable", href: "/timetable" },
+            { label: "Trainers", href: "/trainers" },
+            { label: "Membership", href: "/membership" },
+        ];
+        expect(
+            withInPageNavigation(pages, [
+                { content: { anchor: "first-visit", navLabel: "First visit" } },
+                { content: { anchor: "timetable", navLabel: " timetable " } },
+                { content: { anchor: "membership", navLabel: "MEMBERSHIP" } },
+                { content: { anchor: "trainers", navLabel: "Trainers" } },
+            ]).map((item) => item.label),
+        ).toEqual(["First visit", "Timetable", "Trainers", "Membership"]);
+    });
+
+    it("keeps a section entry a module page names, for the header to settle at view time", () => {
+        expect(
+            withInPageNavigation(menu, [
+                { content: { anchor: "book", navLabel: "Book" } },
+            ]),
+        ).toEqual([{ label: "Book", href: "/#book" }, ...menu]);
+    });
 });
