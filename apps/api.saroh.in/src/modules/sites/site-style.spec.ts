@@ -284,6 +284,17 @@ describe("the typeface pair (KTD-2)", () => {
         expect(vars["--site-font-body"]).toBe("newsreader");
     });
 
+    it("names the pair's mono face only when it has one", () => {
+        expect(
+            siteStyleVariables(parseSiteStyle({ fontPair: "geist" }))[
+                "--site-font-mono"
+            ],
+        ).toBe("geist");
+        expect(
+            siteStyleVariables(parseSiteStyle({ fontPair: "newsreader" })),
+        ).not.toHaveProperty("--site-font-mono");
+    });
+
     it("emits no font variable for the default, as before fonts existed", () => {
         const vars = siteStyleVariables(defaultSiteStyle());
         expect(vars).not.toHaveProperty("--site-font-heading");

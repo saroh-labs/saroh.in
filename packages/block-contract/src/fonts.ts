@@ -43,13 +43,21 @@ export interface SiteFontFace {
     fallback: string;
 }
 
-/** A heading face and a body face, chosen together. */
+/**
+ * A heading face and a body face, chosen together, and sometimes a third.
+ *
+ * `mono` is an optional ACCENT role for small machine facts — a handle, a
+ * year, a stack, a class time — never paragraphs. Blocks reach it through
+ * `font-site-mono`, which falls back to the body face, so a pair without one
+ * sets those facts exactly as it sets everything else.
+ */
 export interface SiteFontPair {
     key: string;
     /** What a merchant reads in Website › Style, in plain words. */
     name: string;
     heading: SiteFontFace;
     body: SiteFontFace;
+    mono?: SiteFontFace;
 }
 
 const face = (
@@ -88,11 +96,13 @@ export const FONT_PAIRS = [
         heading: face("IBM Plex Sans", SYSTEM_FONT_STACK),
         body: face("IBM Plex Mono", MONO_FALLBACK, [400, 500]),
     },
+    // The gym's times and counts are set in IBM Plex Mono (U6).
     {
         key: "archivo-narrow",
         name: "Archivo Narrow and Archivo",
         heading: face("Archivo Narrow", SYSTEM_FONT_STACK),
         body: face("Archivo", SYSTEM_FONT_STACK),
+        mono: face("IBM Plex Mono", MONO_FALLBACK, [400, 500]),
     },
     {
         key: "source-serif-inter",
@@ -101,18 +111,18 @@ export const FONT_PAIRS = [
         body: face("Inter", SYSTEM_FONT_STACK),
     },
     /*
-     * Geist for headings AND body (the Developer design, U9). The design sets
-     * only its small machine facts (a handle, years, a stack) in JetBrains
-     * Mono, and a site has no role for such an accent face yet — a pair is a
-     * heading face and a body face — so the pair loads Geist alone. Mono as
-     * the BODY, as this pair first had it, set every paragraph in a code
-     * face. The key keeps the design's pairing name: keys are never renamed.
+     * Geist for headings AND body (the Developer design, U9), with JetBrains
+     * Mono in the mono role for its small machine facts (a handle, years, a
+     * stack) only. Mono as the BODY, as this pair first had it, set every
+     * paragraph in a code face. Was `geist-jetbrains`; renamed before any
+     * release, as keys are never renamed once a site can hold one.
      */
     {
-        key: "geist-jetbrains",
-        name: "Geist",
+        key: "geist",
+        name: "Geist and JetBrains Mono",
         heading: face("Geist", SYSTEM_FONT_STACK),
         body: face("Geist", SYSTEM_FONT_STACK),
+        mono: face("JetBrains Mono", MONO_FALLBACK),
     },
     {
         key: "archivo",
@@ -152,4 +162,30 @@ export function findFontPair(key: unknown): SiteFontPair | undefined {
 export function fontStack(face: SiteFontFace, loaded?: string): string {
     if (face.family === null) return face.fallback;
     return `${loaded ?? `"${face.family}"`}, ${face.fallback}`;
+}
+
+/** Every family a pair loads, by role, mono included when it has one. */
+export function fontPairFamilies(pair: SiteFontPair): string[] {
+    return [pair.heading.family, pair.body.family, pair.mono?.family].filter(
+        (f): f is string => typeof f === "string",
+    );
+}
+
+/**
+ * The `--site-font-*` variables a style with this pair emits: the pair's KEY
+ * in each role it fills, which `SiteTheme` turns into stacks from this list
+ * (KTD-2). Nothing for the default pair or a key not in the list, so a site
+ * that chose nothing resolves to exactly the variables it always did; no
+ * `--site-font-mono` for a pair without a mono face, which then sets its
+ * facts in the body face. The API's resolver and the editor's both call
+ * this, so the two cannot drift.
+ */
+export function fontPairVariables(key: unknown): Record<string, string> {
+    const pair = findFontPair(key);
+    if (!pair || pair.key === DEFAULT_FONT_PAIR) return {};
+    return {
+        "--site-font-heading": pair.key,
+        "--site-font-body": pair.key,
+        ...(pair.mono ? { "--site-font-mono": pair.key } : {}),
+    };
 }

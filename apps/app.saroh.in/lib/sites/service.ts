@@ -92,6 +92,8 @@ export interface HeroContent {
     imageBrief?: string;
     /** "On today" (G18); on the full-bleed look, the open line alone. */
     onToday?: boolean;
+    /** `false`: the `none` look's heading is for screen readers only. */
+    titleVisible?: boolean;
 }
 
 export interface RichTextContent {
@@ -415,6 +417,14 @@ export interface SectionLayout {
      * carousel.
      */
     variant?: string;
+    /**
+     * The section's frame (`section-frame.ts` in the contract), on every
+     * block for the same reason: the link name a menu entry or button jumps
+     * to, the label that lists it in the site's menu, and its band.
+     */
+    anchor?: string;
+    navLabel?: string;
+    band?: "surface" | "inverse" | "accent";
 }
 
 /**
@@ -540,6 +550,11 @@ export interface SiteNavigation {
 export interface SiteFooter {
     format: "html" | "markdown";
     value: string;
+    /**
+     * `left`: the designs' row (name, line, Runs on Saroh), set by a template
+     * (industry templates). The API keeps it when a save sends only the line.
+     */
+    layout?: "left";
 }
 
 /**

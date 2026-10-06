@@ -199,6 +199,41 @@ describe("SitesService.replaceDraftSections", () => {
         expect(created.every((s) => s.pageVersionId === "ver_1")).toBe(true);
     });
 
+    it("keeps a section's anchor, label and band, and refuses an anchor used twice", async () => {
+        const text = (extra: Record<string, unknown>) => ({
+            type: "richText",
+            contractVersion: 1,
+            content: { format: "html", value: "<p>ok</p>", ...extra },
+        });
+        await service.replaceDraftSections(ctx(), "site_1", "page_1", {
+            sections: [
+                text({ anchor: "visit", navLabel: "Visit", band: "inverse" }),
+            ],
+        });
+        const created = sectionCreateMany.mock.calls[0][0].data as Array<{
+            content: Record<string, unknown>;
+        }>;
+        expect(created[0].content).toMatchObject({
+            anchor: "visit",
+            navLabel: "Visit",
+            band: "inverse",
+        });
+
+        sectionCreateMany.mockClear();
+        await expect(
+            service.replaceDraftSections(ctx(), "site_1", "page_1", {
+                sections: [
+                    text({ anchor: "visit" }),
+                    text({}),
+                    text({ anchor: "visit" }),
+                ],
+            }),
+        ).rejects.toMatchObject({
+            response: { details: { index: 2, field: "anchor" } },
+        });
+        expect(sectionCreateMany).not.toHaveBeenCalled();
+    });
+
     it("creates an empty DRAFT version when the page has none", async () => {
         versionFindFirst.mockResolvedValue(null);
         versionCreate.mockResolvedValue({ id: "ver_new" });

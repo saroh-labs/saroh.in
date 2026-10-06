@@ -10,6 +10,7 @@ import {
     parseSectionContent,
     Prisma,
     prisma,
+    repeatedAnchor,
 } from "@saroh/database";
 import { isDeepStrictEqual } from "node:util";
 
@@ -100,14 +101,18 @@ import {
     FLAGS_AWAITING_NAVIGATION,
 } from "./site-flags";
 import type { SiteFooter } from "./site-footer";
-import { parseSiteFooter } from "./site-footer";
+import { footerAfterUpdate, parseSiteFooter } from "./site-footer";
 import {
     isTestShapedHost,
     siteHostMode,
     siteRootDomain,
 } from "./site-host-mode";
 import type { SiteNavigation } from "./site-navigation";
-import { parseSiteNavigation, resolveSiteNavigation } from "./site-navigation";
+import {
+    parseSiteNavigation,
+    resolveSiteNavigation,
+    withInPageNavigation,
+} from "./site-navigation";
 import type { SiteStyle, SiteStyleOptions } from "./site-style";
 import {
     parseSiteStyle,
@@ -661,7 +666,12 @@ async function storedDraftSectionsByKey(
  */
 function sanitizedFooter(footer: SiteFooter | null): SiteFooter | null {
     return footer
-        ? { format: footer.format, value: sanitizeRichHtml(footer.value) }
+        ? {
+              format: footer.format,
+              value: sanitizeRichHtml(footer.value),
+              // How it is laid out travels with it; nothing to clean.
+              ...(footer.layout === "left" ? { layout: footer.layout } : {}),
+          }
         : null;
 }
 
@@ -1148,13 +1158,18 @@ export class SitesService {
 
         // Validate BEFORE writing, for the same reason style does: a malformed
         // body is a 400 now rather than a footer that fails to render later.
-        const parsed = parseSiteFooter(input);
+        // An update that sends only the line keeps the stored layout (a
+        // template's left-hand row), so it is read first.
+        parseSiteFooter(input);
+        const stored = await prisma.site.findFirst({
+            where: { id: siteId, organizationId: ctx.organizationId },
+            select: { footer: true },
+        });
+        const parsed = footerAfterUpdate(input, stored?.footer ?? null);
         // Sanitized on the way IN as well as at publish (#280). Publish is not
         // the only reader of what is stored here, and "safe because publish
         // cleans it" left every other reader trusting HTML nobody had cleaned.
-        const footer: SiteFooter | null = parsed
-            ? { format: parsed.format, value: sanitizeRichHtml(parsed.value) }
-            : null;
+        const footer: SiteFooter | null = sanitizedFooter(parsed);
 
         await prisma.site.update({
             where: { id: siteId },
@@ -1616,6 +1631,17 @@ export class SitesService {
             };
         });
 
+        // A section's anchor is an element id on its page, so a page holds
+        // each one once (`section-frame.ts`). Refused with the second use's
+        // index, so the editor points at the block that repeats it.
+        const repeated = repeatedAnchor(validated);
+        if (repeated) {
+            throw new BadRequestException({
+                message: `Section at index ${repeated.index} is invalid: another section on this page already uses the link name "${repeated.anchor}"`,
+                details: { index: repeated.index, field: "anchor" },
+            });
+        }
+
         // A Product grid names only this business's collection and products
         // (G12). An id its stored self already named passes, so a deleted
         // product never blocks the page's later saves; the flag says so.
@@ -1869,9 +1895,14 @@ export class SitesService {
                  * page's entry is simply absent. Same reason style and button
                  * actions resolve here: the snapshot is the site as served.
                  */
-                navigation: resolveSiteNavigation(
-                    parseSiteNavigation(site.navigation),
-                    site.pages,
+                navigation: withInPageNavigation(
+                    resolveSiteNavigation(
+                        parseSiteNavigation(site.navigation),
+                        site.pages,
+                    ),
+                    // The home page's own sections, as this publish writes
+                    // them: each one with a menu label leads the menu.
+                    pages.find((p) => p.isHome)?.sections ?? [],
                 ),
             },
             pages,

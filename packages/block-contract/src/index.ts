@@ -4,6 +4,7 @@ export * from "./fonts";
 export * from "./palette";
 export * from "./rendered";
 export * from "./section-contract";
+export * from "./section-frame";
 export * from "./to-rendered";
 export * from "./type-scale";
 export * from "./variants";

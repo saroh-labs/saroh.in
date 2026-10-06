@@ -87,7 +87,7 @@ describe("developer@1 (industry templates U9)", () => {
             ["cobalt", "Cobalt"],
         ]);
         for (const preset of styles) {
-            expect(preset.style.fontPair).toBe("geist-jetbrains");
+            expect(preset.style.fontPair).toBe("geist");
             expect(isFontPairKey(preset.style.fontPair ?? "")).toBe(true);
         }
         // One colour apart: the accent.

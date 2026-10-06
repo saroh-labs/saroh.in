@@ -1,4 +1,5 @@
 import { BadRequestException } from "@nestjs/common";
+import { inPageNavigation } from "@saroh/database";
 
 import type { ModulePageKind } from "./page-kinds";
 import { isModulePageKind, MODULE_PAGE_KINDS } from "./page-kinds";
@@ -169,4 +170,26 @@ export function resolveSiteNavigation(
         out.push({ label: page.title, href: page.path, kind: page.kind });
     }
     return out;
+}
+
+/**
+ * The menu with the home page's own sections in front (industry templates,
+ * polish pass): each home-page section with a link name and a menu label is
+ * an entry, `/#anchor`, in page order — "Today's bread · Visit · Journal",
+ * as a one-page design's header reads. The page entries follow, so a site
+ * keeps every page it listed. Resolved at publish over the sections being
+ * written, like the rest of the menu: a hidden section is not in them, so
+ * its entry is simply absent.
+ *
+ * A section's label is the merchant's (or their template's) choice, made
+ * in the section's own inspector, so there is no separate switch for this.
+ */
+export function withInPageNavigation(
+    menu: readonly PublishedNavigationItem[],
+    homeSections: readonly { content: unknown }[],
+): PublishedNavigationItem[] {
+    const inPage = inPageNavigation(homeSections);
+    if (inPage.length === 0) return [...menu];
+    const taken = new Set(inPage.map((item) => item.href));
+    return [...inPage, ...menu.filter((item) => !taken.has(item.href))];
 }

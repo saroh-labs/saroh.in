@@ -32,6 +32,8 @@ import {
     freeAddress,
     releaseExpired,
 } from "./site-address";
+import type { SiteFooter } from "./site-footer";
+import { parseSiteFooter } from "./site-footer";
 import type { SiteStyle } from "./site-style";
 import { parseSiteStyle } from "./site-style";
 import {
@@ -78,6 +80,12 @@ export interface SitePlan {
      * default look, as every site did before templates carried styles.
      */
     style?: { id: string; value: SiteStyle };
+    /**
+     * The footer the site starts with: the template's line and layout
+     * (`TemplateManifest.footer`), as plain text. Absent when the template
+     * sets none — the site ends in its name, as every site did.
+     */
+    footer?: SiteFooter;
 }
 
 /** What a caller asks for: the `/sites/new` body's fields. */
@@ -121,6 +129,31 @@ export function planTemplateStyle(
     } catch {
         throw new InternalServerErrorException(
             `Template "${template.id}" v${template.version} has an invalid style "${preset.id}"`,
+        );
+    }
+}
+
+/**
+ * The footer a site made from `template` starts with: its line as plain
+ * text, laid out as it says, through the same parser as a footer the
+ * merchant saves. Undefined when the template sets no footer, or sets
+ * nothing a footer would keep (a centred footer with no line).
+ */
+export function planTemplateFooter(
+    template: Pick<TemplateManifest, "id" | "version" | "footer">,
+): SiteFooter | undefined {
+    if (!template.footer) return undefined;
+    try {
+        return (
+            parseSiteFooter({
+                format: "markdown",
+                value: template.footer.line ?? "",
+                layout: template.footer.layout ?? "centre",
+            }) ?? undefined
+        );
+    } catch {
+        throw new InternalServerErrorException(
+            `Template "${template.id}" v${template.version} has an invalid footer`,
         );
     }
 }
@@ -208,6 +241,7 @@ export async function planSiteFromTemplate(
 
     // Before any read: a colourway the template lacks is the caller's error.
     const style = planTemplateStyle(template, dto.styleId);
+    const footer = planTemplateFooter(template);
 
     const slug = slugify(dto.slug ?? dto.name);
     if (!slug) {
@@ -230,6 +264,7 @@ export async function planSiteFromTemplate(
                 styleId: style?.id ?? null,
             },
             ...(style ? { style } : {}),
+            ...(footer ? { footer } : {}),
         };
     } catch (error) {
         if (error instanceof TemplateInstantiationError) {
@@ -394,6 +429,13 @@ export async function writeSiteFromTemplate(
                     ? {
                           style: plan.style
                               .value as unknown as Prisma.InputJsonValue,
+                      }
+                    : {}),
+                // Its footer line and layout, if it sets them: the
+                // merchant's to rewrite in Site settings.
+                ...(plan.footer
+                    ? {
+                          footer: plan.footer as unknown as Prisma.InputJsonValue,
                       }
                     : {}),
             },

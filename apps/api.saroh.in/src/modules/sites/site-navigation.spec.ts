@@ -4,6 +4,7 @@ import {
     NAVIGATION_MAX_ITEMS,
     parseSiteNavigation,
     resolveSiteNavigation,
+    withInPageNavigation,
 } from "./site-navigation";
 
 describe("parseSiteNavigation", () => {
@@ -201,5 +202,31 @@ describe("resolveSiteNavigation with module pages (G14)", () => {
                 free,
             ),
         ).toEqual([{ label: "Story", href: "/about" }]);
+    });
+});
+
+describe("withInPageNavigation", () => {
+    const menu = [
+        { label: "About", href: "/about" },
+        { label: "Book", href: "/book", kind: "BOOK" as const },
+    ];
+
+    it("puts the home page's labelled sections first, as /#anchor", () => {
+        expect(
+            withInPageNavigation(menu, [
+                { content: { anchor: "today", navLabel: "Today's bread" } },
+                { content: { anchor: "story" } },
+                { content: { anchor: "visit", navLabel: "Visit" } },
+            ]),
+        ).toEqual([
+            { label: "Today's bread", href: "/#today" },
+            { label: "Visit", href: "/#visit" },
+            ...menu,
+        ]);
+    });
+
+    it("leaves a menu without labelled sections exactly as it was", () => {
+        expect(withInPageNavigation(menu, [{ content: {} }])).toEqual(menu);
+        expect(withInPageNavigation([], [])).toEqual([]);
     });
 });

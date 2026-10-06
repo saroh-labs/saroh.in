@@ -58,6 +58,9 @@ function samePath(a: string, b: string): boolean {
 /** Whether `href` (already prefixed) is the page at `current`. */
 function isCurrent(href: string, current: string | null): boolean {
     if (current === null || !href.startsWith("/")) return false;
+    // A section of a page is never "the page you are on": on the home page
+    // every one of them would be filled at once.
+    if (href.includes("#")) return false;
     const path = href.split(/[?#]/)[0] ?? href;
     return samePath(path, current);
 }

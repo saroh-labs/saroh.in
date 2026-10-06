@@ -1,7 +1,11 @@
 "use client";
 
 import { MediaPicker } from "@/components/sites/media-picker";
+import { resolveVariant } from "@saroh/block-contract";
 import { Input } from "@saroh/ui/input";
+import { Label } from "@saroh/ui/label";
+import { Switch } from "@saroh/ui/switch";
+import { useId } from "react";
 
 import type { HeroContent } from "@/lib/sites/service";
 import { buildImage } from "./build-image";
@@ -32,8 +36,12 @@ export function HeroFields({
     onChange,
 }: SectionFieldsProps<"hero">) {
     const c = section.content;
+    const id = useId();
     const patch = (next: Partial<HeroContent>) =>
         onChange({ ...section, content: { ...c, ...next } });
+    // The `none` look is a page title: it may keep its heading for screen
+    // readers only, when the header already shows the same name.
+    const titleOnly = resolveVariant("hero", c) === "none";
     return (
         <div className="grid gap-3">
             <Field label="Heading">
@@ -43,6 +51,25 @@ export function HeroFields({
                     placeholder="Welcome"
                 />
             </Field>
+            {titleOnly ? (
+                <div className="grid gap-1">
+                    <div className="flex items-center justify-between gap-3">
+                        <Label htmlFor={`${id}-title`}>Show the heading</Label>
+                        <Switch
+                            id={`${id}-title`}
+                            checked={c.titleVisible !== false}
+                            onCheckedChange={(on) =>
+                                patch({ titleVisible: on ? undefined : false })
+                            }
+                        />
+                    </div>
+                    <p className="text-[12px] leading-relaxed text-muted-foreground">
+                        Off, the heading is kept for screen readers and search
+                        engines only — for a page whose menu already shows the
+                        same name.
+                    </p>
+                </div>
+            ) : null}
             <Field label="Subheading">
                 <Input
                     value={c.subheading ?? ""}

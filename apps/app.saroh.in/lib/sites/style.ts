@@ -9,7 +9,11 @@
  */
 
 import type { SitePalette, SiteTypeScale } from "@saroh/block-contract";
-import { paletteVariables, typeScaleVariables } from "@saroh/block-contract";
+import {
+    fontPairVariables,
+    paletteVariables,
+    typeScaleVariables,
+} from "@saroh/block-contract";
 
 /** One selectable colour, as the API serves it. */
 export interface StyleSwatch {
@@ -241,10 +245,7 @@ export function resolveStyleVariables(
     set("--site-heading-scale", `${num("headingScale")}`);
     // The pair's KEY, as the API's resolver emits it: `SiteTheme` turns it
     // into stacks from its own list. None for the default pair, as there.
-    if (style.fontPair && style.fontPair !== "system") {
-        set("--site-font-heading", style.fontPair);
-        set("--site-font-body", style.fontPair);
-    }
+    Object.assign(vars, fontPairVariables(style.fontPair));
     // A template's exact colours and type scale (DEC-090), by the contract's
     // one rule, as the API's resolver applies them.
     if (style.palette) Object.assign(vars, paletteVariables(style.palette));

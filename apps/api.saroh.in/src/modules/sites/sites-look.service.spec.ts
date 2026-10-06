@@ -152,6 +152,24 @@ describe("SitesService.updateFooter", () => {
         });
     });
 
+    it("keeps a template's left-hand row when only the line is sent", async () => {
+        siteFindFirst.mockResolvedValue({
+            id: "site_1",
+            currentPublicationId: null,
+            footer: { format: "markdown", value: "Old", layout: "left" },
+        });
+        const res = await service.updateFooter(ctx(), "site_1", {
+            format: "markdown",
+            value: "14 Hill Road",
+        });
+        expect(res.footer).toEqual({
+            format: "markdown",
+            value: "14 Hill Road",
+            layout: "left",
+        });
+        expect(siteUpdate.mock.calls[0][0].data.footer).toEqual(res.footer);
+    });
+
     it("clears the column when the box is emptied — there is no separate delete", async () => {
         const res = await service.updateFooter(ctx(), "site_1", {
             value: "   ",

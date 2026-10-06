@@ -65,6 +65,24 @@ export const SITE_FONT_STACK =
 export const siteFontFamily = {
     "site-heading": [`var(--site-font-heading, ${SITE_FONT_STACK})`],
     "site-body": [`var(--site-font-body, ${SITE_FONT_STACK})`],
+    /*
+     * The optional third face, for small machine facts only (a time, a year,
+     * a handle): never paragraphs. A pair without a mono face sets no
+     * `--site-font-mono`, so these facts fall back to the body face and look
+     * like the rest of the page. Never Saroh's `font-mono` (G7).
+     */
+    "site-mono": [
+        `var(--site-font-mono, var(--site-font-body, ${SITE_FONT_STACK}))`,
+    ],
+};
+
+/**
+ * The page's column (`max-w-site-content`): a template's `contentWidth`
+ * (DEC-090 type scale) when it sets one, else 1280px, which is the
+ * `max-w-screen-xl` every section and the header and footer have always had.
+ */
+export const siteMaxWidth = {
+    "site-content": "var(--site-content-width, 1280px)",
 };
 
 /**
@@ -77,7 +95,11 @@ export const siteFontFamily = {
 export const siteBlocksPreset = {
     content: [],
     theme: {
-        extend: { colors: { site: siteColors }, fontFamily: siteFontFamily },
+        extend: {
+            colors: { site: siteColors },
+            fontFamily: siteFontFamily,
+            maxWidth: siteMaxWidth,
+        },
     },
 } satisfies Partial<Config>;
 

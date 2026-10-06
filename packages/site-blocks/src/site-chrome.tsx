@@ -12,10 +12,19 @@ import { trimTrailingSlashes } from "./url-path";
  * like the live site, so there is one implementation of each, here (#252).
  */
 
+/**
+ * How the footer is laid out. Absent is today's: one centred line. `left`
+ * is the industry designs' row: the site's name in its heading face, the
+ * merchant's line beside it, and "Runs on Saroh" at the far end.
+ */
+export const FOOTER_LAYOUTS = ["centre", "left"] as const;
+export type FooterLayout = (typeof FOOTER_LAYOUTS)[number];
+
 /** What the merchant wrote at the foot of their site. */
 export interface SiteFooterContent {
     format: "html" | "markdown";
     value: string;
+    layout?: FooterLayout;
 }
 
 /** Where a footer line breaks into more than one line. */
@@ -79,13 +88,16 @@ export function SiteFooter({
     name: string;
 }) {
     const written = footer && footer.value.trim() !== "" ? footer : null;
+    if (footer?.layout === "left") {
+        return <LeftFooter written={written} name={name} />;
+    }
     const line = written
         ? footerLine(written)
         : { kind: "text" as const, value: name.trim() };
 
     return (
         <footer className="border-site-border bg-site-footer-bg text-site-footer-fg font-site-body w-full border-t px-5 pb-7 pt-5 sm:px-[var(--site-page-margin)]">
-            <div className="mx-auto max-w-screen-xl text-center text-[12.5px]">
+            <div className="max-w-site-content mx-auto text-center text-[12.5px]">
                 {written && line === null ? (
                     written.format === "html" ? (
                         <div
@@ -119,15 +131,79 @@ export function SiteFooter({
                             {" · "}
                         </>
                     ) : null}
-                    <a
-                        href="https://saroh.in"
-                        target="_blank"
-                        rel="noopener"
-                        className="focus-visible:ring-site-footer-fg rounded-sm underline underline-offset-2 hover:no-underline focus-visible:outline-none focus-visible:ring-2"
-                    >
-                        Runs on Saroh
-                    </a>
+                    <RunsOnSaroh />
                 </p>
+            </div>
+        </footer>
+    );
+}
+
+/** "Runs on Saroh" (G17), in the footer's own colours and type. */
+function RunsOnSaroh({ className = "" }: { className?: string }) {
+    return (
+        <a
+            href="https://saroh.in"
+            target="_blank"
+            rel="noopener"
+            className={[
+                "focus-visible:ring-site-footer-fg rounded-sm underline underline-offset-2 hover:no-underline focus-visible:outline-none focus-visible:ring-2",
+                className,
+            ]
+                .filter(Boolean)
+                .join(" ")}
+        >
+            Runs on Saroh
+        </a>
+    );
+}
+
+/**
+ * The `left` footer: one row on the page's column, wrapping on a phone —
+ * the name in the heading face, the merchant's line (an address, the days
+ * they open), and "Runs on Saroh" pushed to the far end. A footer richer
+ * than a line keeps its own block above the row, left-aligned too. The same
+ * safety note as {@link SiteFooter}: html arrives sanitized.
+ */
+function LeftFooter({
+    written,
+    name,
+}: {
+    written: SiteFooterContent | null;
+    name: string;
+}) {
+    const line = written ? footerLine(written) : null;
+    return (
+        <footer className="border-site-border bg-site-footer-bg text-site-footer-fg font-site-body w-full border-t px-5 pb-12 pt-6 sm:px-[var(--site-page-margin)]">
+            <div className="max-w-site-content mx-auto">
+                {written && line === null ? (
+                    written.format === "html" ? (
+                        <div
+                            className="prose prose-sm prose-headings:text-site-footer-fg prose-p:text-site-footer-fg prose-a:text-site-footer-fg prose-strong:text-site-footer-fg prose-li:text-site-footer-fg mb-4 max-w-none"
+                            // Sanitized at publish — see SiteFooter.
+                            dangerouslySetInnerHTML={{ __html: written.value }}
+                        />
+                    ) : (
+                        <p className="mb-4 whitespace-pre-wrap text-sm">
+                            {written.value}
+                        </p>
+                    )
+                ) : null}
+                <div className="flex flex-wrap items-baseline gap-x-6 gap-y-2 text-[13.5px]">
+                    <span className="font-site-heading text-base font-semibold tracking-[-0.02em]">
+                        {name.trim()}
+                    </span>
+                    {line && line.value !== "" ? (
+                        line.kind === "html" ? (
+                            <span
+                                // Sanitized at publish — see SiteFooter.
+                                dangerouslySetInnerHTML={{ __html: line.value }}
+                            />
+                        ) : (
+                            <span>{line.value}</span>
+                        )
+                    ) : null}
+                    <RunsOnSaroh className="ml-auto" />
+                </div>
             </div>
         </footer>
     );
@@ -204,13 +280,20 @@ export function withShopLink(
     if (menu.some(opensShop)) return [...menu];
     const shop: SiteNavItem = { label: "Shop", href: SHOP_HREF, kind: "SHOP" };
     if (menu.length === 0) return [{ label: "Home", href: "/" }, shop];
-    const at = menu[0] && isHome(menu[0]) ? 1 : 0;
+    // After Home and the home page's own sections, which lead the menu.
+    let at = menu[0] && isHome(menu[0]) ? 1 : 0;
+    while (menu[at] && isInPage(menu[at])) at++;
     return [...menu.slice(0, at), shop, ...menu.slice(at)];
 }
 
 /** An entry that opens the home page: "/" (or "", as a page path can be). */
 function isHome(item: SiteNavItem): boolean {
     return item.href === "/" || item.href === "";
+}
+
+/** An entry that jumps to a section of the home page (`/#visit`). */
+function isInPage(item: SiteNavItem): boolean {
+    return item.href.startsWith("/#");
 }
 
 /**
@@ -295,8 +378,13 @@ export function SiteHeader({
     /** Sign in, or the signed-in customer's avatar (A3). Same rule. */
     account?: ReactNode;
 }) {
-    const to = (href: string) =>
-        basePath && href.startsWith("/") ? `${basePath}${href}` : href;
+    const to = (href: string) => {
+        if (!basePath || !href.startsWith("/")) return href;
+        // A section of the home page (`/#visit`): the preview's own home,
+        // with the anchor, never "/preview/<token>/#visit".
+        if (href.startsWith("/#")) return `${basePath}${href.slice(1)}`;
+        return `${basePath}${href}`;
+    };
     const items = withShopLink(siteMenu(navigation, modules), shopServes).map(
         (item) => ({
             label: item.label,
@@ -311,7 +399,7 @@ export function SiteHeader({
             data-site-header=""
             className={`border-site-border bg-site-bg font-site-body sticky top-0 z-30 border-b ${OVER_PHOTO}`}
         >
-            <div className="mx-auto flex min-h-11 max-w-screen-xl items-center gap-3.5 px-5 py-2.5 sm:px-[var(--site-page-margin)]">
+            <div className="max-w-site-content mx-auto flex min-h-11 items-center gap-3.5 px-5 py-2.5 sm:px-[var(--site-page-margin)]">
                 <Link
                     href={to("/")}
                     aria-label={`${name} — home`}

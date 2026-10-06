@@ -1,4 +1,8 @@
-import { FONT_PAIRS, fontPairStacks } from "@saroh/site-blocks";
+import {
+    FONT_PAIRS,
+    fontPairFamilies,
+    fontPairStacks,
+} from "@saroh/site-blocks";
 import { describe, expect, it, vi } from "vitest";
 
 import { SITE_FACES } from "./site-fonts";
@@ -19,6 +23,7 @@ vi.mock("next/font/google", () => {
         "IBM_Plex_Sans",
         "Inter",
         "Inter_Tight",
+        "JetBrains_Mono",
         "Newsreader",
         "Source_Serif_4",
     ];
@@ -27,31 +32,29 @@ vi.mock("next/font/google", () => {
 
 describe("the renderer's faces (KTD-2)", () => {
     it("loads every family the font pairs name", () => {
-        const families = FONT_PAIRS.flatMap((p) => [
-            p.heading.family,
-            p.body.family,
-        ]).filter((f): f is string => f !== null);
+        // Mono faces included: a pair's third role loads like the others.
+        const families = FONT_PAIRS.flatMap((p) => fontPairFamilies(p));
         for (const family of families) {
             expect(SITE_FACES).toHaveProperty([family]);
         }
     });
 
     it("loads nothing the list does not name", () => {
-        const named = new Set(
-            FONT_PAIRS.flatMap((p) => [p.heading.family, p.body.family]),
-        );
+        const named = new Set(FONT_PAIRS.flatMap((p) => fontPairFamilies(p)));
         for (const family of Object.keys(SITE_FACES)) {
             expect(named.has(family)).toBe(true);
         }
     });
 
     it("maps a pair's key to the loaded families", () => {
-        const stacks = fontPairStacks("geist-jetbrains", SITE_FACES);
+        const stacks = fontPairStacks("geist", SITE_FACES);
         expect(stacks?.heading).toMatch(
             /^'__Geist_x1', '__Geist_Fallback_x1', /,
         );
         // Geist for the body too (U9): the design's mono is an accent,
         // never the paragraphs' face.
         expect(stacks?.body).toMatch(/^'__Geist_x1', /);
+        // Its mono role is JetBrains Mono, for machine facts only.
+        expect(stacks?.mono).toMatch(/^'__JetBrains_Mono_x1', /);
     });
 });
