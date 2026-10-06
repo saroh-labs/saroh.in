@@ -134,10 +134,15 @@ describe("customer.notify — what it writes", () => {
         });
         expect(queueTransactional).toHaveBeenCalledWith(tx, ORG, {
             template: "ORDER_READY",
-            rendered: expect.objectContaining({
-                subject:
-                    "Your order ORD-1019 from Rye & Co. is ready to collect",
+            notice: expect.objectContaining({
+                kind: "ORDER_READY",
+                order: expect.objectContaining({
+                    business: "Rye & Co.",
+                    number: "ORD-1019",
+                }) as unknown,
             }) as unknown,
+            // Through the business's own provider: Saroh never asked.
+            sarohMay: false,
             recipient: { kind: "SITE_ACCOUNT", contactId: "ct_1" },
             createdByUserId: null,
         });

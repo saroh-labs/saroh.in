@@ -100,6 +100,19 @@ const envSchema = z.object({
         .string()
         .regex(/^[A-Za-z0-9_-]{1,64}$/)
         .optional(),
+    // The global stop for that route: "true" stops every business's Saroh
+    // email at once, queued and retrying ones included, whatever each
+    // business's SAROH_BUSINESS_EMAIL flag says (the complaint alarm's
+    // runbook step). Read at use (`communications/saroh-may-send.ts`).
+    SAROH_BUSINESS_EMAIL_STOP: z.enum(["true", "false"]).optional(),
+    // At most this many Saroh-sent business emails in any 24 hours, for
+    // every business together, so sign-in codes keep their room on the SES
+    // account. Unset: `SAROH_DAILY_CEILING_DEFAULT` (1,000).
+    SAROH_BUSINESS_EMAIL_DAILY_CEILING: z.coerce
+        .number()
+        .int()
+        .positive()
+        .optional(),
 
     // Sign-in codes for a business's customers on its own site (ADR-011,
     // round-2 plan A, A2). Every one is optional in the schema so dev and

@@ -25,6 +25,7 @@ function statusVariant(status: string): BadgeVariant {
         case "FAILED":
         case "BOUNCED":
         case "SUPPRESSED":
+        case "STOPPED": // Saroh's email was switched off before it went (DEC-086).
             return "destructive";
         case "QUEUED":
         default:

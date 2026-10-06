@@ -52,7 +52,7 @@ export interface SarohBusinessEmail {
 const ADDRESS = z.string().email();
 
 /** One clean address, or null: a header must never carry a line break. */
-function replyToAddress(contactEmail: string | null): string | null {
+export function replyToAddress(contactEmail: string | null): string | null {
     if (!contactEmail) return null;
     const trimmed = contactEmail.trim();
     if (/[\s,;<>"]/u.test(trimmed)) return null;

@@ -16,6 +16,8 @@ import {
     COMMS_PROVIDER_FACTORY,
     isCommsChannel,
 } from "./providers/provider.port";
+import { SAROH_PROVIDER } from "./saroh-delivery";
+import { deliverThroughSaroh } from "./saroh-send";
 import { fillSecretLink, SECRET_LINK_SLOT } from "./transactional";
 
 /** The `type` this handler is registered under (matches the send producer). */
@@ -143,6 +145,16 @@ export class MessageSendHandler {
             return;
         }
 
+        // Saroh sends it for a business with no email of its own (DEC-086):
+        // the route stamped when it was queued wins, so a provider connected
+        // since never sends it a second way.
+        if (delivery.provider === SAROH_PROVIDER) {
+            if (await deliverThroughSaroh(delivery.id, message)) {
+                await this.stamp(message);
+            }
+            return;
+        }
+
         const providerRow = await prisma.communicationProvider.findUnique({
             where: {
                 organizationId_channel: {
@@ -216,9 +228,15 @@ export class MessageSendHandler {
             throw err;
         }
 
-        // The email went: a confirmation proves the address (A14). The send
-        // is done either way, so a failure here is logged, never retried
-        // into a second email.
+        await this.stamp(message);
+    };
+
+    /**
+     * The email went: a confirmation proves the address (A14). The send is
+     * done either way, so a failure here is logged, never retried into a
+     * second email.
+     */
+    private async stamp(message: Message): Promise<void> {
         try {
             await stampConfirmedEmail(prisma, message, new Date());
         } catch (err) {
@@ -228,7 +246,7 @@ export class MessageSendHandler {
                 })`,
             );
         }
-    };
+    }
 
     /**
      * The invoice's PDF for its email (DEC-083), or nothing. Nothing when

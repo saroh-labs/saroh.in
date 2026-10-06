@@ -7,9 +7,13 @@ import { isNoticeTemplate } from "../communications/transactional";
 import { resolveContact } from "../customer-workspace/resolve-contact";
 import type { CustomerNotifyPayload } from "./customer-notify-queue";
 import { CUSTOMER_NOTIFY_TYPE } from "./customer-notify-queue";
-import { hasLiveAccount, noticeChannels } from "./notice-reach";
+import {
+    hasLiveAccount,
+    noticeChannels,
+    noticeEmailRoute,
+} from "./notice-reach";
 import type { NoticeVars } from "./notify-templates";
-import { noticeSentence, renderNotice } from "./notify-templates";
+import { noticeSentence } from "./notify-templates";
 import { appendMessage } from "./thread-store";
 import { loadWaitlistOffer } from "./waitlist-notice";
 
@@ -59,7 +63,11 @@ const NOTHING: NoticeOutcome = {
  *     email provider is connected, is also emailed through D17's one
  *     transactional path (`CommunicationsService.queueTransactional`): a
  *     `Message` and `Delivery` sent by `message.send`, which retries a
- *     failed send and leaves the thread message standing.
+ *     failed send and leaves the thread message standing. A booking notice
+ *     at a business with no provider goes through Saroh instead when
+ *     `sarohMaySend` says so (DEC-086). Who emails is decided here, before
+ *     the call, so the path's "connect an email provider" 409 can never
+ *     roll this transaction back.
  *
  * Nothing goes by SMS or WhatsApp: there is no verified phone this round.
  */
@@ -116,13 +124,17 @@ export class CustomerNotifyService {
         }
 
         let messageId: string | null = null;
-        if (account && channels.email) {
+        const route = account
+            ? await noticeEmailRoute(tx, organizationId, payload.kind)
+            : null;
+        if (route) {
             const queued = await this.comms.queueTransactional(
                 tx,
                 organizationId,
                 {
                     template: payload.kind,
-                    rendered: renderNotice(subject.vars),
+                    notice: subject.vars,
+                    sarohMay: route === "SAROH",
                     recipient: { kind: "SITE_ACCOUNT", contactId: contact.id },
                     createdByUserId: null,
                 },

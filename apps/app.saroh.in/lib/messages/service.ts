@@ -22,7 +22,7 @@ export interface MessageDelivery {
     id: string;
     provider: string;
     providerMessageId: string | null;
-    /** QUEUED | SENT | DELIVERED | FAILED | BOUNCED */
+    /** QUEUED | SENT | DELIVERED | FAILED | BOUNCED; a Saroh send (DEC-086) also STOPPED | UNKNOWN */
     status: string;
     error: string | null;
     attempts: number;

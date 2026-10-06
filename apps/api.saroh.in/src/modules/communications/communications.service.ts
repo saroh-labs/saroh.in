@@ -23,12 +23,16 @@ import type {
     NoticeReach,
 } from "../site-accounts/notice-reach";
 import { contactReach, noticeChannels } from "../site-accounts/notice-reach";
+import type { NoticeVars } from "../site-accounts/notify-templates";
+import { renderNotice } from "../site-accounts/notify-templates";
 import type { MessageSendPayload } from "./message-send.handler";
 import {
     INVOICE_PDF_ATTACHMENT,
     MESSAGE_SEND_TYPE,
 } from "./message-send.handler";
 import { isCommsChannel, isSupportedComms } from "./providers/provider.port";
+import { sarohMaySend } from "./saroh-may-send";
+import { queueSarohInTx, renderForSaroh } from "./saroh-queue";
 import type {
     AutopayTemplate,
     InvoiceMailVars,
@@ -66,6 +70,22 @@ export type TransactionalWords =
     | {
           template: NoticeTemplate | TeamTemplate | AutopayTemplate;
           rendered: RenderedMessage;
+      }
+    | {
+          /**
+           * A14's notice with its values, worded here: through the
+           * business's provider as `renderNotice` words it, or (a booking
+           * notice with no provider, DEC-086) as Saroh sends it, its names
+           * cleaned and Saroh's footer added (`renderSarohNotice`).
+           */
+          template: NoticeTemplate;
+          notice: NoticeVars;
+          /**
+           * The caller already asked `sarohMaySend` on this transaction and
+           * it said yes (the notify handler), so a switch flipped since
+           * can't turn that into a 409 inside its transaction.
+           */
+          sarohMay?: boolean;
       };
 
 /** Input for {@link CommunicationsService.queueTransactional}. */
@@ -97,6 +117,8 @@ export interface TransactionalResult {
     id: string;
     status: "QUEUED" | "SUPPRESSED";
     toAddress: string;
+    /** Who sends it: the business's own provider, or Saroh (DEC-086). */
+    route?: "PROVIDER" | "SAROH";
 }
 
 /** Where an email for this recipient would go, with the contact it is for. */
@@ -703,14 +725,25 @@ export class CommunicationsService {
                 organizationId_channel: { organizationId, channel: "EMAIL" },
             },
         });
-        if (provider?.status !== "CONNECTED") {
+        const connected = provider?.status === "CONNECTED";
+        // No provider of its own: Saroh sends a booking notice for it when
+        // the one rule says so (DEC-086); anything else is refused as ever.
+        const saroh =
+            !connected &&
+            "notice" in input &&
+            (input.sarohMay === true ||
+                (await sarohMaySend(tx, organizationId, input.template)));
+        if (!connected && !saroh) {
             throw new ConflictException(
                 "Connect an email provider in Settings to send this.",
             );
         }
 
-        const { subject, body } =
-            "rendered" in input
+        const { subject, body } = saroh
+            ? await renderForSaroh(tx, organizationId, input)
+            : "notice" in input
+              ? renderNotice(input.notice)
+              : "rendered" in input
                 ? input.rendered
                 : renderTransactional(input.template, input.vars);
         const base = {
@@ -744,7 +777,19 @@ export class CommunicationsService {
                 id: suppressed.id,
                 status: "SUPPRESSED",
                 toAddress: to.address,
+                route: saroh ? "SAROH" : "PROVIDER",
             };
+        }
+
+        if (saroh) {
+            return queueSarohInTx(tx, organizationId, base);
+        }
+        // Without Saroh the provider is connected (checked above); said
+        // again so the type knows it.
+        if (provider?.status !== "CONNECTED") {
+            throw new ConflictException(
+                "Connect an email provider in Settings to send this.",
+            );
         }
 
         const link = input.secretLink ? await input.secretLink() : null;
@@ -774,22 +819,33 @@ export class CommunicationsService {
                 payload: payload as unknown as Prisma.InputJsonObject,
             },
         });
-        return { id: message.id, status: "QUEUED", toAddress: to.address };
+        return {
+            id: message.id,
+            status: "QUEUED",
+            toAddress: to.address,
+            route: "PROVIDER",
+        };
     }
 
     /**
-     * How a notice about a customer's own booking or order reaches them
-     * (A14, R17): the business's channels, and for `contactId` that
-     * customer's reach (`site-accounts/notice-reach.ts`). `contact:read`,
-     * as the booking peek that asks it. Another business's contact reads
-     * as reaching nobody, never as a 404 that would confirm it exists.
+     * How a notice about a customer's own booking reaches them (A14,
+     * R17): the business's channels, and for `contactId` that customer's
+     * reach (`site-accounts/notice-reach.ts`). `contact:read`, as the
+     * booking peek and the class cancel that ask it. A booking notice, so
+     * email counts Saroh's sending too (DEC-086): every booking notice
+     * kind reads the same. Another business's contact reads as reaching
+     * nobody, never as a 404 that would confirm it exists.
      */
     async noticeReach(
         ctx: OrganizationContext,
         contactId: string | null,
     ): Promise<NoticeChannels & { reach: NoticeReach | null }> {
         authorize(ctx, "contact:read");
-        const channels = await noticeChannels(prisma, ctx.organizationId);
+        const channels = await noticeChannels(
+            prisma,
+            ctx.organizationId,
+            "BOOKING_MOVED",
+        );
         const reach = contactId
             ? await contactReach(
                   prisma,

@@ -4743,7 +4743,7 @@ model Message {
   subject   String?
   body      String
 
-  status String @default("QUEUED") // QUEUED | SENT | FAILED | SUPPRESSED
+  status String @default("QUEUED") // QUEUED | SENT | FAILED | SUPPRESSED; a Saroh send (DEC-086) also UNKNOWN
 
   createdByUserId String?
 
@@ -4777,7 +4777,7 @@ model Delivery {
 
   provider          String
   providerMessageId String?
-  status            String  @default("QUEUED") // QUEUED | SENT | DELIVERED | FAILED | BOUNCED
+  status            String  @default("QUEUED") // QUEUED | SENT | DELIVERED | FAILED | BOUNCED; a SAROH one (DEC-086) also STOPPED | UNKNOWN
   error             String?
   attempts          Int     @default(0)
 
