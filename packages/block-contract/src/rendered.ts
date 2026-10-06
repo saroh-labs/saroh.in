@@ -414,6 +414,8 @@ const renderedHours = z.object({
     title: z.string().optional(),
     storeId: z.string().optional(),
     showClosed: z.boolean().optional(),
+    groupDays: z.boolean().optional(),
+    showAddress: z.boolean().optional(),
 });
 
 const renderedPerson = z.object({

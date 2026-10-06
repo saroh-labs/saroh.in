@@ -899,6 +899,15 @@ export const BLOCK_META = {
             // The catalog and the snapshot hand the component a sample week.
             default: { variant: "default", title: "Opening hours" },
         },
+        cases: {
+            // Days in a row with the same hours on one line, the address under.
+            grouped: {
+                variant: "default",
+                title: "Come in the morning",
+                groupDays: true,
+                showAddress: true,
+            },
+        },
     },
     person: {
         label: "Person",

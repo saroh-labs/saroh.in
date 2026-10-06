@@ -89,3 +89,21 @@ describe("richText: left-aligned, photo above, part labels, a callout", () => {
         expect(resolveVariant("richText", { value })).toBe("default");
     });
 });
+
+describe("hours and visitUs: grouped days, the address, the business's place", () => {
+    it("saves grouped days and the address, and refuses a non-switch", () => {
+        expect(
+            parseSectionContent("hours", 1, {
+                groupDays: true,
+                showAddress: true,
+            }).success,
+        ).toBe(true);
+        expect(
+            parseSectionContent("hours", 1, { groupDays: "yes" }).success,
+        ).toBe(false);
+    });
+
+    it("saves a Visit us with no shop chosen: it shows the business's own place", () => {
+        expect(parseSectionContent("visitUs", 1, {}).success).toBe(true);
+    });
+});

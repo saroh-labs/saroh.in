@@ -132,9 +132,9 @@ export function VisitUsFields({
                         >
                             Sell › Locations
                         </Link>
-                        . A location with no counter has no address or hours, so
-                        until there is one customers visit this block shows
-                        nothing on your site.
+                        . Until there is one, this block shows your
+                        business&apos;s own address and hours from Settings, or
+                        nothing when there are none.
                     </p>
                 ) : choice.kind === "only" ? (
                     <p className="text-sm">Showing {choice.place.name}</p>
@@ -149,7 +149,7 @@ export function VisitUsFields({
                         ) : choice.chosen === null ? (
                             <p className="text-sm text-muted-foreground">
                                 Which location does this show? Until you choose,
-                                the block shows nothing on your site.
+                                it shows your business&apos;s first location.
                             </p>
                         ) : null}
                         <Select

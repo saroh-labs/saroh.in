@@ -315,6 +315,10 @@ export interface HoursContent {
     title?: string;
     storeId?: string;
     showClosed?: boolean;
+    /** Days in a row with the same hours on one line (template polish). */
+    groupDays?: boolean;
+    /** The place's address under the week. */
+    showAddress?: boolean;
 }
 
 /** `person` — one practitioner, typed in (U2). */

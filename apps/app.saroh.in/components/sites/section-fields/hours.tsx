@@ -19,6 +19,7 @@ import type { HoursContent } from "@/lib/sites/service";
 import type { VisitPlacesRead } from "@/lib/stores/storefronts";
 
 import { Field } from "./field";
+import { OptionSwitch } from "./option-switch";
 import type { SectionFieldsProps } from "./props";
 
 const HOURS = "/settings/organization?section=hours";
@@ -130,6 +131,19 @@ export function HoursFields({
                     On, a closed day says Closed. Off, it is left out.
                 </p>
             </div>
+
+            <OptionSwitch
+                label="Join days with the same hours"
+                checked={c.groupDays === true}
+                onChange={(on) => patch({ groupDays: on ? true : undefined })}
+                note="On: Tuesday to Friday on one line. Off: one line a day."
+            />
+            <OptionSwitch
+                label="Show the address"
+                checked={c.showAddress === true}
+                onChange={(on) => patch({ showAddress: on ? true : undefined })}
+                note="The address under the hours, for a page without Visit us."
+            />
 
             <p className="text-sm text-muted-foreground">
                 The hours are set in{" "}

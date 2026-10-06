@@ -647,9 +647,12 @@ const servicesListV1 = z.object({
  * `storeId` names one `SHOP` storefront — a place with an address and hours.
  * It is the block's own and NOT the site's "sells from" storefront, because a
  * site that sells from an `ONLINE` storefront still has a shop to visit.
- * Optional, like `booking.serviceId`: a just-added block has none until the
- * editor picks one, and the live site then renders nothing rather than a
- * card with no place in it.
+ * ABSENT, the block shows the business's own place (template polish), as
+ * `hours` does (`GET public/sites/:siteId/visit`): its first open shop, else
+ * the business profile's address and hours — so a template can lay the block
+ * down for a business with one place and nothing to choose. With no place
+ * at all the live site renders nothing rather than a card with no place in
+ * it.
  *
  * `showMap` is the Get directions link (a maps search for the address, not an
  * embedded map); `showHours` the week and "Open now". Both default to on, so
@@ -919,6 +922,16 @@ const hoursV1 = z.object({
     title: z.string().trim().max(160).optional(),
     storeId: z.string().min(1).optional(),
     showClosed: z.boolean().optional(),
+    /**
+     * Days in a row with the same hours as one line — "Tuesday to Friday ·
+     * 7:00 – 15:00" (template polish). ABSENT, one row per day, as before.
+     */
+    groupDays: z.boolean().optional(),
+    /**
+     * The place's address under the week, from the same read (template
+     * polish), for a page with no Visit us beside it. ABSENT, not shown.
+     */
+    showAddress: z.boolean().optional(),
 });
 
 /** How many qualifications a Person lists, at most, and how long a bio runs. */

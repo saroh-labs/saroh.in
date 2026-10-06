@@ -3,7 +3,9 @@ import { BLOCK_META } from "@saroh/block-contract";
 import { render, screen, within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
+import { SAMPLE_VISIT } from "../block-fixture-preview";
 import FeaturesSection from "./features";
+import HoursSection, { groupedHoursRows, hoursRows } from "./hours";
 import RichTextSection from "./rich-text";
 
 /**
@@ -114,5 +116,66 @@ describe("richText: left-aligned, photo above, part labels, a callout", () => {
         expect(container.querySelector(".prose")?.className).not.toContain(
             "prose-h3:uppercase",
         );
+    });
+});
+
+describe("hours: grouped days and the address", () => {
+    // Tuesday 6 Oct 2026, 10:00 in London.
+    const TUESDAY = new Date("2026-10-06T09:00:00.000Z");
+
+    it("joins days in a row with the same hours, and names the range", () => {
+        const rows = hoursRows(SAMPLE_VISIT.hours, true) ?? [];
+        expect(groupedHoursRows(rows).map((l) => [l.label, l.hours])).toEqual([
+            ["Monday to Friday", "7:30am – 5pm"],
+            ["Saturday", "8am – 12pm"],
+            ["Sunday", null],
+        ]);
+    });
+
+    it("never joins days across one left out between them", () => {
+        const rows = hoursRows(
+            [
+                { day: "MON", open: "09:00", close: "17:00", closed: false },
+                { day: "TUE", open: "09:00", close: "17:00", closed: true },
+                { day: "WED", open: "09:00", close: "17:00", closed: false },
+                { day: "THU", open: "09:00", close: "17:00", closed: false },
+            ],
+            false,
+        );
+        expect(groupedHoursRows(rows ?? []).map((l) => l.label)).toEqual([
+            "Monday",
+            "Wednesday and Thursday",
+        ]);
+    });
+
+    it("draws the grouped week with today marked on its line, and the address", () => {
+        render(
+            <HoursSection
+                content={BLOCK_META.hours.cases.grouped}
+                visit={SAMPLE_VISIT}
+                now={TUESDAY}
+            />,
+        );
+        const today = screen.getByRole("rowheader", {
+            name: /Monday to Friday/,
+        });
+        expect(today.textContent).toContain("Today");
+        expect(screen.getByText("Sunday")).toBeTruthy();
+        expect(screen.getAllByText("Closed").length).toBe(1);
+        expect(screen.getByText(/Riverside Trade Park/).tagName).toBe(
+            "ADDRESS",
+        );
+    });
+
+    it("keeps one row a day and no address by default", () => {
+        const { container } = render(
+            <HoursSection
+                content={BLOCK_META.hours.fixtures.default}
+                visit={SAMPLE_VISIT}
+                now={TUESDAY}
+            />,
+        );
+        expect(container.querySelectorAll("tbody tr").length).toBe(7);
+        expect(container.querySelector("address")).toBeNull();
     });
 });
