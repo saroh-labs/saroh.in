@@ -453,11 +453,38 @@ export type SectionInput = Section;
 // Resource types
 // ---------------------------------------------------------------------------
 
+/** One of a template's colourways, as the picker draws it. */
+export interface TemplateColourway {
+    /** The create request's `styleId`. */
+    id: string;
+    name: string;
+    /** Three HSL triples, page · text · accent, as the page resolves them. */
+    chips: string[];
+}
+
+/**
+ * A template a new site can start from (`GET …/sites/templates`). Every
+ * field after `description` is the picker's (industry templates, U12) and
+ * optional here: an API from before it sends none, and the picker then
+ * shows the name alone.
+ */
 export interface Template {
     id: string;
     version: number;
     name: string;
     description?: string;
+    /** The gallery's URL segment, which `?template=` may name. */
+    slug?: string;
+    /** The waitlist kinds it is for first (`food`, `creator`, …). */
+    kinds?: string[];
+    /** What it is built around (`store`, `services`, …); null: not said. */
+    shape?: string | null;
+    /** Module keys its sections read. */
+    uses?: string[];
+    /** Its colourways, the default first. */
+    colourways?: TemplateColourway[];
+    /** Its pages' titles. */
+    pages?: string[];
 }
 
 export interface SiteSummary {
@@ -689,6 +716,8 @@ export interface PageDraft {
 export interface CreateSiteInput {
     templateId?: string;
     templateVersion?: number;
+    /** One of the template's colourways; its first when absent. */
+    styleId?: string;
     name: string;
     slug?: string;
     subdomain?: string;

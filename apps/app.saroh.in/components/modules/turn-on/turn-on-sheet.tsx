@@ -233,6 +233,7 @@ function TurnOnBody({
                                             errors={errorsOf(k)}
                                             suggestion={t.suggestion}
                                             template={t.websiteTemplate}
+                                            choices={t.websiteChoices}
                                         />
                                     </Section>
                                 );

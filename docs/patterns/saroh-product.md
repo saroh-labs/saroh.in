@@ -59,8 +59,14 @@ pattern files refer back here.
   template: the starter (`starter@2`) for a business, Personal for Just me,
   Portfolio (with the Projects block) for A site for my work. The Turn on
   sheet's Website step says which ("Starts from the Portfolio template"),
-  and `/sites/new` starts its picker there; any registered template can be
-  chosen instead, Writing among them, and an explicit choice always wins.
+  or offers the few suggested for the business with it picked; and
+  `/sites/new` starts its picker there (industry templates U12: cards
+  suggested from the kind and the modules that are on, "All" a click away,
+  `?template=` to start on one, and the chosen template's colourway sent as
+  `styleId`). Any registered template can be chosen instead, and an
+  explicit choice always wins. A card whose sections need a module that is
+  off says so ("Its products show once Sell is on") and is never refused
+  (`lib/sites/template-picker.ts`).
   There is no blank site. The kind only picks the default
   (`sites/site-template.ts`, `KIND_TEMPLATE`), never which templates a
   business may use. No template assumes a business, speaks as "we", or
