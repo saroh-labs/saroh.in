@@ -169,6 +169,14 @@ test("no Resources page scrolls sideways at 390", async ({ page, request }) => {
 test("the changelog's email joins the list, and the same address again is fine", async ({
     page,
 }, testInfo) => {
+    // Desk only: the waitlist takes 5 joins a minute per visitor, and every
+    // test here is one visitor (localhost). With desk and phone both posting,
+    // a run of only the marketing and Resources specs hit the limit (429).
+    // The form is the same on the phone; its layout is checked at 390 above.
+    test.skip(
+        testInfo.project.name.startsWith("phone"),
+        "the same request on the phone; the waitlist limits one visitor",
+    );
     const address = `${stamp(testInfo).toLowerCase()}@example.com`;
     for (const attempt of ["first", "again"]) {
         await page.goto(`${WEB}/changelog`);
