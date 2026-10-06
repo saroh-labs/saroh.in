@@ -29,6 +29,16 @@
   the mark").
 - **Current** — Every `siteColors` key has a default in `SiteTheme` (`muted` and
   `border` did not until `00cd219`).
+- **Current** — **A template may carry exact colours and a type scale
+  (DEC-090)**, never a merchant: `Site.style.palette` (`#RRGGBB` per role,
+  every text pairing 4.5:1, `parsePalette` in `@saroh/block-contract`) and
+  `Site.style.type` (`parseTypeScale`). The API accepts either only as one of
+  the site's template's colourways (`site-style-offer.ts`), and publishes the
+  hex as HSL triples, so `SiteTheme`'s guard never admits a `#`. A block reads
+  the type scale as `var(--site-display-size, <today's size>)`,
+  `--site-body-size` and `--site-measure` with today's value as the fallback,
+  and marks a section title `data-site-title` (the eyebrow rule `SiteTheme`
+  writes from `--site-label-style`). Section headings use `font-site-heading`.
 
 ## Saroh tokens — Ink & Saffron
 
