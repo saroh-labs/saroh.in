@@ -1,6 +1,7 @@
 {
     "extends": "@saroh/tsconfig/nextjs.json",
     "compilerOptions": {
+        "moduleResolution": "bundler",
         "plugins": [{ "name": "next" }]
     },
     "include": ["next-env.d.ts", "**/*.ts", "**/*.tsx", ".next/types/**/*.ts"],

@@ -98,6 +98,16 @@ export const NO_OFFER = {
     note: "Offer details announced at launch.",
 };
 
+/**
+ * Under "For people who run": where a customer's money goes, and a link to
+ * Integrations (Resources plan U7), drawn only while Integrations is shown
+ * (`linkShown`). Claim WL14 in `MARKETING_CLAIMS.md` (as F3 and CL6).
+ */
+export const WAITLIST_MONEY = {
+    line: "Customers pay through your own Razorpay or Cashfree account, so the money goes straight to you.",
+    link: { label: "See integrations", href: "/integrations" },
+} as const;
+
 /** Where someone writes to be taken off the list (KTD-17). */
 export const WAITLIST_CONTACT = "hello@saroh.in";
 
