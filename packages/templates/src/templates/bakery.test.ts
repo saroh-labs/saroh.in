@@ -1,4 +1,10 @@
-import { isFontPairKey, parseSectionContent } from "@saroh/block-contract";
+import {
+    inPageNavigation,
+    isFontPairKey,
+    parsePalette,
+    parseSectionContent,
+    parseTypeScale,
+} from "@saroh/block-contract";
 import { describe, expect, it } from "vitest";
 
 import { instantiateTemplate } from "../instantiate";
@@ -10,6 +16,7 @@ import {
 } from "../manifest";
 import { getTemplate, listTemplates } from "../registry";
 import {
+    BAKERY_FOOTER_LINE,
     BAKERY_IMAGE_BRIEFS,
     BAKERY_TEMPLATE_ID,
     bakeryTemplate,
@@ -86,6 +93,51 @@ describe("bakery@1 (industry templates U4)", () => {
         }
     });
 
+    it("draws each colourway in the design's colours, every pairing at 4.5:1", () => {
+        const [crust, porcelain] = bakeryTemplate.styles ?? [];
+        expect(crust.style.palette).toMatchObject({
+            bg: "#FBF7EF",
+            fg: "#2A1F14",
+            // Brick, not crust: crust reads at 3.5:1 as a link on flour.
+            accent: "#8A3324",
+        });
+        expect(porcelain.style.palette).toMatchObject({
+            bg: "#F5F8FB",
+            surface: "#E3E7EE",
+            accent: "#732B58",
+        });
+        for (const preset of bakeryTemplate.styles ?? []) {
+            expect(parsePalette(preset.style.palette)).toMatchObject({
+                ok: true,
+            });
+            expect(parseTypeScale(preset.style.type)).toMatchObject({
+                ok: true,
+                type: { displaySize: 68, contentWidth: 1240 },
+            });
+        }
+    });
+
+    it("starts the footer as one left-set line that says what to write", () => {
+        expect(bakeryTemplate.footer).toEqual({
+            line: BAKERY_FOOTER_LINE,
+            layout: "left",
+        });
+        expect(BAKERY_FOOTER_LINE).toMatch(/^Your [^—]+ — /);
+    });
+
+    it("leads the header menu with the design's three in-page links", () => {
+        expect(inPageNavigation(home(withProducts).sections)).toEqual([
+            { label: "Today's bread", href: "/#today" },
+            { label: "Visit", href: "/#visit" },
+            { label: "Journal", href: "/#journal" },
+        ]);
+        // No bread laid down, no link to it.
+        expect(inPageNavigation(home(withoutProducts).sections)).toEqual([
+            { label: "Visit", href: "/#visit" },
+            { label: "Journal", href: "/#journal" },
+        ]);
+    });
+
     it.each(profiles)(
         "instantiates and every section passes the contract, with %s",
         (_label, ctx) => {
@@ -113,7 +165,7 @@ describe("bakery@1 (industry templates U4)", () => {
         expect(looks(withProducts)).toEqual([
             ["hero", "fullBleed"],
             ["productGrid", "default"],
-            ["richText", undefined],
+            ["richText", "left"],
             ["hours", "default"],
             ["journal", "archive"],
         ]);
@@ -140,7 +192,12 @@ describe("bakery@1 (industry templates U4)", () => {
                 "What's on the shelf at Rye & Co. today, and when to come in.",
             imageBrief: BAKERY_IMAGE_BRIEFS.hero,
             onToday: true,
+            cta: { label: "See today's bread", href: "/#today", style: "link" },
         });
+        // No bread on the page, no button pointing at it.
+        expect(home(withoutProducts).sections[0].content).not.toHaveProperty(
+            "cta",
+        );
         expect(
             home({ ...withProducts, tagline: "Sourdough on Hill Road." })
                 .sections[0].content,
@@ -151,17 +208,33 @@ describe("bakery@1 (industry templates U4)", () => {
         const [, grid, , hours, journal] = home(withProducts).sections;
         expect(grid.content).toEqual({
             variant: "default",
+            anchor: "today",
+            navLabel: "Today's bread",
             title: "Today's bread",
             source: "newest",
             count: 5,
+            cardStyle: "bare",
+            showAvailability: true,
+            note: "Baked this morning. Anything marked sold out has gone for today.",
         });
+        // The dark Visit band: the week grouped, closed days said, the address.
         expect(hours.content).toEqual({
             variant: "default",
+            anchor: "visit",
+            navLabel: "Visit",
+            band: "inverse",
             title: "Come in the morning",
+            groupDays: true,
+            showAddress: true,
         });
+        // The newest three and "All {n} entries".
         expect(journal.content).toEqual({
             variant: "archive",
+            anchor: "journal",
+            navLabel: "Journal",
             title: "From the bakery",
+            archiveLimit: 3,
+            shortDates: true,
         });
         // The sample business's own name aside, which it is given.
         const copy = home({ ...withProducts, organizationName: "Sample" })
@@ -178,6 +251,8 @@ describe("bakery@1 (industry templates U4)", () => {
             (s) => s.type === "richText",
         );
         expect(story?.content).toMatchObject({
+            // Nothing centred: the text sits on the page's left edge.
+            variant: "left",
             format: "html",
             imageBrief: BAKERY_IMAGE_BRIEFS.story,
             imageSide: "right",

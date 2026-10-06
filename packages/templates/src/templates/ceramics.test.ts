@@ -1,4 +1,10 @@
-import { isFontPairKey, parseSectionContent } from "@saroh/block-contract";
+import {
+    inPageNavigation,
+    isFontPairKey,
+    parsePalette,
+    parseSectionContent,
+    parseTypeScale,
+} from "@saroh/block-contract";
 import { describe, expect, it } from "vitest";
 
 import { instantiateTemplate } from "../instantiate";
@@ -7,6 +13,7 @@ import { templateStylePreset } from "../manifest";
 import { getTemplate, listTemplates } from "../registry";
 import {
     CERAMICS_COLLECTION_COUNT,
+    CERAMICS_FOOTER_LINE,
     CERAMICS_TEMPLATE_ID,
     ceramicsTemplate,
 } from "./ceramics";
@@ -88,6 +95,56 @@ describe("ceramics@1, the gallery's Store (U5)", () => {
         });
     });
 
+    it("draws each colourway in the design's exact colours, every pairing at 4.5:1", () => {
+        const [green, oxblood] = ceramicsTemplate.styles ?? [];
+        expect(green.style.palette).toMatchObject({
+            bg: "#F4F1E8",
+            surface: "#EAE6DB",
+            fg: "#1A1815",
+            body: "#3B362E",
+            muted: "#6E685E",
+            border: "#DFDACD",
+            accent: "#1F3D2B",
+        });
+        expect(oxblood.style.palette).toMatchObject({
+            bg: "#F1F1F4",
+            surface: "#DADADE",
+            accent: "#4F2927",
+        });
+        for (const s of ceramicsTemplate.styles ?? []) {
+            expect(parsePalette(s.style.palette)).toMatchObject({ ok: true });
+            expect(parseTypeScale(s.style.type)).toEqual({
+                ok: true,
+                type: {
+                    bodySize: 16,
+                    measure: 62,
+                    contentWidth: 1180,
+                    labelStyle: "eyebrowAccent",
+                },
+            });
+            // The hairlines between plates and photographs.
+            expect(s.style.scalars?.gridGap).toBe(1);
+        }
+    });
+
+    it("starts the footer as one left-set line that says what to write", () => {
+        expect(ceramicsTemplate.footer).toEqual({
+            line: CERAMICS_FOOTER_LINE,
+            layout: "left",
+        });
+        expect(CERAMICS_FOOTER_LINE).toMatch(/^Your [^—]+ — /);
+    });
+
+    it("leads the header menu with Collection and Material, Collection only while it is laid down", () => {
+        expect(inPageNavigation(home(selling).sections)).toEqual([
+            { label: "Collection", href: "/#collection" },
+            { label: "Material", href: "/#material" },
+        ]);
+        expect(inPageNavigation(home(nameOnly).sections)).toEqual([
+            { label: "Material", href: "/#material" },
+        ]);
+    });
+
     it.each(profiles)(
         "instantiates and every section passes the contract, for %s",
         (_label, ctx) => {
@@ -115,7 +172,7 @@ describe("ceramics@1, the gallery's Store (U5)", () => {
             ]),
         ).toEqual([
             ["hero", "none"],
-            ["productGrid", "lead"],
+            ["productGrid", "plates"],
             ["features", "grid"],
             ["gallery", "grid"],
             ["richText", undefined],
@@ -144,11 +201,15 @@ describe("ceramics@1, the gallery's Store (U5)", () => {
             (s) => s.type === "productGrid",
         );
         expect(grid?.content).toEqual({
-            variant: "lead",
+            variant: "plates",
+            anchor: "collection",
+            navLabel: "Collection",
             title: "Current collection",
             source: "newest",
             count: CERAMICS_COLLECTION_COUNT,
             showPrices: true,
+            showAvailability: true,
+            note: "Everything not marked sold out can be bought here.",
         });
         expect(grid?.content).not.toHaveProperty("productIds");
     });
@@ -169,16 +230,14 @@ describe("ceramics@1, the gallery's Store (U5)", () => {
         },
     );
 
-    it("heads the page with the name, small, and the owner's line when given", () => {
-        expect(home(selling).sections[0].content).toEqual({
-            variant: "none",
-            heading: "Sample Pottery",
-            subheading: "Stoneware, thrown and fired in small runs.",
-        });
-        expect(home(nameOnly).sections[0].content).toEqual({
-            variant: "none",
-            heading: "Sample Maker",
-        });
+    it("gives the page its h1 for screen readers only: the header already shows the name", () => {
+        for (const ctx of [selling, nameOnly]) {
+            expect(home(ctx).sections[0].content).toEqual({
+                variant: "none",
+                heading: ctx.organizationName,
+                titleVisible: false,
+            });
+        }
     });
 
     it("ships its photographs as the design's briefs, and no image", () => {
@@ -189,6 +248,7 @@ describe("ceramics@1, the gallery's Store (U5)", () => {
             imageBrief?: string;
         };
         expect(shelf.images).toEqual([]);
+        expect(gallery?.content).toMatchObject({ captionPlacement: "below" });
         expect(shelf.imageBrief).toMatch(/grog.*glaze.*kiln shelf/);
         const studio = sections.find((s) => s.type === "richText");
         expect(studio?.content).toMatchObject({
@@ -220,6 +280,11 @@ describe("ceramics@1, the gallery's Store (U5)", () => {
         expect(studio).toContain("<h2>The studio</h2>");
         expect(studio).toContain("This is a placeholder");
         expect(studio).toContain("Replace both paragraphs with your own.");
+        // The facts are a definition list, each value saying what to write.
+        expect(studio).toContain(
+            "<dl><dt>Studio</dt><dd>Your area and town — ",
+        );
+        expect(studio).toContain("<dt>Throwing since</dt>");
     });
 
     it("escapes the name where it is woven into HTML", () => {

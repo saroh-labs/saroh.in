@@ -81,12 +81,17 @@ describe("the ceramics template, rendered live", () => {
             "H2 Material",
             "H2 The studio",
         ]);
-        expect(
-            container.querySelector("h1")?.nextElementSibling?.textContent,
-        ).toBe("Stoneware, thrown and fired in small runs.");
+        // The h1 is for screen readers: the header already shows the name.
+        expect(container.querySelector("h1")?.className).toBe("sr-only");
+        expect(container.textContent).not.toContain(
+            "Stoneware, thrown and fired in small runs.",
+        );
+        // Collection and Material are the menu's in-page links.
+        expect(container.querySelector("#collection")).not.toBeNull();
+        expect(container.querySelector("#material")).not.toBeNull();
     });
 
-    it("shows the catalogue's own pieces, the first given the lead, five of them", () => {
+    it("shows the catalogue's own pieces as plates, the first given the lead, five of them", () => {
         const { container } = renderHome(selling, {
             products: PIECES,
             basePath: "/shop",
@@ -98,7 +103,17 @@ describe("the ceramics template, rendered live", () => {
         const grid = within(section);
         const items = grid.getAllByRole("listitem");
         expect(items).toHaveLength(5);
-        expect(items[0].className).toContain("sm:col-span-2");
+        expect(
+            section.querySelector('[data-grid-look="plates"]'),
+        ).not.toBeNull();
+        expect(items[0].className).toContain("md:row-span-2");
+        // Counted from the pieces shown, and the note under them.
+        expect(grid.getByText("4 of 5 available")).toBeTruthy();
+        expect(
+            grid.getByText(
+                "Everything not marked sold out can be bought here.",
+            ),
+        ).toBeTruthy();
         expect(items.map((li) => li.textContent)).toEqual([
             expect.stringContaining("Fixture plate"),
             expect.stringContaining("Fixture mug"),
@@ -136,7 +151,10 @@ describe("the ceramics template, rendered live", () => {
         // The briefs are notes to the owner, never drawn for a visitor.
         expect(container.textContent).not.toMatch(/grog|mid-throw/);
         expect(container.querySelectorAll("img")).toHaveLength(0);
-        expect(page.getByText(/Throwing since:/)).toBeTruthy();
+        // The studio's facts, as a definition list.
+        const term = page.getByText("Throwing since");
+        expect(term.tagName).toBe("DT");
+        expect(term.nextElementSibling?.tagName).toBe("DD");
     });
 
     it("without Commerce, the page is the name, Material and the studio", () => {
