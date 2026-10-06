@@ -91,6 +91,16 @@ describe("All modules", () => {
                 name: "Things on Plan A: 11, limit 11. Edit plan by plan",
             }),
         ).toBeTruthy();
+        // A soft cap says so, in words and to a screen reader.
+        const soft = matrix().getByRole("button", {
+            name: "Things on Plan B: 111, soft limit 111. Edit plan by plan",
+        });
+        expect(within(soft).getByText("soft")).toBeTruthy();
+        expect(
+            within(
+                matrix().getByRole("button", { name: /^Things on Plan A/ }),
+            ).queryByText("soft"),
+        ).toBeNull();
         expect(
             matrix().getByRole("button", {
                 name: "Widgets on Plan A: Hidden. Edit plan by plan",

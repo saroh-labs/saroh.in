@@ -92,7 +92,12 @@ export default async function PeoplePage() {
                 catalogue={catalogue}
                 myActions={organization?.actions ?? null}
                 joinedFromStorefronts={joinedFromStorefronts}
-                teamLimit={team?.on ? { full: team.full, why: team.why } : null}
+                teamLimit={
+                    // A soft cap never stops an invite.
+                    team?.on && !team.soft
+                        ? { full: team.full, why: team.why }
+                        : null
+                }
                 limitNotice={
                     canManage ? <PlanLimitNotice moduleId="members" /> : null
                 }

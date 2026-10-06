@@ -20,11 +20,11 @@ export interface ComparePlan {
     same: string;
 }
 
-/** A cell as the comparison says it: its limit, its words, or not included. */
+/** A cell as the comparison says it: its limit (and if it's soft), its words, or not included. */
 export function cellWords(c: Cell): string {
     if (!c.inc) return "Not included";
     if (c.limit === null) return c.text || "Included";
-    return `${c.limit.toLocaleString("en-IN")}${c.per ? " a month" : ""}`;
+    return `${c.limit.toLocaleString("en-IN")}${c.per ? " a month" : ""}${c.soft ? " (soft)" : ""}`;
 }
 
 function yearlyWords(catalog: Catalog, plan: Plan): string {

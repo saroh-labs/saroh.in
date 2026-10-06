@@ -48,6 +48,34 @@ describe("limitNotice", () => {
         });
     });
 
+    it("never says a soft cap stops anything", () => {
+        const soft = { ...access, soft: true };
+        expect(limitNotice(soft, 85, "GB of things", "")).toMatchObject({
+            on: true,
+            full: false,
+            soft: true,
+            body: "Nothing stops at 100; we'll let you know when you reach it. Plan B gives you more.",
+            why: "",
+        });
+        const full = limitNotice(
+            soft,
+            120,
+            "GB of things",
+            "Nothing is blocked: things keep working.",
+        );
+        expect(full).toMatchObject({
+            full: true,
+            soft: true,
+            title: "You've reached your 100 GB of things on Plan A",
+            body: "Nothing is blocked: things keep working. Plan B raises the limit, or add more with an add-on.",
+            why: "",
+        });
+        expect(full.on && full.body).not.toMatch(/stopped|paused|can't/);
+        expect(limitNotice(soft, 82.34, "GB of things", "")).toMatchObject({
+            title: "You've used 82.3 of 100 GB of things on Plan A",
+        });
+    });
+
     it("offers only an add-on on the top plan, and nothing without a cap", () => {
         expect(
             limitNotice({ ...access, upgradeTo: "" }, 90, "things", ""),

@@ -117,6 +117,7 @@ describe("Plan by plan", () => {
             card: "",
             limit: null,
             per: "",
+            soft: false,
         });
     });
 
@@ -254,6 +255,39 @@ describe("Plan by plan", () => {
         expect(c.modules[0]?.cells.b).toMatchObject({
             limit: null,
             per: "month",
+        });
+    });
+
+    it("turns a cap soft or hard, offered only when there is a limit", async () => {
+        open();
+        const soft = () =>
+            row("things").getByRole("switch", {
+                name: "Soft cap: count and tell the business, never refuse",
+            });
+        expect(soft().getAttribute("aria-checked")).toBe("true");
+        expect(
+            document.getElementById(
+                soft().getAttribute("aria-describedby") ?? "",
+            )?.textContent,
+        ).toContain("nothing stops");
+
+        fireEvent.click(soft());
+        expect(soft().getAttribute("aria-checked")).toBe("false");
+        let c = await saved();
+        expect(c.modules[0]?.cells.b).toMatchObject({
+            limit: 111,
+            soft: false,
+        });
+
+        fireEvent.click(soft());
+        fireEvent.change(row("things").getByLabelText("Limit (blank: none)"), {
+            target: { value: "" },
+        });
+        expect(row("things").queryByRole("switch")).toBeNull();
+        c = await saved();
+        expect(c.modules[0]?.cells.b).toMatchObject({
+            limit: null,
+            soft: false,
         });
     });
 

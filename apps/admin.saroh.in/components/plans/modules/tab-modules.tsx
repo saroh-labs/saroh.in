@@ -385,7 +385,7 @@ function ModuleLine({
                 const ch = cellChanged(liveCatalog, m, p.id);
                 const lim = limitWords(c);
                 const said = c.inc
-                    ? `${c.text || "Included"}${lim ? `, limit ${lim}` : ""}`
+                    ? `${c.text || "Included"}${lim ? `, ${c.soft ? "soft " : ""}limit ${lim}` : ""}`
                     : c.off === "hidden"
                       ? "Hidden"
                       : "Locked";
@@ -413,8 +413,13 @@ function ModuleLine({
                                         {c.text || "Included"}
                                     </span>
                                     {lim && (
-                                        <span className="text-[11.5px] text-muted-foreground">
+                                        <span className="flex flex-wrap items-center gap-x-1.5 gap-y-0.5 text-[11.5px] text-muted-foreground">
                                             Limit {lim}
+                                            {c.soft && (
+                                                <span className="rounded-full bg-info-subtle px-1.5 py-px text-[10.5px] font-semibold text-info-subtle-foreground">
+                                                    soft
+                                                </span>
+                                            )}
                                         </span>
                                     )}
                                 </>

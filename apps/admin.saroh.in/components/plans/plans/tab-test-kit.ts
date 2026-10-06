@@ -8,7 +8,8 @@ import { ASHA, fakePricing, fakeVersion } from "@/test/pricing-fixture";
 /**
  * A made-up catalogue for the Plans and Modules tab tests (U7, U8): three
  * plans, two groups, four modules, with names, prices and limits that are
- * fake on purpose. Plan B is highlighted; Widgets is off on Plan A.
+ * fake on purpose. Plan B is highlighted, and its Things cap is soft;
+ * Widgets is off on Plan A.
  */
 export function tabCatalog(): Catalog {
     return parseCatalog({
@@ -36,7 +37,7 @@ export function tabCatalog(): Catalog {
                 child: "Things",
                 cells: {
                     a: { inc: true, text: "11", card: "11 things", limit: 11 },
-                    b: { inc: true, text: "111", limit: 111 },
+                    b: { inc: true, text: "111", limit: 111, soft: true },
                     c: { inc: true, text: "Included" },
                 },
             },

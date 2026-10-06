@@ -31,6 +31,11 @@ export interface ModuleAccessView {
     state: "on" | "locked" | "hidden";
     limit: number | null;
     per: "" | "month";
+    /**
+     * A soft cap counts and tells the business, and never refuses (storage,
+     * site visits). Absent from an API that predates it: a hard cap.
+     */
+    soft?: boolean;
     text: string;
     override: string;
     /** Metered use against `limit`; null for a switch or a row that is off. */
@@ -80,7 +85,8 @@ const OFF: LimitNotice = { on: false, full: false };
  * The 80% / 100% notice for one row, in the design's words (`limitNotice`,
  * `LIMIT_WORDS`) — or none: under 80%, a row with no cap, a business the
  * catalogue doesn't reach, or while limits aren't enforced (nothing would
- * stop them, so "you'll be stopped" would be untrue).
+ * stop them, so "you'll be stopped" would be untrue). A soft cap's notice
+ * informs and never says anything stops.
  */
 export function rowNotice(
     view: BillingAccessView | null,
@@ -96,6 +102,7 @@ export function rowNotice(
             limit: row.limit,
             plan: view.plan?.name ?? "",
             upgradeTo: row.upgradeTo?.name ?? "",
+            soft: row.soft === true,
         },
         row.usage,
         words.what,
