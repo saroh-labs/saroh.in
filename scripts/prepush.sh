@@ -1079,8 +1079,11 @@ if [ "$INT" = 1 ]; then
     if cached "$INT_STEP" int; then say "$INT_STEP" "PASS (cached)"; else INT_NEED=plain; fi
     if cached "$INT_RLS_STEP" int-rls; then say "$INT_RLS_STEP" "PASS (cached)"; else INT_NEED="$INT_NEED rls"; fi
     if [ -n "$INT_NEED" ]; then
-        # The api's workspace packages are consumed built, as in CI.
-        step int-build $TURBO build --filter='@saroh/api^...'
+        # The api's workspace packages are consumed built, as in CI. The
+        # Prisma client is generated into node_modules, outside turbo's
+        # cached outputs, so a cache hit after a schema merge left it stale
+        # (DEV_LEARNINGS, 6 Oct): generate it first, every time (~1s).
+        step int-build sh -c "pnpm --filter @saroh/database exec prisma generate >/dev/null && $TURBO build --filter='@saroh/api^...'"
         if [ "$INT_STEP" = int ] || int_select; then
             say int "$INT_WHY"
             # One mode after the other, never side by side (int_worker).

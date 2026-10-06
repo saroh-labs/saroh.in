@@ -2827,3 +2827,19 @@ on CI when that package changes, so the seed's growth since the limit was set
 **Rule**: a CPU-bound test's timeout gets at least 8 times its local time;
 don't set it just above what a laptop takes.
 **Category**: seeds · CI · `packages/database/src/seed/showcase/clinic.test.ts`
+
+## Gate — every integration spec failed after merging a schema change
+
+**Symptom**: after merging a unit that added `BookingRules.bookingPayment`,
+`pnpm prepush --all` failed nearly every int and int-rls shard with
+`PrismaClientValidationError` on the new field. Lint, types and the browser
+specs passed.
+**Root cause**: `@saroh/database`'s build runs `prisma generate`, but turbo
+caches only `dist/**`. The unit's worktree had built the same inputs, so the
+batch's build was a cache hit: `dist` was restored and the Prisma client in
+`node_modules` stayed the old one.
+**Fix**: the gate's int-build step runs `prisma generate` before the turbo
+build, every time (about a second).
+**Rule**: anything generated outside a task's turbo `outputs` must be
+regenerated before it is used; a cache hit won't do it.
+**Category**: gate · Prisma · `scripts/prepush.sh` (int-build)
