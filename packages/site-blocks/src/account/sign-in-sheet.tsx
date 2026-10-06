@@ -101,10 +101,15 @@ export function SignInSheet({
     const [code, setCode] = useState("");
     const [busy, setBusy] = useState(false);
     const [problem, setProblem] = useState<Problem | null>(null);
-    const [siteKey, setSiteKey] = useState<string | null>(
-        options.challenge.required ? options.challenge.siteKey : null,
-    );
     const [token, setToken] = useState<string | null>(null);
+
+    // The challenge's key: the one the API asked with, else the options'
+    // when they say a challenge is likely. Derived, not copied, because the
+    // options can land after the sheet opened (`AccountEntry`, #838).
+    const [askedKey, setAskedKey] = useState<string | null>(null);
+    const siteKey =
+        askedKey ??
+        (options.challenge.required ? options.challenge.siteKey : null);
 
     // Focus in on open; back to the opener on close.
     useEffect(() => {
@@ -146,7 +151,7 @@ export function SignInSheet({
             setStep("code");
             return;
         }
-        if (result.reason === "challenge") setSiteKey(result.siteKey);
+        if (result.reason === "challenge") setAskedKey(result.siteKey);
         setProblem(result);
     }
 
