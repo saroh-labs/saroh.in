@@ -65,6 +65,8 @@ describe("a site made from a template with colourways (KTD-1)", () => {
                     },
                 ],
             }),
+            // Recorded on the Site (KTD-7), with the colourway it starts in.
+            template: { id: "bakery", version: 1, styleId: "original" },
         };
 
         const { siteId } = await prisma.$transaction((tx) =>
