@@ -285,9 +285,10 @@ orgId)` (`organizations/organization-kind.ts`).
   upgrade. Deposits are the first (`bookings/deposit-plan.ts`): setting a
   service's `depositMode` to anything but NONE needs the row (NONE, or the
   deposit it already has, never asks, so the editor's full-form save keeps
-  working); on a plan without it the booking page serves no
-  `depositCents` and books the service "pay at the desk", with the stored
-  deposit untouched. Staff bookings never ask. The app locks the control
+  working); whenever the business can't take money online — that plan,
+  Payments off, or no provider (`takesOnlinePayment`, the one predicate) —
+  the booking page serves no `depositCents` and books the service "pay at
+  the desk", with the stored deposit untouched. Staff bookings never ask. The app locks the control
   with the way up (`depositLock`). `bookings/deposit-plan.db.spec.ts`.
 - **Current** (DEC-068) — **Turning a module on creates its minimum in the
   switch's own transaction.** `PUT …/modules/:key { status: "ENABLED", setup }`

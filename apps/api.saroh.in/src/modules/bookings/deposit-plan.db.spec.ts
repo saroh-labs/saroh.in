@@ -5,7 +5,9 @@
  * where it is set, on the service — and never where the customer pays: a
  * service that keeps a stored deposit on a plan without online payments
  * books at the desk like one with none, and its deposit is kept for an
- * upgrade. With `PLAN_ENFORCEMENT` off nothing changes.
+ * upgrade. The same whenever the business can't take money online for any
+ * reason: Payments switched off, or no provider connected. With
+ * `PLAN_ENFORCEMENT` off the plan changes nothing.
  *
  * The services run as the API builds them; `planMeter` reads the real
  * switch, turned on per business (an override). Catalogue rows are made up
@@ -62,8 +64,15 @@ async function planRow(planId: string) {
     });
 }
 
-/** A business on `planId`@V, its owner, details, a provider and the switch. */
-async function business(planId: string, enforce = true): Promise<Business> {
+/**
+ * A business on `planId`@V, its owner, details, the switch and — unless
+ * `provider` is false — a provider that can open the checkout.
+ */
+async function business(
+    planId: string,
+    enforce = true,
+    provider = true,
+): Promise<Business> {
     const org = await prisma.organization.create({
         data: { name: "Kavi Dental", slug: uniq("deposit-plan") },
     });
@@ -96,6 +105,12 @@ async function business(planId: string, enforce = true): Promise<Business> {
         data: { organizationId: org.id, timezone: "UTC" },
     });
     await giveBusinessDetails(org.id);
+    if (!provider) {
+        return {
+            orgId: org.id,
+            owner: { organizationId: org.id, userId: user.id, role: "OWNER" },
+        };
+    }
     // A provider that can open the checkout, so only the plan decides.
     const sealed = encryptSecret(
         JSON.stringify({ keyId: "rzp_test_Dep1", keySecret: "dep-secret" }),
@@ -293,5 +308,45 @@ describe("a stored deposit never makes a service unbookable (DB)", () => {
         });
         expect(row.status).toBe("PENDING");
         expect(row.snapshot).toMatchObject({ deposit: { cents: 40_000 } });
+    });
+});
+
+describe("a stored deposit when money can't be taken online for another reason (DB)", () => {
+    /** Book it at the desk; the deposit is refused, and the row keeps it. */
+    async function booksAtTheDesk(b: Business) {
+        const id = await rootCanal(b, "PERCENT_50");
+
+        await expect(book(id, "DEPOSIT")).rejects.toBeInstanceOf(
+            BadRequestException,
+        );
+        const { booking, payToken } = await book(id, "DESK");
+        expect(payToken).toBeNull();
+        const row = await prisma.booking.findUniqueOrThrow({
+            where: { id: booking.id },
+        });
+        expect(row).toMatchObject({ status: "CONFIRMED", paidWith: "DESK" });
+        expect(row.snapshot).toMatchObject({
+            service: { depositMode: "NONE" },
+        });
+        expect(
+            (await prisma.service.findUniqueOrThrow({ where: { id } }))
+                .depositMode,
+        ).toBe("PERCENT_50");
+    }
+
+    it("books at the desk on a plan with online payments when Payments is switched off", async () => {
+        const b = await business("grow");
+        await prisma.organizationModule.create({
+            data: {
+                organizationId: b.orgId,
+                moduleKey: "PAYMENTS",
+                status: "DISABLED",
+            },
+        });
+        await booksAtTheDesk(b);
+    });
+
+    it("books at the desk on a plan with online payments when no provider is connected", async () => {
+        await booksAtTheDesk(await business("grow", true, false));
     });
 });
