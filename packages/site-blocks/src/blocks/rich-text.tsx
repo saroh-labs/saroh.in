@@ -34,6 +34,12 @@ export default function RichTextSection({
     align?: "column" | "cards";
 }) {
     const cards = align === "cards";
+    /*
+     * A template's type scale (DEC-090) sets the body size and the reading
+     * width through `--site-body-size` and `--site-measure`; without one the
+     * fallbacks are the prose plugin's 1rem and no cap of its own, which is
+     * what every text block has always drawn.
+     */
     const text =
         content.format === "html" ? (
             <div
@@ -41,12 +47,12 @@ export default function RichTextSection({
                    text colour (#189), and `dark:prose-invert` is gone with
                    them: once a palette is chosen, a visitor's OS setting
                    must not repaint a storefront its owner picked. */
-                className="prose prose-headings:text-site-fg prose-p:text-site-fg/80 prose-a:text-site-accent prose-strong:text-site-fg prose-li:text-site-fg/80 max-w-none"
+                className="prose prose-headings:font-site-heading prose-headings:text-site-fg prose-p:text-site-fg/80 prose-a:text-site-accent prose-strong:text-site-fg prose-li:text-site-fg/80 max-w-[var(--site-measure,none)] text-[length:var(--site-body-size,1rem)]"
                 // Sanitized at publish (see the safety note above).
                 dangerouslySetInnerHTML={{ __html: content.value }}
             />
         ) : (
-            <div className="prose prose-p:text-site-fg/80 max-w-none">
+            <div className="prose prose-p:text-site-fg/80 max-w-[var(--site-measure,none)] text-[length:var(--site-body-size,1rem)]">
                 <p className="whitespace-pre-wrap">{content.value}</p>
             </div>
         );

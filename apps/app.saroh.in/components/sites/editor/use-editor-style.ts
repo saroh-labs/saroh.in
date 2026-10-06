@@ -91,7 +91,16 @@ export function useEditorStyle({
 
     function resetStyle() {
         // Back to the business's own defaults — which is what the site looked
-        // like before anyone touched the panel, not a Saroh default.
+        // like before anyone touched the panel, not a Saroh default. A site
+        // made from a template started in one of its colourways (DEC-090),
+        // so that whole look is its starting point.
+        const start = styleOptions.colourways?.find(
+            (c) => c.id === styleOptions.startColourway,
+        );
+        if (start) {
+            setStyle(start.style);
+            return;
+        }
         const defaults: SiteStyle = {
             colours: Object.fromEntries(
                 styleOptions.rows.map((r) => [r.key, r.swatches[0]?.key ?? ""]),

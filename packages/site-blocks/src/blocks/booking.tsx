@@ -237,7 +237,10 @@ export default function BookingSection({
     return (
         <section className="mx-auto w-full max-w-2xl px-5 py-[var(--site-section-padding)] sm:px-[var(--site-page-margin)]">
             {content.title ? (
-                <h2 className="text-site-fg text-3xl font-bold tracking-tight">
+                <h2
+                    data-site-title=""
+                    className="font-site-heading text-site-fg text-3xl font-bold tracking-tight"
+                >
                     {content.title}
                 </h2>
             ) : null}

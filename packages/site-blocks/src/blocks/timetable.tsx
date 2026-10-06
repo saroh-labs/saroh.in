@@ -208,7 +208,10 @@ function Frame({
 }) {
     return (
         <section className="text-site-fg mx-auto w-full max-w-screen-xl px-5 py-[var(--site-section-padding)] sm:px-[var(--site-page-margin)]">
-            <h2 className="font-site-heading text-[calc(1.625rem*var(--site-heading-scale))] font-semibold tracking-[-0.01em]">
+            <h2
+                data-site-title=""
+                className="font-site-heading text-[calc(1.625rem*var(--site-heading-scale))] font-semibold tracking-[-0.01em]"
+            >
                 {title}
             </h2>
             {intro ? (

@@ -363,7 +363,10 @@ function JournalFrame({
     return (
         <section className="mx-auto w-full max-w-screen-xl px-5 py-[var(--site-section-padding)] sm:px-[var(--site-page-margin)]">
             <div className="mb-3.5 flex items-baseline gap-3">
-                <h2 className="font-site-heading text-site-fg min-w-0 flex-1 text-[calc(1.625rem*var(--site-heading-scale))] font-semibold tracking-[-0.01em]">
+                <h2
+                    data-site-title=""
+                    className="font-site-heading text-site-fg min-w-0 flex-1 text-[calc(1.625rem*var(--site-heading-scale))] font-semibold tracking-[-0.01em]"
+                >
                     {title}
                 </h2>
                 {more ?? null}

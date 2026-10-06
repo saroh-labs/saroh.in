@@ -1,6 +1,14 @@
 import { BadRequestException } from "@nestjs/common";
-import type { FontPairKey } from "@saroh/templates";
-import { DEFAULT_FONT_PAIR, FONT_PAIRS, isFontPairKey } from "@saroh/templates";
+import type { FontPairKey, SitePalette, SiteTypeScale } from "@saroh/templates";
+import {
+    DEFAULT_FONT_PAIR,
+    FONT_PAIRS,
+    isFontPairKey,
+    paletteVariables,
+    parsePalette,
+    parseTypeScale,
+    typeScaleVariables,
+} from "@saroh/templates";
 
 /**
  * A site's look: six colour choices and five spacing scalars (#189).
@@ -120,7 +128,15 @@ export const STYLE_SCALARS = {
     },
     gridGap: {
         label: "Grid gap",
-        min: 6,
+        /*
+         * 1px is a template's floor, not a merchant's slider (DEC-090): the
+         * ceramics and studio designs draw hairlines between photos with a
+         * 1–3px gap. The slider still starts at `pickerMin`, so a merchant
+         * is offered the gaps a card grid reads with; a site whose template
+         * set a hairline keeps it.
+         */
+        min: 1,
+        pickerMin: 6,
         max: 32,
         step: 1,
         unit: "px",
@@ -158,6 +174,16 @@ export interface SiteStyle {
      * report "the style changed" on every live site nobody touched.
      */
     fontPair?: FontPairKey;
+    /**
+     * A template's own exact colours (DEC-090), complete and validated by
+     * `parsePalette`; when present they replace the six rows' colours.
+     * ABSENT unless the site is in a colourway that has one, for the reason
+     * `fontPair` is. A merchant reaches it only by choosing one of their
+     * template's colourways (`site-style-offer.ts`).
+     */
+    palette?: SitePalette;
+    /** A template's type scale (DEC-090), absent for today's sizes. */
+    type?: SiteTypeScale;
 }
 
 /** The look a site has before anyone chooses anything: today's appearance. */
@@ -194,6 +220,8 @@ export function parseSiteStyle(input: unknown): SiteStyle {
         colours?: unknown;
         scalars?: unknown;
         fontPair?: unknown;
+        palette?: unknown;
+        type?: unknown;
     };
 
     if (raw.colours !== undefined) {
@@ -250,7 +278,36 @@ export function parseSiteStyle(input: unknown): SiteStyle {
         if (raw.fontPair !== DEFAULT_FONT_PAIR) base.fontPair = raw.fontPair;
     }
 
+    // A template's palette and type scale (DEC-090): refused with every
+    // failing field named, never coerced. Null clears either, as absent.
+    // WHETHER this site may carry them is the offer's rule, checked where a
+    // merchant saves (`assertTemplateLookOffered`); this is only whether
+    // they are well formed and legible.
+    if (raw.palette !== undefined && raw.palette !== null) {
+        const parsed = parsePalette(raw.palette);
+        if (!parsed.ok) throw styleProblems(parsed.problems);
+        base.palette = parsed.palette;
+    }
+    if (raw.type !== undefined && raw.type !== null) {
+        const parsed = parseTypeScale(raw.type);
+        if (!parsed.ok) throw styleProblems(parsed.problems);
+        if (Object.keys(parsed.type).length > 0) base.type = parsed.type;
+    }
+
     return base;
+}
+
+/**
+ * A 400 naming each refused field: `details.field` is the first (the shape
+ * the font pair's refusal has), `details.problems` all of them.
+ */
+function styleProblems(
+    problems: { field: string; message: string }[],
+): BadRequestException {
+    return new BadRequestException({
+        message: problems[0]?.message ?? "This style is not valid",
+        details: { field: problems[0]?.field, problems },
+    });
 }
 
 /**
@@ -397,7 +454,30 @@ export function siteStyleVariables(style: SiteStyle): Record<string, string> {
                   "--site-font-body": style.fontPair,
               }
             : {}),
+        /*
+         * A template's own colours replace the rows' (DEC-090). Already
+         * checked to 4.5:1 per pairing, so none of the corrections above
+         * applies; turned into HSL triples, the notation every other
+         * `--site-*` colour is in, so the renderer's guard is unchanged.
+         */
+        ...(style.palette ? paletteVariables(style.palette) : {}),
+        // Its type scale: nothing at all for a site without one.
+        ...typeScaleVariables(style.type),
     };
+}
+
+/** One of a template's colourways, as Website › Style offers it. */
+export interface StyleColourway {
+    /** The preset's id, stable within the template (`Site.templateStyleId`). */
+    id: string;
+    name: string;
+    /** The colourway's whole look, parsed as a saved style is. */
+    style: SiteStyle;
+    /**
+     * Three HSL triples to draw the choice with — page, text, accent — as
+     * they resolve, so the chip shows what the page will.
+     */
+    chips: string[];
 }
 
 /**
@@ -432,19 +512,55 @@ export interface SiteStyleOptions {
     }[];
     /** The typeface pairs Website › Style offers, the default first. */
     fontPairs: { key: string; name: string }[];
+    /**
+     * The site's template's colourways (DEC-090), as named choices, the
+     * template's first first. Empty for a site with no recorded template or
+     * one whose template has none.
+     */
+    colourways: StyleColourway[];
+    /**
+     * The colourway the site was made in, which Reset returns to: the
+     * template's look is the business's starting look. Null without one.
+     */
+    startColourway: string | null;
 }
 
-export function siteStyleOptions(): SiteStyleOptions {
+/**
+ * @param colourways The site's template's colourways
+ *   (`templateColourways` in `site-style-offer.ts`); none by default.
+ * @param startColourway The one it was made in (`Site.templateStyleId`).
+ */
+export function siteStyleOptions(
+    colourways: StyleColourway[] = [],
+    startColourway?: string | null,
+): SiteStyleOptions {
     return {
         rows: STYLE_ROW_KEYS.map((row) => ({
             key: row,
             label: STYLE_ROW_LABELS[row],
             swatches: STYLE_ROWS[row].map((s) => ({ ...s })),
         })),
-        scalars: STYLE_SCALAR_KEYS.map((key) => ({
-            key,
-            ...STYLE_SCALARS[key],
-        })),
+        scalars: STYLE_SCALAR_KEYS.map((key) => {
+            const {
+                pickerMin,
+                ...bounds
+            }: (typeof STYLE_SCALARS)[StyleScalar] & {
+                pickerMin?: number;
+            } = STYLE_SCALARS[key];
+            // The slider's floor is the merchant's, not the template's.
+            return { key, ...bounds, min: pickerMin ?? bounds.min };
+        }),
         fontPairs: FONT_PAIRS.map((p) => ({ key: p.key, name: p.name })),
+        colourways,
+        startColourway: startOf(colourways, startColourway),
     };
+}
+
+/** The colourway asked for if offered, else the template's first, else none. */
+function startOf(
+    colourways: StyleColourway[],
+    id: string | null | undefined,
+): string | null {
+    if (colourways.some((c) => c.id === id)) return id ?? null;
+    return colourways.length > 0 ? colourways[0].id : null;
 }

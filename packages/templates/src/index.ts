@@ -40,6 +40,33 @@ export {
 } from "@saroh/block-contract";
 export type { FontPairKey, SiteFontPair } from "@saroh/block-contract";
 
+// A template's own palette and type scale (DEC-090), re-exported for the same
+// reason: the API validates `Site.style.palette`/`type` with the rules the
+// editor resolves its preview with.
+export {
+    LABEL_STYLES,
+    PALETTE_CONTRAST_PAIRS,
+    PALETTE_MIN_CONTRAST,
+    PALETTE_ROLES,
+    TYPE_SCALE_BOUNDS,
+    contrastRatio,
+    hexToHslTriple,
+    paletteVariables,
+    parsePalette,
+    parseTypeScale,
+    samePalette,
+    sameTypeScale,
+    typeScaleVariables,
+} from "@saroh/block-contract";
+export type {
+    LabelStyle,
+    PaletteProblem,
+    PaletteRole,
+    SitePalette,
+    SitePaletteInput,
+    SiteTypeScale,
+} from "@saroh/block-contract";
+
 // Registry
 export { getTemplate, listTemplates } from "./registry";
 

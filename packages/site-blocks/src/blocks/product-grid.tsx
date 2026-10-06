@@ -20,6 +20,7 @@ import { formatAmount } from "../product/product-page";
 import type { ShopListingCard } from "../product/shop-listing";
 import { cardLink, listCard, listPhoto } from "./list-layout";
 import { LeadGrid } from "./product-grid-lead";
+import { PlatesGrid } from "./product-grid-plates";
 
 /**
  * `productGrid` v1 — products from the catalogue, read live (G12).
@@ -251,7 +252,10 @@ function GridFrame({
     return (
         <section className="mx-auto w-full max-w-screen-xl px-5 py-[var(--site-section-padding)] sm:px-[var(--site-page-margin)]">
             <div className="mb-3.5 flex items-baseline gap-3">
-                <h2 className="font-site-heading text-site-fg min-w-0 flex-1 text-[calc(1.625rem*var(--site-heading-scale))] font-semibold tracking-[-0.01em]">
+                <h2
+                    data-site-title=""
+                    className="font-site-heading text-site-fg min-w-0 flex-1 text-[calc(1.625rem*var(--site-heading-scale))] font-semibold tracking-[-0.01em]"
+                >
                     {title}
                 </h2>
                 {more ?? null}
@@ -317,7 +321,10 @@ function ProductCards({
         feed.basePath != null ? trimTrailingSlashes(feed.basePath) : null;
     // The lead look (U2): the first product twice the room. It ignores
     // "Show as", which is the even grid's.
-    const lead = resolveVariant("productGrid", content) === "lead";
+    const look = resolveVariant("productGrid", content);
+    const lead = look === "lead";
+    // The plates look (DEC-090): photos in fixed cells, words on a band.
+    const plates = look === "plates";
     const card = (p: ShopListingCard) =>
         list
             ? listCard(show.photo && p.image !== null)
@@ -341,7 +348,14 @@ function ProductCards({
                 )
             }
         >
-            {lead ? (
+            {plates ? (
+                <PlatesGrid
+                    products={products}
+                    show={show}
+                    base={base}
+                    line={cardLine}
+                />
+            ) : lead ? (
                 <LeadGrid
                     products={products}
                     show={show}

@@ -8,6 +8,9 @@
  * use it.
  */
 
+import type { SitePalette, SiteTypeScale } from "@saroh/block-contract";
+import { paletteVariables, typeScaleVariables } from "@saroh/block-contract";
+
 /** One selectable colour, as the API serves it. */
 export interface StyleSwatch {
     key: string;
@@ -41,6 +44,23 @@ export interface SiteStyleOptions {
      * older API serves none, and the panel then offers no choice.
      */
     fontPairs?: { key: string; name: string }[];
+    /**
+     * The site's template's colourways (DEC-090), its first first: named
+     * whole looks the merchant may choose, which is the only way a palette
+     * or a type scale reaches a site. Absent from an older API.
+     */
+    colourways?: StyleColourway[];
+    /** The colourway the site was made in; Reset returns to it. */
+    startColourway?: string | null;
+}
+
+/** One of the template's colourways, as the API serves it. */
+export interface StyleColourway {
+    id: string;
+    name: string;
+    style: SiteStyle;
+    /** Page, text and accent, as HSL triples, to draw the choice with. */
+    chips: string[];
 }
 
 export interface SiteStyle {
@@ -48,6 +68,52 @@ export interface SiteStyle {
     scalars: Record<string, number>;
     /** A pair's key; absent is the default (system) pair. */
     fontPair?: string;
+    /** A template's exact colours (DEC-090); they replace the rows'. */
+    palette?: SitePalette;
+    /** A template's type scale (DEC-090). */
+    type?: SiteTypeScale;
+}
+
+/**
+ * The colourway a style is in, or undefined for a look of the merchant's own
+ * making. Matched on what a colourway sets — its colours, palette and type —
+ * so moving a slider or changing the typeface keeps the colourway chosen.
+ */
+export function activeColourway(
+    style: SiteStyle,
+    colourways: StyleColourway[] | undefined,
+): StyleColourway | undefined {
+    const same = (a: unknown, b: unknown) =>
+        JSON.stringify(a ?? null) === JSON.stringify(b ?? null);
+    return (colourways ?? []).find(
+        (c) =>
+            same(c.style.palette, style.palette) &&
+            same(c.style.type, style.type) &&
+            (style.palette !== undefined ||
+                Object.entries(c.style.colours).every(
+                    ([row, key]) => style.colours[row] === key,
+                )),
+    );
+}
+
+/**
+ * Put a style in a colourway: its colours, palette and type scale. Spacing
+ * and the typeface stay the merchant's, so choosing a colourway never undoes
+ * a slider they moved.
+ */
+export function inColourway(
+    style: SiteStyle,
+    colourway: StyleColourway,
+): SiteStyle {
+    const { palette: _p, type: _t, ...rest } = style;
+    return {
+        ...rest,
+        colours: { ...colourway.style.colours },
+        ...(colourway.style.palette
+            ? { palette: colourway.style.palette }
+            : {}),
+        ...(colourway.style.type ? { type: colourway.style.type } : {}),
+    };
 }
 
 /**
@@ -179,5 +245,9 @@ export function resolveStyleVariables(
         set("--site-font-heading", style.fontPair);
         set("--site-font-body", style.fontPair);
     }
+    // A template's exact colours and type scale (DEC-090), by the contract's
+    // one rule, as the API's resolver applies them.
+    if (style.palette) Object.assign(vars, paletteVariables(style.palette));
+    Object.assign(vars, typeScaleVariables(style.type));
     return vars;
 }

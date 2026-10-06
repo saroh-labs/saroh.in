@@ -169,6 +169,8 @@ const renderedGallery = z.object({
         renderedImageSchema.extend({ caption: z.string().optional() }),
     ),
     imageBrief: z.string().optional(),
+    // Where captions sit (DEC-090); a value this build does not know is below.
+    captionPlacement: z.string().optional(),
 });
 
 const renderedEnquiryField = z.object({
@@ -378,6 +380,7 @@ const renderedProjects = z.object({
             }),
         )
         .min(1),
+    captionPlacement: z.string().optional(),
 });
 
 /**

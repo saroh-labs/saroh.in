@@ -278,7 +278,10 @@ function VisitCard({
         <section className="mx-auto w-full max-w-screen-xl px-5 py-[var(--site-section-padding)] sm:px-[var(--site-page-margin)]">
             <div className="bg-site-fg text-site-bg grid items-center gap-4 rounded-[calc(var(--site-radius)*1.6)] p-[22px] [grid-template-columns:repeat(auto-fit,minmax(min(220px,100%),1fr))]">
                 <div className="min-w-0">
-                    <h2 className="font-site-heading text-[calc(1.375rem*var(--site-heading-scale))] font-semibold tracking-[-0.01em]">
+                    <h2
+                        data-site-title=""
+                        className="font-site-heading text-[calc(1.375rem*var(--site-heading-scale))] font-semibold tracking-[-0.01em]"
+                    >
                         {title}
                     </h2>
                     {children}

@@ -2,6 +2,8 @@ import type {
     ContractVersion,
     FontPairKey,
     SectionType,
+    SitePaletteInput,
+    SiteTypeScale,
 } from "@saroh/block-contract";
 
 /**
@@ -171,6 +173,19 @@ export interface TemplateStyle {
     scalars?: Readonly<Record<string, number>>;
     /** A key from `FONT_PAIRS` (`@saroh/block-contract`). */
     fontPair?: FontPairKey;
+    /**
+     * The design's own exact colours (DEC-090), `#RRGGBB` per `--site-*`
+     * role; when present they replace the swatch rows' colours. Checked by
+     * `parsePalette` (`@saroh/block-contract`): every text pairing 4.5:1.
+     * A merchant reaches it only by choosing this colourway.
+     */
+    palette?: Readonly<SitePaletteInput>;
+    /**
+     * The design's type scale (DEC-090): display and body size, reading
+     * width, section-title style. Bounded by `parseTypeScale`; not a
+     * Website › Style control.
+     */
+    type?: Readonly<SiteTypeScale>;
 }
 
 /** One named colourway of a template, e.g. "Original" or "Night". */

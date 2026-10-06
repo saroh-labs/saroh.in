@@ -260,3 +260,52 @@ describe("person (U2)", () => {
         }
     });
 });
+
+describe("template fidelity looks (DEC-090)", () => {
+    it("knows productGrid plates", () => {
+        expect(resolveVariant("productGrid", { variant: "plates" })).toBe(
+            "plates",
+        );
+        expect(
+            parseSectionContent("productGrid", 1, {
+                variant: "plates",
+                title: "Current collection",
+            }).success,
+        ).toBe(true);
+    });
+
+    it("takes captions over or below the photo on a gallery and on projects", () => {
+        const image = { src: "/a.jpg", alt: "a", caption: "The clay" };
+        for (const placement of ["over", "below"]) {
+            expect(
+                parseSectionContent("gallery", 2, {
+                    variant: "grid",
+                    images: [image],
+                    captionPlacement: placement,
+                }).success,
+            ).toBe(true);
+            expect(
+                parseSectionContent("projects", 1, {
+                    items: [{ title: "Kiln house", image }],
+                    captionPlacement: placement,
+                }).success,
+            ).toBe(true);
+        }
+        expect(
+            parseSectionContent("gallery", 2, {
+                variant: "grid",
+                images: [image],
+                captionPlacement: "top",
+            }).success,
+        ).toBe(false);
+    });
+
+    it("carries the placement into the published content", () => {
+        const rendered = parseRenderedContent("gallery", {
+            variant: "grid",
+            images: [{ src: "/a.jpg", alt: "a" }],
+            captionPlacement: "over",
+        });
+        expect(rendered.success && rendered.data.captionPlacement).toBe("over");
+    });
+});

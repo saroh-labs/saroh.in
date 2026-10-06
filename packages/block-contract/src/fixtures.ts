@@ -315,6 +315,15 @@ export const BLOCK_META = {
                     caption: i === 0 ? "The counter, 6am" : "The deck oven",
                 })),
             },
+            // The same lines on a bounded band over each photo (DEC-090).
+            captionsOver: {
+                variant: "grid",
+                captionPlacement: "over",
+                images: GALLERY_IMAGES.map((image, i) => ({
+                    ...image,
+                    caption: i === 0 ? "The counter, 6am" : "The deck oven",
+                })),
+            },
         },
     },
     enquiry: {
@@ -667,11 +676,18 @@ export const BLOCK_META = {
                 description:
                     "The first product takes twice the room, with tall photos and the price set large. One column on a phone.",
             },
+            {
+                id: "plates",
+                label: "Plates",
+                description:
+                    "Photos in fixed-height cells with hairlines between, the first twice the room; the name, a line and a small price sit on a band over each photo.",
+            },
         ] as const,
         fixtures: {
             // The catalog and the snapshot hand the component sample products.
             default: { variant: "default", title: "From the counter" },
             lead: { variant: "lead", title: "On the counter today" },
+            plates: { variant: "plates", title: "Current collection" },
         },
         cases: {
             // Hand-picked, two of them, no prices.
@@ -753,6 +769,15 @@ export const BLOCK_META = {
                         title: "A shopfront in Bandra",
                         imageBrief: "The finished shopfront at dusk",
                     },
+                ],
+            },
+            // Title and caption over the photo, the studio's work (DEC-090).
+            captionsOver: {
+                variant: "cards",
+                title: "Selected work",
+                captionPlacement: "over",
+                items: [
+                    { ...PROJECT_ITEMS[0], caption: "Photographed on site" },
                 ],
             },
         },

@@ -29,6 +29,11 @@ export default function GallerySection({
     if (images.length === 0) return null;
     // Captions (U2): a line under a photo, drawn only where one was written.
     const captioned = images.some((img) => Boolean(img.caption?.trim()));
+    // Over the photo, on a bounded band (DEC-090); anything else is below.
+    const over = content.captionPlacement === "over";
+    const figure = over
+        ? "relative overflow-hidden rounded-[var(--site-radius)]"
+        : null;
 
     if (layout === "carousel") {
         return (
@@ -36,13 +41,16 @@ export default function GallerySection({
                 <div className="flex snap-x snap-mandatory gap-[var(--site-grid-gap)] overflow-x-auto pb-4">
                     {images.map((img, i) =>
                         captioned ? (
-                            <figure key={i} className="flex-none snap-start">
+                            <figure
+                                key={i}
+                                className={cn("flex-none snap-start", figure)}
+                            >
                                 <img
                                     src={img.src}
                                     alt={img.alt ?? ""}
                                     className="h-64 w-auto rounded-[var(--site-radius)] object-cover"
                                 />
-                                <Caption text={img.caption} />
+                                <Caption text={img.caption} over={over} />
                             </figure>
                         ) : (
                             <img
@@ -87,9 +95,12 @@ export default function GallerySection({
                     // always drawn (G5).
                     if (!captioned) return picture;
                     return (
-                        <figure key={i} className="min-w-0 break-inside-avoid">
+                        <figure
+                            key={i}
+                            className={cn("min-w-0 break-inside-avoid", figure)}
+                        >
                             {picture}
-                            <Caption text={img.caption} />
+                            <Caption text={img.caption} over={over} />
                         </figure>
                     );
                 })}
@@ -98,10 +109,22 @@ export default function GallerySection({
     );
 }
 
-/** The line under a photo; nothing when none was written. */
-function Caption({ text }: { text?: string }) {
+/**
+ * The line under a photo; nothing when none was written. `over` sets it on
+ * a band across the photo's foot instead: at most 66px and two lines, the
+ * rest clipped, in the page colour on a scrim of the text colour, so it
+ * reads at the palette's own contrast whatever the photo is.
+ */
+function Caption({ text, over = false }: { text?: string; over?: boolean }) {
     const said = text?.trim();
     if (!said) return null;
+    if (over) {
+        return (
+            <figcaption className="from-site-fg/90 via-site-fg/80 to-site-fg/0 text-site-bg absolute inset-x-0 bottom-0 max-h-[66px] overflow-hidden bg-gradient-to-t px-3 pb-2.5 pt-5 text-[13px] leading-snug [overflow-wrap:anywhere]">
+                <span className="line-clamp-2">{said}</span>
+            </figcaption>
+        );
+    }
     return (
         <figcaption className="text-site-muted mt-2 text-[13px] leading-snug [overflow-wrap:anywhere]">
             {said}
