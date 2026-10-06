@@ -19,7 +19,6 @@ vi.mock("next/font/google", () => {
         "IBM_Plex_Sans",
         "Inter",
         "Inter_Tight",
-        "JetBrains_Mono",
         "Newsreader",
         "Source_Serif_4",
     ];
@@ -51,6 +50,8 @@ describe("the renderer's faces (KTD-2)", () => {
         expect(stacks?.heading).toMatch(
             /^'__Geist_x1', '__Geist_Fallback_x1', /,
         );
-        expect(stacks?.body).toMatch(/^'__JetBrains_Mono_x1', /);
+        // Geist for the body too (U9): the design's mono is an accent,
+        // never the paragraphs' face.
+        expect(stacks?.body).toMatch(/^'__Geist_x1', /);
     });
 });
