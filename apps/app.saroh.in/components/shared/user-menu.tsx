@@ -20,7 +20,7 @@ import { useTheme } from "next-themes";
 import Link from "next/link";
 
 import { accountsLoginUrl } from "@/lib/accounts";
-import { HELP_URL } from "@/lib/help/links";
+import { helpHomeUrl } from "@/lib/help/links";
 
 /**
  * All three, including System. Appearance lives only here since the top
@@ -130,7 +130,7 @@ export function UserMenu({
                     </DropdownMenuSubContent>
                 </DropdownMenuSub>
                 <DropdownMenuItem asChild>
-                    <a href={HELP_URL} target="_blank" rel="noreferrer">
+                    <a href={helpHomeUrl()} target="_blank" rel="noreferrer">
                         <CircleHelp />
                         <span className="flex-1">Help centre</span>
                     </a>

@@ -2,10 +2,14 @@
 import { cleanup, render, screen, within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
+import { features } from "@/content/features";
 import { FEATURE_SLUGS, SOLUTION_SLUGS } from "@/content/types";
 
 import FeaturePage, { generateMetadata, generateStaticParams } from "./page";
 
+// jsdom reads as a browser, so the server env is mocked: no preview, and
+// no built-routes list (every route counts as built).
+vi.mock("@/env", () => ({ env: {} }));
 vi.mock("next/navigation", () => ({
     notFound: () => {
         throw new Error("NEXT_NOT_FOUND");
@@ -19,7 +23,17 @@ vi.mock("@/lib/pricing", () => ({
 
 const params = (slug: string) => ({ params: Promise.resolve({ slug }) });
 
-afterEach(cleanup);
+afterEach(() => {
+    cleanup();
+    vi.useRealTimers();
+});
+
+/** The page as it renders at `iso` (no preview; every route counts as built). */
+async function renderAt(slug: string, iso: string) {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date(iso));
+    return render(await FeaturePage(params(slug)));
+}
 
 describe("/features/[slug]", () => {
     it("builds the eight feature pages and nothing else", () => {
@@ -67,6 +81,29 @@ describe("/features/[slug]", () => {
             expect(hrefs).not.toContain(`/features/${slug}`);
             unmount();
         }
+    });
+
+    it("links its Help articles only once Help is published (17 Oct, India)", async () => {
+        const before = await renderAt("bookings", "2026-10-16T18:29:59.999Z");
+        expect(
+            before.container.querySelectorAll('a[href^="/help"]'),
+        ).toHaveLength(0);
+        before.unmount();
+
+        await renderAt("bookings", "2026-10-16T18:30:00.000Z");
+        const how = screen
+            .getByRole("heading", { name: features.bookings.howTitle })
+            .closest("section");
+        const links = Array.from(
+            how?.querySelectorAll('a[href^="/help"]') ?? [],
+        ).map((a) => [a.textContent, a.getAttribute("href")]);
+        expect(links).toEqual([
+            ["How to set your team's hours", "/help/set-your-teams-hours"],
+            [
+                "How to take a deposit when they book",
+                "/help/take-a-deposit-when-they-book",
+            ],
+        ]);
     });
 
     it("an unknown slug is a 404", async () => {

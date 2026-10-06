@@ -1,4 +1,4 @@
-// @covers web:/changelog web:/privacy web:/help web:/api/waitlist api:waitlist
+// @covers web:/changelog web:/privacy web:/help web:/llms.txt web:/api/waitlist api:waitlist
 import type { APIRequestContext, Page, TestInfo } from "@playwright/test";
 import { expect, test } from "@playwright/test";
 
@@ -14,6 +14,7 @@ import { urls } from "../playwright.config";
  *   a Resources page) answers 200: no 404, no link to a page that isn't
  *   published or built (R2, R8 as a class).
  * - No Resources page links to itself in its own content (R8).
+ * - Every page /llms.txt lists answers 200 (plan U7).
  * - No Resources page scrolls sideways at 390.
  * - The changelog's email field joins the list (`source=changelog`) and
  *   confirms; the same address again is not an error.
@@ -128,6 +129,22 @@ test("every Resources link resolves, and no page links to itself", async ({
     }
     await page.keyboard.press("Escape");
     await expect(nav.getByRole("menu")).toHaveCount(0);
+});
+
+test("every page /llms.txt lists answers", async ({ request }, testInfo) => {
+    test.skip(!isDesk(testInfo), "HTTP only; once is enough");
+    const res = await request.get(`${WEB}/llms.txt`);
+    expect(res.status()).toBe(200);
+    const text = await res.text();
+    expect(text.startsWith("# Saroh")).toBe(true);
+    // Its links are absolute on www.saroh.in; check each path on this stack.
+    const paths = Array.from(text.matchAll(/\]\((https:\/\/[^)]+)\)/g)).map(
+        (m) => new URL(m[1]).pathname,
+    );
+    expect(paths).toContain("/changelog");
+    for (const path of paths) {
+        expect(await resolves(request, `${WEB}${path}`), path).toBe("200");
+    }
 });
 
 test("no Resources page scrolls sideways at 390", async ({ page, request }) => {

@@ -39,6 +39,9 @@
     ],
     "globalPassThroughEnv": [
         "PORT",
+        // help.saroh.in: where its proxy sends people once Help moves to
+        // saroh.in/help (17 Oct 2026). Read per request, never at build.
+        "MARKETING_URL",
         "APP_URL",
         "ACCOUNTS_URL",
         "CORS_ORIGIN",

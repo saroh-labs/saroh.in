@@ -3,7 +3,9 @@ import type { Metadata } from "next";
 import localFont from "next/font/local";
 import Link from "next/link";
 
+import { Arrow } from "@/components/v2/arrow";
 import { WaitlistForm } from "@/components/v2/waitlist/waitlist-form";
+import { linkShown } from "@/content/resources";
 import { SAROH_HANDLE, SAROH_SOCIAL } from "@/content/social";
 import type { WaitlistContent } from "@/content/waitlist";
 import {
@@ -11,8 +13,10 @@ import {
     launchOfferLines,
     WAITLIST,
     WAITLIST_FOOTER,
+    WAITLIST_MONEY,
 } from "@/content/waitlist";
 import { readLaunchOffer } from "@/lib/launch-offer";
+import { resourcesContext } from "@/lib/resources-context";
 import { pageMetadata } from "@/lib/seo";
 import { openingShort } from "@/lib/waitlist";
 
@@ -72,6 +76,10 @@ export default async function WaitlistPage() {
         ...WAITLIST,
         offer: offer ? launchOfferLines(offer) : WAITLIST.offer,
     };
+    const integrations = linkShown(
+        WAITLIST_MONEY.link.href,
+        resourcesContext(),
+    );
     const opening = content.openingDate
         ? `Opens ${openingShort(content.openingDate)}`
         : "Opening soon";
@@ -129,6 +137,21 @@ export default async function WaitlistPage() {
                             ))}
                         </ul>
                     </div>
+                    <p className="m-0 max-w-[46ch] text-[14px] leading-[1.5] text-muted-foreground [text-wrap:pretty]">
+                        {WAITLIST_MONEY.line}
+                        {integrations ? (
+                            <>
+                                {" "}
+                                <Link
+                                    href={WAITLIST_MONEY.link.href}
+                                    className="cursor-pointer whitespace-nowrap rounded-sm font-semibold text-brand-700 no-underline hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-foreground focus-visible:[outline-style:solid]"
+                                >
+                                    {WAITLIST_MONEY.link.label}
+                                    <Arrow />
+                                </Link>
+                            </>
+                        ) : null}
+                    </p>
                 </div>
 
                 <div className="flex flex-col gap-5 rounded-mk-card border border-border bg-white p-[clamp(20px,3vw,32px)] shadow-[0_4px_12px_rgba(28,28,26,0.10)]">
