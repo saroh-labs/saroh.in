@@ -39,6 +39,43 @@ async function business(name = "Rye"): Promise<OrganizationContext> {
 
 const personalVersion = getTemplate("personal")?.version;
 
+describe("a site's menu from its template", () => {
+    it("lists the template's other pages, in its order, and not the home page", async () => {
+        const ctx = await business("Iron & Oak");
+        const created = await sites.createFromTemplate(ctx, {
+            name: "Iron & Oak",
+            templateId: "portfolio",
+        });
+        const site = await prisma.site.findUniqueOrThrow({
+            where: { id: created.siteId },
+            select: {
+                navigation: true,
+                pages: { select: { id: true, title: true, isHome: true } },
+            },
+        });
+        const manifest = getTemplate("portfolio");
+        const others = (manifest?.pages ?? []).filter((p) => !p.isHome);
+        expect(others.length).toBeGreaterThan(0);
+        const byTitle = new Map(site.pages.map((p) => [p.title, p.id]));
+        expect(site.navigation).toEqual({
+            items: others.map((p) => ({ pageId: byTitle.get(p.title) })),
+        });
+    });
+
+    it("leaves a one-page site's menu empty", async () => {
+        const ctx = await business();
+        const created = await sites.createFromTemplate(ctx, {
+            name: "Rye",
+            templateId: "bakery",
+        });
+        const site = await prisma.site.findUniqueOrThrow({
+            where: { id: created.siteId },
+            select: { navigation: true },
+        });
+        expect(site.navigation).toBeNull();
+    });
+});
+
 describe("a site's template (KTD-7)", () => {
     it("is recorded when the site is made from personal", async () => {
         const ctx = await business();

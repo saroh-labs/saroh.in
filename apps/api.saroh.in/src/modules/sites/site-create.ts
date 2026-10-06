@@ -34,6 +34,8 @@ import {
 } from "./site-address";
 import type { SiteFooter } from "./site-footer";
 import { parseSiteFooter } from "./site-footer";
+import type { SiteNavigation } from "./site-navigation";
+import { NAVIGATION_MAX_ITEMS } from "./site-navigation";
 import type { SiteStyle } from "./site-style";
 import { parseSiteStyle } from "./site-style";
 import {
@@ -466,8 +468,14 @@ export async function writeSiteFromTemplate(
         plan.pages,
     );
 
+    // A template's other pages go in the menu, in its order (industry
+    // templates): the menu lists only what `Site.navigation` names, so a
+    // Timetable or Trainers page would otherwise be unreachable from the
+    // header. The home page is the site name's link, not an entry.
+    const menuPageIds: string[] = [];
     for (const page of pages) {
-        await tx.page.create({
+        const created = await tx.page.create({
+            select: { id: true },
             data: {
                 siteId: site.id,
                 organizationId: ctx.organizationId,
@@ -494,6 +502,20 @@ export async function writeSiteFromTemplate(
                         },
                     },
                 },
+            },
+        });
+        if (!page.isHome) menuPageIds.push(created.id);
+    }
+    if (menuPageIds.length > 0) {
+        const navigation: SiteNavigation = {
+            items: menuPageIds
+                .slice(0, NAVIGATION_MAX_ITEMS)
+                .map((pageId) => ({ pageId })),
+        };
+        await tx.site.update({
+            where: { id: site.id },
+            data: {
+                navigation: navigation as unknown as Prisma.InputJsonValue,
             },
         });
     }
