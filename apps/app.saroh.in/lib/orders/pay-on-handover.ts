@@ -16,3 +16,18 @@ export function handoverPayment(
     }
     return order.fulfilmentType === "PICKUP" ? "collection" : "delivery";
 }
+
+/**
+ * "Not collected for 4 days" (R34): the pay-on-handover banner's heading
+ * once nobody has come for the order in three days, counted by the API in
+ * the business's zone, which sends none before then (the banner then
+ * reads as usual).
+ */
+export function uncollectedHeading(
+    handover: "collection" | "delivery",
+    days: number | null | undefined,
+): string | null {
+    if (typeof days !== "number" || days <= 0) return null;
+    const what = handover === "collection" ? "Not collected" : "Not delivered";
+    return `${what} for ${days} days`;
+}

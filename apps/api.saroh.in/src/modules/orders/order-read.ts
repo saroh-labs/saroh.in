@@ -168,6 +168,12 @@ export interface OrderReadDto extends FulfilmentView, LateView {
      * money at the handover and mark it paid.
      */
     payOnHandover: boolean;
+    /**
+     * Days a pay-on-handover order has waited, unpaid and not handed over,
+     * from the third on in the business's zone (R34, `uncollected.ts`);
+     * null otherwise. Set by Order Detail's read only.
+     */
+    uncollectedDays?: number | null;
     updatedAt: Date;
     store: { id: string; name: string };
     status: string;

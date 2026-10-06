@@ -177,6 +177,19 @@ nobody was told. Round-2 A14 closed it (`bookings/booking-notify.handler.ts`).
 - **Once per event**, claimed as a `CustomerNotice` (`TEAM_TOLD`,
   `team:<event>:<id>`), and re-read first: an unpaid checkout, a payment
   that went through after all, or someone who left again is not announced.
+- **Order alerts live on the New order row** (`event: "order"` in
+  `alert-preferences.ts`, notice types `order.new` and `order.uncollected`).
+  A new order type of alert adds its notice type there, so the bell switch
+  and the role check cover it. **Not collected** (R34, DEC-032): a site
+  order to pay on handover queues `team.alert` `{ event: "uncollected" }`
+  with the order, `runAt` the start of the third day after it was placed in
+  the business's zone (`queueUncollectedAlert`). The run re-reads it: paid,
+  handed over or cancelled since says nothing; not due yet (the zone moved)
+  queues itself again for its day (`putOffUntilDue`); else it is told once
+  (`team:uncollected:<orderId>`). It never cancels the order. Home's row is
+  read live (`home/home-uncollected.ts`), not from the alert. Known gap: a
+  pay-on-handover order placed before this shipped has no alert queued;
+  Home still shows it.
 
 ## Scheduled go-live — **Current** (DEC-071, T10)
 

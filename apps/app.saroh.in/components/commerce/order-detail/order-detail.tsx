@@ -355,6 +355,12 @@ export function OrderDetail({
                         }
                         sending={payLink.busy}
                         handover={handover ?? undefined}
+                        uncollectedDays={order.uncollectedDays}
+                        onCancel={
+                            change.cancel === null && !hold
+                                ? () => setPanel("cancel")
+                                : undefined
+                        }
                     />
                 ) : null}
                 {appointment ? (

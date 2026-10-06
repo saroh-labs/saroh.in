@@ -236,6 +236,12 @@ export interface OrderRead extends FulfilmentFields {
      * first, and handed over once marked paid. Absent from an older API.
      */
     payOnHandover?: boolean;
+    /**
+     * Days a pay-on-handover order has waited, unpaid and not handed over,
+     * from the third on in the business's zone (R34); null otherwise.
+     * Absent from an older API.
+     */
+    uncollectedDays?: number | null;
     updatedAt: string;
     store: { id: string; name: string };
     status: "PENDING" | "PROCESSING" | "SHIPPED" | "DELIVERED" | "CANCELLED";

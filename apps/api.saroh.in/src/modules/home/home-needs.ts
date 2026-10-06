@@ -15,7 +15,8 @@ import type {
  *
  * The design ranks by what has gone wrong, not by module:
  *
- * 1. Late, and someone is waiting: late orders, a note for a visit in the
+ * 1. Late, and someone is waiting: late orders, a website order to pay on
+ *    handover nobody came for in three days (R34), a note for a visit in the
  *    next two days, a message waiting on a reply, overdue invoices, money
  *    to refund, a refund the provider failed (B9), overdue follow-ups.
  * 2. Blocked: stock short for orders, a renewal not paid, invoices going
@@ -51,6 +52,7 @@ interface Ranked {
  */
 const SOURCE_ORDER = [
     "COMMERCE_OPEN_ORDERS",
+    "COMMERCE_UNCOLLECTED_ORDERS",
     "APPOINTMENTS_BOOKING_NOTES",
     "CRM_UNANSWERED_MESSAGES",
     "PAYMENTS_OVERDUE_INVOICES",
@@ -165,6 +167,19 @@ const ROWERS: Partial<Record<string, Rower>> = {
             amountIn: ev.amountMinor === null ? null : "sub",
         }),
         more: (n) => `${n} more open order${n === 1 ? "" : "s"}`,
+    },
+    // R34: "Anika Rao hasn't collected order #1042", "Not collected: 4
+    // days", until it is paid, handed over or cancelled.
+    COMMERCE_UNCOLLECTED_ORDERS: {
+        rank: () => 1,
+        row: (action, ev) => ({
+            ...fromEvidence(action, ev),
+            title: ev.headline ?? `Order ${ev.title} hasn't been collected`,
+            sub: ev.detail ?? null,
+            amountIn: ev.amountMinor === null ? null : "sub",
+        }),
+        more: (n) =>
+            `${n} more order${n === 1 ? "" : "s"} not collected or delivered`,
     },
     PAYMENTS_OVERDUE_INVOICES: {
         rank: () => 1,

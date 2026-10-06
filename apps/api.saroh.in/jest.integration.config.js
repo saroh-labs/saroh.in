@@ -86,6 +86,8 @@ module.exports = {
         // Paying at the handover (2026-10-06): mocked database, unit project.
         "<rootDir>/src/modules/orders/offline-checkout-order.spec.ts",
         "<rootDir>/src/modules/orders/offline-checkout-start.spec.ts",
+        // R34: pure; home.uncollected.db.spec.ts runs here.
+        "<rootDir>/src/modules/orders/uncollected.spec.ts",
         "<rootDir>/src/modules/stores/storefronts.spec.ts",
         "<rootDir>/src/modules/products/products.remove.spec.ts",
         "<rootDir>/src/modules/products/merge-report.service.spec.ts",

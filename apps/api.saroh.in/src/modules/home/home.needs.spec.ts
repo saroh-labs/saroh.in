@@ -448,9 +448,22 @@ describe("HomeService needs", () => {
             organizationModule: {
                 findFirst: jest.fn().mockResolvedValue(null),
             },
+            // R34's uncollected orders (`payOnHandover`): none here.
             order: {
-                count: jest.fn().mockResolvedValue(orders.length),
-                findMany: jest.fn().mockResolvedValue(orders),
+                count: jest.fn(
+                    (args?: { where?: { payOnHandover?: boolean } }) =>
+                        Promise.resolve(
+                            args?.where?.payOnHandover === true
+                                ? 0
+                                : orders.length,
+                        ),
+                ),
+                findMany: jest.fn(
+                    (args?: { where?: { payOnHandover?: boolean } }) =>
+                        Promise.resolve(
+                            args?.where?.payOnHandover === true ? [] : orders,
+                        ),
+                ),
             },
             invoice: {
                 count: jest.fn().mockResolvedValue(invoices.length),

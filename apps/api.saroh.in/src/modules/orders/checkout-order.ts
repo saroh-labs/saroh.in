@@ -8,6 +8,7 @@ import { resolveContact } from "../customer-workspace/resolve-contact";
 import { gstInsideOrder } from "../invoices/order-invoice";
 import { loadTaxProfile } from "../invoices/order-invoicing";
 import { enqueueTeamAlert } from "../notifications/team-alerts";
+import { queueUncollectedAlert } from "../notifications/uncollected-alert";
 import type { ShopScope } from "./checkout-bag";
 import type { QuotedLine } from "./checkout-quote";
 import type { CheckoutStartDto } from "./checkout.dto";
@@ -252,7 +253,11 @@ export async function createCheckoutOrder(
                             })),
                         },
                     },
-                    select: { id: true, items: { select: { id: true } } },
+                    select: {
+                        id: true,
+                        createdAt: true,
+                        items: { select: { id: true } },
+                    },
                 });
                 if (onHandover) {
                     // Promised now, as a staff pay-later order's units are
@@ -271,6 +276,14 @@ export async function createCheckoutOrder(
                         orderId: order.id,
                         actorUserId: null,
                     });
+                    // And, three days on in the business's zone, the
+                    // team's "Not collected" if it is still waiting (R34).
+                    // It only tells: nothing cancels it on its own.
+                    await queueUncollectedAlert(
+                        tx,
+                        scope.organizationId,
+                        order,
+                    );
                     return order.id;
                 }
                 await tx.job.create({

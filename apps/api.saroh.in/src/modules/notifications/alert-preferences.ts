@@ -85,7 +85,8 @@ export const ALERT_MODULE: Record<AlertEvent, string | null> = {
 
 /** The inbox notice types each row covers. */
 export const ALERT_NOTIFICATION_TYPES: Record<AlertEvent, readonly string[]> = {
-    order: ["order.new"],
+    // R34: an order to pay on handover nobody came for in three days.
+    order: ["order.new", "order.uncollected"],
     booking: ["booking.new", "booking.moved", "booking.cancelled"],
     failed: ["payment.failed"],
     team: ["team.joined"],
