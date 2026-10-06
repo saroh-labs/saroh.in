@@ -146,6 +146,110 @@ function looksLikePlaceholder(value: string): boolean {
     return PLACEHOLDER_PATTERNS.some((re) => re.test(t));
 }
 
+/**
+ * The words an industry template ships in place of the owner's own
+ * (template polish): text that says it is a placeholder, or that tells the
+ * owner what to write — "Your degree — the subject, where you studied",
+ * "Say how the work is fired", "Your first coach". Matched at the START of
+ * a piece of text and on a template's own phrasing, so an owner's sentence
+ * that happens to begin "Say" or "Your" is not caught: the list below is
+ * the templates' (`packages/templates/src/templates/*.ts`), and a template
+ * adding a new kind of instruction adds its opening here.
+ */
+const TEMPLATE_PLACEHOLDER_PATTERNS: RegExp[] = [
+    /\bplaceholders?\b/i,
+    /^your (first|second|third|fourth|fifth|lead|next|most recent) (project|coach|offer|engagement|piece|class|service)\b/i,
+    /^your [^.!?—\n]{1,48} — /i,
+    /^your (day rate|monthly rate|usual range)\b/i,
+    /^write (a few lines|two or three|a line|a sentence|a paragraph)\b/i,
+    /^say (how|what|where|which|whether|who|when|why|a little|plainly)\b/i,
+    /^name something you\b/i,
+    /^add one of these\b/i,
+    /^one sentence on what you\b/i,
+];
+
+/** A template's placeholder words in one piece of text, or null. */
+function templatePlaceholderIn(value: string): string | null {
+    for (const line of value.split(/\n+/)) {
+        const t = line.trim();
+        if (
+            t !== "" &&
+            TEMPLATE_PLACEHOLDER_PATTERNS.some((re) => re.test(t))
+        ) {
+            return t;
+        }
+    }
+    return null;
+}
+
+/**
+ * The first piece of a block's text still in a template's words. HTML is
+ * read as its runs of text between tags, so one placeholder paragraph is
+ * found inside a longer text block. A scan of `<` and `>`, not a regex over
+ * the markup, so it stays linear (CodeQL js/polynomial-redos).
+ */
+function templatePlaceholderInAny(values: string[]): string | null {
+    for (const value of values) {
+        let at = 0;
+        for (;;) {
+            const open = value.indexOf("<", at);
+            const close = open === -1 ? -1 : value.indexOf(">", open + 1);
+            const piece =
+                open === -1 || close === -1
+                    ? value.slice(at)
+                    : value.slice(at, open);
+            const found = templatePlaceholderIn(piece);
+            if (found) return found;
+            if (open === -1 || close === -1) break;
+            at = close + 1;
+        }
+    }
+    return null;
+}
+
+/** Every string inside a value, however deep. */
+function stringsOf(value: unknown, out: string[] = []): string[] {
+    if (typeof value === "string") out.push(value);
+    else if (Array.isArray(value)) value.forEach((v) => stringsOf(v, out));
+    else if (typeof value === "object" && value !== null) {
+        Object.values(value).forEach((v) => stringsOf(v, out));
+    }
+    return out;
+}
+
+/**
+ * The fields of the four blocks a template fills with placeholder words,
+ * read for the check below. Ids, links, photos and briefs are left out: a
+ * photo brief is a note to the owner by design (KTD-5) and never drawn.
+ */
+const TEMPLATE_TEXT_FIELDS: Record<string, string[]> = {
+    person: [
+        "name",
+        "role",
+        "credentials",
+        "credentialsLabel",
+        "bio",
+        "title",
+        "people",
+    ],
+    features: ["heading", "intro", "items", "note"],
+    richText: ["value", "callout"],
+    projects: ["title", "items"],
+};
+
+/** Keys inside those fields that are not text a visitor reads. */
+const NOT_VISITOR_TEXT = new Set(["imageBrief", "image", "link", "src", "alt"]);
+
+function visitorText(value: unknown): string[] {
+    if (Array.isArray(value)) return value.flatMap(visitorText);
+    if (typeof value === "object" && value !== null) {
+        return Object.entries(value)
+            .filter(([key]) => !NOT_VISITOR_TEXT.has(key))
+            .flatMap(([, v]) => visitorText(v));
+    }
+    return stringsOf(value);
+}
+
 /** Strip tags so a rich-text check reads the words, not the markup. */
 function textOf(html: string): string {
     return html
@@ -224,6 +328,39 @@ function checkSection(
             `This ${label === label.toUpperCase() ? label : label.toLowerCase()} still has example text in it ("${quoted}") — replace it with your own before going live.`,
             null,
         );
+    }
+
+    /*
+     * A template's placeholder words (template polish): an industry
+     * template ships the practitioner, the points, the text and the work as
+     * words that say what to write ("A placeholder. Say what they coach…").
+     * Named with the words themselves, once per block, so the check says
+     * exactly what to replace. The text block's own check below already
+     * names a "placeholder"; this one is not repeated for it.
+     */
+    const fields = TEMPLATE_TEXT_FIELDS[section.type] as string[] | undefined;
+    if (fields !== undefined && example === null) {
+        const found = templatePlaceholderInAny(
+            fields.flatMap((key) => visitorText(c[key])),
+        );
+        const textBlockSaysSo =
+            section.type === "richText" &&
+            looksLikePlaceholder(textOf(str(c.value)));
+        if (found !== null && !textBlockSaysSo) {
+            const label =
+                section.type in BLOCK_META
+                    ? BLOCK_META[
+                          section.type as keyof typeof BLOCK_META
+                      ].label.toLowerCase()
+                    : "block";
+            const quoted =
+                found.length > 60 ? `${found.slice(0, 57).trimEnd()}…` : found;
+            at(
+                "placeholderText",
+                `This ${label} block still has the template's placeholder words in it ("${quoted}") — replace them with your own before going live.`,
+                null,
+            );
+        }
     }
 
     switch (section.type) {

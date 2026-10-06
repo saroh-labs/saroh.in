@@ -1099,8 +1099,8 @@ const personV1 = z.object({
     /**
      * The name as the page's `h1` (template polish), for a person who opens
      * the page — the practitioner's site whose first section is them. ABSENT
-     * is the `h2` every section heading is. The pre-publish check names a
-     * second `h1` on a page.
+     * is the `h2` every section heading is. Set it only on a section that
+     * opens its page, so the page keeps one `h1`.
      */
     asTitle: z.boolean().optional(),
     /**
