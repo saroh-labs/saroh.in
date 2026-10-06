@@ -96,8 +96,8 @@ test("the article draws its five real screens, ringed where a step names a contr
     expect(howTo?.step).toHaveLength(5);
 });
 
-/** The other articles, each with how many steps it has. */
-const MORE = [
+/** The setup, orders and payment articles, each with how many steps it has. */
+const SETUP_AND_PAY = [
     ["create-your-business", 5],
     ["add-your-gstin", 5],
     ["take-your-first-order", 6],
@@ -105,7 +105,7 @@ const MORE = [
     ["connect-cashfree", 5],
 ] as const;
 
-for (const [slug, steps] of MORE) {
+for (const [slug, steps] of SETUP_AND_PAY) {
     test(`${slug} draws a real, ringed screen for each of its ${steps} steps`, async ({
         page,
     }) => {
