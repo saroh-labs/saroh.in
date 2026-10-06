@@ -16,6 +16,7 @@ import {
     AuditService,
 } from "../audit/audit.service";
 import { EntitlementService } from "../billing/entitlement.service";
+import { planMeter } from "../billing/metering.service";
 import type {
     LateThresholds,
     StorefrontFulfilmentType,
@@ -163,11 +164,12 @@ export class StorefrontsService {
      * succeed. For rendering; `StoresService.createForUser` still decides.
      */
     async allowance(organizationId: string): Promise<StorefrontAllowance> {
-        const [used, entitlements] = await Promise.all([
+        const [used, entitlements, governed] = await Promise.all([
             prisma.store.count({ where: { organizationId, deletedAt: null } }),
             this.entitlements.getEntitlements(organizationId),
+            planMeter.enforcedRow(organizationId, "locations"),
         ]);
-        return { used, limit: storefrontLimit(entitlements) };
+        return { used, limit: storefrontLimit(entitlements, !!governed) };
     }
 
     async list(organizationId: string): Promise<StorefrontSummary[]> {
@@ -445,6 +447,12 @@ export class StorefrontsService {
         };
 
         await prisma.$transaction(async (tx) => {
+            // Becoming a place customers visit is one more of the plan's
+            // locations (`shopLocations`): checked first, as it takes the
+            // meter's lock. Going online, or staying a shop, adds none.
+            if (dto.kind === "SHOP" && current.kind !== "SHOP") {
+                await planMeter.roomInTx(tx, organizationId, "locations");
+            }
             if (dto.name !== undefined) {
                 await tx.store.update({
                     where: { id: storeId },

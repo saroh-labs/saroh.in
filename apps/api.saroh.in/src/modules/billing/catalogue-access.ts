@@ -17,8 +17,8 @@
  *   `teamMembers`) beside it, with the same cap (absent when uncapped, 0 when
  *   off);
  * - the keys no catalogue row sells: from the business's own legacy row when
- *   it is still on one, else {@link UNSOLD_ENTITLEMENTS} and the paid-plan
- *   switches ({@link PAID_PLAN_SWITCHES}).
+ *   it is still on one, else {@link LEGACY_FLOOR_ENTITLEMENTS} and the
+ *   paid-plan switches ({@link PAID_PLAN_SWITCHES}).
  */
 import type {
     Catalog,
@@ -44,15 +44,27 @@ export function mapEntry(moduleId: string): ModuleMapEntry | undefined {
 export type EntitlementMap = Record<string, number | boolean>;
 
 /**
- * Keys enforced today that no catalogue row sells, the same on every
- * catalogue plan. They are product defaults, not plan terms: one website
- * (DEC-018, beside the product's own cap) and the default number of
- * locations (DEC-030). A raise still lifts them for one business.
+ * The floor from before the catalogue sold websites and locations: one
+ * website (DEC-018) and the default number of locations (DEC-030), the same
+ * on every plan. The catalogue governs both now — the `sites` row, and the
+ * `locations` row for places customers visit — through metering, behind
+ * `PLAN_ENFORCEMENT`. This floor is what `EntitlementService.check` reads
+ * where metering doesn't answer for that row (the switch off, a business
+ * off the catalogue, a version without the row), so nothing new locks while
+ * the switch is off. A raise still lifts it for one business.
+ *
+ * Its keys stay the floor in the map: a catalogue row with the same id
+ * (`sites`) doesn't overwrite one here, or turning the row off on a plan
+ * would read as no cap at all, and capping it would lock behind the switch.
  */
-export const UNSOLD_ENTITLEMENTS: Readonly<EntitlementMap> = {
+export const LEGACY_FLOOR_ENTITLEMENTS: Readonly<EntitlementMap> = {
     sites: 1,
     storefronts: 5,
 };
+
+const FLOOR_KEYS: ReadonlySet<string> = new Set(
+    Object.keys(LEGACY_FLOOR_ENTITLEMENTS),
+);
 
 /**
  * Switches no catalogue row carries, on with any plan that has a price and
@@ -118,12 +130,14 @@ export function entitlementMapFor(input: {
     const out: EntitlementMap = input.legacyRow
         ? { ...input.legacyRow }
         : {
-              ...UNSOLD_ENTITLEMENTS,
+              ...LEGACY_FLOOR_ENTITLEMENTS,
               ...Object.fromEntries(PAID_PLAN_SWITCHES.map((k) => [k, paid])),
           };
     for (const a of input.access) {
         const on = a.state === "on";
-        out[a.moduleId] = on ? (a.limit ?? true) : false;
+        if (!FLOOR_KEYS.has(a.moduleId)) {
+            out[a.moduleId] = on ? (a.limit ?? true) : false;
+        }
         const legacyKey = mapEntry(a.moduleId)?.legacyEntitlementKey;
         if (!legacyKey) continue;
         if (!on) out[legacyKey] = 0;
@@ -164,7 +178,7 @@ export interface EntitlementOverrideRow {
  * the map already sets: a key left uncapped stays uncapped (a raise must not
  * impose a limit where there was none), a boolean feature is untouched, and
  * a value below the current one is ignored. On the catalogue path the rows'
- * raises are already in (`resolveAccess`); this lifts the keys no row sells
+ * raises are already in (`resolveAccess`); this lifts the legacy floor
  * (`sites`, `storefronts`), and is a no-op on the rest.
  */
 export function applyOverrides(
@@ -229,6 +243,8 @@ export interface ModuleAccessView {
     /** The cap, null for none. */
     limit: number | null;
     per: ModuleAccess["per"];
+    /** A soft cap: counted and told, never refused (storage, visits). */
+    soft: boolean;
     text: string;
     /** Why it differs from the plan, in the design's words; empty if not. */
     override: string;
@@ -294,6 +310,7 @@ export function moduleAccessViews(
             state: a.state,
             limit: a.state === "on" ? a.limit : null,
             per: a.per,
+            soft: a.state === "on" && a.soft === true,
             text: a.text,
             override: a.override,
             usage:

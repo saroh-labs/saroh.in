@@ -33,12 +33,12 @@ import {
     applyOverrides,
     asEntitlementMap,
     entitlementMapFor,
+    LEGACY_FLOOR_ENTITLEMENTS,
     liveRaises,
     moduleAccessViews,
     PAID_PLAN_SWITCHES,
     registryModuleIncluded,
     toOverrides,
-    UNSOLD_ENTITLEMENTS,
     withoutRaises,
 } from "./catalogue-access";
 import { usageByModule } from "./metering";
@@ -55,7 +55,7 @@ import { moveReadiness } from "./plan-moves";
  * cannot, e.g., add a custom domain.
  */
 export const FREE_ENTITLEMENTS: EntitlementMap = {
-    ...UNSOLD_ENTITLEMENTS,
+    ...LEGACY_FLOOR_ENTITLEMENTS,
     teamMembers: 2,
     customDomain: false,
 };
@@ -311,9 +311,9 @@ export class CatalogueAccessService {
             planId = mapped;
             if (billed.key.startsWith(CATALOG_PLAN_KEY_PREFIX)) {
                 version = billed.version;
-                // A catalogue row keys by row id; the unsold keys beside it.
+                // A catalogue row keys by row id; the floor beside it, and
+                // never overwritten by a row of the same id (`sites`).
                 fallback = {
-                    ...UNSOLD_ENTITLEMENTS,
                     ...Object.fromEntries(
                         PAID_PLAN_SWITCHES.map((k) => [
                             k,
@@ -321,6 +321,7 @@ export class CatalogueAccessService {
                         ]),
                     ),
                     ...own,
+                    ...LEGACY_FLOOR_ENTITLEMENTS,
                 };
             } else {
                 version = null;

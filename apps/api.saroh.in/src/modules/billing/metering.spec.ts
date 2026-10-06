@@ -20,6 +20,10 @@ const tx = {
     communicationProvider: { count: jest.fn() },
     businessProfile: { findUnique: jest.fn() },
     service: { findFirst: jest.fn() },
+    store: { count: jest.fn() },
+    site: { count: jest.fn() },
+    media: { aggregate: jest.fn() },
+    analyticsDailyAggregate: { aggregate: jest.fn() },
 };
 const $transaction = jest.fn((fn: (t: typeof tx) => unknown) => fn(tx));
 
@@ -34,12 +38,18 @@ import { resolveAllAccess } from "@saroh/pricing-catalog";
 
 import { fakeMeteredCatalog } from "../../../test/fixtures/pricing-catalog";
 import type { FeatureFlagService } from "../feature-flags/feature-flags.service";
-import { moduleAccessViews } from "./catalogue-access";
+import {
+    entitlementMapFor,
+    LEGACY_FLOOR_ENTITLEMENTS,
+    moduleAccessViews,
+} from "./catalogue-access";
 import type { CatalogueAccessService } from "./catalogue-access.service";
 import {
+    bytesToGb,
     countUsage,
     meteredKeyOf,
     meteredModules,
+    monthFirstDay,
     monthWindow,
     windowKey,
 } from "./metering";
@@ -119,6 +129,10 @@ describe("which rows metering counts", () => {
             bookings: "bookingsPerMonth",
             members: "teamMembers",
             integrations: "integrations",
+            locations: "shopLocations",
+            sites: "sites",
+            storage: "storageGb",
+            visits: "visitsPerMonth",
         });
         expect(meteredKeyOf("roles")).toBeNull();
     });
@@ -170,6 +184,105 @@ describe("what each count asks", () => {
         );
     });
 
+    it("leaves Reviewers out of the team, people and invitations both", async () => {
+        tx.membership.count.mockResolvedValue(0);
+        tx.organizationInvitation.count.mockResolvedValue(0);
+        await countUsage(tx as never, "org", "teamMembers", now);
+        expect(tx.membership.count).toHaveBeenCalledWith({
+            where: { organizationId: "org", role: { not: "REVIEWER" } },
+        });
+        expect(tx.organizationInvitation.count).toHaveBeenCalledWith({
+            where: {
+                organizationId: "org",
+                status: "PENDING",
+                expiresAt: { gt: now },
+                role: { not: "REVIEWER" },
+            },
+        });
+    });
+
+    it("counts only live locations customers visit", async () => {
+        tx.store.count.mockResolvedValue(1);
+        expect(await countUsage(tx as never, "org", "shopLocations", now)).toBe(
+            1,
+        );
+        expect(tx.store.count).toHaveBeenCalledWith({
+            where: {
+                organizationId: "org",
+                deletedAt: null,
+                settings: { kind: "SHOP" },
+            },
+        });
+    });
+
+    it("counts websites that aren't deleted", async () => {
+        tx.site.count.mockResolvedValue(2);
+        expect(await countUsage(tx as never, "org", "sites", now)).toBe(2);
+        expect(tx.site.count).toHaveBeenCalledWith({
+            where: { organizationId: "org", deletedAt: null },
+        });
+    });
+
+    it("sums checked uploads, in GB rounded up to the hundredth", async () => {
+        tx.media.aggregate.mockResolvedValue({
+            _sum: { sizeBytes: 1_234_567_890 },
+        });
+        expect(await countUsage(tx as never, "org", "storageGb", now)).toBe(
+            1.24,
+        );
+        expect(tx.media.aggregate).toHaveBeenCalledWith({
+            where: { organizationId: "org", status: "READY" },
+            _sum: { sizeBytes: true },
+        });
+        tx.media.aggregate.mockResolvedValue({ _sum: { sizeBytes: null } });
+        expect(await countUsage(tx as never, "org", "storageGb", now)).toBe(0);
+    });
+
+    it("reads GB as storage is sold, and never shows a little as nothing", () => {
+        expect(bytesToGb(1_000_000_000)).toBe(1);
+        expect(bytesToGb(1)).toBe(0.01);
+        expect(bytesToGb(0)).toBe(0);
+        expect(bytesToGb(-5)).toBe(0);
+    });
+
+    it("sums this month's site views from the rollup's org-wide total", async () => {
+        tx.analyticsDailyAggregate.aggregate.mockResolvedValue({
+            _sum: { count: 7 },
+        });
+        expect(
+            await countUsage(tx as never, "org", "visitsPerMonth", now),
+        ).toBe(7);
+        expect(tx.analyticsDailyAggregate.aggregate).toHaveBeenCalledWith({
+            where: {
+                organizationId: "org",
+                siteId: "",
+                type: "site.view",
+                dimension: "",
+                dimensionValue: "",
+                date: { gte: new Date("2026-10-01T00:00:00.000Z") },
+            },
+            _sum: { count: true },
+        });
+        tx.analyticsDailyAggregate.aggregate.mockResolvedValue({
+            _sum: { count: null },
+        });
+        expect(
+            await countUsage(tx as never, "org", "visitsPerMonth", now),
+        ).toBe(0);
+    });
+
+    it("starts visits on the UTC day dated the 1st of the business's month", () => {
+        // 1 Oct 00:10 in India is still 30 Sep in UTC: India's month, and
+        // its rollup day, is October's.
+        const now = new Date("2026-10-01T00:10:00+05:30");
+        expect(monthFirstDay(now, "Asia/Kolkata")).toEqual(
+            new Date("2026-10-01T00:00:00.000Z"),
+        );
+        expect(monthFirstDay(now, "UTC")).toEqual(
+            new Date("2026-09-01T00:00:00.000Z"),
+        );
+    });
+
     it("adds connected messaging to connected payment providers", async () => {
         tx.merchantPaymentProvider.count.mockResolvedValue(1);
         tx.communicationProvider.count.mockResolvedValue(1);
@@ -216,6 +329,21 @@ describe("crossing a notice's line", () => {
             title: "You're past your 2 orders a month on Plan A",
             body: "Your site kept taking orders, so no customer was turned away. Plan B raises the limit.",
         });
+    });
+
+    it("never tells a soft cap it will be stopped", () => {
+        const row = { plan: "Plan A", upgradeTo: "Plan B", soft: true };
+        expect(limitNoticeWords(row, "visitsPerMonth", 11, 9, "warn")).toEqual({
+            title: "You've used 9 of 11 site visits a month on Plan A",
+            body: "Nothing stops at 11. Plan B gives you more.",
+        });
+        const over = limitNoticeWords(row, "storageGb", 1, 1.5, "over");
+        expect(over.title).toBe(
+            "You're past your 1 GB of photos and videos on Plan A",
+        );
+        expect(over.body).toMatch(
+            /^Nothing is blocked: your uploads keep working/,
+        );
     });
 });
 
@@ -315,6 +443,56 @@ describe("MeteringService", () => {
         ).toMatchObject({ used: 5 });
     });
 
+    it("never refuses a row the catalogue marks soft, whatever the caller says", async () => {
+        const { meter } = meterFor("free");
+        // Plan A's storage is 1 GB, soft: 3 GB in, adding more is counted.
+        tx.media.aggregate.mockResolvedValue({
+            _sum: { sizeBytes: 3_000_000_000 },
+        });
+        expect(
+            await meter.roomInTx(tx as never, "org", "storage", {
+                adding: 0.5,
+            }),
+        ).toMatchObject({ key: "storageGb", limit: 1, used: 3, adding: 0.5 });
+        // Visits: soft and monthly, told once past the cap.
+        tx.analyticsDailyAggregate.aggregate.mockResolvedValue({
+            _sum: { count: 11 },
+        });
+        expect(
+            await meter.roomInTx(tx as never, "org", "visits", { adding: 2 }),
+        ).toMatchObject({ key: "visitsPerMonth", limit: 11, used: 11 });
+        expect(tx.job.create).toHaveBeenCalledWith({
+            data: {
+                type: PLAN_LIMIT_NOTICE_TYPE,
+                organizationId: "org",
+                payload: { organizationId: "org", moduleId: "visits" },
+            },
+        });
+    });
+
+    it("refuses a hard row the catalogue doesn't mark soft", async () => {
+        const { meter } = meterFor("free");
+        tx.site.count.mockResolvedValue(1);
+        expect(
+            responseOf(
+                await meter
+                    .roomInTx(tx as never, "org", "sites")
+                    .catch((e: unknown) => e),
+            ).details,
+        ).toMatchObject({ code: "PLAN_LIMIT_REACHED", limitKey: "sites" });
+        tx.store.count.mockResolvedValue(1);
+        expect(
+            responseOf(
+                await meter
+                    .roomInTx(tx as never, "org", "locations")
+                    .catch((e: unknown) => e),
+            ).details,
+        ).toMatchObject({
+            code: "PLAN_LIMIT_REACHED",
+            limitKey: "shopLocations",
+        });
+    });
+
     it("refuses a write into a row the plan leaves off", async () => {
         const { meter } = meterFor("free");
         await expect(meter.assertIncluded("org", "roles")).rejects.toThrow(
@@ -371,7 +549,26 @@ describe("usage on the access view", () => {
         });
         const row = (id: string) => views.find((v) => v.moduleId === id);
         expect(row("products")?.usage).toBe(2);
+        expect(row("products")?.soft).toBe(false);
+        expect(row("storage")?.soft).toBe(true);
         expect(row("orders")?.usage).toBeNull();
         expect(row("roles")?.usage).toBeNull();
+    });
+});
+
+describe("the legacy floor for websites and locations", () => {
+    it("stays the floor in the limit map, whatever the catalogue's row says", () => {
+        // Plan B sells 2 websites; behind the switch the floor still reads,
+        // and metering, not the map, enforces the catalogue's number.
+        const map = entitlementMapFor({
+            catalog,
+            access: rows("grow"),
+            planId: "grow",
+            legacyRow: null,
+        });
+        expect(map.sites).toBe(LEGACY_FLOOR_ENTITLEMENTS.sites);
+        expect(map.storefronts).toBe(LEGACY_FLOOR_ENTITLEMENTS.storefronts);
+        // Other rows still read by id.
+        expect(map.locations).toBe(2);
     });
 });

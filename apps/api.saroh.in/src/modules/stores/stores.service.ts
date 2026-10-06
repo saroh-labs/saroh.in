@@ -8,6 +8,7 @@ import {
 import { prisma } from "@saroh/database";
 
 import { EntitlementService } from "../billing/entitlement.service";
+import { planMeter } from "../billing/metering.service";
 import { FeatureFlagService } from "../feature-flags/feature-flags.service";
 import { FlagKey } from "../feature-flags/flags";
 import {
@@ -324,11 +325,14 @@ export class StoresService {
      * as of B5) and is proven by the caller (the org-scoped controller resolves
      * it from the request context, never the client body).
      *
-     * Two caps on the business's live storefronts, checked before anything
-     * else, as `SitesService.createFromTemplate` checks websites: the
-     * product's ceiling first (a 409 — upgrading would not help), then the
-     * plan's `storefronts` entitlement (a 403 at the plan limit). The lower
-     * of the two wins (ADR-010).
+     * Caps on the business's live storefronts, checked before anything
+     * else: the product's ceiling first (a 409 — upgrading would not
+     * help), then the plan's. Where the catalogue governs locations (its
+     * `locations` row, behind PLAN_ENFORCEMENT) it caps only places
+     * customers visit, and a new storefront is online until its kind says
+     * otherwise — so the kind change is what's metered
+     * (`StorefrontsService.update`), and creating one asks nothing more.
+     * Elsewhere the old `storefronts` floor, a 403 (ADR-010).
      */
     async createForUser(
         userId: string,
@@ -343,23 +347,11 @@ export class StoresService {
                 message: `This business has ${existing} locations, as many as Saroh allows. Close one it no longer sells from to add another.`,
             });
         }
-        try {
-            await this.entitlements.check(
-                organizationId,
-                "storefronts",
-                existing,
-            );
-        } catch (err) {
-            if (!(err instanceof ForbiddenException)) throw err;
-            // The check's own words are for a developer; say it as the
-            // merchant meets it.
-            const limit = storefrontLimit(
-                await this.entitlements.getEntitlements(organizationId),
-            );
-            throw new ForbiddenException({
-                message: `Your plan includes ${limit === 1 ? "one location" : `${limit} locations`}. A bigger plan adds more.`,
-            });
-        }
+        const governed = await planMeter.enforcedRow(
+            organizationId,
+            "locations",
+        );
+        if (!governed) await this.storefrontFloor(organizationId, existing);
 
         // A business sells in one currency (DEC-030): a new storefront takes
         // the business's, rather than reading as the column default (USD)
@@ -389,6 +381,30 @@ export class StoresService {
             },
         });
         return { id: store.id };
+    }
+
+    /** The plan's `storefronts` floor, in the merchant's words when it refuses. */
+    private async storefrontFloor(
+        organizationId: string,
+        existing: number,
+    ): Promise<void> {
+        try {
+            await this.entitlements.check(
+                organizationId,
+                "storefronts",
+                existing,
+            );
+        } catch (err) {
+            if (!(err instanceof ForbiddenException)) throw err;
+            // The check's own words are for a developer; say it as the
+            // merchant meets it.
+            const limit = storefrontLimit(
+                await this.entitlements.getEntitlements(organizationId),
+            );
+            throw new ForbiddenException({
+                message: `Your plan includes ${limit === 1 ? "one location" : `${limit} locations`}. A bigger plan adds more.`,
+            });
+        }
     }
 
     /** Update a store's core fields — owner or a write-capable member. */

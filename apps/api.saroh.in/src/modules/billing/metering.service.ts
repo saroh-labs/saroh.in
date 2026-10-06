@@ -35,7 +35,9 @@ export interface RoomOptions {
     adding?: number;
     /**
      * Never refuse: count, and tell the business when it passes its cap —
-     * the site's checkout at the monthly orders cap (OQ-8: a soft cap).
+     * the site's checkout at the monthly orders cap (OQ-8: a soft cap). A
+     * row the catalogue marks soft (`ModuleAccess.soft`: storage, visits)
+     * is soft whatever the call site passes.
      */
     soft?: boolean;
     /** The refusal to throw instead of `PLAN_LIMIT_REACHED` (the booking page's). */
@@ -69,9 +71,12 @@ export async function lockMeter(
  * kill switch (OQ-4): off, they read nothing and refuse nothing. They read
  * the business through `CatalogueAccessService`, so its plan, overrides and
  * add-ons are the same ones `GET …/billing/access` shows; a business the
- * catalogue doesn't reach yet (`source: "legacy"`) is never refused here,
- * and the limits `EntitlementService.check` has always enforced (`sites`,
- * `storefronts`) are unchanged.
+ * catalogue doesn't reach yet (`source: "legacy"`) is never refused here.
+ * Websites and locations: where {@link enforcedRow} answers for `sites` or
+ * `locations`, the catalogue governs them and the old `sites`/`storefronts`
+ * floor isn't asked; where it doesn't (switch off, off the catalogue), the
+ * callers keep the floor `EntitlementService.check` has always enforced
+ * (`LEGACY_FLOOR_ENTITLEMENTS`), so nothing new locks behind the switch.
  *
  * Fail safe (OQ-4): if the plan can't be read, the write goes ahead and the
  * failure is logged (`plan_meter_unresolved`) — a business keeps what it has
@@ -219,8 +224,11 @@ export class MeteringService {
         const adding = options.adding ?? 1;
         const { now } = options;
         const moduleId = row.moduleId;
+        // The catalogue's word wins over the call site's: a soft cell
+        // counts and tells, and never refuses.
+        const soft = options.soft === true || row.soft === true;
         if (row.state !== "on") {
-            if (options.soft) return null;
+            if (soft) return null;
             throw moduleLocked(row);
         }
         const key = meteredKeyOf(moduleId);
@@ -229,7 +237,7 @@ export class MeteringService {
 
         await lockMeter(tx, organizationId, key);
         const used = await countUsage(tx, organizationId, key, now);
-        if (!options.soft && used + adding > limit) {
+        if (!soft && used + adding > limit) {
             throw options.refuse?.() ?? planLimitReached(row, key, limit, used);
         }
         const room: PlanRoom = {
