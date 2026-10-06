@@ -69,6 +69,12 @@ export interface FreeRowsOptions {
     grandfatheredBefore: Date;
     dryRun?: boolean;
     now?: Date;
+    /**
+     * Read only the businesses with no subscription row (the go-live job,
+     * #839): the report then counts no `hasSubscription`, and stays cheap on
+     * an instance where every business already has its row.
+     */
+    onlyWithoutSubscription?: boolean;
 }
 
 export interface FreeRowsReport {
@@ -111,6 +117,9 @@ export async function backfillFreeSubscriptions(
         dryRun,
     };
     const organizations = await prisma.organization.findMany({
+        where: options.onlyWithoutSubscription
+            ? { subscription: null, deletedRetainedAt: null }
+            : undefined,
         select: { id: true },
         orderBy: { id: "asc" },
     });
@@ -181,4 +190,52 @@ export async function backfillFreeSubscriptions(
         }
     }
     return report;
+}
+
+/**
+ * When the catalogue first existed on this instance: the first version's
+ * publish (its row's `createdAt`). Null before any version is written.
+ */
+export async function catalogueStartedAt(
+    prisma: Pick<PrismaClient, "pricingCatalogVersion">,
+): Promise<Date | null> {
+    const first = await prisma.pricingCatalogVersion.findFirst({
+        orderBy: { version: "asc" },
+        select: { createdAt: true },
+    });
+    return first?.createdAt ?? null;
+}
+
+/**
+ * Give their Free row to the businesses sign-up couldn't (#839): those that
+ * joined once the catalogue existed but while no version was live (a first
+ * version scheduled, or waiting on the billing provider), so the onboarding
+ * transaction found no plan to put them on. Run at every go-live.
+ *
+ * The cutoff is the first version's publish, never "now": a business that
+ * joined before the catalogue existed is an existing business, given a row
+ * only once it has a live plan override (grandfathered, or an operator's),
+ * exactly as {@link backfillFreeSubscriptions} decides. Null when no version
+ * is live or the live one doesn't offer `planId` monthly; nothing written.
+ */
+export async function startMissingFreeRows(
+    prisma: PrismaClient,
+    options: { planId: string; now?: Date },
+): Promise<FreeRowsReport | null> {
+    const now = options.now ?? new Date();
+    const row = await liveCataloguePlanRow(
+        prisma,
+        options.planId,
+        "month",
+        now,
+    );
+    if (!row?.active) return null;
+    const startedAt = await catalogueStartedAt(prisma);
+    if (!startedAt) return null;
+    return backfillFreeSubscriptions(prisma, {
+        planId: options.planId,
+        grandfatheredBefore: startedAt,
+        now,
+        onlyWithoutSubscription: true,
+    });
 }

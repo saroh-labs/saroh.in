@@ -21,6 +21,10 @@ import {
 } from "../admin/admin-audit.service";
 import { AdminPermission } from "../admin/admin-permissions";
 import {
+    BILLING_FREE_ROWS_TYPE,
+    enqueueFreeRows,
+} from "../billing/free-rows.job";
+import {
     CATALOGUE_BILLING_PROVIDER,
     enqueueProviderPlanSync,
     PROVIDER_PLAN_SYNC_TYPE,
@@ -607,6 +611,12 @@ export class CatalogueWritesService {
                 input.goLiveAt,
             );
         }
+        // A business that signed up while no version was live has no Free
+        // row (#839): give it one at go-live. Waiting: the provider sync
+        // queues it when the version goes live.
+        if (status !== "waiting") {
+            await enqueueFreeRows(tx, { version }, input.goLiveAt, input.now);
+        }
 
         return {
             version,
@@ -665,12 +675,16 @@ export class CatalogueWritesService {
         return { version: row.version, catalog: check.catalog };
     }
 
-    /** A cancelled version's go-live revalidation and provider sync, not yet run. */
+    /** A cancelled version's go-live revalidation, provider sync and Free rows, not yet run. */
     private async dropRevalidations(tx: Tx, version: number): Promise<void> {
         const jobs = await tx.job.findMany({
             where: {
                 type: {
-                    in: [PRICING_REVALIDATE_TYPE, PROVIDER_PLAN_SYNC_TYPE],
+                    in: [
+                        PRICING_REVALIDATE_TYPE,
+                        PROVIDER_PLAN_SYNC_TYPE,
+                        BILLING_FREE_ROWS_TYPE,
+                    ],
                 },
                 status: "PENDING",
             },

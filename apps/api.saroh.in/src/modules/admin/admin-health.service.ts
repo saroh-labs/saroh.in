@@ -1,5 +1,9 @@
 import { Injectable } from "@nestjs/common";
-import { prisma } from "@saroh/database";
+import {
+    catalogueStartedAt,
+    liveCatalogueVersion,
+    prisma,
+} from "@saroh/database";
 
 import { env } from "../../env";
 import { HealthService } from "../health/health.service";
@@ -58,6 +62,7 @@ export class AdminHealthService {
             this.safe("queue", "Job queue", () => this.queue()),
             this.safe("webhooks", "Webhook deliveries", () => this.webhooks()),
             this.safe("providers", "Providers", () => this.providers()),
+            this.safe("plan-rows", "Plan rows", () => this.planRows()),
             this.safe("storage", "Storage", () =>
                 Promise.resolve(this.storage()),
             ),
@@ -238,6 +243,66 @@ export class AdminHealthService {
                 label: "Open providers",
                 consoleHref: "/operations/providers",
             },
+        };
+    }
+
+    /**
+     * Businesses with no subscription row read as legacy `no-plan`, and plan
+     * rules skip them (#839). Once a version is live, every business that
+     * joined after the catalogue existed gets its Free row (at sign-up or the
+     * go-live job); one that joined before waits for the grandfather step.
+     */
+    private async planRows() {
+        const live = await liveCatalogueVersion(prisma);
+        if (!live) {
+            return {
+                state: "unmeasured" as const,
+                summary:
+                    "No pricing version is live yet, so no business is on a plan row.",
+            };
+        }
+        const startedAt = await catalogueStartedAt(prisma);
+        const where = { subscription: null, deletedRetainedAt: null };
+        const [missing, before] = await Promise.all([
+            prisma.organization.count({ where }),
+            startedAt
+                ? prisma.organization.count({
+                      where: { ...where, createdAt: { lt: startedAt } },
+                  })
+                : Promise.resolve(0),
+        ]);
+        if (missing === 0) {
+            return {
+                state: "ok" as const,
+                summary: "Every business is on a plan row.",
+            };
+        }
+        const after = missing - before;
+        const parts = [
+            `${count(missing, "business", "businesses")} on no plan row, so plan rules skip ${missing === 1 ? "it" : "them"}`,
+            ...(before > 0
+                ? [
+                      `${NUMBER.format(before)} joined before pricing existed and ${before === 1 ? "waits" : "wait"} on the grandfather and Free-rows backfills`,
+                  ]
+                : []),
+            ...(after > 0
+                ? [
+                      `${NUMBER.format(after)} joined since and should have ${after === 1 ? "its" : "their"} Free row: check the job queue`,
+                  ]
+                : []),
+        ];
+        return {
+            state: "warn" as const,
+            summary: `${parts.join("; ")}.`,
+            ...(after > 0
+                ? {
+                      action: {
+                          label: "Open the job queue",
+                          consoleHref:
+                              "/operations/jobs?type=billing.free-rows.start",
+                      },
+                  }
+                : {}),
         };
     }
 

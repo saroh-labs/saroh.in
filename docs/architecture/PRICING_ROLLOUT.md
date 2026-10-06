@@ -39,7 +39,12 @@ release time.
    subscription row and no plan override still reads `FREE_ENTITLEMENTS`,
    and nothing new is locked while `PLAN_ENFORCEMENT` is off. From this
    release every new sign-up gets a Free subscription row on the live
-   version (OQ-2).
+   version (OQ-2). One who signs up while no version is live (the first
+   scheduled, or waiting on the provider) gets it at go-live:
+   `billing.free-rows.start`, queued at every go-live, runs this step's rule
+   with the first version's publish as the cutoff (#839), so it never starts
+   a business that joined before pricing existed and has no plan override.
+   The admin Health page's **Plan rows** counts businesses on no row.
 5. **Free-rows backfill (U12)**, after step 3, with step 3's cutoff. Dry run
    first:
 
