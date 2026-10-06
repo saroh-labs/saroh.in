@@ -25,6 +25,8 @@ jest.mock("../invoices/order-invoicing", () => ({
 jest.mock("@saroh/database", () => {
     const order = {
         findFirst: jest.fn(),
+        // Recording a payment by hand keeps what was taken (`paidByHand`).
+        findUnique: jest.fn().mockResolvedValue({ total: "250.00" }),
         update: jest.fn(),
         // Cancelling or refunding retires the order's pay link (B11).
         updateMany: jest.fn().mockResolvedValue({ count: 0 }),
@@ -43,7 +45,11 @@ jest.mock("@saroh/database", () => {
     // Marking paid first asks whether it is being paid online (#622): here
     // no visit is held and no payment is going through.
     const booking = { findFirst: jest.fn().mockResolvedValue(null) };
-    const paymentIntent = { findFirst: jest.fn().mockResolvedValue(null) };
+    const paymentIntent = {
+        findFirst: jest.fn().mockResolvedValue(null),
+        // Nothing was paid online here.
+        findMany: jest.fn().mockResolvedValue([]),
+    };
     return {
         prisma: {
             order,

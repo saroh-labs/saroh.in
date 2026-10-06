@@ -33,6 +33,7 @@ import {
     storefrontTypesOf,
     typeOf,
 } from "./fulfilment";
+import { handPaidCents } from "./hand-payments";
 import type { ChangeFulfilmentDto } from "./order-change.dto";
 import { fulfilmentNote, tellOrderCustomer } from "./order-customer-note";
 import { isServiceLine } from "./order-line";
@@ -290,12 +291,27 @@ export class OrderFulfilmentChangeService {
                 }
             }
 
+            // Paid by hand, the counter takes or gives back the difference
+            // now (`byHand`): what was paid by hand moves with it, so a
+            // later edit works out its own difference from what was paid.
+            const paidByHand = byHand
+                ? {
+                      paidByHand: fromCents(
+                          Math.max(
+                              0,
+                              handPaidCents({ ...order, paymentIntents: [] }) +
+                                  differenceCents,
+                          ),
+                      ),
+                  }
+                : {};
             await tx.order.update({
                 where: { id: order.id },
                 data: {
                     fulfilment: stored,
                     shipping: fromCents(newShippingCents),
                     total: fromCents(totalCents),
+                    ...paidByHand,
                     ...(gstCents !== null ? { tax: fromCents(gstCents) } : {}),
                     ...address,
                 },

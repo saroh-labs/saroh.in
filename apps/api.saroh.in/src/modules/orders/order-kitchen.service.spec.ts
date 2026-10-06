@@ -63,6 +63,12 @@ jest.mock("../invoices/order-invoicing", () => ({
     settleSupplementaryInvoices: jest.fn().mockResolvedValue(0),
 }));
 
+// Whether a difference can be asked for online (plan, Payments, a
+// provider): yes, unless a test says the plan takes no online payments.
+jest.mock("./order-online", () => ({
+    orderTakesOnline: jest.fn().mockResolvedValue(true),
+}));
+
 jest.mock("@saroh/database", () => {
     const pick = <T extends Record<string, unknown>>(row: T) => ({ ...row });
     const orderWith = () => {
@@ -88,8 +94,10 @@ jest.mock("@saroh/database", () => {
                 lastName: "Rao",
                 phone: "+91 90000 00000",
             },
+            // Paid online: one payment for `paidCents`. Paid at the counter
+            // (`paidCents` 0): none, the money recorded on the order.
             paymentIntents:
-                o.paymentStatus === "PAID"
+                o.paymentStatus === "PAID" && (o.paidCents as number) > 0
                     ? [{ amountCents: o.paidCents as number, refunds: [] }]
                     : [],
             discountRedemption: null,
@@ -424,7 +432,8 @@ jest.mock("@saroh/database", () => {
                 Promise.resolve(
                     // Nothing was paid on a superseded charge here.
                     where.status !== "SUPERSEDED" &&
-                        mockDb.order.paymentStatus === "PAID"
+                        mockDb.order.paymentStatus === "PAID" &&
+                        (mockDb.order.paidCents as number) > 0
                         ? [
                               {
                                   amountCents: mockDb.order.paidCents,
@@ -435,6 +444,12 @@ jest.mock("@saroh/database", () => {
                 ),
             ),
             updateMany: jest.fn(() => Promise.resolve({ count: 0 })),
+            // Nothing is going through online right now (#622).
+            findFirst: jest.fn(() => Promise.resolve(null)),
+        },
+        // No visit held for the customer's own payment (#622).
+        booking: {
+            findFirst: jest.fn(() => Promise.resolve(null)),
         },
         user: {
             findMany: jest.fn(() =>
@@ -469,8 +484,9 @@ import {
     settleSupplementaryInvoices,
 } from "../invoices/order-invoicing";
 import type { PaymentsService } from "../payments/payments.service";
-import { EditOrderDto, MoveStageDto } from "./dto";
+import { EditOrderDto, MoveStageDto, RecordDifferenceDto } from "./dto";
 import { OrderKitchenService } from "./order-kitchen.service";
+import { orderTakesOnline } from "./order-online";
 import { UNDO_WINDOW_MS } from "./order-stage";
 
 /** The fields the global ValidationPipe would refuse in `body`. */
@@ -518,6 +534,8 @@ function reset(over: Record<string, unknown> = {}) {
         discount: "0.00",
         total: "360.00",
         paidCents: 36000,
+        // Nothing recorded by hand: it was paid online.
+        paidByHand: "0.00",
         notes: "No sesame",
         trackingUrl: null,
         courierName: null,
@@ -763,6 +781,191 @@ describe("undo", () => {
             kitchen.undoStage(OWNER, "order_1", step.eventId),
         ).rejects.toThrow(/too late/);
         expect(mockDb.order.stage).toBe("PREPARING");
+    });
+});
+
+describe("the difference after an edit, wherever the order was paid", () => {
+    const takesOnline = orderTakesOnline as jest.Mock;
+    const supersede = prisma.paymentIntent.updateMany as jest.Mock;
+
+    it("an order paid at the counter, edited up, asks only for the difference", async () => {
+        // Paid in cash at the counter: no provider payment behind it, the
+        // amount recorded on the order.
+        reset({ paidCents: 0, paidByHand: "360.00" });
+        const result = await kitchen.edit(OWNER, "order_1", {
+            lines: [{ itemId: "li_1", quantity: 4 }],
+        });
+        expect(result.settleCents).toBe(12000);
+        expect(result.dueCents).toBe(12000);
+        expect(payments.createDifferenceIntent).toHaveBeenCalledWith(
+            OWNER,
+            "order_1",
+            12000,
+            `order-edit:${result.eventId}`,
+        );
+        // Not paid yet: its supplementary invoice waits on the money.
+        expect(correctOrderInvoiceForEdit).toHaveBeenCalledWith(
+            expect.anything(),
+            expect.objectContaining({ settled: false }),
+        );
+        expect(mockDb.order.paidByHand).toBe("360.00");
+    });
+
+    it("one paid at the counter before the amount was kept counts its total, and keeps it", async () => {
+        reset({ paidCents: 0, paidByHand: "0.00" });
+        const result = await kitchen.edit(OWNER, "order_1", {
+            lines: [{ itemId: "li_1", quantity: 4 }],
+        });
+        expect(result.settleCents).toBe(12000);
+        // Written on its first edit: the next one starts from it.
+        expect(mockDb.order.paidByHand).toBe("360.00");
+    });
+
+    it("paid online, then edited up: the difference is charged online", async () => {
+        const result = await kitchen.edit(OWNER, "order_1", {
+            lines: [{ itemId: "li_1", quantity: 4 }],
+        });
+        expect(result).toMatchObject({
+            settleCents: 12000,
+            dueCents: 12000,
+            online: true,
+            handBackCents: 0,
+            moneyError: null,
+        });
+        expect(result.charge?.paymentIntentId).toBe("pi_diff");
+    });
+
+    it("edited down after a counter payment: a credit note, and the till gives it back", async () => {
+        reset({ paidCents: 0, paidByHand: "360.00" });
+        const result = await kitchen.edit(OWNER, "order_1", {
+            lines: [{ itemId: "li_1", quantity: 2 }],
+        });
+        expect(result.settleCents).toBe(-12000);
+        expect(result.handBackCents).toBe(12000);
+        // Nothing was paid online, so nothing is refunded online.
+        expect(payments.refundOrderDifference).not.toHaveBeenCalled();
+        expect(result.moneyError).toBeNull();
+        expect(mockDb.order.paidByHand).toBe("240.00");
+        expect(correctOrderInvoiceForEdit).toHaveBeenCalledWith(
+            expect.anything(),
+            expect.objectContaining({
+                changes: [expect.objectContaining({ deltaQuantity: -1 })],
+                settled: true,
+            }),
+        );
+    });
+
+    it("edited down after an online payment: refunded online, with a credit note", async () => {
+        const result = await kitchen.edit(OWNER, "order_1", {
+            lines: [{ itemId: "li_1", quantity: 2 }],
+        });
+        expect(result.handBackCents).toBe(0);
+        expect(payments.refundOrderDifference).toHaveBeenCalledWith(
+            OWNER,
+            "order_1",
+            12000,
+            `order-edit:${result.eventId}`,
+        );
+        expect(correctOrderInvoiceForEdit).toHaveBeenCalledWith(
+            expect.anything(),
+            expect.objectContaining({
+                changes: [expect.objectContaining({ deltaQuantity: -1 })],
+            }),
+        );
+        expect(mockDb.order.paidByHand).toBe("0.00");
+    });
+
+    it("on a plan without online payments nothing is tried online; recording it settles it", async () => {
+        reset({ paidCents: 0, paidByHand: "360.00" });
+        takesOnline.mockResolvedValueOnce(false);
+        const edited = await kitchen.edit(OWNER, "order_1", {
+            lines: [{ itemId: "li_1", quantity: 4 }],
+        });
+        expect(edited).toMatchObject({
+            dueCents: 12000,
+            online: false,
+            charge: null,
+            // Not paid yet is not a failure to settle.
+            moneyError: null,
+        });
+        expect(payments.createDifferenceIntent).not.toHaveBeenCalled();
+
+        const recorded = await kitchen.recordDifference(OWNER, "order_1", {
+            kind: "CASH",
+        });
+        expect(recorded.amountCents).toBe(12000);
+        expect(mockDb.order.paidByHand).toBe("480.00");
+        // Its pay link stops working: nobody pays twice.
+        expect(mockDb.order.payTokenHash).toBeNull();
+        // The supplementary invoice is paid as the counter paid it.
+        expect(settleSupplementaryInvoices).toHaveBeenCalledWith(
+            expect.anything(),
+            "order_1",
+            expect.any(Date),
+            "CASH",
+        );
+        expect(mockDb.events[mockDb.events.length - 1]).toMatchObject({
+            kind: "STATUS",
+            note: "Difference paid in cash",
+            amountCents: 12000,
+            actorUserId: OWNER.userId,
+        });
+        // Nothing more is owed.
+        await expect(
+            kitchen.recordDifference(OWNER, "order_1", { kind: "CASH" }),
+        ).rejects.toThrow(/Nothing more is owed/);
+    });
+
+    it("on a plan with online payments both ways stay open: recording it stops the charge", async () => {
+        const edited = await kitchen.edit(OWNER, "order_1", {
+            lines: [{ itemId: "li_1", quantity: 4 }],
+        });
+        expect(edited.online).toBe(true);
+        expect(payments.createDifferenceIntent).toHaveBeenCalledTimes(1);
+        supersede.mockClear();
+
+        const recorded = await kitchen.recordDifference(OWNER, "order_1", {
+            kind: "UPI",
+        });
+        expect(recorded.amountCents).toBe(12000);
+        // The open charge is superseded first: paid by UPI at the counter,
+        // it isn't asked for online too.
+        expect(supersede).toHaveBeenCalledWith(
+            expect.objectContaining({ data: { status: "SUPERSEDED" } }),
+        );
+        // Paid online before, by hand now: only the difference by hand.
+        expect(mockDb.order.paidByHand).toBe("120.00");
+        expect(settleSupplementaryInvoices).toHaveBeenCalledWith(
+            expect.anything(),
+            "order_1",
+            expect.any(Date),
+            "UPI",
+        );
+    });
+
+    it("recording asks order:edit, and a paid order that owes nothing has nothing to record", async () => {
+        await expect(
+            kitchen.recordDifference(MEMBER, "order_1", { kind: "CASH" }),
+        ).rejects.toBeInstanceOf(ForbiddenException);
+        await expect(
+            kitchen.recordDifference(OWNER, "order_1", { kind: "CASH" }),
+        ).rejects.toThrow(/Nothing more is owed/);
+    });
+
+    it("an unpaid order is recorded as paid, not as a difference", async () => {
+        reset({ paymentStatus: "UNPAID", paidCents: 0 });
+        await expect(
+            kitchen.recordDifference(OWNER, "order_1", { kind: "CASH" }),
+        ).rejects.toThrow(/Record it as paid instead/);
+    });
+
+    it("only cash, UPI or card can be recorded", async () => {
+        expect(await refused(RecordDifferenceDto, { kind: "LINK" })).toEqual([
+            "kind",
+        ]);
+        expect(await refused(RecordDifferenceDto, { kind: "CARD" })).toEqual(
+            [],
+        );
     });
 });
 

@@ -6,6 +6,7 @@ import {
     showInfo,
     showSuccess,
     showUndo,
+    showWarning,
 } from "@saroh/ui/toast";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState, useTransition } from "react";
@@ -14,6 +15,7 @@ import { formatMoney } from "@/lib/format/money";
 import {
     editBeforePreparing,
     moveStage,
+    recordPayment as recordPaymentAction,
     refundLines,
     retryRefund as retryRefundAction,
     saveCourier as saveCourierAction,
@@ -21,7 +23,10 @@ import {
 } from "@/lib/orders/actions";
 import type { CourierFields } from "@/lib/orders/courier";
 import { OWN_DRIVER, shipmentWords } from "@/lib/orders/courier";
-import type { EditOrderInput } from "@/lib/orders/kitchen-service";
+import type {
+    CounterPayment,
+    EditOrderInput,
+} from "@/lib/orders/kitchen-service";
 import { HOLD_MS, STAGE_LABEL } from "@/lib/orders/lifecycle";
 import type { KitchenStage, OrderRead } from "@/lib/orders/read";
 
@@ -316,22 +321,76 @@ export function useKitchen({
                 return;
             }
             setPanel(null);
-            const cents = res.data.differenceCents;
-            const amount = formatMoney(Math.abs(cents), currency) ?? "";
-            if (res.data.moneyError) {
+            const d = res.data;
+            const money = (c: number) =>
+                formatMoney(Math.abs(c), currency) ?? "";
+            // What is still owed, and what goes back (online, or from the
+            // till for what was paid by hand). An API before the audit of
+            // 6 Oct 2026 sends only `settleCents`.
+            const due = d.dueCents ?? Math.max(0, d.settleCents);
+            const fromTill = d.handBackCents ?? 0;
+            const online = d.settleCents < 0 ? -d.settleCents - fromTill : 0;
+            const record = "Record it on the order when you're paid.";
+            if (due > 0) {
+                if (d.moneyError) {
+                    // The edit stands and the money is still owed; asking
+                    // for it online didn't start. Nothing was lost.
+                    showWarning(
+                        `Saved. ${money(due)} more is due.`,
+                        `It couldn't be asked for online: ${d.moneyError} ${record}`,
+                    );
+                } else {
+                    showSuccess(
+                        `Saved. ${money(due)} more is due.`,
+                        d.online === false ? record : undefined,
+                    );
+                }
+            } else if (d.moneyError && online > 0) {
                 showError(
-                    "Saved, but the money didn't settle.",
-                    res.data.moneyError,
+                    `Saved, but the ${money(online)} refund didn't go through.`,
+                    d.moneyError,
+                );
+            } else if (fromTill > 0 && online > 0) {
+                showSuccess(
+                    `Saved. ${money(online)} goes back to ${refundTo}, and ${money(fromTill)} from the till.`,
+                );
+            } else if (fromTill > 0) {
+                showSuccess(
+                    `Saved. Give ${money(fromTill)} back from the till.`,
+                );
+            } else if (online > 0) {
+                showSuccess(
+                    `Saved. ${money(online)} goes back to ${refundTo}.`,
                 );
             } else {
-                showSuccess(
-                    cents > 0
-                        ? `Saved. ${amount} more is due on the order.`
-                        : cents < 0
-                          ? `Saved. ${amount} goes back to ${refundTo}.`
-                          : "Saved.",
-                );
+                showSuccess("Saved.");
             }
+            refresh();
+        });
+    };
+
+    /**
+     * "Record payment": what the order still owes — an edit's difference —
+     * was paid at the counter. The API works out the amount.
+     */
+    const recordPayment = (kind: CounterPayment) => {
+        startTransition(async () => {
+            const res = await recordPaymentAction(order.id, kind);
+            if (!res.ok) {
+                showError(res.error);
+                refresh();
+                return;
+            }
+            const how =
+                kind === "CASH"
+                    ? "in cash"
+                    : kind === "UPI"
+                      ? "by UPI"
+                      : "by card";
+            showSuccess(
+                `${formatMoney(res.data.amountCents, currency) ?? ""} recorded, paid ${how}.`,
+                "Nothing more is due on the order.",
+            );
             refresh();
         });
     };
@@ -340,6 +399,7 @@ export function useKitchen({
         hold,
         busy,
         move,
+        recordPayment,
         holdReady,
         commitHold,
         cancelHold,
