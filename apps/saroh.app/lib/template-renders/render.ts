@@ -217,6 +217,7 @@ export function templateRender(
                   }
                 : undefined,
             timetable: fixture?.timetable,
+            today: fixture?.today,
         },
     };
 }

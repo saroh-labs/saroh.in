@@ -63,7 +63,7 @@ describe("/templates/[slug]", () => {
         await expect(renderAt("starter", AFTER)).rejects.toThrow(
             "NEXT_NOT_FOUND",
         );
-        await expect(renderAt("salon", AFTER)).rejects.toThrow(
+        await expect(renderAt("no-such-template", AFTER)).rejects.toThrow(
             "NEXT_NOT_FOUND",
         );
     });

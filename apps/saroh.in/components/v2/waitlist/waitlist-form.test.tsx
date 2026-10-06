@@ -114,7 +114,7 @@ describe("WaitlistForm", () => {
 
     it("ignores a template the gallery doesn't have", async () => {
         answer({ status: "success", created: true, position: 4 });
-        renderForm("?template=salon");
+        renderForm("?template=no-such-template");
         fill();
         await submit();
 

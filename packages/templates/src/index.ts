@@ -164,3 +164,16 @@ export {
     dieticianServiceIds,
     dieticianTemplate,
 } from "./templates/dietician";
+// Salon and Clinic, designed in code (industry templates plan, U11).
+export {
+    CLINIC_GALLERY_SAMPLE,
+    CLINIC_TEMPLATE_ID,
+    clinicServiceIds,
+    clinicTemplate,
+} from "./templates/clinic";
+export {
+    SALON_GALLERY_SAMPLE,
+    SALON_TEMPLATE_ID,
+    salonServiceIds,
+    salonTemplate,
+} from "./templates/salon";

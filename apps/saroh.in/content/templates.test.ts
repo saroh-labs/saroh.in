@@ -32,10 +32,12 @@ function must(slug: string) {
 }
 
 describe("which templates the gallery shows (KTD-6)", () => {
-    it("shows the seven industry templates, in the design's order", () => {
+    it("shows the nine industry templates, in the design's order", () => {
         expect(templates.map((t) => t.slug)).toEqual([
             "bakery",
+            "salon",
             "gym",
+            "clinic",
             "store",
             "dietician",
             "blogs",
@@ -67,7 +69,7 @@ describe("which templates the gallery shows (KTD-6)", () => {
             expect(manifest?.slug ?? manifest?.id).toBe(t.slug);
             expect(galleryTemplate(t.slug)).toBe(t);
         }
-        expect(galleryTemplate("salon")).toBeUndefined();
+        expect(galleryTemplate("no-such-template")).toBeUndefined();
         expect(galleryTemplate("starter")).toBeUndefined();
     });
 
@@ -86,9 +88,10 @@ describe("kinds and chips", () => {
         }
     });
 
-    it("draws a chip only for a kind with a template: no Salons until one is built", () => {
+    it("draws a chip only for a kind with a template", () => {
         const chips = galleryChips(templates).map((c) => c.label);
         expect(chips).toEqual([
+            "Salons",
             "Gyms & studios",
             "Clinics",
             "Dieticians & coaches",
@@ -113,7 +116,7 @@ describe("kinds and chips", () => {
 describe("what the pages say", () => {
     it("derives the count, and claims only blocks the templates lay down", () => {
         expect(templatesPage.intro(templates)).toBe(
-            "Seven templates, each made for a kind of business, each with its own type and colours. Bookings, products and memberships are already wired in.",
+            "Nine templates, each made for a kind of business, each with its own type and colours. Bookings, products and memberships are already wired in.",
         );
         const blogs = templates.filter((t) => t.slug === "blogs");
         expect(templatesPage.intro(blogs)).toBe(
@@ -204,7 +207,11 @@ describe("related templates", () => {
         }
         expect(
             relatedTemplates(must("dietician"), templates).map((r) => r.slug),
-        ).toEqual(["blogs", "gym"]);
+        ).toEqual(["clinic", "blogs", "salon"]);
+        // The clinic's own kind first (the dietician), then other services.
+        expect(
+            relatedTemplates(must("clinic"), templates).map((r) => r.slug),
+        ).toEqual(["dietician", "salon", "gym"]);
     });
 });
 

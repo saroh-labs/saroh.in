@@ -17,7 +17,7 @@ import type { WaitlistKindId } from "@/content/waitlist";
  * metadata: the kinds of business it is for, a shape, a sample business
  * and at least one colourway (`isGalleryTemplate`). The general templates
  * (starter, personal, writing, the first portfolio) carry none and are not
- * shown. Salon and Clinic join on their own once they are built with it.
+ * shown. Salon and Clinic joined on their own when they were built (U11).
  *
  * What is written here, not read from the manifest: the gallery's name
  * where the design renames one (Studio is "Portfolio"; Ceramics is already
@@ -54,7 +54,9 @@ const GALLERY_NAMES: Readonly<Partial<Record<string, string>>> = {
 /** The design's order; a gallery template not named here follows, in registry order. */
 const GALLERY_ORDER = [
     "bakery",
+    "salon",
     "gym",
+    "clinic",
     "store",
     "dietician",
     "blogs",
@@ -71,6 +73,8 @@ const IDEAS: Readonly<Partial<Record<string, string>>> = {
     blogs: "your writing, newest first",
     studio: "the work first, the biggest project at the top",
     developer: "your work, your rates and when you're free",
+    salon: "who's free today, and what it costs",
+    clinic: "the next appointment, and what a treatment involves",
 };
 
 /**

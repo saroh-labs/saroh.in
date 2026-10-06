@@ -1,4 +1,8 @@
-import { DIETICIAN_GALLERY_SAMPLE } from "@saroh/templates";
+import {
+    CLINIC_GALLERY_SAMPLE,
+    DIETICIAN_GALLERY_SAMPLE,
+    SALON_GALLERY_SAMPLE,
+} from "@saroh/templates";
 import { describe, expect, it } from "vitest";
 
 import { briefImage, wrapBrief } from "./brief-image";
@@ -46,6 +50,18 @@ function dataFor(
             return render.fixtures.visit?.hours?.length;
         case "timetable":
             return render.fixtures.timetable?.sessions.length;
+        case "hero": {
+            // On today beside the headline reads today's free times; the
+            // full-bleed hero's open line reads the place.
+            const hero = render.sections[i]?.content as {
+                onToday?: boolean;
+                variant?: string;
+            };
+            if (!hero.onToday) return "static";
+            return hero.variant === "fullBleed"
+                ? render.fixtures.visit?.hours?.length
+                : render.fixtures.today?.items.length;
+        }
         default:
             return "static";
     }
@@ -133,6 +149,31 @@ describe("templateRender", () => {
             true,
         );
     });
+
+    it.each([
+        ["salon", SALON_GALLERY_SAMPLE.stylists],
+        ["clinic", CLINIC_GALLERY_SAMPLE.doctors],
+    ] as const)(
+        "fills the %s's people from its gallery sample, briefs kept",
+        (id, sample) => {
+            const render = templateRender(id, undefined, "/");
+            const person = render?.sections.find((s) => s.type === "person")
+                ?.content as {
+                name: string;
+                image?: unknown;
+                people: { name: string; image?: unknown }[];
+            };
+            expect([person.name, ...person.people.map((p) => p.name)]).toEqual(
+                sample.map((p) => p.name),
+            );
+            expect(person.image).toBeTruthy();
+            for (const p of person.people) expect(p.image).toBeTruthy();
+            // Free today names the same people the section does.
+            for (const item of render?.fixtures.today?.items ?? []) {
+                expect(sample.map((p) => p.name)).toContain(item.staffName);
+            }
+        },
+    );
 
     it("never gives a sample an email off its own saroh.app address", () => {
         for (const t of galleryTemplates()) {

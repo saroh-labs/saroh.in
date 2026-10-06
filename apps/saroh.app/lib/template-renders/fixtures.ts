@@ -5,11 +5,17 @@ import type {
     PublicPlan,
     PublicService,
     PublicTimetable,
+    PublicToday,
+    PublicTodayItem,
     PublicVisit,
     TimetableSession,
 } from "@saroh/site-blocks";
 import type { TemplateContext } from "@saroh/templates";
-import { DIETICIAN_GALLERY_SAMPLE } from "@saroh/templates";
+import {
+    CLINIC_GALLERY_SAMPLE,
+    DIETICIAN_GALLERY_SAMPLE,
+    SALON_GALLERY_SAMPLE,
+} from "@saroh/templates";
 
 /**
  * The sample businesses the gallery's renders show (industry templates U14,
@@ -64,6 +70,8 @@ export interface TemplateFixture {
     services?: PublicService[];
     visit?: Omit<PublicVisit, "name" | "source" | "storeId" | "timezone">;
     timetable?: PublicTimetable;
+    /** The hero's On today panel: today's free times, by who has them. */
+    today?: PublicToday;
     posts?: PostFixture[];
     plans?: PublicPlan[];
     packs?: PublicPack[];
@@ -558,6 +566,309 @@ function withSamples(
     });
 }
 
+// ---------------------------------------------------------------------------
+// Salon — "Kesar Salon" (Salon.spec.md, U11)
+// ---------------------------------------------------------------------------
+
+/** The day the captures show: a Monday, fixed, so every capture matches. */
+const SAMPLE_DAY = "2026-10-12";
+
+/** One free appointment time today, as the public today read sends it. */
+function freeAt(
+    serviceId: string,
+    serviceName: string,
+    durationMinutes: number,
+    time: string,
+    staffName: string,
+): PublicTodayItem {
+    return {
+        kind: "one",
+        serviceId,
+        serviceName,
+        durationMinutes,
+        startAt: istInstant(SAMPLE_DAY, time),
+        date: SAMPLE_DAY,
+        time,
+        staffName,
+        placesLeft: null,
+    };
+}
+
+const SALON_HOURS = week({
+    TUE: ["10:00", "20:00"],
+    WED: ["10:00", "20:00"],
+    THU: ["10:00", "20:00"],
+    FRI: ["10:00", "20:00"],
+    SAT: ["09:00", "21:00"],
+    SUN: ["10:00", "18:00"],
+});
+
+const salon: TemplateFixture = {
+    context: {
+        serviceIds: [
+            "salon-cut-blow-dry",
+            "salon-mens-cut",
+            "salon-root-touch-up",
+            "salon-global-colour",
+            "salon-keratin",
+            "salon-bridal-trial",
+        ],
+    },
+    services: [
+        {
+            id: "salon-cut-blow-dry",
+            name: "Haircut and blow-dry",
+            description:
+                "Wash, cut and finish, with a word on what to ask for next time.",
+            durationMinutes: 60,
+            priceCents: 120000,
+            currency: "INR",
+        },
+        {
+            id: "salon-mens-cut",
+            name: "Men's cut",
+            description: "Scissor or clipper, with a neck shave.",
+            durationMinutes: 30,
+            priceCents: 50000,
+            currency: "INR",
+        },
+        {
+            id: "salon-root-touch-up",
+            name: "Root touch-up",
+            description: "Up to two inches of regrowth, one colour.",
+            durationMinutes: 75,
+            priceCents: 180000,
+            currency: "INR",
+        },
+        {
+            id: "salon-global-colour",
+            name: "Global colour",
+            description: "One colour, roots to ends, shoulder length.",
+            durationMinutes: 120,
+            priceCents: 380000,
+            currency: "INR",
+        },
+        {
+            id: "salon-keratin",
+            name: "Keratin smoothing",
+            description:
+                "For frizz that will not sit down. Lasts about three months.",
+            durationMinutes: 150,
+            priceCents: 650000,
+            currency: "INR",
+        },
+        {
+            id: "salon-bridal-trial",
+            name: "Bridal trial",
+            description: "Hair and make-up, tried once before the day.",
+            durationMinutes: 90,
+            priceCents: 250000,
+            currency: "INR",
+        },
+    ],
+    today: {
+        timezone: FIXTURE_TIME_ZONE,
+        date: SAMPLE_DAY,
+        appointments: true,
+        classes: false,
+        items: [
+            freeAt(
+                "salon-cut-blow-dry",
+                "Haircut and blow-dry",
+                60,
+                "11:30",
+                "Meher",
+            ),
+            freeAt("salon-mens-cut", "Men's cut", 30, "12:00", "Rohit"),
+            freeAt(
+                "salon-root-touch-up",
+                "Root touch-up",
+                75,
+                "14:15",
+                "Meher",
+            ),
+            freeAt("salon-bridal-trial", "Bridal trial", 90, "16:00", "Tanvi"),
+            freeAt("salon-mens-cut", "Men's cut", 30, "18:30", "Rohit"),
+        ],
+        hours: SALON_HOURS,
+        closedDates: [],
+    },
+    visit: {
+        address: "22 Linking Road\nKhar West\nMumbai 400052",
+        phone: null,
+        hours: SALON_HOURS,
+    },
+    patches: [
+        {
+            // The gallery's sample stylists (KTD-6), photo briefs kept.
+            page: "/",
+            type: "person",
+            patch: (content) => {
+                const [first, ...rest] = SALON_GALLERY_SAMPLE.stylists;
+                const people = Array.isArray(content.people)
+                    ? content.people
+                    : [];
+                return {
+                    ...content,
+                    ...first,
+                    people: people.map((p: unknown, i) => ({
+                        ...(p as object),
+                        ...rest[i],
+                    })),
+                };
+            },
+        },
+        {
+            page: "/",
+            type: "features",
+            patch: (content) => ({
+                ...content,
+                items: Array.isArray(content.items)
+                    ? content.items.map((item: unknown, i) => ({
+                          ...(item as object),
+                          body: SALON_GALLERY_SAMPLE.before[i],
+                      }))
+                    : content.items,
+            }),
+        },
+    ],
+};
+
+// ---------------------------------------------------------------------------
+// Clinic — "Kavi Dental" (Clinic.spec.md, U11; the seeded showcase's data)
+// ---------------------------------------------------------------------------
+
+const CLINIC_HOURS = week({
+    MON: ["09:00", "19:00"],
+    TUE: ["09:00", "19:00"],
+    WED: ["09:00", "19:00"],
+    THU: ["09:00", "19:00"],
+    FRI: ["09:00", "19:00"],
+    SAT: ["09:00", "19:00"],
+    SUN: ["10:00", "13:00"],
+});
+
+const clinic: TemplateFixture = {
+    context: {
+        serviceIds: [
+            "kavi-check-up",
+            "kavi-root-canal",
+            "kavi-whitening",
+            "kavi-video",
+            "kavi-review",
+        ],
+    },
+    services: [
+        {
+            id: "kavi-check-up",
+            name: "Check-up and clean",
+            description:
+                "A look, a clean and an explanation, with a written plan and price before any treatment.",
+            durationMinutes: 30,
+            priceCents: 120000,
+            currency: "INR",
+        },
+        {
+            id: "kavi-root-canal",
+            name: "Root canal treatment",
+            description: "Usually three visits, priced for all of them.",
+            durationMinutes: 60,
+            priceCents: 1200000,
+            currency: "INR",
+        },
+        {
+            id: "kavi-whitening",
+            name: "Teeth whitening",
+            description:
+                "Two visits. Some sensitivity for a day or two afterwards.",
+            durationMinutes: 45,
+            priceCents: 850000,
+            currency: "INR",
+        },
+        {
+            id: "kavi-video",
+            name: "Video consultation",
+            description: "Talk it through with a dentist first, by video.",
+            durationMinutes: 20,
+            priceCents: 60000,
+            currency: "INR",
+        },
+        {
+            id: "kavi-review",
+            name: "Follow-up review",
+            description:
+                "A short visit after treatment to see how it is healing.",
+            durationMinutes: 20,
+            priceCents: 50000,
+            currency: "INR",
+        },
+    ],
+    today: {
+        timezone: FIXTURE_TIME_ZONE,
+        date: SAMPLE_DAY,
+        appointments: true,
+        classes: false,
+        items: [
+            freeAt(
+                "kavi-check-up",
+                "Check-up and clean",
+                30,
+                "10:30",
+                "Dr. Meenakshi Rao",
+            ),
+            freeAt(
+                "kavi-video",
+                "Video consultation",
+                20,
+                "12:20",
+                "Dr. Arun Pillai",
+            ),
+            freeAt(
+                "kavi-check-up",
+                "Check-up and clean",
+                30,
+                "16:30",
+                "Dr. Meenakshi Rao",
+            ),
+            freeAt(
+                "kavi-review",
+                "Follow-up review",
+                20,
+                "17:40",
+                "Dr. Meenakshi Rao",
+            ),
+        ],
+        hours: CLINIC_HOURS,
+        closedDates: [],
+    },
+    visit: {
+        address: "12th Main, Indiranagar\nBengaluru 560038",
+        phone: null,
+        hours: CLINIC_HOURS,
+    },
+    patches: [
+        {
+            // The showcase's two dentists (KTD-6), photo briefs kept.
+            page: "/",
+            type: "person",
+            patch: (content) => {
+                const [first, ...rest] = CLINIC_GALLERY_SAMPLE.doctors;
+                const people = Array.isArray(content.people)
+                    ? content.people
+                    : [];
+                return {
+                    ...content,
+                    ...first,
+                    people: people.map((p: unknown, i) => ({
+                        ...(p as object),
+                        ...rest[i],
+                    })),
+                };
+            },
+        },
+    ],
+};
+
 /** By template id. A gallery template with no entry renders with none. */
 export const TEMPLATE_FIXTURES: Readonly<
     Partial<Record<string, TemplateFixture>>
@@ -569,4 +880,6 @@ export const TEMPLATE_FIXTURES: Readonly<
     blogs,
     studio,
     developer,
+    salon,
+    clinic,
 };

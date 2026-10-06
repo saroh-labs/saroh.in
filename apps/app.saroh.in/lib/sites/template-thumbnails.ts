@@ -24,6 +24,11 @@ export const TEMPLATE_THUMBNAILS: Readonly<
         width: 360,
         height: 225,
     },
+    clinic: {
+        src: "/templates/clinic.webp",
+        width: 360,
+        height: 225,
+    },
     dietician: {
         src: "/templates/dietician.webp",
         width: 360,
@@ -31,6 +36,11 @@ export const TEMPLATE_THUMBNAILS: Readonly<
     },
     gym: {
         src: "/templates/gym.webp",
+        width: 360,
+        height: 225,
+    },
+    salon: {
+        src: "/templates/salon.webp",
         width: 360,
         height: 225,
     },

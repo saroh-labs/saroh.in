@@ -84,13 +84,15 @@ describe("maskEmail", () => {
 
 describe("waitlistTemplate (industry templates U13)", () => {
     it("saves exactly the gallery's templates: those with kinds and a sample", () => {
-        // saroh.in's content test pins the same seven (`content/templates.test.ts`).
+        // saroh.in's content test pins the same nine (`content/templates.test.ts`).
         expect([...WAITLIST_TEMPLATES].sort()).toEqual([
             "bakery",
             "blogs",
+            "clinic",
             "developer",
             "dietician",
             "gym",
+            "salon",
             "store",
             "studio",
         ]);
@@ -103,7 +105,7 @@ describe("waitlistTemplate (industry templates U13)", () => {
 
     it("drops anything else: a general template, an unbuilt one, free text", () => {
         expect(waitlistTemplate("starter")).toBeNull();
-        expect(waitlistTemplate("salon")).toBeNull();
+        expect(waitlistTemplate("no-such-template")).toBeNull();
         expect(waitlistTemplate("<b>gym</b>")).toBeNull();
         expect(waitlistTemplate("")).toBeNull();
         expect(waitlistTemplate(undefined)).toBeNull();
