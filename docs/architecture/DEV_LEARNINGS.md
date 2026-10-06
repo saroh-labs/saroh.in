@@ -2756,6 +2756,7 @@ try) and at most 8 checks run at once (`busy` past that).
 **Rule**: `docs/patterns/backend-integrations.md` — "An email a stranger can
 trigger carries only our words".
 **Category**: security · email · `apps/api.saroh.in/src/modules/link-preview/`
+
 ## Layout — a phone zoomed out on text it never showed
 
 **Symptom**: On the batch-2026-10-05-5 gate, a customer's Orders tab
@@ -2779,6 +2780,7 @@ inside the clip; a `grid` that holds one-line, truncating content names
 its track `minmax(0,1fr)` (`min-w-0` on the grid itself is not enough).
 **Category**: layout · phone · `components/commerce/orders/order-row.tsx`,
 `components/invoices/invoice-form.tsx`
+
 ## Shop checkout — the bag's name and phone were asked for twice, and lost
 
 **Symptom**: a customer who typed their name and phone in the bag was asked
@@ -2810,3 +2812,18 @@ API's rules, and the form's `superRefine` puts the problem under its field.
 **Rule**: `docs/patterns/frontend-forms.md` → "The schema checks what the API's DTO
 checks".
 **Category**: discounts · forms · `apps/app.saroh.in/components/stores/discount-form.tsx`
+
+## Seeds — the clinic's 70-day sweep timed out on CI, not locally
+
+**Symptom**: PR #825's unit job failed twice on `clinic.test.ts` ("keeps
+every booking, bill and state, 70 days running"): 123s and 125s against a
+120s limit. The same test took 16s in `pnpm prepush`.
+**Root cause**: CI's unit job runs `turbo run test` across every affected
+package at once on a small runner, so the CPU-bound sweep (490 seeds) runs
+about 8 times slower than on a laptop. The database package's tests only run
+on CI when that package changes, so the seed's growth since the limit was set
+(E9's treatment orders) went unseen until a migration landed.
+**Fix**: the sweep's limit is 300s, with the reason beside it.
+**Rule**: a CPU-bound test's timeout gets at least 8 times its local time;
+don't set it just above what a laptop takes.
+**Category**: seeds · CI · `packages/database/src/seed/showcase/clinic.test.ts`
