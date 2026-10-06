@@ -123,6 +123,8 @@ export interface GalleryContent {
 export interface FeatureItem {
     title: string;
     body?: string;
+    /** A figure the point stands on — a rate, a span (template polish). */
+    value?: string;
 }
 
 /** `features` — a heading over a set of short, titled points. */
@@ -130,6 +132,10 @@ export interface FeaturesContent {
     heading?: string;
     intro?: string;
     items: FeatureItem[];
+    /** The list looks in two columns; absent is one. */
+    columns?: 1 | 2;
+    /** A muted line under the points. */
+    note?: string;
 }
 
 /** One question in an FAQ section (mirror of the section contract). */

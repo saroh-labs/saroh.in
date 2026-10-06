@@ -386,6 +386,12 @@ export const BLOCK_META = {
                 description:
                     "Points stacked in one column, each numbered 01, 02, 03 beside its title, for something done in order.",
             },
+            {
+                id: "facts",
+                label: "Facts row",
+                description:
+                    "Short facts side by side: each point's figure set large, its title as the label under it. For a few numbers worth knowing first.",
+            },
         ] as const,
         fixtures: {
             grid: {
@@ -443,6 +449,38 @@ export const BLOCK_META = {
                         body: "To see what held and what did not, and change the ones that did not.",
                     },
                 ],
+            },
+            facts: {
+                variant: "facts",
+                items: [
+                    { title: "In practice", value: "14 years" },
+                    { title: "First consultation", value: "45 min" },
+                    {
+                        title: "Consultations in",
+                        value: "Hindi, English, Marathi",
+                    },
+                ],
+            },
+        },
+        cases: {
+            // A figure per point, the merchant's own (a rate), and a note.
+            values: {
+                variant: "list",
+                heading: "What I charge",
+                columns: 2,
+                items: [
+                    {
+                        title: "Day rate",
+                        value: "Your day rate",
+                        body: "For short pieces of work and reviews.",
+                    },
+                    {
+                        title: "Project",
+                        value: "Your usual range",
+                        body: "Fixed price after a paid week of scoping.",
+                    },
+                ],
+                note: "Scoping weeks are paid, and the fee comes off the project if you go ahead.",
             },
         },
     },

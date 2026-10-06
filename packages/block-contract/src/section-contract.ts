@@ -431,9 +431,20 @@ const galleryV2 = z
  * media dependency. An added optional field is not a breaking change, so either
  * can arrive without a v2.
  */
+/** How long a point's figure ("₹42,000", "14 years") may run. */
+export const FEATURE_VALUE_MAX = 60;
+
 const featureItemSchema = z.object({
     title: z.string().min(1).max(120),
     body: z.string().max(600).optional(),
+    /**
+     * A figure the point stands on — a rate, a count, a span ("₹42,000",
+     * "14 years") — set large in the heading face (template polish). The
+     * merchant's own words, never read from anywhere: a rate here is the
+     * owner's to write, not a price the platform knows. Optional, so it
+     * extends v1 in place.
+     */
+    value: z.string().trim().max(FEATURE_VALUE_MAX).optional(),
 });
 
 const featuresV1 = z.object({
@@ -442,6 +453,14 @@ const featuresV1 = z.object({
     heading: z.string().max(160).optional(),
     intro: z.string().max(600).optional(),
     items: z.array(featureItemSchema).min(1).max(12),
+    /**
+     * The `list` and `steps` looks in two columns from the tablet width up
+     * (one on a phone). ABSENT is one column, as before. The grid has its
+     * own columns and ignores it.
+     */
+    columns: z.union([z.literal(1), z.literal(2)]).optional(),
+    /** A muted line under the points — a disclaimer, a caveat. Plain text. */
+    note: z.string().trim().max(600).optional(),
 });
 
 /**

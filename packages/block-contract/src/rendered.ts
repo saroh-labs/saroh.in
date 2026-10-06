@@ -218,9 +218,13 @@ const renderedFeatures = z.object({
             z.object({
                 title: z.string(),
                 body: z.string().optional(),
+                /** A figure the point stands on, the merchant's own words. */
+                value: z.string().optional(),
             }),
         )
         .min(1),
+    columns: z.number().int().optional(),
+    note: z.string().optional(),
 });
 
 /**
