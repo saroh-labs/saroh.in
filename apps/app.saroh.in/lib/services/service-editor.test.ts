@@ -480,6 +480,18 @@ describe("At booking, they pay (E8)", () => {
         );
     });
 
+    it("at the desk only, a deposit is paid at the visit too (DEC-089)", () => {
+        expect(depositNote("PERCENT_50", "1200", "INR", 1, "DESK")).toBe(
+            "They pay ₹1,200 at the visit.",
+        );
+        expect(depositNote("FULL", "1200", "INR", 3, "DESK")).toBe(
+            "They pay ₹1,200 over the visits.",
+        );
+        expect(depositNote("PERCENT_50", "1200", "INR", 1, "BOTH")).toBe(
+            "They pay ₹600 when booking, and the rest (₹600) at the visit. Refunded if they cancel in time.",
+        );
+    });
+
     it("refuses a deposit on a free service, as the API does", () => {
         expect(
             serviceProblems(

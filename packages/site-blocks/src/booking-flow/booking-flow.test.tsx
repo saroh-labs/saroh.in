@@ -2031,29 +2031,10 @@ describe("a deposit at booking (E8)", () => {
         ).toBeInTheDocument();
     });
 
-    it("a business that can't take the deposit online says so, and books nothing", async () => {
-        serve((url) => json(url.endsWith("/days") ? ONE_DAYS : {}));
-        render(
-            <BookingFlow
-                page={{ ...DEPOSIT_PAGE, payOnline: false }}
-                apiUrl={API}
-                account={account()}
-            />,
+    it("a business that can't take the deposit online books it to pay at the desk (DEC-089)", async () => {
+        serve((url) =>
+            url.endsWith("/days") ? json(ONE_DAYS) : json(booked(), 201),
         );
-        fireEvent.click(
-            screen.getByRole("radio", { name: /Personal training/ }),
-        );
-        expect(
-            await screen.findByText(
-                "Pulse Fitness can't take the deposit online right now. Get in touch with them to book.",
-            ),
-        ).toBeInTheDocument();
-        expect(screen.queryByRole("radiogroup", { name: "Paying" })).toBeNull();
-        expect(calls.some((c) => c.url.endsWith("/book"))).toBe(false);
-    });
-
-    it("shows no payment line beside the get-in-touch message, even with a time chosen (#822)", async () => {
-        serve((url) => json(url.endsWith("/days") ? ONE_DAYS : {}));
         render(
             <BookingFlow
                 page={{ ...DEPOSIT_PAGE, payOnline: false }}
@@ -2065,19 +2046,27 @@ describe("a deposit at booking (E8)", () => {
         const aside = screen.getByRole("complementary", {
             name: "Your booking",
         });
+        expect(within(aside).getByText("Pay at the desk")).toBeInTheDocument();
+        expect(within(aside).getByText("₹1,200")).toBeInTheDocument();
+        expect(document.body.textContent).not.toMatch(/Get in touch/);
+        expect(document.body.textContent).not.toMatch(/deposit/i);
+        fireEvent.click(
+            within(aside).getByRole("button", {
+                name: "Book — pay at the desk",
+            }),
+        );
         expect(
-            within(aside).getByText(
-                "Pulse Fitness can't take the deposit online right now. Get in touch with them to book.",
+            await screen.findByText(
+                "Pay ₹1,200 at the front desk when you arrive.",
             ),
         ).toBeInTheDocument();
-        expect(within(aside).queryByText(/at the desk/)).toBeNull();
-        expect(within(aside).queryByText(/₹/)).toBeNull();
-        expect(screen.queryByText("Pay at the desk")).toBeNull();
-        expect(
-            within(aside).getByRole("button", { name: "Book" }),
-        ).toHaveAttribute("aria-disabled", "true");
-        fireEvent.click(within(aside).getByRole("button", { name: "Book" }));
-        expect(calls.some((c) => c.url.endsWith("/book"))).toBe(false);
+        const post = calls.find((c) => c.url.endsWith("/book"));
+        const body = JSON.parse(post?.init?.body as string) as Record<
+            string,
+            unknown
+        >;
+        expect(body).toMatchObject({ pay: "DESK" });
+        expect(body).not.toHaveProperty("amount");
     });
 });
 
@@ -2157,11 +2146,47 @@ describe("how the business takes payment (DEC-088)", () => {
         expect(screen.queryByText(/at the desk/)).toBeNull();
     });
 
-    it("at the desk only, with a deposit: get in touch, and no payment line", async () => {
-        serve((url) => json(url.endsWith("/days") ? ONE_DAYS : {}));
+    it("at the desk only, with a deposit: books it to pay at the desk (DEC-089)", async () => {
+        serve((url) =>
+            url.endsWith("/days") ? json(ONE_DAYS) : json(booked(), 201),
+        );
         render(
             <BookingFlow
                 page={withWay("DESK", {
+                    services: [{ ...PAGE.services[0], depositCents: 60_000 }],
+                })}
+                apiUrl={API}
+                account={account()}
+            />,
+        );
+        await chooseOneToOne();
+        expect(payWays()).toHaveLength(1);
+        expect(payWays()[0]).toMatch(/^Pay at the desk/);
+        const aside = screen.getByRole("complementary", {
+            name: "Your booking",
+        });
+        expect(within(aside).getByText("Pay at the desk")).toBeInTheDocument();
+        expect(document.body.textContent).not.toMatch(/Get in touch/);
+        fireEvent.click(
+            within(aside).getByRole("button", {
+                name: "Book — pay at the desk",
+            }),
+        );
+        await screen.findByText(
+            "Pay ₹1,200 at the front desk when you arrive.",
+        );
+        const post = calls.find((c) => c.url.endsWith("/book"));
+        expect(JSON.parse(post?.init?.body as string)).toMatchObject({
+            pay: "DESK",
+        });
+    });
+
+    it("online only with no provider, with a deposit: get in touch, no payment line, nothing booked", async () => {
+        serve((url) => json(url.endsWith("/days") ? ONE_DAYS : {}));
+        render(
+            <BookingFlow
+                page={withWay("ONLINE", {
+                    payOnline: false,
                     services: [{ ...PAGE.services[0], depositCents: 60_000 }],
                 })}
                 apiUrl={API}
@@ -2177,8 +2202,14 @@ describe("how the business takes payment (DEC-088)", () => {
                 "Pulse Fitness can't take the deposit online right now. Get in touch with them to book.",
             ),
         ).toBeInTheDocument();
+        expect(screen.queryByRole("radiogroup", { name: "Paying" })).toBeNull();
         expect(within(aside).queryByText(/₹/)).toBeNull();
         expect(screen.queryByText(/at the desk/)).toBeNull();
+        expect(
+            within(aside).getByRole("button", { name: "Book" }),
+        ).toHaveAttribute("aria-disabled", "true");
+        fireEvent.click(within(aside).getByRole("button", { name: "Book" }));
+        expect(calls.some((c) => c.url.endsWith("/book"))).toBe(false);
     });
 });
 

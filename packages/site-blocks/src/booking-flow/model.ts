@@ -414,12 +414,14 @@ export function creditUsedText(credit: OfferedCredit): string {
 /**
  * The ways a service can be paid for, in the order the pay step lists
  * them (the Kavi Dental and Pulse Fitness designs). A service with a
- * deposit is paid online — its deposit, or the whole price — and never at
- * the desk; one whose deposit is the full price is simply paid now.
- * Without a deposit: now, when the business takes money online, or at the
- * desk. Only what the business allows (DEC-088): `way` online only drops
- * the desk, at the desk only drops paying online. None when nothing it
- * allows can be taken — a deposit, or online only, with no way to pay
+ * deposit is paid online — its deposit, or the whole price — and not at
+ * the desk; one whose deposit is the full price is simply paid now. When
+ * online can't take it (the business chose the desk only, or has no way
+ * to pay online), it is paid at the desk wherever the business allows the
+ * desk (DEC-089). Without a deposit: now, when the business takes money
+ * online, or at the desk. Only what the business allows (DEC-088): `way`
+ * online only drops the desk, at the desk only drops paying online. None
+ * when nothing it allows can be taken — online only, with no way to pay
  * online — and none for a service with no price.
  */
 export function payChoices(
@@ -445,9 +447,17 @@ export function payChoices(
         sub: `Online — your ${place} is confirmed straight away`,
         amount: price,
     };
+    const desk: PayChoice = {
+        pay: "DESK",
+        label: "Pay at the desk",
+        sub: "Held for you; pay when you arrive",
+        amount: price,
+    };
     const deposit = service.depositCents ?? null;
     if (deposit !== null && deposit > 0) {
-        if (!online) return [];
+        // Online can't take it: the desk, where the business allows it
+        // (DEC-089); under online only it can't be booked here.
+        if (!online) return atDesk ? [desk] : [];
         if (deposit >= service.priceCents) return [payNow];
         const part = formatMoney(deposit, service.currency) ?? "";
         const rest = restAfterDeposit(service) ?? "";
@@ -465,21 +475,16 @@ export function payChoices(
             },
         ];
     }
-    const desk: PayChoice = {
-        pay: "DESK",
-        label: "Pay at the desk",
-        sub: "Held for you; pay when you arrive",
-        amount: price,
-    };
     return [...(online ? [payNow] : []), ...(atDesk ? [desk] : [])];
 }
 
 /**
  * Why a priced service can't be booked here at all, or null when it can
- * (E8, DEC-088, #822): it asks a deposit, or the business takes payment
- * only online, and there is no way to pay online — the business chose the
- * desk only, or has no provider connected. The page then shows this and
- * no payment line.
+ * (E8, DEC-088, DEC-089, #822): the business takes payment only online,
+ * and there is no way to pay online now — no provider connected, or
+ * Payments off. The page then shows this and no payment line. Under Both
+ * or At the desk it never applies: a deposit online can't take is paid at
+ * the desk.
  */
 export function unpayableText(
     service: BookingService | null,

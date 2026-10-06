@@ -3,13 +3,15 @@ import type { BookingPaymentView } from "@/lib/staff/types";
 import type { DepositMode } from "./service";
 
 /*
- * Whether people can book a service online, as its payment allows
- * (DEC-088, #821). A deposit or the full price at booking is only ever
- * paid online, so it needs the business to take payment online and a
- * provider that can take it; a business that takes payment online only
- * needs that provider for every priced service. The Service Editor says
- * so where the deposit is chosen, and the Services list marks the service.
- * Pure, so both and their tests agree.
+ * What happens when people book a service online, as its payment allows
+ * (DEC-088, DEC-089, #821). A deposit or the full price at booking is
+ * paid online when it can be. When it can't — the business takes payment
+ * at the desk only, Payments is off, or no provider is connected — it is
+ * paid at the desk wherever the business allows the desk; under Online
+ * only, the service can't be booked online at all, and neither can any
+ * priced service while online can't be taken. The Service Editor says
+ * which where the deposit is chosen; the Services list marks only a
+ * service that can't be booked. Pure, so both and their tests agree.
  */
 
 /** What to do about it: where the fix is, and the link's words. */
@@ -18,8 +20,16 @@ export interface OnlineFix {
     label: string;
 }
 
-/** Why a service can't be booked online, and what fixes it. */
+/**
+ * What happens to a service's payment when people book it online, when
+ * it isn't what the merchant chose, and what fixes it.
+ */
 export interface OnlineProblem {
+    /**
+     * True when people can't book it online at all (Online only); false
+     * when it books and is paid at the desk instead (DEC-089).
+     */
+    blocked: boolean;
     /** The whole sentence, for the Service Editor. */
     text: string;
     /** The short one, for a Services card: "Can't be booked online: …". */
@@ -44,18 +54,26 @@ const PAYMENTS_FIX: OnlineFix = {
     label: "Turn on Payments",
 };
 
-function problem(why: string, fix: OnlineFix, more = ""): OnlineProblem {
+function problem(why: string, fix: OnlineFix): OnlineProblem {
     return {
-        text: `People can't book this online: ${why}.${more ? ` ${more}` : ""}`,
+        blocked: true,
+        text: `People can't book this online: ${why}.`,
         line: `Can't be booked online: ${why}.`,
         fix,
     };
 }
 
+/** Booked online and paid at the desk, because online can't take it. */
+function atDesk(lead: string, why: string, fix: OnlineFix): OnlineProblem {
+    const said = `${lead}: ${why}, so nothing is taken when people book.`;
+    return { blocked: false, text: said, line: said, fix };
+}
+
 /**
- * Why people can't book this service online because of how it is paid,
- * or null when they can — or when it couldn't be told (`payment` null). A
- * service with no price is booked with nothing to pay, whatever the rule.
+ * What happens when people book this service online because of how it is
+ * paid, or null when it is paid as chosen — or when it couldn't be told
+ * (`payment` null). A service with no price is booked with nothing to pay,
+ * whatever the rule.
  */
 export function onlineBookingProblem(
     service: { priceCents: number | null; depositMode: DepositMode },
@@ -65,19 +83,16 @@ export function onlineBookingProblem(
     if (!service.priceCents || service.priceCents <= 0) return null;
     const atBooking = service.depositMode !== "NONE";
     const { bookingPayment, onlineBlocker } = payment;
-    const takes = "it takes payment when they book";
 
     if (atBooking && bookingPayment === "DESK") {
-        return problem(
-            `${takes}, and your booking rules take payment at the desk only`,
+        return atDesk(
+            "Paid at the desk",
+            "your booking rules take payment at the desk only",
             RULES_FIX,
-            "Take nothing at booking, or let people pay online.",
         );
     }
     if (!onlineBlocker) return null;
-    // Online can't be taken now, and the rules allow the desk: it books
-    // there, with no deposit asked (DEC-089) — nothing to fix.
-    if (bookingPayment !== "ONLINE") return null;
+    if (!atBooking && bookingPayment !== "ONLINE") return null;
 
     const cant =
         onlineBlocker === "PLAN"
@@ -91,8 +106,11 @@ export function onlineBookingProblem(
             : onlineBlocker === "PAYMENTS_OFF"
               ? PAYMENTS_FIX
               : PROVIDER_FIX;
+    if (bookingPayment === "BOTH") {
+        return atDesk("Paid at the desk for now", cant, fix);
+    }
     return atBooking
-        ? problem(`${takes}, and ${cant}`, fix)
+        ? problem(`it takes payment when they book, and ${cant}`, fix)
         : problem(
               `your booking rules take payment online only, and ${cant}`,
               fix,

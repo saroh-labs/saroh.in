@@ -108,8 +108,9 @@ export interface PublicBookingPage {
         /**
          * What is paid online at booking when the booker pays the deposit
          * (E8): the service's share of its price, worked out here, or null
-         * when it takes none. A service with a deposit is never paid at the
-         * desk; one whose deposit is the full price is paid now.
+         * when it takes none. A service with a deposit is paid at the desk
+         * only when online can't take it and the business allows the desk
+         * (DEC-089); one whose deposit is the full price is paid now.
          */
         depositCents: number | null;
         /**

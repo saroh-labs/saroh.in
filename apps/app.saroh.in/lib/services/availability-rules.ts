@@ -215,8 +215,9 @@ export const PAY_WAY = {
 
 /**
  * What the chosen way means on the booking page, and — when online can't
- * be taken now and the way needs it — why. A deposit is only ever paid
- * online. `blocker` undefined is "couldn't tell", which says nothing more.
+ * be taken now and the way needs it — why. A deposit is paid online when
+ * it can be, else at the desk wherever the desk is allowed (DEC-089).
+ * `blocker` undefined is "couldn't tell", which says nothing more.
  */
 export function payWayHint(
     way: BookingPayment,
@@ -224,10 +225,10 @@ export function payWayHint(
 ): string {
     const base =
         way === "DESK"
-            ? "Nobody pays on the booking page; they pay when they come. A service that takes a deposit can't be booked online."
+            ? "Nobody pays on the booking page; they pay when they come, a deposit too."
             : way === "ONLINE"
               ? "Everyone pays on the booking page when they book. Free services book with nothing to pay."
-              : "People pay online when they book, or at the desk. A deposit is always paid online.";
+              : "People pay online when they book, or at the desk. A deposit is paid online, or at the desk when you can't take payment online.";
     if (way === "DESK" || !blocker) return base;
     const why =
         blocker === "PAYMENTS_OFF"
@@ -236,7 +237,7 @@ export function payWayHint(
     const then =
         way === "ONLINE"
             ? "nobody can book a service with a price online"
-            : "only services with no deposit can be booked online, to pay at the desk";
+            : "everything is paid at the desk";
     return `${base} Right now ${why}, so ${then}.`;
 }
 

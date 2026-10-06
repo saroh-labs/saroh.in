@@ -272,8 +272,9 @@ describe("a stored deposit never makes a service unbookable (DB)", () => {
         const b = await business("free");
         const id = await rootCanal(b, "PERCENT_50");
 
-        await expect(book(id, "DEPOSIT")).rejects.toBeInstanceOf(
-            BadRequestException,
+        // Online can't take it: the deposit is paid at the desk instead.
+        await expect(book(id, "DEPOSIT")).rejects.toThrow(
+            "Book it to pay at the desk",
         );
         const { booking, payToken } = await book(id, "DESK");
         expect(payToken).toBeNull();
@@ -281,9 +282,7 @@ describe("a stored deposit never makes a service unbookable (DB)", () => {
             where: { id: booking.id },
         });
         expect(row).toMatchObject({ status: "CONFIRMED", paidWith: "DESK" });
-        expect(row.snapshot).toMatchObject({
-            service: { depositMode: "NONE" },
-        });
+        // Paid at the desk (DEC-089): nothing was taken online.
         expect(
             await prisma.invoice.count({ where: { bookingId: booking.id } }),
         ).toBe(0);
@@ -316,8 +315,9 @@ describe("a stored deposit when money can't be taken online for another reason (
     async function booksAtTheDesk(b: Business) {
         const id = await rootCanal(b, "PERCENT_50");
 
-        await expect(book(id, "DEPOSIT")).rejects.toBeInstanceOf(
-            BadRequestException,
+        // Online can't take it: the deposit is paid at the desk instead.
+        await expect(book(id, "DEPOSIT")).rejects.toThrow(
+            "Book it to pay at the desk",
         );
         const { booking, payToken } = await book(id, "DESK");
         expect(payToken).toBeNull();
@@ -325,9 +325,7 @@ describe("a stored deposit when money can't be taken online for another reason (
             where: { id: booking.id },
         });
         expect(row).toMatchObject({ status: "CONFIRMED", paidWith: "DESK" });
-        expect(row.snapshot).toMatchObject({
-            service: { depositMode: "NONE" },
-        });
+        // Paid at the desk (DEC-089): nothing was taken online.
         expect(
             (await prisma.service.findUniqueOrThrow({ where: { id } }))
                 .depositMode,

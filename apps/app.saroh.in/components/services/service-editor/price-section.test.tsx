@@ -1,10 +1,11 @@
 // @vitest-environment jsdom
 /**
- * The Service Editor's Price section (E8, DEC-088, #821): when the deposit
- * chosen — or a business that takes payment online only — leaves the
- * service unbookable online, it says so where the deposit is chosen, with
- * a link to what fixes it. Nothing when it couldn't be told, when the
- * service isn't on the booking page, or when nothing is wrong.
+ * The Service Editor's Price section (E8, DEC-088, DEC-089, #821): when
+ * online can't take what the service asks, it says what happens where the
+ * deposit is chosen — paid at the desk under Both or At the desk, can't be
+ * booked online under Online only — with a link to what fixes it. Nothing
+ * when it couldn't be told, when the service isn't on the booking page, or
+ * when nothing is wrong.
  *
  * `react-dom/client` + `act` directly, as the editor's tests do.
  */
@@ -71,35 +72,29 @@ function warning(): HTMLElement | null {
         host.querySelectorAll<HTMLElement>('[role="status"]'),
     );
     return (
-        all.find((el) =>
-            el.textContent.startsWith("People can't book this online"),
+        all.find(
+            (el) =>
+                el.textContent.startsWith("People can't book this online") ||
+                el.textContent.startsWith("Paid at the desk"),
         ) ?? null
     );
 }
 
 describe("the deposit's warning (#821)", () => {
-    it("a deposit with no provider, the desk allowed: no warning, it books at the desk (DEC-089)", () => {
+    it("Both, a deposit with no provider: paid at the desk for now, linking to Settings › Providers (DEC-089)", () => {
         render(draft(), {
             bookingPayment: "BOTH",
             onlineBlocker: "NO_PROVIDER",
         });
-        expect(warning()).toBeNull();
-    });
-
-    it("a deposit with no provider, online only: says so, linking to Settings › Providers", () => {
-        render(draft(), {
-            bookingPayment: "ONLINE",
-            onlineBlocker: "NO_PROVIDER",
-        });
         expect(warning()?.textContent).toBe(
-            "People can't book this online: it takes payment when they book, and no payment provider is connected. Connect one in Settings › Providers",
+            "Paid at the desk for now: no payment provider is connected, so nothing is taken when people book. Connect one in Settings › Providers",
         );
         expect(warning()?.querySelector("a")?.getAttribute("href")).toBe(
             "/settings/providers",
         );
     });
 
-    it("a deposit when the business takes payment at the desk only: links to the booking rule", () => {
+    it("a deposit when the business takes payment at the desk only: paid at the desk, links to the booking rule", () => {
         render(draft({ deposit: "FULL" }), {
             bookingPayment: "DESK",
             onlineBlocker: null,
@@ -107,8 +102,19 @@ describe("the deposit's warning (#821)", () => {
         expect(warning()?.querySelector("a")?.getAttribute("href")).toBe(
             "/bookings/availability",
         );
-        expect(warning()?.textContent).toContain(
-            "your booking rules take payment at the desk only",
+        expect(warning()?.textContent).toBe(
+            "Paid at the desk: your booking rules take payment at the desk only, so nothing is taken when people book. Change it in Booking rules",
+        );
+        expect(host.textContent).toContain("They pay ₹1,200 at the visit.");
+    });
+
+    it("online only, a deposit with no provider: can't be booked online", () => {
+        render(draft(), {
+            bookingPayment: "ONLINE",
+            onlineBlocker: "NO_PROVIDER",
+        });
+        expect(warning()?.textContent).toBe(
+            "People can't book this online: it takes payment when they book, and no payment provider is connected. Connect one in Settings › Providers",
         );
     });
 

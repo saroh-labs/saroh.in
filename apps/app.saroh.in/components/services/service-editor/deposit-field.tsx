@@ -1,5 +1,6 @@
 "use client";
 
+import { cn } from "@saroh/ui/lib/utils";
 import Link from "next/link";
 import { useId } from "react";
 
@@ -25,17 +26,17 @@ const DEPOSITS: [DepositMode, string][] = [
  * "At booking, they pay" (E8, the Service Editor design): nothing, a 25%
  * or 50% deposit, or the full price. The note works the split out from the
  * price as typed, so the merchant sees what a customer pays now and at the
- * visit; the booking page charges what the server works out. When the
- * choice leaves the service unbookable online — payment at booking with no
- * way to take it online, or a business that takes payment online only and
- * can't (DEC-088, #821) — it says so here, with a link to what fixes it.
+ * visit; the booking page charges what the server works out. When online
+ * can't take what it asks, it says what happens instead, with a link to
+ * what fixes it (DEC-088, DEC-089, #821): paid at the desk where the
+ * business allows the desk, or — a business that takes payment online
+ * only — can't be booked online at all.
  *
  * A deposit is taken online, so on a plan without online payments
  * (`paymentsLock`, 6 Oct 2026) the deposits are locked, with the way up:
  * the business can take a deposit off, never set a new one, and a service
- * that already has one keeps it, paused — the booking page books it "pay
- * at the desk" until the plan has online payments. The API refuses the
- * same (`MODULE_LOCKED`).
+ * that already has one keeps it, paused — paid at the desk where the
+ * business allows the desk. The API refuses the same (`MODULE_LOCKED`).
  */
 export function DepositField({
     deposit,
@@ -60,7 +61,7 @@ export function DepositField({
     paymentsLock?: PlanLock | null;
     /** How the business takes payment when people book (DEC-088). */
     way?: BookingPayment;
-    /** Why people can't book it online as it stands, if they can't. */
+    /** What happens when people book it online, when it isn't as chosen. */
     problem?: OnlineProblem | null;
     onChange: (deposit: DepositMode) => void;
 }) {
@@ -109,7 +110,12 @@ export function DepositField({
             ) : problem ? (
                 <p
                     role="status"
-                    className="mt-2 rounded-[8px] bg-warning-subtle px-3 py-2 text-[12.5px] leading-[1.45] text-warning-subtle-foreground"
+                    className={cn(
+                        "mt-2 rounded-[8px] px-3 py-2 text-[12.5px] leading-[1.45]",
+                        problem.blocked
+                            ? "bg-warning-subtle text-warning-subtle-foreground"
+                            : "bg-muted text-foreground",
+                    )}
                 >
                     {problem.text}{" "}
                     <Link
