@@ -1,5 +1,5 @@
-import type { Catalog } from "@saroh/pricing-catalog";
-import { parseCatalog } from "@saroh/pricing-catalog";
+import type { Catalog, ModuleAccess } from "@saroh/pricing-catalog";
+import { parseCatalog, resolveAllAccess } from "@saroh/pricing-catalog";
 
 /**
  * A made-up pricing catalogue for the pricing specs (plans catalogue U3).
@@ -320,4 +320,45 @@ export function fakeMeteredCatalog(edit?: (c: Catalog) => void): Catalog {
         return parseCatalog(c);
     }
     return c;
+}
+
+/**
+ * {@link fakeMeteredCatalog} with the Payments rows (the plan's say over
+ * taking money online, `billing/online-payments-plan.ts`): `payments` and
+ * `subscriptions`, both locked on `free` and on from `grow`. Made up, as
+ * the rest.
+ */
+export function fakePaymentsCatalog(edit?: (c: Catalog) => void): Catalog {
+    return fakeMeteredCatalog((c) => {
+        for (const [id, name] of [
+            ["payments", "Online payments"],
+            ["subscriptions", "Memberships that renew"],
+        ] as const) {
+            c.modules.push({
+                id,
+                name,
+                group: "g",
+                cells: {
+                    free: { inc: false, off: "locked" },
+                    grow: { inc: true, text: "Included" },
+                    pro: { inc: true, text: "Included" },
+                },
+            } as unknown as Catalog["modules"][number]);
+        }
+        edit?.(c);
+    });
+}
+
+/** One row of {@link fakePaymentsCatalog} as a business on `planId` has it. */
+export function fakePaymentsRow(
+    planId: "free" | "grow" | "pro",
+    moduleId: "payments" | "subscriptions",
+): ModuleAccess {
+    const row = resolveAllAccess({
+        catalog: fakePaymentsCatalog(),
+        planId,
+        now: new Date(),
+    }).find((m) => m.moduleId === moduleId);
+    if (!row) throw new Error(`no ${moduleId} row`);
+    return row;
 }

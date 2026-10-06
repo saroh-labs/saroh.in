@@ -62,6 +62,8 @@ const SEND_SELECT = {
     kind: true,
     source: true,
     orderId: true,
+    // A renewal stays payable online on any plan (`online-payments-plan.ts`).
+    subscriptionId: true,
     contactId: true,
     billToName: true,
     currency: true,
@@ -175,7 +177,7 @@ export class InvoiceSendService {
     ): Promise<InvoiceSendView> {
         const [nextReminderAt, payOnline] = await Promise.all([
             this.nextReminderAt(db, row.id, now),
-            invoicePayOnline(db, organizationId),
+            invoicePayOnline(db, organizationId, row),
         ]);
         const none = (reason: SendBlocker): InvoiceSendView => ({
             channels: [],

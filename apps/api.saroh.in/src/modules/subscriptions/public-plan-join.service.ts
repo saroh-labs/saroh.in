@@ -8,6 +8,7 @@ import {
 import { prisma } from "@saroh/database";
 
 import { toMoneyString } from "../../common/money";
+import { planStartsSubscriptions } from "../billing/online-payments-plan";
 import { takesOnlinePayment } from "../bookings/public-booking-page";
 import { FixedWindowRateLimiter } from "../bookings/rate-limiter";
 import { contactEmailForDisplay } from "../contacts/contact-email";
@@ -168,7 +169,13 @@ export class PublicPlanJoinService {
             orderBy: { createdAt: "asc" },
             select: { provider: true },
         });
-        if (!provider || !(await takesOnlinePayment(organizationId))) {
+        // A new subscription: the plan must start one (memberships and
+        // online payments); said to the customer without naming a plan.
+        if (
+            !provider ||
+            !(await takesOnlinePayment(organizationId)) ||
+            !(await planStartsSubscriptions(organizationId))
+        ) {
             throw new ConflictException({
                 message: ASK_ABOUT_JOINING,
                 details: { reason: "ask" },

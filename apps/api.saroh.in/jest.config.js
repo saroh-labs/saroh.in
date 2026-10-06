@@ -66,6 +66,8 @@ module.exports = {
         // commands, and the readiness registry — all with mocked Prisma/flags/
         // entitlements (no DB, no network).
         "<rootDir>/src/modules/capabilities/module-availability.service.spec.ts",
+        // U12: the plan step, and PAYMENTS locking actions, never the module.
+        "<rootDir>/src/modules/capabilities/module-availability.catalogue.spec.ts",
         "<rootDir>/src/modules/capabilities/module-lifecycle.service.spec.ts",
         "<rootDir>/src/modules/capabilities/readiness/module-readiness.registry.spec.ts",
         // #115 module API controller (mocked services).
@@ -215,6 +217,9 @@ module.exports = {
         // G13: the site bag's pricing, DB-free. The real rows are in
         // public-checkout.db.spec.ts.
         "<rootDir>/src/modules/orders/checkout-quote.spec.ts",
+        // Whether the site can take an online order, with the plan's say
+        // over online payments — DB-free.
+        "<rootDir>/src/modules/orders/checkout-readiness.spec.ts",
         // P4: the site's order confirmation, DB-free. Its access rules are
         // in checkout-confirmation.db.spec.ts.
         "<rootDir>/src/modules/orders/checkout-confirmation.spec.ts",

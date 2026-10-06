@@ -1,6 +1,12 @@
 import { describe, expect, it } from "vitest";
 
-import { planLocks, rowNotice, upgradeHref, upgradeLine } from "./access";
+import {
+    onlinePaymentsLock,
+    planLocks,
+    rowNotice,
+    upgradeHref,
+    upgradeLine,
+} from "./access";
 import { access, row } from "./fixtures.test-data";
 
 describe("rowNotice", () => {
@@ -209,5 +215,91 @@ describe("rowNotice on a soft cap", () => {
             full: true,
             body: expect.stringMatching(/^Nothing is blocked/),
         });
+    });
+});
+
+describe("onlinePaymentsLock", () => {
+    const locked = (moduleId: string) =>
+        row({
+            moduleId,
+            name: moduleId,
+            state: "locked",
+            limit: null,
+            usage: null,
+            menu: null,
+            child: null,
+        });
+
+    it("says taking payment online is on the plan above, and what goes on", () => {
+        const lock = onlinePaymentsLock(
+            access({ modules: [locked("payments")] }),
+            "payments",
+        );
+        expect(lock).toEqual({
+            title: "Taking payment online comes with Plan B",
+            body: "You're on Plan A. Invoices still go out, as a link to view, and customers pay you another way. Memberships you already have keep renewing.",
+            cta: "See Plan B",
+            href: "/settings/billing?plan=b#change-plan",
+        });
+    });
+
+    it("stops new memberships when either row is locked, and says renewals go on", () => {
+        for (const id of ["subscriptions", "payments"]) {
+            const lock = onlinePaymentsLock(
+                access({ modules: [locked(id)] }),
+                "subscriptions",
+            );
+            expect(lock).toMatchObject({
+                title: "New memberships come with Plan B",
+                body: "You're on Plan A. Everyone already subscribed keeps renewing, and nothing they hold is lost. Subscribing someone new needs Plan B.",
+            });
+        }
+    });
+
+    it("names no plan to go to when there is none", () => {
+        const lock = onlinePaymentsLock(
+            access({
+                modules: [{ ...locked("payments"), upgradeTo: null }],
+            }),
+            "payments",
+        );
+        expect(lock).toMatchObject({
+            title: "Taking payment online isn't in your Plan A plan",
+            cta: "See plans",
+            href: "/settings/billing#change-plan",
+        });
+    });
+
+    it("says nothing while locks aren't enforced, off the catalogue, or with the row on", () => {
+        const modules = [locked("payments"), locked("subscriptions")];
+        expect(
+            onlinePaymentsLock(
+                access({ enforced: false, modules }),
+                "payments",
+            ),
+        ).toBeNull();
+        expect(
+            onlinePaymentsLock(
+                access({ source: "legacy", modules }),
+                "subscriptions",
+            ),
+        ).toBeNull();
+        expect(
+            onlinePaymentsLock(
+                access({ modules: [row({ moduleId: "payments" })] }),
+                "payments",
+            ),
+        ).toBeNull();
+        expect(onlinePaymentsLock(null, "payments")).toBeNull();
+    });
+
+    it("never locks the rail for Payments: the rows have no rail entry, and invoicing lives there", () => {
+        expect(
+            planLocks(
+                access({
+                    modules: [locked("payments"), locked("subscriptions")],
+                }),
+            ),
+        ).toEqual([]);
     });
 });

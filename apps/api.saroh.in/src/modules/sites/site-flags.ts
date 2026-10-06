@@ -718,7 +718,7 @@ export interface ShopFlagInput {
      * null when it can (or none is chosen).
      */
     cantTakeOrders?: {
-        reason: "paused" | "no-provider";
+        reason: "paused" | "no-provider" | "plan";
         message: string;
     } | null;
 }

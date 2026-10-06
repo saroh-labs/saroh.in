@@ -7,6 +7,7 @@ import type { Prisma } from "@saroh/database";
 import { prisma } from "@saroh/database";
 
 import type { OrganizationContext } from "../../common/types/organization-context";
+import { assertPlanTakesOnlinePayment } from "../billing/online-payments-plan";
 import { assertBusinessDetails } from "../invoices/business-details";
 import { mintPayToken } from "../invoices/pay-token";
 import { assertPaymentsOn } from "../invoices/payments-on";
@@ -47,6 +48,8 @@ export class OrderPayLinkService {
             authorize(ctx, "order:edit");
         }
         await assertPaymentsOn(prisma, ctx.organizationId, "make a pay link");
+        // A pay link charges online: the plan's too (403 MODULE_LOCKED).
+        await assertPlanTakesOnlinePayment(ctx.organizationId);
         // A way to take money online: the business details first (DEC-068).
         await assertBusinessDetails(prisma, ctx.organizationId);
         return prisma.$transaction((tx) =>

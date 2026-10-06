@@ -8,6 +8,11 @@ import type { Prisma } from "@saroh/database";
 import { prisma } from "@saroh/database";
 
 import type { OrganizationContext } from "../../common/types/organization-context";
+import {
+    assertPlanTakesOnlinePayment,
+    isRenewalInvoice,
+    planTakesOnlinePayment,
+} from "../billing/online-payments-plan";
 import { resolveContact } from "../customer-workspace/resolve-contact";
 import { authorize } from "../organizations/organization-policy";
 import {
@@ -233,6 +238,17 @@ export class InvoicesService {
         // Taking money online is Payments' (DEC-070); a view link isn't.
         if (options.requireProvider) {
             await assertPaymentsOn(db, ctx.organizationId, "make a pay link");
+            // And the plan's (403 MODULE_LOCKED), except for a renewal of a
+            // subscription the business already has: that stays payable.
+            if (!(await planTakesOnlinePayment(ctx.organizationId))) {
+                const paper = await db.invoice.findFirst({
+                    where: { id, organizationId: ctx.organizationId },
+                    select: { subscriptionId: true },
+                });
+                if (!isRenewalInvoice(paper)) {
+                    await assertPlanTakesOnlinePayment(ctx.organizationId);
+                }
+            }
         }
         return this.mintInvoiceLink(db, ctx.organizationId, id, options);
     }

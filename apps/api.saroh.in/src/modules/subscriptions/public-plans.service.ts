@@ -7,6 +7,7 @@ import {
 import { prisma, runInOrgContext } from "@saroh/database";
 
 import { toMoneyString } from "../../common/money";
+import { planStartsSubscriptions } from "../billing/online-payments-plan";
 import { takesOnlinePayment } from "../bookings/public-booking-page";
 import { FixedWindowRateLimiter } from "../bookings/rate-limiter";
 import { MODULE_BY_KEY } from "../capabilities/module-registry";
@@ -206,7 +207,14 @@ export class PublicPlansService {
                             },
                         },
                     }),
-                    takesOnlinePayment(organizationId),
+                    // Join is a new subscription: the plan must start one
+                    // (memberships and online payments), not only take
+                    // payment online.
+                    takesOnlinePayment(organizationId).then(
+                        async (ok) =>
+                            ok &&
+                            (await planStartsSubscriptions(organizationId)),
+                    ),
                 ]);
             },
         );

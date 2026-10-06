@@ -107,7 +107,9 @@ import {
 } from "@nestjs/common";
 import { prisma } from "@saroh/database";
 
+import { fakePaymentsRow } from "../../../test/fixtures/pricing-catalog";
 import type { OrganizationContext } from "../../common/types/organization-context";
+import { planMeter } from "../billing/metering.service";
 import type { InvoicesService } from "../invoices/invoices.service";
 import { resolveCapabilities } from "../organizations/organization-policy";
 import { SubscriptionsService } from "./subscriptions.service";
@@ -220,6 +222,20 @@ beforeEach(() => {
 
 afterEach(() => jest.useRealTimers());
 
+/** The business's plan leaves `payments` and `subscriptions` off (made up). */
+function onPlanWithoutPayments() {
+    return jest
+        .spyOn(planMeter, "enforcedRow")
+        .mockImplementation((_org: string, moduleId: string) =>
+            Promise.resolve(
+                fakePaymentsRow(
+                    "free",
+                    moduleId as "payments" | "subscriptions",
+                ),
+            ),
+        );
+}
+
 describe("subscribing", () => {
     beforeEach(() => {
         db.customerSubscription!.count!.mockResolvedValue(0);
@@ -295,6 +311,24 @@ describe("subscribing", () => {
         expect(data.timezone).toBe("Asia/Kolkata");
         // 22 Sep 00:00 in Kolkata.
         expect(data.anchorAt).toEqual(at("2026-09-21T18:30:00Z"));
+    });
+
+    it("is refused on a plan without memberships and online payments: 403 MODULE_LOCKED, nothing made", async () => {
+        const spy = onPlanWithoutPayments();
+        const err = await service
+            .subscribe(owner, { contactId: "c_1", planId: "plan_1" })
+            .then(
+                () => null,
+                (e: unknown) => e,
+            );
+        spy.mockRestore();
+
+        expect(err).toBeInstanceOf(ForbiddenException);
+        expect((err as ForbiddenException).getResponse()).toMatchObject({
+            details: { code: "MODULE_LOCKED", moduleId: "subscriptions" },
+        });
+        expect(tx.customerSubscription!.create).not.toHaveBeenCalled();
+        expect(issueInTx).not.toHaveBeenCalled();
     });
 
     it("is refused while Payments is off: a subscription is its invoices", async () => {
@@ -624,6 +658,24 @@ describe("renewal", () => {
                 createdByUserId: null,
             }),
         );
+    });
+
+    it("still renews on a plan without online payments, never asking the plan (ADR-003)", async () => {
+        const spy = onPlanWithoutPayments();
+        const assertIncluded = jest.spyOn(planMeter, "assertIncluded");
+
+        await expect(service.renewOne("sub_1", now)).resolves.toBe("renewed");
+        expect(issueInTx).toHaveBeenCalledWith(
+            tx,
+            "org_1",
+            expect.objectContaining({
+                periodStart: at("2026-10-01T00:00:00Z"),
+            }),
+        );
+        expect(spy).not.toHaveBeenCalled();
+        expect(assertIncluded).not.toHaveBeenCalled();
+        spy.mockRestore();
+        assertIncluded.mockRestore();
     });
 
     it("issues the first invoice on the day a later start arrives", async () => {

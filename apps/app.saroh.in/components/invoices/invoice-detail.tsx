@@ -8,6 +8,7 @@ import Link from "next/link";
 import type { ReactNode } from "react";
 import { useState } from "react";
 
+import { reportFailure } from "@/components/billing/plan-refusal";
 import type { InvoiceRef } from "@/components/invoices/invoice-actions";
 import {
     CancelInvoiceDialog,
@@ -151,7 +152,8 @@ export function InvoiceDetail({
         const res = await details.run(() => createPayLink(invoice.id));
         setBusy(false);
         if (!res) return;
-        if (!res.ok) return showError(res.error);
+        // A plan without online payments: its notice and the way up.
+        if (!res.ok) return reportFailure(res);
         setUrl(res.data.url);
         showSuccess(
             (await copy(res.data.url))

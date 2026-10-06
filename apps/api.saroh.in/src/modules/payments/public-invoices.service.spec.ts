@@ -55,6 +55,8 @@ import {
 } from "@nestjs/common";
 import { prisma } from "@saroh/database";
 
+import { fakePaymentsRow } from "../../../test/fixtures/pricing-catalog";
+import { planMeter } from "../billing/metering.service";
 import { FixedWindowRateLimiter } from "../bookings/rate-limiter";
 import { hashPayToken, mintPayToken } from "../invoices/pay-token";
 import { encryptSecret } from "./crypto";
@@ -157,7 +159,8 @@ describe("PublicInvoicesService.read", () => {
         await makeService().service.read(TOKEN);
         expect(invoiceFindUnique).toHaveBeenCalledWith({
             where: { payTokenHash: hashPayToken(TOKEN) },
-            select: { id: true, organizationId: true },
+            // A renewal stays payable on any plan (online-payments-plan.ts).
+            select: { id: true, organizationId: true, subscriptionId: true },
         });
         expect(JSON.stringify(invoiceFindUnique.mock.calls)).not.toContain(
             TOKEN,
@@ -516,6 +519,58 @@ describe("PublicInvoicesService.createIntent", () => {
         await expect(service.createIntent(TOKEN, {})).rejects.toMatchObject({
             status: 429,
         });
+    });
+});
+
+describe("PublicInvoicesService on a plan without online payments", () => {
+    const PAYABLE = {
+        id: "inv_1",
+        organizationId: "org_1",
+        status: "ISSUED",
+        total: dec("1400.00"),
+        currency: "INR",
+        subscriptionId: null,
+    };
+
+    beforeEach(() => {
+        jest.spyOn(planMeter, "enforcedRow").mockResolvedValue(
+            fakePaymentsRow("free", "payments"),
+        );
+        providerFindFirst.mockResolvedValue(connectedRow());
+        intentCreate.mockResolvedValue({ id: "pi_1" });
+    });
+    afterEach(() => jest.restoreAllMocks());
+
+    it("opens the business's own invoice as a view link, and refuses paying it online", async () => {
+        const { service, fake } = makeService();
+        invoiceFindFirst.mockResolvedValue({ ...STORED, ...PAYABLE });
+
+        await expect(service.read(TOKEN)).resolves.toMatchObject({
+            payOnline: false,
+        });
+        await expect(service.createIntent(TOKEN, {})).rejects.toThrow(
+            "This business doesn't take payment online.",
+        );
+        expect(fake.calls).toHaveLength(0);
+        expect(intentCreate).not.toHaveBeenCalled();
+    });
+
+    it("keeps a renewal of a subscription the business already has payable online", async () => {
+        const { service, fake } = makeService();
+        invoiceFindUnique.mockResolvedValue({
+            id: "inv_1",
+            organizationId: "org_1",
+            subscriptionId: "sub_1",
+        });
+        invoiceFindFirst.mockResolvedValue({
+            ...PAYABLE,
+            subscriptionId: "sub_1",
+        });
+
+        await expect(service.createIntent(TOKEN, {})).resolves.toMatchObject({
+            amountCents: 140000,
+        });
+        expect(fake.calls).toHaveLength(1);
     });
 });
 

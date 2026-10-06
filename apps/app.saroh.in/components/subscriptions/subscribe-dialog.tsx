@@ -15,6 +15,7 @@ import { showError, showSuccess } from "@saroh/ui/toast";
 import { useRouter } from "next/navigation";
 import { useId, useState } from "react";
 
+import { reportFailure } from "@/components/billing/plan-refusal";
 import type { ContactOption } from "@/components/shared/contact-picker";
 import { ContactPicker } from "@/components/shared/contact-picker";
 import { OptionSelect } from "@/components/shared/option-select";
@@ -88,7 +89,11 @@ export function SubscribeDialog({
             timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
         });
         setBusy(false);
-        if (!res.ok) return showError(res.error);
+        if (!res.ok) {
+            // The plan's notice replaces this dialog, with the way up.
+            if (res.plan) onOpenChange(false);
+            return reportFailure(res);
+        }
         showSuccess(
             res.data.startsAt
                 ? `${person?.name ?? "They"} subscribed to ${plan.name} — the first invoice goes out when they start`

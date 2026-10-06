@@ -1,5 +1,6 @@
 import { EmptyState, PermissionDeniedState } from "@saroh/ui/data-state";
 
+import { OnlinePaymentsLockNotice } from "@/components/billing/online-payments-lock";
 import { PlanLimitNotice } from "@/components/billing/plan-limit-notice";
 import { ProviderList } from "@/components/providers/provider-list";
 import {
@@ -67,6 +68,9 @@ export default async function ProvidersSettingsPage() {
             }
         >
             <PlanLimitNotice moduleId="integrations" />
+            {/* A plan without online payments: no first connection, no
+                pay links, no checkout — said here, before Connect. */}
+            <OnlinePaymentsLockNotice what="payments" />
             {/* Three outcomes, three states. "Nothing to show" was previously
                 rendered for both a denial and an empty list, which are
                 different facts about the same screen (#177, §30). */}
