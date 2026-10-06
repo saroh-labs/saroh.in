@@ -4,11 +4,13 @@ import { useSyncExternalStore } from "react";
 
 import type {
     RenderedBooking,
+    RenderedHours,
     RenderedJournal,
     RenderedPacks,
     RenderedPlans,
     RenderedProductGrid,
     RenderedServicesList,
+    RenderedTimetable,
     RenderedVisitUs,
     SectionType,
 } from "@saroh/block-contract";
@@ -16,6 +18,7 @@ import { blockFixture } from "@saroh/block-contract";
 
 import type { Slot } from "./blocks/booking";
 import BookingSection from "./blocks/booking";
+import HoursSection from "./blocks/hours";
 import type { JournalPost } from "./blocks/journal";
 import JournalSection from "./blocks/journal";
 import type { PublicPack } from "./blocks/packs";
@@ -25,8 +28,10 @@ import PlansSection from "./blocks/plans";
 import ProductGridSection from "./blocks/product-grid";
 import type { PublicService } from "./blocks/services-list";
 import ServicesListSection from "./blocks/services-list";
+import TimetableSection from "./blocks/timetable";
 import type { PublicVisit } from "./blocks/visit-us";
 import VisitUsSection from "./blocks/visit-us";
+import type { PublicTimetable, TimetableSession } from "./lib/timetable-read";
 import type { ShopListingCard } from "./product/shop-listing";
 import SectionRenderer from "./section-renderer";
 
@@ -232,6 +237,57 @@ export const SAMPLE_PRODUCTS: ShopListingCard[] = [
 ];
 
 /**
+ * A week of classes for previewing `timetable` where there are no real ones:
+ * the catalog and the Add-section picker (U2). Fixed dates, so the picture
+ * is the same on every machine; one class is full and one nearly, so both
+ * words show.
+ */
+const [MON, TUE, WED, , FRI, SAT] = [
+    "2026-10-05",
+    "2026-10-06",
+    "2026-10-07",
+    "2026-10-08",
+    "2026-10-09",
+    "2026-10-10",
+    "2026-10-11",
+] as const;
+const WEEK_DATES = [MON, TUE, WED, "2026-10-08", FRI, SAT, "2026-10-11"];
+
+function sampleSession(
+    date: string,
+    time: string,
+    name: string,
+    staffName: string,
+    placesLeft: number,
+): TimetableSession {
+    return {
+        serviceId: `sample-${name.toLowerCase().replace(/\W+/g, "-")}`,
+        serviceName: name,
+        durationMinutes: 45,
+        startAt: `${date}T${time}:00.000Z`,
+        date,
+        time,
+        staffName,
+        placesLeft,
+        capacity: 12,
+    };
+}
+
+export const SAMPLE_TIMETABLE: PublicTimetable = {
+    timezone: "UTC",
+    days: WEEK_DATES,
+    sessions: [
+        sampleSession(MON, "07:00", "Strength", "Meera", 6),
+        sampleSession(MON, "18:30", "Conditioning", "Arjun", 0),
+        sampleSession(TUE, "07:00", "Mobility", "Meera", 9),
+        sampleSession(WED, "07:00", "Strength", "Meera", 2),
+        sampleSession(WED, "18:30", "Conditioning", "Arjun", 5),
+        sampleSession(FRI, "07:00", "Strength", "Meera", 7),
+        sampleSession(SAT, "09:00", "Open gym", "Arjun", 12),
+    ],
+};
+
+/**
  * Open times for previewing `booking`: tomorrow and the day after, mornings,
  * in the viewer's own time zone as the block itself would show them.
  */
@@ -341,6 +397,16 @@ const LIVE_DATA_PREVIEWS: Partial<
             content={content as RenderedVisitUs}
             visit={SAMPLE_VISIT}
         />
+    ),
+    timetable: (content) => (
+        <TimetableSection
+            content={content as RenderedTimetable}
+            timetable={SAMPLE_TIMETABLE}
+            bookHref="/book"
+        />
+    ),
+    hours: (content) => (
+        <HoursSection content={content as RenderedHours} visit={SAMPLE_VISIT} />
     ),
 };
 

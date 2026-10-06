@@ -113,6 +113,7 @@ function ProjectCard({ item }: { item: Project }) {
                     className="mb-1.5 aspect-[4/3] w-full object-cover"
                 />
             ) : null}
+            {src ? <PhotoCaption text={item.caption} /> : null}
             <ProjectWords item={item} />
         </article>
     );
@@ -131,6 +132,7 @@ function ProjectRow({ item }: { item: Project }) {
                 />
             ) : null}
             <div className="grid min-w-0 content-start gap-1.5 py-4">
+                {src ? <PhotoCaption text={item.caption} /> : null}
                 <ProjectWords item={item} />
             </div>
         </article>
@@ -163,5 +165,19 @@ function ProjectWords({ item }: { item: Project }) {
                 </a>
             ) : null}
         </>
+    );
+}
+
+/**
+ * The line under a project's photo (U2): who took it, where. Drawn only
+ * beside a photo, and as text: it is not the project's description.
+ */
+function PhotoCaption({ text }: { text?: string }) {
+    const caption = said(text);
+    if (!caption) return null;
+    return (
+        <p className="text-site-muted px-4 text-[12.5px] leading-snug [overflow-wrap:anywhere]">
+            {caption}
+        </p>
     );
 }

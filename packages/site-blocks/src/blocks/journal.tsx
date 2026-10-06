@@ -3,9 +3,11 @@
 import { useCallback, useEffect, useState } from "react";
 
 import type { RenderedJournal } from "@saroh/block-contract";
+import { resolveVariant } from "@saroh/block-contract";
 
 import { DEFAULT_API_URL } from "../api-url";
 import { cn, trimTrailingSlashes } from "../lib/utils";
+import { JournalArchive } from "./journal-archive";
 import { cardLink, listCard, listPhoto } from "./list-layout";
 
 /**
@@ -406,8 +408,40 @@ function JournalCards({
     title: string;
     feed: JournalFeed;
 }) {
-    const posts = feed.posts.slice(0, content.count ?? JOURNAL_DEFAULT_COUNT);
+    // The archive look (U2): every post, dated, whatever the count says.
+    const archive = resolveVariant("journal", content) === "archive";
+    const posts = archive
+        ? feed.posts
+        : feed.posts.slice(0, content.count ?? JOURNAL_DEFAULT_COUNT);
     if (posts.length === 0) return null;
+    if (archive) {
+        const index = trimTrailingSlashes(feed.basePath);
+        return (
+            <JournalFrame title={title}>
+                <JournalArchive
+                    rows={posts.map((post) => {
+                        const live =
+                            post.live !== false && post.publishedAt !== null;
+                        return {
+                            key: post.slug,
+                            href: `${index}/${encodeURIComponent(post.slug)}`,
+                            title: post.title,
+                            date: live
+                                ? postDay(post.publishedAt ?? "")
+                                : "Not published",
+                            dateTime: live
+                                ? (post.publishedAt ?? "").slice(0, 10)
+                                : null,
+                            excerpt:
+                                content.showExcerpts !== false
+                                    ? postExcerpt(post)
+                                    : null,
+                        };
+                    })}
+                />
+            </JournalFrame>
+        );
+    }
     const showImages = content.showImages !== false;
     const showExcerpts = content.showExcerpts !== false;
     const base = trimTrailingSlashes(feed.basePath);

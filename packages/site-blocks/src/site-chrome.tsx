@@ -214,6 +214,34 @@ function isHome(item: SiteNavItem): boolean {
 }
 
 /**
+ * The header over a full-bleed hero (U2).
+ *
+ * When the page's first section is a full-bleed hero, `PageSections` marks
+ * its wrapper `data-site-first-hero`, and these classes — keyed off that
+ * mark with `:has()`, so the layout needs to know nothing about the page —
+ * lay the header over the photo: no longer sticky, taking no room of its
+ * own (the hero leaves room for it), with no ground or rule of its own, but
+ * its own band of the page's ink fading down from the top, so the name and
+ * the menu read over any photo, or over none. The words over it take the
+ * page's paper, as the hero's do. Every other page's header is unchanged:
+ * without the mark, none of these classes applies.
+ *
+ * Literal strings, not built from a prefix, so Tailwind finds them.
+ */
+// Joined, not `cn()`-merged: tailwind-merge reads the gradient as
+// replacing `bg-transparent` and drops it, and the ground would show.
+const OVER_PHOTO = [
+    "[body:has([data-site-first-hero])_&]:relative",
+    "[body:has([data-site-first-hero])_&]:-mb-16",
+    "[body:has([data-site-first-hero])_&]:h-16",
+    "[body:has([data-site-first-hero])_&]:border-transparent",
+    "[body:has([data-site-first-hero])_&]:bg-transparent",
+    "[body:has([data-site-first-hero])_&]:bg-gradient-to-b",
+    "[body:has([data-site-first-hero])_&]:from-site-fg/75",
+    "[body:has([data-site-first-hero])_&]:to-transparent",
+].join(" ");
+
+/**
  * The site's header (#206, G17), in one row: the name, the menu, the bag,
  * Sign in or the avatar, and the main button ("Book" or "Order").
  *
@@ -279,12 +307,15 @@ export function SiteHeader({
     const hasMenu = items.length > 0 || main !== null;
 
     return (
-        <header className="border-site-border bg-site-bg font-site-body sticky top-0 z-30 border-b">
+        <header
+            data-site-header=""
+            className={`border-site-border bg-site-bg font-site-body sticky top-0 z-30 border-b ${OVER_PHOTO}`}
+        >
             <div className="mx-auto flex min-h-11 max-w-screen-xl items-center gap-3.5 px-5 py-2.5 sm:px-[var(--site-page-margin)]">
                 <Link
                     href={to("/")}
                     aria-label={`${name} — home`}
-                    className="text-site-fg focus-visible:ring-site-accent flex min-w-0 cursor-pointer items-center rounded-[var(--site-radius)] hover:opacity-80 focus-visible:outline-none focus-visible:ring-2 active:opacity-70"
+                    className="text-site-fg focus-visible:ring-site-accent [body:has([data-site-first-hero])_&]:text-site-bg flex min-w-0 cursor-pointer items-center rounded-[var(--site-radius)] hover:opacity-80 focus-visible:outline-none focus-visible:ring-2 active:opacity-70"
                 >
                     <span className="font-site-heading truncate text-lg font-semibold tracking-[-0.02em]">
                         {name}

@@ -7,16 +7,20 @@ import type {
     RenderedFeatures,
     RenderedGallery,
     RenderedHero,
+    RenderedHours,
     RenderedJournal,
     RenderedPacks,
+    RenderedPerson,
     RenderedPlans,
     RenderedProductGrid,
     RenderedProjects,
     RenderedRichText,
     RenderedServicesList,
     RenderedTestimonials,
+    RenderedTimetable,
     RenderedVisitUs,
 } from "@saroh/block-contract";
+import { resolveVariant } from "@saroh/block-contract";
 
 import BookingSection from "./blocks/booking";
 import ContactSection from "./blocks/contact";
@@ -27,10 +31,12 @@ import FaqSection from "./blocks/faq";
 import FeaturesSection from "./blocks/features";
 import GallerySection from "./blocks/gallery";
 import HeroSection from "./blocks/hero";
+import HoursSection from "./blocks/hours";
 import type { JournalFeed } from "./blocks/journal";
 import JournalSection from "./blocks/journal";
 import type { PacksFeed } from "./blocks/packs";
 import PacksSection from "./blocks/packs";
+import PersonSection from "./blocks/person";
 import type { PlansFeed } from "./blocks/plans";
 import PlansSection from "./blocks/plans";
 import type { ProductGridFeed } from "./blocks/product-grid";
@@ -39,6 +45,7 @@ import ProjectsSection from "./blocks/projects";
 import RichTextSection from "./blocks/rich-text";
 import ServicesListSection from "./blocks/services-list";
 import TestimonialsSection from "./blocks/testimonials";
+import TimetableSection from "./blocks/timetable";
 import VisitUsSection from "./blocks/visit-us";
 import type { ModulePageTopContent } from "./module-page-top";
 import { ModulePageTop } from "./module-page-top";
@@ -250,6 +257,27 @@ export default function SectionRenderer({
                     content={section.content as RenderedProjects}
                 />
             );
+        case "timetable":
+            return (
+                <TimetableSection
+                    content={section.content as RenderedTimetable}
+                    apiUrl={apiUrl}
+                    siteId={siteId}
+                    bookHref={bookHref}
+                />
+            );
+        case "hours":
+            return (
+                <HoursSection
+                    content={section.content as RenderedHours}
+                    apiUrl={apiUrl}
+                    siteId={siteId}
+                />
+            );
+        case "person":
+            return (
+                <PersonSection content={section.content as RenderedPerson} />
+            );
         case "booking":
             return (
                 <BookingSection
@@ -281,6 +309,20 @@ function paddingOverride(content: unknown): React.CSSProperties | undefined {
     // Set one level down from the site variable, so a section that overrides
     // padding does so for its own subtree and hands the setting back after.
     return { "--site-section-padding": `${px}px` } as React.CSSProperties;
+}
+
+/**
+ * Whether a section is a full-bleed hero (U2), which the site header lies
+ * over when it opens the page. `PageSections` marks the first section's
+ * wrapper with `data-site-first-hero`, and the header's own classes key off
+ * the mark (`site-chrome.tsx`), so a page that does not open with one keeps
+ * the header exactly as it was.
+ */
+export function opensOverPhoto(section: Section): boolean {
+    return (
+        section.type === "hero" &&
+        resolveVariant("hero", section.content) === "fullBleed"
+    );
 }
 
 /**
@@ -365,7 +407,16 @@ export function PageSections({
                     />
                 );
                 return (
-                    <div key={i} className={className} style={style}>
+                    <div
+                        key={i}
+                        className={className}
+                        style={style}
+                        data-site-first-hero={
+                            !top && i === 0 && opensOverPhoto(section)
+                                ? "fullBleed"
+                                : undefined
+                        }
+                    >
                         {rendered}
                     </div>
                 );
