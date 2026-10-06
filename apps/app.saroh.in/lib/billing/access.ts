@@ -285,3 +285,30 @@ export function depositLock(
         href: lock.href,
     };
 }
+
+/**
+ * The plan's stop on setting up memberships (6 Oct 2026), said on the Plans
+ * tab and the New plan page: making a plan, publishing a draft and selling
+ * an archived plan again come with the plan that has memberships (rows
+ * `subscriptions` and `payments`, either locked stops it). What goes on is
+ * said too, and true: members already on a plan keep renewing; the plans
+ * stay here to edit or archive, but are off the site. Plan names are the
+ * catalogue's; no price. Null when nothing is locked, or while nothing
+ * enforces it (`rowLock`).
+ */
+export function membershipPlansLock(
+    view: BillingAccessView | null,
+): OnlinePaymentsLock | null {
+    const lock = rowLock(view, "subscriptions") ?? rowLock(view, "payments");
+    if (!lock) return null;
+    const up = lock.upgradeTo;
+    const on = lock.plan ? `You're on ${lock.plan}. ` : "";
+    return {
+        title: up
+            ? `Memberships come with ${up.name}`
+            : `Memberships aren't in your ${lock.plan || "current"} plan`,
+        body: `${on}Members you already have keep renewing. Your plans stay here to edit or archive, but they're off your site, and new plans can't go on sale${up ? ` until you move to ${up.name}` : ""}.`,
+        cta: up ? `See ${up.name}` : "See plans",
+        href: lock.href,
+    };
+}

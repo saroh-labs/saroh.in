@@ -1,7 +1,7 @@
 import { PaymentsLocked } from "@/components/invoices/payments-locked";
 import { PageContainer } from "@/components/shared/page-container";
 import { SubscriptionsScreen } from "@/components/subscriptions/subscriptions-screen";
-import { onlinePaymentsLock } from "@/lib/billing/access";
+import { membershipPlansLock, onlinePaymentsLock } from "@/lib/billing/access";
 import { mayRead, paymentsLockedCopy } from "@/lib/invoices/access";
 import { contactPickerOptions } from "@/lib/invoices/contacts";
 import { modulesOrUnknown } from "@/lib/modules/guard";
@@ -111,6 +111,7 @@ export default async function SubscriptionsPage({
                 settings={settings}
                 autopayOffered={autopay?.offered ?? false}
                 newLocked={onlinePaymentsLock(access, "subscriptions")}
+                plansLocked={membershipPlansLock(access)}
             />
         </PageContainer>
     );

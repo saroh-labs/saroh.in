@@ -287,6 +287,18 @@ orgId)` (`organizations/organization-kind.ts`).
   `depositCents` and books the service "pay at the desk", with the stored
   deposit untouched. Staff bookings never ask. The app locks the control
   with the way up (`depositLock`). `bookings/deposit-plan.db.spec.ts`.
+  Memberships are the second (`subscriptions/plan-writes.ts`,
+  `plan-drafts.ts`): creating a membership plan, starting or publishing a
+  draft and selling an archived plan again need the `subscriptions` and
+  `payments` rows (`assertPlanStartsSubscriptions`). Changing a plan's
+  wording (also publishing a live plan's changes), archiving, discarding
+  and deleting a draft never ask, so a downgraded business tidies up. A
+  membership has no offline fallback on the site, so there the plan
+  **leaves the site**: `public-plans` answers no plans and `offered: false`
+  (no card, no "Ask about joining"); the editor's canvas says why. Members
+  already on a plan keep renewing; staff can't add new ones (`subscribe`).
+  The app swaps "New plan" for the notice and drops "Sell again"
+  (`membershipPlansLock`). `subscriptions/membership-plan-lock.db.spec.ts`.
 - **Current** (DEC-068) — **Turning a module on creates its minimum in the
   switch's own transaction.** `PUT …/modules/:key { status: "ENABLED", setup }`
   checks `module:manage` and then the action for each thing it creates

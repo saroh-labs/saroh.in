@@ -14,6 +14,7 @@ import {
     samePending,
 } from "../../common/drafts/draft-record";
 import { toMoneyString } from "../../common/money";
+import { assertPlanStartsSubscriptions } from "../billing/online-payments-plan";
 import { businessCurrency } from "../stores/currency";
 import type { PlanDraftDto, PlanInputDto } from "./dto";
 import type { PlanDraftRow, PlanValues } from "./plan-draft-view";
@@ -50,6 +51,13 @@ import { lockPlan, lockPlanNames } from "./plans";
  * written), then bumps it. Publish also takes the name lock first and
  * checks the plan again as a whole. The service authorizes and reads the
  * plan back for the editor.
+ *
+ * Memberships are a paid feature, checked where they are set up (6 Oct
+ * 2026): starting a new plan and putting a draft on sale need the plan's
+ * `subscriptions` and `payments` rows (403 `MODULE_LOCKED`, behind
+ * `PLAN_ENFORCEMENT`, failing open). Autosaving, discarding, deleting a
+ * draft and publishing a live plan's changed wording never ask, so a
+ * business that moved down can still tidy up what it has.
  */
 
 function fieldError(message: string, field: string): never {
@@ -112,6 +120,7 @@ export async function createPlanDraft(
     actor: PlanActor,
     dto: PlanInputDto,
 ): Promise<string> {
+    await assertPlanStartsSubscriptions(organizationId);
     const name = dto.name;
     if (!name) fieldError("Give the plan a name", "name");
     const patch = patchOf(dto);
@@ -247,6 +256,10 @@ export async function publishPlan(
         const held = pendingOf(row);
         const isDraft = row.status === PLAN_DRAFT;
         if (!isDraft && !held) return;
+        // A draft going on sale is a new way in: it needs memberships on
+        // the plan. A live plan's changes reach only future sign-ups, which
+        // the site and the desk already refuse on such a plan.
+        if (isDraft) await assertPlanStartsSubscriptions(organizationId);
         const target = isDraft ? live : mergeForEditor(live, held);
 
         const problems = await planProblems(tx, organizationId, id, target);

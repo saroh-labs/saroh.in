@@ -65,6 +65,7 @@ export function SubscriptionsScreen({
     settings = null,
     autopayOffered = false,
     newLocked = null,
+    plansLocked = null,
 }: {
     subscriptions: Subscription[];
     /** The newest read hit its cap: older cancelled ones are not here. */
@@ -93,6 +94,11 @@ export function SubscriptionsScreen({
      * keep renewing.
      */
     newLocked?: OnlinePaymentsLock | null;
+    /**
+     * The plan sets up no membership plan (6 Oct 2026): the Plans tab says
+     * so in place of "New plan", and its own notice replaces the one above.
+     */
+    plansLocked?: OnlinePaymentsLock | null;
 }) {
     const router = useRouter();
     const now = new Date(nowIso);
@@ -162,7 +168,8 @@ export function SubscriptionsScreen({
                         </Button>
                     ) : null}
                 </div>
-                {newLocked ? (
+                {/* The Plans tab says its own lock, in its own words. */}
+                {newLocked && !(onPlans && plansLocked) ? (
                     <LimitNoticeBlock
                         full={false}
                         title={newLocked.title}
@@ -274,6 +281,7 @@ export function SubscriptionsScreen({
                         showClasses={showClasses}
                         settings={settings}
                         nowIso={nowIso}
+                        locked={plansLocked}
                     />
                 ) : (
                     <>

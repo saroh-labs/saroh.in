@@ -152,6 +152,9 @@ module.exports = {
         "<rootDir>/src/modules/subscriptions/public-plans.spec.ts",
         // G20: pure; the real rows are in public-plan-join.db.spec.ts.
         "<rootDir>/src/modules/subscriptions/plan-join.spec.ts",
+        // Mocked; the real rows are in membership-plan-lock.db.spec.ts.
+        "<rootDir>/src/modules/subscriptions/membership-plan-lock.spec.ts",
+        "<rootDir>/src/modules/subscriptions/public-plans.lock.spec.ts",
         "<rootDir>/src/modules/class-packs/class-packs.service.spec.ts",
         // E14: pure; the real rows are in class-packs.drafts.db.spec.ts.
         "<rootDir>/src/modules/class-packs/pack-on-sale.spec.ts",
