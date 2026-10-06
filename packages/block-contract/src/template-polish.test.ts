@@ -142,3 +142,47 @@ describe("productGrid: what is left, a note and bare cards", () => {
         ).toBe(false);
     });
 });
+
+describe("projects: rhythm and rows, year, role and meta, a count", () => {
+    const item = {
+        title: "A dispatch board",
+        year: "2019–2022",
+        role: "Sole engineer",
+        meta: "Go · Postgres",
+    };
+
+    it("saves the rows fields and the count switch", () => {
+        expect(
+            parseSectionContent("projects", 1, {
+                variant: "rows",
+                items: [item],
+                showCount: true,
+            }).success,
+        ).toBe(true);
+    });
+
+    it("refuses a year or role past its length", () => {
+        expect(
+            parseSectionContent("projects", 1, {
+                items: [{ ...item, year: "x".repeat(21) }],
+            }).success,
+        ).toBe(false);
+        expect(
+            parseSectionContent("projects", 1, {
+                items: [{ ...item, role: "x".repeat(81) }],
+            }).success,
+        ).toBe(false);
+    });
+
+    it("knows both looks, and their fixtures parse", () => {
+        for (const look of ["rhythm", "rows"] as const) {
+            expect(resolveVariant("projects", { variant: look })).toBe(look);
+            expect(
+                parseRenderedContent(
+                    "projects",
+                    BLOCK_META.projects.fixtures[look],
+                ).success,
+            ).toBe(true);
+        }
+    });
+});

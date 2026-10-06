@@ -392,10 +392,14 @@ const renderedProjects = z.object({
                 title: z.string(),
                 summary: z.string().optional(),
                 link: z.string().optional(),
+                year: z.string().optional(),
+                role: z.string().optional(),
+                meta: z.string().optional(),
             }),
         )
         .min(1),
     captionPlacement: z.string().optional(),
+    showCount: z.boolean().optional(),
 });
 
 /**

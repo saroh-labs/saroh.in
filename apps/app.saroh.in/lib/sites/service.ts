@@ -179,12 +179,18 @@ export interface ProjectItem {
     summary?: string;
     /** A web address, an email or phone link, or a path on this site. */
     link?: string;
+    /** The rows look's year, role and a line of facts (template polish). */
+    year?: string;
+    role?: string;
+    meta?: string;
 }
 
 /** `projects` — the merchant's own work, typed in (K11). Up to 24. */
 export interface ProjectsContent {
     title?: string;
     items: ProjectItem[];
+    /** "5 projects across 8 years" beside the title. */
+    showCount?: boolean;
 }
 
 /** `contact` — where to find the business and how to reach it. */

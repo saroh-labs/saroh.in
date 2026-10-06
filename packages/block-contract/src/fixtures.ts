@@ -837,8 +837,80 @@ export const BLOCK_META = {
                 description:
                     "One project per row, the photo on the left. Better for a longer line about each.",
             },
+            {
+                id: "rhythm",
+                label: "Rhythm",
+                description:
+                    "Photos at changing sizes: a wide lead, then an equal pair, then a portrait beside a landscape, and on in that pattern. For work best judged by its photographs.",
+            },
+            {
+                id: "rows",
+                label: "Rows",
+                description:
+                    "Hairline rows with no photos, like a CV: the year, then the work and a line about it, then your role.",
+            },
         ] as const,
         fixtures: {
+            rhythm: {
+                variant: "rhythm",
+                title: "Work",
+                captionPlacement: "over",
+                items: [
+                    {
+                        ...PROJECT_ITEMS[0],
+                        caption: "Identity, packaging · 2026",
+                    },
+                    {
+                        ...PROJECT_ITEMS[1],
+                        caption: "Menus, signage · 2025",
+                    },
+                    {
+                        ...PROJECT_ITEMS[0],
+                        title: "A shopfront in Bandra",
+                        caption: "Signage · 2025",
+                    },
+                    {
+                        ...PROJECT_ITEMS[1],
+                        title: "Labels for a ceramics studio",
+                        caption: "Print · 2024",
+                    },
+                    {
+                        ...PROJECT_ITEMS[0],
+                        title: "A van livery",
+                        caption: "Identity, livery · 2024",
+                    },
+                ],
+            },
+            rows: {
+                variant: "rows",
+                title: "Work",
+                showCount: true,
+                items: [
+                    {
+                        year: "2026",
+                        title: "A dispatch board for a wholesaler",
+                        summary:
+                            "Replaced three spreadsheets and a group chat with one board the warehouse uses.",
+                        meta: "Go · Postgres · React",
+                        role: "Sole engineer",
+                        link: "https://example.com/dispatch",
+                    },
+                    {
+                        year: "2024",
+                        title: "Ordering for a café group",
+                        summary:
+                            "The ordering and payments layer behind eleven outlets.",
+                        meta: "TypeScript · Postgres",
+                        role: "Lead, team of 3",
+                    },
+                    {
+                        year: "2019–2022",
+                        title: "Payments infrastructure",
+                        meta: "Go · Kafka",
+                        role: "Senior engineer",
+                    },
+                ],
+            },
             cards: {
                 variant: "cards",
                 title: "Selected work",

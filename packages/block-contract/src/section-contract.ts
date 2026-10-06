@@ -778,7 +778,9 @@ export const PROJECTS_MAX = 24;
  * is chosen first and the draft saves in between.
  *
  * `link` is a `linkHref`, so `javascript:` is refused when it is authored.
- * Looks are `cards` and `list` (`LIST_LAYOUTS`), in `BLOCK_META`.
+ * Looks are `cards` and `list` (`LIST_LAYOUTS`), and the template polish's
+ * `rhythm` (a wide lead, then a pair, then a portrait beside a landscape)
+ * and `rows` (hairline rows: year | the work | role), in `BLOCK_META`.
  * Up to {@link PROJECTS_MAX}: past that it is a page of its own.
  */
 const projectItemSchema = z.object({
@@ -793,6 +795,16 @@ const projectItemSchema = z.object({
     title: z.string().trim().min(1).max(120),
     summary: z.string().max(600).optional(),
     link: linkHref.optional(),
+    /**
+     * When, who and with what (template polish), for the `rows` look's
+     * columns: `year` ("2026", "2019–2022") in the first, `role` ("Sole
+     * engineer") in the last, `meta` (a stack, a medium) under the summary.
+     * Plain text, each optional; the other looks draw `meta` under the
+     * summary and leave the rest.
+     */
+    year: z.string().trim().max(20).optional(),
+    role: z.string().trim().max(80).optional(),
+    meta: z.string().trim().max(160).optional(),
 });
 
 const projectsV1 = z.object({
@@ -800,6 +812,12 @@ const projectsV1 = z.object({
     padding: paddingOverride,
     title: z.string().trim().max(160).optional(),
     items: z.array(projectItemSchema).min(1).max(PROJECTS_MAX),
+    /**
+     * A line beside the title counted from the projects shown — "5 projects
+     * across 8 years", the span read from their years (template polish).
+     * Derived, never typed. ABSENT, not shown.
+     */
+    showCount: z.boolean().optional(),
     /**
      * `over`: in the cards look, a project's title and caption sit on a
      * bounded band over its photo (DEC-090). Absent is below, as before.

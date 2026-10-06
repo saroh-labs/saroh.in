@@ -1,4 +1,4 @@
-import type { RenderedFeatures } from "@saroh/block-contract";
+import type { RenderedFeatures, RenderedProjects } from "@saroh/block-contract";
 import { BLOCK_META } from "@saroh/block-contract";
 import { render, screen, within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -12,6 +12,9 @@ import FeaturesSection from "./features";
 import HoursSection, { groupedHoursRows, hoursRows } from "./hours";
 import PlansSection from "./plans";
 import ProductGridSection, { availabilityLine } from "./product-grid";
+import ProjectsSection from "./projects";
+import { rhythmGroups } from "./projects-rhythm";
+import { linkText, projectsCount } from "./projects-rows";
 import RichTextSection from "./rich-text";
 
 /**
@@ -258,6 +261,89 @@ describe("productGrid: what is left, a note and bare cards", () => {
                 feed={{ products: [], basePath: "/shop" }}
             />,
         );
+        expect(container.innerHTML).toBe("");
+    });
+});
+
+describe("projects: rhythm and rows, a count", () => {
+    const named = (title: string) => ({ title });
+
+    it("lays the rhythm out as a lead, a pair, an offset, and on", () => {
+        const items = ["a", "b", "c", "d", "e", "f", "g", "h"].map(named);
+        const { lead, groups } = rhythmGroups(items);
+        expect(lead?.title).toBe("a");
+        expect(groups.map((g) => g.kind)).toEqual([
+            "pair",
+            "offset",
+            "pair",
+            "single",
+        ]);
+    });
+
+    it("draws the rhythm's lead wide, then a pair, then a portrait beside a landscape", () => {
+        const { container } = render(
+            <ProjectsSection content={BLOCK_META.projects.fixtures.rhythm} />,
+        );
+        const frames = Array.from(
+            container.querySelectorAll(
+                "article > a > div:first-child, article > div:first-child",
+            ),
+        ).map((el) => el.className);
+        expect(frames[0]).toContain("aspect-[21/9]");
+        expect(frames[1]).toContain("aspect-[4/3]");
+        expect(frames[2]).toContain("aspect-[4/3]");
+        expect(frames[3]).toContain("aspect-[3/4]");
+        expect(frames[4]).toContain("aspect-video");
+        // Words over the photo sit on a band of a fixed height.
+        const bands = container.querySelectorAll("[data-plate-band]");
+        expect(bands.length).toBe(5);
+        expect(bands[0]?.className).toContain("h-[82px]");
+    });
+
+    it("draws rows as year | the work | role, with the count beside the title", () => {
+        const { container } = render(
+            <ProjectsSection content={BLOCK_META.projects.fixtures.rows} />,
+        );
+        expect(container.querySelector("img")).toBeNull();
+        const rows = container.querySelectorAll("ol > li");
+        expect(rows.length).toBe(3);
+        expect(rows[0]?.textContent).toContain("2026");
+        expect(rows[0]?.textContent).toContain("Sole engineer");
+        expect(rows[0]?.textContent).toContain("Go · Postgres · React");
+        // A web link shows its host, and names the project for a screen reader.
+        expect(
+            screen.getByRole("link", {
+                name: /example\.com.*A dispatch board/,
+            }),
+        ).toBeTruthy();
+        expect(
+            container.querySelector("[data-project-count]")?.textContent,
+        ).toBe("3 projects across 8 years");
+    });
+
+    it("counts projects, and the span of their years when there is one", () => {
+        expect(projectsCount([named("a")])).toBe("One project");
+        expect(
+            projectsCount([
+                { title: "a", year: "2024" },
+                { title: "b", year: "2024" },
+            ]),
+        ).toBe("2 projects");
+        expect(
+            projectsCount([
+                { title: "a", year: "2026" },
+                { title: "b", year: "2019–2022" },
+            ]),
+        ).toBe("2 projects across 8 years");
+        expect(linkText("/work/one", "View project")).toBe("View project");
+    });
+
+    it("renders nothing with no titled project, whatever the look", () => {
+        const content: RenderedProjects = {
+            variant: "rhythm",
+            items: [{ title: "  " }],
+        };
+        const { container } = render(<ProjectsSection content={content} />);
         expect(container.innerHTML).toBe("");
     });
 });
