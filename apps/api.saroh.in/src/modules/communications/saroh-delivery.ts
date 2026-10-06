@@ -25,8 +25,8 @@ export const SAROH_SEND_ATTEMPTS = 5;
 export const SAROH_STOPPED = "STOPPED";
 
 /**
- * A Saroh delivery whose connection dropped after SES had started taking
- * it (`outcomeOfError`'s `unknown`): it may have gone, so it is never
+ * A Saroh delivery whose connection dropped mid-session with no reply from
+ * SES (`outcomeOfError`'s `unknown`): SES may have taken it, so it is never
  * retried, and it counts.
  */
 export const SAROH_UNKNOWN = "UNKNOWN";

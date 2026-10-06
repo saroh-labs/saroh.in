@@ -3000,19 +3000,31 @@ its track `minmax(0,1fr)` (`min-w-0` on the grid itself is not enough).
 
 ## Email — nodemailer says CONN for every timeout, whatever the stage
 
-**Symptom** (U1 review, 6 Oct, caught before commit): the Saroh business
-sender classed a send as "unknown, don't retry" when the error's `command`
-started with `DATA`. Nodemailer never produces that for a lost connection:
-every timeout and drop is `command: 'CONN'`, and the only `DATA` errors
-carry a server reply. So a send lost mid-hand-over would be retried, and
-the customer emailed twice.
-**Root cause**: the rule was written from the error shape we expected, not from
-`nodemailer/lib/smtp-connection` (10.0.x).
-**Fix**: the stage comes from the server's last reply, which nodemailer
-attaches on a dropped connection: `responseCode` 354 (SES had started
-taking the message) or a bare `Timeout` mid-session is `unknown`; a 4xx/5xx
-reply, or anything before the hand-over, is `failed`. The spec uses
-nodemailer's real shapes.
-**Rule**: Classify a library's errors from its source, and test with the
-shapes it actually throws, not a hand-made object.
+**Symptom** (U1 review, 6 Oct; the first fix was wrong too, caught by the
+branch's code review the same day): the Saroh business sender has to tell
+"failed, safe to retry" from "unknown, may have gone, never retry". It first
+classed a send as unknown when the error's `command` started with `DATA`;
+nodemailer never produces that for a lost connection. The first fix then
+read the stage from `responseCode` 354, as if nodemailer attached the last
+reply to a dropped connection. It doesn't: a drop after "354" arrived as
+`ECONNECTION` (or `ESOCKET`) with no `responseCode`, was classed `failed`
+and retried, and the customer could be emailed twice.
+**Root cause**: both rules were written from the error shape we expected.
+In nodemailer 10.0.10 (`dist/cjs/smtp-connection/index.js`) every drop and
+inactivity timeout is `command: 'CONN'`, and `_onClose` passes on only the
+unparsed `_remainder` — a reply already handled (the 354) is never on the
+error. So the stage cannot be read from the error at all: a drop after 354
+and a drop during EHLO look the same.
+**Fix**: `outcomeOfError` classes by what can be known. A 4xx/5xx
+`responseCode` is `failed`. Errors that only happen before the hand-over
+are `failed`: `EAUTH`, `EDNS`, `ETLS`, `ECONNREFUSED`/`ENOTFOUND` (which
+nodemailer re-tags `ESOCKET`, keeping Node's `syscall: 'connect'` or
+`'getaddrinfo'`), and the "Connection timeout" and "Greeting never
+received" timeouts. Any other drop with no server reply (`ECONNECTION`,
+`ESOCKET`, the mid-session "Timeout") is `unknown` and never retried. The
+spec drives a real nodemailer session against a stub server on loopback
+that closes after "354", so the shape is nodemailer's, not ours.
+**Rule**: Classify a library's errors from its source, and test against the
+library itself (a stub server is minutes of work), not a hand-made object.
+When the stage can't be known, a send that may have gone is never retried.
 **Category**: email · `modules/communications/providers/saroh-email.sender.ts`

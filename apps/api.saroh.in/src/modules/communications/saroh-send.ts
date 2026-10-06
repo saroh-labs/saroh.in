@@ -22,7 +22,7 @@ import { SECRET_LINK_SLOT } from "./transactional";
  * - The flag couldn't be read: this throws before anything is recorded, so
  *   the delivery stays QUEUED and the worker retries it with backoff.
  * - Sent: the delivery and the message SENT.
- * - `unknown` (the connection dropped after SES started taking it): it may
+ * - `unknown` (the connection dropped mid-session, no reply from SES): it may
  *   have gone, so it is never retried; the delivery and the message are
  *   UNKNOWN, and it counts.
  * - Failed, or no mail set up: FAILED, and this throws so the worker
@@ -92,7 +92,7 @@ export async function deliverThroughSaroh(
             await record(deliveryId, message.id, {
                 delivery: SAROH_UNKNOWN,
                 message: SAROH_UNKNOWN,
-                error: "The connection dropped after the email was handed over; not retried, in case it went",
+                error: "The connection dropped before SES replied; not retried, in case it went",
             });
             return false;
         case "not-configured":

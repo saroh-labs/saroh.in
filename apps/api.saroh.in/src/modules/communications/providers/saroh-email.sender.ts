@@ -30,9 +30,9 @@ import {
 export const SAROH_BUSINESS_FROM_DEFAULT = "bookings@notify.saroh.in";
 
 /**
- * How a send went. `unknown` is a connection lost after the message was
- * handed over: SES may have taken it, so a retry could email the customer
- * twice, and the caller must not retry it.
+ * How a send went. `unknown` is a connection lost mid-session with no reply
+ * from the server: SES may have taken the message, so a retry could email
+ * the customer twice, and the caller must not retry it.
  */
 export type SarohSendOutcome = EmailOutcome | "unknown";
 
@@ -87,15 +87,41 @@ export function sarohBusinessMessage(
     };
 }
 
+/** Errors nodemailer raises before anything is handed over. */
+const BEFORE_HAND_OVER_CODES = new Set([
+    "EAUTH",
+    "EDNS",
+    "ETLS",
+    "ECONNREFUSED",
+    "ENOTFOUND",
+]);
+
+/** Nodemailer's timeouts that can only happen before the session starts. */
+const BEFORE_HAND_OVER_TIMEOUTS = new Set([
+    "Connection timeout",
+    "Greeting never received",
+]);
+
+/** The connection lost mid-session, with no reply from the server. */
+const DROPPED_CODES = new Set(["ECONNECTION", "ESOCKET", "ETIMEDOUT"]);
+
 /**
- * Whether a send that threw may still have reached SES. Nodemailer tags
- * every timeout and dropped connection `CONN`, so the stage comes from the
- * server's last reply instead:
+ * Whether a send that threw may still have reached SES.
+ *
+ * The stage can't be read from the error: nodemailer (10.0.10) tags every
+ * dropped connection and inactivity timeout `command: "CONN"`, and a close
+ * passes on only an unparsed partial reply, so a drop after "354" (SES
+ * taking the message) arrives as `ECONNECTION` or `ESOCKET` with no
+ * `responseCode` at all — the same shape as a drop during EHLO. So:
  * - a 4xx or 5xx reply is a rejection: `failed`, safe to retry;
- * - a connection lost after "354" (SES had started taking the message), or
- *   a plain inactivity timeout mid-session, may have been delivered:
- *   `unknown`, never retried, so the customer is not emailed twice;
- * - anything before the hand-over (connect, greeting, login) is `failed`.
+ * - an error that only happens before the hand-over is `failed`: login
+ *   refused (`EAUTH`), DNS (`EDNS`, `ENOTFOUND`), TLS (`ETLS`), a refused
+ *   or failed connect (`ECONNREFUSED`, or a socket error from `connect`),
+ *   or the connect and greeting timeouts;
+ * - any other drop with no server reply (`ECONNECTION`, `ESOCKET`, the
+ *   mid-session "Timeout") may have been delivered: `unknown`, never
+ *   retried, so the customer is never emailed twice;
+ * - anything else is `failed`.
  */
 export function outcomeOfError(error: unknown): SarohSendOutcome {
     if (typeof error !== "object" || error === null) return "failed";
@@ -103,11 +129,30 @@ export function outcomeOfError(error: unknown): SarohSendOutcome {
         responseCode?: unknown;
         code?: unknown;
         message?: unknown;
+        syscall?: unknown;
     };
-    if (typeof e.responseCode === "number") {
-        return e.responseCode === 354 ? "unknown" : "failed";
+    if (
+        typeof e.responseCode === "number" &&
+        e.responseCode >= 400 &&
+        e.responseCode < 600
+    ) {
+        return "failed";
     }
-    if (e.code === "ETIMEDOUT" && e.message === "Timeout") return "unknown";
+    const code = typeof e.code === "string" ? e.code : "";
+    if (BEFORE_HAND_OVER_CODES.has(code)) return "failed";
+    // A socket error while connecting (nodemailer re-tags ECONNREFUSED and
+    // the like `ESOCKET`, keeping Node's `syscall`).
+    if (e.syscall === "connect" || e.syscall === "getaddrinfo") {
+        return "failed";
+    }
+    if (
+        code === "ETIMEDOUT" &&
+        typeof e.message === "string" &&
+        BEFORE_HAND_OVER_TIMEOUTS.has(e.message)
+    ) {
+        return "failed";
+    }
+    if (DROPPED_CODES.has(code)) return "unknown";
     return "failed";
 }
 
