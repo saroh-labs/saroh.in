@@ -1,9 +1,7 @@
+import type { Prisma } from "@saroh/database";
 import { prisma } from "@saroh/database";
-import type { ModuleAccess } from "@saroh/pricing-catalog";
 
 import { env } from "../../env";
-import { CatalogueAccessService } from "../billing/catalogue-access.service";
-import { planMeter } from "../billing/metering.service";
 import {
     limitLevel,
     nextMonthStarts,
@@ -17,12 +15,13 @@ import {
     replyToAddress,
     SAROH_BUSINESS_FROM_DEFAULT,
 } from "./providers/saroh-email.sender";
-import { SAROH_EMAILS_ROW } from "./saroh-delivery";
+import { SAROH_REPRESENTATIVE_NOTICE } from "./saroh-delivery";
 import type { SarohDeps } from "./saroh-may-send";
 import {
     allowanceLimit,
+    allowancePaused,
     defaultSarohDeps,
-    sarohRefusal,
+    sarohDecision,
 } from "./saroh-may-send";
 
 /**
@@ -75,24 +74,6 @@ export interface SarohStateDeps extends SarohDeps {
     business: (organizationId: string) => Promise<SarohBusinessFacts>;
 }
 
-const catalogue = new CatalogueAccessService();
-
-/**
- * The business's `saroh-emails` row, read as `enforcedRow` reads it but
- * letting a failed lookup throw: the send folds a failure into "no
- * allowance" (fail closed), while this screen must say it couldn't read it
- * rather than look as if Saroh is simply off.
- */
-async function allowanceOrThrow(
-    organizationId: string,
-    now: Date,
-): Promise<ModuleAccess | null> {
-    if (!(await planMeter.enforcing(organizationId))) return null;
-    const a = await catalogue.resolve(organizationId, now);
-    if (a.source !== "catalogue") return null;
-    return a.modules.find((m) => m.moduleId === SAROH_EMAILS_ROW) ?? null;
-}
-
 async function businessFacts(
     organizationId: string,
 ): Promise<SarohBusinessFacts> {
@@ -117,19 +98,10 @@ async function businessFacts(
 
 export const defaultSarohStateDeps: SarohStateDeps = {
     ...defaultSarohDeps,
-    allowance: allowanceOrThrow,
     business: businessFacts,
 };
 
-type ProviderDb = Parameters<typeof sarohRefusal>[0];
-
-/** The rule's provider read, answered "none": Saroh's route as if disconnected. */
-const NO_PROVIDER = {
-    communicationProvider: { findUnique: () => Promise.resolve(null) },
-} as unknown as ProviderDb;
-
-/** The booking notices all read alike; one stands for them. */
-const BOOKING = "BOOKING_CONFIRMED";
+type ProviderDb = Pick<Prisma.TransactionClient, "communicationProvider">;
 
 export async function sarohEmailState(
     db: ProviderDb,
@@ -137,38 +109,46 @@ export async function sarohEmailState(
     now: Date = new Date(),
     deps: SarohStateDeps = defaultSarohStateDeps,
 ): Promise<SarohEmailState> {
-    const refusal = await sarohRefusal(db, organizationId, BOOKING, now, deps);
+    // The same rule as the send, which reads the allowance's row for it: a
+    // plan that can't be read is LOOKUP_FAILED, so UNREAD, never OFF.
+    const decision = await sarohDecision(
+        db,
+        organizationId,
+        SAROH_REPRESENTATIVE_NOTICE,
+        now,
+        deps,
+    );
+    const { refusal } = decision;
     if (refusal === "LOOKUP_FAILED") return { state: "UNREAD" };
     if (refusal === "PROVIDER_CONNECTED") {
         // Would Saroh take over if the business disconnected its own?
-        const after = await sarohRefusal(
-            NO_PROVIDER,
+        const after = await sarohDecision(
+            db,
             organizationId,
-            BOOKING,
+            SAROH_REPRESENTATIVE_NOTICE,
             now,
             deps,
+            { providerConnected: false },
         );
-        return { state: "OFF", takesOver: after === null };
+        return { state: "OFF", takesOver: after.refusal === null };
     }
     if (refusal !== null) return { state: "OFF", takesOver: false };
 
+    const cap = allowanceLimit(decision.allowance);
+    // The rule said yes only with a cap; said again so the type knows it.
+    if (cap === null) return { state: "UNREAD" };
     try {
-        const cap = allowanceLimit(await deps.allowance(organizationId, now));
-        // The row changed between the two reads: say nothing either way.
-        if (cap === null) return { state: "UNREAD" };
         const [used, facts] = await Promise.all([
             deps.used(organizationId, now),
             deps.business(organizationId),
         ]);
-        const level = limitLevel(used, cap);
         const name = cleanBusinessName(facts.name, facts.slug);
         return {
-            state:
-                level === "full" || level === "over"
-                    ? "PAUSED"
-                    : level === "warn"
-                      ? "NEAR"
-                      : "SENDING",
+            state: allowancePaused(used, cap)
+                ? "PAUSED"
+                : limitLevel(used, cap) === "warn"
+                  ? "NEAR"
+                  : "SENDING",
             used,
             cap,
             resetsOn: nextMonthStarts(now, facts.zone),

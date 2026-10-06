@@ -1,5 +1,6 @@
 import { ForbiddenException } from "@nestjs/common";
 import type { Prisma } from "@saroh/database";
+import type { ModuleAccess } from "@saroh/pricing-catalog";
 
 import { countUsage, windowKey } from "../billing/metering";
 import type { MeteringService, PlanRoom } from "../billing/metering.service";
@@ -87,7 +88,7 @@ export async function renderForSaroh(
         phone: profile?.phone ?? null,
     });
     if (!words) {
-        // Only booking notices reach here (`sarohMaySend`); anything else
+        // Only booking notices reach here (`emailRoute`); anything else
         // is a bug, and must not go from Saroh's address.
         throw new Error("Only a booking notice can go through Saroh");
     }
@@ -154,6 +155,17 @@ export interface SarohAbout {
     bookingId?: string | null;
 }
 
+/** How `queueSarohInTx` counts. */
+export interface SarohQueueOptions {
+    /**
+     * The `saroh-emails` row the rule read deciding to send (`emailRoute`):
+     * counted against as it is, not read again. Read when left out.
+     */
+    allowance?: ModuleAccess;
+    meter?: Pick<MeteringService, "roomInTx" | "enforcedRow">;
+    now?: Date;
+}
+
 /**
  * Message + `SAROH` Delivery + `message.send` job, on the caller's
  * transaction — when this month's allowance has room (U3), and the booking
@@ -175,13 +187,15 @@ export async function queueSarohInTx(
     organizationId: string,
     base: QueuedMessageBase,
     about: SarohAbout = {},
-    meter: Pick<MeteringService, "roomInTx" | "enforcedRow"> = planMeter,
-    now: Date = new Date(),
+    options: SarohQueueOptions = {},
 ): Promise<SarohQueued> {
+    const { allowance } = options;
+    const meter = options.meter ?? planMeter;
+    const now = options.now ?? new Date();
     if (about.bookingId) {
         // Counted under the plan-meter lock (the notify handler took it
-        // first; taking it again is a no-op), so two notices about one
-        // booking at once can't both have its last place.
+        // before writing anything; taking it again is a no-op), so two
+        // notices about one booking at once can't both have its last place.
         await lockMeter(tx, organizationId, SAROH_EMAILS_KEY);
         const sent = await sarohEmailsForBooking(
             tx,
@@ -201,15 +215,26 @@ export async function queueSarohInTx(
             refuse: () => used,
             refuseSoft: () => soft,
             now,
+            ...(allowance ? { row: allowance } : {}),
         });
     } catch (err) {
         if (err === used) {
-            await queueCapNotice(tx, meter, organizationId, now);
+            await queueCapNotice(
+                tx,
+                allowance ??
+                    (await meter.enforcedRow(
+                        organizationId,
+                        SAROH_EMAILS_ROW,
+                        now,
+                    )),
+                organizationId,
+                now,
+            );
             return notEmailed(tx, base, ALLOWANCE_USED);
         }
         // A soft cell never refuses, so Saroh would send unmetered: none.
         if (err === soft) return notEmailed(tx, base, NO_ALLOWANCE);
-        // The row turned off since `sarohMaySend` read it (MODULE_LOCKED):
+        // The row turned off since the rule read it (MODULE_LOCKED):
         // thrown before the meter wrote or counted anything.
         if (err instanceof ForbiddenException) {
             return notEmailed(tx, base, NO_ALLOWANCE);
@@ -272,11 +297,10 @@ async function notEmailed(
  */
 async function queueCapNotice(
     tx: Tx,
-    meter: Pick<MeteringService, "enforcedRow">,
+    row: ModuleAccess | null,
     organizationId: string,
     now: Date,
 ): Promise<void> {
-    const row = await meter.enforcedRow(organizationId, SAROH_EMAILS_ROW, now);
     if (row?.state !== "on" || row.limit === null) return;
     const count = await countUsage(tx, organizationId, SAROH_EMAILS_KEY, now);
     const level = limitLevel(count, row.limit);

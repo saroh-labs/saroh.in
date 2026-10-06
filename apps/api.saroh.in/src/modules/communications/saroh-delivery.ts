@@ -39,6 +39,12 @@ export const SAROH_TEMPLATES = [
 ] as const satisfies readonly NoticeTemplate[];
 export type SarohTemplate = (typeof SAROH_TEMPLATES)[number];
 
+/**
+ * Every booking notice reads alike under the rule, so one stands for them
+ * where nothing names a kind: notice reach's peek and Settings' state.
+ */
+export const SAROH_REPRESENTATIVE_NOTICE: SarohTemplate = SAROH_TEMPLATES[0];
+
 export function isSarohTemplate(value: unknown): value is SarohTemplate {
     return (SAROH_TEMPLATES as readonly unknown[]).includes(value);
 }

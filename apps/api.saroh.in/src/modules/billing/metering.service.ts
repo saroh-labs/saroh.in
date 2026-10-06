@@ -118,16 +118,31 @@ export class MeteringService {
         now: Date = new Date(),
     ): Promise<ModuleAccess | null> {
         try {
-            if (!(await this.enforcing(organizationId))) return null;
-            const a = await this.access.resolve(organizationId, now);
-            if (a.source !== "catalogue") return null;
-            return a.modules.find((m) => m.moduleId === moduleId) ?? null;
+            return await this.enforcedRowOrThrow(organizationId, moduleId, now);
         } catch (err) {
             this.logger.warn(
                 `plan_meter_unresolved org=${organizationId} module=${moduleId} error=${err instanceof Error ? err.name : "unknown"}`,
             );
             return null;
         }
+    }
+
+    /**
+     * {@link enforcedRow}, letting a failed lookup throw instead of reading
+     * as null. For a caller that must tell "couldn't read the plan" from
+     * "the plan has no such row": Saroh's emails (DEC-086) fail closed on
+     * it, and Settings says it couldn't read the allowance rather than
+     * that Saroh is off.
+     */
+    async enforcedRowOrThrow(
+        organizationId: string,
+        moduleId: string,
+        now: Date = new Date(),
+    ): Promise<ModuleAccess | null> {
+        if (!(await this.enforcing(organizationId))) return null;
+        const a = await this.access.resolve(organizationId, now);
+        if (a.source !== "catalogue") return null;
+        return a.modules.find((m) => m.moduleId === moduleId) ?? null;
     }
 
     /**
@@ -158,11 +173,20 @@ export class MeteringService {
         tx: MeterTx,
         organizationId: string,
         moduleId: string,
-        options: RoomOptions = {},
+        options: RoomOptions & {
+            /**
+             * The row as the caller already read it ({@link enforcedRow}),
+             * so it isn't read again: Saroh's route (DEC-086) has it from
+             * deciding to send.
+             */
+            row?: ModuleAccess;
+        } = {},
     ): Promise<PlanRoom | null> {
         if ((options.adding ?? 1) <= 0) return null;
         const now = options.now ?? new Date();
-        const row = await this.enforcedRow(organizationId, moduleId, now);
+        const row =
+            options.row ??
+            (await this.enforcedRow(organizationId, moduleId, now));
         if (!row) return null;
         return this.room(tx, row, organizationId, { ...options, now });
     }

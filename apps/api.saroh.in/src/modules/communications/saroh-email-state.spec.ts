@@ -94,6 +94,12 @@ describe("sarohEmailState (DEC-086, U4)", () => {
         });
     });
 
+    it("reads the plan's allowance once: the rule's row is the cap", async () => {
+        const d = deps();
+        await sarohEmailState(db(), "org_1", NOW, d);
+        expect(d.allowance).toHaveBeenCalledTimes(1);
+    });
+
     it("uses the configured from address", async () => {
         mockEnv.SAROH_BUSINESS_EMAIL_FROM = "bookings@notify.example";
         const s = await sarohEmailState(db(), "org_1", NOW, deps());
@@ -183,7 +189,8 @@ describe("sarohEmailState (DEC-086, U4)", () => {
 
     it("is OFF with enforcement off, a plan without the allowance (or a 0 or soft one), the switch off or the global stop", async () => {
         const cases: SarohStateDeps[] = [
-            deps({ enforced: false }),
+            // Enforcement off is no row (`enforcedRowOrThrow`); the db
+            // spec reads it through the real one.
             deps({ row: null }),
             deps({ row: { ...ROW, limit: null } as ModuleAccess }),
             deps({ row: { ...ROW, limit: 0 } as ModuleAccess }),

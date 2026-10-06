@@ -1,11 +1,7 @@
 import type { Prisma } from "@saroh/database";
 
 import { accountThreadOn } from "../communications/account-thread";
-import {
-    providerConnected,
-    sarohMaySend,
-    sarohRoomLeft,
-} from "../communications/saroh-may-send";
+import { emailRoute, sarohRoomLeft } from "../communications/saroh-may-send";
 import type { NoticeTemplate } from "../communications/transactional";
 import { resolveContact } from "../customer-workspace/resolve-contact";
 import { accountAreaOn } from "./account-area";
@@ -23,7 +19,7 @@ import { accountAreaOn } from "./account-area";
  * - **Email** goes only to a live site account's verified email, through
  *   the business's own connected EMAIL provider (D17, default 10) — or,
  *   for a booking notice at a business with none, through Saroh when
- *   `sarohMaySend` says so and its monthly allowance has room (DEC-086).
+ *   the one rule (`emailRoute`) says so and its monthly allowance has room (DEC-086).
  *   So email reach is per notice kind.
  *   Nothing goes by SMS or WhatsApp this round.
  */
@@ -60,19 +56,20 @@ export type NoticeEmailRoute = "PROVIDER" | "SAROH" | null;
 /**
  * Who would email a notice of `kind` for this business now: its own
  * connected provider; else, for a booking notice, Saroh when the one rule
- * says so (`sarohMaySend`); else nobody. With no `kind`, the provider
- * alone, as before Saroh sent anything.
+ * says so; else nobody (`emailRoute`). With no `kind`, the provider alone,
+ * as before Saroh sent anything.
  */
 export async function noticeEmailRoute(
     db: Pick<Prisma.TransactionClient, "communicationProvider">,
     organizationId: string,
     kind?: NoticeTemplate,
 ): Promise<NoticeEmailRoute> {
-    if (await providerConnected(db, organizationId)) return "PROVIDER";
-    if (kind && (await sarohMaySend(db, organizationId, kind))) {
-        return "SAROH";
-    }
-    return null;
+    return (await emailRoute(db, organizationId, kind)).route;
+}
+
+/** Whether the account thread is live for the business. */
+export async function threadLive(organizationId: string): Promise<boolean> {
+    return accountAreaOn() ? accountThreadOn(organizationId) : false;
 }
 
 export async function noticeChannels(
@@ -80,15 +77,23 @@ export async function noticeChannels(
     organizationId: string,
     kind?: NoticeTemplate,
 ): Promise<NoticeChannels> {
+    const now = new Date();
     const [route, thread] = await Promise.all([
-        noticeEmailRoute(db, organizationId, kind),
-        accountAreaOn() ? accountThreadOn(organizationId) : false,
+        emailRoute(db, organizationId, kind, now),
+        threadLive(organizationId),
     ]);
     // Saroh's route says "emailed" only while this month's allowance has
-    // room: past it, the notice is recorded as not emailed (U3).
+    // room: past it, the notice is recorded as not emailed (U3). The row
+    // the rule read is counted against, not read again.
     const email =
-        route === "PROVIDER" ||
-        (route === "SAROH" && (await sarohRoomLeft(organizationId)));
+        route.route === "PROVIDER" ||
+        (route.route === "SAROH" &&
+            (await sarohRoomLeft(
+                organizationId,
+                now,
+                undefined,
+                route.allowance,
+            )));
     return { email, thread };
 }
 

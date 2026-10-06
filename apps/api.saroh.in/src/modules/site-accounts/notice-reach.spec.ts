@@ -7,14 +7,14 @@ jest.mock("../customer-workspace/resolve-contact", () => ({
 }));
 jest.mock("../communications/saroh-may-send", () => ({
     ...jest.requireActual<object>("../communications/saroh-may-send"),
-    sarohMaySend: jest.fn(),
+    emailRoute: jest.fn(),
     sarohRoomLeft: jest.fn(),
 }));
 
 import type { Prisma } from "@saroh/database";
 
 import { accountThreadOn } from "../communications/account-thread";
-import { sarohMaySend, sarohRoomLeft } from "../communications/saroh-may-send";
+import { emailRoute, sarohRoomLeft } from "../communications/saroh-may-send";
 import { resolveContact } from "../customer-workspace/resolve-contact";
 import { accountAreaOn } from "./account-area";
 import {
@@ -27,8 +27,12 @@ import {
 const threadFlag = accountThreadOn as jest.Mock;
 const areaOn = accountAreaOn as jest.Mock;
 const resolve = resolveContact as jest.Mock;
-const sarohMay = sarohMaySend as jest.Mock;
+const route = emailRoute as jest.Mock;
+/** Whether the stood-in rule lets Saroh send a kind, with no provider. */
+const sarohMay = jest.fn();
 const roomLeft = sarohRoomLeft as jest.Mock;
+/** The allowance row the rule read. */
+const ROW = { moduleId: "saroh-emails", state: "on", limit: 5 };
 
 function makeDb(provider: string | null = "CONNECTED", accounts = 1) {
     return {
@@ -49,6 +53,21 @@ beforeEach(() => {
     jest.clearAllMocks();
     sarohMay.mockResolvedValue(false);
     roomLeft.mockResolvedValue(true);
+    // `emailRoute` as it answers: the provider once, then Saroh's say.
+    route.mockImplementation(
+        async (db: ReturnType<typeof makeDb>, org: string, kind?: string) => {
+            const p = (await db.communicationProvider.findUnique()) as {
+                status: string;
+            } | null;
+            if (p?.status === "CONNECTED") {
+                return { route: "PROVIDER", provider: "RESEND" };
+            }
+            if (kind === undefined) return { route: null, refusal: null };
+            return (await sarohMay(db, org, kind))
+                ? { route: "SAROH", allowance: ROW }
+                : { route: null, refusal: "SWITCHED_OFF" };
+        },
+    );
     areaOn.mockReturnValue(true);
     threadFlag.mockResolvedValue(true);
     resolve.mockImplementation((_db: unknown, id: string) =>
@@ -163,6 +182,13 @@ describe("email reach per notice kind (DEC-086)", () => {
                 .email,
         ).toBe(true);
         expect(sarohMay).toHaveBeenCalledWith(db, "org_1", "BOOKING_CONFIRMED");
+        // Room is counted against the row the rule read, not read again.
+        expect(roomLeft).toHaveBeenCalledWith(
+            "org_1",
+            expect.any(Date),
+            undefined,
+            ROW,
+        );
         expect(
             await noticeEmailRoute(
                 asDb(makeDb("DISABLED")),

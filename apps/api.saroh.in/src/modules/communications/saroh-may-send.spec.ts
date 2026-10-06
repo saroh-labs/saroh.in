@@ -10,7 +10,10 @@ import type { ModuleAccess } from "@saroh/pricing-catalog";
 import { FlagKey } from "../feature-flags/flags";
 import type { SarohDeps } from "./saroh-may-send";
 import {
+    allowancePaused,
+    emailRoute,
     sarohDailyCeiling,
+    sarohDecision,
     sarohMaySend,
     sarohRefusal,
     sarohRoomLeft,
@@ -144,16 +147,54 @@ describe("sarohMaySend (DEC-086)", () => {
         );
     });
 
-    it("never sends unmetered: plan enforcement must be on", async () => {
+    it("never sends unmetered: enforcement off reads as no allowance row", async () => {
+        // `enforcedRowOrThrow` is null with enforcement off; the rule reads
+        // PLAN_ENFORCEMENT only through it, never a second time itself.
+        const d = deps({ row: null });
         expect(
-            await sarohRefusal(
+            await sarohRefusal(db(), "org_1", "BOOKING_CONFIRMED", NOW, d),
+        ).toBe("NO_ALLOWANCE");
+        expect(d.flags.isEnabled).not.toHaveBeenCalledWith(
+            FlagKey.PLAN_ENFORCEMENT,
+            "org_1",
+        );
+    });
+
+    it("a plan that can't be read is a failed lookup, never sent", async () => {
+        const d = deps();
+        (d.allowance as jest.Mock).mockRejectedValue(new Error("down"));
+        expect(
+            await sarohDecision(db(), "org_1", "BOOKING_CONFIRMED", NOW, d),
+        ).toEqual({ refusal: "LOOKUP_FAILED", allowance: null });
+    });
+
+    it("hands back the allowance row it read, to count against", async () => {
+        expect(
+            await sarohDecision(
                 db(),
                 "org_1",
                 "BOOKING_CONFIRMED",
                 NOW,
-                deps({ enforced: false }),
+                deps(),
             ),
-        ).toBe("NOT_ENFORCED");
+        ).toEqual({ refusal: null, allowance: ROW });
+    });
+
+    it("takes the provider as read when told, and doesn't read it again", async () => {
+        const connected = db("CONNECTED");
+        expect(
+            await sarohDecision(
+                connected,
+                "org_1",
+                "BOOKING_CONFIRMED",
+                NOW,
+                deps(),
+                { providerConnected: false },
+            ),
+        ).toEqual({ refusal: null, allowance: ROW });
+        expect(
+            connected.communicationProvider.findUnique,
+        ).not.toHaveBeenCalled();
     });
 
     it("stops at the platform's daily ceiling, counted over the last 24 hours", async () => {
@@ -258,5 +299,67 @@ describe("room in this month's allowance (U3)", () => {
         const d = deps();
         (d.used as jest.Mock).mockRejectedValue(new Error("down"));
         expect(await sarohRoomLeft("org_1", NOW, d)).toBe(false);
+    });
+});
+
+describe("emailRoute: who emails it, the provider read once", () => {
+    it("the business's own connected provider, named, whatever the message; Saroh never asked", async () => {
+        const d = deps();
+        const conn = db("CONNECTED");
+        (conn.communicationProvider.findUnique as jest.Mock).mockResolvedValue({
+            status: "CONNECTED",
+            provider: "RESEND",
+        });
+        expect(
+            await emailRoute(conn, "org_1", "BOOKING_CONFIRMED", NOW, d),
+        ).toEqual({ route: "PROVIDER", provider: "RESEND" });
+        expect(d.flags.isEnabled).not.toHaveBeenCalled();
+        expect(conn.communicationProvider.findUnique).toHaveBeenCalledTimes(1);
+    });
+
+    it("Saroh, with the row, for a booking notice the rule allows", async () => {
+        const none = db();
+        expect(
+            await emailRoute(none, "org_1", "BOOKING_MOVED", NOW, deps()),
+        ).toEqual({ route: "SAROH", allowance: ROW });
+        expect(none.communicationProvider.findUnique).toHaveBeenCalledTimes(1);
+    });
+
+    it("nobody, with why, when the rule says no; nobody and Saroh unasked with no kind", async () => {
+        expect(
+            await emailRoute(
+                db(),
+                "org_1",
+                "BOOKING_MOVED",
+                NOW,
+                deps({ flag: false }),
+            ),
+        ).toEqual({ route: null, refusal: "SWITCHED_OFF" });
+        const d = deps();
+        expect(await emailRoute(db(), "org_1", undefined, NOW, d)).toEqual({
+            route: null,
+            refusal: null,
+        });
+        expect(d.flags.isEnabled).not.toHaveBeenCalled();
+    });
+});
+
+describe("allowancePaused: the one PAUSED line", () => {
+    it("is paused at the cap and past it, not below", () => {
+        expect(allowancePaused(4, 5)).toBe(false);
+        expect(allowancePaused(5, 5)).toBe(true);
+        expect(allowancePaused(6, 5)).toBe(true);
+    });
+});
+
+describe("room with the row already read", () => {
+    it("counts against the row given and doesn't read the plan", async () => {
+        const d = deps({ used: 4 });
+        expect(await sarohRoomLeft("org_1", NOW, d, ROW)).toBe(true);
+        expect(d.allowance).not.toHaveBeenCalled();
+        expect(await sarohRoomLeft("org_1", NOW, deps({ used: 5 }), ROW)).toBe(
+            false,
+        );
+        expect(await sarohRoomLeft("org_1", NOW, deps(), null)).toBe(false);
     });
 });

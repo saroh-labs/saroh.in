@@ -9,7 +9,6 @@ import { countUsage } from "../billing/metering";
 import { planMeter } from "../billing/metering.service";
 import { FeatureFlagService } from "../feature-flags/feature-flags.service";
 import { FlagKey } from "../feature-flags/flags";
-import type { SarohTemplate } from "./saroh-delivery";
 import {
     isSarohTemplate,
     SAROH_DAILY_CEILING_DEFAULT,
@@ -29,10 +28,10 @@ import {
  * 2. the message is a booking notice (confirmed, moved, cancelled);
  * 3. the global stop (`SAROH_BUSINESS_EMAIL_STOP`) is off;
  * 4. the business's `SAROH_BUSINESS_EMAIL` flag is on;
- * 5. `PLAN_ENFORCEMENT` is on for it — Saroh's sending is never unmetered;
- * 6. its plan has an allowance for it: a `saroh-emails` row, on, hard (a
- *    soft cell never refuses), with a number (`sarohEmailsPerMonth`, U3);
- * 7. the platform's daily ceiling has room.
+ * 5. its plan, enforced (`PLAN_ENFORCEMENT` on — Saroh's sending is never
+ *    unmetered), has an allowance for it: a `saroh-emails` row, on, hard
+ *    (a soft cell never refuses), with a number (`sarohEmailsPerMonth`, U3);
+ * 6. the platform's daily ceiling has room.
  *
  * Every lookup that fails says no (and logs): this route spends a resource
  * every business shares, so it fails closed where other meters fail open.
@@ -44,7 +43,6 @@ export type SarohRefusal =
     | "NOT_A_BOOKING_NOTICE"
     | "STOPPED"
     | "SWITCHED_OFF"
-    | "NOT_ENFORCED"
     | "NO_ALLOWANCE"
     | "CEILING"
     | "LOOKUP_FAILED";
@@ -55,10 +53,11 @@ export interface SarohDeps {
     /** Saroh deliveries queued for every business since `since`. */
     queuedSince: (since: Date) => Promise<number>;
     /**
-     * The business's `saroh-emails` row, when the plan is enforced and
-     * read (`MeteringService.enforcedRow`); null for every other case:
-     * enforcement off, a business off the catalogue, a version without the
-     * row, or a lookup that failed (logged `plan_meter_unresolved`).
+     * The business's `saroh-emails` row, when the plan is enforced
+     * (`MeteringService.enforcedRowOrThrow`); null when enforcement is off,
+     * the business is off the catalogue or its version has no such row.
+     * A lookup that failed throws: the rule refuses it (LOOKUP_FAILED) and
+     * Settings says it couldn't read it, never that Saroh is off.
      */
     allowance: (
         organizationId: string,
@@ -91,7 +90,7 @@ export const defaultSarohDeps: SarohDeps = {
     flags: new FeatureFlagService(),
     queuedSince,
     allowance: (organizationId, now) =>
-        planMeter.enforcedRow(organizationId, SAROH_EMAILS_ROW, now),
+        planMeter.enforcedRowOrThrow(organizationId, SAROH_EMAILS_ROW, now),
     used: (organizationId, now) =>
         countUsage(prisma, organizationId, SAROH_EMAILS_KEY, now),
 };
@@ -122,18 +121,29 @@ export function sarohDailyCeiling(): number {
     return Number.isInteger(raw) && raw > 0 ? raw : SAROH_DAILY_CEILING_DEFAULT;
 }
 
-/** Whether the business's own email provider is connected. */
-export async function providerConnected(
+/**
+ * Whether this month's allowance is used: at the cap or past it. What
+ * Settings calls PAUSED, and what notice reach reads as no room.
+ */
+export function allowancePaused(used: number, cap: number): boolean {
+    return used >= cap;
+}
+
+/**
+ * The business's own CONNECTED email provider's name ("RESEND", …), or
+ * null: none, or one it disconnected.
+ */
+async function connectedProvider(
     db: ProviderDb,
     organizationId: string,
-): Promise<boolean> {
+): Promise<string | null> {
     const row = await db.communicationProvider.findUnique({
         where: {
             organizationId_channel: { organizationId, channel: "EMAIL" },
         },
-        select: { status: true },
+        select: { status: true, provider: true },
     });
-    return row?.status === "CONNECTED";
+    return row?.status === "CONNECTED" ? row.provider : null;
 }
 
 /**
@@ -164,10 +174,81 @@ export async function sarohSwitchesOn(
     }
 }
 
+/** What the rule decided, with what it read on the way. */
+export interface SarohDecision {
+    /** Why not, or null when Saroh may send. */
+    refusal: SarohRefusal | null;
+    /**
+     * The `saroh-emails` row it read: set whenever it got that far, so a
+     * send or the Settings state counts against it without reading the
+     * plan again (always set when `refusal` is null).
+     */
+    allowance: ModuleAccess | null;
+}
+
+export interface SarohDecisionOptions {
+    /**
+     * Whether the business's own provider is connected, when the caller
+     * has read it already (`emailRoute`); false asks "what if it had none"
+     * (the Disconnect warning's `takesOver`). Read here when left out.
+     */
+    providerConnected?: boolean;
+}
+
 /**
- * Why Saroh would not send `template` for this business now, or null when
- * it may. See the file's comment for the rule.
+ * Why Saroh would not send `template` for this business now (null when it
+ * may), with the allowance row it read. See the file's comment for the
+ * rule.
  */
+export async function sarohDecision(
+    db: ProviderDb,
+    organizationId: string,
+    template: string,
+    now: Date = new Date(),
+    deps: SarohDeps = defaultSarohDeps,
+    options: SarohDecisionOptions = {},
+): Promise<SarohDecision> {
+    const no = (refusal: SarohRefusal, allowance: ModuleAccess | null = null) =>
+        ({ refusal, allowance }) satisfies SarohDecision;
+    if (!isSarohTemplate(template)) return no("NOT_A_BOOKING_NOTICE");
+    if (sarohStopped()) return no("STOPPED");
+    try {
+        const connected =
+            options.providerConnected ??
+            (await connectedProvider(db, organizationId)) !== null;
+        if (connected) return no("PROVIDER_CONNECTED");
+        if (
+            !(await deps.flags.isEnabled(
+                FlagKey.SAROH_BUSINESS_EMAIL,
+                organizationId,
+            ))
+        ) {
+            return no("SWITCHED_OFF");
+        }
+        // Never unmetered: enforcement off, a plan with no row, no number
+        // or a soft cell gives Saroh nothing to send against (fail closed);
+        // a plan that can't be read throws into LOOKUP_FAILED below.
+        const allowance = await deps.allowance(organizationId, now);
+        if (allowanceLimit(allowance) === null) {
+            return no("NO_ALLOWANCE", allowance);
+        }
+        const queued = await deps.queuedSince(new Date(now.getTime() - DAY_MS));
+        if (queued >= sarohDailyCeiling()) {
+            logger.warn(
+                `saroh_email_ceiling_reached org=${organizationId} queued=${queued}`,
+            );
+            return no("CEILING", allowance);
+        }
+        return { refusal: null, allowance };
+    } catch (err) {
+        logger.warn(
+            `saroh_email_lookup_failed org=${organizationId} error=${err instanceof Error ? err.name : "unknown"}`,
+        );
+        return no("LOOKUP_FAILED");
+    }
+}
+
+/** Why Saroh would not send `template` for this business now, or null. */
 export async function sarohRefusal(
     db: ProviderDb,
     organizationId: string,
@@ -175,49 +256,8 @@ export async function sarohRefusal(
     now: Date = new Date(),
     deps: SarohDeps = defaultSarohDeps,
 ): Promise<SarohRefusal | null> {
-    if (!isSarohTemplate(template)) return "NOT_A_BOOKING_NOTICE";
-    if (sarohStopped()) return "STOPPED";
-    try {
-        if (await providerConnected(db, organizationId)) {
-            return "PROVIDER_CONNECTED";
-        }
-        if (
-            !(await deps.flags.isEnabled(
-                FlagKey.SAROH_BUSINESS_EMAIL,
-                organizationId,
-            ))
-        ) {
-            return "SWITCHED_OFF";
-        }
-        if (
-            !(await deps.flags.isEnabled(
-                FlagKey.PLAN_ENFORCEMENT,
-                organizationId,
-            ))
-        ) {
-            return "NOT_ENFORCED";
-        }
-        // Never unmetered: a plan whose allowance can't be read, or has no
-        // number, gives Saroh nothing to send against (fail closed).
-        if (
-            allowanceLimit(await deps.allowance(organizationId, now)) === null
-        ) {
-            return "NO_ALLOWANCE";
-        }
-        const queued = await deps.queuedSince(new Date(now.getTime() - DAY_MS));
-        if (queued >= sarohDailyCeiling()) {
-            logger.warn(
-                `saroh_email_ceiling_reached org=${organizationId} queued=${queued}`,
-            );
-            return "CEILING";
-        }
-        return null;
-    } catch (err) {
-        logger.warn(
-            `saroh_email_lookup_failed org=${organizationId} error=${err instanceof Error ? err.name : "unknown"}`,
-        );
-        return "LOOKUP_FAILED";
-    }
+    return (await sarohDecision(db, organizationId, template, now, deps))
+        .refusal;
 }
 
 /** Whether Saroh sends `template` for this business now (DEC-086). */
@@ -233,22 +273,66 @@ export async function sarohMaySend(
     );
 }
 
-export type { SarohTemplate };
+/**
+ * Who emails a message for this business now, decided once with one read
+ * of its provider:
+ * - PROVIDER: its own connected provider (named), whatever the message;
+ * - SAROH: none connected, and for a booking notice Saroh may send it
+ *   (`sarohDecision`), with the allowance row to count against;
+ * - null: nobody — with why Saroh didn't, when it was asked.
+ *
+ * `template` is the notice's kind; left out (an invoice, a team alert, a
+ * peek at the provider alone) Saroh isn't asked at all.
+ */
+export type EmailRoute =
+    | { route: "PROVIDER"; provider: string }
+    | { route: "SAROH"; allowance: ModuleAccess }
+    | { route: null; refusal: SarohRefusal | null };
+
+export async function emailRoute(
+    db: ProviderDb,
+    organizationId: string,
+    template?: string,
+    now: Date = new Date(),
+    deps: SarohDeps = defaultSarohDeps,
+): Promise<EmailRoute> {
+    const provider = await connectedProvider(db, organizationId);
+    if (provider !== null) return { route: "PROVIDER", provider };
+    if (template === undefined) return { route: null, refusal: null };
+    const decision = await sarohDecision(
+        db,
+        organizationId,
+        template,
+        now,
+        deps,
+        { providerConnected: false },
+    );
+    return decision.refusal === null && decision.allowance
+        ? { route: "SAROH", allowance: decision.allowance }
+        : { route: null, refusal: decision.refusal ?? "NO_ALLOWANCE" };
+}
 
 /**
  * Whether the business's allowance has room for one more this month: what
  * notice reach says ("emailed") only when it is true. Not the send's check
  * (that counts under the plan-meter lock, `saroh-queue.ts`). Fails closed.
+ * `allowance` is the row the rule already read (`emailRoute`); read again
+ * when left out.
  */
 export async function sarohRoomLeft(
     organizationId: string,
     now: Date = new Date(),
     deps: SarohDeps = defaultSarohDeps,
+    allowance?: ModuleAccess | null,
 ): Promise<boolean> {
     try {
-        const limit = allowanceLimit(await deps.allowance(organizationId, now));
+        const limit = allowanceLimit(
+            allowance === undefined
+                ? await deps.allowance(organizationId, now)
+                : allowance,
+        );
         if (limit === null) return false;
-        return (await deps.used(organizationId, now)) < limit;
+        return !allowancePaused(await deps.used(organizationId, now), limit);
     } catch (err) {
         logger.warn(
             `saroh_email_lookup_failed org=${organizationId} step=room error=${err instanceof Error ? err.name : "unknown"}`,

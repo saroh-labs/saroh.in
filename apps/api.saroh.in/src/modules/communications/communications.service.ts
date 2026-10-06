@@ -32,9 +32,11 @@ import {
 } from "./message-send.handler";
 import { isCommsChannel, isSupportedComms } from "./providers/provider.port";
 import type { NotEmailed } from "./saroh-delivery";
+import { SAROH_REPRESENTATIVE_NOTICE } from "./saroh-delivery";
 import type { SarohEmailState } from "./saroh-email-state";
 import { sarohEmailState } from "./saroh-email-state";
-import { sarohMaySend } from "./saroh-may-send";
+import type { EmailRoute } from "./saroh-may-send";
+import { emailRoute } from "./saroh-may-send";
 import { queueSarohInTx, renderForSaroh } from "./saroh-queue";
 import type {
     AutopayTemplate,
@@ -84,11 +86,13 @@ export type TransactionalWords =
           template: NoticeTemplate;
           notice: NoticeVars;
           /**
-           * The caller already asked `sarohMaySend` on this transaction and
-           * it said yes (the notify handler), so a switch flipped since
-           * can't turn that into a 409 inside its transaction.
+           * Who emails it, when the caller already decided on this
+           * transaction (`emailRoute`, the notify handler): not decided
+           * again, so a switch flipped since can't turn it into a 409
+           * inside the caller's transaction, and the provider and plan
+           * aren't read twice. A route of nobody is still refused.
            */
-          sarohMay?: boolean;
+          route?: EmailRoute;
           /**
            * The booking the notice is about, for Saroh's cap per booking
            * (`SAROH_EMAILS_PER_BOOKING_PER_DAY`); a business's own
@@ -770,24 +774,22 @@ export class CommunicationsService {
                 "There's no email address to send this to.",
             );
         }
-        const provider = await tx.communicationProvider.findUnique({
-            where: {
-                organizationId_channel: { organizationId, channel: "EMAIL" },
-            },
-        });
-        const connected = provider?.status === "CONNECTED";
-        // No provider of its own: Saroh sends a booking notice for it when
-        // the one rule says so (DEC-086); anything else is refused as ever.
-        const saroh =
-            !connected &&
-            "notice" in input &&
-            (input.sarohMay === true ||
-                (await sarohMaySend(tx, organizationId, input.template)));
-        if (!connected && !saroh) {
+        // Who emails it, read once (DEC-086): the business's own connected
+        // provider; else, for a booking notice, Saroh when the one rule
+        // says so; anything else with no provider is refused as ever.
+        const route =
+            ("notice" in input ? input.route : undefined) ??
+            (await emailRoute(
+                tx,
+                organizationId,
+                "notice" in input ? input.template : undefined,
+            ));
+        if (route.route === null) {
             throw new ConflictException(
                 "Connect an email provider in Settings to send this.",
             );
         }
+        const saroh = route.route === "SAROH" && "notice" in input;
 
         const { subject, body } = saroh
             ? await renderForSaroh(tx, organizationId, input)
@@ -827,20 +829,17 @@ export class CommunicationsService {
                 id: suppressed.id,
                 status: "SUPPRESSED",
                 toAddress: to.address,
-                route: saroh ? "SAROH" : "PROVIDER",
+                route: route.route,
             };
         }
 
-        if (saroh) {
-            return queueSarohInTx(tx, organizationId, base, {
-                bookingId: "notice" in input ? input.bookingId : null,
-            });
-        }
-        // Without Saroh the provider is connected (checked above); said
-        // again so the type knows it.
-        if (provider?.status !== "CONNECTED") {
-            throw new ConflictException(
-                "Connect an email provider in Settings to send this.",
+        if (route.route === "SAROH") {
+            return queueSarohInTx(
+                tx,
+                organizationId,
+                base,
+                { bookingId: "notice" in input ? input.bookingId : null },
+                { allowance: route.allowance },
             );
         }
 
@@ -852,7 +851,7 @@ export class CommunicationsService {
             data: {
                 organizationId,
                 messageId: message.id,
-                provider: provider.provider,
+                provider: route.provider,
                 status: "QUEUED",
             },
         });
@@ -896,7 +895,7 @@ export class CommunicationsService {
         const channels = await noticeChannels(
             prisma,
             ctx.organizationId,
-            "BOOKING_MOVED",
+            SAROH_REPRESENTATIVE_NOTICE,
         );
         const reach = contactId
             ? await contactReach(

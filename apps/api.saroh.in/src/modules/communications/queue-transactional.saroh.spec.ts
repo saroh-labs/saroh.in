@@ -11,7 +11,7 @@ jest.mock("../../env", () => ({
 
 jest.mock("./saroh-may-send", () => ({
     ...jest.requireActual<object>("./saroh-may-send"),
-    sarohMaySend: jest.fn(),
+    emailRoute: jest.fn(),
 }));
 
 jest.mock("@saroh/database", () => ({ prisma: {} }));
@@ -29,9 +29,23 @@ import { planMeter } from "../billing/metering.service";
 import type { NoticeVars } from "../site-accounts/notify-templates";
 import { renderNotice } from "../site-accounts/notify-templates";
 import { CommunicationsService } from "./communications.service";
-import { sarohMaySend } from "./saroh-may-send";
+import type { EmailRoute } from "./saroh-may-send";
+import { emailRoute } from "./saroh-may-send";
 
-const maySend = sarohMaySend as jest.Mock;
+const route = emailRoute as jest.Mock;
+/** Whether the stood-in rule lets Saroh send (no provider connected). */
+let sarohSays = true;
+
+/** The allowance row the rule read: on, 3 a month. */
+const ROW = {
+    moduleId: "saroh-emails",
+    state: "on",
+    limit: 3,
+    per: "month",
+} as unknown as Extract<EmailRoute, { route: "SAROH" }>["allowance"];
+
+/** What the notify handler decided and hands over. */
+const SAROH: EmailRoute = { route: "SAROH", allowance: ROW };
 const roomInTx = planMeter.roomInTx as jest.Mock;
 const enforcedRow = planMeter.enforcedRow as jest.Mock;
 
@@ -111,10 +125,10 @@ function makeTx(
 
 type Tx = Parameters<CommunicationsService["queueTransactional"]>[0];
 
-const notice = (sarohMay?: boolean) => ({
+const notice = (decided?: EmailRoute) => ({
     template: "BOOKING_CONFIRMED" as const,
     notice: vars,
-    ...(sarohMay === undefined ? {} : { sarohMay }),
+    ...(decided === undefined ? {} : { route: decided }),
     recipient: { kind: "SITE_ACCOUNT" as const, contactId: "contact_1" },
     createdByUserId: null,
 });
@@ -123,7 +137,26 @@ const comms = new CommunicationsService();
 
 beforeEach(() => {
     jest.clearAllMocks();
-    maySend.mockResolvedValue(true);
+    sarohSays = true;
+    // The rule as `emailRoute` answers it: the provider read from the
+    // transaction, then (a notice kind) Saroh's say.
+    route.mockImplementation(
+        async (
+            tx: ReturnType<typeof makeTx>,
+            _org: string,
+            template?: string,
+        ): Promise<EmailRoute> => {
+            const p = (await tx.communicationProvider.findUnique()) as {
+                provider: string;
+                status: string;
+            } | null;
+            if (p?.status === "CONNECTED") {
+                return { route: "PROVIDER", provider: p.provider };
+            }
+            if (template === undefined) return { route: null, refusal: null };
+            return sarohSays ? SAROH : { route: null, refusal: "SWITCHED_OFF" };
+        },
+    );
     roomInTx.mockResolvedValue({ limit: 3, used: 0, adding: 1 });
     enforcedRow.mockResolvedValue({
         moduleId: "saroh-emails",
@@ -139,7 +172,7 @@ describe("queueTransactional through Saroh (DEC-086)", () => {
         const res = await comms.queueTransactional(
             tx as unknown as Tx,
             "org_1",
-            notice(true),
+            notice(SAROH),
         );
         expect(res).toEqual({
             id: "msg_1",
@@ -147,8 +180,10 @@ describe("queueTransactional through Saroh (DEC-086)", () => {
             toAddress: "asha@example.com",
             route: "SAROH",
         });
-        // The handler asked already; a flip since can't 409 its transaction.
-        expect(maySend).not.toHaveBeenCalled();
+        // The handler decided already; a flip since can't 409 its
+        // transaction, and nothing is read again.
+        expect(route).not.toHaveBeenCalled();
+        expect(tx.communicationProvider.findUnique).not.toHaveBeenCalled();
         expect(tx.delivery.create.mock.calls[0][0].data).toMatchObject({
             provider: "SAROH",
             status: "QUEUED",
@@ -178,11 +213,11 @@ describe("queueTransactional through Saroh (DEC-086)", () => {
             notice(),
         );
         expect(res.route).toBe("SAROH");
-        expect(maySend).toHaveBeenCalledWith(tx, "org_1", "BOOKING_CONFIRMED");
+        expect(route).toHaveBeenCalledWith(tx, "org_1", "BOOKING_CONFIRMED");
     });
 
     it("the rule says no: 409 as before, nothing written", async () => {
-        maySend.mockResolvedValue(false);
+        sarohSays = false;
         const tx = makeTx();
         await expect(
             comms.queueTransactional(tx as unknown as Tx, "org_1", notice()),
@@ -198,7 +233,6 @@ describe("queueTransactional through Saroh (DEC-086)", () => {
             notice(),
         );
         expect(res.route).toBe("PROVIDER");
-        expect(maySend).not.toHaveBeenCalled();
         expect(tx.delivery.create.mock.calls[0][0].data.provider).toBe(
             "RESEND",
         );
@@ -212,7 +246,7 @@ describe("queueTransactional through Saroh (DEC-086)", () => {
         const res = await comms.queueTransactional(
             tx as unknown as Tx,
             "org_1",
-            notice(true),
+            notice(SAROH),
         );
         expect(res).toMatchObject({ status: "SUPPRESSED", route: "SAROH" });
         expect(tx.delivery.create).not.toHaveBeenCalled();
@@ -229,7 +263,8 @@ describe("queueTransactional through Saroh (DEC-086)", () => {
                 createdByUserId: null,
             }),
         ).rejects.toBeInstanceOf(ConflictException);
-        expect(maySend).not.toHaveBeenCalled();
+        // Not a notice: Saroh isn't asked, only the provider.
+        expect(route).toHaveBeenCalledWith(tx, "org_1", undefined);
     });
 });
 
@@ -239,14 +274,16 @@ describe("the monthly allowance on Saroh's route (U3)", () => {
         await comms.queueTransactional(
             tx as unknown as Tx,
             "org_1",
-            notice(true),
+            notice(SAROH),
         );
         expect(roomInTx).toHaveBeenCalledWith(
             tx,
             "org_1",
             "saroh-emails",
-            expect.objectContaining({ refuse: expect.any(Function) }),
+            // Against the row the rule read: the plan isn't read again.
+            expect.objectContaining({ refuse: expect.any(Function), row: ROW }),
         );
+        expect(enforcedRow).not.toHaveBeenCalled();
     });
 
     it("at the cap: recorded ALLOWANCE_USED, no delivery or job, nothing thrown, the cap's notice queued once", async () => {
@@ -255,7 +292,7 @@ describe("the monthly allowance on Saroh's route (U3)", () => {
         const res = await comms.queueTransactional(
             tx as unknown as Tx,
             "org_1",
-            notice(true),
+            notice(SAROH),
         );
         expect(res).toMatchObject({ status: "ALLOWANCE_USED", route: "SAROH" });
         expect(tx.message.create.mock.calls[0][0].data).toMatchObject({
@@ -289,7 +326,7 @@ describe("the monthly allowance on Saroh's route (U3)", () => {
         await comms.queueTransactional(
             tx as unknown as Tx,
             "org_1",
-            notice(true),
+            notice(SAROH),
         );
         expect(tx.job.create).not.toHaveBeenCalled();
     });
@@ -300,7 +337,7 @@ describe("the monthly allowance on Saroh's route (U3)", () => {
         const res = await comms.queueTransactional(
             tx as unknown as Tx,
             "org_1",
-            notice(true),
+            notice(SAROH),
         );
         expect(res.status).toBe("NO_ALLOWANCE");
         expect(tx.delivery.create).not.toHaveBeenCalled();
@@ -320,7 +357,7 @@ describe("the monthly allowance on Saroh's route (U3)", () => {
         const res = await comms.queueTransactional(
             tx as unknown as Tx,
             "org_1",
-            notice(true),
+            notice(SAROH),
         );
         expect(res).toMatchObject({ status: "NO_ALLOWANCE", route: "SAROH" });
         expect(tx.message.create.mock.calls[0][0].data).toMatchObject({
@@ -337,7 +374,7 @@ describe("the monthly allowance on Saroh's route (U3)", () => {
             comms.queueTransactional(
                 tx as unknown as Tx,
                 "org_1",
-                notice(true),
+                notice(SAROH),
             ),
         ).resolves.toMatchObject({ status: "NO_ALLOWANCE" });
     });
@@ -348,7 +385,7 @@ describe("the monthly allowance on Saroh's route (U3)", () => {
             comms.queueTransactional(
                 makeTx() as unknown as Tx,
                 "org_1",
-                notice(true),
+                notice(SAROH),
             ),
         ).rejects.toThrow("connection lost");
     });
@@ -358,7 +395,7 @@ describe("the monthly allowance on Saroh's route (U3)", () => {
         await comms.queueTransactional(
             tx as unknown as Tx,
             "org_1",
-            notice(true),
+            notice(SAROH),
         );
         expect(roomInTx).not.toHaveBeenCalled();
     });
@@ -371,7 +408,7 @@ describe("the monthly allowance on Saroh's route (U3)", () => {
 });
 
 describe("Saroh's cap per booking (DEC-086)", () => {
-    const aboutBooking = () => ({ ...notice(true), bookingId: "bk_1" });
+    const aboutBooking = () => ({ ...notice(SAROH), bookingId: "bk_1" });
 
     it("under the cap: counted through the booking's notices, then queued", async () => {
         const tx = makeTx();

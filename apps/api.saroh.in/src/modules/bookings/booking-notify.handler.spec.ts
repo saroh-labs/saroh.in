@@ -31,7 +31,7 @@ const WAS = new Date("2026-10-05T04:30:00.000Z");
 
 function makeTx() {
     return {
-        // The plan-meter lock a booking notice takes first (DEC-086).
+        // Never called here: the plan-meter lock is customer.notify's.
         $executeRaw: jest.fn().mockResolvedValue(1),
         booking: {
             findFirst: jest.fn().mockResolvedValue({
@@ -76,7 +76,7 @@ function run(tx: FakeTx, payload: BookingNotifyPayload) {
 beforeEach(() => jest.clearAllMocks());
 
 describe("booking.notify", () => {
-    it("takes Saroh's email allowance's plan-meter lock before it writes anything (DEC-086)", async () => {
+    it("writes nothing before the customer's notice, which takes Saroh's plan-meter lock first (DEC-086)", async () => {
         const tx = makeTx();
         tx.bookingEvent.findFirst.mockResolvedValue({
             id: "ev_move",
@@ -86,16 +86,10 @@ describe("booking.notify", () => {
             toStartAt: NOW,
         });
         await run(tx, { bookingId: "bk_1", reason: "rescheduled" });
-        const [lock] = tx.$executeRaw.mock.calls[0] as [
-            TemplateStringsArray,
-            string,
-        ];
-        expect(lock.join("?")).toContain("pg_advisory_xact_lock");
-        expect(tx.$executeRaw.mock.calls[0][1]).toBe(
-            `plan-meter:${ORG}:sarohEmailsPerMonth`,
-        );
-        expect(tx.$executeRaw.mock.invocationCallOrder[0]).toBeLessThan(
-            tx.customerNotice.createMany.mock.invocationCallOrder[0],
+        // One lock site (customer.notify's), taken only when Saroh emails.
+        expect(tx.$executeRaw).not.toHaveBeenCalled();
+        expect(notify.mock.invocationCallOrder[0]).toBeLessThan(
+            tx.notification.create.mock.invocationCallOrder[0],
         );
     });
 

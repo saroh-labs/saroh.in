@@ -67,11 +67,11 @@ Each is a transaction lock on `hashtext(<key>)`, held until the
 transaction ends. Take it before the transaction's row locks, so it never
 waits while holding one.
 
-| Key                                       | Serialises                                                                                                                    | Where                                                                                                       |
-| ----------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------- |
-| `first-pack:<organizationId>:<contactId>` | Selling a "first pack only" pack to one person                                                                                | `class-packs/first-pack.ts`                                                                                 |
-| `subscription-plan-name:<organizationId>` | Saving a subscription plan's name in one business                                                                             | `subscriptions/plans.ts` (`lockPlanNames`)                                                                  |
-| `plan-meter:<organizationId>:<limitKey>`  | Writes that add to one plan limit (a product, a booking…); every booking notice takes `…:sarohEmailsPerMonth` first (DEC-086) | `billing/metering.service.ts` (`lockMeter`, U13); `booking-notify.handler.ts`, `customer-notify.handler.ts` |
+| Key                                       | Serialises                                                                                                                                                  | Where                                                                                                                                           |
+| ----------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------- |
+| `first-pack:<organizationId>:<contactId>` | Selling a "first pack only" pack to one person                                                                                                              | `class-packs/first-pack.ts`                                                                                                                     |
+| `subscription-plan-name:<organizationId>` | Saving a subscription plan's name in one business                                                                                                           | `subscriptions/plans.ts` (`lockPlanNames`)                                                                                                      |
+| `plan-meter:<organizationId>:<limitKey>`  | Writes that add to one plan limit (a product, a booking…); a booking notice Saroh will email takes `…:sarohEmailsPerMonth` before its first write (DEC-086) | `billing/metering.service.ts` (`lockMeter`, U13); `customer-notify.handler.ts` (the one notice site; `booking.notify` writes nothing before it) |
 
 Race tests wait on an advisory lock with `waitUntilAdvisoryBlockedBy`
 (`test/lock-wait.ts`).
@@ -137,11 +137,14 @@ nobody was told. Round-2 A14 closed it (`bookings/booking-notify.handler.ts`).
   `resolveContact` (a merge lands on the survivor; a removed contact hears
   nothing).
 - **Saroh emails a booking notice when the business has no provider**
-  (DEC-086), when `sarohMaySend` says so (`communications/saroh-may-send.ts`:
+  (DEC-086), when the one rule says so (`emailRoute` in
+  `communications/saroh-may-send.ts`, the provider read once:
   the global stop, the business's `SAROH_BUSINESS_EMAIL`, `PLAN_ENFORCEMENT`,
   a `saroh-emails` allowance with a number, the platform's daily ceiling).
-  The handler decides before it calls `queueTransactional`, so nothing it
-  refuses rolls the notice back; the delivery is stamped `SAROH` and
+  The handler decides first, takes the plan-meter lock only for Saroh's
+  route, and hands the route (with the allowance row it read) to
+  `queueTransactional`, so nothing it refuses rolls the notice back and
+  nothing is read twice; the delivery is stamped `SAROH` and
   `message.send` re-checks the switches (off: `STOPPED`, never retried).
   Each one counts against `sarohEmailsPerMonth` under the plan-meter lock;
   at the cap the Message is `ALLOWANCE_USED`, never thrown. A soft
@@ -150,7 +153,9 @@ nobody was told. Round-2 A14 closed it (`bookings/booking-notify.handler.ts`).
   booking in any 24 hours, counted through its `CustomerNotice` rows;
   past it the Message is `BOOKING_LIMIT` and not counted. A flag that
   can't be read when the send job runs throws (retried, still `QUEUED`);
-  only a switch read as off stops it.
+  only a switch read as off stops it. A last attempt that leaves it
+  `QUEUED` logs `saroh_business_email_gave_up org=…` at WARN (it still
+  counts).
 
 ## Autopay charges — **Current** (D13)
 
