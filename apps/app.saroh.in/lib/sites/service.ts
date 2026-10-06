@@ -283,6 +283,12 @@ export interface ProductGridContent {
     showPhotos?: boolean;
     showDescriptions?: boolean;
     buttonLabel?: string;
+    /** "3 of 5 available" beside the title (template polish). */
+    showAvailability?: boolean;
+    /** A line under the products. */
+    note?: string;
+    /** `bare`: the even grid without a card. Absent: the card. */
+    cardStyle?: "card" | "bare";
 }
 
 /**

@@ -119,3 +119,26 @@ describe("plans: a line under the title", () => {
         ).toBe(false);
     });
 });
+
+describe("productGrid: what is left, a note and bare cards", () => {
+    it("saves the count switch, a note and the bare card", () => {
+        expect(
+            parseSectionContent("productGrid", 1, {
+                showAvailability: true,
+                note: "Baked this morning.",
+                cardStyle: "bare",
+            }).success,
+        ).toBe(true);
+    });
+
+    it("refuses an unknown card style and a note past its length", () => {
+        expect(
+            parseSectionContent("productGrid", 1, { cardStyle: "glass" })
+                .success,
+        ).toBe(false);
+        expect(
+            parseSectionContent("productGrid", 1, { note: "x".repeat(401) })
+                .success,
+        ).toBe(false);
+    });
+});

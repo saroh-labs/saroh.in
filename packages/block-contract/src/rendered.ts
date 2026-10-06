@@ -355,6 +355,10 @@ const renderedProductGrid = z.object({
     showPhotos: z.boolean().optional(),
     showDescriptions: z.boolean().optional(),
     buttonLabel: z.string().optional(),
+    showAvailability: z.boolean().optional(),
+    note: z.string().optional(),
+    // A card style this build does not know draws as the card.
+    cardStyle: z.string().optional(),
 });
 
 /**

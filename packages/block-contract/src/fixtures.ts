@@ -783,6 +783,14 @@ export const BLOCK_META = {
                 count: 2,
                 showPrices: false,
             },
+            // Bare cards, a count of what is left and a note (template polish).
+            bare: {
+                variant: "default",
+                title: "Today's bread",
+                cardStyle: "bare",
+                showAvailability: true,
+                note: "Baked this morning. What is gone usually goes before ten.",
+            },
         },
     },
     packs: {

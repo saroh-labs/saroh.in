@@ -865,6 +865,21 @@ const productGridV1 = z.object({
     showPhotos: z.boolean().optional(),
     showDescriptions: z.boolean().optional(),
     buttonLabel,
+    /**
+     * A line beside the title counted from the products shown — "3 of 5
+     * available", "All sold out" (template polish). Derived, never typed,
+     * so it is a switch. ABSENT, not shown.
+     */
+    showAvailability: z.boolean().optional(),
+    /** A short line under the grid, the merchant's own. Plain text. */
+    note: z.string().trim().max(400).optional(),
+    /**
+     * `bare` (template polish): the even grid's products without a card —
+     * a tall 4:5 photo, the name and price beside each other in the
+     * heading face, sold out as a label on the photo's corner. ABSENT is
+     * the card. The other looks ignore it.
+     */
+    cardStyle: z.enum(["card", "bare"]).optional(),
 });
 
 /** How many classes a Timetable may be limited to (U2). */

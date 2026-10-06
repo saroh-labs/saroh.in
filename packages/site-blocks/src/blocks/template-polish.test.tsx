@@ -3,10 +3,15 @@ import { BLOCK_META } from "@saroh/block-contract";
 import { render, screen, within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { SAMPLE_PLANS, SAMPLE_VISIT } from "../block-fixture-preview";
+import {
+    SAMPLE_PLANS,
+    SAMPLE_PRODUCTS,
+    SAMPLE_VISIT,
+} from "../block-fixture-preview";
 import FeaturesSection from "./features";
 import HoursSection, { groupedHoursRows, hoursRows } from "./hours";
 import PlansSection from "./plans";
+import ProductGridSection, { availabilityLine } from "./product-grid";
 import RichTextSection from "./rich-text";
 
 /**
@@ -197,6 +202,60 @@ describe("plans: a line under the title", () => {
             <PlansSection
                 content={BLOCK_META.plans.cases.intro}
                 feed={{ plans: [], joinHref: "/contact" }}
+            />,
+        );
+        expect(container.innerHTML).toBe("");
+    });
+});
+
+describe("productGrid: what is left, a note and bare cards", () => {
+    it("counts what is left from the products shown, in words", () => {
+        const free = { soldOut: false };
+        const gone = { soldOut: true };
+        expect(availabilityLine([free, gone, free])).toBe("2 of 3 available");
+        expect(availabilityLine([free, free])).toBe("All 2 available");
+        expect(availabilityLine([gone, gone])).toBe("All sold out");
+        expect(availabilityLine([gone])).toBe("Sold out");
+        expect(availabilityLine([])).toBeNull();
+    });
+
+    it("draws bare cards: tall photos, sold out on the corner, the count and the note", () => {
+        const { container } = render(
+            <ProductGridSection
+                content={BLOCK_META.productGrid.cases.bare}
+                feed={{ products: SAMPLE_PRODUCTS, basePath: "/shop" }}
+            />,
+        );
+        const shown = SAMPLE_PRODUCTS.slice(0, 4);
+        expect(
+            container.querySelector("[data-availability]")?.textContent,
+        ).toBe(availabilityLine(shown));
+        expect(container.querySelector(".aspect-\\[4\\/5\\]")).not.toBeNull();
+        // No bordered card around a product.
+        expect(container.querySelector("li a")?.className).not.toContain(
+            "border",
+        );
+        const soldOut = shown.filter((p) => p.soldOut).length;
+        expect(screen.queryAllByText("Sold out").length).toBe(soldOut);
+        expect(screen.getByText(/Baked this morning/)).toBeTruthy();
+    });
+
+    it("keeps the card, and no count or note, by default", () => {
+        const { container } = render(
+            <ProductGridSection
+                content={BLOCK_META.productGrid.fixtures.default}
+                feed={{ products: SAMPLE_PRODUCTS, basePath: "/shop" }}
+            />,
+        );
+        expect(container.querySelector("[data-availability]")).toBeNull();
+        expect(container.querySelector("li a")?.className).toContain("border");
+    });
+
+    it("renders nothing with no products, count or not", () => {
+        const { container } = render(
+            <ProductGridSection
+                content={BLOCK_META.productGrid.cases.bare}
+                feed={{ products: [], basePath: "/shop" }}
             />,
         );
         expect(container.innerHTML).toBe("");
