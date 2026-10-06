@@ -88,16 +88,26 @@ describe("an unpublished page is in neither the nav nor the sitemap", () => {
         expect(indexedPaths("waitlist", after)).toContain("/help");
     });
 
-    it("the legal pages are out of the footer and sitemap until 5 Oct in India", () => {
+    it("the legal pages are out of the footer and sitemap until their day in India", () => {
         const legalBefore = at("2026-10-04T18:29:00Z");
-        const legalAfter = at("2026-10-04T18:31:00Z");
-        const legal = ["/privacy", "/terms", "/refunds"];
+        const termsAfter = at("2026-10-04T18:31:00Z");
+        // Privacy's date moved to 6 Oct with the email provider change.
+        const privacyAfter = at("2026-10-05T18:31:00Z");
         expect(shownLegal(legalBefore).map((p) => p.href)).toEqual([]);
-        for (const href of legal) {
+        for (const href of ["/privacy", "/terms", "/refunds"]) {
             expect(indexedPaths("waitlist", legalBefore)).not.toContain(href);
-            expect(indexedPaths("waitlist", legalAfter)).toContain(href);
+            expect(indexedPaths("waitlist", privacyAfter)).toContain(href);
         }
-        expect(shownLegal(legalAfter).map((p) => p.href)).toEqual(legal);
+        expect(indexedPaths("waitlist", termsAfter)).not.toContain("/privacy");
+        expect(shownLegal(termsAfter).map((p) => p.href)).toEqual([
+            "/terms",
+            "/refunds",
+        ]);
+        expect(shownLegal(privacyAfter).map((p) => p.href)).toEqual([
+            "/privacy",
+            "/terms",
+            "/refunds",
+        ]);
     });
 
     it("the launch entry joins the sitemap on its day", () => {

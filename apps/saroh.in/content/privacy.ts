@@ -1,6 +1,6 @@
 /**
  * The Privacy Policy, as the owner agreed it (Claude Doc "Saroh Privacy
- * Policy and Terms", settled 4 Oct 2026, rev 32). Published VERBATIM at
+ * Policy and Terms", settled 4 Oct 2026, rev 32; email provider rev 42, 6 Oct). Published VERBATIM at
  * /privacy: do not reword it here. A change comes from the owner's text,
  * and moves `publishOn`, which is the "Last updated" date the page shows.
  *
@@ -51,7 +51,8 @@ Only the companies that help us run Saroh, each for its own job, and only what t
 | --- | --- |
 | Razorpay | Taking your payments to Saroh. Your own Razorpay or Cashfree account takes your customers' payments to you |
 | Cashfree | Your customers' payments, when you connect it |
-| Google (Gmail) | Sending email |
+| Amazon Web Services (SES) | Sending the emails Saroh sends, from India |
+| Google (Workspace) | Our mailboxes, when you write to us |
 | Hostinger | Running our servers and database |
 | Vercel | Serving our websites |
 | Cloudflare | Network security and speed |

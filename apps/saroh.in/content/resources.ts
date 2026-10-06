@@ -83,7 +83,7 @@ export const LEGAL_PAGES: readonly ResourcePage[] = [
         name: "Privacy",
         line: "What Saroh collects, why, and what you can ask for.",
         href: "/privacy",
-        publishOn: "2026-10-05",
+        publishOn: "2026-10-06",
     },
     {
         id: "terms",
