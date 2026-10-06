@@ -2974,6 +2974,16 @@ model Site {
   // the snapshot at publish. Null means no menu has been built.
   navigation Json?
 
+  // The template this site was made from (industry templates, KTD-7): its id
+  // and version, and the style (colourway) chosen with it, when it has
+  // styles. Set once at creation and never rewritten by an edit. Null means
+  // unknown — a site made before this was recorded — never guessed. Publish
+  // stamps these on each Publication; a site without them stamps the
+  // starter, as every publish did before.
+  templateId      String?
+  templateVersion Int?
+  templateStyleId String?
+
   // Reserved placeholder for the S2-007 custom-domain claim/verification flow.
   // NOT wired to a relation here and NOT the legacy store `CustomDomain`.
   customDomainId String?

@@ -328,6 +328,21 @@ describe("SitesService.createFromTemplate", () => {
         });
     });
 
+    it("records the template a site was asked to be made from (KTD-7)", async () => {
+        // Personal has an enquiry section, which gets its Form.
+        (prisma.form.create as jest.Mock).mockResolvedValue({ id: "form_1" });
+        await service.createFromTemplate(ctx(), {
+            name: "Acme",
+            templateId: "personal",
+        });
+
+        expect(siteCreate.mock.calls[0][0].data).toMatchObject({
+            templateId: "personal",
+            templateVersion: 1,
+            templateStyleId: null,
+        });
+    });
+
     it("creates a Site + Pages + DRAFT PageVersions + Sections in one org-scoped transaction from the real starter template", async () => {
         const dto: CreateSiteFromTemplateDto = { name: "Acme" };
 
@@ -346,6 +361,10 @@ describe("SitesService.createFromTemplate", () => {
                 slug: "acme",
                 // Never without an address (L5): the business's own.
                 subdomain: "acme",
+                // The template it came from (KTD-7): the kind's default.
+                templateId: STARTER_TEMPLATE_ID,
+                templateVersion: 2,
+                templateStyleId: null,
                 storefrontId: null,
             },
             select: { id: true, slug: true },

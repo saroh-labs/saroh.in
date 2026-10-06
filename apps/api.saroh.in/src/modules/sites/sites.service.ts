@@ -11,7 +11,6 @@ import {
     Prisma,
     prisma,
 } from "@saroh/database";
-import { starterTemplate } from "@saroh/templates";
 import { isDeepStrictEqual } from "node:util";
 
 import type { OrganizationContext } from "../../common/types/organization-context";
@@ -115,6 +114,8 @@ import {
     siteStyleOptions,
     siteStyleVariables,
 } from "./site-style";
+import type { SiteTemplateRecord } from "./site-template-record";
+import { publicationTemplate, siteTemplate } from "./site-template-record";
 
 /**
  * Take the key a section claims, unless something earlier in the list already
@@ -429,6 +430,11 @@ export interface SiteDetailView {
      * image, style, menu, footer, page list. Null before the first publish.
      */
     pendingSiteChanges: SiteChangeKind[] | null;
+    /**
+     * The template the site was made from and the style chosen with it
+     * (KTD-7). Null for a site made before that was recorded.
+     */
+    template: SiteTemplateRecord | null;
     /** Always complete — absent choices are filled from the defaults. */
     style: SiteStyle;
     /**
@@ -553,6 +559,9 @@ const draftSiteSelect = {
     socialImageBytes: true,
     footer: true,
     navigation: true,
+    // Not part of the snapshot: what a Publication is stamped with (KTD-7).
+    templateId: true,
+    templateVersion: true,
     pages: {
         // A hidden page does not travel, for the same reason a
         // hidden section does not: a Publication is immutable once
@@ -859,6 +868,9 @@ export class SitesService {
                 navigation: true,
                 storefrontId: true,
                 publishNeedsApproval: true,
+                templateId: true,
+                templateVersion: true,
+                templateStyleId: true,
                 createdAt: true,
                 updatedAt: true,
                 // When the site last went live. Read through the current
@@ -889,7 +901,16 @@ export class SitesService {
         // client filling gaps itself is how the preview and the published site
         // drift apart. The footer is normalized here for the same reason — the
         // editor reads back exactly what publish would write.
-        const { style, footer, navigation, storefrontId, ...rest } = site;
+        const {
+            style,
+            footer,
+            navigation,
+            storefrontId,
+            templateId,
+            templateVersion,
+            templateStyleId,
+            ...rest
+        } = site;
         const pending = await this.pendingSectionChanges([site.id]);
         const sellsFrom = (await shopRolloutOn(ctx.organizationId))
             ? await sellsFromView(prisma, {
@@ -920,6 +941,11 @@ export class SitesService {
             pendingSectionChanges: pending.get(site.id)?.sections ?? null,
             // The settings that travel into the snapshot too (#282).
             pendingSiteChanges: pending.get(site.id)?.site ?? null,
+            template: siteTemplate({
+                templateId,
+                templateVersion,
+                templateStyleId,
+            }),
             style: parseSiteStyle(style),
             styleOptions: siteStyleOptions(),
             footer: parseSiteFooter(footer),
@@ -1914,9 +1940,9 @@ export class SitesService {
              * asks the review standing INSIDE this transaction (#278): a
              * verdict posted while a publish is in flight is not missed.
              *
-             * The Site does not track which template produced it; default
-             * the Publication's required (non-null) template stamp to the
-             * starter template's identity/version.
+             * The Publication's required template stamp is the site's own
+             * template (KTD-7); a site made before that was recorded
+             * stamps the starter, as every publish did until then.
              */
             const live = await putLive(tx, {
                 site: { id: site.id, organizationId: ctx.organizationId },
@@ -1925,10 +1951,7 @@ export class SitesService {
                 actor: { userId: ctx.userId, owner: isOwner(ctx) },
                 override: options.override,
                 fingerprint,
-                template: {
-                    id: starterTemplate.id,
-                    version: starterTemplate.version,
-                },
+                template: publicationTemplate(site),
                 publishedAt,
             });
             return {

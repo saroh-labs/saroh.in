@@ -571,6 +571,19 @@ export interface SiteDetail extends SiteSummary {
      * and on (DEC-057). Absent from an older API, which reads as not.
      */
     packsBlockOffered?: boolean;
+    /**
+     * The template the site was made from and the style chosen with it
+     * (industry templates, KTD-7). Null for a site made before that was
+     * recorded; absent from an older API.
+     */
+    template?: SiteTemplate | null;
+}
+
+/** Which template a site came from: its id, version and style, if any. */
+export interface SiteTemplate {
+    id: string;
+    version: number;
+    styleId: string | null;
 }
 
 /** The storefront a site sells from, and the open ones with products. */

@@ -35,6 +35,7 @@ import {
     KIND_TEMPLATE,
     withEnquiryForms,
 } from "./site-template";
+import type { SiteTemplateRecord } from "./site-template-record";
 
 /**
  * Creating a website from a template (S2-003), in two halves so a caller
@@ -65,6 +66,8 @@ export interface SitePlan {
     name: string;
     slug: string;
     pages: ReturnType<typeof instantiateTemplate>["pages"];
+    /** The template it is made from, recorded on the Site (KTD-7). */
+    template: SiteTemplateRecord;
 }
 
 /** What a caller asks for: the `/sites/new` body's fields. */
@@ -171,6 +174,13 @@ export async function planSiteFromTemplate(
             name: dto.name,
             slug,
             pages: instantiateTemplate(template, context).pages,
+            template: {
+                id: template.id,
+                version: template.version,
+                // No style is asked for yet; the template's styles (U1)
+                // fill this when a site is made with one.
+                styleId: null,
+            },
         };
     } catch (error) {
         if (error instanceof TemplateInstantiationError) {
@@ -324,6 +334,9 @@ export async function writeSiteFromTemplate(
                 name: plan.name,
                 slug: plan.slug,
                 subdomain,
+                templateId: plan.template.id,
+                templateVersion: plan.template.version,
+                templateStyleId: plan.template.styleId,
                 // Where it sells from (G11): set only when there is
                 // exactly one candidate, and the settings say so.
                 storefrontId: await automaticStorefront(tx, ctx.organizationId),
