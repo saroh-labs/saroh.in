@@ -69,6 +69,28 @@ export type {
     SiteTypeScale,
 } from "@saroh/block-contract";
 
+// A site's look and its `--site-*` variables (#189), for the same reason:
+// the API validates a saved style and publishes its variables with the
+// rules the renderer's template renders (U14) draw a colourway with.
+export {
+    STYLE_ROWS,
+    STYLE_ROW_KEYS,
+    STYLE_ROW_LABELS,
+    STYLE_SCALARS,
+    STYLE_SCALAR_KEYS,
+    contrastOk,
+    defaultSiteStyle,
+    presetSiteStyle,
+    readableOn,
+    siteStyleVariables,
+} from "@saroh/block-contract";
+export type {
+    SiteStyle,
+    StyleRow,
+    StyleScalar,
+    Swatch,
+} from "@saroh/block-contract";
+
 // Registry
 export { getTemplate, listTemplates } from "./registry";
 
