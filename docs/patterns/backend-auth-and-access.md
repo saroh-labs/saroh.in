@@ -244,8 +244,17 @@ orgId)` (`organizations/organization-kind.ts`).
   `BOOKINGS_PAUSED`, which names no plan. What each limit counts is
   `billing/metering.ts`, the one place: orders and bookings that stand
   (never an unpaid online checkout or a pay-now hold), in the business's
-  month in its zone. The site's checkout is never refused (a soft cap,
-  OQ-8); a payment once captured never is (OQ-7). Over after a downgrade,
+  month in its zone (many businesses at once: `billing/metering-across.ts`,
+  the same rules). The site's checkout is never refused (a soft cap,
+  OQ-8); a payment once captured never is (OQ-7). A catalogue cell marked
+  `soft` (storage, site visits) is soft wherever it's checked — counted and
+  told, never refused — whatever the call site passes. Websites (`sites`)
+  and places customers visit (`locations` → `shopLocations`, metered when a
+  storefront's kind becomes SHOP) are the catalogue's where `enforcedRow`
+  answers for the row; elsewhere the old one-website and `storefronts`
+  floor (`LEGACY_FLOOR_ENTITLEMENTS`) still applies, so nothing new locks
+  behind the switch. Team members never count a Reviewer, so moving
+  someone off Reviewer is metered. Over after a downgrade,
   existing things stay readable and editable; only adding is refused. A
   new write that adds a metered thing, or a new switch row, gets its call
   and a row in `billing/plan-limits.db.spec.ts`.

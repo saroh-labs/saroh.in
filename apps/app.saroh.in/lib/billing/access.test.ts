@@ -141,3 +141,32 @@ describe("upgradeLine and upgradeHref", () => {
         expect(upgradeHref(null)).toBe("/settings/billing#change-plan");
     });
 });
+
+describe("rowNotice on a soft cap", () => {
+    const storage = (usage: number) =>
+        access({
+            modules: [
+                row({
+                    moduleId: "storage",
+                    soft: true,
+                    limit: 11,
+                    usage,
+                }),
+            ],
+        });
+
+    it("warns from 80% without saying anything will stop", () => {
+        expect(rowNotice(storage(9), "storage")).toMatchObject({
+            on: true,
+            full: false,
+            body: "Nothing stops at 11. Plan B gives you more.",
+        });
+    });
+
+    it("at the cap, says nothing is blocked", () => {
+        expect(rowNotice(storage(11), "storage")).toMatchObject({
+            full: true,
+            body: expect.stringMatching(/^Nothing is blocked/),
+        });
+    });
+});

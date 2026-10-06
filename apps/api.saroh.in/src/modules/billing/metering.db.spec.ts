@@ -31,7 +31,8 @@ import { FlagKey } from "../feature-flags/flags";
 import { ImpactService } from "../pricing/impact.service";
 import { CatalogueAccessService } from "./catalogue-access.service";
 import type { MeteredLimitKey } from "./metering";
-import { countUsage, countUsageAcross, monthWindow } from "./metering";
+import { countUsage, monthFirstDay, monthWindow } from "./metering";
+import { countUsageAcross } from "./metering-across";
 import { MeteringService, PLAN_LIMIT_NOTICE_TYPE } from "./metering.service";
 import {
     PLAN_LIMIT_NOTIFICATION_TYPE,
@@ -169,6 +170,57 @@ async function booking(
             timezone: "Asia/Kolkata",
             snapshot: {},
             bookerEmail: `${uniq("b")}@example.test`,
+            ...over,
+        },
+    });
+}
+
+/** A location customers visit (`StoreSettings.kind` SHOP). */
+async function shop(
+    organizationId: string,
+    over: Partial<Prisma.StoreUncheckedCreateInput> = {},
+) {
+    return prisma.store.create({
+        data: {
+            name: "Counter",
+            organizationId,
+            settings: { create: { kind: "SHOP" } },
+            ...over,
+        },
+    });
+}
+
+/** An uploaded file of `sizeBytes`. */
+async function media(
+    organizationId: string,
+    sizeBytes: number,
+    status: string,
+) {
+    return prisma.media.create({
+        data: {
+            organizationId,
+            key: uniq("media"),
+            contentType: "image/png",
+            filename: "a.png",
+            sizeBytes,
+            status,
+        },
+    });
+}
+
+/** One rollup row: the org-wide site views for `date`, unless told otherwise. */
+async function views(
+    organizationId: string,
+    date: Date,
+    count: number,
+    over: Partial<Prisma.AnalyticsDailyAggregateUncheckedCreateInput> = {},
+) {
+    return prisma.analyticsDailyAggregate.create({
+        data: {
+            organizationId,
+            date,
+            type: "site.view",
+            count,
             ...over,
         },
     });
@@ -375,6 +427,86 @@ describe("what each limit counts (DB, U13)", () => {
         expect(await countUsage(prisma, orgId, "integrations")).toBe(2);
     });
 
+    it("leaves Reviewers out of the team, people and invitations both", async () => {
+        const { orgId } = await business("free");
+        for (const role of ["OWNER", "REVIEWER"]) {
+            const user = await prisma.user.create({
+                data: { email: `${uniq("m")}@example.test` },
+            });
+            await prisma.membership.create({
+                data: { organizationId: orgId, userId: user.id, role },
+            });
+        }
+        for (const role of ["MEMBER", "REVIEWER"]) {
+            await prisma.organizationInvitation.create({
+                data: {
+                    organizationId: orgId,
+                    email: `${uniq("i")}@example.test`,
+                    role,
+                    tokenHash: uniq("t"),
+                    status: "PENDING",
+                    expiresAt: new Date(Date.now() + 60 * MINUTE),
+                },
+            });
+        }
+        expect(await countUsage(prisma, orgId, "teamMembers")).toBe(2);
+    });
+
+    it("counts live locations customers visit, never an online one", async () => {
+        const { orgId, storeId } = await business("free");
+        // `business` made an online one with no settings: not counted.
+        expect(await countUsage(prisma, orgId, "shopLocations")).toBe(0);
+        await shop(orgId);
+        await shop(orgId, { deletedAt: new Date() });
+        await prisma.storeSettings.create({
+            data: { storeId, kind: "ONLINE" },
+        });
+        expect(await countUsage(prisma, orgId, "shopLocations")).toBe(1);
+    });
+
+    it("counts websites that aren't deleted", async () => {
+        const { orgId } = await business("free");
+        await prisma.site.create({
+            data: { organizationId: orgId, name: "Site", slug: uniq("s") },
+        });
+        await prisma.site.create({
+            data: {
+                organizationId: orgId,
+                name: "Gone",
+                slug: uniq("s"),
+                deletedAt: new Date(),
+            },
+        });
+        expect(await countUsage(prisma, orgId, "sites")).toBe(1);
+    });
+
+    it("sums checked uploads in GB, rounded up to the hundredth", async () => {
+        const { orgId } = await business("free");
+        await media(orgId, 1_000_000_000, "READY");
+        await media(orgId, 200_000_001, "READY");
+        // Not stored: still uploading, or not what its type said.
+        await media(orgId, 900_000_000, "PENDING");
+        await media(orgId, 900_000_000, "FAILED");
+        expect(await countUsage(prisma, orgId, "storageGb")).toBe(1.21);
+    });
+
+    it("counts this month's site views from the rollup's org-wide total", async () => {
+        const { orgId } = await business("free", { zone: "Asia/Kolkata" });
+        const first = monthFirstDay(new Date(), "Asia/Kolkata");
+        const before = new Date(first.getTime() - 24 * 60 * MINUTE);
+        await views(orgId, first, 5);
+        await views(orgId, before, 50);
+        // A per-site row and a path row repeat the total: never added twice.
+        await views(orgId, first, 5, { siteId: "site_1" });
+        await views(orgId, first, 3, {
+            dimension: "path",
+            dimensionValue: "/",
+        });
+        // Another event type isn't a visit.
+        await views(orgId, first, 9, { type: "form.submit" });
+        expect(await countUsage(prisma, orgId, "visitsPerMonth")).toBe(5);
+    });
+
     it("counts many businesses at once as it counts one", async () => {
         const india = await business("free", { zone: "Asia/Kolkata" });
         const newYork = await business("free", { zone: "America/New_York" });
@@ -394,6 +526,19 @@ describe("what each limit counts (DB, U13)", () => {
             await booking(b.orgId, {
                 createdAt: new Date(start.getTime() + MINUTE),
             });
+            await shop(b.orgId);
+            await prisma.site.create({
+                data: { organizationId: b.orgId, name: "S", slug: uniq("s") },
+            });
+            await media(b.orgId, 123_456_789, "READY");
+            await views(
+                b.orgId,
+                monthFirstDay(
+                    new Date(),
+                    b === india ? "Asia/Kolkata" : "America/New_York",
+                ),
+                4,
+            );
         }
         const ids = [india.orgId, newYork.orgId, quiet.orgId];
         const keys: MeteredLimitKey[] = [
@@ -403,6 +548,10 @@ describe("what each limit counts (DB, U13)", () => {
             "blogPosts",
             "teamMembers",
             "integrations",
+            "shopLocations",
+            "sites",
+            "storageGb",
+            "visitsPerMonth",
         ];
         for (const key of keys) {
             const across = await countUsageAcross(prisma, key, ids);
@@ -426,6 +575,10 @@ describe("what each limit counts (DB, U13)", () => {
                 "members",
                 "orders",
                 "products",
+                "locations",
+                "sites",
+                "storage",
+                "visits",
             ].sort(),
         );
         const row = businesses.find((b) => b.id === india.orgId);
@@ -569,6 +722,29 @@ describe("enforcement behind PLAN_ENFORCEMENT (DB, U13)", () => {
             where: { organizationId: orgId, type: PLAN_LIMIT_NOTICE_TYPE },
         });
         expect(jobs).toBe(1);
+    });
+
+    it("never refuses a row the catalogue marks soft, though the caller doesn't say so", async () => {
+        const { orgId } = await business("free");
+        // Plan A's storage is 1 GB, soft; 1.5 GB is already in.
+        await media(orgId, 1_500_000_000, "READY");
+        await expect(
+            prisma.$transaction((tx) =>
+                meter.roomInTx(tx, orgId, "storage", { adding: 0.1 }),
+            ),
+        ).resolves.toMatchObject({ key: "storageGb", limit: 1, used: 1.5 });
+        // Visits, soft and monthly: past the cap, counted and told.
+        await views(orgId, monthFirstDay(new Date(), "Asia/Kolkata"), 10);
+        await expect(
+            prisma.$transaction((tx) =>
+                meter.roomInTx(tx, orgId, "visits", { adding: 5 }),
+            ),
+        ).resolves.toMatchObject({ key: "visitsPerMonth", used: 10 });
+        expect(
+            await prisma.job.count({
+                where: { organizationId: orgId, type: PLAN_LIMIT_NOTICE_TYPE },
+            }),
+        ).toBe(1);
     });
 
     it("lets the write through when the plan can't be read (fail safe)", async () => {

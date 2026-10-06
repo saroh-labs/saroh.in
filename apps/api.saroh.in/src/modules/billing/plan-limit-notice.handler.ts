@@ -27,25 +27,36 @@ export function limitLevel(used: number, limit: number): LimitLevel | null {
     return null;
 }
 
-/** The notice's words: the design's 80% / 100% (`limitNotice`), or past it. */
+/** What past a cap says, by key: what kept working. */
+function overBody(key: MeteredLimitKey, soft: boolean): string {
+    if (key === "ordersPerMonth")
+        return "Your site kept taking orders, so no customer was turned away.";
+    // A soft cap's own words say nothing was stopped (`LIMIT_WORDS.paused`).
+    if (soft) return METER_WORDS[key].paused;
+    return "What you already have stays as it is.";
+}
+
+/**
+ * The notice's words: the design's 80% / 100% (`limitNotice`), or past it.
+ * A soft cap (`ModuleAccess.soft`: storage, visits) never stops anything,
+ * so its 80% notice doesn't say "you'll be stopped".
+ */
 export function limitNoticeWords(
-    row: Pick<ModuleAccess, "plan" | "upgradeTo">,
+    row: Pick<ModuleAccess, "plan" | "upgradeTo"> & { soft?: boolean },
     key: MeteredLimitKey,
     limit: number,
     used: number,
     level: LimitLevel,
 ): { title: string; body: string } {
     const words = METER_WORDS[key];
+    const soft = row.soft === true;
     if (level === "over") {
         const more = row.upgradeTo
             ? `${row.upgradeTo} raises the limit.`
             : "An add-on gives you more.";
         return {
             title: `You're past your ${limit.toLocaleString("en-IN")} ${words.what} on ${row.plan}`,
-            body:
-                key === "ordersPerMonth"
-                    ? `Your site kept taking orders, so no customer was turned away. ${more}`
-                    : `What you already have stays as it is. ${more}`,
+            body: `${overBody(key, soft)} ${more}`,
         };
     }
     const n = limitNotice(
@@ -54,7 +65,21 @@ export function limitNoticeWords(
         words.what,
         words.paused,
     );
-    return n.on ? { title: n.title, body: n.body } : { title: "", body: "" };
+    if (!n.on) return { title: "", body: "" };
+    if (soft && !n.full) {
+        return { title: n.title, body: softWarnBody(limit, row.upgradeTo) };
+    }
+    return { title: n.title, body: n.body };
+}
+
+/** A soft cap's 80% body: nothing will stop; where more comes from. */
+export function softWarnBody(limit: number, upgradeTo: string): string {
+    return (
+        `Nothing stops at ${limit.toLocaleString("en-IN")}.` +
+        (upgradeTo
+            ? ` ${upgradeTo} gives you more.`
+            : " An add-on gives you more.")
+    );
 }
 
 function parsePayload(payload: unknown): PlanLimitNoticePayload | null {

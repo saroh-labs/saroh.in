@@ -233,7 +233,10 @@ export function fakeLegacyMappedCatalog(edit?: (c: Catalog) => void): Catalog {
  * them in a few writes:
  *
  * - `products`: 3 / 5 / no cap; `blog`: 2 / 4 / no cap;
- *   `members`: 2 / 4 / no cap; `integrations`: 1 / 2 / no cap.
+ *   `members`: 2 / 4 / no cap; `integrations`: 1 / 2 / no cap;
+ *   `locations` and `sites`: 1 / 2 / no cap.
+ * - Soft (count and tell, never refuse): `storage` 1 / 2 GB / no cap, and
+ *   `visits` 11 / 111 a month / no cap.
  * - `orders` and `bookings`: 2 a month on `free`, no cap above it.
  * - `roles` and `themes`: hidden on `free` and `grow`, on for `pro`;
  *   `review`: locked on `free`, on above it.
@@ -244,6 +247,7 @@ export function fakeMeteredCatalog(edit?: (c: Catalog) => void): Catalog {
         name: string,
         caps: [number | null, number | null, number | null],
         per: "" | "month" = "",
+        soft = false,
     ) => ({
         id,
         name,
@@ -255,7 +259,13 @@ export function fakeMeteredCatalog(edit?: (c: Catalog) => void): Catalog {
                     plan,
                     limit === null
                         ? { inc: true, text: "No cap" }
-                        : { inc: true, text: String(limit), limit, per },
+                        : {
+                              inc: true,
+                              text: String(limit),
+                              limit,
+                              per,
+                              soft,
+                          },
                 ];
             }),
         ),
@@ -292,6 +302,11 @@ export function fakeMeteredCatalog(edit?: (c: Catalog) => void): Catalog {
             capped("blog", "Posts", [2, 4, null]),
             capped("members", "People", [2, 4, null]),
             capped("integrations", "Links", [1, 2, null]),
+            capped("locations", "Counters", [1, 2, null]),
+            capped("sites", "Pages", [1, 2, null]),
+            // Soft: counted and told, never refused.
+            capped("storage", "Space", [1, 2, null], "", true),
+            capped("visits", "Callers", [11, 111, null], "month", true),
             switched("roles", "Own roles", "hidden", "pro"),
             switched("themes", "Looks", "hidden", "pro"),
             switched("review", "Second look", "locked", "grow"),

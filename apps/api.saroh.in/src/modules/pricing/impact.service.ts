@@ -11,7 +11,8 @@ import {
 
 import type { Catalog } from "@saroh/pricing-catalog";
 
-import { countUsageAcross, meteredModules } from "../billing/metering";
+import { meteredModules } from "../billing/metering";
+import { countUsageAcross } from "../billing/metering-across";
 import type { CatalogueBusiness, Impact } from "./impact";
 import { catalogueImpact } from "./impact";
 

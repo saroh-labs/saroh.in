@@ -49,6 +49,7 @@ import {
 import { prisma } from "@saroh/database";
 
 import type { OrganizationContext } from "../../common/types/organization-context";
+import { planMeter } from "../billing/metering.service";
 import { resolveCapabilities } from "../organizations/organization-policy";
 import { openingHoursText } from "./opening-hours-text";
 import { StorefrontsController } from "./storefronts.controller";
@@ -406,6 +407,51 @@ describe("StorefrontsService", () => {
             used: 2,
             limit: 5,
         });
+    });
+
+    it("allows up to the ceiling where the catalogue governs locations", async () => {
+        const enforcedRow = jest
+            .spyOn(planMeter, "enforcedRow")
+            .mockResolvedValue({ moduleId: "locations" } as never);
+        db.store.count!.mockResolvedValue(2);
+        await expect(service.allowance("org_1")).resolves.toEqual({
+            used: 2,
+            limit: 25,
+        });
+        enforcedRow.mockRestore();
+    });
+});
+
+describe("a place customers visit is one of the plan's locations (U13)", () => {
+    const service = new StorefrontsService();
+    let roomInTx: jest.SpyInstance;
+    beforeEach(() => {
+        roomInTx = jest.spyOn(planMeter, "roomInTx").mockResolvedValue(null);
+    });
+    afterEach(() => roomInTx.mockRestore());
+
+    it("meters an online storefront becoming a shop, on the save's transaction", async () => {
+        await service.update("org_1", "st_1", { kind: "SHOP" });
+        expect(roomInTx).toHaveBeenCalledWith(db.__tx, "org_1", "locations");
+    });
+
+    it("a refusal saves nothing", async () => {
+        roomInTx.mockRejectedValue(new ForbiddenException("full"));
+        await expect(
+            service.update("org_1", "st_1", { kind: "SHOP" }),
+        ).rejects.toThrow(ForbiddenException);
+        expect(db.__tx.storeSettings.upsert).not.toHaveBeenCalled();
+    });
+
+    it("meters nothing for a shop staying one, or going online", async () => {
+        db.storeSettings.findUnique!.mockResolvedValue({
+            kind: "SHOP",
+            fulfilmentTypes: [],
+            taxRate: "0",
+        });
+        await service.update("org_1", "st_1", { kind: "SHOP" });
+        await service.update("org_1", "st_1", { kind: "ONLINE" });
+        expect(roomInTx).not.toHaveBeenCalled();
     });
 });
 

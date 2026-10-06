@@ -31,6 +31,11 @@ export interface ModuleAccessView {
     state: "on" | "locked" | "hidden";
     limit: number | null;
     per: "" | "month";
+    /**
+     * A soft cap: counted and told, never refused (storage, visits). Absent
+     * from an API before it was sent: read as a hard cap.
+     */
+    soft?: boolean;
     text: string;
     override: string;
     /** Metered use against `limit`; null for a switch or a row that is off. */
@@ -90,17 +95,31 @@ export function rowNotice(
     const row = accessRow(view, moduleId);
     const words = limitWordsFor(moduleId);
     if (!row || !words || row.state !== "on" || row.usage === null) return OFF;
-    return limitNotice(
+    const upgradeTo = row.upgradeTo?.name ?? "";
+    const notice = limitNotice(
         {
             inc: true,
             limit: row.limit,
             plan: view.plan?.name ?? "",
-            upgradeTo: row.upgradeTo?.name ?? "",
+            upgradeTo,
         },
         row.usage,
         words.what,
         words.paused,
     );
+    // A soft cap stops nothing, so its 80% notice can't say "you'll be
+    // stopped" (the API's inbox notice says the same).
+    if (row.soft && notice.on && !notice.full && row.limit !== null) {
+        return {
+            ...notice,
+            body:
+                `Nothing stops at ${row.limit.toLocaleString("en-IN")}.` +
+                (upgradeTo
+                    ? ` ${upgradeTo} gives you more.`
+                    : " An add-on gives you more."),
+        };
+    }
+    return notice;
 }
 
 /**

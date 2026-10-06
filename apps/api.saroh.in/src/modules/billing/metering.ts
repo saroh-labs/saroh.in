@@ -13,21 +13,29 @@
  * | `ordersPerMonth`   | orders placed this month that stand: not cancelled, and not an online checkout nobody paid (OQ-7) |
  * | `bookingsPerMonth` | bookings made this month that stand (CONFIRMED), a course's sessions left out |
  * | `blogPosts`        | posts live on a site that isn't deleted                                |
- * | `teamMembers`      | people in the business, plus invitations still open                   |
+ * | `teamMembers`      | people in the business, plus invitations still open; Reviewers left out (they only look at the website) |
  * | `integrations`     | connected payment and messaging providers                              |
+ * | `shopLocations`    | locations not deleted whose settings say `SHOP` (customers visit); an online-only one, or one with no settings, never counts |
+ * | `sites`            | websites not deleted                                                   |
+ * | `storageGb`        | photos and videos uploaded and checked (`Media.status` READY), in GB  |
+ * | `visitsPerMonth`   | this month's site views (`site.view`), from the daily rollup          |
  *
  * A month is the business's own (its zone, `businessTimezone`): the 1st
- * starts at midnight there, not in UTC.
+ * starts at midnight there, not in UTC. Visits are the exception: the
+ * rollup (`AnalyticsDailyAggregate`) buckets by UTC day, so a month of
+ * visits is the UTC days dated in the business's month — off by the zone's
+ * offset at each end, and behind by whatever the rollup hasn't reached yet.
+ *
+ * Storage is in decimal gigabytes ({@link BYTES_PER_GB}, as a disk is sold),
+ * rounded UP to the hundredth so a business with anything stored never reads
+ * as using 0 GB. Failed or unconfirmed uploads hold nothing.
  */
 import type { Prisma } from "@saroh/database";
 import type { LimitPeriod, LimitWords } from "@saroh/pricing-catalog";
 import { LIMIT_WORDS, MODULE_MAP } from "@saroh/pricing-catalog";
-import { DateTime, IANAZone } from "luxon";
+import { DateTime } from "luxon";
 
-import {
-    businessTimezone,
-    FALLBACK_TIMEZONE,
-} from "../bookings/staff-availability";
+import { businessTimezone } from "../bookings/staff-availability";
 
 /** The limit keys metering counts, in `MODULE_MAP`'s words. */
 export const METERED_LIMIT_KEYS = [
@@ -37,6 +45,10 @@ export const METERED_LIMIT_KEYS = [
     "blogPosts",
     "teamMembers",
     "integrations",
+    "shopLocations",
+    "sites",
+    "storageGb",
+    "visitsPerMonth",
 ] as const;
 export type MeteredLimitKey = (typeof METERED_LIMIT_KEYS)[number];
 
@@ -45,6 +57,21 @@ const METERED: ReadonlySet<string> = new Set(METERED_LIMIT_KEYS);
 export function isMeteredLimitKey(key: unknown): key is MeteredLimitKey {
     return typeof key === "string" && METERED.has(key);
 }
+
+/** A gigabyte as storage is sold: 1,000,000,000 bytes (not 2^30). */
+export const BYTES_PER_GB = 1_000_000_000;
+
+/** Bytes as the GB a storage limit counts: up to the next hundredth. */
+export function bytesToGb(bytes: number): number {
+    if (!Number.isFinite(bytes) || bytes <= 0) return 0;
+    return Math.ceil(bytes / (BYTES_PER_GB / 100)) / 100;
+}
+
+/** The role metering leaves out of the team count: it reviews the website, nothing else. */
+export const UNMETERED_ROLE = "REVIEWER";
+
+/** The analytics event a site visit is (`analytics/event-contract.ts`). */
+const SITE_VIEW = "site.view";
 
 /** How each limit reads to the merchant: `@saroh/pricing-catalog`'s words. */
 export type MeterWords = LimitWords;
@@ -108,10 +135,45 @@ export type MeterDb = Pick<
     | "communicationProvider"
     | "businessProfile"
     | "service"
+    | "store"
+    | "site"
+    | "media"
+    | "analyticsDailyAggregate"
 >;
 
+/**
+ * The first UTC day bucket of the business's month: the calendar date its
+ * month starts on there, as `AnalyticsDailyAggregate.date` stores a day.
+ */
+export function monthFirstDay(now: Date, zone: string): Date {
+    const local = DateTime.fromJSDate(now, { zone }).startOf("month");
+    return new Date(Date.UTC(local.year, local.month - 1, 1));
+}
+
+/** People who count: everyone but a Reviewer. */
+export const countedRole = { role: { not: UNMETERED_ROLE } } as const;
+
+/** Media that holds space: uploaded and checked. */
+export const STORED = "READY";
+
+/** A location customers visit (`StoreSettings.kind`). */
+export const SHOP_KIND = "SHOP";
+
+/** The rollup's org-wide daily total of site views, from `firstDay`. */
+export function siteViewTotals(
+    firstDay: Date,
+): Prisma.AnalyticsDailyAggregateWhereInput {
+    return {
+        siteId: "",
+        type: SITE_VIEW,
+        dimension: "",
+        dimensionValue: "",
+        date: { gte: firstDay },
+    };
+}
+
 /** Orders that stand: not cancelled, and not an unpaid online checkout. */
-function standingOrders(since: Date): Prisma.OrderWhereInput {
+export function standingOrders(since: Date): Prisma.OrderWhereInput {
     return {
         createdAt: { gte: since },
         status: { not: "CANCELLED" },
@@ -120,7 +182,7 @@ function standingOrders(since: Date): Prisma.OrderWhereInput {
 }
 
 /** Bookings that stand, a course's sessions left out (COURSES' own). */
-function standingBookings(since: Date): Prisma.BookingWhereInput {
+export function standingBookings(since: Date): Prisma.BookingWhereInput {
     return {
         createdAt: { gte: since },
         status: "CONFIRMED",
@@ -168,12 +230,15 @@ export async function countUsage(
             });
         case "teamMembers": {
             const [members, invites] = await Promise.all([
-                db.membership.count({ where: { organizationId } }),
+                db.membership.count({
+                    where: { organizationId, ...countedRole },
+                }),
                 db.organizationInvitation.count({
                     where: {
                         organizationId,
                         status: "PENDING",
                         expiresAt: { gt: now },
+                        ...countedRole,
                     },
                 }),
             ]);
@@ -189,6 +254,36 @@ export async function countUsage(
                 }),
             ]);
             return payments + messaging;
+        }
+        case "shopLocations":
+            return db.store.count({
+                where: {
+                    organizationId,
+                    deletedAt: null,
+                    settings: { kind: SHOP_KIND },
+                },
+            });
+        case "sites":
+            return db.site.count({
+                where: { organizationId, deletedAt: null },
+            });
+        case "storageGb": {
+            const sum = await db.media.aggregate({
+                where: { organizationId, status: STORED },
+                _sum: { sizeBytes: true },
+            });
+            return bytesToGb(Number(sum._sum.sizeBytes ?? 0));
+        }
+        case "visitsPerMonth": {
+            const zone = await businessTimezone(db, organizationId);
+            const sum = await db.analyticsDailyAggregate.aggregate({
+                where: {
+                    organizationId,
+                    ...siteViewTotals(monthFirstDay(now, zone)),
+                },
+                _sum: { count: true },
+            });
+            return sum._sum.count ?? 0;
         }
     }
 }
@@ -213,223 +308,4 @@ export async function usageByModule(
         wanted.map(([, key]) => countUsage(db, organizationId, key, now)),
     );
     return Object.fromEntries(wanted.map(([id], i) => [id, counts[i]]));
-}
-
-/** What the cross-business counts read (the admin's, outside any business). */
-export type MeterAcrossDb = MeterDb &
-    Pick<Prisma.TransactionClient, "site" | "store">;
-
-interface Counted {
-    _count: { _all: number };
-}
-
-function tally<K extends string>(
-    rows: readonly (Counted & Record<K, string | null>)[],
-    by: K,
-    into = new Map<string, number>(),
-    owner: (id: string) => string | undefined = (id) => id,
-): Map<string, number> {
-    for (const r of rows) {
-        const id = r[by];
-        const org = id ? owner(id) : undefined;
-        if (!org) continue;
-        into.set(org, (into.get(org) ?? 0) + r._count._all);
-    }
-    return into;
-}
-
-/**
- * Each business's zone, as `businessTimezone` reads one: its own setting,
- * else its first active service's, else India — for every business at once.
- */
-async function zonesOf(
-    db: MeterAcrossDb,
-    organizationIds: readonly string[],
-): Promise<Map<string, string>> {
-    const ids = [...organizationIds];
-    const [profiles, services] = await Promise.all([
-        db.businessProfile.findMany({
-            where: { organizationId: { in: ids } },
-            select: { organizationId: true, timezone: true },
-        }),
-        db.service.findMany({
-            where: {
-                organizationId: { in: ids },
-                deletedAt: null,
-                status: "ACTIVE",
-            },
-            orderBy: { createdAt: "asc" },
-            distinct: ["organizationId"],
-            select: { organizationId: true, timezone: true },
-        }),
-    ]);
-    const valid = (z: string | null | undefined): z is string =>
-        !!z && IANAZone.isValidZone(z);
-    const own = new Map<string, string>();
-    for (const p of profiles) {
-        if (valid(p.timezone)) own.set(p.organizationId, p.timezone);
-    }
-    const first = new Map(
-        services
-            .filter((s) => valid(s.timezone))
-            .map((s) => [s.organizationId, s.timezone]),
-    );
-    return new Map(
-        ids.map((id) => [
-            id,
-            own.get(id) ?? first.get(id) ?? FALLBACK_TIMEZONE,
-        ]),
-    );
-}
-
-/**
- * One limit's usage for many businesses at once: business id → count (a
- * business with none is absent). The same rules as {@link countUsage}, one
- * query per zone for the monthly keys.
- *
- * CROSS-TENANT READ: only the admin's `ImpactService` calls it, behind the
- * admin guards. It returns counts, never what was counted.
- */
-export async function countUsageAcross(
-    db: MeterAcrossDb,
-    key: MeteredLimitKey,
-    organizationIds: readonly string[],
-    now: Date = new Date(),
-): Promise<Map<string, number>> {
-    const ids = [...organizationIds];
-    if (ids.length === 0) return new Map();
-    switch (key) {
-        case "products":
-            return tally(
-                await db.product.groupBy({
-                    by: ["organizationId"],
-                    where: {
-                        organizationId: { in: ids },
-                        status: { not: "ARCHIVED" },
-                    },
-                    _count: { _all: true },
-                }),
-                "organizationId",
-            );
-        case "ordersPerMonth":
-        case "bookingsPerMonth": {
-            const zones = await zonesOf(db, ids);
-            const byZone = new Map<string, string[]>();
-            for (const [org, zone] of zones) {
-                byZone.set(zone, [...(byZone.get(zone) ?? []), org]);
-            }
-            const out = new Map<string, number>();
-            for (const [zone, orgs] of byZone) {
-                const { start } = monthWindow(now, zone);
-                if (key === "bookingsPerMonth") {
-                    tally(
-                        await db.booking.groupBy({
-                            by: ["organizationId"],
-                            where: {
-                                organizationId: { in: orgs },
-                                ...standingBookings(start),
-                            },
-                            _count: { _all: true },
-                        }),
-                        "organizationId",
-                        out,
-                    );
-                    continue;
-                }
-                const stores = await db.store.findMany({
-                    where: { organizationId: { in: orgs } },
-                    select: { id: true, organizationId: true },
-                });
-                const ownerOf = new Map(
-                    stores.map((s) => [s.id, s.organizationId]),
-                );
-                tally(
-                    await db.order.groupBy({
-                        by: ["storeId"],
-                        where: {
-                            storeId: { in: [...ownerOf.keys()] },
-                            ...standingOrders(start),
-                        },
-                        _count: { _all: true },
-                    }),
-                    "storeId",
-                    out,
-                    (id) => ownerOf.get(id),
-                );
-            }
-            return out;
-        }
-        case "blogPosts": {
-            const sites = await db.site.findMany({
-                where: { organizationId: { in: ids }, deletedAt: null },
-                select: {
-                    organizationId: true,
-                    _count: {
-                        select: {
-                            posts: {
-                                where: { currentPublicationId: { not: null } },
-                            },
-                        },
-                    },
-                },
-            });
-            const out = new Map<string, number>();
-            for (const s of sites) {
-                if (s._count.posts === 0) continue;
-                out.set(
-                    s.organizationId,
-                    (out.get(s.organizationId) ?? 0) + s._count.posts,
-                );
-            }
-            return out;
-        }
-        case "teamMembers": {
-            const [members, invites] = await Promise.all([
-                db.membership.groupBy({
-                    by: ["organizationId"],
-                    where: { organizationId: { in: ids } },
-                    _count: { _all: true },
-                }),
-                db.organizationInvitation.groupBy({
-                    by: ["organizationId"],
-                    where: {
-                        organizationId: { in: ids },
-                        status: "PENDING",
-                        expiresAt: { gt: now },
-                    },
-                    _count: { _all: true },
-                }),
-            ]);
-            return tally(
-                invites,
-                "organizationId",
-                tally(members, "organizationId"),
-            );
-        }
-        case "integrations": {
-            const [payments, messaging] = await Promise.all([
-                db.merchantPaymentProvider.groupBy({
-                    by: ["organizationId"],
-                    where: {
-                        organizationId: { in: ids },
-                        status: "CONNECTED",
-                    },
-                    _count: { _all: true },
-                }),
-                db.communicationProvider.groupBy({
-                    by: ["organizationId"],
-                    where: {
-                        organizationId: { in: ids },
-                        status: "CONNECTED",
-                    },
-                    _count: { _all: true },
-                }),
-            ]);
-            return tally(
-                messaging,
-                "organizationId",
-                tally(payments, "organizationId"),
-            );
-        }
-    }
 }

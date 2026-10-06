@@ -4,7 +4,10 @@
  * brought back from the archive), orders a month taken by hand, bookings a
  * month (by hand, and the booking page told only that the business isn't
  * taking bookings), blog posts put live, team members invited, integrations
- * connected, and the switches — custom roles, themes, site review. Existing
+ * connected, websites made, locations turned into places customers visit,
+ * Reviewers left off the team count, the soft caps (storage, visits) that
+ * tell and never refuse, and the switches — custom roles, themes, site
+ * review. Existing
  * things stay editable; only adding is refused. With `PLAN_ENFORCEMENT`
  * off, none of it is.
  *
@@ -26,6 +29,10 @@ import { planRows } from "@saroh/pricing-catalog";
 import { giveBusinessDetails } from "../../../test/business-details";
 import { fakeMeteredCatalog } from "../../../test/fixtures/pricing-catalog";
 import type { OrganizationContext } from "../../common/types/organization-context";
+import {
+    ANALYTICS_AGGREGATE_TYPE,
+    AnalyticsAggregateHandler,
+} from "../analytics/analytics-aggregate.handler";
 import { AuditService } from "../audit/audit.service";
 import { reserve } from "../bookings/reservation";
 import { CommunicationsService } from "../communications/communications.service";
@@ -40,9 +47,11 @@ import { ProductAccess } from "../products/product-access";
 import { ProductsService } from "../products/products.service";
 import { setPublishNeedsApproval } from "../sites/publish-approval";
 import { SitesService } from "../sites/sites.service";
+import { StorefrontsService } from "../stores/storefronts.service";
 import { StoresService } from "../stores/stores.service";
 import { EntitlementService } from "./entitlement.service";
 import { monthWindow } from "./metering";
+import { PLAN_LIMIT_NOTICE_TYPE } from "./metering.service";
 import { BOOKINGS_PAUSED_MESSAGE } from "./plan-limit-errors";
 
 const tag = `${process.pid}-${Date.now()}`;
@@ -63,6 +72,8 @@ const members = new OrganizationMembersService(new AuditService());
 const roles = new OrganizationRolesService();
 const comms = new CommunicationsService();
 const sites = new SitesService(new EntitlementService());
+const storefronts = new StorefrontsService();
+const aggregate = new AnalyticsAggregateHandler();
 
 interface Business {
     orgId: string;
@@ -455,5 +466,202 @@ describe("switches: custom roles, themes, site review (DB, U13)", () => {
                 )
             ).details,
         ).toMatchObject({ code: "MODULE_LOCKED", moduleId: "review" });
+    });
+});
+
+describe("websites (DB, U13)", () => {
+    it("makes the plan's last website, then refuses the next with the notice", async () => {
+        const b = await business("free");
+        await giveBusinessDetails(b.orgId);
+        await sites.createFromTemplate(b.owner, { name: "Rye" });
+        const body = await refused(
+            sites.createFromTemplate(b.owner, {
+                name: "Rye two",
+                subdomain: uniq("rye"),
+            }),
+        );
+        expect(body.details).toMatchObject({
+            code: "PLAN_LIMIT_REACHED",
+            limitKey: "sites",
+            limit: 1,
+            used: 1,
+        });
+        expect(
+            await prisma.site.count({ where: { organizationId: b.orgId } }),
+        ).toBe(1);
+    });
+
+    it("lets a plan that sells two have two", async () => {
+        const b = await business("grow");
+        await giveBusinessDetails(b.orgId);
+        await sites.createFromTemplate(b.owner, { name: "Rye" });
+        await expect(
+            sites.createFromTemplate(b.owner, {
+                name: "Rye two",
+                subdomain: uniq("rye"),
+            }),
+        ).resolves.toHaveProperty("siteId");
+    });
+
+    it("with the switch off, one website per business as before", async () => {
+        const b = await business("grow", false);
+        await giveBusinessDetails(b.orgId);
+        await sites.createFromTemplate(b.owner, { name: "Rye" });
+        const body = await refused(
+            sites.createFromTemplate(b.owner, {
+                name: "Rye two",
+                subdomain: uniq("rye"),
+            }),
+            ConflictException,
+        );
+        expect(body.message).toMatch(/already has its website/);
+    });
+});
+
+describe("locations customers visit (DB, U13)", () => {
+    it("refuses a storefront becoming a shop past the cap; online ones are free", async () => {
+        const b = await business("free");
+        await storefronts.update(b.orgId, b.storeId, { kind: "SHOP" });
+        // The old floor of storefronts isn't asked: online ones don't count.
+        const more: string[] = [];
+        for (let i = 0; i < 5; i++) {
+            more.push(
+                (
+                    await stores.createForUser(b.ownerId, b.orgId, {
+                        name: `Online ${i}`,
+                    })
+                ).id,
+            );
+        }
+        const body = await refused(
+            storefronts.update(b.orgId, more[0], { kind: "SHOP" }),
+        );
+        expect(body.details).toMatchObject({
+            code: "PLAN_LIMIT_REACHED",
+            limitKey: "shopLocations",
+            limit: 1,
+            used: 1,
+        });
+        const saved = await prisma.storeSettings.findUnique({
+            where: { storeId: more[0] },
+            select: { kind: true },
+        });
+        expect(saved?.kind ?? "ONLINE").toBe("ONLINE");
+        // Saving the shop again adds nothing.
+        await expect(
+            storefronts.update(b.orgId, b.storeId, { kind: "SHOP" }),
+        ).resolves.toMatchObject({ kind: "SHOP" });
+    });
+
+    it("with the switch off, keeps the old floor of storefronts", async () => {
+        const b = await business("free", false);
+        for (let i = 0; i < 4; i++) {
+            await stores.createForUser(b.ownerId, b.orgId, { name: `S ${i}` });
+        }
+        await refused(
+            stores.createForUser(b.ownerId, b.orgId, { name: "Sixth" }),
+        );
+    });
+});
+
+describe("team members leave Reviewers out (DB, U13)", () => {
+    it("invites a Reviewer at the cap, and refuses making them a Member", async () => {
+        const b = await business("free");
+        const site = await prisma.site.create({
+            data: { organizationId: b.orgId, name: "Site", slug: uniq("s") },
+        });
+        // Plan A has 2: the owner and one open invitation.
+        await members.invite(b.owner, {
+            email: `${uniq("asha")}@example.test`,
+            role: "MEMBER",
+        } as never);
+        await expect(
+            members.invite(b.owner, {
+                email: `${uniq("rev")}@example.test`,
+                role: "REVIEWER",
+                siteIds: [site.id],
+            } as never),
+        ).resolves.toBeDefined();
+
+        const reviewer = await prisma.user.create({
+            data: { email: `${uniq("r")}@example.test` },
+        });
+        await prisma.membership.create({
+            data: {
+                organizationId: b.orgId,
+                userId: reviewer.id,
+                role: "REVIEWER",
+            },
+        });
+        const body = await refused(
+            members.updateRole(b.owner, reviewer.id, { role: "MEMBER" }),
+        );
+        expect(body.details).toMatchObject({
+            code: "PLAN_LIMIT_REACHED",
+            limitKey: "teamMembers",
+            limit: 2,
+            used: 2,
+        });
+        const still = await prisma.membership.findUniqueOrThrow({
+            where: {
+                organizationId_userId: {
+                    organizationId: b.orgId,
+                    userId: reviewer.id,
+                },
+            },
+            select: { role: true },
+        });
+        expect(still.role).toBe("REVIEWER");
+    });
+});
+
+describe("site visits, soft (DB, U13)", () => {
+    it("tells the business from the rollup, and never stops the site", async () => {
+        const b = await business("free");
+        const today = new Date();
+        // Plan A has 11 visits a month: 9 is 80%.
+        for (let i = 0; i < 9; i++) {
+            await prisma.analyticsEvent.create({
+                data: {
+                    organizationId: b.orgId,
+                    type: "site.view",
+                    properties: { path: "/" },
+                    occurredAt: today,
+                },
+            });
+        }
+        await aggregate.handle({
+            id: uniq("job"),
+            type: ANALYTICS_AGGREGATE_TYPE,
+            payload: {
+                organizationId: b.orgId,
+                date: today.toISOString(),
+            },
+        } as never);
+        expect(
+            await prisma.job.count({
+                where: {
+                    organizationId: b.orgId,
+                    type: PLAN_LIMIT_NOTICE_TYPE,
+                },
+            }),
+        ).toBe(1);
+        // Recounting the same day adds nothing, and tells nothing again.
+        await aggregate.handle({
+            id: uniq("job"),
+            type: ANALYTICS_AGGREGATE_TYPE,
+            payload: {
+                organizationId: b.orgId,
+                date: today.toISOString(),
+            },
+        } as never);
+        expect(
+            await prisma.job.count({
+                where: {
+                    organizationId: b.orgId,
+                    type: PLAN_LIMIT_NOTICE_TYPE,
+                },
+            }),
+        ).toBe(1);
     });
 });

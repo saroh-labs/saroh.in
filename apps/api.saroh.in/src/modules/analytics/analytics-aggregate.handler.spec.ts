@@ -2,13 +2,14 @@
 jest.mock("@saroh/database", () => ({
     prisma: {
         analyticsEvent: { findMany: jest.fn() },
-        analyticsDailyAggregate: { upsert: jest.fn() },
+        analyticsDailyAggregate: { upsert: jest.fn(), findUnique: jest.fn() },
     },
 }));
 
 import type { Job } from "@saroh/database";
 import { prisma } from "@saroh/database";
 
+import { planMeter } from "../billing/metering.service";
 import { JobHandlerRegistry } from "../jobs/job-handler.registry";
 import {
     ANALYTICS_AGGREGATE_TYPE,
@@ -17,6 +18,8 @@ import {
 
 const eventFindMany = prisma.analyticsEvent.findMany as jest.Mock;
 const aggregateUpsert = prisma.analyticsDailyAggregate.upsert as jest.Mock;
+const aggregateFindUnique = prisma.analyticsDailyAggregate
+    .findUnique as jest.Mock;
 
 const DAY = "2026-07-19";
 const at = (hhmm: string) => new Date(`2026-07-19T${hhmm}:00Z`);
@@ -164,6 +167,35 @@ describe("AnalyticsAggregateHandler — org-isolated daily rollups", () => {
                 uniqueCount: call[0].create.uniqueCount,
             });
         }
+    });
+
+    it("soft-meters the plan's visits with what the recount adds (U13)", async () => {
+        wireFindMany();
+        // The org-wide total stood at 1 view; the recount makes it 3.
+        aggregateFindUnique.mockResolvedValue({ count: 1 });
+        const withRoom = jest.spyOn(planMeter, "withRoom");
+        await new AnalyticsAggregateHandler().handle(jobFor("org_1"));
+        expect(withRoom).toHaveBeenCalledTimes(1);
+        expect(withRoom).toHaveBeenCalledWith(
+            "org_1",
+            "visits",
+            expect.any(Function),
+            { soft: true, adding: 2 },
+        );
+        // The row is still written (the meter's write is the upsert).
+        expect(findRow("", "", "")).toMatchObject({ count: 3 });
+        withRoom.mockRestore();
+    });
+
+    it("still writes the rollup when the meter fails", async () => {
+        wireFindMany();
+        aggregateFindUnique.mockResolvedValue(null);
+        const withRoom = jest
+            .spyOn(planMeter, "withRoom")
+            .mockRejectedValue(new Error("down"));
+        await new AnalyticsAggregateHandler().handle(jobFor("org_1"));
+        expect(findRow("", "", "")).toMatchObject({ count: 3 });
+        withRoom.mockRestore();
     });
 
     it("registers under the analytics.aggregate job type", () => {
