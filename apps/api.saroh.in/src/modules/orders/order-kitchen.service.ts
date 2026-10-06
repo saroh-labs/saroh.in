@@ -28,7 +28,12 @@ import { orderContactId } from "../site-accounts/customer-notify.handler";
 import type { NoticeReach } from "../site-accounts/notice-reach";
 import { contactReach } from "../site-accounts/notice-reach";
 import { returnableUnits } from "../stock/reserve";
-import type { EditOrderDto, MoveStageDto, OrderStage } from "./dto";
+import type {
+    EditOrderDto,
+    MoveStageDto,
+    OrderStage,
+    RecordDifferenceDto,
+} from "./dto";
 import {
     assertItemsAllow,
     FULFILMENT_RULES,
@@ -38,6 +43,11 @@ import {
     storedValueFor,
     typeOf,
 } from "./fulfilment";
+import {
+    DIFFERENCE_PAID_NOTE,
+    handPaidCents,
+    onlineKeptCents,
+} from "./hand-payments";
 import { LATE_THRESHOLD_SELECT, lateThresholdsOf } from "./late-thresholds";
 import type { OrderAttention } from "./order-attention";
 import { attentionByCustomer } from "./order-attention";
@@ -49,6 +59,8 @@ import {
     assertOrdersAtOwnLocation,
     orderLocationWhere,
 } from "./order-location";
+import { orderTakesOnline } from "./order-online";
+import { RETIRED_PAY_LINK } from "./order-pay-link";
 import {
     fromCents,
     notSold,
@@ -69,6 +81,7 @@ import {
 import type { VisitAttended } from "./order-visit-attend";
 import { markVisitAttended } from "./order-visit-attend";
 import { visitsForRead } from "./order-visits";
+import { assertNotPayingOnlineInTx } from "./payment-in-flight";
 import { LEDGER_PAYMENTS, withBookingPayments } from "./treatment-ledger";
 
 /**
@@ -326,6 +339,15 @@ export class OrderKitchenService {
         differenceCents: number;
         /** What was taken (+) or handed back (-) to settle it. */
         settleCents: number;
+        /**
+         * Still owed on the order after the edit: asked for online when
+         * `online`, else recorded with "Record payment" when they pay.
+         */
+        dueCents: number;
+        /** An online charge was asked for the amount still owed. */
+        online: boolean;
+        /** Of what is owed back, the part to give back from the till. */
+        handBackCents: number;
         charge: CreateIntentResult | null;
         refund: {
             refundId: string;
@@ -696,6 +718,9 @@ export class OrderKitchenService {
             // order now costs. Line refunds cancel out (they lowered what
             // was paid for, not the total), so only edit refunds count.
             let settleCents = 0;
+            // Of money owed back, what goes back from the till: the part
+            // that was paid by hand (`hand-payments.ts`).
+            let handBackCents = 0;
             if (touchesItems && paid) {
                 // An earlier edit's charge still open asks for a difference
                 // this edit replaces: superseded first, so only the charge
@@ -719,14 +744,36 @@ export class OrderKitchenService {
                         },
                     },
                 });
-                const kept = ledger.reduce(
-                    (s, p) =>
-                        s +
-                        p.amountCents -
-                        p.refunds.reduce((r, x) => r + x.amountCents, 0),
-                    0,
-                );
-                settleCents = totalCents - kept;
+                // Every payment the order received counts: online, and
+                // what was taken at the counter or recorded by hand. An
+                // order paid in cash has no payment intent, and asking for
+                // its whole new total would charge it twice.
+                const onlineCents = onlineKeptCents(ledger);
+                const handCents = handPaidCents({
+                    total: order.total,
+                    paymentStatus: order.paymentStatus,
+                    paidByHand: order.paidByHand,
+                    paymentIntents: ledger,
+                });
+                settleCents = totalCents - onlineCents - handCents;
+                // Owed back: online first, as far as online money goes;
+                // the rest from the till, which the order then no longer
+                // counts as paid by hand.
+                if (settleCents < 0) {
+                    handBackCents = Math.min(
+                        handCents,
+                        Math.max(0, -settleCents - onlineCents),
+                    );
+                }
+                // Written whenever it moves, and the first time an order
+                // paid by hand before it was kept is edited.
+                const handAfter = handCents - handBackCents;
+                if (handAfter !== toCents(order.paidByHand.toString())) {
+                    await tx.order.update({
+                        where: { id: order.id },
+                        data: { paidByHand: fromCents(handAfter) },
+                    });
+                }
                 // What was paid covers the order now: a supplementary
                 // invoice an earlier edit left waiting on the charge just
                 // superseded is settled by that money, as one written now
@@ -768,8 +815,16 @@ export class OrderKitchenService {
                 eventId: event.id,
                 differenceCents,
                 settleCents,
+                handBackCents,
             };
         });
+        const { handBackCents } = result;
+        // Still to take: online when the business can (`orderTakesOnline`),
+        // else it is recorded when they pay — at the counter, by UPI —
+        // with "Record payment" on the order (`recordDifference`).
+        const dueCents = Math.max(0, result.settleCents);
+        const online =
+            dueCents > 0 && (await orderTakesOnline(ctx.organizationId));
 
         let charge: CreateIntentResult | null = null;
         let refund: {
@@ -778,7 +833,10 @@ export class OrderKitchenService {
             status: string;
         } | null = null;
         let moneyError: string | null = null;
-        if (result.settleCents !== 0) {
+        // Handed back online: what of it the till isn't giving back.
+        const refundOnlineCents =
+            result.settleCents < 0 ? -result.settleCents - handBackCents : 0;
+        if (online || refundOnlineCents > 0) {
             const key = `${DIFFERENCE_KEY_PREFIX}${result.eventId}`;
             try {
                 if (!this.payments) {
@@ -795,7 +853,7 @@ export class OrderKitchenService {
                     const r = await this.payments.refundOrderDifference(
                         ctx,
                         result.id,
-                        -result.settleCents,
+                        refundOnlineCents,
                         key,
                     );
                     refund = {
@@ -818,10 +876,115 @@ export class OrderKitchenService {
             eventId: result.eventId,
             differenceCents: result.differenceCents,
             settleCents: result.settleCents,
+            dueCents,
+            online,
+            handBackCents,
             charge,
             refund,
             moneyError,
         };
+    }
+
+    /**
+     * "Record payment" (audit, 6 Oct 2026): what a paid order still owes —
+     * an edit's difference — was paid at the counter, in cash, by UPI or by
+     * card. `order:edit`, as any payment recorded by hand (B16). On a plan
+     * without online payments it is the only way a difference is settled;
+     * on one with them it is the other way beside the pay link.
+     *
+     * The amount is what the order owes, worked out here under its lock
+     * from every payment it received (`hand-payments.ts`), never a figure
+     * the screen sent. The money goes on the order (`paidByHand`) and its
+     * supplementary invoices waiting on it are settled by it, as the
+     * order's own invoice is by a counter payment (DEC-023: the order is
+     * the ledger, its paper mirrors it). An open charge for the difference
+     * stops first, so the customer isn't asked online for money already
+     * paid; one they pay at this moment is owed back, never counted twice.
+     * Its pay link stops working too (B11).
+     */
+    async recordDifference(
+        ctx: OrganizationContext,
+        orderId: string,
+        dto: RecordDifferenceDto,
+    ): Promise<{ id: string; eventId: string; amountCents: number }> {
+        authorize(ctx, "order:edit");
+        await assertOrdersAtOwnLocation(ctx, [orderId]);
+        return prisma.$transaction(async (tx) => {
+            const order = await lockOrder(tx, ctx, orderId);
+            if (order.status === "CANCELLED") {
+                throw new ConflictException({
+                    message:
+                        "This order is cancelled, so there's nothing to pay.",
+                    field: "status",
+                });
+            }
+            if (order.paymentStatus !== "PAID") {
+                throw new ConflictException({
+                    message:
+                        "Nothing has been paid on this order yet. Record it as paid instead.",
+                    field: "paymentStatus",
+                });
+            }
+            await assertNotPayingOnlineInTx(tx, order.id);
+            await supersedeOpenDifferenceIntents(
+                tx,
+                ctx.organizationId,
+                order.id,
+            );
+            const ledger = await tx.paymentIntent.findMany({
+                where: {
+                    orderId: order.id,
+                    organizationId: ctx.organizationId,
+                    status: "SUCCEEDED",
+                },
+                select: {
+                    amountCents: true,
+                    refunds: {
+                        where: { status: { not: "FAILED" }, forEdit: true },
+                        select: { amountCents: true },
+                    },
+                },
+            });
+            const handCents = handPaidCents({
+                total: order.total,
+                paymentStatus: order.paymentStatus,
+                paidByHand: order.paidByHand,
+                paymentIntents: ledger,
+            });
+            const dueCents =
+                toCents(order.total.toString()) -
+                onlineKeptCents(ledger) -
+                handCents;
+            if (dueCents <= 0) {
+                throw new ConflictException({
+                    message: "Nothing more is owed on this order.",
+                    field: "paymentStatus",
+                });
+            }
+            const at = new Date();
+            await tx.order.update({
+                where: { id: order.id },
+                data: {
+                    paidByHand: fromCents(handCents + dueCents),
+                    ...RETIRED_PAY_LINK,
+                },
+            });
+            await settleSupplementaryInvoices(tx, order.id, at, dto.kind);
+            const event = await tx.orderEvent.create({
+                data: {
+                    organizationId: ctx.organizationId,
+                    orderId: order.id,
+                    kind: "STATUS",
+                    actorUserId: ctx.userId,
+                    fromStatus: null,
+                    toStatus: null,
+                    note: DIFFERENCE_PAID_NOTE[dto.kind],
+                    amountCents: dueCents,
+                },
+                select: { id: true },
+            });
+            return { id: order.id, eventId: event.id, amountCents: dueCents };
+        });
     }
 }
 
@@ -843,6 +1006,7 @@ async function saveCourier(
     eventId: string;
     differenceCents: number;
     settleCents: number;
+    handBackCents: number;
 }> {
     const field = fields[0];
     if (!goesByCourier(order.fulfilment, order.stage)) {
@@ -896,6 +1060,7 @@ async function saveCourier(
         eventId: event.id,
         differenceCents: 0,
         settleCents: 0,
+        handBackCents: 0,
     };
 }
 

@@ -2782,3 +2782,25 @@ API's rules, and the form's `superRefine` puts the problem under its field.
 **Rule**: `docs/patterns/frontend-forms.md` → "The schema checks what the API's DTO
 checks".
 **Category**: discounts · forms · `apps/app.saroh.in/components/stores/discount-form.tsx`
+
+## Orders — a counter-paid order edited up asked for its whole new total
+
+**Symptom**: an order paid in cash at the counter, edited to cost more, asked
+for its whole new total online instead of the difference; on a plan without
+online payments the edit said "the money didn't settle" and nothing could
+record the difference by hand (audit, 6 Oct 2026).
+**Root cause**: the edit worked out what was paid from SUCCEEDED payment
+intents only. A counter payment (`takeCounterPaymentInTx`, "Record as paid")
+writes no intent and kept no amount, so `kept` was 0. The read had papered
+over the same gap with "paid by hand: nothing is due".
+**Fix**: `Order.paidByHand` keeps what was taken outside Saroh;
+`orders/hand-payments.ts` counts it beside online payments for the edit, the
+read, the list row and the pay link (0 on an older order paid by hand reads
+as its total). With no way online (`orders/order-online.ts`) nothing is
+tried, and "Record payment" (`POST orders/:id/record-payment`) settles the
+difference and its supplementary invoice. Edited down, the till gives back
+what was paid by hand. `order-kitchen.service.spec.ts` ("the difference after
+an edit…") and `order-difference.db.spec.ts` cover it.
+**Rule**: "what the order was paid" is every payment it received — online
+and recorded by hand — read through `hand-payments.ts`, never intents alone.
+**Category**: orders · money · `apps/api.saroh.in/src/modules/orders/order-kitchen.service.ts`

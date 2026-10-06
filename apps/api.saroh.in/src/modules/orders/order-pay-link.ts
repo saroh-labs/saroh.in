@@ -25,6 +25,8 @@ export const PAY_LINK_ORDER_SELECT = {
     // webhook (`online-order-payment.ts` `heldByAnotherPayment`).
     placedOnline: true,
     total: true,
+    // Taken outside Saroh (`hand-payments.ts`): a link never asks for it.
+    paidByHand: true,
     currency: true,
     store: { select: { settings: { select: { pausedAt: true } } } },
     // What was taken: the SUCCEEDED payments, with the refunds an edit made

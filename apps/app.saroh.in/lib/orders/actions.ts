@@ -3,6 +3,7 @@
 import type { CourierFields } from "./courier";
 import type {
     ChangeFulfilmentInput,
+    CounterPayment,
     EditOrderInput,
     MoveStageInput,
 } from "./kitchen-service";
@@ -13,6 +14,7 @@ import {
     editOrderBeforePreparing,
     markOrderVisitAttended,
     moveOrderStage,
+    recordOrderPayment,
     refundOrderLines,
     retryOrderRefund,
     saveOrderCourier,
@@ -58,6 +60,10 @@ export async function editBeforePreparing(
     input: EditOrderInput,
 ) {
     return editOrderBeforePreparing(orderId, input);
+}
+
+export async function recordPayment(orderId: string, kind: CounterPayment) {
+    return recordOrderPayment(orderId, kind);
 }
 
 export async function refundLines(

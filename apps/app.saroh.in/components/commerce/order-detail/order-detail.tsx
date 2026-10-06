@@ -572,6 +572,9 @@ export function OrderDetail({
                                     can.refund ? kitchen.retryRefund : undefined
                                 }
                                 busy={busy}
+                                onRecordPayment={
+                                    can.edit ? kitchen.recordPayment : undefined
+                                }
                                 payLink={
                                     linkable ? (
                                         <PayLinkBlock

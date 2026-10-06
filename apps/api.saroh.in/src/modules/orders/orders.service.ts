@@ -38,6 +38,7 @@ import {
     storedValueFor,
     typeOf,
 } from "./fulfilment";
+import { recordPaidByHandInTx } from "./hand-payments";
 import {
     assertOneParty,
     assertStorefrontOffers,
@@ -602,6 +603,7 @@ export class OrdersService {
             const paymentChanging =
                 nextPayment != null && nextPayment !== order.paymentStatus;
             if (paymentChanging && nextPayment === "PAID") {
+                await recordPaidByHandInTx(tx, orderId);
                 await ensureOrderInvoice(tx, orderId, {
                     method: "RECORDED",
                 });

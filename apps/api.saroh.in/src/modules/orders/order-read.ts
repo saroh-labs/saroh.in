@@ -7,6 +7,7 @@ import {
 import type { InvoiceTitle } from "../invoices/invoice-title";
 import type { FulfilmentView, LateThresholds, LateView } from "./fulfilment";
 import { fulfilmentView, lateOf } from "./fulfilment";
+import { handPaidCents } from "./hand-payments";
 import type { OrderAttention } from "./order-attention";
 import type { ChangeOptions } from "./order-change-types";
 import type { RawOrderInvoice } from "./order-invoice-title";
@@ -117,7 +118,10 @@ export interface OrderMoneyDto {
     shipping: string;
     discount: string;
     total: string;
-    /** Taken from the customer, across every successful payment. */
+    /**
+     * Taken from the customer, across every successful payment and every
+     * payment recorded by hand (`hand-payments.ts`).
+     */
     paid: string;
     /** Handed back (pending or settled). */
     refunded: string;
@@ -126,7 +130,7 @@ export interface OrderMoneyDto {
     /**
      * Paid, with no payment taken through a provider: the money moved
      * outside Saroh (cash at the counter, a transfer) and was recorded by
-     * hand, so `paid` is the order's total rather than the provider sum.
+     * hand, so `paid` is what was recorded rather than a provider sum.
      */
     recordedByHand: boolean;
     discountCode: { code: string; rule: string } | null;
@@ -275,6 +279,8 @@ export interface RawOrderRead {
     shipping: DecimalLike;
     discount: DecimalLike;
     total: DecimalLike;
+    /** Taken outside Saroh and recorded on it (`hand-payments.ts`). */
+    paidByHand?: DecimalLike | null;
     notes: string | null;
     trackingUrl: string | null;
     courierName: string | null;
@@ -624,14 +630,11 @@ export function serializeOrderRead(
                   shipping: toMoneyString(order.shipping),
                   discount: toMoneyString(order.discount),
                   total: toMoneyString(order.total),
-                  paid:
-                      byHand || order.balanceByHand
-                          ? toMoneyString(order.total)
-                          : money(capturedCents),
+                  paid: order.balanceByHand
+                      ? toMoneyString(order.total)
+                      : money(capturedCents + handPaidCents(order)),
                   refunded: money(refundedCents),
-                  due: byHand
-                      ? "0.00"
-                      : money(amountDueCents(order, capturedCents)),
+                  due: money(amountDueCents(order, capturedCents)),
                   recordedByHand: byHand,
                   refundsBeingConfirmed: order.paymentIntents.flatMap((p) =>
                       p.refunds.flatMap((r) =>
@@ -664,16 +667,18 @@ export function serializeOrderRead(
 }
 
 /**
- * What is still to collect on an order: its total less what was taken, where
- * money handed back because the order was edited DOWN counts as never taken
- * (the total already dropped by it). A line refund does not make money due —
- * the customer is not asked to pay again for what was refunded.
+ * What is still to collect on an order: its total less what was taken —
+ * online or recorded by hand (`hand-payments.ts`) — where money handed back
+ * because the order was edited DOWN counts as never taken (the total
+ * already dropped by it). A line refund does not make money due — the
+ * customer is not asked to pay again for what was refunded.
  */
 export function amountDueCents(
     order: {
         total: DecimalLike;
         paymentStatus: string;
         status: string;
+        paidByHand?: DecimalLike | null;
         paymentIntents: {
             amountCents: number;
             refunds: { amountCents: number; forEdit?: boolean }[];
@@ -701,5 +706,8 @@ export function amountDueCents(
                 .reduce((t, r) => t + r.amountCents, 0),
         0,
     );
-    return Math.max(0, cents(order.total) - (captured - editRefunds));
+    return Math.max(
+        0,
+        cents(order.total) - (captured - editRefunds) - handPaidCents(order),
+    );
 }

@@ -171,6 +171,7 @@ export async function listOrderRows(
                   fulfilment: true,
                   currency: true,
                   total: true,
+                  paidByHand: true,
                   createdAt: true,
                   courierName: true,
                   trackingNumber: true,

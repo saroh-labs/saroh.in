@@ -15,6 +15,7 @@ import { creditRestOfOrder } from "../invoices/order-invoicing";
 import { authorize } from "../organizations/organization-policy";
 import { PaymentsService } from "../payments/payments.service";
 import { enqueueRefundSendInTx } from "../payments/send-refund.handler";
+import { handPaidCents } from "./hand-payments";
 import {
     cancelRefundKey,
     cancelRefusal,
@@ -108,8 +109,14 @@ export class OrderCancelService {
                     data: { paymentStatus: "REFUNDED" },
                 });
                 await creditRestOfOrder(tx, order.id, "Cancelled", ctx.userId);
+                // What was taken at the counter goes back from the till:
+                // the amount recorded, which an unpaid edit's difference
+                // never joined (`hand-payments.ts`).
                 byHand = {
-                    amountCents: Math.round(Number(order.total) * 100),
+                    amountCents: handPaidCents({
+                        ...order,
+                        paymentIntents: [],
+                    }),
                     currency: order.currency,
                 };
             }
@@ -236,6 +243,7 @@ async function lockForCancel(
             stage: true,
             fulfilment: true,
             total: true,
+            paidByHand: true,
             currency: true,
             customerId: true,
         },

@@ -1541,6 +1541,13 @@ model Order {
   // Status
   status        String @default("PENDING") // PENDING, PROCESSING, SHIPPED, DELIVERED, CANCELLED
   paymentStatus String @default("UNPAID") // UNPAID, PAID, FAILED, REFUNDED
+  // Money taken outside Saroh and recorded on the order: cash, UPI or a
+  // card machine at the counter, a payment marked by hand, a difference
+  // after an edit recorded as paid — less what an edit handed back from the
+  // till. With the order's SUCCEEDED payments, what it has been paid
+  // (`orders/hand-payments.ts`). 0 on an order paid by hand before it was
+  // kept: such an order counts its total, as it did.
+  paidByHand    Decimal @default(0) @db.Decimal(12, 2)
 
   // Relations
   items        OrderItem[]
