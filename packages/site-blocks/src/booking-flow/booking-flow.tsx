@@ -49,16 +49,17 @@ import type {
 } from "./model";
 import {
     asksWhere,
+    bookingPaymentOf,
     creditChoice,
     creditUsedText,
     dateIn,
     dateText,
-    depositUnpayable,
     formatMoney,
     payChoices,
     restAfterDeposit,
     rulesText,
     timeIn,
+    unpayableText,
     visitsOf,
     whereText,
 } from "./model";
@@ -408,16 +409,24 @@ export default function BookingFlow({
     );
     // The ways this service may be paid (E8): the one chosen, else the
     // first — and a service that takes a deposit is never at the desk.
+    // Only the ways the business allows (DEC-088).
+    const way = bookingPaymentOf(page.rules);
     const choices = service
         ? [
               ...(credit ? [creditChoice(credit, service.currency)] : []),
-              ...payChoices(service, page.payOnline, page.businessName),
+              ...payChoices(service, page.payOnline, page.businessName, way),
           ]
         : [];
+    // A priced service nothing the business allows can pay for (a deposit,
+    // or online only, with no way to pay online): it can't be booked here,
+    // and the summary shows no payment line (#822). A credit still books it.
+    const unpayable = credit
+        ? null
+        : unpayableText(service, page.payOnline, page.businessName, way);
+    const deskOffered = choices.some((c) => c.pay === "DESK");
     const chosenPay =
         choices.find((c) => c.pay === payChoice) ?? choices.at(0) ?? null;
     const pay: BookPay = chosenPay?.pay ?? "DESK";
-    const takesDeposit = (service?.depositCents ?? 0) > 0;
     /** What leaves their account at booking: the deposit or the price. */
     const payingNow = chosenPay?.amount ?? price ?? "";
     /** What is left for the visit once the deposit is paid. */
@@ -439,13 +448,8 @@ export default function BookingFlow({
 
     const block = !service
         ? "Pick what you'd like to book."
-        : depositUnpayable(service, page.payOnline)
-          ? `${page.businessName} can't take the deposit online right now. Get in touch with them to book.`
-          : !chosenStart
-            ? "Pick a time."
-            : !whoOk
-              ? "Add your name."
-              : "";
+        : (unpayable ??
+          (!chosenStart ? "Pick a time." : !whoOk ? "Add your name." : ""));
 
     const whenText = chosenStart
         ? `${dateText(dateIn(chosenStart.startAt, zone), true)} at ${timeIn(chosenStart.startAt, zone)}${
@@ -453,23 +457,28 @@ export default function BookingFlow({
           }`
         : "";
 
-    const dueLabel = waiting
-        ? "Waitlist"
-        : pay === "CREDIT"
-          ? "Uses 1 credit"
-          : pay === "DEPOSIT"
-            ? "Deposit now"
-            : pay === "NOW"
-              ? "To pay now"
-              : price
-                ? "Pay at the desk"
-                : "To pay";
-    const due = waiting
-        ? (formatMoney(0, service?.currency ?? "INR") ?? "₹0")
-        : (chosenPay?.amount ??
-          price ??
-          formatMoney(0, service?.currency ?? "INR") ??
-          "₹0");
+    // Nothing it can take: no payment line at all (#822).
+    const dueLabel = unpayable
+        ? ""
+        : waiting
+          ? "Waitlist"
+          : pay === "CREDIT"
+            ? "Uses 1 credit"
+            : pay === "DEPOSIT"
+              ? "Deposit now"
+              : pay === "NOW"
+                ? "To pay now"
+                : price
+                  ? "Pay at the desk"
+                  : "To pay";
+    const due = unpayable
+        ? ""
+        : waiting
+          ? (formatMoney(0, service?.currency ?? "INR") ?? "₹0")
+          : (chosenPay?.amount ??
+            price ??
+            formatMoney(0, service?.currency ?? "INR") ??
+            "₹0");
     // Not signed in yet, the last step is signing in (A9, the Customer Site
     // design's "Continue to sign in"); the booking follows the code.
     const confirmLabel = !customer
@@ -484,7 +493,7 @@ export default function BookingFlow({
                 ? `Pay ${payingNow} deposit and book`
                 : pay === "NOW"
                   ? `Pay ${price ?? ""} and book`
-                  : price
+                  : price && !unpayable
                     ? "Book — pay at the desk"
                     : "Book";
     const barLabel = !customer
@@ -1066,9 +1075,11 @@ export default function BookingFlow({
                                 email: customer?.email ?? "",
                             }}
                             busy={leaving}
-                            // A deposit is never paid at the desk (E8).
+                            // Only when the desk is on offer: never for a
+                            // deposit (E8), nor when the business takes
+                            // payment online only (DEC-088).
                             onDesk={
-                                takesDeposit
+                                !deskOffered
                                     ? undefined
                                     : () => void leaveHold("desk")
                             }

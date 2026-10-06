@@ -4,6 +4,10 @@ import { confirmClasses, onDarkMuted } from "./styles";
 
 /** What both confirm surfaces — the aside and the phone bar — show. */
 export interface ConfirmSummary {
+    /**
+     * What the amount is ("Deposit now", "Pay at the desk"), or "" for no
+     * payment line at all: a service that can't be paid for here (#822).
+     */
     dueLabel: string;
     due: string;
     /** Why it cannot go yet, or "" when it can. */
@@ -61,14 +65,16 @@ export function SummaryAside({
                     ),
                 )}
             </dl>
-            <div className="mt-3 flex items-baseline">
-                <span className={cn("flex-1 text-sm", onDarkMuted)}>
-                    {dueLabel}
-                </span>
-                <span className="font-site-heading text-[30px] font-semibold tabular-nums tracking-[-0.02em]">
-                    {due}
-                </span>
-            </div>
+            {dueLabel ? (
+                <div className="mt-3 flex items-baseline">
+                    <span className={cn("flex-1 text-sm", onDarkMuted)}>
+                        {dueLabel}
+                    </span>
+                    <span className="font-site-heading text-[30px] font-semibold tabular-nums tracking-[-0.02em]">
+                        {due}
+                    </span>
+                </div>
+            ) : null}
             {(block && hasService) || submitError ? (
                 <p
                     role="status"
@@ -165,12 +171,16 @@ export function PhoneBar({
             ) : null}
             <div className="flex items-center gap-3">
                 <div className="min-w-0 flex-1">
-                    <p className={cn("truncate text-xs", onDarkMuted)}>
-                        {dueLabel}
-                    </p>
-                    <p className="font-site-heading text-2xl font-semibold tabular-nums leading-[1.1] tracking-[-0.02em]">
-                        {due}
-                    </p>
+                    {dueLabel ? (
+                        <>
+                            <p className={cn("truncate text-xs", onDarkMuted)}>
+                                {dueLabel}
+                            </p>
+                            <p className="font-site-heading text-2xl font-semibold tabular-nums leading-[1.1] tracking-[-0.02em]">
+                                {due}
+                            </p>
+                        </>
+                    ) : null}
                 </div>
                 <button
                     type="button"
