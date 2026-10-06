@@ -100,11 +100,19 @@ export const FONT_PAIRS = [
         heading: face("Source Serif 4", SERIF_FALLBACK),
         body: face("Inter", SYSTEM_FONT_STACK),
     },
+    /*
+     * Geist for headings AND body (the Developer design, U9). The design sets
+     * only its small machine facts (a handle, years, a stack) in JetBrains
+     * Mono, and a site has no role for such an accent face yet — a pair is a
+     * heading face and a body face — so the pair loads Geist alone. Mono as
+     * the BODY, as this pair first had it, set every paragraph in a code
+     * face. The key keeps the design's pairing name: keys are never renamed.
+     */
     {
         key: "geist-jetbrains",
-        name: "Geist and JetBrains Mono",
+        name: "Geist",
         heading: face("Geist", SYSTEM_FONT_STACK),
-        body: face("JetBrains Mono", MONO_FALLBACK),
+        body: face("Geist", SYSTEM_FONT_STACK),
     },
     {
         key: "archivo",

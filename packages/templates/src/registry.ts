@@ -2,6 +2,7 @@ import type { TemplateManifest } from "./manifest";
 import { bakeryTemplate } from "./templates/bakery";
 import { blogsTemplate } from "./templates/blogs";
 import { ceramicsTemplate } from "./templates/ceramics";
+import { developerTemplate } from "./templates/developer";
 import { gymTemplate } from "./templates/gym";
 import { personalTemplate } from "./templates/personal";
 import { portfolioTemplate } from "./templates/portfolio";
@@ -37,6 +38,7 @@ const REGISTRY: Record<string, TemplateManifest> = Object.fromEntries(
         gymTemplate,
         bakeryTemplate,
         studioTemplate,
+        developerTemplate,
     ].map((t) => [key(t.id, t.version), t]),
 );
 

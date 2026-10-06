@@ -35,6 +35,13 @@ describe("FONT_PAIRS", () => {
         }
     });
 
+    it("sets the Developer pair's body in Geist, not in a code face (U9)", () => {
+        const pair = findFontPair("geist-jetbrains");
+        expect(pair?.heading.family).toBe("Geist");
+        expect(pair?.body.family).toBe("Geist");
+        expect(pair?.name).toBe("Geist");
+    });
+
     it("keeps keys to a shape a URL and an id can carry, and names plain", () => {
         for (const pair of FONT_PAIRS) {
             expect(pair.key).toMatch(/^[a-z][a-z0-9-]*$/);
