@@ -17,7 +17,10 @@ export default function TestimonialsSection({
     return (
         <section className="mx-auto w-full max-w-screen-xl px-5 py-[var(--site-section-padding)] sm:px-[var(--site-page-margin)]">
             {content.heading ? (
-                <h2 className="text-site-fg text-[calc(1.875rem*var(--site-heading-scale))] font-bold tracking-tight">
+                <h2
+                    data-site-title=""
+                    className="font-site-heading text-site-fg text-[calc(1.875rem*var(--site-heading-scale))] font-bold tracking-tight"
+                >
                     {content.heading}
                 </h2>
             ) : null}

@@ -54,7 +54,7 @@ export default function PlainHero({
                 <div className={hasImage ? "" : "flex flex-col items-center"}>
                     {/* Headings scale together, so one slider moves the whole
                         page's voice rather than each size separately. */}
-                    <h1 className="text-[calc(2.25rem*var(--site-heading-scale))] font-bold leading-tight tracking-tight sm:text-[calc(3rem*var(--site-heading-scale))] md:text-[calc(3.75rem*var(--site-heading-scale))]">
+                    <h1 className="font-site-heading text-[calc(min(var(--site-display-size,2.25rem),max(2.25rem,9vw))*var(--site-heading-scale))] font-bold leading-tight tracking-tight sm:text-[calc(min(var(--site-display-size,3rem),max(2.25rem,9vw))*var(--site-heading-scale))] md:text-[calc(var(--site-display-size,3.75rem)*var(--site-heading-scale))]">
                         {content.heading}
                     </h1>
                     {content.subheading ? (

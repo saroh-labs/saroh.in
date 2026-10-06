@@ -107,7 +107,7 @@ export default function FullBleedHero({
                             {openStateText(status)}
                         </p>
                     ) : null}
-                    <h1 className="font-site-heading text-balance text-[clamp(calc(40px*var(--site-heading-scale)),8vw,calc(76px*var(--site-heading-scale)))] font-semibold leading-[1.02] tracking-[-0.035em]">
+                    <h1 className="font-site-heading text-balance text-[clamp(calc(40px*var(--site-heading-scale)),8vw,calc(var(--site-display-size,76px)*var(--site-heading-scale)))] font-semibold leading-[1.02] tracking-[-0.035em]">
                         {content.heading}
                     </h1>
                     {content.subheading ? (

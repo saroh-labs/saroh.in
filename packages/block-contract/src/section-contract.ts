@@ -378,6 +378,14 @@ const galleryV1 = z.object({
  * publication validates as before, and v1 stays untouched (see above).
  */
 export const GALLERY_CAPTION_MAX = 200;
+/**
+ * Where a photo's caption sits (DEC-090): `below` the photo, as captions
+ * always have, or `over` it on a bounded band — a fixed height, its lines
+ * clipped — as the studio and ceramics designs draw them. ABSENT is below.
+ */
+export const CAPTION_PLACEMENTS = ["below", "over"] as const;
+const captionPlacement = z.enum(CAPTION_PLACEMENTS).optional();
+
 const galleryImageSchema = imageSchema.extend({
     caption: z.string().trim().max(GALLERY_CAPTION_MAX).optional(),
 });
@@ -387,6 +395,7 @@ const galleryV2 = z
         variant,
         padding: paddingOverride,
         images: z.array(galleryImageSchema),
+        captionPlacement,
         /**
          * What photographs belong here, when there are none yet (KTD-5). A
          * template ships a gallery as this brief and no images; see
@@ -740,6 +749,11 @@ const projectsV1 = z.object({
     padding: paddingOverride,
     title: z.string().trim().max(160).optional(),
     items: z.array(projectItemSchema).min(1).max(PROJECTS_MAX),
+    /**
+     * `over`: in the cards look, a project's title and caption sit on a
+     * bounded band over its photo (DEC-090). Absent is below, as before.
+     */
+    captionPlacement,
 });
 
 /** How many products a Product grid shows, at most, and when it isn't set. */
@@ -767,6 +781,8 @@ export const PRODUCT_GRID_DEFAULT_COUNT = 4;
  * The `lead` look (industry templates U2) gives the first product twice the
  * room — two columns and two rows from the tablet width up, one column on a
  * phone — with tall photos and the price set large. It ignores `layout`.
+ * The `plates` look (DEC-090) puts each product in a fixed-height cell, the
+ * first twice the room, with its words on a bounded band over the photo.
  *
  * A just-added block, or one whose collection or products are still to be
  * chosen, saves: a draft is saved as it is typed. It renders nothing live

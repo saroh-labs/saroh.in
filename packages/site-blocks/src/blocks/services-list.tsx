@@ -175,7 +175,10 @@ export default function ServicesListSection({
             }
         >
             {content.heading ? (
-                <h2 className="text-site-fg text-[calc(1.875rem*var(--site-heading-scale))] font-bold tracking-tight">
+                <h2
+                    data-site-title=""
+                    className="font-site-heading text-site-fg text-[calc(1.875rem*var(--site-heading-scale))] font-bold tracking-tight"
+                >
                     {content.heading}
                 </h2>
             ) : null}
@@ -232,7 +235,7 @@ export default function ServicesListSection({
                                     className="border-site-border flex flex-wrap items-baseline justify-between gap-x-6 gap-y-1 border-b py-5"
                                 >
                                     <div className="min-w-0 flex-1">
-                                        <h3 className="text-site-fg text-[calc(1.125rem*var(--site-heading-scale))] font-semibold">
+                                        <h3 className="font-site-heading text-site-fg text-[calc(1.125rem*var(--site-heading-scale))] font-semibold">
                                             {service.name}
                                         </h3>
                                         {showDescriptions &&

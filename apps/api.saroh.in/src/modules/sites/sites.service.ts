@@ -114,6 +114,11 @@ import {
     siteStyleOptions,
     siteStyleVariables,
 } from "./site-style";
+import {
+    assertSiteLookOffered,
+    recordedTemplate,
+    templateColourways,
+} from "./site-style-offer";
 import type { SiteTemplateRecord } from "./site-template-record";
 import { publicationTemplate, siteTemplate } from "./site-template-record";
 
@@ -947,7 +952,13 @@ export class SitesService {
                 templateStyleId,
             }),
             style: parseSiteStyle(style),
-            styleOptions: siteStyleOptions(),
+            // The template's colourways join the choices (DEC-090).
+            styleOptions: siteStyleOptions(
+                templateColourways(
+                    recordedTemplate({ templateId, templateVersion }),
+                ),
+                templateStyleId,
+            ),
             footer: parseSiteFooter(footer),
             footerPreview: sanitizedFooter(parseSiteFooter(footer)),
             navigation: parseSiteNavigation(navigation),
@@ -1098,6 +1109,9 @@ export class SitesService {
         // Validate BEFORE writing: an unknown colour key or a non-numeric
         // slider must be a 400, not a site that renders wrong later.
         const style = parseSiteStyle(input);
+        // A palette or type scale only as one of the template's colourways
+        // (DEC-090): never colours a merchant typed.
+        await assertSiteLookOffered(ctx.organizationId, siteId, style);
         // Changing the theme and fonts is a plan row (U13); a site keeps the
         // look it has where the plan leaves it off.
         await planMeter.assertIncluded(ctx.organizationId, "themes");

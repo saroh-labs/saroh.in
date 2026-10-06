@@ -86,7 +86,7 @@ export default function PersonSection({
                         </ul>
                     ) : null}
                     {bio ? (
-                        <p className="text-site-body mt-4 max-w-[60ch] whitespace-pre-line text-[15.5px] leading-relaxed [overflow-wrap:anywhere]">
+                        <p className="text-site-body mt-4 max-w-[var(--site-measure,60ch)] whitespace-pre-line text-[length:var(--site-body-size,15.5px)] leading-relaxed [overflow-wrap:anywhere]">
                             {bio}
                         </p>
                     ) : null}

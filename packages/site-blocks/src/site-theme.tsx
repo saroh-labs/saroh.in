@@ -116,6 +116,7 @@ export function SiteTheme({
 }) {
     const custom = cssVariables(variables, faces);
     const at = safeSelector(selector);
+    const labels = labelRule(at, variables?.[LABEL_STYLE_VARIABLE]);
 
     return (
         <style>{`
@@ -198,9 +199,42 @@ ${
                 }
             }`
         : `            ${at} {\n${custom}\n            }`
-}
+}${labels}
         `}</style>
     );
+}
+
+/**
+ * The section-title style a template set (DEC-090), by WORD
+ * (`--site-label-style`, from `typeScaleVariables`). Like a font pair's key,
+ * the value is never written into CSS: it picks one of the fixed rules below.
+ */
+const LABEL_STYLE_VARIABLE = "--site-label-style";
+
+/**
+ * Section titles as an eyebrow: small, uppercase, wide-tracked, in the quiet
+ * text colour or the accent — both held to 4.5:1 on the page by the
+ * palette's rules. Blocks mark a section title `data-site-title`; the
+ * selector's two parts outrank the title's own size and colour utilities, so
+ * a site without a label style keeps the headings it has.
+ */
+const LABEL_RULES: Record<string, string> = {
+    eyebrow: "hsl(var(--site-muted))",
+    eyebrowAccent: "hsl(var(--site-accent))",
+};
+
+function labelRule(at: string, style: string | undefined): string {
+    const colour = style ? LABEL_RULES[style] : undefined;
+    if (!colour) return "";
+    return `
+            ${at} [data-site-title] {
+                font-size: 0.875rem;
+                line-height: 1.4;
+                font-weight: 500;
+                letter-spacing: 0.14em;
+                text-transform: uppercase;
+                color: ${colour};
+            }`;
 }
 
 /**
@@ -242,10 +276,14 @@ function cssVariables(
 ): string | null {
     if (!variables) return null;
     const safeName = /^--site-[a-z-]+$/;
-    // HSL triples ("18 45% 45%"), lengths ("38px") and bare scales ("1.05").
+    // HSL triples ("18 45% 45%"), lengths ("38px", "64ch") and bare scales
+    // ("1.05"). A template's exact colours (DEC-090) arrive as HSL triples
+    // too — the publisher converts its `#RRGGBB` — so no `#` is ever let in.
     const safeValue = /^[a-zA-Z0-9 .%]{1,64}$/;
 
     const declarations = Object.entries(variables)
+        // A word that chooses a rule, not a value (see `labelRule`).
+        .filter(([name]) => name !== LABEL_STYLE_VARIABLE)
         .map(([name, value]): [string, unknown] => {
             // The two font variables carry a pair's KEY (KTD-2), translated
             // here from the curated list; an unknown key is dropped, leaving
