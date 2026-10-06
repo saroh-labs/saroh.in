@@ -6,6 +6,7 @@ import {
 import type { Prisma } from "@saroh/database";
 import { prisma } from "@saroh/database";
 
+import { assertPlanStartsSubscriptions } from "../billing/online-payments-plan";
 import { fromCents, toCents } from "../invoices/totals";
 import type { PlanInputDto } from "./dto";
 import type { PlanActor } from "./plan-events";
@@ -24,6 +25,11 @@ import { assertPlanNameFree, lockPlan, lockPlanNames } from "./plans";
  * A plan's writes: create, change, archive and sell again. Each runs in one
  * transaction with the plan event it records (D2), so a refused or failed
  * write records nothing. The service authorizes and reads the plan back.
+ *
+ * Creating a plan and selling an archived one again are new ways in, so
+ * they need memberships on the business's plan (`subscriptions` and
+ * `payments` rows; 403 `MODULE_LOCKED`, failing open). Changing a plan's
+ * wording and archiving it never ask: a business that moved down tidies up.
  */
 
 function fieldError(message: string, field: string): never {
@@ -40,6 +46,7 @@ export async function createPlanRow(
     actor: PlanActor,
     dto: PlanInputDto,
 ): Promise<string> {
+    await assertPlanStartsSubscriptions(organizationId);
     const { name, price, currency, interval } = dto;
     if (!name) fieldError("Give the plan a name", "name");
     if (!price) fieldError("Set a price", "price");
@@ -178,6 +185,7 @@ export async function setPlanStatusRow(
             });
         }
         if (status === "ACTIVE" && plan.status === "ARCHIVED") {
+            await assertPlanStartsSubscriptions(organizationId);
             await assertPlanNameFree(tx, organizationId, plan.name, id);
         }
         await tx.subscriptionPlan.updateMany({

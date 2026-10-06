@@ -276,6 +276,15 @@ describe("the Plans block on the editor's canvas (G9)", () => {
         );
     });
 
+    it("with memberships not on the Saroh plan, says so instead of 'no plans yet'", async () => {
+        await drawWith(json({ plans: [], payOnline: false, offered: false }));
+        const note = screen.getByRole("status").textContent;
+        expect(note).toContain("Memberships aren't on your Saroh plan");
+        expect(note).toContain("Members you already have keep renewing");
+        expect(note).not.toContain("No plans on sale yet");
+        expect(cards()).toHaveLength(0);
+    });
+
     it("with Payments off (a 404), says why the section is left off", async () => {
         await drawWith(json({ message: "Nothing to show here" }, 404));
         expect(screen.getByRole("status").textContent).toContain(

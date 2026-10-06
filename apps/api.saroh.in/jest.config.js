@@ -287,6 +287,9 @@ module.exports = {
         "<rootDir>/src/modules/subscriptions/public-plans.spec.ts",
         // G20: a plan joined online — its snapshot and waiting joins. Pure.
         "<rootDir>/src/modules/subscriptions/plan-join.spec.ts",
+        // 6 Oct 2026: memberships need the plan's rows to be set up.
+        "<rootDir>/src/modules/subscriptions/membership-plan-lock.spec.ts",
+        "<rootDir>/src/modules/subscriptions/public-plans.lock.spec.ts",
         "<rootDir>/src/modules/class-packs/class-packs.service.spec.ts",
         "<rootDir>/src/modules/class-packs/class-packs.controller.spec.ts",
         "<rootDir>/src/modules/class-packs/dto.spec.ts",

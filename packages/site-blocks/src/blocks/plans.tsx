@@ -11,6 +11,7 @@ import {
     isPublicPlan,
     plansAutopayMethods,
     plansOf,
+    plansOffered,
     plansPayOnline,
 } from "../lib/plans-read";
 import { cn } from "../lib/utils";
@@ -31,7 +32,8 @@ import { askAboutHref } from "../shop/ask-about-ordering";
  *
  * - **`feed`** — handed in by the page that serves the site (live or behind
  *   a preview token), read on the server. No plans (none on sale, Payments
- *   off, the read failed): the block renders NOTHING.
+ *   off, memberships not on the business's Saroh plan, the read failed):
+ *   the block renders NOTHING.
  * - **no feed, a `siteId`** — the editor's canvas. The block reads the same
  *   public list itself so the merchant sees their real plans, and says why
  *   the section is empty rather than vanishing.
@@ -105,6 +107,8 @@ type LoadState =
     | { kind: "ready"; plans: PublicPlan[]; payOnline: boolean }
     /** 404: Payments is off, or the site isn't one the API serves. */
     | { kind: "off" }
+    /** The business's Saroh plan leaves memberships off: none listed. */
+    | { kind: "unoffered" }
     | { kind: "error" };
 
 export default function PlansSection({
@@ -145,6 +149,7 @@ export default function PlansSection({
             if (!res.ok) return { kind: "error" };
             const body: unknown = await res.json().catch(() => null);
             const plans = plansOf(body);
+            if (plans && !plansOffered(body)) return { kind: "unoffered" };
             return plans
                 ? { kind: "ready", plans, payOnline: plansPayOnline(body) }
                 : { kind: "error" };
@@ -219,6 +224,15 @@ export default function PlansSection({
             <PlansNote title={title}>
                 Payments is off, so this section is left off your live site.
                 Turn Payments on and publish a plan, and your plans show here.
+            </PlansNote>
+        );
+    }
+    if (state.kind === "unoffered") {
+        return (
+            <PlansNote title={title}>
+                Memberships aren&apos;t on your Saroh plan, so this section is
+                left off your live site. Members you already have keep renewing.
+                Upgrade and your plans show here again.
             </PlansNote>
         );
     }

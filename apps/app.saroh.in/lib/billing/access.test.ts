@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import {
     depositLock,
+    membershipPlansLock,
     onlinePaymentsLock,
     planLocks,
     rowLock,
@@ -362,5 +363,61 @@ describe("depositLock", () => {
                 true,
             ),
         ).toBeNull();
+    });
+});
+
+describe("membershipPlansLock", () => {
+    const locked = (moduleId: string) =>
+        row({
+            moduleId,
+            name: moduleId,
+            state: "locked",
+            limit: null,
+            usage: null,
+            menu: null,
+            child: null,
+        });
+
+    it("says memberships come with the plan above, and that members keep renewing", () => {
+        for (const id of ["subscriptions", "payments"]) {
+            expect(
+                membershipPlansLock(access({ modules: [locked(id)] })),
+            ).toEqual({
+                title: "Memberships come with Plan B",
+                body: "You're on Plan A. Members you already have keep renewing. Your plans stay here to edit or archive, but they're off your site, and new plans can't go on sale until you move to Plan B.",
+                cta: "See Plan B",
+                href: "/settings/billing?plan=b#change-plan",
+            });
+        }
+    });
+
+    it("names no plan to go to when there is none", () => {
+        expect(
+            membershipPlansLock(
+                access({
+                    modules: [{ ...locked("subscriptions"), upgradeTo: null }],
+                }),
+            ),
+        ).toMatchObject({
+            title: "Memberships aren't in your Plan A plan",
+            cta: "See plans",
+            href: "/settings/billing#change-plan",
+        });
+    });
+
+    it("says nothing while locks aren't enforced, off the catalogue, or with the rows on", () => {
+        const modules = [locked("subscriptions")];
+        expect(
+            membershipPlansLock(access({ enforced: false, modules })),
+        ).toBeNull();
+        expect(
+            membershipPlansLock(access({ source: "legacy", modules })),
+        ).toBeNull();
+        expect(
+            membershipPlansLock(
+                access({ modules: [row({ moduleId: "subscriptions" })] }),
+            ),
+        ).toBeNull();
+        expect(membershipPlansLock(null)).toBeNull();
     });
 });

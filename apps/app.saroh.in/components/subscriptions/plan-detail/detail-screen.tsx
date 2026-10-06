@@ -2,11 +2,12 @@
 
 import { Button } from "@saroh/ui/button";
 import { cn } from "@saroh/ui/lib/utils";
-import { dismissToasts, showError, showUndo } from "@saroh/ui/toast";
+import { dismissToasts, showUndo } from "@saroh/ui/toast";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useRef, useState, useTransition } from "react";
 
+import { reportFailure } from "@/components/billing/plan-refusal";
 import { ReadOnlyNote } from "@/components/shared/read-only-note";
 import { HOLD_UNDO_MS } from "@/lib/hold-undo";
 import type { CappedList } from "@/lib/lists/capped";
@@ -125,7 +126,8 @@ export function PlanDetail({
             const res = await setPlanArchived(plan.id, to);
             setBusy(false);
             if (!res.ok) {
-                showError(res.error);
+                // A plan without memberships refuses Sell again: its notice.
+                reportFailure(res);
                 return;
             }
             setOlder([]);
@@ -136,7 +138,7 @@ export function PlanDetail({
                 () =>
                     start(async () => {
                         const back = await setPlanArchived(plan.id, !to);
-                        if (!back.ok) showError(back.error);
+                        if (!back.ok) reportFailure(back);
                         setOlder([]);
                         router.refresh();
                     }),
