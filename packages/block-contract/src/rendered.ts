@@ -153,6 +153,10 @@ const renderedRichText = z.object({
         .object({ label: z.string().optional(), text: z.string() })
         .optional(),
     partLabels: z.boolean().optional(),
+    // A style this build does not know draws as absent does.
+    headingStyle: z.string().optional(),
+    factsStyle: z.string().optional(),
+    label: z.string().optional(),
 });
 
 const renderedCta = renderedCtaSchema.extend({ variant, padding });
@@ -233,6 +237,8 @@ const renderedFeatures = z.object({
         .min(1),
     columns: z.number().int().optional(),
     note: z.string().optional(),
+    // An intro style this build does not know draws as the plain intro.
+    introStyle: z.string().optional(),
 });
 
 /**
@@ -370,6 +376,8 @@ const renderedProductGrid = z.object({
     note: z.string().optional(),
     // A card style this build does not know draws as the card.
     cardStyle: z.string().optional(),
+    // A count this build does not draw falls back to filling the row.
+    columns: z.number().int().optional(),
 });
 
 /**

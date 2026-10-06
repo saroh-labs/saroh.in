@@ -55,6 +55,17 @@ function sellsProducts(ctx: TemplateContext): boolean {
     return (ctx.modules ?? []).includes("COMMERCE");
 }
 
+/**
+ * "Open now"'s green dot. Over the hero's photo, and in the dark Visit
+ * band, the design's own #9BD17B (9:1 on the ink); on the page, where that
+ * pale green reads at 1.7:1, a deeper leaf from the same family (3.9:1, a
+ * graphic's 3:1 met).
+ */
+const BAKERY_STATUS = {
+    status: "#4E8A36",
+    statusInverse: "#9BD17B",
+} as const;
+
 /** The design's ground, ink and text tones, with brick as the link colour. */
 const CRUST_PALETTE = {
     bg: "#FBF7EF",
@@ -67,6 +78,7 @@ const CRUST_PALETTE = {
     // a link needs; brick is its darker sibling in the same swatch set.
     accent: "#8A3324",
     accentFg: "#FBF7EF",
+    ...BAKERY_STATUS,
 } as const;
 
 /**
@@ -82,6 +94,7 @@ const PORCELAIN_PALETTE = {
     border: "#DCE1EA",
     accent: "#732B58",
     accentFg: "#F5F8FB",
+    ...BAKERY_STATUS,
 } as const;
 
 /** The design's type: a 68px display line and a 1240px column. */
@@ -199,6 +212,8 @@ export const bakeryTemplate: TemplateManifest = {
                         source: "newest",
                         count: 5,
                         cardStyle: "bare",
+                        // The design's five breads in one row at the desk.
+                        columns: 5,
                         showAvailability: true,
                         note: "Baked this morning. Anything marked sold out has gone for today.",
                     },
@@ -209,8 +224,9 @@ export const bakeryTemplate: TemplateManifest = {
                     content: (ctx: TemplateContext) => ({
                         variant: "left",
                         format: "html",
+                        // The design's small eyebrow over the story.
+                        label: "The starter",
                         value:
-                            `<p><strong>The starter</strong></p>` +
                             `<h2>Everything here begins in a clip-top jar</h2>` +
                             `<p>This is a placeholder for the story behind ` +
                             `${escapeHtml(ctx.organizationName)}'s bread: ` +

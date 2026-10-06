@@ -191,3 +191,64 @@ describe("normalizeHex and samePalette", () => {
         expect(samePalette(a.palette, c.palette)).toBe(false);
     });
 });
+
+describe("status roles (template round 2)", () => {
+    const BAKERY = {
+        bg: "#FBF7EF",
+        fg: "#2A1F14",
+        accent: "#8A3324",
+        accentFg: "#FBF7EF",
+    };
+
+    it("leaves the status unset when none is named, so the dot keeps the accent", () => {
+        const result = parsePalette(BAKERY);
+        if (!result.ok) throw new Error("palette refused");
+        expect(result.palette.status).toBeUndefined();
+        expect(result.palette.statusInverse).toBeUndefined();
+        const vars = paletteVariables(result.palette);
+        expect(vars["--site-status"]).toBeUndefined();
+        expect(vars["--site-status-inverse"]).toBeUndefined();
+    });
+
+    it("accepts a green held to a graphic's 3:1 on the ground it is drawn on", () => {
+        const result = parsePalette({
+            ...BAKERY,
+            status: "#4e8a36",
+            statusInverse: "#9BD17B",
+        });
+        if (!result.ok) throw new Error("palette refused");
+        expect(result.palette.status).toBe("#4E8A36");
+        const vars = paletteVariables(result.palette);
+        expect(hslToHex(vars["--site-status"] ?? "")).toBe("#4E8A36");
+        expect(hslToHex(vars["--site-status-inverse"] ?? "")).toBe("#9BD17B");
+    });
+
+    it("refuses a dot that would vanish into its ground, by field", () => {
+        // The design's pale green reads 1.7:1 on flour.
+        const result = parsePalette({
+            ...BAKERY,
+            status: "#9BD17B",
+            statusInverse: "#4E3A20",
+        });
+        expect(result.ok).toBe(false);
+        if (result.ok) return;
+        expect(result.problems.map((p) => p.field).sort()).toEqual([
+            "palette.status",
+            "palette.statusInverse",
+        ]);
+        expect(result.problems[0]?.message).toContain("3:1");
+    });
+
+    it("refuses a status that is not #RRGGBB", () => {
+        const result = parsePalette({ ...BAKERY, status: "green" });
+        expect(result.ok).toBe(false);
+    });
+
+    it("tells palettes apart by their status", () => {
+        const a = parsePalette({ ...BAKERY, status: "#4E8A36" });
+        const b = parsePalette(BAKERY);
+        if (!a.ok || !b.ok) throw new Error("palette refused");
+        expect(samePalette(a.palette, b.palette)).toBe(false);
+        expect(samePalette(a.palette, a.palette)).toBe(true);
+    });
+});

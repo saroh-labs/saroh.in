@@ -408,7 +408,12 @@ function ProductCards({
                     line={cardLine}
                 />
             ) : bare ? (
-                <BareGrid products={products} show={show} base={base} />
+                <BareGrid
+                    products={products}
+                    show={show}
+                    base={base}
+                    columns={content.columns}
+                />
             ) : (
                 <ul
                     className={cn(
@@ -561,6 +566,20 @@ function CardWords({
 }
 
 /**
+ * A set number across for the bare cards (template round 2), at the desk:
+ * five breads in a row. It steps down so a card never gets narrower than
+ * its name and price beside each other — three on a tablet, two on a
+ * phone, one on the narrowest — with the gap tightened on a phone. Whole
+ * class names, so Tailwind finds them. A count this build does not know
+ * fills the row as before.
+ */
+const BARE_COLUMNS: Partial<Record<number, string>> = {
+    3: "grid-cols-1 gap-x-4 min-[360px]:grid-cols-2 sm:gap-x-[30px] md:grid-cols-3",
+    4: "grid-cols-1 gap-x-4 min-[360px]:grid-cols-2 sm:gap-x-[30px] md:grid-cols-3 lg:grid-cols-4",
+    5: "grid-cols-1 gap-x-4 min-[360px]:grid-cols-2 sm:gap-x-[30px] md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5",
+};
+
+/**
  * The bare cards (template polish), as the bakery design lays out its
  * bread: no card around each product, a tall 4:5 photo, the name and the
  * price side by side in the heading face, the line under them. Sold out is
@@ -571,13 +590,22 @@ function BareGrid({
     products,
     show,
     base,
+    columns,
 }: {
     products: ShopListingCard[];
     show: CardShow;
     base: string | null;
+    columns?: number;
 }) {
+    const fixed = columns !== undefined ? BARE_COLUMNS[columns] : undefined;
     return (
-        <ul className="grid gap-x-[30px] gap-y-10 [grid-template-columns:repeat(auto-fill,minmax(min(212px,100%),1fr))]">
+        <ul
+            className={cn(
+                "grid gap-y-10",
+                fixed ??
+                    "gap-x-[30px] [grid-template-columns:repeat(auto-fill,minmax(min(212px,100%),1fr))]",
+            )}
+        >
             {products.map((p) => {
                 const line = show.line ? cardLine(p.blurb) : null;
                 const amount = formatAmount(p.price, p.currency);

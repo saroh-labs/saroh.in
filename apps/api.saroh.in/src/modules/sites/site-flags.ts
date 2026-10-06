@@ -118,6 +118,14 @@ export interface FlagSiteInput {
     published: boolean;
     /** Whether the draft differs from what is live. */
     hasUnpublishedChanges: boolean;
+    /** The site's footer as stored (`Site.footer`), if it has one. */
+    footer?: { format?: string; value: string } | null;
+    /**
+     * The footer line the site's template started it with (round 2): the
+     * manifest's `footer.line` for the template and version the site
+     * records, or null when the site has no template, or one with no line.
+     */
+    templateFooterLine?: string | null;
 }
 
 // ---------------------------------------------------------------------------
@@ -768,6 +776,12 @@ export function checkSite(site: FlagSiteInput): Flag[] {
         });
     }
 
+    const footerFlag = untouchedTemplateFooter(
+        site.footer,
+        site.templateFooterLine,
+    );
+    if (footerFlag) flags.push(footerFlag);
+
     /*
      * The two flags that waited on the navigation model (#206).
      *
@@ -863,6 +877,45 @@ export function checkSite(site: FlagSiteInput): Flag[] {
     }
 
     return flags;
+}
+
+/**
+ * The footer still in its template's words (round 2). A template starts the
+ * footer with a line that says what to write there ("Your street and area
+ * — and the day you close"), and the site records which template it came
+ * from, so the check compares the footer with that template's own line
+ * rather than guessing from its phrasing. The comparison is on the words:
+ * a footer the editor saved back as `<p>…</p>`, or with its spacing
+ * changed, is still the template's. Anything else — an edit of one word —
+ * is the owner's, and quiet.
+ */
+export function untouchedTemplateFooter(
+    footer: FlagSiteInput["footer"],
+    templateLine: string | null | undefined,
+): Flag | null {
+    const line = words(templateLine ?? "");
+    if (line === "" || !footer) return null;
+    const written =
+        footer.format === "html" ? textOf(footer.value) : footer.value;
+    if (words(written) !== line) return null;
+    return {
+        type: "placeholderText",
+        message:
+            "The footer still has the template's line in it — write your own (an address, the days you open) in Site settings before going live.",
+        pageId: null,
+        sectionIndex: null,
+        field: "footer",
+    };
+}
+
+/** Text compared as its words: entities read, spacing collapsed. */
+function words(value: string): string {
+    return value
+        .replace(/&mdash;/g, "—")
+        .replace(/&amp;/g, "&")
+        .replace(/&nbsp;/g, " ")
+        .replace(/\s+/g, " ")
+        .trim();
 }
 
 /** Flags on one page's sections, for the rail dots and per-field markers. */

@@ -1,6 +1,10 @@
 import { starterTemplate } from "@saroh/templates";
 
-import { publicationTemplate, siteTemplate } from "./site-template-record";
+import {
+    publicationTemplate,
+    siteTemplate,
+    templateFooterLine,
+} from "./site-template-record";
 
 describe("a site's template record (KTD-7)", () => {
     it("reads the template, version and style a site was made with", () => {
@@ -42,5 +46,28 @@ describe("a site's template record (KTD-7)", () => {
         expect(
             publicationTemplate({ templateId: null, templateVersion: null }),
         ).toEqual({ id: starterTemplate.id, version: starterTemplate.version });
+    });
+});
+
+describe("the template's own footer line (round 2)", () => {
+    it("is the manifest's line for the template and version the site records", () => {
+        expect(
+            templateFooterLine({ templateId: "bakery", templateVersion: 1 }),
+        ).toBe("Your street and area — and the day you close");
+    });
+
+    it("is null for an unknown site, an unknown template, or one with no line", () => {
+        expect(
+            templateFooterLine({ templateId: null, templateVersion: null }),
+        ).toBeNull();
+        expect(
+            templateFooterLine({ templateId: "nope", templateVersion: 1 }),
+        ).toBeNull();
+        expect(
+            templateFooterLine({
+                templateId: starterTemplate.id,
+                templateVersion: starterTemplate.version,
+            }),
+        ).toBeNull();
     });
 });

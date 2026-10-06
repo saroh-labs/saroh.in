@@ -230,6 +230,10 @@ const LABEL_STYLE_VARIABLE = "--site-label-style";
  * palette's rules. Blocks mark a section title `data-site-title`; the
  * selector's two parts outrank the title's own size and colour utilities, so
  * a site without a label style keeps the headings it has.
+ *
+ * A text block's own `h2`s and `h3`s join them when it asks
+ * (`headingStyle: "label"`, marked `data-site-headings` on its prose): the
+ * sanitized markup cannot carry the attribute itself.
  */
 const LABEL_RULES: Record<string, string> = {
     eyebrow: "hsl(var(--site-muted))",
@@ -240,7 +244,7 @@ function labelRule(at: string, style: string | undefined): string {
     const colour = style ? LABEL_RULES[style] : undefined;
     if (!colour) return "";
     return `
-            ${at} [data-site-title] {
+            ${at} :is([data-site-title], [data-site-headings="label"] :is(h2, h3)) {
                 font-size: 0.875rem;
                 line-height: 1.4;
                 font-weight: 500;
@@ -291,10 +295,23 @@ function columnRule(at: string, width: string | undefined): string {
  *
  * Anchors leave room for the sticky header when a link jumps to them.
  *
+ * STATUS. The "open now" dot's colours (`--site-status`, and
+ * `--site-status-inverse` over the ink) are optional palette roles, unset
+ * unless a template's colourway names them; the blocks fall back to the
+ * accent. An inverse band swaps the two, so the dot keeps the colour held
+ * to 3:1 on the ink; an accent band clears both, so the dot is the
+ * accent's text there, as every other mark in it is. An unset status stays
+ * unset through a band (`var()` of nothing is nothing), and the dot keeps
+ * the band's accent, as it always did.
+ *
  * DEFINITION LISTS. A text block may carry `dl`/`dt`/`dd` (facts: "Clay /
  * Stoneware"). The prose defaults would set them in the typography
  * plugin's greys; this sets them in the merchant's colours, terms in the
  * heading face. Scoped to sections, so a footer's own colours stay its own.
+ * A text block that asks for `factsStyle: "labels"` (marked
+ * `data-site-facts`) sets its terms as small uppercase labels in the quiet
+ * text colour — held to 4.5:1 on the page — and its values in the text
+ * colour, the facts list the ceramics design draws.
  */
 function sectionRules(at: string): string {
     return `
@@ -304,6 +321,8 @@ function sectionRules(at: string): string {
                 --site-band-card: var(--site-surface);
                 --site-band-accent: var(--site-accent);
                 --site-band-accent-fg: var(--site-accent-fg);
+                --site-band-status: var(--site-status);
+                --site-band-status-inverse: var(--site-status-inverse);
             }
             ${at} [data-site-band] {
                 background-color: hsl(var(--site-bg));
@@ -322,6 +341,8 @@ function sectionRules(at: string): string {
                 --site-border: var(--site-band-paper);
                 --site-accent: var(--site-band-paper);
                 --site-accent-fg: var(--site-band-ink);
+                --site-status: var(--site-band-status-inverse);
+                --site-status-inverse: var(--site-band-status);
             }
             ${at} [data-site-band="accent"] {
                 --site-bg: var(--site-band-accent);
@@ -332,6 +353,8 @@ function sectionRules(at: string): string {
                 --site-border: var(--site-band-accent-fg);
                 --site-accent: var(--site-band-accent-fg);
                 --site-accent-fg: var(--site-band-accent);
+                --site-status: initial;
+                --site-status-inverse: initial;
             }
             ${at} [data-site-section][id] {
                 scroll-margin-top: 4.5rem;
@@ -342,6 +365,20 @@ function sectionRules(at: string): string {
             }
             ${at} [data-site-section] .prose dd {
                 color: hsl(var(--site-fg) / 0.8);
+            }
+            ${at} [data-site-section] [data-site-facts="labels"] dt {
+                margin-top: 1.25em;
+                color: hsl(var(--site-muted));
+                font-family: var(--site-font-body);
+                font-size: 0.78rem;
+                font-weight: 500;
+                letter-spacing: 0.1em;
+                text-transform: uppercase;
+            }
+            ${at} [data-site-section] [data-site-facts="labels"] dd {
+                margin-top: 0.25em;
+                padding-inline-start: 0;
+                color: hsl(var(--site-fg));
             }`;
 }
 

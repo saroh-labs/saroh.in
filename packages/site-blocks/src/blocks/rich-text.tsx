@@ -48,14 +48,29 @@ export default function RichTextSection({
         ? " prose-h3:font-site-body prose-h3:text-site-muted prose-h3:mb-2 prose-h3:mt-8 prose-h3:text-[13px] prose-h3:font-semibold prose-h3:uppercase prose-h3:tracking-[0.1em]"
         : "";
     /*
+     * Round 2: the text's own headings as the site's section titles, and
+     * its facts list as labels. Attributes, not utilities: the rules are
+     * `SiteTheme`'s, which already knows the label style and outranks the
+     * prose plugin's own.
+     */
+    const marks = {
+        ...(content.headingStyle === "label"
+            ? { "data-site-headings": "label" }
+            : {}),
+        ...(content.factsStyle === "labels"
+            ? { "data-site-facts": "labels" }
+            : {}),
+    };
+    /*
      * A template's type scale (DEC-090) sets the body size and the reading
      * width through `--site-body-size` and `--site-measure`; without one the
      * fallbacks are the prose plugin's 1rem and no cap of its own, which is
      * what every text block has always drawn.
      */
-    const text =
+    const prose =
         content.format === "html" ? (
             <div
+                {...marks}
                 /* Typography's own greys are replaced by the merchant's
                    text colour (#189), and `dark:prose-invert` is gone with
                    them: once a palette is chosen, a visitor's OS setting
@@ -69,6 +84,27 @@ export default function RichTextSection({
                 <p className="whitespace-pre-wrap">{content.value}</p>
             </div>
         );
+
+    /*
+     * The label over the text (round 2): an eyebrow in the accent, marked
+     * `data-site-title` so a site that sets its section titles as an
+     * eyebrow sets this one the same way. Not a heading — the text's own
+     * `h2` is the section's heading.
+     */
+    const label = content.label?.trim();
+    const text = label ? (
+        <>
+            <p
+                data-site-title=""
+                className="font-site-body text-site-accent mb-4 text-[13px] font-semibold uppercase leading-snug tracking-[0.1em]"
+            >
+                {label}
+            </p>
+            {prose}
+        </>
+    ) : (
+        prose
+    );
 
     const callout = content.callout?.text.trim() ? (
         <Callout label={content.callout.label} text={content.callout.text} />

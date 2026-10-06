@@ -180,6 +180,20 @@ describe("ceramics@1, the gallery's Store (U5)", () => {
         expect(page.sections.map((s) => s.order)).toEqual([0, 1, 2, 3, 4]);
     });
 
+    it("sets Material's intro as the design's display line, and the studio's title and facts as labels", () => {
+        const page = home(selling);
+        const material = page.sections.find((s) => s.type === "features");
+        expect(material?.content).toMatchObject({ introStyle: "display" });
+        const studio = page.sections.find((s) => s.type === "richText");
+        expect(studio?.content).toMatchObject({
+            headingStyle: "label",
+            factsStyle: "labels",
+        });
+        const html = (studio?.content as { value: string }).value;
+        expect(html).toMatch(/^<h2>The studio<\/h2>/);
+        expect(html).toContain("<dl>");
+    });
+
     it.each([
         ["no modules known", nameOnly],
         ["Commerce off", { ...nameOnly, modules: ["WEBSITE"] }],

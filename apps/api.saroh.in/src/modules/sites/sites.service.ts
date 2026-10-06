@@ -125,7 +125,11 @@ import {
     templateColourways,
 } from "./site-style-offer";
 import type { SiteTemplateRecord } from "./site-template-record";
-import { publicationTemplate, siteTemplate } from "./site-template-record";
+import {
+    publicationTemplate,
+    siteTemplate,
+    templateFooterLine,
+} from "./site-template-record";
 
 /**
  * Take the key a section claims, unless something earlier in the list already
@@ -2782,6 +2786,9 @@ export class SitesService {
                 navigation: true,
                 storefrontId: true,
                 subdomain: true,
+                footer: true,
+                templateId: true,
+                templateVersion: true,
                 pages: {
                     select: {
                         id: true,
@@ -2848,6 +2855,9 @@ export class SitesService {
             seoDescription: site.seoDescription,
             published: site.currentPublicationId !== null,
             hasUnpublishedChanges,
+            // The footer still in its template's words (round 2).
+            footer: parseSiteFooter(site.footer),
+            templateFooterLine: templateFooterLine(site),
             pages: site.pages.map((page) => ({
                 id: page.id,
                 path: page.path,

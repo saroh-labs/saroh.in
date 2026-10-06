@@ -1219,3 +1219,80 @@ describe("a template's placeholder words (template polish)", () => {
         expect(checked).toBeGreaterThan(5);
     });
 });
+
+describe("the footer still in its template's words (round 2)", () => {
+    const LINE = "Your street and area — and the day you close";
+
+    it("flags a footer left exactly as the site's template wrote it", () => {
+        const flags = checkSite(
+            site({
+                footer: { format: "markdown", value: LINE },
+                templateFooterLine: LINE,
+            }),
+        );
+        const flag = flags.find((f) => f.field === "footer");
+        expect(flag).toMatchObject({
+            type: "placeholderText",
+            pageId: null,
+            sectionIndex: null,
+        });
+        expect(flag?.message).toMatch(/footer/i);
+    });
+
+    it("still knows it once the editor saved it back as a paragraph", () => {
+        for (const value of [
+            `<p>${LINE}</p>`,
+            "<p>Your street and area &mdash; and   the day you close</p>",
+        ]) {
+            expect(
+                checkSite(
+                    site({
+                        footer: { format: "html", value },
+                        templateFooterLine: LINE,
+                    }),
+                ).some((f) => f.field === "footer"),
+            ).toBe(true);
+        }
+    });
+
+    it("is quiet once the owner has written their own, or the site has no template line", () => {
+        for (const over of [
+            {
+                footer: {
+                    format: "markdown",
+                    value: "14 Hill Road · Closed Mondays",
+                },
+                templateFooterLine: LINE,
+            },
+            {
+                footer: { format: "markdown", value: `${LINE}s` },
+                templateFooterLine: LINE,
+            },
+            {
+                footer: { format: "markdown", value: LINE },
+                templateFooterLine: null,
+            },
+            { footer: { format: "markdown", value: LINE } },
+            { footer: null, templateFooterLine: LINE },
+        ] as Partial<FlagSiteInput>[]) {
+            expect(
+                checkSite(site(over)).some((f) => f.field === "footer"),
+            ).toBe(false);
+        }
+    });
+
+    it("finds every gallery template's own line, as a new site starts with it", () => {
+        for (const template of listTemplates()) {
+            const line = template.footer?.line;
+            if (!line) continue;
+            expect(
+                checkSite(
+                    site({
+                        footer: { format: "markdown", value: line },
+                        templateFooterLine: line,
+                    }),
+                ).some((f) => f.field === "footer"),
+            ).toBe(true);
+        }
+    });
+});

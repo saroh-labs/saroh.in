@@ -320,6 +320,14 @@ const heroV1 = z.object({
 export const TEXT_IMAGE_SIDES = ["left", "right", "above"] as const;
 export type TextImageSide = (typeof TEXT_IMAGE_SIDES)[number];
 
+/** How a text block's own headings are set. See `richTextV1.headingStyle`. */
+export const TEXT_HEADING_STYLES = ["heading", "label"] as const;
+/** How a text block's facts list is set. See `richTextV1.factsStyle`. */
+export const TEXT_FACTS_STYLES = ["plain", "labels"] as const;
+
+/** How long a text block's label may run. */
+export const TEXT_LABEL_MAX = 60;
+
 /** How long a text block's callout may run. */
 export const TEXT_CALLOUT_MAX = 600;
 
@@ -349,6 +357,29 @@ const richTextV1 = z.object({
      * as headings.
      */
     partLabels: z.boolean().optional(),
+    /**
+     * `label` (template round 2): the text's `h2`s and `h3`s are set as the
+     * site's section titles are — an eyebrow while the type scale's
+     * `labelStyle` is one, today's headings under `plain`. For a text block
+     * that opens on a label ("The studio", "The starter") the way the
+     * sections around it do. ABSENT keeps them as headings.
+     */
+    headingStyle: z.enum(TEXT_HEADING_STYLES).optional(),
+    /**
+     * A small label over the text (template round 2): "The starter" above
+     * the story's own heading, the bakery design's eyebrow. Plain text, set
+     * small, uppercase and wide-tracked — in the accent, or as the site's
+     * section titles are while the type scale sets them as an eyebrow. It
+     * is not a heading: the text's own `h2` is. ABSENT draws nothing.
+     */
+    label: z.string().trim().max(TEXT_LABEL_MAX).optional(),
+    /**
+     * `labels` (template round 2): a definition list's terms as small
+     * uppercase labels in the quiet text colour, its values in the text
+     * colour — "STUDIO / Koregaon Park". ABSENT keeps terms in the heading
+     * face.
+     */
+    factsStyle: z.enum(TEXT_FACTS_STYLES).optional(),
 });
 
 /** cta v1 — a standalone call-to-action button. */
@@ -494,6 +525,12 @@ const featuresV1 = z.object({
     columns: z.union([z.literal(1), z.literal(2)]).optional(),
     /** A muted line under the points — a disclaimer, a caveat. Plain text. */
     note: z.string().trim().max(600).optional(),
+    /**
+     * `display` (template round 2): the intro set as one large line in the
+     * heading face under the heading — the ceramics design's "Material"
+     * sentence. ABSENT is today's quiet paragraph.
+     */
+    introStyle: z.enum(["plain", "display"]).optional(),
 });
 
 /**
@@ -949,6 +986,14 @@ const productGridV1 = z.object({
      * the card. The other looks ignore it.
      */
     cardStyle: z.enum(["card", "bare"]).optional(),
+    /**
+     * How many products across at the desk for the `bare` cards (template
+     * round 2): five breads in a row, as the bakery design has them. The
+     * grid steps down to three on a tablet and two (one on the narrowest
+     * phone) on a phone. ABSENT, the cards fill the row by their own width,
+     * as before. The other looks ignore it.
+     */
+    columns: z.union([z.literal(3), z.literal(4), z.literal(5)]).optional(),
 });
 
 /** How many classes a Timetable may be limited to (U2). */

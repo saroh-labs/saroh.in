@@ -99,8 +99,10 @@ export default function FullBleedHero({
                                 aria-hidden="true"
                                 className={cn(
                                     "inline-block size-2 rounded-full",
+                                    // Over the photo's wash: the inverse
+                                    // status (the accent without one).
                                     status.open
-                                        ? "bg-site-accent"
+                                        ? "bg-site-status-inverse"
                                         : "bg-site-bg/60",
                                 )}
                             />
