@@ -266,7 +266,7 @@ describe("block rendering", () => {
         expect(container.innerHTML).toMatchSnapshot();
     });
 
-    it.each(["grid", "list"])("features/%s", (look) => {
+    it.each(["grid", "list", "steps"])("features/%s", (look) => {
         const { container } = render(
             <FeaturesSection
                 content={blockFixture("features", look) as RenderedFeatures}

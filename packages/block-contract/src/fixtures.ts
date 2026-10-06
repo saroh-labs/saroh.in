@@ -371,6 +371,12 @@ export const BLOCK_META = {
                 description:
                     "Points stacked in one column, each with room to explain itself. Better when the copy is longer than a line.",
             },
+            {
+                id: "steps",
+                label: "Numbered steps",
+                description:
+                    "Points stacked in one column, each numbered 01, 02, 03 beside its title, for something done in order.",
+            },
         ] as const,
         fixtures: {
             grid: {
@@ -407,6 +413,25 @@ export const BLOCK_META = {
                     {
                         title: "Order by 2pm, it goes the same day",
                         body: "Anything stocked. Custom runs get their own date, agreed before you commit.",
+                    },
+                ],
+            },
+            steps: {
+                variant: "steps",
+                heading: "How I work",
+                intro: "Three stages, and the whole of the first one is listening.",
+                items: [
+                    {
+                        title: "We talk first",
+                        body: "What you eat, when, who cooks it, and what has already been tried.",
+                    },
+                    {
+                        title: "We change three things",
+                        body: "Not thirty. Three changes you can make, written down in plain language.",
+                    },
+                    {
+                        title: "We check in",
+                        body: "To see what held and what did not, and change the ones that did not.",
                     },
                 ],
             },

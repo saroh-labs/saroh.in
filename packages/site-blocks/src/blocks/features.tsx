@@ -4,8 +4,12 @@ import { resolveVariant } from "@saroh/block-contract";
 /**
  * `features` v1 — a heading over a set of short, titled points (#255).
  *
- * Two looks, drawing the same content. `grid` puts the points side by side and
- * reads as a summary; `list` stacks them so each has room to explain itself.
+ * Three looks, drawing the same content. `grid` puts the points side by side
+ * and reads as a summary; `list` stacks them so each has room to explain
+ * itself; `steps` stacks them numbered 01, 02, 03 beside each title, for a
+ * way of working done in order (the dietician template's "How I work"). The
+ * numbers come from the position, so reordering renumbers, and the list is an
+ * `<ol>` so a screen reader counts them too.
  * Which one is a merchant's choice, not a consequence of what they typed — the
  * mistake `hero` made, where the layout turned on whether an image happened to
  * be present.
@@ -20,7 +24,9 @@ export default function FeaturesSection({
     content: RenderedFeatures;
 }) {
     const variant = resolveVariant("features", content);
-    const isList = variant === "list";
+    const isSteps = variant === "steps";
+    const isList = variant === "list" || isSteps;
+    const List = isSteps ? "ol" : "ul";
 
     return (
         <section className="mx-auto w-full max-w-screen-xl px-5 py-[var(--site-section-padding)] sm:px-[var(--site-page-margin)]">
@@ -35,7 +41,7 @@ export default function FeaturesSection({
                 </p>
             ) : null}
 
-            <ul
+            <List
                 className={
                     /*
                      * The grid caps at three columns rather than tracking the
@@ -54,20 +60,32 @@ export default function FeaturesSection({
                     <li
                         key={i}
                         className={
-                            isList
-                                ? "border-site-border border-t pt-5"
-                                : "rounded-[var(--site-radius)]"
+                            isSteps
+                                ? "border-site-border grid grid-cols-[2.75rem_minmax(0,1fr)] items-baseline border-t pt-5"
+                                : isList
+                                  ? "border-site-border border-t pt-5"
+                                  : "rounded-[var(--site-radius)]"
                         }
                     >
+                        {isSteps ? (
+                            <span
+                                aria-hidden="true"
+                                className="font-site-heading text-site-accent text-[15px] tabular-nums"
+                            >
+                                {String(i + 1).padStart(2, "0")}
+                            </span>
+                        ) : null}
                         <h3 className="text-site-fg text-[calc(1.125rem*var(--site-heading-scale))] font-semibold">
                             {item.title}
                         </h3>
                         {item.body ? (
                             <p
                                 className={
-                                    isList
-                                        ? "text-site-body mt-2 max-w-2xl leading-relaxed"
-                                        : "text-site-body mt-2 leading-relaxed"
+                                    isSteps
+                                        ? "text-site-body col-start-2 mt-2 max-w-2xl leading-relaxed"
+                                        : isList
+                                          ? "text-site-body mt-2 max-w-2xl leading-relaxed"
+                                          : "text-site-body mt-2 leading-relaxed"
                                 }
                             >
                                 {item.body}
@@ -75,7 +93,7 @@ export default function FeaturesSection({
                         ) : null}
                     </li>
                 ))}
-            </ul>
+            </List>
         </section>
     );
 }
