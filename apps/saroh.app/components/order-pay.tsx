@@ -10,6 +10,7 @@ import { ProviderHandoff } from "@/components/provider-handoff";
 import type { CheckoutIntent } from "@/lib/checkout-shape";
 import { payMoney } from "@/lib/invoice-pay-shape";
 import type { PayOrder } from "@/lib/order-pay";
+import { orderPayOffer } from "@/lib/order-pay-shape";
 
 /**
  * The order a pay link shows, and its Pay button (plan B, B11).
@@ -20,6 +21,11 @@ import type { PayOrder } from "@/lib/order-pay";
  * over to the provider exactly as checkout does; the page never claims a
  * payment went through — "Check again" re-reads the order, which only the
  * provider's webhook moves to paid.
+ *
+ * When the business can't take it online (`payOnline` false, R33 — a link
+ * made before its plan changed, say), the page is view-only: the order,
+ * what's left to pay and "Pay ‹business› directly", with the business's
+ * own way to pay once it has one (`howToPay`), and no Pay button.
  *
  * Styled in the business's `--site-*` tokens, never Saroh's brand. Status is
  * an opaque fill with its own foreground: the page ground is the
@@ -38,8 +44,9 @@ export function OrderPay({ token, order }: { token: string; order: PayOrder }) {
     );
 
     const money = (a: string) => payMoney(a, order.currency);
-    const payable = order.status === "DUE";
-    const partPaid = payable && Number(order.due) < Number(order.total);
+    const offer = orderPayOffer(order);
+    const partPaid =
+        order.status === "DUE" && Number(order.due) < Number(order.total);
 
     function pay() {
         setError(null);
@@ -134,7 +141,13 @@ export function OrderPay({ token, order }: { token: string; order: PayOrder }) {
                 </table>
             </div>
 
-            {payable ? (
+            {offer === "elsewhere" ? (
+                <PayDirectly
+                    businessName={order.businessName}
+                    due={money(order.due)}
+                    howToPay={order.howToPay ?? null}
+                />
+            ) : offer === "pay" ? (
                 <div className="mt-6 space-y-4">
                     {error ? (
                         <p role="alert" className={destructiveAlertClasses}>
@@ -179,6 +192,41 @@ export function OrderPay({ token, order }: { token: string; order: PayOrder }) {
                 </div>
             )}
         </section>
+    );
+}
+
+/**
+ * The view-only page's ask (R33): pay the business directly — in the
+ * business's own words when it has given them ("How to pay us"), else
+ * just that. No button: nothing here takes money.
+ */
+function PayDirectly({
+    businessName,
+    due,
+    howToPay,
+}: {
+    businessName: string;
+    due: string;
+    howToPay: string | null;
+}) {
+    return (
+        <div
+            role="status"
+            className="mt-6 rounded-xl border border-site-border bg-site-surface p-5 text-center"
+        >
+            <p className="font-semibold text-site-fg">
+                Pay {businessName} directly
+            </p>
+            <p className="mt-1 text-sm text-site-muted">
+                {businessName} doesn&apos;t take payment online here. {due} is
+                left to pay.
+            </p>
+            {howToPay ? (
+                <p className="mt-3 whitespace-pre-line text-sm text-site-body">
+                    {howToPay}
+                </p>
+            ) : null}
+        </div>
     );
 }
 

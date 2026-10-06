@@ -77,20 +77,30 @@ export function deskChoices(input: {
     take: DeskTake;
     /** `booking:write` and `invoice:write`, with a provider connected. */
     canLink: boolean;
+    /**
+     * The plan takes payment online (`takesOnlinePayment`). When it
+     * doesn't, the link isn't offered at all — not even greyed out — and
+     * the counter ways are the choices (R33). Absent: yes.
+     */
+    online?: boolean;
 }): { key: DeskChoice; label: string; off: string | null }[] {
     return [
         { key: "CASH", label: "Cash", off: null },
         { key: "UPI", label: "UPI at the counter", off: null },
         { key: "CARD", label: "Card machine", off: null },
-        {
-            key: "LINK",
-            label: "Send a pay link",
-            off: !input.take.byLink
-                ? "A pay link bills the whole booking, so take the rest here"
-                : !input.canLink
-                  ? "Connect a payment provider to send a link"
-                  : null,
-        },
+        ...(input.online === false
+            ? []
+            : [
+                  {
+                      key: "LINK" as const,
+                      label: "Send a pay link",
+                      off: !input.take.byLink
+                          ? "A pay link bills the whole booking, so take the rest here"
+                          : !input.canLink
+                            ? "Connect a payment provider to send a link"
+                            : null,
+                  },
+              ]),
     ];
 }
 

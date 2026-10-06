@@ -51,7 +51,12 @@ export function BookingDetailView({
      * Taking payment at the desk (P2): `booking:write` and `invoice:write`,
      * and whether a pay link can be sent (a provider connected).
      */
-    desk?: { canTake: boolean; canLink: boolean };
+    desk?: {
+        canTake: boolean;
+        canLink: boolean;
+        /** The plan takes payment online (R33); else no link is offered. */
+        online?: boolean;
+    };
     /** Whether the slot has ended. Read by the page so "now" stays out of render. */
     past: boolean;
     /**
@@ -217,6 +222,7 @@ export function BookingDetailView({
                                 currency={booking.money.currency}
                                 who={bookerLabel(booking)}
                                 canLink={desk.canLink}
+                                online={desk.online}
                                 triggerClassName="h-9"
                             />
                         </div>

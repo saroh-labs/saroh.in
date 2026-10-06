@@ -3,14 +3,16 @@ import { describe, expect, it } from "vitest";
 import {
     depositLock,
     membershipPlansLock,
+    offersOnlinePay,
     onlinePaymentsLock,
     planLocks,
     rowLock,
     rowNotice,
+    takesOnlinePayment,
     upgradeHref,
     upgradeLine,
 } from "./access";
-import { access, row } from "./fixtures.test-data";
+import { access, offlinePlan, onlinePlan, row } from "./fixtures.test-data";
 
 describe("rowNotice", () => {
     it("says nothing under 80%", () => {
@@ -419,5 +421,32 @@ describe("membershipPlansLock", () => {
             ),
         ).toBeNull();
         expect(membershipPlansLock(null)).toBeNull();
+    });
+});
+
+describe("takesOnlinePayment and offersOnlinePay (R33)", () => {
+    it("is no on a plan whose payments row is locked, while enforced", () => {
+        expect(takesOnlinePayment(offlinePlan())).toBe(false);
+        expect(offersOnlinePay(offlinePlan(), true, true)).toBe(false);
+    });
+
+    it("is yes on a plan with online payments, when everything else is so", () => {
+        expect(takesOnlinePayment(onlinePlan())).toBe(true);
+        expect(offersOnlinePay(onlinePlan(), true)).toBe(true);
+        expect(offersOnlinePay(onlinePlan())).toBe(true);
+    });
+
+    it("still needs the screen's own checks — a provider, Payments on", () => {
+        expect(offersOnlinePay(onlinePlan(), false)).toBe(false);
+        expect(offersOnlinePay(onlinePlan(), true, false)).toBe(false);
+    });
+
+    it("fails open as the API does: unread, legacy, unenforced or no row", () => {
+        expect(takesOnlinePayment(null)).toBe(true);
+        expect(takesOnlinePayment(offlinePlan({ enforced: false }))).toBe(true);
+        expect(
+            takesOnlinePayment(offlinePlan({ source: "legacy", modules: [] })),
+        ).toBe(true);
+        expect(takesOnlinePayment(access())).toBe(true);
     });
 });

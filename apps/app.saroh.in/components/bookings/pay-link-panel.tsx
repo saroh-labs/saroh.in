@@ -5,19 +5,30 @@ import { Input } from "@saroh/ui/input";
 import { showError, showSuccess } from "@saroh/ui/toast";
 import { useId, useState } from "react";
 
+import { showPlanRefusal } from "@/components/billing/plan-refusal";
 import { createBookingPayLink } from "@/lib/services/actions";
 
-/** The pay link a booking got, or why it couldn't. */
+/**
+ * The pay link a booking got, or why it couldn't. `plan`: the business's
+ * plan refused it (no online payments, R33) — trying again won't help.
+ */
 export type PayLinkResult =
-    { ok: true; url: string } | { ok: false; error: string };
+    { ok: true; url: string } | { ok: false; error: string; plan?: boolean };
 
-/** Make a booking's pay link, never throwing. */
+/**
+ * Make a booking's pay link, never throwing. A refusal by the plan is
+ * shown as the plan's notice, with the way up (`showPlanRefusal`), as
+ * every other screen shows one — not as a plain error.
+ */
 export async function makePayLink(bookingId: string): Promise<PayLinkResult> {
     try {
         const res = await createBookingPayLink(bookingId);
-        return res.ok
-            ? { ok: true, url: res.data.url }
-            : { ok: false, error: res.error };
+        if (res.ok) return { ok: true, url: res.data.url };
+        if (res.plan) {
+            showPlanRefusal(res.plan);
+            return { ok: false, error: res.error, plan: true };
+        }
+        return { ok: false, error: res.error };
     } catch {
         return { ok: false, error: "Couldn't make the pay link." };
     }
@@ -82,6 +93,11 @@ export function PayLinkPanel({
                         to refund.
                     </p>
                 </>
+            ) : link.plan ? (
+                <p className="text-[12.5px] leading-[1.5] text-muted-foreground">
+                    No pay link — your plan doesn&apos;t take payment online.
+                    The booking is made; they can pay at the session.
+                </p>
             ) : (
                 <p
                     role="alert"
@@ -108,7 +124,7 @@ export function PayLinkPanel({
                     >
                         Copy link
                     </Button>
-                ) : (
+                ) : link.plan ? null : (
                     <Button
                         type="button"
                         disabled={trying}

@@ -312,3 +312,32 @@ export function membershipPlansLock(
         href: lock.href,
     };
 }
+
+/**
+ * Whether the plan lets the business take a new payment online (catalogue
+ * row `payments`, the owner's rule of 6 Oct 2026, R33). The screens ask
+ * this, as the API does (`online-payments-plan.ts`), before offering a pay
+ * link or pay-online: off only where `rowLock` would say so — a locked
+ * row while enforced. An unread plan, a business the catalogue doesn't
+ * reach, or nothing enforcing it reads as yes, failing open as the API's
+ * own check does; the write still says no if it must.
+ */
+export function takesOnlinePayment(view: BillingAccessView | null): boolean {
+    return rowLock(view, "payments") === null;
+}
+
+/**
+ * Whether a screen offers an online way to pay: the plan takes online
+ * payment (`takesOnlinePayment`) and everything else the screen needs is
+ * so — a provider that opens the checkout window, Payments switched on,
+ * the viewer's powers. The one rule every pay-link and pay-online choice
+ * reads (bookings, invoices, orders), so they can't drift apart; where it
+ * is false the offline choices — cash, UPI, pay at the desk, on collection
+ * — are what's offered.
+ */
+export function offersOnlinePay(
+    view: BillingAccessView | null,
+    ...also: boolean[]
+): boolean {
+    return takesOnlinePayment(view) && also.every(Boolean);
+}

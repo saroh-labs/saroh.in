@@ -32,6 +32,42 @@ export interface PayOrder {
      * the apex. Null or absent (an older API): served wherever opened.
      */
     payUrl?: string | null;
+    /**
+     * The business can take this payment online (R33): its plan takes
+     * online payment, Payments is on and its storefront's provider opens
+     * the checkout window. False — a link made before a downgrade, say —
+     * and the page shows the order view-only, with "Pay ‹business›
+     * directly". Absent (an older API): as before, Pay is offered.
+     */
+    payOnline?: boolean;
+    /**
+     * How the business asks to be paid when it isn't online (its "How to
+     * pay us" — UPI, bank, at the counter), shown on the view-only page.
+     * Not sent yet: kept so the page is ready for it. Absent or null: the
+     * page says only to pay the business directly.
+     */
+    howToPay?: string | null;
+}
+
+/**
+ * What the page offers under the order:
+ * - `pay`: it's due and can be paid online — Pay and "Check again";
+ * - `elsewhere`: it's due, but the business can't take it online (R33) —
+ *   the order view-only, and "Pay ‹business› directly";
+ * - `settled`: paid, or no longer payable — nothing to do.
+ */
+export type OrderPayOffer = "pay" | "elsewhere" | "settled";
+
+export function orderPayOffer(
+    order: Pick<PayOrder, "status" | "payOnline">,
+): OrderPayOffer {
+    if (order.status !== "DUE") return "settled";
+    return order.payOnline === false ? "elsewhere" : "pay";
+}
+
+/** "How to pay us", checked: trimmed text, or none. */
+export function howToPayOf(v: unknown): string | null {
+    return typeof v === "string" && v.trim() ? v.trim() : null;
 }
 
 function isRecord(v: unknown): v is Record<string, unknown> {

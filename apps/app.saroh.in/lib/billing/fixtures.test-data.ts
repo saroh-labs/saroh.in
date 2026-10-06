@@ -37,3 +37,32 @@ export function access(
         ...over,
     };
 }
+
+/** The `payments` row (taking money online), on or locked. */
+export function paymentsRow(state: "on" | "locked"): ModuleAccessView {
+    return row({
+        moduleId: "payments",
+        name: "Online payments",
+        what: "Take payment online.",
+        state,
+        limit: null,
+        usage: null,
+        menu: null,
+        child: null,
+    });
+}
+
+/** A plan without online payments (Plan A), enforced. */
+export function offlinePlan(
+    over: Partial<BillingAccessView> = {},
+): BillingAccessView {
+    return access({ modules: [paymentsRow("locked")], ...over });
+}
+
+/** A plan with online payments (Plan B), enforced. */
+export function onlinePlan(): BillingAccessView {
+    return access({
+        plan: { id: "b", name: "Plan B" },
+        modules: [paymentsRow("on")],
+    });
+}

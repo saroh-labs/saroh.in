@@ -114,6 +114,11 @@ export function OrdersScreen({
         openOnArrival: boolean;
         /** `contact:read`: search customers, and read their notes. */
         canSearch: boolean;
+        /**
+         * The plan takes payment online (`takesOnlinePayment`, R33). When
+         * it doesn't, "Send a payment link" isn't offered. Absent: yes.
+         */
+        online?: boolean;
     } | null;
 }) {
     const router = useRouter();
@@ -337,6 +342,7 @@ export function OrdersScreen({
                     initialStoreId={store?.id ?? stores[0].id}
                     // A new order's pay link is `order:create`'s (B16).
                     canLink={can.create}
+                    online={newOrder.online ?? true}
                     canSearch={newOrder.canSearch}
                 />
             ) : null}

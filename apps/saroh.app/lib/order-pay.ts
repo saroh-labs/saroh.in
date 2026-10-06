@@ -1,9 +1,9 @@
 import { serverApiUrl } from "./api-url";
 import { isIntent } from "./checkout-shape";
 import type { StartResult } from "./invoice-pay";
-import { payUrlOf } from "./invoice-pay-shape";
+import { payOnlineOf, payUrlOf } from "./invoice-pay-shape";
 import type { PayOrder } from "./order-pay-shape";
-import { isPayOrder } from "./order-pay-shape";
+import { howToPayOf, isPayOrder } from "./order-pay-shape";
 
 export type { PayOrder, PayOrderLine } from "./order-pay-shape";
 
@@ -38,8 +38,14 @@ export async function getPayOrder(token: string): Promise<OrderPayLookup> {
         return isPayOrder(body)
             ? {
                   ok: true,
-                  // Where the link lives (DEC-069, L6), checked.
-                  order: { ...body, payUrl: payUrlOf(body.payUrl) },
+                  order: {
+                      ...body,
+                      // Where the link lives (DEC-069, L6), checked.
+                      payUrl: payUrlOf(body.payUrl),
+                      // Only a real `false` turns Pay off (R33).
+                      payOnline: payOnlineOf(body.payOnline),
+                      howToPay: howToPayOf(body.howToPay),
+                  },
               }
             : { ok: false, reason: "unavailable" };
     }

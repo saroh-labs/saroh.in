@@ -33,7 +33,12 @@ export interface QuickLookContext {
      * Taking payment at the desk (P2): `booking:write` and `invoice:write`,
      * and whether a pay link can be sent instead (a provider connected).
      */
-    desk?: { canTake: boolean; canLink: boolean };
+    desk?: {
+        canTake: boolean;
+        canLink: boolean;
+        /** The plan takes payment online (R33); else no link is offered. */
+        online?: boolean;
+    };
     /**
      * What the business can tell its customers with (A14); null when it
      * couldn't be read.

@@ -1,5 +1,8 @@
 import { describe, expect, it } from "vitest";
 
+import { takesOnlinePayment } from "@/lib/billing/access";
+import { offlinePlan, onlinePlan } from "@/lib/billing/fixtures.test-data";
+
 import type { DiaryBooking } from "./booking-calendar";
 import { paidLine } from "./booking-money";
 import {
@@ -165,5 +168,29 @@ describe("a booking paid at the desk, as the screens say it", () => {
             "Check-up · pays at the session",
         );
         expect(blockLine(block(paid))).toBe("Check-up · paid at the desk");
+    });
+});
+
+describe("Take ₹X's choices on each plan (R33)", () => {
+    const take = { cents: 50_000, byLink: true };
+
+    it("on a plan without online payments: the counter ways only, no link at all", () => {
+        expect(
+            deskChoices({
+                take,
+                canLink: false,
+                online: takesOnlinePayment(offlinePlan()),
+            }).map((c) => c.key),
+        ).toEqual(["CASH", "UPI", "CARD"]);
+    });
+
+    it("on a plan with online payments: the link too", () => {
+        expect(
+            deskChoices({
+                take,
+                canLink: true,
+                online: takesOnlinePayment(onlinePlan()),
+            }).find((c) => c.key === "LINK"),
+        ).toEqual({ key: "LINK", label: "Send a pay link", off: null });
     });
 });
