@@ -101,7 +101,11 @@ function makeTx(
         },
         job: { create: jest.fn().mockResolvedValue({ id: "job_1" }) },
         service: { findFirst: jest.fn().mockResolvedValue(null) },
-        customerNotice: { findUnique: jest.fn().mockResolvedValue(null) },
+        customerNotice: {
+            findUnique: jest.fn().mockResolvedValue(null),
+            findMany: jest.fn().mockResolvedValue([]),
+        },
+        $executeRaw: jest.fn().mockResolvedValue(1),
     };
 }
 
@@ -303,6 +307,29 @@ describe("the monthly allowance on Saroh's route (U3)", () => {
         expect(tx.job.create).not.toHaveBeenCalled();
     });
 
+    it("a soft allowance cell (it would never refuse): NO_ALLOWANCE, never unmetered", async () => {
+        roomInTx.mockImplementation(
+            (
+                _tx: unknown,
+                _org: string,
+                _row: string,
+                opts: { refuseSoft: () => Error },
+            ) => Promise.reject(opts.refuseSoft()),
+        );
+        const tx = makeTx();
+        const res = await comms.queueTransactional(
+            tx as unknown as Tx,
+            "org_1",
+            notice(true),
+        );
+        expect(res).toMatchObject({ status: "NO_ALLOWANCE", route: "SAROH" });
+        expect(tx.message.create.mock.calls[0][0].data).toMatchObject({
+            status: "NO_ALLOWANCE",
+        });
+        expect(tx.delivery.create).not.toHaveBeenCalled();
+        expect(tx.job.create).not.toHaveBeenCalled();
+    });
+
     it("the row turned off since: NO_ALLOWANCE, the refusal kept out of the caller's transaction", async () => {
         roomInTx.mockRejectedValue(new ForbiddenException("locked"));
         const tx = makeTx();
@@ -340,5 +367,68 @@ describe("the monthly allowance on Saroh's route (U3)", () => {
         const tx = makeTx({ provider: "CONNECTED" });
         await comms.queueTransactional(tx as unknown as Tx, "org_1", notice());
         expect(roomInTx).not.toHaveBeenCalled();
+    });
+});
+
+describe("Saroh's cap per booking (DEC-086)", () => {
+    const aboutBooking = () => ({ ...notice(true), bookingId: "bk_1" });
+
+    it("under the cap: counted through the booking's notices, then queued", async () => {
+        const tx = makeTx();
+        tx.customerNotice.findMany.mockResolvedValue([
+            { messageId: "m1" },
+            { messageId: "m2" },
+        ]);
+        tx.delivery.count.mockResolvedValue(2);
+        const res = await comms.queueTransactional(
+            tx as unknown as Tx,
+            "org_1",
+            aboutBooking(),
+        );
+        expect(res.status).toBe("QUEUED");
+        expect(tx.customerNotice.findMany.mock.calls[0][0].where).toMatchObject(
+            { organizationId: "org_1", bookingId: "bk_1" },
+        );
+        expect(tx.delivery.count.mock.calls[0][0].where).toMatchObject({
+            provider: "SAROH",
+            messageId: { in: ["m1", "m2"] },
+        });
+    });
+
+    it("at 3 in the last day: BOOKING_LIMIT, nothing queued and the allowance not asked", async () => {
+        const tx = makeTx();
+        tx.customerNotice.findMany.mockResolvedValue([
+            { messageId: "m1" },
+            { messageId: "m2" },
+            { messageId: "m3" },
+        ]);
+        tx.delivery.count.mockResolvedValue(3);
+        const res = await comms.queueTransactional(
+            tx as unknown as Tx,
+            "org_1",
+            aboutBooking(),
+        );
+        expect(res).toMatchObject({ status: "BOOKING_LIMIT", route: "SAROH" });
+        expect(tx.message.create.mock.calls[0][0].data).toMatchObject({
+            status: "BOOKING_LIMIT",
+        });
+        expect(roomInTx).not.toHaveBeenCalled();
+        expect(tx.delivery.create).not.toHaveBeenCalled();
+        expect(tx.job.create).not.toHaveBeenCalled();
+    });
+
+    it("the business's own provider has no cap per booking", async () => {
+        const tx = makeTx({ provider: "CONNECTED" });
+        tx.delivery.count.mockResolvedValue(10);
+        const res = await comms.queueTransactional(
+            tx as unknown as Tx,
+            "org_1",
+            {
+                ...notice(),
+                bookingId: "bk_1",
+            },
+        );
+        expect(res).toMatchObject({ status: "QUEUED", route: "PROVIDER" });
+        expect(tx.customerNotice.findMany).not.toHaveBeenCalled();
     });
 });

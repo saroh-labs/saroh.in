@@ -197,7 +197,9 @@ describe("sarohMaySend (DEC-086)", () => {
         expect(
             await sarohRefusal(db(), "org_1", "BOOKING_CONFIRMED", NOW, d),
         ).toBe("LOOKUP_FAILED");
-        expect(await sarohSwitchesOn("org_1", d)).toBe(false);
+        // At send time a failed read is not a switch turned off: it throws,
+        // so the job retries instead of stopping the email for good.
+        await expect(sarohSwitchesOn("org_1", d)).rejects.toThrow("down");
         const count = deps();
         (count.queuedSince as jest.Mock).mockRejectedValue(new Error("down"));
         expect(
@@ -211,6 +213,8 @@ describe("sarohMaySend (DEC-086)", () => {
             { ...ROW, limit: null },
             { ...ROW, limit: 0 },
             { ...ROW, state: "locked" },
+            // A soft cell counts and never refuses: unmetered, so none.
+            { ...ROW, soft: true },
         ] as (ModuleAccess | null)[]) {
             expect(
                 await sarohRefusal(
@@ -242,6 +246,13 @@ describe("room in this month's allowance (U3)", () => {
                 "org_1",
                 NOW,
                 deps({ row: { ...ROW, limit: 0 } as ModuleAccess }),
+            ),
+        ).toBe(false);
+        expect(
+            await sarohRoomLeft(
+                "org_1",
+                NOW,
+                deps({ row: { ...ROW, soft: true } as ModuleAccess }),
             ),
         ).toBe(false);
         const d = deps();

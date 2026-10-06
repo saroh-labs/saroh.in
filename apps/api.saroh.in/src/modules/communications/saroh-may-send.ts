@@ -30,8 +30,8 @@ import {
  * 3. the global stop (`SAROH_BUSINESS_EMAIL_STOP`) is off;
  * 4. the business's `SAROH_BUSINESS_EMAIL` flag is on;
  * 5. `PLAN_ENFORCEMENT` is on for it — Saroh's sending is never unmetered;
- * 6. its plan has an allowance for it: a `saroh-emails` row, on, with a
- *    number (`sarohEmailsPerMonth`, U3);
+ * 6. its plan has an allowance for it: a `saroh-emails` row, on, hard (a
+ *    soft cell never refuses), with a number (`sarohEmailsPerMonth`, U3);
  * 7. the platform's daily ceiling has room.
  *
  * Every lookup that fails says no (and logs): this route spends a resource
@@ -98,10 +98,12 @@ export const defaultSarohDeps: SarohDeps = {
 
 /**
  * The row's monthly cap, or null (no allowance: fail closed) unless it gives
- * Saroh's emails a number above nothing.
+ * Saroh's emails a number above nothing. A soft cell is no allowance either:
+ * the meter counts a soft row and never refuses it, so Saroh's sending would
+ * be unmetered (`queueSarohInTx` refuses it the same way).
  */
 export function allowanceLimit(row: ModuleAccess | null): number | null {
-    if (row?.state !== "on") return null;
+    if (row?.state !== "on" || row.soft) return null;
     return typeof row.limit === "number" && row.limit > 0 ? row.limit : null;
 }
 
@@ -137,6 +139,12 @@ export async function providerConnected(
 /**
  * The switches alone (3 and 4): what a queued Saroh send re-checks when its
  * job runs, so turning either off stops sends already queued or retrying.
+ *
+ * Three answers, not two: true (both on), false (one is off: the send is
+ * STOPPED for good), or it throws when the flag can't be read — a lookup
+ * that failed is not a switch turned off, so the job is retried with
+ * backoff and the delivery stays QUEUED rather than being stopped for ever.
+ * Nothing is sent while it throws, so it still fails closed.
  */
 export async function sarohSwitchesOn(
     organizationId: string,
@@ -152,7 +160,7 @@ export async function sarohSwitchesOn(
         logger.warn(
             `saroh_email_lookup_failed org=${organizationId} step=flag error=${err instanceof Error ? err.name : "unknown"}`,
         );
-        return false;
+        throw err;
     }
 }
 

@@ -42,6 +42,12 @@ export interface RoomOptions {
     soft?: boolean;
     /** The refusal to throw instead of `PLAN_LIMIT_REACHED` (the booking page's). */
     refuse?: () => Error;
+    /**
+     * For a write that must never go unmetered (Saroh's emails, DEC-086):
+     * the error to throw, before anything is counted or told, when the
+     * catalogue marks the row soft — a soft row would never refuse it.
+     */
+    refuseSoft?: () => Error;
     now?: Date;
 }
 
@@ -224,6 +230,8 @@ export class MeteringService {
         const adding = options.adding ?? 1;
         const { now } = options;
         const moduleId = row.moduleId;
+        // A write that must stay metered takes no soft cell at all.
+        if (row.soft && options.refuseSoft) throw options.refuseSoft();
         // The catalogue's word wins over the call site's: a soft cell
         // counts and tells, and never refuses.
         const soft = options.soft === true || row.soft === true;

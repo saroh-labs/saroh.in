@@ -28,6 +28,7 @@ function statusVariant(status: string): BadgeVariant {
         case "STOPPED": // Saroh's email was switched off before it went (DEC-086).
         case "ALLOWANCE_USED": // Not emailed: Saroh's monthly allowance was used.
         case "NO_ALLOWANCE": // Not emailed: the plan gave Saroh's emails none.
+        case "BOOKING_LIMIT": // Not emailed: that booking had its 3 from Saroh today.
             return "destructive";
         case "QUEUED":
         default:

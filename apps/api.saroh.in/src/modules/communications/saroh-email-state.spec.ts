@@ -181,12 +181,14 @@ describe("sarohEmailState (DEC-086, U4)", () => {
         ).toEqual({ state: "UNREAD" });
     });
 
-    it("is OFF with enforcement off, a plan without the allowance (or a 0 one), the switch off or the global stop", async () => {
+    it("is OFF with enforcement off, a plan without the allowance (or a 0 or soft one), the switch off or the global stop", async () => {
         const cases: SarohStateDeps[] = [
             deps({ enforced: false }),
             deps({ row: null }),
             deps({ row: { ...ROW, limit: null } as ModuleAccess }),
             deps({ row: { ...ROW, limit: 0 } as ModuleAccess }),
+            // A soft cell would be unmetered, so it is no allowance.
+            deps({ row: { ...ROW, soft: true } as ModuleAccess }),
             deps({ flag: false }),
         ];
         for (const d of cases) {

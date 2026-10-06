@@ -130,6 +130,14 @@ describe("message.send through Saroh (DEC-086)", () => {
         expect(stampConfirmedEmail).not.toHaveBeenCalled();
     });
 
+    it("the flag can't be read: thrown so the worker retries, nothing sent or recorded (still QUEUED)", async () => {
+        switchesOn.mockRejectedValue(new Error("flag store down"));
+        await expect(handler.handle(job)).rejects.toThrow("flag store down");
+        expect(send).not.toHaveBeenCalled();
+        expect(deliveryUpdate).not.toHaveBeenCalled();
+        expect(messageUpdate).not.toHaveBeenCalled();
+    });
+
     it("a failed send is FAILED and thrown, so the worker retries it as any send", async () => {
         send.mockResolvedValue("failed");
         await expect(handler.handle(job)).rejects.toThrow(

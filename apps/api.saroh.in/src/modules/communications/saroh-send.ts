@@ -19,6 +19,8 @@ import { SECRET_LINK_SLOT } from "./transactional";
  *
  * - A switch off: the delivery is STOPPED (terminal, never retried, never
  *   counted) and the message FAILED.
+ * - The flag couldn't be read: this throws before anything is recorded, so
+ *   the delivery stays QUEUED and the worker retries it with backoff.
  * - Sent: the delivery and the message SENT.
  * - `unknown` (the connection dropped after SES started taking it): it may
  *   have gone, so it is never retried; the delivery and the message are

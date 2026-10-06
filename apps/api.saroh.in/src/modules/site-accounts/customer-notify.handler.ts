@@ -146,6 +146,10 @@ export class CustomerNotifyService {
                     template: payload.kind,
                     notice: subject.vars,
                     sarohMay: route === "SAROH",
+                    // Saroh's cap per booking counts by it (DEC-086).
+                    ...(subject.bookingId
+                        ? { bookingId: subject.bookingId }
+                        : {}),
                     recipient: { kind: "SITE_ACCOUNT", contactId: contact.id },
                     createdByUserId: null,
                 },

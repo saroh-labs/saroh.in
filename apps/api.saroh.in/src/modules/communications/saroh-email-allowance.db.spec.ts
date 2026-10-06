@@ -58,6 +58,7 @@ import {
     FakeCommsProviderFactory,
 } from "./providers/fake.provider";
 import { sendSarohBusinessEmail } from "./providers/saroh-email.sender";
+import { queueSarohInTx } from "./saroh-queue";
 
 const send = sendSarohBusinessEmail as jest.Mock;
 
@@ -408,6 +409,41 @@ describe("the allowance for emails Saroh sends (DEC-086, U3, real database)", ()
             );
         },
     );
+
+    it("a soft allowance cell (never refused) is no allowance: not sent, OFF on the screen, NO_ALLOWANCE at the queue", async () => {
+        const b = await business("soft");
+        await bookAndTell(b);
+        expect(await statuses(b.orgId)).toEqual([]);
+        expect(send).not.toHaveBeenCalled();
+        expect(await comms.noticeReach(b.owner, b.contactId)).toMatchObject({
+            email: false,
+        });
+        expect(await comms.sarohEmail(b.owner)).toEqual({
+            state: "OFF",
+            takesOver: false,
+        });
+        // Even asked past the rule (it read the plan before the cell turned
+        // soft), the queue records it not emailed rather than unmetered.
+        const queued = await prisma.$transaction((tx) =>
+            queueSarohInTx(tx, b.orgId, {
+                organizationId: b.orgId,
+                channel: "EMAIL",
+                contactId: b.contactId,
+                toAddress: "asha@example.com",
+                subject: "Your booking",
+                body: "<p>Hi</p>",
+                createdByUserId: null,
+                invoiceId: null,
+                template: "BOOKING_CONFIRMED",
+            }),
+        );
+        expect(queued.status).toBe("NO_ALLOWANCE");
+        expect(await statuses(b.orgId)).toEqual(["NO_ALLOWANCE"]);
+        expect(
+            await prisma.delivery.count({ where: { organizationId: b.orgId } }),
+        ).toBe(0);
+        expect(await jobsOf(b.orgId, "message.send")).toHaveLength(0);
+    });
 
     it("the plan can't be read: not sent, plan_meter_unresolved logged", async () => {
         const b = await business();

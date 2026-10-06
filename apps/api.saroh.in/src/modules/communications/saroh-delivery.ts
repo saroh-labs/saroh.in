@@ -80,5 +80,22 @@ export const ALLOWANCE_USED = "ALLOWANCE_USED";
  */
 export const NO_ALLOWANCE = "NO_ALLOWANCE";
 
+/**
+ * At most this many emails Saroh sends about one booking in any 24 hours
+ * (DEC-086): a customer moving a booking again and again can't drain the
+ * business's allowance or feed complaints through Saroh's address. Only on
+ * Saroh's route; a business's own provider has no such cap.
+ */
+export const SAROH_EMAILS_PER_BOOKING_PER_DAY = 3;
+
+/**
+ * A booking notice Saroh didn't email because that booking already had
+ * {@link SAROH_EMAILS_PER_BOOKING_PER_DAY} in the last 24 hours (no
+ * delivery, no job, not counted against the allowance). The thread message
+ * stands.
+ */
+export const BOOKING_LIMIT = "BOOKING_LIMIT";
+
 /** The Message statuses of a booking notice Saroh didn't email, and why. */
-export type NotEmailed = typeof ALLOWANCE_USED | typeof NO_ALLOWANCE;
+export type NotEmailed =
+    typeof ALLOWANCE_USED | typeof NO_ALLOWANCE | typeof BOOKING_LIMIT;

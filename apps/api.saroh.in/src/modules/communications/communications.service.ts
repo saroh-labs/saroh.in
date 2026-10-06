@@ -89,6 +89,12 @@ export type TransactionalWords =
            * can't turn that into a 409 inside its transaction.
            */
           sarohMay?: boolean;
+          /**
+           * The booking the notice is about, for Saroh's cap per booking
+           * (`SAROH_EMAILS_PER_BOOKING_PER_DAY`); a business's own
+           * provider has none.
+           */
+          bookingId?: string | null;
       };
 
 /** Input for {@link CommunicationsService.queueTransactional}. */
@@ -127,8 +133,8 @@ export interface TransactionalResult {
 
 /**
  * A notice given as its values: it may go through Saroh (DEC-086), where it
- * can also be recorded and not emailed — ALLOWANCE_USED or NO_ALLOWANCE
- * (`saroh-queue.ts`).
+ * can also be recorded and not emailed — ALLOWANCE_USED, NO_ALLOWANCE or
+ * BOOKING_LIMIT (`saroh-queue.ts`).
  */
 export interface NoticeTransactionalResult extends Omit<
     TransactionalResult,
@@ -826,7 +832,9 @@ export class CommunicationsService {
         }
 
         if (saroh) {
-            return queueSarohInTx(tx, organizationId, base);
+            return queueSarohInTx(tx, organizationId, base, {
+                bookingId: "notice" in input ? input.bookingId : null,
+            });
         }
         // Without Saroh the provider is connected (checked above); said
         // again so the type knows it.

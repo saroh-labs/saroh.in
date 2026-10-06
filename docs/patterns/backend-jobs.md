@@ -144,7 +144,13 @@ nobody was told. Round-2 A14 closed it (`bookings/booking-notify.handler.ts`).
   refuses rolls the notice back; the delivery is stamped `SAROH` and
   `message.send` re-checks the switches (off: `STOPPED`, never retried).
   Each one counts against `sarohEmailsPerMonth` under the plan-meter lock;
-  at the cap the Message is `ALLOWANCE_USED`, never thrown.
+  at the cap the Message is `ALLOWANCE_USED`, never thrown. A soft
+  `saroh-emails` cell is no allowance (`NO_ALLOWANCE`): it would never
+  refuse. At most `SAROH_EMAILS_PER_BOOKING_PER_DAY` (3) go about one
+  booking in any 24 hours, counted through its `CustomerNotice` rows;
+  past it the Message is `BOOKING_LIMIT` and not counted. A flag that
+  can't be read when the send job runs throws (retried, still `QUEUED`);
+  only a switch read as off stops it.
 
 ## Autopay charges — **Current** (D13)
 

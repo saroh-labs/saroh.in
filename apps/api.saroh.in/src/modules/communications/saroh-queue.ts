@@ -3,7 +3,11 @@ import type { Prisma } from "@saroh/database";
 
 import { countUsage, windowKey } from "../billing/metering";
 import type { MeteringService, PlanRoom } from "../billing/metering.service";
-import { planMeter, queueLimitNoticeInTx } from "../billing/metering.service";
+import {
+    lockMeter,
+    planMeter,
+    queueLimitNoticeInTx,
+} from "../billing/metering.service";
 import {
     limitLevel,
     limitNoticeKey,
@@ -16,8 +20,11 @@ import { MESSAGE_SEND_TYPE } from "./message-send.handler";
 import type { NotEmailed } from "./saroh-delivery";
 import {
     ALLOWANCE_USED,
+    BOOKING_LIMIT,
+    COUNTED_SAROH_DELIVERIES,
     NO_ALLOWANCE,
     SAROH_EMAILS_KEY,
+    SAROH_EMAILS_PER_BOOKING_PER_DAY,
     SAROH_EMAILS_ROW,
     SAROH_PROVIDER,
     SAROH_SEND_ATTEMPTS,
@@ -94,9 +101,64 @@ class AllowanceUsed extends Error {
     }
 }
 
+/** …and with when the plan's cell is soft: it would never refuse, so none. */
+class SoftAllowance extends Error {
+    constructor() {
+        super("Saroh's email allowance is soft: it would never stop a send");
+    }
+}
+
+const DAY_MS = 24 * 60 * 60 * 1000;
+
+/**
+ * How many emails Saroh has sent (or still has queued) about one booking
+ * since `since`: its `CustomerNotice` rows name the booking and the Message
+ * each became, and the counted `SAROH` deliveries of those messages are
+ * what went. The notice being handled has no message yet, so it isn't one.
+ */
+export async function sarohEmailsForBooking(
+    tx: Pick<Tx, "customerNotice" | "delivery">,
+    organizationId: string,
+    bookingId: string,
+    since: Date,
+): Promise<number> {
+    const notices = await tx.customerNotice.findMany({
+        where: {
+            organizationId,
+            bookingId,
+            messageId: { not: null },
+            createdAt: { gte: since },
+        },
+        select: { messageId: true },
+    });
+    const messageIds = notices
+        .map((n) => n.messageId)
+        .filter((id): id is string => id !== null);
+    if (messageIds.length === 0) return 0;
+    return tx.delivery.count({
+        where: {
+            ...COUNTED_SAROH_DELIVERIES,
+            organizationId,
+            messageId: { in: messageIds },
+            createdAt: { gte: since },
+        },
+    });
+}
+
+/** What a Saroh send is about, beyond its words. */
+export interface SarohAbout {
+    /**
+     * The booking the notice is about: at most
+     * `SAROH_EMAILS_PER_BOOKING_PER_DAY` go about it in any 24 hours.
+     */
+    bookingId?: string | null;
+}
+
 /**
  * Message + `SAROH` Delivery + `message.send` job, on the caller's
- * transaction — when this month's allowance has room (U3).
+ * transaction — when this month's allowance has room (U3), and the booking
+ * it is about hasn't had its {@link SAROH_EMAILS_PER_BOOKING_PER_DAY} in the
+ * last 24 hours (else BOOKING_LIMIT, checked first so it isn't counted).
  *
  * The allowance is counted under the plan-meter lock
  * (`MeteringService.roomInTx`), so two notices racing for the last email
@@ -104,21 +166,40 @@ class AllowanceUsed extends Error {
  * cap the meter throws a sentinel caught here, and the Message is written
  * ALLOWANCE_USED (no delivery, no job) with the cap's notice queued once a
  * month; with no allowance to count against (the plan read failed, has no
- * row or no number, or the row is off now) it is NO_ALLOWANCE. Either way
+ * row or no number, the row is off now, or it is soft — a soft cell never
+ * refuses, so it would be unmetered) it is NO_ALLOWANCE. Either way
  * the thread message the caller wrote stands.
  */
 export async function queueSarohInTx(
     tx: Tx,
     organizationId: string,
     base: QueuedMessageBase,
+    about: SarohAbout = {},
     meter: Pick<MeteringService, "roomInTx" | "enforcedRow"> = planMeter,
     now: Date = new Date(),
 ): Promise<SarohQueued> {
+    if (about.bookingId) {
+        // Counted under the plan-meter lock (the notify handler took it
+        // first; taking it again is a no-op), so two notices about one
+        // booking at once can't both have its last place.
+        await lockMeter(tx, organizationId, SAROH_EMAILS_KEY);
+        const sent = await sarohEmailsForBooking(
+            tx,
+            organizationId,
+            about.bookingId,
+            new Date(now.getTime() - DAY_MS),
+        );
+        if (sent >= SAROH_EMAILS_PER_BOOKING_PER_DAY) {
+            return notEmailed(tx, base, BOOKING_LIMIT);
+        }
+    }
     const used = new AllowanceUsed();
+    const soft = new SoftAllowance();
     let room: PlanRoom | null;
     try {
         room = await meter.roomInTx(tx, organizationId, SAROH_EMAILS_ROW, {
             refuse: () => used,
+            refuseSoft: () => soft,
             now,
         });
     } catch (err) {
@@ -126,6 +207,8 @@ export async function queueSarohInTx(
             await queueCapNotice(tx, meter, organizationId, now);
             return notEmailed(tx, base, ALLOWANCE_USED);
         }
+        // A soft cell never refuses, so Saroh would send unmetered: none.
+        if (err === soft) return notEmailed(tx, base, NO_ALLOWANCE);
         // The row turned off since `sarohMaySend` read it (MODULE_LOCKED):
         // thrown before the meter wrote or counted anything.
         if (err instanceof ForbiddenException) {
