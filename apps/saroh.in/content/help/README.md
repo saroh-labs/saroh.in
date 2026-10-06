@@ -91,8 +91,7 @@ Then run `pnpm --filter web test` and `e2e/tests/help.spec.ts` with
 ## Pointing articles at each other
 
 When a new article lands, add it to `next` of the articles that should point
-at it. The first article's design also named "Add sizes and options" and
-"Count and move stock", which aren't written yet.
+at it.
 
 A link in an article's MDX body (the prose before the steps) is drawn as a
 link: the payment articles point at their integration page that way.

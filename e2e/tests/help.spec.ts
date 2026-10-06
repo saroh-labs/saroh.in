@@ -202,7 +202,7 @@ test("at desk the topics stay in view while the article scrolls, and scroll insi
     expect(sizes.overflow).toBe("auto");
 });
 
-/** The bookings, plans and website articles: each step's real screen, ringed. */
+/** The bookings, plans, website and stock articles: each step's real screen, ringed. */
 const MORE = [
     { slug: "set-your-teams-hours", title: "Set your team's hours", steps: 6 },
     {
@@ -221,6 +221,8 @@ const MORE = [
         title: "Make your link look right when shared",
         steps: 4,
     },
+    { slug: "add-sizes-and-options", title: "Add sizes and options", steps: 5 },
+    { slug: "count-and-move-stock", title: "Count and move stock", steps: 5 },
 ];
 
 for (const a of MORE) {
