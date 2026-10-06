@@ -541,6 +541,142 @@ describe("a deposit at booking (E8)", () => {
     });
 });
 
+describe("how people pay when they book (DEC-088)", () => {
+    const rules = (bookingPayment: string) => ({
+        bookAheadDays: null,
+        latestBookingMinutes: null,
+        freeCancelHours: null,
+        refundInTimeCancels: true,
+        bookingPayment,
+    });
+    const book = (over: Partial<BookInput>) =>
+        new PublicBookingsService().bookOnline(
+            "svc_1",
+            input(over),
+            "iphash",
+            NOW,
+        );
+
+    it("Both, the default, takes pay now and the desk as before", async () => {
+        db.bookingRules.findUnique.mockResolvedValue(rules("BOTH"));
+        await book({ pay: "DESK" });
+        await book({ pay: "NOW", idempotencyKey: "key_2" });
+        expect(db.booking.create).toHaveBeenCalledTimes(2);
+    });
+
+    it("at the desk only: refuses pay now, holding nothing", async () => {
+        db.bookingRules.findUnique.mockResolvedValue(rules("DESK"));
+        await expect(book({ pay: "NOW" })).rejects.toMatchObject({
+            status: 409,
+            response: {
+                message:
+                    "This business takes payment at the desk. Book it to pay at the desk.",
+                field: "pay",
+            },
+        });
+        expect(db.booking.create).not.toHaveBeenCalled();
+        expect(db.invoice.create).not.toHaveBeenCalled();
+    });
+
+    it("at the desk only: a deposit can't be taken, so it says get in touch", async () => {
+        db.bookingRules.findUnique.mockResolvedValue(rules("DESK"));
+        db.service.findUnique.mockResolvedValue(
+            service({ depositMode: "PERCENT_50" }),
+        );
+        await expect(book({ pay: "DEPOSIT" })).rejects.toMatchObject({
+            response: {
+                message:
+                    "This business can't take the deposit online right now. Get in touch with them to book.",
+            },
+        });
+        expect(db.booking.create).not.toHaveBeenCalled();
+    });
+
+    it("at the desk only: books it at the desk", async () => {
+        db.bookingRules.findUnique.mockResolvedValue(rules("DESK"));
+        await book({ pay: "DESK" });
+        expect(db.booking.create.mock.calls[0][0].data).toMatchObject({
+            status: "CONFIRMED",
+            paidWith: "DESK",
+        });
+    });
+
+    it("online only: refuses the desk, and no way given, for a priced service", async () => {
+        db.bookingRules.findUnique.mockResolvedValue(rules("ONLINE"));
+        for (const pay of ["DESK", undefined] as const) {
+            await expect(book({ pay })).rejects.toMatchObject({
+                status: 409,
+                response: {
+                    message:
+                        "This business takes payment online when you book. Pay now to book it.",
+                    field: "pay",
+                },
+            });
+        }
+        expect(db.booking.create).not.toHaveBeenCalled();
+    });
+
+    it("online only: a service with no price books with nothing to pay", async () => {
+        db.bookingRules.findUnique.mockResolvedValue(rules("ONLINE"));
+        db.service.findUnique.mockResolvedValue(service({ priceCents: null }));
+        await book({ pay: "DESK" });
+        expect(db.booking.create).toHaveBeenCalledTimes(1);
+    });
+
+    it("online only: pays now", async () => {
+        db.bookingRules.findUnique.mockResolvedValue(rules("ONLINE"));
+        const out = await book({ pay: "NOW" });
+        expect(out.payToken).toEqual(expect.any(String));
+    });
+
+    it("online only with no provider: says get in touch, not the desk", async () => {
+        db.bookingRules.findUnique.mockResolvedValue(rules("ONLINE"));
+        db.merchantPaymentProvider.findFirst.mockResolvedValue(null);
+        await expect(book({ pay: "NOW" })).rejects.toMatchObject({
+            response: {
+                message:
+                    "This business can't take payment online right now. Get in touch with them to book.",
+            },
+        });
+        expect(db.booking.create).not.toHaveBeenCalled();
+    });
+
+    it.each([
+        ["BOTH", true],
+        ["ONLINE", true],
+        ["DESK", false],
+    ])(
+        "the page offers pay now only when the business allows it: %s",
+        async (way, payOnline) => {
+            db.bookingRules.findUnique.mockResolvedValue(rules(way));
+            db.site.findFirst.mockResolvedValue({
+                organizationId: "org_1",
+                organization: { name: "Kavi Dental" },
+            });
+            db.service.findMany.mockResolvedValue([]);
+            const page = await new PublicBookingsService().publicBookingPage(
+                "site_1",
+            );
+            expect(page.payOnline).toBe(payOnline);
+            expect(page.rules.bookingPayment).toBe(way);
+        },
+    );
+
+    it("the page never offers pay now without a provider, whatever the rule", async () => {
+        db.bookingRules.findUnique.mockResolvedValue(rules("ONLINE"));
+        db.merchantPaymentProvider.findFirst.mockResolvedValue(null);
+        db.site.findFirst.mockResolvedValue({
+            organizationId: "org_1",
+            organization: { name: "Kavi Dental" },
+        });
+        db.service.findMany.mockResolvedValue([]);
+        const page = await new PublicBookingsService().publicBookingPage(
+            "site_1",
+        );
+        expect(page.payOnline).toBe(false);
+    });
+});
+
 describe("pay at the desk (U19)", () => {
     it("books it confirmed, paid at the desk, with no invoice", async () => {
         const out = await new PublicBookingsService().bookOnline(
