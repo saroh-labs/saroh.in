@@ -689,6 +689,12 @@ const visitUsV1 = z.object({
  * and so ignores `count`, `layout`, `showImages` and `buttonLabel`. A look
  * rather than `count: "all"`, so `count` keeps meaning one thing and a
  * section switched back to cards keeps the count it had.
+ *
+ * The `lead` look (template polish) opens on the newest post in depth: its
+ * date, title, own excerpt, a reading time worked out from its length, its
+ * opening paragraphs as plain text and "Continue reading". The paragraphs
+ * come from the post's body the feed already carries, so nothing new is
+ * read. A section under it sets `afterLead` so the newest is not shown twice.
  */
 const journalV1 = z.object({
     variant,
@@ -700,6 +706,25 @@ const journalV1 = z.object({
     /** Display options (G16): ABSENT, cards and no button of their own. */
     layout: listLayout,
     buttonLabel,
+    /**
+     * Leave out the newest post (template polish), for a section under a
+     * `lead` one that already opens on it. ABSENT, every post.
+     */
+    afterLead: z.boolean().optional(),
+    /** The archive look's posts under their year (template polish). */
+    groupByYear: z.boolean().optional(),
+    /**
+     * "{n} pieces in all" beside the title, counted from every post the
+     * site has live, not only the ones shown (template polish).
+     */
+    showTotal: z.boolean().optional(),
+    /**
+     * The archive look's newest few, with "All {n} entries" beside the title
+     * to the posts index (template polish). ABSENT, every post.
+     */
+    archiveLimit: z.number().int().min(1).max(24).optional(),
+    /** Dates in this year without the year: "2 Apr" (template polish). */
+    shortDates: z.boolean().optional(),
 });
 
 /**

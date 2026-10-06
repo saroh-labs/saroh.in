@@ -165,7 +165,7 @@ function PortraitColumn({ content }: { content: RenderedPerson }) {
     const credentials = credentialsOf(content.credentials);
     const label = said(content.credentialsLabel) ?? PERSON_CREDENTIALS_LABEL;
     const Name = content.asTitle ? "h1" : "h2";
-    const aside = src || credentials.length > 0;
+    const aside = src !== null || credentials.length > 0;
     const rows =
         credentials.length > 0 ? (
             <div className={src ? "mt-6" : undefined}>

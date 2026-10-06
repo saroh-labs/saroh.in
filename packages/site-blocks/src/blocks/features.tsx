@@ -150,7 +150,7 @@ function FactsRow({ content }: { content: RenderedFeatures }) {
     const items = content.items.filter((item) => said(item.title) !== null);
     if (items.length === 0) return null;
     const note = said(content.note);
-    const lead = Boolean(content.heading || content.intro);
+    const lead = Boolean(content.heading) || Boolean(content.intro);
     return (
         <section className="mx-auto w-full max-w-screen-xl px-5 py-[var(--site-section-padding)] sm:px-[var(--site-page-margin)]">
             {content.heading ? (

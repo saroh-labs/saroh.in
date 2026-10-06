@@ -103,6 +103,11 @@ export const SAMPLE_POSTS: JournalPost[] = [
         slug: "two-day-sourdough",
         excerpt:
             "A slow, cold rise is where the flavour comes from. Here is what happens overnight.",
+        content:
+            "<p>The dough is mixed at four in the afternoon and folded until seven. Then it goes into the cold, and the flour has all night to do its work.</p>" +
+            "<p>A slow, cold rise is where the flavour comes from: the starter keeps working long after the yeast would have given up.</p>" +
+            "<p>By six the next morning it is shaped, and by eight it is on the counter.</p>" +
+            "<p>That is the whole secret, and the reason there is no bread on Mondays.</p>",
         image: "data:image/svg+xml;utf8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='800' height='400'%3E%3Crect width='800' height='400' fill='%23d9cbb5'/%3E%3Cellipse cx='400' cy='230' rx='230' ry='110' fill='%23a8794c'/%3E%3C/svg%3E",
         author: "Asha",
         publishedAt: "2026-09-18T08:00:00.000Z",

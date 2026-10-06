@@ -70,7 +70,7 @@ export default function RichTextSection({
             </div>
         );
 
-    const callout = content.callout?.text?.trim() ? (
+    const callout = content.callout?.text.trim() ? (
         <Callout label={content.callout.label} text={content.callout.text} />
     ) : null;
 
@@ -176,7 +176,7 @@ function Callout({ label, text }: { label?: string; text: string }) {
     const name = label?.trim();
     return (
         <aside
-            aria-label={name || undefined}
+            aria-label={name === "" ? undefined : name}
             className="border-site-accent bg-site-surface text-site-fg mt-8 max-w-[var(--site-measure,65ch)] border-l-2 px-5 py-4"
         >
             {name ? (

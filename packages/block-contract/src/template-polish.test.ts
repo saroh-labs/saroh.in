@@ -259,3 +259,30 @@ describe("timetable: the accent look, weekdays only, counts", () => {
         ).toBe(false);
     });
 });
+
+describe("journal: the lead, the archive by year, totals and limits", () => {
+    it("saves the lead look and the archive's options", () => {
+        expect(
+            parseSectionContent("journal", 1, { variant: "lead" }).success,
+        ).toBe(true);
+        expect(
+            parseSectionContent("journal", 1, {
+                variant: "archive",
+                afterLead: true,
+                groupByYear: true,
+                showTotal: true,
+                archiveLimit: 3,
+                shortDates: true,
+            }).success,
+        ).toBe(true);
+        expect(resolveVariant("journal", { variant: "lead" })).toBe("lead");
+    });
+
+    it("refuses an archive limit of none or past two dozen", () => {
+        for (const archiveLimit of [0, 25, 2.5]) {
+            expect(
+                parseSectionContent("journal", 1, { archiveLimit }).success,
+            ).toBe(false);
+        }
+    });
+});

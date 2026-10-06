@@ -698,11 +698,18 @@ export const BLOCK_META = {
                 description:
                     "Every published post as a dated list: the date in a column, the title and its line beside it.",
             },
+            {
+                id: "lead",
+                label: "Lead piece",
+                description:
+                    "The newest post in depth: its title set large, its opening paragraphs and Continue reading. For a site that is mostly writing.",
+            },
         ] as const,
         fixtures: {
             // The catalog and the snapshot hand the component sample posts.
             default: { variant: "default", title: "Journal", count: 3 },
             archive: { variant: "archive", title: "All writing" },
+            lead: { variant: "lead" },
         },
         cases: {
             // Two rows, words only: the switches off and the larger count.
@@ -712,6 +719,22 @@ export const BLOCK_META = {
                 count: 6,
                 showExcerpts: false,
                 showImages: false,
+            },
+            // The archive by year, with the total, after a lead (template polish).
+            byYear: {
+                variant: "archive",
+                title: "Archive",
+                afterLead: true,
+                groupByYear: true,
+                showTotal: true,
+                showExcerpts: false,
+            },
+            // The newest few with a link to all of them, dates without the year.
+            latest: {
+                variant: "archive",
+                title: "From the bakery",
+                archiveLimit: 3,
+                shortDates: true,
             },
         },
     },

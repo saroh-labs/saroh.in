@@ -320,6 +320,11 @@ const renderedJournal = z.object({
     showImages: z.boolean().optional(),
     layout: z.enum(["cards", "list"]).optional(),
     buttonLabel: z.string().optional(),
+    afterLead: z.boolean().optional(),
+    groupByYear: z.boolean().optional(),
+    showTotal: z.boolean().optional(),
+    archiveLimit: z.number().int().optional(),
+    shortDates: z.boolean().optional(),
 });
 
 /**

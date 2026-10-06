@@ -39,6 +39,7 @@ export function rhythmGroups(items: readonly Project[]): {
     lead: Project | null;
     groups: RhythmGroup[];
 } {
+    if (items.length === 0) return { lead: null, groups: [] };
     const [lead, ...rest] = items;
     const groups: RhythmGroup[] = [];
     for (let i = 0, turn = 0; i < rest.length; i += 2, turn++) {
@@ -53,7 +54,7 @@ export function rhythmGroups(items: readonly Project[]): {
             items: two,
         });
     }
-    return { lead: lead ?? null, groups };
+    return { lead, groups };
 }
 
 const focusRing =
@@ -99,13 +100,13 @@ export function RhythmGallery({
                         className="grid items-end gap-[var(--site-grid-gap)] sm:grid-cols-[minmax(0,1fr)_minmax(0,1.72fr)]"
                     >
                         <Tile
-                            item={group.items[0] as Project}
+                            item={group.items[0]}
                             over={over}
                             frame="aspect-[3/4]"
                             band="h-[66px]"
                         />
                         <Tile
-                            item={group.items[1] as Project}
+                            item={group.items[1]}
                             over={over}
                             frame="aspect-video"
                             band="h-[66px]"
@@ -114,7 +115,7 @@ export function RhythmGallery({
                 ) : (
                     <Tile
                         key={i}
-                        item={group.items[0] as Project}
+                        item={group.items[0]}
                         over={over}
                         frame="aspect-video"
                         band="h-[66px]"

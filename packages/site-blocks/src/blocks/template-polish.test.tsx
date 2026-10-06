@@ -9,6 +9,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 import {
     SAMPLE_PLANS,
+    SAMPLE_POSTS,
     SAMPLE_PRODUCTS,
     SAMPLE_TIMETABLE,
     SAMPLE_VISIT,
@@ -16,6 +17,8 @@ import {
 import { fills, isWeekday, weekCounts } from "../lib/timetable-read";
 import FeaturesSection from "./features";
 import HoursSection, { groupedHoursRows, hoursRows } from "./hours";
+import type { JournalPost } from "./journal";
+import JournalSection, { openingParagraphs, readingTime } from "./journal";
 import PersonSection, { credentialsOf } from "./person";
 import PlansSection from "./plans";
 import ProductGridSection, { availabilityLine } from "./product-grid";
@@ -305,7 +308,7 @@ describe("projects: rhythm and rows, a count", () => {
         // Words over the photo sit on a band of a fixed height.
         const bands = container.querySelectorAll("[data-plate-band]");
         expect(bands.length).toBe(5);
-        expect(bands[0]?.className).toContain("h-[82px]");
+        expect(bands[0].className).toContain("h-[82px]");
     });
 
     it("draws rows as year | the work | role, with the count beside the title", () => {
@@ -315,9 +318,9 @@ describe("projects: rhythm and rows, a count", () => {
         expect(container.querySelector("img")).toBeNull();
         const rows = container.querySelectorAll("ol > li");
         expect(rows.length).toBe(3);
-        expect(rows[0]?.textContent).toContain("2026");
-        expect(rows[0]?.textContent).toContain("Sole engineer");
-        expect(rows[0]?.textContent).toContain("Go · Postgres · React");
+        expect(rows[0].textContent).toContain("2026");
+        expect(rows[0].textContent).toContain("Sole engineer");
+        expect(rows[0].textContent).toContain("Go · Postgres · React");
         // A web link shows its host, and names the project for a screen reader.
         expect(
             screen.getByRole("link", {
@@ -369,7 +372,7 @@ describe("person: portrait, team, credential rows, the page's title", () => {
         );
         const list = screen.getByRole("list", { name: "Qualifications" });
         const rows = within(list).getAllByRole("listitem");
-        expect(rows[0]?.textContent).toBe(
+        expect(rows[0].textContent).toBe(
             "MSc Clinical NutritionA university, and the year",
         );
         expect(screen.getByText("Qualifications").tagName).toBe("P");
@@ -482,7 +485,7 @@ describe("timetable: the accent look, weekdays only, counts", () => {
         );
         const lit = Array.from(container.querySelectorAll(".bg-site-accent"))
             .filter((el) => !el.hasAttribute("aria-hidden"))
-            .map((el) => el.textContent ?? "");
+            .map((el) => el.textContent);
         // Each lit cell, desk and phone alike, says why in words.
         expect(lit.length).toBeGreaterThan(0);
         for (const text of lit) {
@@ -522,5 +525,133 @@ describe("timetable: the accent look, weekdays only, counts", () => {
         expect(container.querySelector("th[scope=row]")?.className).toContain(
             "font-site-heading",
         );
+    });
+});
+
+describe("journal: the lead, the archive by year, totals and limits", () => {
+    const post = (slug: string, publishedAt: string): JournalPost => ({
+        title: slug,
+        slug,
+        publishedAt,
+        excerpt: `About ${slug}`,
+    });
+    const POSTS = [
+        post("lead", "2026-04-02T08:00:00.000Z"),
+        post("march", "2026-03-12T08:00:00.000Z"),
+        post("january", "2026-01-31T08:00:00.000Z"),
+        post("december", "2025-12-19T08:00:00.000Z"),
+        post("may", "2025-05-27T08:00:00.000Z"),
+    ];
+    const feed = { posts: POSTS, basePath: "/blog" };
+    const MAY_2026 = new Date("2026-05-01T00:00:00.000Z");
+
+    it("takes the opening paragraphs as text, skipping empty ones and <pre>", () => {
+        expect(
+            openingParagraphs(
+                "<p>One &amp; <b>two</b>.</p><p> </p><pre>code</pre><p class=x>Three</p><p>Four</p><p>Five</p>",
+            ),
+        ).toEqual(["One & two.", "Three", "Four"]);
+        expect(openingParagraphs("<p>Unclosed and <i>on")).toEqual([
+            "Unclosed and on",
+        ]);
+        expect(openingParagraphs(null)).toEqual([]);
+        expect(readingTime(null)).toBeNull();
+        expect(readingTime(`<p>${"word ".repeat(2760)}</p>`)).toBe(
+            "About 12 minutes",
+        );
+    });
+
+    it("opens on the newest post: date, title, excerpt, paragraphs, Continue reading", () => {
+        render(
+            <JournalSection
+                content={BLOCK_META.journal.fixtures.lead}
+                feed={{ posts: SAMPLE_POSTS, basePath: "/blog" }}
+            />,
+        );
+        const title = screen.getByRole("heading", {
+            level: 2,
+            name: "Why our sourdough takes two days",
+        });
+        expect(within(title).getByRole("link").getAttribute("href")).toBe(
+            "/blog/two-day-sourdough",
+        );
+        expect(screen.getByText("18 Sep 2026").className).not.toContain(
+            "text-site-muted",
+        );
+        expect(screen.getByText("About 1 minute")).toBeTruthy();
+        expect(screen.getByText(/mixed at four in the afternoon/)).toBeTruthy();
+        // Three paragraphs, not the fourth.
+        expect(screen.queryByText(/no bread on Mondays/)).toBeNull();
+        expect(
+            screen.getByRole("link", { name: /Continue reading/ }),
+        ).toBeTruthy();
+    });
+
+    it("files the rest by year after the lead, with the total of every post", () => {
+        const { container } = render(
+            <JournalSection
+                content={BLOCK_META.journal.cases.byYear}
+                feed={feed}
+            />,
+        );
+        expect(screen.queryByText("lead")).toBeNull();
+        const years = Array.from(
+            container.querySelectorAll("section[aria-label]"),
+        ).map((el) => el.getAttribute("aria-label"));
+        expect(years).toEqual(["2026", "2025"]);
+        // Under its year, a date has no year of its own.
+        expect(screen.getByText("12 Mar")).toBeTruthy();
+        expect(
+            container.querySelector("[data-journal-total]")?.textContent,
+        ).toBe("5 pieces in all");
+    });
+
+    it("lists the latest few with a link to all, this year's dates without the year", () => {
+        render(
+            <JournalSection
+                content={BLOCK_META.journal.cases.latest}
+                feed={feed}
+                now={MAY_2026}
+            />,
+        );
+        expect(
+            screen
+                .getByRole("link", { name: /All 5 entries/ })
+                .getAttribute("href"),
+        ).toBe("/blog");
+        expect(screen.getByText("2 Apr")).toBeTruthy();
+        expect(screen.getByText("31 Jan")).toBeTruthy();
+        expect(screen.queryByText(/Dec/)).toBeNull();
+    });
+
+    it("keeps last year's dates whole when this year's are short", () => {
+        render(
+            <JournalSection
+                content={{
+                    ...BLOCK_META.journal.cases.latest,
+                    archiveLimit: 5,
+                }}
+                feed={feed}
+                now={MAY_2026}
+            />,
+        );
+        expect(screen.getByText("19 Dec 2025")).toBeTruthy();
+    });
+
+    it("renders nothing with no posts, and nothing after the lead with only one", () => {
+        const none = render(
+            <JournalSection
+                content={BLOCK_META.journal.fixtures.lead}
+                feed={{ posts: [], basePath: "/blog" }}
+            />,
+        );
+        expect(none.container.innerHTML).toBe("");
+        const one = render(
+            <JournalSection
+                content={BLOCK_META.journal.cases.byYear}
+                feed={{ posts: [POSTS[0]], basePath: "/blog" }}
+            />,
+        );
+        expect(one.container.innerHTML).toBe("");
     });
 });

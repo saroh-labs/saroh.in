@@ -249,6 +249,16 @@ export interface JournalContent {
     /** Display options (G16). Absent: cards, and no button of their own. */
     layout?: ListLayout;
     buttonLabel?: string;
+    /** Leave out the newest post, shown above by a lead (template polish). */
+    afterLead?: boolean;
+    /** The archive by year. */
+    groupByYear?: boolean;
+    /** "{n} pieces in all" beside the title. */
+    showTotal?: boolean;
+    /** The archive's newest few, and a link to all. */
+    archiveLimit?: number;
+    /** This year's dates without the year. */
+    shortDates?: boolean;
 }
 
 /**

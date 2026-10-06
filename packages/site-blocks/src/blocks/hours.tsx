@@ -115,21 +115,24 @@ export function groupedHoursRows(
     rows: readonly { day: Weekday; hours: string | null }[],
 ): HoursLine[] {
     const lines: HoursLine[] = [];
+    let last: HoursLine | null = null;
     for (const row of rows) {
-        const last = lines[lines.length - 1];
-        const lastDay = last?.days[last.days.length - 1];
+        const lastDay: Weekday | null = last
+            ? last.days[last.days.length - 1]
+            : null;
         const adjacent =
-            lastDay !== undefined &&
+            lastDay !== null &&
             WEEK.indexOf(row.day) === WEEK.indexOf(lastDay) + 1;
         if (last && adjacent && last.hours === row.hours) {
             last.days.push(row.day);
         } else {
-            lines.push({ days: [row.day], label: "", hours: row.hours });
+            last = { days: [row.day], label: "", hours: row.hours };
+            lines.push(last);
         }
     }
     for (const line of lines) {
-        const first = DAY_NAMES[line.days[0] as Weekday];
-        const end = DAY_NAMES[line.days[line.days.length - 1] as Weekday];
+        const first = DAY_NAMES[line.days[0]];
+        const end = DAY_NAMES[line.days[line.days.length - 1]];
         line.label =
             line.days.length === 1
                 ? first
