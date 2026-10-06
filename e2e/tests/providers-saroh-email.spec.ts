@@ -24,6 +24,13 @@ import { urls } from "../playwright.config";
  * Flags), a live catalogue version whose Free plan has `saroh-emails` with
  * a monthly number, and Communications available to a new business.
  *
+ * The spec can't arrange that for itself: the flags and the catalogue are
+ * written only through `/admin` (staff), and the e2e stack has no staff
+ * session and no database access (DEV_LEARNINGS "a Shop page can't be shown
+ * in the browser suite"). Until it does, the route-on proof is the API's
+ * `saroh-email-state.db.spec.ts` (the state with the real defaults) and
+ * `saroh-email-allowance.db.spec.ts`.
+ *
  * The words for each state (near, paused, unread) and the Disconnect
  * warning are covered by `apps/app.saroh.in/lib/providers/rows.test.ts`;
  * the state itself by the API's `saroh-email-state.spec.ts`.
