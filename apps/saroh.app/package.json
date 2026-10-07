@@ -6,6 +6,8 @@
         "dev": "portless saroh.app next dev",
         "dev:app": "next dev",
         "dev:templates": "TEMPLATE_RENDERS=on NEXT_PUBLIC_ROOT_DOMAIN=templates.saroh.app.localhost portless templates.saroh.app next dev",
+        "build:templates": "TEMPLATE_RENDERS=on NEXT_PUBLIC_ROOT_DOMAIN=${TEMPLATE_RENDER_NAME:-templates.saroh.app}.localhost next build",
+        "start:templates": "TEMPLATE_RENDERS=on NEXT_PUBLIC_ROOT_DOMAIN=${TEMPLATE_RENDER_NAME:-templates.saroh.app}.localhost portless ${TEMPLATE_RENDER_NAME:-templates.saroh.app} next start",
         "build": "next build",
         "start": "next start",
         "lint": "eslint .",

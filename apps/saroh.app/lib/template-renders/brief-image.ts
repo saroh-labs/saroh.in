@@ -58,12 +58,20 @@ export function briefImage(
      * over low down (the full-bleed hero), so the brief never runs into the
      * headline, and a phone's tall crop of the middle still shows it whole.
      */
-    placement: "centre" | "top" = "centre",
+    /**
+     * `upper`: a little smaller, centred a third of the way down, for a card
+     * whose name and price are set over the photo's lower half (the
+     * Ceramics plates), so the brief stays clear of them in any crop.
+     */
+    placement: "centre" | "top" | "upper" = "centre",
 ): string {
     const { width, height } = size;
     const corner = placement === "top";
+    const upper = placement === "upper";
     // Sized to the shorter side, so a tall slot's words are not tiny.
-    const fontSize = Math.round(Math.min(width, height) / (corner ? 34 : 20));
+    const fontSize = Math.round(
+        Math.min(width, height) / (corner ? 34 : upper ? 26 : 20),
+    );
     // Inside the middle of the width (60%, or 30% at the top), whatever
     // the block crops to.
     const perLine = Math.max(
@@ -79,7 +87,8 @@ export function briefImage(
     const blockHeight = labelSize * 2 + lines.length * lineHeight;
     const top = corner
         ? Math.round(height * 0.16)
-        : Math.round((height - blockHeight) / 2) + labelSize;
+        : Math.round(height * (upper ? 0.38 : 0.5) - blockHeight / 2) +
+          labelSize;
     const x = Math.round(width / 2);
     const text = lines
         .map(

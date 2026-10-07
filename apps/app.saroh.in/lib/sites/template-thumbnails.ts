@@ -24,8 +24,23 @@ export const TEMPLATE_THUMBNAILS: Readonly<
         width: 360,
         height: 225,
     },
+    blogs: {
+        src: "/templates/blogs.webp",
+        width: 360,
+        height: 225,
+    },
+    ceramics: {
+        src: "/templates/ceramics.webp",
+        width: 360,
+        height: 225,
+    },
     clinic: {
         src: "/templates/clinic.webp",
+        width: 360,
+        height: 225,
+    },
+    developer: {
+        src: "/templates/developer.webp",
         width: 360,
         height: 225,
     },
@@ -41,6 +56,11 @@ export const TEMPLATE_THUMBNAILS: Readonly<
     },
     salon: {
         src: "/templates/salon.webp",
+        width: 360,
+        height: 225,
+    },
+    studio: {
+        src: "/templates/studio.webp",
         width: 360,
         height: 225,
     },

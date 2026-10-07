@@ -34,6 +34,7 @@ export default function HeroSection({
     bookHref,
     visit,
     today,
+    now,
 }: {
     content: RenderedHero;
     /** The live site, for On today's read (G18). See `SectionRenderer`. */
@@ -46,6 +47,8 @@ export default function HeroSection({
     visit?: PublicVisit;
     /** A day to draw On today from instead of reading (fixtures). */
     today?: PublicToday;
+    /** The moment "Open now" is worked out for (fixtures, tests). */
+    now?: Date;
 }) {
     const look = resolveVariant("hero", content);
     if (look === "fullBleed") {
@@ -55,6 +58,7 @@ export default function HeroSection({
                 siteId={siteId}
                 apiUrl={apiUrl}
                 visit={visit}
+                now={now}
             />
         );
     }
@@ -67,6 +71,7 @@ export default function HeroSection({
                 apiUrl={apiUrl}
                 bookHref={bookHref}
                 today={today}
+                now={now}
             />
         );
     }

@@ -155,6 +155,9 @@ export default function SectionRenderer({
      */
     productGrid?: ProductGridFeed;
 }) {
+    // A pinned moment (`SiteFixtures.now`); undefined on a live site, where
+    // each block reads the clock.
+    const now = fixtures?.now ? new Date(fixtures.now) : undefined;
     switch (section.type) {
         case "hero":
             return (
@@ -165,6 +168,7 @@ export default function SectionRenderer({
                     siteId={siteId}
                     visit={fixtures?.visit}
                     today={fixtures?.today}
+                    now={now}
                 />
             );
         case "richText":
@@ -224,6 +228,7 @@ export default function SectionRenderer({
                     apiUrl={apiUrl}
                     siteId={siteId}
                     visit={fixtures?.visit}
+                    now={now}
                 />
             );
         case "journal":
@@ -233,6 +238,7 @@ export default function SectionRenderer({
                     feed={journal}
                     apiUrl={apiUrl}
                     siteId={siteId}
+                    now={now}
                 />
             );
         case "plans":
@@ -287,6 +293,7 @@ export default function SectionRenderer({
                     apiUrl={apiUrl}
                     siteId={siteId}
                     visit={fixtures?.visit}
+                    now={now}
                 />
             );
         case "person":

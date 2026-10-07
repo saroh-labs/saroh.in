@@ -26,4 +26,11 @@ export interface SiteFixtures {
     timetable?: PublicTimetable;
     /** For the hero's On today panel. */
     today?: PublicToday;
+    /**
+     * The moment the page is drawn for, as an ISO instant: "Open now", today
+     * in Opening hours and the Journal's short dates are worked out for it
+     * instead of the clock, so a render taken at night still reads as the
+     * fixtures' morning. A live site never passes it (`now ?? new Date()`).
+     */
+    now?: string;
 }

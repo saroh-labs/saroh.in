@@ -2,15 +2,22 @@
  * Capture the template gallery's and the picker's pictures from the real
  * renderer (industry templates plan U14, KTD-6).
  *
- *   pnpm --filter sites dev:templates                 # the renderer, alone
+ *   pnpm --filter sites build:templates               # the renderer, built
+ *   pnpm --filter sites start:templates               # …and served, alone
  *   pnpm --filter @saroh/e2e shots:templates           # every gallery template
  *   pnpm --filter @saroh/e2e shots:templates gym store # just these (id or slug)
  *
  * The renderer serves `/template-renders` only with `TEMPLATE_RENDERS=on` on
  * its own host (`apps/saroh.app/lib/template-renders/guard.ts`);
- * `dev:templates` runs it that way under portless at
+ * `start:templates` runs it that way under portless at
  * https://templates.saroh.app.localhost, apart from the usual stack and its
- * ports. `TEMPLATE_RENDER_URL` points this elsewhere. No API, database or
+ * ports (`TEMPLATE_RENDER_NAME=<name>` on both scripts serves it under
+ * another portless name; point `TEMPLATE_RENDER_URL` at it). Capture from
+ * that production build, never `dev:templates` (for
+ * working on a render): a dev server draws Next's indicator and its issue
+ * badge, which no committed picture may show. Every render is drawn at one
+ * fixed weekday morning (`FIXTURE_NOW`, `lib/template-renders/fixtures.ts`),
+ * so "Open now" and "Free today" read the same whenever the run is. `TEMPLATE_RENDER_URL` points this elsewhere. No API, database or
  * sign-in: each template is drawn for its sample business from fixtures.
  *
  * For each template, in its first colourway, every page its sample business

@@ -45,6 +45,20 @@ export const TEMPLATE_SHOTS: Readonly<
             },
         },
     },
+    blogs: {
+        "/": {
+            desktop: {
+                src: "/templates/blogs/home-desktop.webp",
+                width: 1440,
+                height: 900,
+            },
+            phone: {
+                src: "/templates/blogs/home-phone.webp",
+                width: 390,
+                height: 844,
+            },
+        },
+    },
     clinic: {
         "/": {
             desktop: {
@@ -54,6 +68,20 @@ export const TEMPLATE_SHOTS: Readonly<
             },
             phone: {
                 src: "/templates/clinic/home-phone.webp",
+                width: 390,
+                height: 844,
+            },
+        },
+    },
+    developer: {
+        "/": {
+            desktop: {
+                src: "/templates/developer/home-desktop.webp",
+                width: 1440,
+                height: 900,
+            },
+            phone: {
+                src: "/templates/developer/home-phone.webp",
                 width: 390,
                 height: 844,
             },
@@ -132,6 +160,34 @@ export const TEMPLATE_SHOTS: Readonly<
             },
             phone: {
                 src: "/templates/salon/home-phone.webp",
+                width: 390,
+                height: 844,
+            },
+        },
+    },
+    store: {
+        "/": {
+            desktop: {
+                src: "/templates/store/home-desktop.webp",
+                width: 1440,
+                height: 900,
+            },
+            phone: {
+                src: "/templates/store/home-phone.webp",
+                width: 390,
+                height: 844,
+            },
+        },
+    },
+    studio: {
+        "/": {
+            desktop: {
+                src: "/templates/studio/home-desktop.webp",
+                width: 1440,
+                height: 900,
+            },
+            phone: {
+                src: "/templates/studio/home-phone.webp",
                 width: 390,
                 height: 844,
             },
