@@ -136,3 +136,43 @@ describe("PostEditor, a new post's first save (UX-034)", () => {
         );
     });
 });
+
+describe("PostEditor, the byline (UX-091)", () => {
+    it("says the public byline is the writer's account name, and where to change it", () => {
+        act(() =>
+            root.render(
+                <PostEditor
+                    siteId="s1"
+                    categories={[]}
+                    post={{
+                        id: "p1",
+                        title: "Hello",
+                        slug: "hello",
+                        excerpt: null,
+                        content: "",
+                        categoryId: null,
+                        featured: false,
+                        image: null,
+                        status: "DRAFT",
+                        publishedAt: null,
+                        createdAt: "2026-10-07T00:00:00Z",
+                        author: "Asha Rao",
+                        live: false,
+                        liveAt: null,
+                    }}
+                />,
+            ),
+        );
+        const details = Array.from(container.querySelectorAll("button")).find(
+            (b) => b.textContent.trim() === "Details",
+        );
+        act(() => details?.click());
+        expect(container.textContent).toContain(
+            "Shown on the site as by Asha Rao.",
+        );
+        const link = Array.from(container.querySelectorAll("a")).find(
+            (a) => a.textContent.trim() === "Change your name",
+        );
+        expect(link?.getAttribute("href")).toMatch(/\/account$/);
+    });
+});

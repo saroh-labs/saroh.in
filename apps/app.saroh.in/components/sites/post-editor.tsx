@@ -17,6 +17,7 @@ import { ConfirmDialog } from "@/components/shared/confirm-dialog";
 import { OptionSelect } from "@/components/shared/option-select";
 import { MediaPicker } from "@/components/sites/media-picker";
 import { useLeaveGuard } from "@/components/sites/use-leave-guard";
+import { accountSettingsUrl } from "@/lib/accounts";
 import {
     createPost,
     deletePost,
@@ -400,6 +401,27 @@ export function PostEditor({
                                 Close
                             </Button>
                         </div>
+
+                        {post?.author ? (
+                            <Field label="Byline">
+                                {/* Said where it comes from (UX-091): the
+                                    writer's own account name, shown on the
+                                    public post, and changed there. */}
+                                <p className="text-sm">
+                                    Shown on the site as by{" "}
+                                    <span className="font-medium">
+                                        {post.author}
+                                    </span>
+                                    .{" "}
+                                    <a
+                                        href={accountSettingsUrl}
+                                        className="underline underline-offset-2"
+                                    >
+                                        Change your name
+                                    </a>
+                                </p>
+                            </Field>
+                        ) : null}
 
                         <Field
                             label="Post path"
