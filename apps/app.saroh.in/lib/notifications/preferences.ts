@@ -1,3 +1,5 @@
+import type { ConnectLock } from "@/lib/providers/connect-lock";
+
 /**
  * Your alerts (Settings → Your profile, "What you hear about"): which things
  * Saroh tells YOU about, and where. Per person, per business: your team picks
@@ -147,7 +149,16 @@ const UNAVAILABLE_WORDS: Record<ChannelUnavailable, string> = {
  * every switch is off and disabled, and says why rather than "off" — off
  * would be a claim about what this person hears.
  */
-export function alertGrid(read: AlertPreferencesRead): AlertGrid {
+export function alertGrid(
+    read: AlertPreferencesRead,
+    /**
+     * The plan won't let the business connect its own email (DEC-091,
+     * UX-006): the email line says the plan, with See plans, not "Connect
+     * email in Providers" — a dead end on such a plan. Null: no lock, or
+     * the plan unread.
+     */
+    emailLock: Pick<ConnectLock, "upgrade" | "cta" | "href"> | null = null,
+): AlertGrid {
     if (read.status !== "ok") {
         return {
             columns: [...ALERT_CHANNELS],
@@ -222,19 +233,35 @@ export function alertGrid(read: AlertPreferencesRead): AlertGrid {
     }
     if (rows.length > 0 && !prefs.channels.email.available) {
         notes.push(
-            prefs.canConnect
+            emailLock
                 ? {
                       id: "email",
-                      text: "Email alerts go out through your business's own email provider, and none is connected.",
-                      link: {
-                          label: "Connect email in Providers",
-                          href: PROVIDERS_HREF,
-                      },
+                      // True of team alerts (they need the business's own
+                      // provider); Saroh's own enquiry email to owners and
+                      // admins is apart, and still goes (UX-006).
+                      text: `Email alerts go out through your business's own email provider, which comes with ${emailLock.upgrade ?? "a paid plan"}. Saroh still emails owners and admins about each new enquiry.`,
+                      ...(prefs.canConnect
+                          ? {
+                                link: {
+                                    label: emailLock.cta,
+                                    href: emailLock.href,
+                                },
+                            }
+                          : {}),
                   }
-                : {
-                      id: "email",
-                      text: "Email alerts go out through the business's own email provider. Ask an owner to connect email in Providers.",
-                  },
+                : prefs.canConnect
+                  ? {
+                        id: "email",
+                        text: "Email alerts go out through your business's own email provider, and none is connected.",
+                        link: {
+                            label: "Connect email in Providers",
+                            href: PROVIDERS_HREF,
+                        },
+                    }
+                  : {
+                        id: "email",
+                        text: "Email alerts go out through the business's own email provider. Ask an owner to connect email in Providers.",
+                    },
         );
     }
     if (rows.length > 0 && columns.includes("whatsapp")) {

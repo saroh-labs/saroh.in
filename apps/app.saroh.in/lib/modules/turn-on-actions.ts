@@ -2,6 +2,10 @@
 
 import { revalidatePath } from "next/cache";
 
+import type { ConnectLocks } from "@/lib/providers/connect-lock";
+import { connectLocksOf } from "@/lib/providers/connect-lock";
+import { billingAccessOrNull } from "@/lib/saroh-billing/service";
+
 import type { SetupDefaults } from "./turn-on-schema";
 import type { EnableResult } from "./turn-on-service";
 import { enableModule, getSetupDefaults } from "./turn-on-service";
@@ -31,4 +35,13 @@ export async function enableModuleAction(
     const result = await enableModule(key, setup);
     if (result.ok) revalidatePath("/", "layout");
     return result;
+}
+
+/**
+ * What the plan won't let the business connect (DEC-091, UX-006), so the
+ * sheet says it in place of "Connect now" rather than send the merchant to
+ * a key form the API refuses. Best-effort: unread locks nothing.
+ */
+export async function readConnectLocksAction(): Promise<ConnectLocks> {
+    return connectLocksOf(await billingAccessOrNull().catch(() => null));
 }

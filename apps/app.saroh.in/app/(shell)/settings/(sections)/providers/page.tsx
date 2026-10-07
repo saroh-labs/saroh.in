@@ -9,6 +9,7 @@ import {
 } from "@/components/settings/settings-panel";
 import { listOrgDomains } from "@/lib/domains/service";
 import { listProviderHealth } from "@/lib/provider-health/service";
+import { connectLocksOf } from "@/lib/providers/connect-lock";
 import { buildProvidersView } from "@/lib/providers/rows";
 import {
     getSarohEmail,
@@ -16,6 +17,7 @@ import {
     listPaymentProviders,
     listPaymentWebhooks,
 } from "@/lib/providers/service";
+import { billingAccessOrNull } from "@/lib/saroh-billing/service";
 import { requireSession } from "@/lib/session";
 import { listCheckoutProviders } from "@/lib/stores/storefronts";
 
@@ -34,9 +36,17 @@ export default async function ProvidersSettingsPage() {
     const result = await listProviderHealth();
     // Everything else is only read once the health read has shown this
     // person may manage providers.
-    const [payments, messaging, domains, checkout, webhooks, sarohEmail] =
+    const [
+        payments,
+        messaging,
+        domains,
+        checkout,
+        webhooks,
+        sarohEmail,
+        access,
+    ] =
         result.status === "denied"
-            ? [null, null, null, [], null, null]
+            ? [null, null, null, [], null, null, null]
             : await Promise.all([
                   listPaymentProviders(),
                   listCommsProviders(),
@@ -48,6 +58,10 @@ export default async function ProvidersSettingsPage() {
                   // Saroh sending booking emails (DEC-086). Never throws:
                   // a failed read is UNREAD, said in its own notice.
                   getSarohEmail(),
+                  // What the plan lets the business connect (DEC-091):
+                  // locked rows offer See plans in place of Connect, before
+                  // any key form opens. Best-effort; unread locks nothing.
+                  billingAccessOrNull(),
               ]);
     const view =
         result.status === "denied"
@@ -60,6 +74,7 @@ export default async function ProvidersSettingsPage() {
                   checkout,
                   webhooks,
                   sarohEmail,
+                  locks: connectLocksOf(access),
               });
 
     return (

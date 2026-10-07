@@ -3,6 +3,7 @@ import type { ProviderHealth } from "@/lib/provider-health/service";
 
 import type { BookingEmails } from "./booking-emails";
 import { bookingEmailsBlock, sarohRouteOn } from "./booking-emails";
+import type { ConnectLock, ConnectLocks } from "./connect-lock";
 import type {
     CommsChannel,
     ConnectedCommsProvider,
@@ -91,6 +92,12 @@ export interface ProviderEntry {
     setup: ProviderSetup;
     /** What stops when it is disconnected, for the confirmation. */
     consequence: string;
+    /**
+     * One never connected that the plan won't let the business connect
+     * (DEC-091, UX-006): the plan that has it and See plans, in place of
+     * Connect. `null` or absent: Connect is offered.
+     */
+    lock?: ConnectLock | null;
 }
 
 /** The business's domains, which are added and fixed under Sites. */
@@ -125,6 +132,8 @@ export interface ProvidersView {
     connectEmailKey: string | null;
     /** Whether any module that uses a provider is on at all. */
     any: boolean;
+    /** The plan holds back connecting a payment provider (UX-006). */
+    paymentsLocked: boolean;
 }
 
 /**
@@ -215,6 +224,8 @@ export interface ProviderRowsInput {
     now?: Date;
     /** Saroh sending booking emails (DEC-086); absent or null says nothing. */
     sarohEmail?: SarohEmailState | null;
+    /** What the plan won't let the business connect (`connectLocksOf`). */
+    locks?: ConnectLocks;
 }
 
 /**
@@ -262,6 +273,7 @@ export function buildProvidersView(input: ProviderRowsInput): ProvidersView {
         bookingEmails: bookingEmailsBlock(input.sarohEmail),
         connectEmailKey: null,
         any: input.health.length > 0,
+        paymentsLocked: !!input.locks?.payments,
     };
     // Saroh sends whether or not Messaging is on, so its block alone is
     // something to show.
@@ -277,7 +289,10 @@ export function buildProvidersView(input: ProviderRowsInput): ProvidersView {
             for (const provider of CONNECTABLE_PAYMENTS) {
                 if (input.payments.some((p) => p.provider === provider))
                     continue;
-                view.available.push(availablePayment(provider));
+                view.available.push({
+                    ...availablePayment(provider),
+                    lock: input.locks?.payments ?? null,
+                });
             }
         } else view.unread.push("payments");
     }
@@ -296,14 +311,18 @@ export function buildProvidersView(input: ProviderRowsInput): ProvidersView {
                 if (own.some((c) => c.status === "CONNECTED")) continue;
                 for (const provider of CONNECTABLE_COMMS[channel]) {
                     if (own.some((c) => c.provider === provider)) continue;
-                    view.available.push(availableComms(channel, provider));
+                    view.available.push({
+                        ...availableComms(channel, provider),
+                        lock: input.locks?.messaging ?? null,
+                    });
                 }
             }
         } else view.unread.push("messaging");
     }
 
+    // Only one the business can connect: never a jump to a lock.
     view.connectEmailKey =
-        view.available.find((e) => e.type === "Email")?.key ?? null;
+        view.available.find((e) => e.type === "Email" && !e.lock)?.key ?? null;
 
     const domains = has("DOMAINS");
     if (domains) view.domains = domainsRow(domains, input);

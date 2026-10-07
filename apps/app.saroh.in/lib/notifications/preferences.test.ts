@@ -125,6 +125,47 @@ describe("alertGrid", () => {
         ]);
     });
 
+    it("Free: says the plan, links to it, and never sends to Providers (UX-006)", () => {
+        const noEmail = {
+            bell: { available: true as const },
+            email: {
+                available: false as const,
+                reason: "NO_PROVIDER" as const,
+            },
+            whatsapp: {
+                available: false as const,
+                reason: "NO_PROVIDER" as const,
+            },
+        };
+        const lock = {
+            upgrade: "Grow",
+            cta: "See Grow",
+            href: "/settings/billing?plan=grow#change-plan",
+        };
+        const grid = alertGrid(
+            { status: "ok", prefs: prefs({ channels: noEmail }) },
+            lock,
+        );
+        expect(grid.notes[0]).toEqual({
+            id: "email",
+            text: "Email alerts go out through your business's own email provider, which comes with Grow. Saroh still emails owners and admins about each new enquiry.",
+            link: {
+                label: "See Grow",
+                href: "/settings/billing?plan=grow#change-plan",
+            },
+        });
+        // Someone who can't change the plan: the words, no link.
+        const member = alertGrid(
+            {
+                status: "ok",
+                prefs: prefs({ channels: noEmail, canConnect: false }),
+            },
+            lock,
+        );
+        expect(member.notes[0]?.link).toBeUndefined();
+        expect(member.notes[0]?.text).toContain("comes with Grow");
+    });
+
     it("tells someone who can't connect one who can, with no link", () => {
         const grid = alertGrid({
             status: "ok",

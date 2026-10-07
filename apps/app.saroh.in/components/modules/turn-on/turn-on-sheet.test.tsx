@@ -13,6 +13,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { ModuleView } from "@/lib/modules/schema";
 import type { SetupDefaults } from "@/lib/modules/turn-on-schema";
 import type { EnableResult } from "@/lib/modules/turn-on-service";
+import type { ConnectLocks } from "@/lib/providers/connect-lock";
 
 import { TurnOnSheet } from "./turn-on-sheet";
 
@@ -20,7 +21,10 @@ const readSetupDefaultsAction =
     vi.fn<(keys: string[]) => Promise<SetupDefaults[]>>();
 const enableModuleAction =
     vi.fn<(key: string, setup: object) => Promise<EnableResult>>();
+/** What the plan won't let the business connect (UX-006); none by default. */
+let locks: ConnectLocks = { payments: null, messaging: null };
 vi.mock("@/lib/modules/turn-on-actions", () => ({
+    readConnectLocksAction: () => Promise.resolve(locks),
     readSetupDefaultsAction: (keys: string[]) => readSetupDefaultsAction(keys),
     enableModuleAction: (key: string, setup: object) =>
         enableModuleAction(key, setup),
@@ -145,6 +149,7 @@ beforeEach(() => {
     ).IS_REACT_ACT_ENVIRONMENT = true;
     hiddenKeys = [];
     websiteTemplate = null;
+    locks = { payments: null, messaging: null };
     // Radix's checkbox measures itself; jsdom has no ResizeObserver.
     vi.stubGlobal("ResizeObserver", NoResize);
     readSetupDefaultsAction.mockReset();
@@ -466,7 +471,7 @@ describe("Payments and Communications", () => {
         await open(["PAYMENTS"]);
         await press(button(/^Later$/));
         expect(enableModuleAction).toHaveBeenCalledWith("PAYMENTS", {});
-        expect(push).toHaveBeenCalledWith("/billing/subscriptions");
+        expect(push).toHaveBeenCalledWith("/billing");
     });
 
     it("Communications brings Contacts, and Later stays where it is", async () => {
@@ -481,6 +486,70 @@ describe("Payments and Communications", () => {
         ]);
         expect(push).not.toHaveBeenCalled();
         expect(refresh).toHaveBeenCalled();
+    });
+});
+
+describe("on a plan that won't let the business connect (Free, UX-006)", () => {
+    const lock = {
+        comesWith: "Comes with Grow",
+        cta: "See Grow",
+        href: "/settings/billing?plan=grow#change-plan",
+        upgrade: "Grow",
+        full: false,
+    };
+
+    it("Payments: no Connect now, the plan and How to pay us instead, and Turn on", async () => {
+        locks = { payments: lock, messaging: lock };
+        await open(["PAYMENTS"]);
+        expect(text()).toContain(
+            "Taking payment online comes with Grow. Until then, customers pay you the ways you set in How to pay us.",
+        );
+        expect(text()).toContain(
+            "How to pay us for customers who pay you directly.",
+        );
+        expect(text()).not.toContain("Connect now");
+        expect(text()).not.toContain("Razorpay or Cashfree");
+        expect(
+            sheet().querySelector(
+                'a[href="/settings/billing?plan=grow#change-plan"]',
+            ),
+        ).not.toBeNull();
+        await press(button(/^Turn on$/));
+        expect(enableModuleAction).toHaveBeenCalledWith("PAYMENTS", {});
+        // Never sent to Providers to type keys the API refuses.
+        expect(push).toHaveBeenCalledWith("/billing");
+        expect(push).not.toHaveBeenCalledWith("/settings/providers");
+    });
+
+    it("the toast never asks to connect a locked provider", async () => {
+        locks = { payments: lock, messaging: lock };
+        enableModuleAction.mockImplementation((key) =>
+            Promise.resolve({
+                ok: true,
+                module: view(key, {
+                    lifecycle: "ENABLED",
+                    readiness:
+                        key === "COMMUNICATIONS" ? "SETUP_REQUIRED" : "ACTIVE",
+                    blockers:
+                        key === "COMMUNICATIONS"
+                            ? [{ code: "COMMUNICATIONS_NO_PROVIDER" }]
+                            : [],
+                }),
+                alreadyEnabled: false,
+            }),
+        );
+        await open(["COMMUNICATIONS"]);
+        expect(text()).toContain("Connecting your own email comes with Grow.");
+        await press(button(/^Turn on$/));
+        expect(showSuccess).toHaveBeenCalledWith(
+            "Contacts and Communications are on.",
+        );
+    });
+
+    it("Grow: Connect now is offered as before", async () => {
+        await open(["PAYMENTS"]);
+        expect(text()).toContain("Connect now");
+        expect(text()).not.toContain("comes with Grow");
     });
 });
 
