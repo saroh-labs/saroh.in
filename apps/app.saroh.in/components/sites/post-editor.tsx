@@ -12,6 +12,7 @@ import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import { showPlanRefusal } from "@/components/billing/plan-refusal";
+import { useBusinessZone } from "@/components/shared/business-zone";
 import { ConfirmDialog } from "@/components/shared/confirm-dialog";
 import { OptionSelect } from "@/components/shared/option-select";
 import { MediaPicker } from "@/components/sites/media-picker";
@@ -70,6 +71,7 @@ export function PostEditor({
     /** Absent when writing a new post. */
     post?: PostDetail;
 }) {
+    const zone = useBusinessZone();
     const router = useRouter();
     const [postId, setPostId] = useState(post?.id ?? null);
     const [confirmDelete, setConfirmDelete] = useState(false);
@@ -281,9 +283,9 @@ export function PostEditor({
                         : dirty
                           ? "Unsaved changes"
                           : savedAt
-                            ? `Saved ${shortDate(savedAt)}`
+                            ? `Saved ${shortDate(savedAt, zone)}`
                             : liveAt
-                              ? `Live since ${shortDate(liveAt)}`
+                              ? `Live since ${shortDate(liveAt, zone)}`
                               : ""}
                 </span>
 
@@ -452,7 +454,7 @@ export function PostEditor({
                             <div className="border-t pt-4">
                                 <p className="text-xs text-muted-foreground">
                                     {liveAt
-                                        ? `Live copy published ${exactDate(liveAt)}.`
+                                        ? `Live copy published ${exactDate(liveAt, zone)}.`
                                         : "This post has never been published."}
                                 </p>
                                 <Button

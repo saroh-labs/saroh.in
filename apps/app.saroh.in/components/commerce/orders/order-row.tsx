@@ -3,7 +3,7 @@ import { cn } from "@saroh/ui/lib/utils";
 import Link from "next/link";
 import type { ReactNode } from "react";
 
-import { ViewerDate } from "@/components/shared/viewer-date";
+import { BusinessDate } from "@/components/shared/business-zone";
 import type { RowAttention } from "@/lib/orders/attention";
 import { rowAttention } from "@/lib/orders/attention";
 import type { OrderRow } from "@/lib/orders/business-service";
@@ -245,7 +245,7 @@ export function OrderGridRow({
                 ) : null}
             </div>
             <div className="min-w-0 truncate text-[12.5px] text-neutral-700 dark:text-muted-foreground">
-                <ViewerDate iso={row.placedAt} variant="moment" />
+                <BusinessDate iso={row.placedAt} variant="moment" />
             </div>
             <div className="whitespace-nowrap text-right font-display text-[13.5px] font-semibold tabular-nums tracking-[-0.02em]">
                 {v.money.total}

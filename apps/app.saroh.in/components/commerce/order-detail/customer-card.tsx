@@ -1,7 +1,7 @@
 import { cn } from "@saroh/ui/lib/utils";
 import Link from "next/link";
 
-import { ViewerDate } from "@/components/shared/viewer-date";
+import { BusinessDate } from "@/components/shared/business-zone";
 import { cardAttention } from "@/lib/orders/attention";
 import type { Shipment } from "@/lib/orders/courier";
 import type { AllergyNote, OrderAttention, OrderRead } from "@/lib/orders/read";
@@ -91,7 +91,7 @@ export function CustomerCard({
                         {customer.orderCount > 1 && customer.firstOrderAt ? (
                             <>
                                 {customer.orderCount} orders · customer since{" "}
-                                <ViewerDate
+                                <BusinessDate
                                     iso={customer.firstOrderAt}
                                     variant="monthYear"
                                 />

@@ -42,6 +42,12 @@ export interface UserOrganization {
      * is opened. Words and defaults only.
      */
     kind: OrganizationKind;
+    /**
+     * The IANA zone the business keeps time in (UX-008), so the app can
+     * write every server-rendered time in it rather than the server's UTC.
+     * Null when it was never set; the app then reads India's.
+     */
+    timeZone: string | null;
 }
 
 /** Minimal Organization identity returned alongside a resolved context. */
@@ -156,6 +162,7 @@ export class OrganizationContextService {
                         slug: true,
                         lifecycleStatus: true,
                         kind: true,
+                        businessProfile: { select: { timezone: true } },
                     },
                 },
             },
@@ -216,6 +223,8 @@ export class OrganizationContextService {
                 ],
                 lifecycleStatus: membership.organization.lifecycleStatus,
                 kind: kindRead(membership.organization.kind),
+                timeZone:
+                    membership.organization.businessProfile?.timezone ?? null,
             };
         });
     }

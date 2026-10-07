@@ -6,6 +6,7 @@ import { Input } from "@saroh/ui/input";
 import { showError, showInfo, showSuccess } from "@saroh/ui/toast";
 import { useEffect, useState } from "react";
 
+import { useBusinessZone } from "@/components/shared/business-zone";
 import { env } from "@/env";
 import {
     claimDomain,
@@ -102,11 +103,11 @@ function CopyField({ label, value }: { label: string; value: string }) {
 }
 
 /** What the last check means for the merchant, and what to do next. */
-function lastCheckLine(domain: SiteDomain): string {
+function lastCheckLine(domain: SiteDomain, zone: string): string {
     if (!domain.lastCheckedAt) {
         return "Not checked yet. Add the record, then check.";
     }
-    const when = shortDate(domain.lastCheckedAt);
+    const when = shortDate(domain.lastCheckedAt, zone);
     switch (checkFailure(domain.lastCheckResult)) {
         case "WRONG_VALUE":
             return `Checked ${when}: a record exists, but its value does not match. Copy the value again, exactly, and replace what is there.`;
@@ -124,6 +125,7 @@ function Block({ children }: { children: React.ReactNode }) {
 }
 
 export function CustomDomain({ siteId }: { siteId: string }) {
+    const zone = useBusinessZone();
     const [domains, setDomains] = useState<SiteDomain[] | null>(null);
     const [loadError, setLoadError] = useState<string | null>(null);
     const [hostname, setHostname] = useState("");
@@ -189,7 +191,7 @@ export function CustomDomain({ siteId }: { siteId: string }) {
         } else {
             showInfo(
                 "Not verified yet.",
-                lastCheckLine({ ...domain, ...res.data.domain }),
+                lastCheckLine({ ...domain, ...res.data.domain }, zone),
             );
         }
     }
@@ -241,7 +243,7 @@ export function CustomDomain({ siteId }: { siteId: string }) {
                                         className="bg-success text-success-foreground"
                                         title={
                                             domain.verifiedAt
-                                                ? `Verified ${exactDate(domain.verifiedAt)}`
+                                                ? `Verified ${exactDate(domain.verifiedAt, zone)}`
                                                 : undefined
                                         }
                                     >
@@ -319,11 +321,14 @@ export function CustomDomain({ siteId }: { siteId: string }) {
                                     className="text-xs text-muted-foreground"
                                     title={
                                         domain.lastCheckedAt
-                                            ? exactDate(domain.lastCheckedAt)
+                                            ? exactDate(
+                                                  domain.lastCheckedAt,
+                                                  zone,
+                                              )
                                             : undefined
                                     }
                                 >
-                                    {lastCheckLine(domain)}
+                                    {lastCheckLine(domain, zone)}
                                 </p>
                             </div>
                         )}

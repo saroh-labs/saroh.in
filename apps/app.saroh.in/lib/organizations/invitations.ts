@@ -49,12 +49,16 @@ export function inviteEmailError(
  */
 export function invitationMeta(
     invitation: { createdAt: string | Date; expiresAt: string | Date },
+    /** The business's zone (UX-008): the day it says is the business's. */
+    zone: string,
     now: Date = new Date(),
 ): string {
     const created = new Date(invitation.createdAt);
     const expires = new Date(invitation.expiresAt);
     const day = (d: Date) =>
-        shortDate(d) === shortDate(now) ? "today" : shortDate(d);
+        shortDate(d, zone) === shortDate(now, zone)
+            ? "today"
+            : shortDate(d, zone);
 
     const parts = [`Invited ${day(created)}`];
     const lastSent = new Date(expires.getTime() - INVITE_TTL_MS);
@@ -66,7 +70,7 @@ export function invitationMeta(
     parts.push(
         expires.getTime() <= now.getTime()
             ? `link expired ${day(expires)} — resend for a fresh one`
-            : `link works until ${shortDate(expires)}`,
+            : `link works until ${shortDate(expires, zone)}`,
     );
     return parts.join(" · ");
 }

@@ -35,6 +35,7 @@ import {
     ORGANIZATION_KINDS,
 } from "@/lib/organizations/kind";
 import type { AddressAvailability } from "@/lib/organizations/service";
+import { browserZone } from "@/lib/organizations/time-zones";
 import {
     startCheckoutAfterOnboarding,
     takeLaunchOfferAfterOnboarding,
@@ -212,6 +213,7 @@ export function BusinessSetupForm({
         // A site for my work is not asked (KTD-6), so it sends no type even
         // if one was picked under another answer first.
         const asked = kindDefaults(values.kind).asksRegistered;
+        const zone = browserZone();
         const res = await createOrganization({
             name: values.name.trim(),
             kind: values.kind,
@@ -225,6 +227,9 @@ export function BusinessSetupForm({
                     ? { registered: true }
                     : {}),
                 country: values.country,
+                // The browser's zone (UX-008): the business's for a country
+                // that keeps several; one that keeps one zone uses that.
+                ...(zone ? { timezone: zone } : {}),
             },
         });
         if (!res.ok) {

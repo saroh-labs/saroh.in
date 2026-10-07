@@ -20,6 +20,7 @@ import {
     MAX_ADDRESS_LENGTH,
 } from "../sites/site-address";
 import { businessTypeWrite } from "./business-type";
+import { startingZone } from "./business-zone";
 import type { OnboardOrganizationDto } from "./dto";
 import { DEFAULT_ORGANIZATION_KIND } from "./organization-kind";
 import { slugify } from "./slug";
@@ -120,12 +121,18 @@ export class OrganizationOnboardingService {
                 select: { id: true, slug: true },
             });
 
-            const profileData = this.buildProfileData(dto);
-            if (profileData) {
-                await tx.businessProfile.create({
-                    data: { organizationId: organization.id, ...profileData },
-                });
-            }
+            // Every business gets a profile, if only for its time zone
+            // (UX-008): without one, server-rendered times read UTC.
+            await tx.businessProfile.create({
+                data: {
+                    organizationId: organization.id,
+                    ...this.buildProfileData(dto),
+                    timezone: startingZone(
+                        dto.profile?.timezone,
+                        dto.profile?.country,
+                    ),
+                },
+            });
 
             // Actor-derived ownership: the OWNER is the authenticated caller.
             await tx.membership.create({
@@ -196,18 +203,15 @@ export class OrganizationOnboardingService {
     }
 
     /**
-     * Reduce the DTO's optional profile to the columns actually supplied.
-     * Returns `null` when no profile (or an empty one) was sent, so we skip the
-     * BusinessProfile row entirely rather than persisting an all-null record.
+     * Reduce the DTO's optional profile to the columns actually supplied
+     * (the zone is decided by the caller). Empty when no profile was sent.
      */
     private buildProfileData(dto: OnboardOrganizationDto) {
         const profile = dto.profile;
-        if (!profile) {
-            return null;
-        }
+        if (!profile) return {};
 
         const type = businessTypeWrite(profile.type) ?? undefined;
-        const data = {
+        return {
             legalName: profile.legalName,
             type,
             // Setup's "Is it registered?" (prelaunch): Registered sends no
@@ -222,10 +226,5 @@ export class OrganizationOnboardingService {
             contactEmail: profile.contactEmail,
             website: profile.website,
         };
-
-        const hasAnyField = Object.values(data).some(
-            (value) => value !== undefined,
-        );
-        return hasAnyField ? data : null;
     }
 }

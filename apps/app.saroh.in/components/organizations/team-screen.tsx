@@ -2,6 +2,7 @@
 
 import { showPlanRefusal } from "@/components/billing/plan-refusal";
 import { SettingsPanelHeader } from "@/components/settings/settings-panel";
+import { useBusinessZone } from "@/components/shared/business-zone";
 import { zodResolver } from "@hookform/resolvers/zod";
 import {
     Avatar,
@@ -690,6 +691,7 @@ function PendingInvites({
     book: RoleBook;
 }) {
     const router = useRouter();
+    const zone = useBusinessZone();
     const [busy, setBusy] = useState<{
         id: string;
         action: "resend" | "cancel";
@@ -760,7 +762,7 @@ function PendingInvites({
                                     {invitation.email}
                                 </p>
                                 <p className="text-[11.5px] text-muted-foreground">
-                                    {invitationMeta(invitation)}
+                                    {invitationMeta(invitation, zone)}
                                 </p>
                             </div>
                             <span className="text-[12.5px] text-foreground/80">
