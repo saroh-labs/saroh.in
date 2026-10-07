@@ -374,6 +374,8 @@ describe("access from the catalogue (DB, U12)", () => {
                     planId: "grow",
                     name: "Plan B",
                     pricePaise: 22_200,
+                    // Included with no cap there (UX-083).
+                    uncapped: true,
                 },
             }),
         );

@@ -647,7 +647,8 @@ describe("who may book signed in", () => {
         });
         const again = await book(biz, token, {
             serviceId: biz.oneToOne,
-            startAt: nextMonday(9).toISOString(),
+            // Check-up runs 6–9, an hour each: 7 is free, 9 would end past it.
+            startAt: nextMonday(7).toISOString(),
             bookerPhone: "+91 70000 00000",
         });
         expect(again.status).toBe(201);

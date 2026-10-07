@@ -6,11 +6,12 @@
  *   turns the module on where packs were sold, holds it off where
  *   Appointments is off, leaves a business without packs off, and never
  *   overwrites a row that is there; run twice, the second run writes nothing;
- * - after it, a business that sold packs (Pulse) has Class packs available,
- *   and one that never did (Kavi Dental) doesn't;
+ * - class packs aren't offered on any plan for now (DEC-099): after the
+ *   backfill no business has Class packs available, a business that sold
+ *   packs keeps its setting and every pack, and Class packs never holds
+ *   Appointments on;
  * - turning Class packs off refuses new sales and keeps every pack,
- *   purchase and class spent; turning it on with Appointments off is
- *   refused in a sentence.
+ *   purchase and class spent; turning it on again is refused in a sentence.
  */
 import { backfillClassPacksModule, prisma } from "@saroh/database";
 
@@ -266,28 +267,59 @@ describe("the E12 Class packs backfill (real database)", () => {
     });
 });
 
-describe("Class packs after the backfill", () => {
+describe("Class packs after the backfill, now not offered (DEC-099)", () => {
     const evaluate = (organizationId: string) =>
         availability.evaluate({
             organizationId,
             moduleKey: "CLASS_PACKS",
             organizationRole: "OWNER",
         });
+    const NOT_OFFERED = "Class packs isn't available for your business yet.";
 
-    it("Pulse, which sold packs, has Packs; Kavi Dental, which never did, doesn't", async () => {
+    it("Pulse, which sold packs, keeps its setting and packs, but Class packs isn't offered to it or to Kavi Dental", async () => {
+        // The backfill's choice stands: data is kept (DEC-099).
+        expect(await status(orgs.pulse, "CLASS_PACKS")).toBe("ENABLED");
         const pulse = await evaluate(orgs.pulse);
-        expect(pulse.gatesPassed).toBe(true);
-        expect(pulse.readiness).toBe("ACTIVE");
+        expect(pulse.gatesPassed).toBe(false);
+        expect(pulse.readiness).toBe("DISABLED");
+        expect(pulse.blockers.map((b) => b.code)).toEqual(["ROLLOUT_DISABLED"]);
 
         const kavi = await evaluate(orgs.kavi);
         expect(kavi.gatesPassed).toBe(false);
         expect(kavi.readiness).toBe("DISABLED");
-        expect(kavi.blockers.map((b) => b.code)).toContain(
+        expect(kavi.blockers.map((b) => b.code)).toEqual([
+            "ROLLOUT_DISABLED",
             "ORG_MODULE_DISABLED",
-        );
+        ]);
     });
 
-    it("turned off, refuses new sales and keeps every pack and purchase; on again, sells", async () => {
+    it("never holds Appointments on: Class packs isn't named, and keeps its own setting and packs", async () => {
+        const ctx = owner(orgs.pulse);
+        await lifecycle.disable(ctx, "APPOINTMENTS");
+        try {
+            expect(await status(orgs.pulse, "APPOINTMENTS")).toBe("DISABLED");
+            expect(await status(orgs.pulse, "CLASS_PACKS")).toBe("ENABLED");
+            expect(
+                await prisma.packPurchase.count({
+                    where: { organizationId: orgs.pulse },
+                }),
+            ).toBe(1);
+        } finally {
+            // Back as the fixture had it (this business has no CRM row, so
+            // it is put back directly rather than through enable).
+            await prisma.organizationModule.update({
+                where: {
+                    organizationId_moduleKey: {
+                        organizationId: orgs.pulse,
+                        moduleKey: "APPOINTMENTS",
+                    },
+                },
+                data: { status: "ENABLED" },
+            });
+        }
+    });
+
+    it("turned off, refuses new sales and keeps every pack and purchase; can't be turned on again", async () => {
         const ctx = owner(orgs.pulse);
         const purchasesBefore = await prisma.packPurchase.count({
             where: { organizationId: orgs.pulse },
@@ -309,33 +341,20 @@ describe("Class packs after the backfill", () => {
                 where: { organizationId: orgs.pulse },
             }),
         ).toBe(1);
-        // And it reads as switched off, so the rail and the gate drop it.
-        const off = await evaluate(orgs.pulse);
-        expect(off.gatesPassed).toBe(false);
 
-        await lifecycle.enable(ctx, "CLASS_PACKS");
-        await expect(
-            packs.sell(ctx, pulsePackId, { contactId: pulseContactId }),
-        ).resolves.toMatchObject({ credits: 10, left: 10 });
+        // Not offered, so it can't be switched back on (DEC-099).
+        await expect(lifecycle.enable(ctx, "CLASS_PACKS")).rejects.toThrow(
+            NOT_OFFERED,
+        );
+        expect(await status(orgs.pulse, "CLASS_PACKS")).toBe("DISABLED");
     });
 
-    it("can't be turned on while Appointments is off — and says so", async () => {
+    it("can't be turned on while Appointments is off either — and says it isn't offered", async () => {
         await expect(
             lifecycle.enable(owner(orgs.appointmentsOff), "CLASS_PACKS"),
-        ).rejects.toThrow(
-            "Class packs needs Appointments. Turn on Appointments first.",
-        );
+        ).rejects.toThrow(NOT_OFFERED);
         expect(await status(orgs.appointmentsOff, "CLASS_PACKS")).toBe(
             "DISABLED",
         );
-    });
-
-    it("keeps Appointments on while Class packs needs it", async () => {
-        await expect(
-            lifecycle.disable(owner(orgs.pulse), "APPOINTMENTS"),
-        ).rejects.toThrow(
-            "Class packs needs Appointments. Turn off Class packs first.",
-        );
-        expect(await status(orgs.pulse, "APPOINTMENTS")).toBe("ENABLED");
     });
 });

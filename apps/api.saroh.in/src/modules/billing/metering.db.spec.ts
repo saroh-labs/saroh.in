@@ -910,11 +910,12 @@ describe("limit notices (DB, U13)", () => {
         expect(await notices(orgId)).toEqual([
             {
                 title: "You've used 4 of 5 products on Plan B",
-                body: "You'll be stopped at 5. Plan C gives you more.",
+                // Plan C has no cap on products, so it says so (UX-083).
+                body: "You'll be stopped at 5. Plan C has no limit.",
             },
             {
                 title: "You've reached your 5 products on Plan B",
-                body: "You can't add more products. Plan C raises the limit.",
+                body: "You can't add more products. Plan C has no limit.",
             },
         ]);
     });
