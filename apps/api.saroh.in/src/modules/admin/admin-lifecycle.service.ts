@@ -274,6 +274,7 @@ export class AdminLifecycleService {
                         status: "TRIALING",
                         currentPeriodEnd: endsAt,
                         cancelAtPeriodEnd: false,
+                        freeChosenAt: null,
                     },
                 });
             } else if (existing.status === "TRIALING") {

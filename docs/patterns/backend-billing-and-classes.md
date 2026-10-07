@@ -75,8 +75,23 @@ on its own (`first-month:<checkout>`). The term's end is `billing-term.ts`:
 in its last 30 days the same plan quotes as `RENEW` (a SCHEDULED checkout
 from the term's end that cancels nothing), and a term nobody renews runs to
 the end of what was paid and then moves to Free (`term-end.ts`: a monthly
-subscription's `completed`; the hourly sweep for a year paid once). Rules
-in `PRICING_ROLLOUT.md` › "Checkout and term (DEC-093)".
+subscription's `completed`; the hourly sweep for a year paid once). The
+business is asked to pay for the next term, never renewed by itself
+(DEC-100): the hourly sweep sends the request 30, 7 and 1 days before the
+end, in the inbox and by email, once per stage (`term-ending.ts`,
+`term-ending-notice.ts`), and says nothing once a renewal or another plan
+is authorised. A business whose owner chose Free or cancelled for the
+period's end (`Subscription.freeChosenAt`, set by Plan and billing's move
+to Free and by cancel, cleared wherever `cancelAtPeriodEnd` is) is told
+its plan moves to Free then, as it chose, and never asked to pay; the
+term run out (`term-end.ts`) sets `cancelAtPeriodEnd` without it. Rules in `PRICING_ROLLOUT.md` › "Checkout and term
+(DEC-093)".
+
+**First month, not trial (DEC-093).** A TRIAL checkout that took a charge
+is the nominal first month, and its email says "first month" and autopay
+(`firstMonthEndingEmail`); only a trial that cost nothing keeps the trial
+words (`paidFirstMonth` in `offers.ts`). The waitlist's months of a plan
+are a `plan` override with an end date (#805), told as a plan that ends.
 
 Trials, coupons and add-ons (U16) ride the same path: a coupon is
 redeemed and its discount invoiced with the charge it comes off, never at

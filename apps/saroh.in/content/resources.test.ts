@@ -94,20 +94,27 @@ describe("an unpublished page is in neither the nav nor the sitemap", () => {
 
     it("the legal pages are out of the footer and sitemap until their day in India", () => {
         const legalBefore = at("2026-10-04T18:29:00Z");
-        const termsAfter = at("2026-10-04T18:31:00Z");
+        const refundsAfter = at("2026-10-04T18:31:00Z");
         // Privacy's date moved to 6 Oct with the email provider change.
         const privacyAfter = at("2026-10-05T18:31:00Z");
+        // The Terms' moved to 7 Oct with the term's end (DEC-100).
+        const termsAfter = at("2026-10-06T18:31:00Z");
         expect(shownLegal(legalBefore).map((p) => p.href)).toEqual([]);
         for (const href of ["/privacy", "/terms", "/refunds"]) {
             expect(indexedPaths("waitlist", legalBefore)).not.toContain(href);
-            expect(indexedPaths("waitlist", privacyAfter)).toContain(href);
+            expect(indexedPaths("waitlist", termsAfter)).toContain(href);
         }
-        expect(indexedPaths("waitlist", termsAfter)).not.toContain("/privacy");
-        expect(shownLegal(termsAfter).map((p) => p.href)).toEqual([
-            "/terms",
+        expect(indexedPaths("waitlist", refundsAfter)).not.toContain(
+            "/privacy",
+        );
+        expect(shownLegal(refundsAfter).map((p) => p.href)).toEqual([
             "/refunds",
         ]);
         expect(shownLegal(privacyAfter).map((p) => p.href)).toEqual([
+            "/privacy",
+            "/refunds",
+        ]);
+        expect(shownLegal(termsAfter).map((p) => p.href)).toEqual([
             "/privacy",
             "/terms",
             "/refunds",

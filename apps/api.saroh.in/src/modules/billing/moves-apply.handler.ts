@@ -19,6 +19,7 @@ import {
 import { applyDueMoveInTx } from "./plan-moves";
 import { enqueueProviderCancel } from "./provider-cancel.job";
 import { endTermAtInTx } from "./term-end";
+import { remindEndingTerms } from "./term-ending-notice";
 
 /**
  * Saroh billing's hourly sweep (pricing catalogue U15), a self-rescheduling
@@ -39,6 +40,9 @@ import { endTermAtInTx } from "./term-end";
  *    the business to a cheaper plan is told 30, 7 and 1 days ahead
  *    (`plan-ending.ts`): an inbox notice and an email to its billing
  *    people, each claimed once as a `CustomerNotice`.
+ * 4. **Terms that end** (DEC-100). A 12-month term in its last 30 days is
+ *    asked to pay for the next term, 30, 7 and 1 days ahead, the same way
+ *    (`term-ending.ts`, `term-ending-notice.ts`).
  */
 export const BILLING_MOVES_APPLY_TYPE = "billing.moves.apply";
 
@@ -124,6 +128,7 @@ export class MovesApplyHandler {
         }
         out.lapsed = await this.lapseCheckouts(now);
         out.reminded = await this.remindEndingPlans(now);
+        out.reminded += await remindEndingTerms(now, this.logger);
         return out;
     }
 

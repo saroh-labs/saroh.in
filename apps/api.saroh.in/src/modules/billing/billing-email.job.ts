@@ -3,37 +3,44 @@ import type { Job, Prisma } from "@saroh/database";
 import { prisma } from "@saroh/database";
 import { withGstPaise } from "@saroh/pricing-catalog";
 
+import { appBase } from "../../common/app-url";
 import type { EmailOutcome, SarohBillingEmail } from "../../common/email";
 import { sendSarohBillingEmail } from "../../common/email";
 import { paperDay, paperMoney } from "../invoices/invoice-paper-view";
 import { resolveCapabilities } from "../organizations/organization-policy";
+import type { BillingEmailPayload } from "./billing-email-payload";
+import { parseBillingEmailPayload } from "./billing-email-payload";
 import type { RenderedEmail } from "./billing-emails";
 import {
+    firstMonthEndingEmail,
     invoiceEmail,
     paymentFailedEmail,
     planEndingEmail,
+    termEndingEmail,
     trialEndingEmail,
 } from "./billing-emails";
-import type { PlanEndingStage } from "./plan-ending";
-import { PLAN_ENDING_NOTICE_DAYS } from "./plan-ending";
+import { paidFirstMonth } from "./offers";
 import { renderSarohInvoicePdf } from "./saroh-invoice-paper";
 import { paiseToRupees, SAROH_TIMEZONE } from "./saroh-invoice-terms";
 import { sarohSeller } from "./saroh-seller";
+import { termEndingOf } from "./term-ending";
 
 type Tx = Prisma.TransactionClient;
 
 /**
  * Saroh's own billing mail to a business (pricing catalogue U17): the
- * invoice for a charge with its PDF, a payment that failed, a trial ending
- * (queued by U16), and a plan that ends on a date (#805, queued by the
- * billing sweep). Written on the caller's transaction (the outbox),
+ * invoice for a charge with its PDF, a payment that failed, a first month
+ * or a free trial ending (queued by U16), a plan that ends on a date
+ * (#805) and a 12-month term that ends (DEC-100), both queued by the
+ * billing sweep. Written on the caller's transaction (the outbox),
  * so the invoice or the failed charge and its email commit together, and a
  * mail provider that is down never undoes either: a send that fails throws,
  * and the queue retries it with backoff.
  *
  * Re-read, then decide. An invoice already emailed (`emailedAt`) is not
  * sent again. A failed payment that has since been paid, a trial that is
- * no longer one, or a plan whose end was moved or taken away, says nothing. Each kind sends at most once per event,
+ * no longer one, a plan whose end was moved or taken away, or a term
+ * renewed or moved since, says nothing. Each kind sends at most once per event,
  * claimed as a `CustomerNotice` once its email has left.
  *
  * Who hears: everyone on the team whose role manages billing
@@ -44,37 +51,7 @@ export const BILLING_EMAIL_TYPE = "billing.email";
 /** The once-only claim on a billing email (`CustomerNotice.kind`). */
 export const BILLING_EMAIL_NOTICE_KIND = "SAROH_BILLING_EMAIL";
 
-export type BillingEmailPayload =
-    | { kind: "INVOICE"; organizationId: string; invoiceId: string }
-    | {
-          kind: "PAYMENT_FAILED";
-          organizationId: string;
-          subscriptionId: string;
-          /** The provider event that said so: one email per event. */
-          eventKey: string;
-          /** The provider gave up and the business is on Free. */
-          final: boolean;
-      }
-    | {
-          kind: "TRIAL_ENDING";
-          organizationId: string;
-          subscriptionId: string;
-          /** When the trial ends, ISO: one email per trial end. */
-          endsAt: string;
-      }
-    | {
-          kind: "PLAN_ENDING";
-          organizationId: string;
-          /** The `plan` override that ends. */
-          overrideId: string;
-          /** Its end, ISO: one email per end and stage. */
-          endsAt: string;
-          stage: PlanEndingStage;
-          planName: string;
-          nextPlanName: string;
-          /** The end in the business's words ("16 Nov 2026"). */
-          endsOn: string;
-      };
+export type { BillingEmailPayload };
 
 export async function enqueueBillingEmail(
     tx: Pick<Tx, "job">,
@@ -96,41 +73,6 @@ export const SAROH_BILLING_SENDER = Symbol("SAROH_BILLING_SENDER");
 export type SarohBillingSender = (
     email: SarohBillingEmail,
 ) => Promise<EmailOutcome>;
-
-function parsePayload(payload: unknown): BillingEmailPayload | null {
-    if (!payload || typeof payload !== "object") return null;
-    const p = payload as Record<string, unknown>;
-    if (typeof p.organizationId !== "string") return null;
-    if (p.kind === "INVOICE" && typeof p.invoiceId === "string") {
-        return p as unknown as BillingEmailPayload;
-    }
-    if (
-        p.kind === "PAYMENT_FAILED" &&
-        typeof p.subscriptionId === "string" &&
-        typeof p.eventKey === "string"
-    ) {
-        return { ...(p as object), final: p.final === true } as never;
-    }
-    if (
-        p.kind === "TRIAL_ENDING" &&
-        typeof p.subscriptionId === "string" &&
-        typeof p.endsAt === "string"
-    ) {
-        return p as unknown as BillingEmailPayload;
-    }
-    if (
-        p.kind === "PLAN_ENDING" &&
-        typeof p.overrideId === "string" &&
-        typeof p.endsAt === "string" &&
-        PLAN_ENDING_NOTICE_DAYS.includes(p.stage as PlanEndingStage) &&
-        typeof p.planName === "string" &&
-        typeof p.nextPlanName === "string" &&
-        typeof p.endsOn === "string"
-    ) {
-        return p as unknown as BillingEmailPayload;
-    }
-    return null;
-}
 
 /** The emails of everyone in the business who manages its billing. */
 export async function billingRecipients(
@@ -178,13 +120,14 @@ export class BillingEmailHandler {
     ) {}
 
     readonly handle = async (job: Job): Promise<void> => {
-        const p = parsePayload(job.payload);
+        const p = parseBillingEmailPayload(job.payload);
         if (!p) {
             this.logger.error(`billing_email_bad_payload job=${job.id}`);
             return;
         }
         if (p.kind === "INVOICE") return this.invoice(job, p);
         if (p.kind === "PLAN_ENDING") return this.planEnding(job, p);
+        if (p.kind === "TERM_ENDING") return this.termEnding(job, p);
         return this.notice(job, p);
     };
 
@@ -223,7 +166,34 @@ export class BillingEmailHandler {
         });
     }
 
-    private async notice(
+    /**
+     * A notice sent at most once per event: already claimed says nothing;
+     * `compose` re-reads and returns the words, or why it says nothing;
+     * the claim is written once the email has left.
+     */
+    private async once(
+        job: Job,
+        organizationId: string,
+        eventKey: string,
+        compose: () => Promise<RenderedEmail | string>,
+    ): Promise<void> {
+        const told = await prisma.customerNotice.findUnique({
+            where: { organizationId_eventKey: { organizationId, eventKey } },
+            select: { id: true },
+        });
+        if (told) return this.skip(job, "already_sent");
+        const words = await compose();
+        if (typeof words === "string") return this.skip(job, words);
+        if (!(await this.deliver(job, organizationId, words))) return;
+        await prisma.customerNotice.createMany({
+            data: [
+                { organizationId, eventKey, kind: BILLING_EMAIL_NOTICE_KIND },
+            ],
+            skipDuplicates: true,
+        });
+    }
+
+    private notice(
         job: Job,
         p: Extract<
             BillingEmailPayload,
@@ -234,49 +204,38 @@ export class BillingEmailHandler {
             p.kind === "PAYMENT_FAILED"
                 ? `saroh-billing:payment-failed:${p.eventKey}`
                 : `saroh-billing:trial-ending:${p.subscriptionId}:${p.endsAt}`;
-        const told = await prisma.customerNotice.findUnique({
-            where: {
-                organizationId_eventKey: {
+        return this.once(job, p.organizationId, eventKey, async () => {
+            const sub = await prisma.subscription.findFirst({
+                where: {
+                    id: p.subscriptionId,
                     organizationId: p.organizationId,
-                    eventKey,
                 },
-            },
-            select: { id: true },
-        });
-        if (told) return this.skip(job, "already_sent");
-
-        const sub = await prisma.subscription.findFirst({
-            where: { id: p.subscriptionId, organizationId: p.organizationId },
-            select: {
-                status: true,
-                currentPeriodEnd: true,
-                provider: true,
-                providerSubscriptionId: true,
-                plan: { select: { name: true, priceCents: true } },
-                organization: { select: { name: true } },
-            },
-        });
-        if (!sub) return this.skip(job, "subscription_gone");
-        const businessName = sub.organization.name;
-
-        let words: RenderedEmail;
-        if (p.kind === "PAYMENT_FAILED") {
-            // Paid since (a retry went through): nothing to say.
-            if (sub.status === "ACTIVE" && !p.final) {
-                return this.skip(job, "paid_since");
-            }
-            words = paymentFailedEmail({
-                businessName,
-                planName: sub.plan.name,
-                final: p.final,
+                select: {
+                    status: true,
+                    currentPeriodEnd: true,
+                    provider: true,
+                    providerSubscriptionId: true,
+                    plan: { select: { name: true, priceCents: true } },
+                    organization: { select: { name: true } },
+                },
             });
-        } else {
+            if (!sub) return "subscription_gone";
+            const businessName = sub.organization.name;
+            if (p.kind === "PAYMENT_FAILED") {
+                // Paid since (a retry went through): nothing to say.
+                if (sub.status === "ACTIVE" && !p.final) return "paid_since";
+                return paymentFailedEmail({
+                    businessName,
+                    planName: sub.plan.name,
+                    final: p.final,
+                });
+            }
             const endsAt = new Date(p.endsAt);
             if (
                 sub.status !== "TRIALING" ||
                 sub.currentPeriodEnd?.getTime() !== endsAt.getTime()
             ) {
-                return this.skip(job, "not_trialing");
+                return "not_trialing";
             }
             // What the first charge will be: the plan, less a coupon the
             // trial's checkout carries (U16).
@@ -300,25 +259,18 @@ export class BillingEmailHandler {
                 checkout && checkout.discountCharges > 0
                     ? checkout.discountPaise
                     : 0;
-            words = trialEndingEmail({
+            const input = {
                 businessName,
                 planName: sub.plan.name,
                 endsOn: day(endsAt),
                 total: money(
                     withGstPaise(Math.max(0, sub.plan.priceCents - off)),
                 ),
-            });
-        }
-        if (!(await this.deliver(job, p.organizationId, words))) return;
-        await prisma.customerNotice.createMany({
-            data: [
-                {
-                    organizationId: p.organizationId,
-                    eventKey,
-                    kind: BILLING_EMAIL_NOTICE_KIND,
-                },
-            ],
-            skipDuplicates: true,
+            };
+            // DEC-093's nominal first month, or a free trial still running.
+            return (await paidFirstMonth(prisma, p.organizationId))
+                ? firstMonthEndingEmail(input)
+                : trialEndingEmail(input);
         });
     }
 
@@ -327,60 +279,83 @@ export class BillingEmailHandler {
      * moved to another end, or no longer the one the business reads (a
      * newer one replaced it) says nothing; the sweep tells the new end.
      */
-    private async planEnding(
+    private planEnding(
         job: Job,
         p: Extract<BillingEmailPayload, { kind: "PLAN_ENDING" }>,
     ): Promise<void> {
         const eventKey = `saroh-billing:plan-ending:${p.overrideId}:${p.endsAt}:${p.stage}`;
-        const told = await prisma.customerNotice.findUnique({
-            where: {
-                organizationId_eventKey: {
+        return this.once(job, p.organizationId, eventKey, async () => {
+            // The plan override the business reads now (newest live, as
+            // `newestPlanOverride`): still this one, with the same end.
+            const now = new Date();
+            const override = await prisma.entitlementOverride.findFirst({
+                where: {
                     organizationId: p.organizationId,
-                    eventKey,
+                    kind: "plan",
+                    revokedAt: null,
+                    OR: [{ expiresAt: null }, { expiresAt: { gt: now } }],
                 },
-            },
-            select: { id: true },
-        });
-        if (told) return this.skip(job, "already_sent");
-        // The plan override the business reads now (newest live, as
-        // `newestPlanOverride`): still this one, with the same end.
-        const now = new Date();
-        const override = await prisma.entitlementOverride.findFirst({
-            where: {
-                organizationId: p.organizationId,
-                kind: "plan",
-                revokedAt: null,
-                OR: [{ expiresAt: null }, { expiresAt: { gt: now } }],
-            },
-            orderBy: { createdAt: "desc" },
-            select: {
-                id: true,
-                expiresAt: true,
-                organization: { select: { name: true } },
-            },
-        });
-        if (
-            override?.id !== p.overrideId ||
-            override.expiresAt?.toISOString() !== p.endsAt
-        ) {
-            return this.skip(job, "plan_end_changed");
-        }
-        const words = planEndingEmail({
-            businessName: override.organization.name,
-            planName: p.planName,
-            nextPlanName: p.nextPlanName,
-            endsOn: p.endsOn,
-        });
-        if (!(await this.deliver(job, p.organizationId, words))) return;
-        await prisma.customerNotice.createMany({
-            data: [
-                {
-                    organizationId: p.organizationId,
-                    eventKey,
-                    kind: BILLING_EMAIL_NOTICE_KIND,
+                orderBy: { createdAt: "desc" },
+                select: {
+                    id: true,
+                    expiresAt: true,
+                    organization: { select: { name: true } },
                 },
-            ],
-            skipDuplicates: true,
+            });
+            if (
+                override?.id !== p.overrideId ||
+                override.expiresAt?.toISOString() !== p.endsAt
+            ) {
+                return "plan_end_changed";
+            }
+            return planEndingEmail({
+                businessName: override.organization.name,
+                planName: p.planName,
+                nextPlanName: p.nextPlanName,
+                endsOn: p.endsOn,
+            });
+        });
+    }
+
+    /**
+     * A 12-month term's end, 30, 7 or 1 days ahead (DEC-100). Re-read with
+     * the sweep's own rule (`termEndingOf`): a term renewed or another plan
+     * authorised since, a move that takes over first, or an end that moved
+     * says nothing. The price is the plan's on the live catalogue now.
+     */
+    private termEnding(
+        job: Job,
+        p: Extract<BillingEmailPayload, { kind: "TERM_ENDING" }>,
+    ): Promise<void> {
+        const eventKey = `saroh-billing:term-ending:${p.subscriptionId}:${p.endsAt}:${p.stage}`;
+        return this.once(job, p.organizationId, eventKey, async () => {
+            const ending = await termEndingOf(
+                prisma,
+                p.subscriptionId,
+                new Date(),
+            );
+            if (
+                ending?.organizationId !== p.organizationId ||
+                ending.term.endsAt.toISOString() !== p.endsAt
+            ) {
+                return "term_end_changed";
+            }
+            const org = await prisma.organization.findUnique({
+                where: { id: p.organizationId },
+                select: { name: true },
+            });
+            return termEndingEmail({
+                businessName: org?.name ?? "your business",
+                planName: ending.planName,
+                endsOn: day(ending.term.endsAt),
+                payment: ending.term.payment,
+                price:
+                    ending.nextPricePaise === null
+                        ? null
+                        : money(ending.nextPricePaise),
+                payUrl: `${appBase()}/settings/billing#change-plan`,
+                chosenFree: ending.chosenFree,
+            });
         });
     }
 

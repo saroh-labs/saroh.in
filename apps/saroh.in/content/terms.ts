@@ -1,8 +1,9 @@
 /**
  * The Terms of Service, as the owner agreed them (Claude Doc "Saroh Privacy
  * Policy and Terms": the 4 Oct text, with the 5 Oct changes for the 12-month
- * term, the introductory month and moving to a lower plan). Published
- * VERBATIM at /terms: do not reword it here. A change comes from the owner's
+ * term, the introductory month and moving to a lower plan, and the 7 Oct
+ * change to the term's end: a request to pay, not a one-tap renewal,
+ * DEC-100). Published VERBATIM at /terms: do not reword it here. A change comes from the owner's
  * text, and moves `publishOn` (`content/resources.ts`), which is the "Last
  * updated" date the page shows.
  *
@@ -30,7 +31,7 @@ Keep your sign-in safe. You're responsible for what happens in your account, inc
 
 - Each plan's price, limits and add-ons are shown on saroh.in/pricing and in the app before you choose. Prices are shown before GST; GST is added as the law requires, and you get a tax invoice for every charge.
 - A paid plan runs for a term of 12 months at the price you chose, paid monthly by UPI Autopay or card, or once for the year. Your price doesn't change during your term.
-- Before your term ends, we email you, and you renew with one tap at the price then. If you don't renew, your plan moves to Free when the term ends.
+- Before your term ends, we email you asking you to pay for the next term, at the price then. Paying starts your next term. If you don't pay, your plan moves to Free when the term ends.
 - We send a receipt with its tax invoice after every payment.
 - If you start with an introductory first month, you pay the amount shown when you sign up, and your plan's full price starts on the date shown unless you cancel before then. We email you 3 days before.
 - We'll give you at least 30 days' notice by email before a price you pay goes up. A new price applies only from your next term.
@@ -38,7 +39,7 @@ Keep your sign-in safe. You're responsible for what happens in your account, inc
 
 ## Moving to a lower plan
 
-If your plan moves to a lower one (you cancel, don't renew, or a payment fails), what's over the new plan's limits becomes read-only: team members beyond the limit are paused, products and posts beyond the limit are hidden from your site, and extra locations stop taking orders and bookings. We email you 7 days before it happens. Nothing is deleted, your invoices, orders and customers stay, and moving back up restores everything at once.
+If your plan moves to a lower one (you cancel, don't pay for the next term, or a payment fails), what's over the new plan's limits becomes read-only: team members beyond the limit are paused, products and posts beyond the limit are hidden from your site, and extra locations stop taking orders and bookings. We email you 7 days before it happens. Nothing is deleted, your invoices, orders and customers stay, and moving back up restores everything at once.
 
 ## Cancelling and refunds
 

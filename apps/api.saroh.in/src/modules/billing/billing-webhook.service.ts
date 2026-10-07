@@ -444,6 +444,8 @@ export class BillingWebhookService {
                     pendingPlanId: checkout.planId,
                     pendingFrom: from,
                     cancelAtPeriodEnd: !renewal && Boolean(oldProvider),
+                    // A paid plan chosen since: Free is no longer the choice.
+                    freeChosenAt: null,
                 },
             });
             // A year paid once is paid now (DEC-093): invoiced with the
@@ -510,6 +512,7 @@ export class BillingWebhookService {
             providerCustomerId: checkout.providerCustomerId,
             currentPeriodEnd,
             cancelAtPeriodEnd: false,
+            freeChosenAt: null,
             pendingPlanId: null,
             pendingFrom: null,
             providerEventAt: event.eventAt ?? null,

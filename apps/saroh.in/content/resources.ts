@@ -100,7 +100,8 @@ export const LEGAL_PAGES: readonly ResourcePage[] = [
         name: "Terms",
         line: "The agreement for using Saroh.",
         href: "/terms",
-        publishOn: "2026-10-05",
+        // 7 Oct: the term ends with a request to pay (DEC-100).
+        publishOn: "2026-10-07",
     },
     {
         id: "refunds",

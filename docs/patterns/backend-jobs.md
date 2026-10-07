@@ -347,8 +347,11 @@ overrideId, reason }`. Re-read, then decide
   provider, and a refusal (already cancelled) isn't retried.
 - **`billing.email`** (U17) is Saroh's own mail to a business: an
   invoice with its PDF (queued with the invoice), a failed charge (queued by
-  the webhook on `pending` or `halted`) and a trial ending (U16 queues it,
-  `enqueueBillingEmail`). To everyone whose role has `billing:manage`, in
+  the webhook on `pending` or `halted`), a first month or a free trial
+  ending (U16 queues it, `enqueueBillingEmail`), a plan that ends (#805)
+  and a 12-month term that ends (DEC-100: `TERM_ENDING`, queued by the
+  hourly sweep with an inbox notice, claimed once per subscription, end and
+  stage, and silent once a renewal is authorised). To everyone whose role has `billing:manage`, in
   one message. Re-read, then decide: an invoice already emailed
   (`emailedAt`), a failed charge paid since, a subscription no longer
   trialing say nothing; a notice is claimed as a `CustomerNotice`
