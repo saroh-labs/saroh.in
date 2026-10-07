@@ -4,6 +4,7 @@ import { nextOrderNumberInTx, Prisma, prisma } from "@saroh/database";
 import { isSerializationFailure } from "../../common/prisma-errors";
 import { planMeter } from "../billing/metering.service";
 import { splitName } from "../bookings/reservation";
+import { fillContactPhoneInTx } from "../customer-workspace/contact-phone-fill";
 import { resolveContact } from "../customer-workspace/resolve-contact";
 import type { AppliedDiscount } from "../discounts/discounts.service";
 import { recordRedemptionInTx } from "../discounts/redemption";
@@ -133,6 +134,14 @@ export async function createCheckoutOrder(
                         scope.organizationId,
                         account,
                         address?.name,
+                    );
+                    // The phone typed for the delivery fills their contact
+                    // when it has none, as the booking page's does (UX-049).
+                    await fillContactPhoneInTx(
+                        tx,
+                        scope.organizationId,
+                        account.contactId,
+                        address?.phone,
                     );
                     // Found whatever case staff typed it in, as a treatment's
                     // customer is; made only when there is none.

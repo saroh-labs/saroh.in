@@ -804,6 +804,39 @@ describe("starting a checkout and paying (G13)", () => {
         });
     });
 
+    it("fills the account's contact's phone from the delivery when it has none, and keeps one it has (UX-049)", async () => {
+        const s = await shop();
+        const delivery = (phone: string) => ({
+            fulfilment: "LOCAL_DELIVERY",
+            address: {
+                name: "Kavya Iyer",
+                phone,
+                line1: "14, 2nd Cross",
+                city: "Bengaluru",
+                state: "Karnataka",
+                postalCode: "560038",
+            },
+        });
+        const { email, token } = await signIn(s.host);
+        const contactOf = async () =>
+            (
+                await prisma.customerAccount.findFirstOrThrow({
+                    where: { organizationId: s.organizationId, email },
+                    select: { contact: true },
+                })
+            ).contact;
+        expect((await contactOf()).phone ?? null).toBeNull();
+
+        const first = await start(s, token, delivery("9811122233"));
+        expect(first.status).toBe(201);
+        expect((await contactOf()).phone).toBe("9811122233");
+
+        // A later delivery to another number never replaces it.
+        const gift = await start(s, token, delivery("9800000001"));
+        expect(gift.status).toBe(201);
+        expect((await contactOf()).phone).toBe("9811122233");
+    });
+
     it("refuses a session from site A on site B's host, or naming site B", async () => {
         const [a, b] = [await shop(), await shop()];
         const { token } = await signIn(a.host);

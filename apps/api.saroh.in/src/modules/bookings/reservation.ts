@@ -10,6 +10,7 @@ import { prismaErrorCode } from "../../common/prisma-errors";
 import type { ActivationEvents } from "../analytics/activation-events";
 import { planMeter } from "../billing/metering.service";
 import { bookingsPaused } from "../billing/plan-limit-errors";
+import { phoneToFill } from "../customer-workspace/contact-phone-fill";
 import { resolveContact } from "../customer-workspace/resolve-contact";
 import { appointmentsOpen } from "./appointments-open";
 import type { AvailabilityRuleWindow } from "./availability";
@@ -747,8 +748,8 @@ async function accountContactInTx(
     }
     // A phone they gave on the booking page fills a record that has none
     // (UX-049); one the business already has is never replaced from here.
-    const phone = input.bookerPhone?.trim();
-    if (phone && !contact.phone?.trim()) data.phone = phone;
+    const phone = phoneToFill(input.bookerPhone, contact.phone);
+    if (phone) data.phone = phone;
     if (Object.keys(data).length > 0) {
         await tx.contact.update({
             where: { id: contact.id },
