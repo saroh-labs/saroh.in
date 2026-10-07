@@ -27,6 +27,7 @@ import { listCataloguePage, listCategories } from "@/lib/products/service";
 import { requireSession } from "@/lib/session";
 import { getStockTracking } from "@/lib/stock/service";
 import { listBusinessStores } from "@/lib/stores/service";
+import { listStorefronts } from "@/lib/stores/storefronts";
 import { isSince, sinceParam } from "@/lib/views/since";
 
 /**
@@ -56,11 +57,20 @@ export default async function CataloguePage({
     searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
     await requireSession();
-    const [stores, params, organization] = await Promise.all([
+    const [ownStores, storefronts, params, organization] = await Promise.all([
         listBusinessStores(),
+        listStorefronts().catch(() => null),
         searchParams,
         resolveActiveOrganization(),
     ]);
+    // The business's locations, as anyone who may read them sees them
+    // (UX-027). The catalogue is the business's, read org-scoped; the
+    // stores a person is on (`GET /stores`) left staff who aren't on one
+    // with "No location yet" while Stock showed its products.
+    const stores =
+        storefronts && storefronts.length > 0
+            ? storefronts.map(({ id, name }) => ({ id, name }))
+            : ownStores.map(({ id, name }) => ({ id, name }));
     // From what the API resolved this person may do; the role's name only as
     // the fallback for a response that predates permissions.
     const may = (action: string) =>
@@ -182,7 +192,7 @@ export default async function CataloguePage({
             <CatalogueScreen
                 query={query}
                 page={page}
-                stores={stores.map((s) => ({ id: s.id, name: s.name }))}
+                stores={stores}
                 tabs={tabs}
                 notice={
                     <>

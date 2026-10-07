@@ -1,4 +1,6 @@
 import type { CrmResult } from "@/lib/api/http";
+import { forbidden } from "next/navigation";
+
 import { apiFetch, destroy, mutate, orgBase } from "@/lib/api/http";
 
 /**
@@ -96,6 +98,10 @@ export async function listLeads(filter?: {
     if (filter?.stageId) qs.set("stageId", filter.stageId);
     const suffix = qs.toString() ? `?${qs.toString()}` : "";
     const res = await apiFetch(`${base}/leads${suffix}`);
+    // A role without leads is refused, not empty (UX-027): the shell's
+    // "You do not have access", never "Leads appear here as enquiries come
+    // in" beside an Add a lead it can't use. Outside any try, so it lands.
+    if (res.status === 403) forbidden();
     if (!res.ok) return [];
     return (await res.json()) as LeadListItem[];
 }
