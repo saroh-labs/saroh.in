@@ -13,6 +13,7 @@ import {
     AuthSubmit,
 } from "@/components/auth/field";
 import { SocialButtons } from "@/components/auth/social-buttons";
+import { isJoining, withCarry } from "@/lib/joining";
 
 /**
  * Creating the account.
@@ -37,6 +38,10 @@ export function SignupForm({
     const [password, setPassword] = useState("");
     const [error, setError] = useState<string | null>(null);
     const [isLoading, setIsLoading] = useState(false);
+    // Joining someone's business through their invitation (UX-029).
+    const joining = isJoining(returnTo);
+    // The invitation's address, which the accept insists on: fixed.
+    const emailLocked = joining && !!invitedEmail;
 
     async function handleSubmit(e: React.FormEvent) {
         e.preventDefault();
@@ -57,19 +62,20 @@ export function SignupForm({
         // /login with "Email not verified" and no way to act on it.
         // Carried through verification, so an invitee lands on the
         // invitation they clicked rather than in their own onboarding (#276).
-        const destination = returnTo
-            ? `&redirect=${encodeURIComponent(returnTo)}`
-            : "";
-        router.push(
-            `/verify-email?email=${encodeURIComponent(email)}${destination}`,
-        );
+        router.push(withCarry("/verify-email", returnTo, email));
     }
 
     return (
         <div>
             <AuthHeading
-                title="Make your account"
-                blurb="Your details, not the business's — that comes in a moment."
+                title={
+                    joining ? "Make your account to join" : "Make your account"
+                }
+                blurb={
+                    joining
+                        ? "Your own details. Once your email is confirmed, you join the business that invited you."
+                        : "Your details, not the business's — that comes in a moment."
+                }
             />
             <form onSubmit={handleSubmit} noValidate>
                 {error ? <AuthError>{error}</AuthError> : null}
@@ -98,6 +104,8 @@ export function SignupForm({
                     }
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
+                    readOnly={emailLocked}
+                    aria-readonly={emailLocked || undefined}
                     required
                     disabled={isLoading}
                 />
@@ -126,11 +134,11 @@ export function SignupForm({
             <AuthFooter>
                 Already have an account?{" "}
                 <Link
-                    href={
-                        returnTo
-                            ? `/login?redirect=${encodeURIComponent(returnTo)}`
-                            : "/login"
-                    }
+                    href={withCarry(
+                        "/login",
+                        returnTo,
+                        emailLocked ? invitedEmail : undefined,
+                    )}
                     className="text-foreground decoration-border-strong hover:decoration-foreground active:text-muted-foreground underline underline-offset-4 transition-colors"
                 >
                     Log in

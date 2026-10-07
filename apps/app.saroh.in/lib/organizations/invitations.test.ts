@@ -2,7 +2,13 @@ import { describe, expect, it } from "vitest";
 
 import { shortDate } from "@/lib/sites/format-date";
 
-import { invitationMeta, inviteEmailError, inviteSchema } from "./invitations";
+import {
+    invitationMeta,
+    inviteEmailError,
+    inviteRoom,
+    inviteSchema,
+    teamCountLine,
+} from "./invitations";
 
 const ZONE = "Asia/Kolkata";
 
@@ -148,5 +154,31 @@ describe("invitationMeta", () => {
         expect(invitationMeta(late, "UTC", now)).toBe(
             `Invited ${sep(8)} · link works until ${sep(15)}`,
         );
+    });
+});
+
+describe("the team cap, said (UX-028)", () => {
+    it("counts the owner and the invites waiting", () => {
+        expect(teamCountLine(1, 0)).toBe("Just you");
+        expect(teamCountLine(1, 1)).toBe("Just you · 1 invite waiting");
+        expect(teamCountLine(2, 3)).toBe(
+            "2 people including you · 3 invites waiting",
+        );
+    });
+
+    it("keeps Invite open for a Reviewer while the team is full", () => {
+        expect(inviteRoom(null)).toEqual({ open: true, seatReason: null });
+        expect(inviteRoom({ full: false, why: "" })).toEqual({
+            open: true,
+            seatReason: null,
+        });
+        const full = inviteRoom({ full: true, why: "Your team is full" });
+        expect(full.open).toBe(true);
+        expect(full.seatReason).toBe(
+            "Your team is full (invites count too). A Reviewer doesn't take a seat.",
+        );
+        expect(
+            inviteRoom({ full: true, why: "x", reviewersFull: true }).open,
+        ).toBe(false);
     });
 });

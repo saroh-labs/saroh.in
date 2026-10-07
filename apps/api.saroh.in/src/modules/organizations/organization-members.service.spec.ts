@@ -495,6 +495,45 @@ describe("accepting", () => {
         expect(db.siteReviewer.upsert).not.toHaveBeenCalled();
         expect(result.siteId).toBeNull();
     });
+
+    // UX-004: a role the business made used to be narrowed to MEMBER here,
+    // so "Front desk" joined with a Member's powers and its own never applied.
+    it("keeps a role the business made, as invited", async () => {
+        db.organizationInvitation.findUnique.mockResolvedValue({
+            ...pending,
+            role: "front-desk",
+            siteIds: [],
+        });
+        db.site.findMany.mockResolvedValue([]);
+        db.organizationRole.findUnique.mockResolvedValue({ key: "front-desk" });
+
+        const result = await service.accept(invitee, "a-token");
+
+        expect(db.organizationRole.findUnique.mock.calls[0][0].where).toEqual({
+            organizationId_key: { organizationId: "org_1", key: "front-desk" },
+        });
+        const upsert = db.membership.upsert.mock.calls[0][0];
+        expect(upsert.create.role).toBe("front-desk");
+        expect(upsert.update.role).toBe("front-desk");
+        expect(result).toMatchObject({ role: "MEMBER", roleKey: "front-desk" });
+    });
+
+    it("joins at the floor when the made role was removed since the invite", async () => {
+        db.organizationInvitation.findUnique.mockResolvedValue({
+            ...pending,
+            role: "front-desk",
+            siteIds: [],
+        });
+        db.site.findMany.mockResolvedValue([]);
+        db.organizationRole.findUnique.mockResolvedValue(null);
+
+        const result = await service.accept(invitee, "a-token");
+
+        expect(db.membership.upsert.mock.calls[0][0].create.role).toBe(
+            "MEMBER",
+        );
+        expect(result.roleKey).toBe("MEMBER");
+    });
 });
 
 describe("the last owner", () => {
@@ -1077,6 +1116,34 @@ describe("extra permissions per person (F17)", () => {
             taken: ["order:refund"],
             takenLabels: [expect.stringMatching(/refund/i)],
         });
+    });
+
+    // UX-030: an extra is a role of one's own, the plan's "Custom roles".
+    it("asks the plan's Custom roles row before giving anything", async () => {
+        person("MEMBER");
+        const included = jest
+            .spyOn(planMeter, "assertIncluded")
+            .mockRejectedValueOnce(new ForbiddenException("MODULE_LOCKED"));
+
+        await expect(
+            service.setExtraActions(admin(), "user_2", {
+                actions: ["payment:manage"],
+            }),
+        ).rejects.toThrow(ForbiddenException);
+        expect(included).toHaveBeenCalledWith("org_1", "roles");
+        expect(db.membership.updateMany).not.toHaveBeenCalled();
+        included.mockRestore();
+    });
+
+    it("never asks the plan to take extras away", async () => {
+        person("MEMBER", ["order:refund"]);
+        const included = jest.spyOn(planMeter, "assertIncluded");
+
+        await service.setExtraActions(admin(), "user_2", { actions: [] });
+
+        expect(included).not.toHaveBeenCalled();
+        expect(db.membership.updateMany).toHaveBeenCalled();
+        included.mockRestore();
     });
 
     it("refuses org:delete as an extra (400), even from an Owner", async () => {

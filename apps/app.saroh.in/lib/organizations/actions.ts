@@ -6,6 +6,8 @@ import { redirect } from "next/navigation";
 import { env } from "@/env";
 import { ACTIVE_ORG_COOKIE } from "@/lib/api/http";
 
+import { ACTIVE_ORG_NAME_COOKIE } from "./left-business";
+
 import type {
     AddressAvailability,
     CreateOrganizationInput,
@@ -27,8 +29,12 @@ import {
 
 const ONE_YEAR = 60 * 60 * 24 * 365;
 
-async function writeActiveOrgCookie(organizationId: string): Promise<void> {
-    (await cookies()).set(ACTIVE_ORG_COOKIE, organizationId, {
+async function writeActiveOrgCookie(
+    organizationId: string,
+    name: string | null,
+): Promise<void> {
+    const jar = await cookies();
+    const options = {
         httpOnly: true,
         sameSite: "lax",
         // Off in development so the cookie still works over plain-HTTP
@@ -37,7 +43,12 @@ async function writeActiveOrgCookie(organizationId: string): Promise<void> {
         secure: env.NODE_ENV === "production",
         path: "/",
         maxAge: ONE_YEAR,
-    });
+    } as const;
+    jar.set(ACTIVE_ORG_COOKIE, organizationId, options);
+    // Its name beside it, so someone later removed is told which business
+    // they are no longer in (UX-073). Never anything but the name.
+    if (name) jar.set(ACTIVE_ORG_NAME_COOKIE, name, options);
+    else jar.delete(ACTIVE_ORG_NAME_COOKIE);
 }
 
 /**
@@ -49,13 +60,14 @@ export async function setActiveOrganization(
     organizationId: string,
 ): Promise<OrganizationResult<{ id: string }>> {
     const organizations = await listOrganizations();
-    if (!organizations.some((o) => o.id === organizationId)) {
+    const chosen = organizations.find((o) => o.id === organizationId);
+    if (!chosen) {
         return {
             ok: false,
             error: "You are not a member of that organization.",
         };
     }
-    await writeActiveOrgCookie(organizationId);
+    await writeActiveOrgCookie(organizationId, chosen.name);
     return { ok: true, data: { id: organizationId } };
 }
 
@@ -95,7 +107,7 @@ export async function createOrganization(
 ): Promise<OrganizationResult<{ id: string; slug: string }>> {
     const res = await createOrganizationApi(input);
     if (res.ok) {
-        await writeActiveOrgCookie(res.data.id);
+        await writeActiveOrgCookie(res.data.id, input.name);
     }
     return res;
 }

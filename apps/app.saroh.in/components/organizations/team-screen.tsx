@@ -51,8 +51,13 @@ import {
     extraLabels,
     roleGrants,
 } from "@/lib/organizations/extras";
-import type { InviteValues } from "@/lib/organizations/invitations";
-import { invitationMeta, inviteSchema } from "@/lib/organizations/invitations";
+import type { InviteValues, TeamLimit } from "@/lib/organizations/invitations";
+import {
+    invitationMeta,
+    inviteRoom,
+    inviteSchema,
+    teamCountLine,
+} from "@/lib/organizations/invitations";
 import {
     inviteMember,
     removeMember,
@@ -66,6 +71,7 @@ import type {
     StorefrontTeamNoticePerson,
 } from "@/lib/organizations/members";
 import type { Role, RoleCatalogue } from "@/lib/organizations/roles";
+import type { RolesLock } from "@/lib/organizations/roles-lock";
 import type { OrganizationRole } from "@/lib/organizations/service";
 import {
     STOREFRONT_TEAM_LABEL,
@@ -201,6 +207,7 @@ export function TeamScreen({
     myActions,
     joinedFromStorefronts = [],
     teamLimit = null,
+    rolesLock = null,
     limitNotice = null,
 }: {
     organizationName: string;
@@ -225,7 +232,12 @@ export function TeamScreen({
      * The plan's team-members limit (plans catalogue U14): `full` once the
      * team and its open invites reach it, with the reason the design says.
      */
-    teamLimit?: { full: boolean; why: string } | null;
+    teamLimit?: TeamLimit | null;
+    /**
+     * The plan leaves roles of your own off (UX-030): New role becomes the
+     * way up, and extra permissions are locked. Null when it has them.
+     */
+    rolesLock?: RolesLock | null;
     /** Its 80% / 100% notice, above the tab's content. */
     limitNotice?: ReactNode;
 }) {
@@ -234,10 +246,17 @@ export function TeamScreen({
     const [editing, setEditing] = useState<OrganizationMember | null>(null);
     const [removing, setRemoving] = useState<OrganizationMember | null>(null);
     const [inviteOpen, setInviteOpen] = useState(false);
-    // Inviting while the team is full says why, as the design flashes it:
-    // the invite would be refused, invites count too, and where more is.
+    // A full team still invites a Reviewer, who takes no seat (UX-028).
+    // With both caps reached, it says why, as the design flashes it: the
+    // invite would be refused, invites count too, and where more is.
+    const room = inviteRoom(teamLimit);
+    const inviteLabel = !teamLimit?.full
+        ? "Invite someone"
+        : room.open
+          ? "Invite a reviewer"
+          : "Team is full";
     const openInvite = () => {
-        if (teamLimit?.full) {
+        if (!room.open && teamLimit) {
             showInfo(
                 `${teamLimit.why} (invites count too). Upgrade or add more in Plan and billing.`,
             );
@@ -305,9 +324,7 @@ export function TeamScreen({
                         canManage && tab === "people" ? (
                             <Button onClick={openInvite}>
                                 <Plus className="mr-1.5 size-4" />
-                                {teamLimit?.full
-                                    ? "Team is full"
-                                    : "Invite someone"}
+                                {inviteLabel}
                             </Button>
                         ) : undefined
                     }
@@ -353,6 +370,15 @@ export function TeamScreen({
             </div>
 
             {limitNotice}
+            {/* What the cap counts, so "full" never sits beside People = 1. */}
+            {teamLimit && tab === "people" ? (
+                <p className="text-[12.5px] text-muted-foreground">
+                    {teamCountLine(members.length, invitations.length)}
+                    {teamLimit.full
+                        ? " — the team is at its plan's limit."
+                        : ""}
+                </p>
+            ) : null}
 
             {tab === "roles" ? (
                 <RolesTab
@@ -363,6 +389,7 @@ export function TeamScreen({
                     organizationName={organizationName}
                     builtInBlurb={ROLE_BLURB}
                     builtInPlain={ROLE_PLAIN}
+                    rolesLock={rolesLock}
                 />
             ) : members.length <= 1 && invitations.length === 0 ? (
                 <div className="flex flex-col items-center gap-[9px] rounded-xl border border-dashed border-border-strong px-6 py-12 text-center">
@@ -380,9 +407,7 @@ export function TeamScreen({
                     </p>
                     {canManage ? (
                         <Button className="mt-1" onClick={openInvite}>
-                            {teamLimit?.full
-                                ? "Team is full"
-                                : "Invite someone"}
+                            {inviteLabel}
                         </Button>
                     ) : null}
                 </div>
@@ -427,6 +452,7 @@ export function TeamScreen({
                 organizationName={organizationName}
                 book={book}
                 canEditExtras={canEditRoles}
+                rolesLock={rolesLock}
                 onClose={() => setEditing(null)}
                 onRemove={(m) => {
                     setEditing(null);
@@ -447,6 +473,7 @@ export function TeamScreen({
                     book={book}
                     members={members}
                     invitations={invitations}
+                    seatReason={room.seatReason}
                     // The new invite shows at the top of People.
                     onSent={() => setTab("people")}
                 />
@@ -814,6 +841,7 @@ function MemberDrawer({
     organizationName,
     book,
     canEditExtras,
+    rolesLock,
     onClose,
     onRemove,
 }: {
@@ -823,6 +851,8 @@ function MemberDrawer({
     book: RoleBook;
     /** Holds `member:role:update`, which also sets extras (F17). */
     canEditExtras: boolean;
+    /** The plan leaves extras off (UX-030); null when it has them. */
+    rolesLock: RolesLock | null;
     onClose: () => void;
     /** Hands an owner to the one Remove confirmation; see below. */
     onRemove: (member: OrganizationMember) => void;
@@ -855,6 +885,7 @@ function MemberDrawer({
         name: member ? nameOf(member) : "",
         catalogue: book.catalogue,
         myActions: book.myActions,
+        planLocked: rolesLock?.line ?? null,
     });
     const roleChanged = !!member && role !== current;
     const changed = roleChanged || extras.changed;
@@ -1132,6 +1163,7 @@ function InviteDialog({
     book,
     members,
     invitations,
+    seatReason,
     onSent,
 }: {
     open: boolean;
@@ -1141,6 +1173,8 @@ function InviteDialog({
     book: RoleBook;
     members: OrganizationMember[];
     invitations: OrganizationInvitation[];
+    /** The team is full (UX-028): only a Reviewer can be invited, and why. */
+    seatReason: string | null;
     onSent: () => void;
 }) {
     const router = useRouter();
@@ -1150,7 +1184,11 @@ function InviteDialog({
     });
     const form = useForm<InviteValues>({
         resolver: zodResolver(schema),
-        defaultValues: { email: "", role: "MEMBER", siteIds: [] },
+        defaultValues: {
+            email: "",
+            role: seatReason ? "REVIEWER" : "MEMBER",
+            siteIds: [],
+        },
         mode: "onTouched",
     });
     const sending = form.formState.isSubmitting;
@@ -1158,7 +1196,12 @@ function InviteDialog({
     const offered = book.all.filter((r) => r.key !== "OWNER");
 
     function setOpen(next: boolean) {
-        if (!next) form.reset();
+        if (!next)
+            form.reset({
+                email: "",
+                role: seatReason ? "REVIEWER" : "MEMBER",
+                siteIds: [],
+            });
         onOpenChange(next);
     }
 
@@ -1248,6 +1291,11 @@ function InviteDialog({
                                         >
                                             Role
                                         </p>
+                                        {seatReason ? (
+                                            <p className="text-[12px] leading-[1.45] text-muted-foreground">
+                                                {seatReason}
+                                            </p>
+                                        ) : null}
                                         <div
                                             role="radiogroup"
                                             aria-labelledby="invite-role-label"
@@ -1267,6 +1315,12 @@ function InviteDialog({
                                                     // the inviter.
                                                     beyond={
                                                         !book.withinReach(r)
+                                                    }
+                                                    // A full team takes no
+                                                    // one who needs a seat.
+                                                    noSeat={
+                                                        !!seatReason &&
+                                                        r !== "REVIEWER"
                                                     }
                                                     disabled={sending}
                                                     onPick={() =>
@@ -1371,6 +1425,7 @@ function RoleChoice({
     blurb,
     checked,
     beyond,
+    noSeat = false,
     disabled,
     onPick,
 }: {
@@ -1380,15 +1435,24 @@ function RoleChoice({
     blurb: string;
     checked: boolean;
     beyond: boolean;
+    /** The team is full and this role takes a seat (UX-028). */
+    noSeat?: boolean;
     disabled: boolean;
     onPick: () => void;
 }) {
+    const off = beyond || noSeat;
     return (
         <label
-            title={beyond ? "Can do more than you can" : undefined}
+            title={
+                beyond
+                    ? "Can do more than you can"
+                    : noSeat
+                      ? "The team is full"
+                      : undefined
+            }
             className={cn(
                 "block rounded-[9px] border px-3 py-[9px] transition-colors duration-fast has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-ring has-[:focus-visible]:ring-offset-2",
-                beyond
+                off
                     ? "cursor-not-allowed border-border opacity-50"
                     : checked
                       ? "cursor-pointer border-foreground bg-foreground/[0.03] shadow-[inset_0_0_0_1px_hsl(var(--foreground))]"
@@ -1400,11 +1464,17 @@ function RoleChoice({
                 name={name}
                 value={value}
                 checked={checked}
-                disabled={beyond || disabled}
+                disabled={off || disabled}
                 onChange={onPick}
                 className="sr-only"
             />
-            <span className="block text-[13.5px] font-semibold">{label}</span>
+            <span className="flex items-center justify-between gap-2 text-[13.5px] font-semibold">
+                {label}
+                {/* Which one is picked, beyond the border (UX-029). */}
+                {checked && !off ? (
+                    <Check aria-hidden className="size-4 shrink-0" />
+                ) : null}
+            </span>
             <span className="mt-0.5 block text-[12px] text-muted-foreground">
                 {blurb}
             </span>

@@ -160,3 +160,53 @@ describe("TeamScreen: who may change what", () => {
         );
     });
 });
+
+describe("TeamScreen at the plan's team limit (UX-028)", () => {
+    const people = [
+        member({ userId: "u1", name: "Asha", role: "OWNER", isSelf: true }),
+    ];
+    const invite = {
+        id: "inv_1",
+        email: "meera@example.com",
+        role: "MEMBER" as const,
+        roleKey: "MEMBER",
+        siteIds: [],
+        status: "PENDING",
+        expiresAt: "2026-10-14T00:00:00.000Z",
+        createdAt: "2026-10-07T00:00:00.000Z",
+    };
+    const renderAt = (teamLimit: {
+        full: boolean;
+        why: string;
+        reviewersFull?: boolean;
+    }) =>
+        renderToString(
+            createElement(TeamScreen, {
+                organizationName: "Rye Bakery",
+                members: people,
+                invitations: [invite] as never,
+                sites: [],
+                canManage: true,
+                canEditRoles: true,
+                roles: [],
+                catalogue: null,
+                myActions: null,
+                teamLimit,
+            }),
+        );
+
+    it("says what the cap counts, owner and waiting invites included", () => {
+        const html = renderAt({ full: true, why: "Team is full" });
+        expect(html).toContain("Just you · 1 invite waiting");
+    });
+
+    it("still invites a Reviewer while seats are full", () => {
+        expect(renderAt({ full: true, why: "Team is full" })).toContain(
+            "Invite a reviewer",
+        );
+        expect(
+            renderAt({ full: true, why: "Team is full", reviewersFull: true }),
+        ).toContain("Team is full");
+        expect(renderAt({ full: false, why: "" })).toContain("Invite someone");
+    });
+});

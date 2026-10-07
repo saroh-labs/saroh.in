@@ -34,7 +34,7 @@ import * as React from "react";
  * departure is older than this screen and is recorded in the token layer.
  */
 const FIELD =
-    "h-[38px] w-full rounded-[9px] border border-input bg-field px-[11px] text-[13.5px] text-foreground ring-offset-background transition-colors placeholder:text-muted-foreground focus-visible:border-ring focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:border-disabled disabled:bg-disabled disabled:text-disabled-foreground aria-[invalid=true]:border-destructive aria-[invalid=true]:bg-destructive-subtle";
+    "h-[38px] w-full rounded-[9px] border border-input bg-field px-[11px] text-[13.5px] text-foreground ring-offset-background transition-colors placeholder:text-muted-foreground focus-visible:border-ring focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:border-disabled disabled:bg-disabled disabled:text-disabled-foreground read-only:bg-muted read-only:text-muted-foreground aria-[invalid=true]:border-destructive aria-[invalid=true]:bg-destructive-subtle";
 
 export interface AuthFieldProps extends React.InputHTMLAttributes<HTMLInputElement> {
     label: string;

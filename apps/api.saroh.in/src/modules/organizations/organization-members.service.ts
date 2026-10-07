@@ -529,7 +529,14 @@ export class OrganizationMembersService {
             );
         }
 
-        const role = toRole(invitation.role);
+        // The role as invited: a built-in, or a role the business made
+        // (UX-004). Narrowing a made role to MEMBER here is how "Front desk"
+        // joined as a Member everywhere, its permissions never reaching them.
+        const roleKey = await invitedRoleKey(
+            invitation.organizationId,
+            invitation.role,
+        );
+        const role = toRole(roleKey);
         // Sites deleted since the invite was sent are dropped rather than
         // failing the accept: the person still belongs in the workspace.
         const sites = await prisma.site.findMany({
@@ -552,9 +559,9 @@ export class OrganizationMembersService {
                 create: {
                     organizationId: invitation.organizationId,
                     userId: user.id,
-                    role,
+                    role: roleKey,
                 },
-                update: { role },
+                update: { role: roleKey },
             });
             for (const site of sites) {
                 await tx.siteReviewer.upsert({
@@ -593,13 +600,14 @@ export class OrganizationMembersService {
             targetType: "membership",
             targetId: user.id,
             outcome: AuditOutcome.Success,
-            metadata: { role, siteCount: sites.length },
+            metadata: { role: roleKey, siteCount: sites.length },
         });
 
         return {
             organizationId: invitation.organizationId,
             organization: invitation.organization,
             role,
+            roleKey,
             // Where to send them: the site they were asked to look at.
             siteId: sites[0]?.id ?? null,
         };
@@ -811,6 +819,13 @@ export class OrganizationMembersService {
         const taken = current.filter((a) => !next.includes(a));
         if (given.length === 0 && taken.length === 0) {
             return { userId, extraActions: next };
+        }
+        // Giving someone more than their role is a role of their own, the
+        // plan's "Custom roles" row (UX-030): refused where the plan leaves
+        // it off. Taking extras away never asks, so a business that moved
+        // down can still tidy up.
+        if (given.length > 0) {
+            await planMeter.assertIncluded(organizationId, "roles");
         }
 
         const { count } = await prisma.membership.updateMany({
@@ -1134,6 +1149,25 @@ function labelsOf(actions: readonly OrgAction[]): string[] {
 /** "Refund orders, See invoices and Export orders". */
 function listed(labels: readonly string[]): string {
     return new Intl.ListFormat("en", { type: "conjunction" }).format(labels);
+}
+
+/**
+ * The role key a membership made from an invitation holds: the built-in it
+ * names, or the business's own role when it still exists. A role removed
+ * since the invite was sent leaves the read-only floor (MEMBER), which is
+ * what a dangling key would resolve to anyway — stored as MEMBER, so Team
+ * names it rather than showing a key nobody can pick.
+ */
+export async function invitedRoleKey(
+    organizationId: string,
+    invited: string,
+): Promise<string> {
+    if (isBuiltInRole(invited)) return invited;
+    const made = await prisma.organizationRole.findUnique({
+        where: { organizationId_key: { organizationId, key: invited } },
+        select: { key: true },
+    });
+    return made?.key ?? "MEMBER";
 }
 
 /** Narrow a stored role string, defaulting the unrecognized to MEMBER. */

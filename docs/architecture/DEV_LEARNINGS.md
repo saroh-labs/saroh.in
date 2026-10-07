@@ -3061,3 +3061,21 @@ a review) is written in the business's zone, never the viewer's or the
 server's: `BusinessDate`, or `useBusinessZone()` for a string. Pinning UTC
 avoids a hydration mismatch by being wrong for everyone.
 **Category**: dates · `app.saroh.in/components/shared/business-zone.tsx`
+## Team — a custom role was lost when the invitation was accepted (UX-004)
+
+**Problem**: Someone invited as "Front desk" joined as a Member: no New
+booking, no order changes, and Roles said "Front desk · 0 people". The
+invitation row read `role=front-desk ACCEPTED`; the membership `MEMBER`.
+**Root cause**: `accept` stored `toRole(invitation.role)`, the helper that
+narrows a stored key to the four built-ins for display. Every unit test
+mocked Prisma and checked a Reviewer invite, so nothing ran invite → accept →
+resolve with a role the business made.
+**Fix**: Accept stores the invited key when that role still exists in the
+business (MEMBER when it was removed since); migration
+`20261029141100_invited_custom_role` puts back the memberships the old accept
+dropped, only where nobody changed the role since.
+`invite-custom-role.db.spec.ts` runs the whole path and then asks the booking
+and order services what the role may do.
+**Category**: roles · rule in `docs/patterns/backend-auth-and-access.md`
+(invitations). `toRole` is for the response's `role` field only — never for
+what is written.

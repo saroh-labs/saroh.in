@@ -133,6 +133,22 @@ describe("extras on Team (F17)", () => {
         );
     });
 
+    it("locks extras where the plan leaves roles of your own off (UX-030)", () => {
+        const base = {
+            isSelf: false,
+            canEdit: true,
+            reviewer: false,
+            beyondViewer: false,
+            name: "Ravi",
+            planLocked: "Roles of your own come with Plan B.",
+        };
+        expect(extrasLockedReason(base)).toBe(
+            "Roles of your own come with Plan B. Extra permissions for one person come with them.",
+        );
+        // Extras from before a move down can still be taken away.
+        expect(extrasLockedReason({ ...base, holdsExtras: true })).toBeNull();
+    });
+
     it("counts a person's extras when asking whether they are above the viewer", () => {
         const mine = ["order:read"];
         expect(beyondViewer(new Set(["order:read"]), [], mine)).toBe(false);
