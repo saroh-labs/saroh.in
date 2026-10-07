@@ -7,6 +7,7 @@ import type { Activity, Lead, Stage } from "@saroh/database";
 import { prisma } from "@saroh/database";
 
 import type { OrganizationContext } from "../../common/types/organization-context";
+import { enquiryEntriesFor } from "../forms/enquiry-entries";
 import { authorize } from "../organizations/organization-policy";
 import { PipelinesService } from "../pipelines/pipelines.service";
 import type {
@@ -64,8 +65,9 @@ export class LeadsService {
 
     /**
      * A lead with its contact, pipeline (+ ordered stages, so the UI can offer a
-     * move target), current stage, and full activity timeline (oldest first).
-     * Authorizes `lead:read`; a missing / cross-tenant id 404s.
+     * move target), current stage, full activity timeline (oldest first), and
+     * the enquiries sent through a form that opened it, readable. Authorizes
+     * `lead:read`; a missing / cross-tenant id 404s.
      */
     async get(ctx: OrganizationContext, leadId: string) {
         authorize(ctx, "lead:read");
@@ -84,7 +86,12 @@ export class LeadsService {
         if (lead?.organizationId !== ctx.organizationId) {
             throw new NotFoundException("Lead not found");
         }
-        return lead;
+        // What they wrote, when the lead came from a form (UX-002): stored
+        // on the submission and shown nowhere until now.
+        const enquiries = await enquiryEntriesFor(ctx.organizationId, {
+            leadId: lead.id,
+        });
+        return { ...lead, enquiries };
     }
 
     /**

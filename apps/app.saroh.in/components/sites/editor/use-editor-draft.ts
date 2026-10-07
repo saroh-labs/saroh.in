@@ -230,7 +230,7 @@ export function useEditorDraft({
         // returned formId into the content we then persist + publish.
         const synced = await syncEnquiryForms(
             sections,
-            siteName,
+            { id: siteId, name: siteName },
             ensureFormForSection,
         );
         if (!synced.ok) {

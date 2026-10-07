@@ -24,9 +24,11 @@ jest.mock("@saroh/database", () => {
         create: jest.fn(),
     };
     const job = { create: jest.fn() };
+    const submission = { findMany: jest.fn().mockResolvedValue([]) };
     return {
         prisma: {
             lead,
+            submission,
             contact,
             stage,
             activity,
@@ -134,6 +136,7 @@ describe("LeadsService.get", () => {
 
         const res = await service.get(ctx(), "l_1");
         expect(res.id).toBe("l_1");
+        expect(res.enquiries).toEqual([]);
         expect(leadFindUnique).toHaveBeenCalledWith(
             expect.objectContaining({
                 include: expect.objectContaining({
@@ -141,6 +144,57 @@ describe("LeadsService.get", () => {
                 }),
             }),
         );
+    });
+});
+
+describe("LeadsService.get — what they wrote (UX-002)", () => {
+    beforeEach(() => jest.clearAllMocks());
+
+    it("carries the lead's form entries, labelled, read within the business", async () => {
+        const submissionFindMany = prisma.submission.findMany as jest.Mock;
+        leadFindUnique.mockResolvedValue({
+            id: "l_1",
+            organizationId: "org_1",
+            activities: [],
+        });
+        submissionFindMany.mockResolvedValueOnce([
+            {
+                id: "sub_1",
+                createdAt: new Date("2026-10-01T10:00:00.000Z"),
+                formId: "form_1",
+                data: { email: "a@example.test", message: "Open Sundays?" },
+                form: {
+                    name: "Ask us",
+                    fields: [
+                        { name: "email", label: "Email", type: "email" },
+                        { name: "message", label: "Message", type: "textarea" },
+                    ],
+                },
+            },
+        ]);
+
+        const res = await makeService().get(ctx(), "l_1");
+
+        expect(submissionFindMany.mock.calls[0][0].where).toEqual({
+            organizationId: "org_1",
+            leadId: "l_1",
+        });
+        expect(res.enquiries).toEqual([
+            {
+                id: "sub_1",
+                createdAt: "2026-10-01T10:00:00.000Z",
+                formId: "form_1",
+                formName: "Ask us",
+                answers: [
+                    { name: "email", label: "Email", value: "a@example.test" },
+                    {
+                        name: "message",
+                        label: "Message",
+                        value: "Open Sundays?",
+                    },
+                ],
+            },
+        ]);
     });
 });
 

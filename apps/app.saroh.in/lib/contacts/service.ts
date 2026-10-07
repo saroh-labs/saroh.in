@@ -1,5 +1,6 @@
 import type { CrmResult } from "@/lib/api/http";
 import { apiFetch, destroy, mutate, orgBase } from "@/lib/api/http";
+import type { EnquiryEntry } from "@/lib/crm/enquiries";
 
 /**
  * CRM Contacts data access for app.saroh.in (S3-005). Org-scoped reads +
@@ -58,6 +59,8 @@ export interface ContactLead {
 
 export interface ContactDetail extends Contact {
     leads: ContactLead[];
+    /** What they wrote through the site's forms, newest first (UX-002); empty without lead access. */
+    enquiries?: EnquiryEntry[];
 }
 
 export interface UpdateContactInput {

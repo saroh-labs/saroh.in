@@ -1,5 +1,6 @@
 import type { CrmResult } from "@/lib/api/http";
 import { apiFetch, destroy, mutate, orgBase } from "@/lib/api/http";
+import type { EnquiryEntry } from "@/lib/crm/enquiries";
 
 /**
  * CRM Leads data access for app.saroh.in (S3-005). Org-scoped list / detail /
@@ -61,6 +62,8 @@ export interface LeadDetail {
     stage: LeadStage | null;
     pipeline: { id: string; name: string; stages: LeadStage[] } | null;
     activities: LeadActivity[];
+    /** What they wrote through a form, newest first (UX-002); empty for a hand-made lead. */
+    enquiries?: EnquiryEntry[];
 }
 
 export interface CreateLeadInput {

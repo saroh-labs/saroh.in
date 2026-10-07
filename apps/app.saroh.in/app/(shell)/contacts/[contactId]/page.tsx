@@ -10,6 +10,7 @@ import { EditContactDialog } from "@/components/contacts/edit-contact-dialog";
 import { InvoicesPanel } from "@/components/contacts/invoices-panel";
 import { PacksPanel } from "@/components/contacts/packs-panel";
 import { SubscriptionsPanel } from "@/components/contacts/subscriptions-panel";
+import { EnquiryCard } from "@/components/crm/enquiry-card";
 import { AddLeadDialog } from "@/components/leads/add-lead-dialog";
 import { PageContainer } from "@/components/shared/page-container";
 import type { ContactHoldings } from "@/lib/contacts/holdings";
@@ -139,6 +140,13 @@ export default async function ContactDetailPage({
                         ) : undefined
                     }
                 />
+
+                {seesLeads ? (
+                    <EnquiryCard
+                        enquiries={contact.enquiries ?? []}
+                        knownEmail={email}
+                    />
+                ) : null}
 
                 <section className="overflow-hidden rounded-[12px] border border-border bg-card">
                     <h2 className="border-b border-muted px-4 py-[13px] text-[11px] font-semibold uppercase tracking-[0.1em] text-muted-foreground">
