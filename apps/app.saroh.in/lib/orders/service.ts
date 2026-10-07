@@ -22,6 +22,8 @@ export interface UpdateOrderInput {
     paymentStatus?: PaymentStatus;
     /** Marked paid by hand: how it was paid (#834). */
     paidHow?: PaymentMethod;
+    /** Recorded as refunded by hand: how it went back (UX-061). */
+    refundedHow?: PaymentMethod;
 }
 
 export type OrderResult =

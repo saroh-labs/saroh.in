@@ -38,7 +38,12 @@ import {
     storedValueFor,
     typeOf,
 } from "./fulfilment";
-import { markedPaidNote, recordPaidByHandInTx } from "./hand-payments";
+import {
+    heldCents,
+    markedPaidNote,
+    recordPaidByHandInTx,
+    refundedByHandNote,
+} from "./hand-payments";
 import {
     assertOneParty,
     assertStorefrontOffers,
@@ -65,6 +70,7 @@ import { stageForStatus } from "./order-stage";
 import { assertPaymentTransition, assertStatusTransition } from "./order-state";
 import { assertNotPayingOnlineInTx } from "./payment-in-flight";
 import { serializeOrderDetail, serializeOrderSummary } from "./serialize";
+import { orderMoneyIntents } from "./treatment-ledger";
 
 const CUSTOMER_SELECT = {
     select: { email: true, firstName: true, lastName: true },
@@ -627,7 +633,44 @@ export class OrdersService {
                 }
             }
             if (paymentChanging && nextPayment === "REFUNDED") {
+                // What it held, read before the credit note: the step on the
+                // timeline says how much went back, and how (UX-061).
+                const [held, paid] = await Promise.all([
+                    tx.order.findUniqueOrThrow({
+                        where: { id: orderId },
+                        select: { total: true, paidByHand: true },
+                    }),
+                    tx.paymentIntent.findMany({
+                        where: {
+                            ...orderMoneyIntents(orderId),
+                            status: "SUCCEEDED",
+                        },
+                        select: {
+                            amountCents: true,
+                            refunds: {
+                                where: { status: { not: "FAILED" } },
+                                select: { amountCents: true },
+                            },
+                        },
+                    }),
+                ]);
                 await creditRestOfOrder(tx, orderId, "Refunded", userId);
+                if (order.organizationId) {
+                    await tx.orderEvent.create({
+                        data: {
+                            organizationId: order.organizationId,
+                            orderId,
+                            kind: "REFUND",
+                            actorUserId: userId,
+                            note: refundedByHandNote(dto.refundedHow),
+                            amountCents: heldCents({
+                                ...held,
+                                paymentStatus: order.paymentStatus,
+                                paymentIntents: paid,
+                            }),
+                        },
+                    });
+                }
             }
             // Cancelled, refunded or paid at the counter: its pay link stops
             // working (B11, DEC-067), so nobody can pay twice. The page says

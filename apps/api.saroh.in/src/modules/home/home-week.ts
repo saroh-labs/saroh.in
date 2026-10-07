@@ -2,7 +2,11 @@ import type { Prisma, prisma } from "@saroh/database";
 import { DateTime } from "luxon";
 
 import { toMinor } from "../../common/money";
-import { NOT_A_BOOKING_HOLD, OWED_WHERE } from "../invoices/invoice-state";
+import {
+    NOT_A_BOOKING_HOLD,
+    OWED_WHERE,
+    refundedBetweenWhere,
+} from "../invoices/invoice-state";
 import { realOrderWhere } from "../orders/open-orders";
 import { MONEY_ON_THE_CALENDAR, sinceHref } from "./home-last-day";
 import type {
@@ -167,26 +171,9 @@ export function paidBetweenWhere(
     };
 }
 
-/**
- * The where for money handed back in `[from, to)`: a credit note issued
- * then, on an order (a refund, or an edit down that gave money back — the
- * calendar's takings read them the same) or made by a refund of an
- * invoice's payment. A credit note that only corrects an unpaid invoice
- * gave nobody money back, so it takes nothing off.
- */
-export function refundedBetweenWhere(
-    organizationId: string,
-    from: Date,
-    to: Date,
-): Prisma.InvoiceWhereInput {
-    return {
-        organizationId,
-        kind: "CREDIT_NOTE",
-        status: { notIn: ["DRAFT", "VOID"] },
-        issuedAt: { gte: from, lt: to },
-        OR: [{ orderId: { not: null } }, { paymentRefundId: { not: null } }],
-    };
-}
+// The where for money handed back lives with the invoice rules, which
+// Home's last-24-hours strip reads too (UX-061).
+export { refundedBetweenWhere };
 
 interface SumRow {
     currency: string;

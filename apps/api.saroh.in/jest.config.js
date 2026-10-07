@@ -226,6 +226,8 @@ module.exports = {
         "<rootDir>/src/modules/orders/offline-checkout-start.spec.ts",
         // R34: an order to pay on handover nobody came for, pure.
         "<rootDir>/src/modules/orders/uncollected.spec.ts",
+        // Record as refunded's amount and words (UX-061).
+        "<rootDir>/src/modules/orders/hand-payments.spec.ts",
         // P4: the site's order confirmation, DB-free. Its access rules are
         // in checkout-confirmation.db.spec.ts.
         "<rootDir>/src/modules/orders/checkout-confirmation.spec.ts",

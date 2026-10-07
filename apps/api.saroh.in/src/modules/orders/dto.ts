@@ -431,6 +431,15 @@ export class UpdateOrderDto {
     @IsOptional()
     @IsIn(PAYMENT_METHODS, { message: "Pick how it was paid." })
     paidHow?: PaymentMethod;
+
+    /**
+     * Recorded as refunded by hand (UX-061): how the money went back. On
+     * the order's timeline with the amount handed back. Read only with
+     * `paymentStatus` REFUNDED; an app before it sends none.
+     */
+    @IsOptional()
+    @IsIn(PAYMENT_METHODS, { message: "Pick how it was handed back." })
+    refundedHow?: PaymentMethod;
 }
 
 /** A query value that may repeat (`?stage=NEW&stage=READY`) or be a list. */
