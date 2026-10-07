@@ -77,15 +77,23 @@ function bareAddress(raw: string | undefined): string | null {
 }
 
 /**
- * The visitor's address, as this app's platform reports it: `x-real-ip`,
- * then the first `x-forwarded-for` entry, which the platform's edge writes
- * (Vercel overwrites both, so a visitor cannot choose them).
+ * The visitor's address, as this app's platform reports it:
+ * `cf-connecting-ip` first, then `x-real-ip`, then the first
+ * `x-forwarded-for` entry.
+ *
+ * Cloudflare writes `cf-connecting-ip` and overwrites any a visitor sent, on
+ * a Worker and when Cloudflare proxies to Vercel. Behind that proxy Vercel's
+ * `x-real-ip` and `x-forwarded-for` name Cloudflare's edge, not the visitor,
+ * so every visitor would share a handful of addresses (and the API's
+ * per-visitor limits with them). On a Worker `x-forwarded-for` keeps what the
+ * visitor sent, so it is never read before Cloudflare's header.
  *
  * Off the platform (local development behind portless, CI) a request can
  * arrive with neither; the loopback address stands in there, and only there.
  */
 export function visitorAddress(headers: Headers): string | null {
     const found =
+        bareAddress(headers.get("cf-connecting-ip") ?? undefined) ??
         bareAddress(headers.get("x-real-ip") ?? undefined) ??
         bareAddress(headers.get("x-forwarded-for")?.split(",")[0]);
     if (found) return found;
