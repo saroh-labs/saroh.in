@@ -269,6 +269,29 @@ describe("going live with a test release (DEC-071, T7)", () => {
         ]);
     });
 
+    it("closes the release's open review request when it goes live (DEC-101)", async () => {
+        const b = await business();
+        const made = await releases.create(b.ctx, b.site.id, {});
+        await sites.requestReview(b.ctx, b.site.id, made.release.id);
+        const before = await sites.getReviewState(
+            b.ctx,
+            b.site.id,
+            made.release.id,
+        );
+        expect(before.pending).toBe(true);
+
+        await releases.goLive(b.ctx, b.site.id, made.release.id);
+
+        const after = await sites.getReviewState(
+            b.ctx,
+            b.site.id,
+            made.release.id,
+        );
+        expect(after.outstanding).toBe(false);
+        expect(after.pending).toBe(false);
+        expect(after.latestApproval?.outcome).toBe("BYPASSED");
+    });
+
     it("counts an approval of the release by someone else as APPROVED", async () => {
         const b = await business();
         const made = await releases.create(b.ctx, b.site.id, {});

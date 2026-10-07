@@ -188,6 +188,14 @@ export function standingCopy(standing: TestReleaseStanding): {
             return { text: `${who} asked for changes`, approved: false };
         case "REQUESTED":
             return { text: `In review — asked by ${who}`, approved: false };
+        // Going live closed the review (DEC-101): it no longer reads
+        // "In review" about a version that is already out.
+        case "BYPASSED":
+        case "OVERRIDDEN":
+            return {
+                text: `${who} put it live without approval`,
+                approved: false,
+            };
         default:
             return { text: "Not reviewed yet", approved: false };
     }
