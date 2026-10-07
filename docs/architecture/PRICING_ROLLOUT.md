@@ -334,7 +334,7 @@ Code: `checkout-quote.ts` (the rule, with `TERM_CHARGES` and
 `RENEW_WINDOW_DAYS`), `billing-term.ts`, `term-end.ts`,
 `checkout-confirm.service.ts`, `billing-webhook.service.ts`
 (`reconcileCheckout`), the sweep's `endPaidYears`. Migration
-`20261029153000_billing_first_month` lets a TRIAL checkout charge now.
+`20261029160000_billing_first_month` lets a TRIAL checkout charge now.
 
 - **Monthly** is a provider subscription made for 12 charges, never
   open-ended. **Yearly** is one payment for the year: a provider order for
