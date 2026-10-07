@@ -1026,6 +1026,24 @@ Unless an entry says otherwise, its status is **Proposed — requires audit revi
 - Decision: setup stores the answer (`BusinessProfile.legallyRegistered`). A business that said Registered and takes money or invoices gets a "Choose your business type" step on its go-live checklist (Settings and Home) until it picks one. Every other business gets a gentle suggestion in Settings, never a block.
 - Consequences: businesses set up before this release read as "not asked" (the old answer was never saved), so they get the suggestion only. The API must deploy before the app: an older API refuses the new field.
 
+## DEC-085 The API sends its email through Amazon SES in Mumbai
+
+**Status: Accepted — 2026-10-06** · user · in conversation
+
+- Context: the API sent identity mail and site sign-in codes through a Google Workspace account over SMTP. A personal mailbox is the wrong sender for a product's transactional mail (sending limits, one person's credentials).
+- Decision: the `SMTP_*` set points at Amazon SES in `ap-south-1`, next to the API's servers in India. `saroh.in` sends with SES's DKIM and a `mail.saroh.in` MAIL FROM domain; account-level suppression stops mail to addresses that bounced or complained. The credentials can only send, only from `@saroh.in`. Google Workspace stays the mailbox people write to. The code transport is pooled (two connections at most), so a burst of codes reuses an open connection. No code path changed: the switch was configuration.
+- Consequences: the privacy page lists Amazon Web Services (SES) for sending and Google Workspace for our mailboxes (dated 6 Oct). Bounce and complaint notices go to SES, not to a webhook: nothing in Saroh marks an address undeliverable yet, which is fine at today's volume and is the next step if bounces grow. Rolling back is a configuration change on the host.
+
+## DEC-086 Saroh sends a business's customer notifications until it connects its own email
+
+**Status: Accepted — 2026-10-06** · user · in conversation · planned 6 Oct, not built
+
+- Context: DEC-011 sends a business's messages to its customers only through a provider the business connects. Most new businesses connect none, so their customers get no booking confirmation or order update by email at all.
+- Decision: while a business has no connected email provider, Saroh's own email (Amazon SES, DEC-085) sends its customer notifications: booking confirmations and the other transactional messages the business would send through its provider. When the business connects a provider, its provider sends them and Saroh stops. Marketing and broadcasts never go through Saroh.
+- Settled with the owner the same day: the booking notices (confirmed, moved, cancelled) come first. Each email Saroh sends counts against a monthly plan allowance; Free gets a small allowance and Grow and Pro more, with the numbers kept only in the plans catalogue. At the allowance, or when it can't be read, Saroh does not send (the customer's account message still stands). Mail goes from its own subdomain (`bookings@notify.saroh.in`, own DKIM and MAIL FROM) as "‹Business› via Saroh", replies to the business. A separate AWS account comes only if volume grows, since SES judges reputation per account.
+- Still open: review invitations (MARKETING_CLAIMS D11), and the other notices after booking emails have run clean.
+- Consequences: until built, DEC-011's rule stands in code: no provider, no customer email.
+
 ## DEC-087 An in-person booking is offered only inside the business's opening hours
 
 **Status: Accepted — 2026-10-06** · user · from #820
@@ -1065,20 +1083,3 @@ Unless an entry says otherwise, its status is **Proposed — requires audit revi
 - Context: on a plan without online payments, the "Ready to take payments" checklist (Settings › Business) and Home's "Get ready to take money" counted "Take payment online" as a step left (#835). Nothing in setup could finish it, so a Free business could never reach all done.
 - Decision: that step is not counted. Both checklists show it beside the steps, outside the count and the bar, as "Comes with ‹plan›" when the catalogue's `payments` row names the plan that has it, otherwise "Comes with a paid plan", with See plans to `/settings/billing#change-plan`. Payments' other steps (connect, finish connecting, reconnect) still count on a plan that takes payment online.
 - Consequences: `readyChecklist` returns the plan's asides as `outside`, apart from `done` and `total`; `loadReadyChecklist` and `loadSettingsChecklist` read billing access only on such a plan, best-effort. Once every counted step is done the checklists hide, aside included; the plan page and the Payment panel still say it.
-## DEC-085 The API sends its email through Amazon SES in Mumbai
-
-**Status: Accepted — 2026-10-06** · user · in conversation
-
-- Context: the API sent identity mail and site sign-in codes through a Google Workspace account over SMTP. A personal mailbox is the wrong sender for a product's transactional mail (sending limits, one person's credentials).
-- Decision: the `SMTP_*` set points at Amazon SES in `ap-south-1`, next to the API's servers in India. `saroh.in` sends with SES's DKIM and a `mail.saroh.in` MAIL FROM domain; account-level suppression stops mail to addresses that bounced or complained. The credentials can only send, only from `@saroh.in`. Google Workspace stays the mailbox people write to. The code transport is pooled (two connections at most), so a burst of codes reuses an open connection. No code path changed: the switch was configuration.
-- Consequences: the privacy page lists Amazon Web Services (SES) for sending and Google Workspace for our mailboxes (dated 6 Oct). Bounce and complaint notices go to SES, not to a webhook: nothing in Saroh marks an address undeliverable yet, which is fine at today's volume and is the next step if bounces grow. Rolling back is a configuration change on the host.
-
-## DEC-086 Saroh sends a business's customer notifications until it connects its own email
-
-**Status: Accepted — 2026-10-06** · user · in conversation · planned 6 Oct, not built
-
-- Context: DEC-011 sends a business's messages to its customers only through a provider the business connects. Most new businesses connect none, so their customers get no booking confirmation or order update by email at all.
-- Decision: while a business has no connected email provider, Saroh's own email (Amazon SES, DEC-085) sends its customer notifications: booking confirmations and the other transactional messages the business would send through its provider. When the business connects a provider, its provider sends them and Saroh stops. Marketing and broadcasts never go through Saroh.
-- Settled with the owner the same day: the booking notices (confirmed, moved, cancelled) come first. Each email Saroh sends counts against a monthly plan allowance; Free gets a small allowance and Grow and Pro more, with the numbers kept only in the plans catalogue. At the allowance, or when it can't be read, Saroh does not send (the customer's account message still stands). Mail goes from its own subdomain (`bookings@notify.saroh.in`, own DKIM and MAIL FROM) as "‹Business› via Saroh", replies to the business. A separate AWS account comes only if volume grows, since SES judges reputation per account.
-- Still open: review invitations (MARKETING_CLAIMS D11), and the other notices after booking emails have run clean.
-- Consequences: until built, DEC-011's rule stands in code: no provider, no customer email.
