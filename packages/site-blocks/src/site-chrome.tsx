@@ -47,15 +47,25 @@ export function footerLine(
     return { kind: "html", value: inner };
 }
 
+/** The business's public phone and place, for the footer (UX-038). */
+export interface SiteContact {
+    phone: string | null;
+    address: string | null;
+}
+
 /**
  * The foot of every page (#202, G17): the merchant's own line, then
  * "Runs on Saroh" linking to saroh.in.
  *
  * "Runs on Saroh" stays on every site this round (default 67), so the footer
  * always renders now. With nothing written, the merchant's line is the site's
- * name, which the header already shows to everyone. Nothing from the business
- * profile is published here: `parseSiteFooter` in the API says why that stays
- * the merchant's to write.
+ * name, which the header already shows to everyone.
+ *
+ * `contact` (UX-038) is the business's PUBLIC place and phone: the same live
+ * read the Visit us block and the booking header show (`/visit`, G8, DEC-053),
+ * where Settings › Business calls the number "Phone on your website". Nothing
+ * else from the business profile is published here — not the contact email,
+ * which `parseSiteFooter` in the API says stays the merchant's to write.
  *
  * The link is plain text in the site's own footer colours and type, never
  * Saroh's colours or font: a merchant's site does not wear the brand. The
@@ -73,11 +83,16 @@ export function footerLine(
 export function SiteFooter({
     footer,
     name,
+    contact = null,
 }: {
     footer: SiteFooterContent | null | undefined;
     /** The site's name: the footer's line when the merchant wrote none. */
     name: string;
+    /** The business's public phone and place (UX-038); null draws neither. */
+    contact?: SiteContact | null;
 }) {
+    const phone = contact?.phone?.trim() || null;
+    const address = contact?.address?.trim() || null;
     const written = footer && footer.value.trim() !== "" ? footer : null;
     const line = written
         ? footerLine(written)
@@ -102,6 +117,19 @@ export function SiteFooter({
                             {written.value}
                         </p>
                     )
+                ) : null}
+                {phone || address ? (
+                    <p className="mb-2 flex flex-wrap items-center justify-center gap-x-3 gap-y-1 text-[13px]">
+                        {phone ? (
+                            <a
+                                href={`tel:${phone.replace(/[^\d+]/g, "")}`}
+                                className="focus-visible:ring-site-footer-fg rounded-sm underline underline-offset-2 hover:no-underline focus-visible:outline-none focus-visible:ring-2"
+                            >
+                                Call {phone}
+                            </a>
+                        ) : null}
+                        {address ? <span>{address}</span> : null}
+                    </p>
                 ) : null}
                 <p>
                     {line && line.value !== "" ? (

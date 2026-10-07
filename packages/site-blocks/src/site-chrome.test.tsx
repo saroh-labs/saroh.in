@@ -677,3 +677,35 @@ describe("the header's controls look pressable (G19)", () => {
         );
     });
 });
+
+describe("the site footer's contact line (UX-038)", () => {
+    it("offers the business's public phone and place", () => {
+        render(
+            <SiteFooter
+                footer={null}
+                name="Pulse Fitness"
+                contact={{
+                    phone: "+91 98450 00000",
+                    address: "12 Main Rd, Indiranagar",
+                }}
+            />,
+        );
+        const call = screen.getByRole("link", { name: "Call +91 98450 00000" });
+        expect(call).toHaveAttribute("href", "tel:+919845000000");
+        expect(screen.getByText("12 Main Rd, Indiranagar")).toBeInTheDocument();
+    });
+
+    it("draws no line when the business shows neither", () => {
+        render(
+            <SiteFooter
+                footer={null}
+                name="Pulse Fitness"
+                contact={{ phone: null, address: "  " }}
+            />,
+        );
+        expect(screen.queryByRole("link", { name: /^Call/ })).toBeNull();
+        expect(
+            screen.getByRole("contentinfo").querySelectorAll("p"),
+        ).toHaveLength(1);
+    });
+});

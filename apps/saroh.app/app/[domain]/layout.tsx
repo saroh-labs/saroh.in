@@ -16,7 +16,7 @@ import { TestReleaseBar } from "@/components/test-release-bar";
 import { TestReleaseGate } from "@/components/test-release-gate";
 import { accountAreaOn } from "@/lib/account-area";
 import { publicApiUrl } from "@/lib/api-url";
-import { getBookingPage } from "@/lib/booking-page";
+import { getBookingPage, getBookingVisit } from "@/lib/booking-page";
 import { getCatalogue } from "@/lib/catalogue";
 import { customerReader } from "@/lib/customer-reader";
 import { getSignedInCustomer } from "@/lib/customer-session";
@@ -182,13 +182,15 @@ export default async function SiteLayout({
      * from the catalogue's answer, and waiting for it would add a round
      * trip to every page of a site that sells.
      */
-    const [booking, catalogue, checkout] = siteId
+    const [booking, catalogue, checkout, visit] = siteId
         ? await Promise.all([
               getBookingPage(siteId),
               getCatalogue(siteId),
               getCheckoutOptions(siteId),
+              // The footer's public phone and place (UX-038).
+              getBookingVisit(siteId),
           ])
-        : [null, null, null];
+        : [null, null, null, null];
     const shopServes = catalogue?.ok ?? false;
     const action = headerAction({ booking, shopServes });
 
@@ -308,6 +310,14 @@ export default async function SiteLayout({
                         <SiteFooter
                             footer={snapshot.site.footer}
                             name={snapshot.site.name}
+                            contact={
+                                visit
+                                    ? {
+                                          phone: visit.phone,
+                                          address: visit.address,
+                                      }
+                                    : null
+                            }
                         />
                     }
                 >
