@@ -14,6 +14,7 @@ import { planMeter } from "../billing/metering.service";
 import { assertPlanTakesOnlinePayment } from "../billing/online-payments-plan";
 import type { AppliedDiscount } from "../discounts/discounts.service";
 import { DiscountsService } from "../discounts/discounts.service";
+import { recordRedemptionInTx } from "../discounts/redemption";
 import { assertBusinessDetails } from "../invoices/business-details";
 import { formatMoney } from "../invoices/invoice-send.service";
 import { gstInsideOrder } from "../invoices/order-invoice";
@@ -413,7 +414,7 @@ export class OrdersService {
                             "RESERVED",
                         );
                         if (applied) {
-                            await this.recordRedemption(
+                            await recordRedemptionInTx(
                                 tx,
                                 applied,
                                 order.id,
@@ -724,51 +725,6 @@ export class OrdersService {
      * here rather than looking it up at each call site makes the stamp hard to
      * forget: the guard you must call already hands you the value.
      */
-    /**
-     * The redemption, inside the order's own transaction: a failed order
-     * leaves none behind, and the unique order id keeps a retried create
-     * from counting twice. It snapshots the rule it applied, so re-rating
-     * the code later cannot rewrite this order's history.
-     */
-    private async recordRedemption(
-        tx: Prisma.TransactionClient,
-        applied: AppliedDiscount,
-        orderId: string,
-        organizationId: string | null,
-        currency: string,
-    ): Promise<void> {
-        if (!organizationId) {
-            // redeemForOrder already refused this; the type needs saying so.
-            throw new BadRequestException("A code needs a business");
-        }
-        if (applied.usageLimit !== null) {
-            // Re-counted INSIDE the serializable transaction, so two orders
-            // racing for the last use cannot both see room for it.
-            const used = await tx.discountRedemption.count({
-                where: { discountId: applied.discountId },
-            });
-            if (used >= applied.usageLimit) {
-                throw new ConflictException({
-                    message: `${applied.code} has been used as many times as it allows.`,
-                    details: { field: "discountCode" },
-                });
-            }
-        }
-        await tx.discountRedemption.create({
-            data: {
-                organizationId,
-                discountId: applied.discountId,
-                orderId,
-                amount: fromCents(applied.amountCents),
-                currency,
-                code: applied.code,
-                kind: applied.kind,
-                percentBps: applied.percentBps,
-                ruleAmount: applied.ruleAmount,
-            },
-        });
-    }
-
     /**
      * What New order v2 asks beyond writing to the storefront (B13): a
      * picked person is read by their email, which takes `contact:read` (as

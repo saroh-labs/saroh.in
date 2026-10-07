@@ -295,3 +295,174 @@ describe("a paid plan", () => {
         expect(createIntent).toHaveBeenCalled();
     });
 });
+
+describe("a discount code at the checkout (DEC-104)", () => {
+    const applied = {
+        discountId: "d_1",
+        code: "SAVE10",
+        kind: "PERCENTAGE",
+        percentBps: 1000,
+        ruleAmount: null,
+        usageLimit: null,
+        amountCents: 5_000,
+    };
+
+    /** The bag priced with the code's answer, as `priceBag` gives it. */
+    function pricedWith(
+        discount: Record<string, unknown> | null,
+        total: string,
+        codeApplied: typeof applied | null,
+    ) {
+        (priceBag as jest.Mock).mockImplementation(
+            (_scope: unknown, _bag: unknown, asked: string | null) =>
+                Promise.resolve({
+                    quote: {
+                        currency: "INR",
+                        lines: [],
+                        ways: [],
+                        fulfilment: asked ?? "PICKUP",
+                        subtotal: "500.00",
+                        delivery: "0.00",
+                        discount,
+                        total,
+                        ready: true,
+                    },
+                    lines: [
+                        {
+                            listingId: "listing_1",
+                            productId: "product_1",
+                            fulfilmentTypes: [],
+                        },
+                    ],
+                    settings: {
+                        currency: "INR",
+                        ways: ["PICKUP"],
+                        fees: { localDeliveryFee: null, shippingFee: null },
+                    },
+                    applied: codeApplied,
+                }),
+        );
+    }
+
+    function startWithCode(payment: "ONLINE" | "ON_HANDOVER") {
+        return service.start("site_1", customer, "hash_1", {
+            lines: [{ listingId: "listing_1", quantity: 2 }],
+            fulfilment: "PICKUP",
+            key: "key-12345678",
+            payment,
+            discountCode: "SAVE10",
+        } as CheckoutStartDto);
+    }
+
+    it("hands the code to the quote, judged for the site's own business", async () => {
+        onPlan("free");
+        pricedWith(
+            { code: "SAVE10", applied: true, amount: "50.00" },
+            "450.00",
+            applied,
+        );
+
+        const quote = await service.quote(
+            "site_1",
+            {
+                lines: [{ listingId: "listing_1", quantity: 2 }],
+                discountCode: "SAVE10",
+            },
+            "hash_1",
+        );
+
+        expect(quote.discount).toEqual({
+            code: "SAVE10",
+            applied: true,
+            amount: "50.00",
+        });
+        expect(quote.total).toBe("450.00");
+        const code = (priceBag as jest.Mock).mock.calls[0][4];
+        expect(code).toMatchObject({ code: "SAVE10" });
+    });
+
+    it("places the order with the code it applied, paid at the handover (Free)", async () => {
+        onPlan("free");
+        pricedWith(
+            { code: "SAVE10", applied: true, amount: "50.00" },
+            "450.00",
+            applied,
+        );
+
+        await startWithCode("ON_HANDOVER");
+
+        expect(createCheckoutOrder).toHaveBeenCalledWith(
+            expect.anything(),
+            expect.anything(),
+            expect.objectContaining({
+                payOnHandover: true,
+                discount: applied,
+            }),
+        );
+    });
+
+    it("places it paid online too, and asks the provider for the order's total", async () => {
+        onPlan("grow");
+        pricedWith(
+            { code: "SAVE10", applied: true, amount: "50.00" },
+            "450.00",
+            applied,
+        );
+
+        await startWithCode("ONLINE");
+
+        expect(createCheckoutOrder).toHaveBeenCalledWith(
+            expect.anything(),
+            expect.anything(),
+            expect.objectContaining({
+                payOnHandover: false,
+                discount: applied,
+            }),
+        );
+        // The intent is made from the stored order (its discounted total),
+        // never from an amount the browser sent.
+        expect(createIntent).toHaveBeenCalledWith(
+            expect.objectContaining({ organizationId: "org_1" }),
+            "order_1",
+            "checkout:key-12345678",
+        );
+    });
+
+    it("refuses a code that no longer applies as a changed bag, saying why", async () => {
+        onPlan("free");
+        pricedWith(
+            {
+                code: "SAVE10",
+                applied: false,
+                reason: "EXPIRED",
+                message: "SAVE10 has ended.",
+            },
+            "500.00",
+            null,
+        );
+
+        const err = await startWithCode("ON_HANDOVER").catch((e: unknown) => e);
+
+        expect(err).toBeInstanceOf(ConflictException);
+        expect((err as ConflictException).getResponse()).toMatchObject({
+            message: "SAVE10 has ended.",
+            details: { reason: "bag-changed", field: "discountCode" },
+        });
+        expect(createCheckoutOrder).not.toHaveBeenCalled();
+    });
+
+    it("won't ask a provider for nothing when the code covers it all", async () => {
+        onPlan("grow");
+        pricedWith(
+            { code: "SAVE10", applied: true, amount: "500.00" },
+            "0.00",
+            { ...applied, amountCents: 50_000 },
+        );
+
+        await expect(startWithCode("ONLINE")).rejects.toBeInstanceOf(
+            ConflictException,
+        );
+        expect(createCheckoutOrder).not.toHaveBeenCalled();
+        expect(createIntent).not.toHaveBeenCalled();
+    });
+});

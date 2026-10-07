@@ -19,6 +19,7 @@ import type {
 import { checkoutKey, SHOP_OFFLINE } from "./api";
 import type { BagItem } from "./bag-store";
 import { MAX_ITEM_QUANTITY, setQuantity } from "./bag-store";
+import { cleanCode, CodeField, codeSettled } from "./code-field";
 import { sheetButton, SheetFrame } from "./sheet-frame";
 
 /**
@@ -187,6 +188,11 @@ export interface BagDraft {
     /** How they'll pay; null until picked (the first offered then). */
     pay: ShopPayment | null;
     address: DeliveryAddress;
+    /**
+     * The discount code applied in the bag (DEC-104), as typed and tidied;
+     * null for none. The quote judges it every time it prices the bag.
+     */
+    code: string | null;
     /** One key per request: the same bag placed again is the same order. */
     checkout: { print: string; key: string } | null;
 }
@@ -201,6 +207,7 @@ export const EMPTY_DRAFT: BagDraft = {
     way: null,
     pay: null,
     address: EMPTY_ADDRESS,
+    code: null,
     checkout: null,
 };
 
@@ -239,6 +246,12 @@ export function BagSheet({
     const setPay = (next: ShopPayment) => onDraft((d) => ({ ...d, pay: next }));
     const setAddress = (change: (a: DeliveryAddress) => DeliveryAddress) =>
         onDraft((d) => ({ ...d, address: change(d.address) }));
+    const setCode = (next: string | null) =>
+        onDraft((d) => ({ ...d, code: next }));
+    // "Have a code?" opens the field; one applied already keeps it open.
+    const [codeOpen, setCodeOpen] = useState(draft.code !== null);
+    const [codeInput, setCodeInput] = useState(draft.code ?? "");
+    const [codeError, setCodeError] = useState<string | null>(null);
     const [load, setLoad] = useState<Load>({ kind: "loading" });
     const [round, setRound] = useState(0);
     // What each line was capped at once the quote said fewer are left
@@ -275,6 +288,7 @@ export function BagSheet({
                 .quote({
                     lines: [...items],
                     ...(way ? { fulfilment: way } : {}),
+                    ...(draft.code ? { discountCode: draft.code } : {}),
                 })
                 .catch(() => null)
                 .then((result) => {
@@ -300,7 +314,7 @@ export function BagSheet({
         // A start refused because the bag changed (`problem`) prices it
         // again too.
         // eslint-disable-next-line react-hooks/exhaustive-deps -- the bag's contents, by value
-    }, [bagPrint, way, api, round, problem]);
+    }, [bagPrint, way, api, round, problem, draft.code]);
 
     if (items.length === 0) {
         return (
@@ -316,6 +330,12 @@ export function BagSheet({
     }
 
     const quote = load.kind === "ready" ? load.quote : null;
+    const discount = quote?.discount ?? null;
+    // The code applied and the quote that judged it agree; until then the
+    // total on the button is the old one, and the button waits.
+    const settled = draft.code === null || codeSettled(quote, draft.code);
+    const applied =
+        settled && discount?.applied === true ? discount.code : null;
     const chosen = quote?.ways.find((w) => w.type === way) ?? null;
     const addressOk = !needsAddress(way) || addressReady(address);
     const pays = paysOf(quote);
@@ -327,6 +347,7 @@ export function BagSheet({
         quote.fulfilment === way &&
         addressOk &&
         pay !== null &&
+        settled &&
         !busy;
     const total = quote ? formatAmount(quote.total, quote.currency) : "";
     const held = busy
@@ -341,6 +362,8 @@ export function BagSheet({
             fulfilment: way,
             ...(needsAddress(way) ? { address: trimmed(address) } : {}),
             ...(pay.type === "ON_HANDOVER" ? { payment: pay.type } : {}),
+            // Only a code the quote applied: a refused one is never sent.
+            ...(applied ? { discountCode: applied } : {}),
         };
         const print = JSON.stringify(body);
         const checkout =
@@ -361,6 +384,33 @@ export function BagSheet({
 
     const setField = (name: keyof DeliveryAddress) => (value: string) =>
         setAddress((a) => ({ ...a, [name]: value }));
+
+    function applyCode() {
+        const next = cleanCode(codeInput);
+        if (!next) {
+            setCodeError(
+                codeInput.trim()
+                    ? "That isn't a code this shop has. Check it and try again."
+                    : "Type your code first.",
+            );
+            return;
+        }
+        setCodeError(null);
+        setCodeInput(next);
+        setCode(next);
+    }
+
+    function removeCode() {
+        setCode(null);
+        setCodeInput("");
+        setCodeError(null);
+    }
+
+    // What the field says under it: the shop's refusal for the applied
+    // code, or a code that couldn't be one.
+    const codeNote =
+        codeError ??
+        (settled && discount && !discount.applied ? discount.message : null);
 
     return (
         <SheetFrame title="Your bag" onClose={onClose}>
@@ -475,12 +525,48 @@ export function BagSheet({
                                 : "—"}
                         </span>
                     </div>
+                    {applied && discount?.applied ? (
+                        <div className="border-site-border flex items-center gap-2.5 border-t py-2.5 text-sm">
+                            <span className="min-w-0 flex-1">
+                                Code {discount.code}
+                            </span>
+                            <button
+                                type="button"
+                                onClick={removeCode}
+                                aria-label={`Remove code ${discount.code}`}
+                                className={cn(
+                                    "text-site-muted cursor-pointer text-[12.5px] underline",
+                                    focusRing,
+                                )}
+                            >
+                                Remove
+                            </button>
+                            <span className="font-semibold tabular-nums">
+                                −{formatAmount(discount.amount, quote.currency)}
+                            </span>
+                        </div>
+                    ) : null}
                     <div className="border-site-border flex gap-2.5 border-t py-2.5 text-sm">
                         <span className="flex-1 font-semibold">Total</span>
                         <span className="font-semibold tabular-nums">
                             {total}
                         </span>
                     </div>
+
+                    <CodeField
+                        site={site}
+                        open={codeOpen}
+                        onOpen={() => setCodeOpen(true)}
+                        value={codeInput}
+                        onChange={(v) => {
+                            setCodeInput(v);
+                            setCodeError(null);
+                        }}
+                        onApply={applyCode}
+                        checking={!settled}
+                        applied={applied}
+                        note={codeNote}
+                    />
 
                     {quote.ways.length > 0 ? (
                         <>

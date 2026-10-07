@@ -7,8 +7,13 @@ import {
 import { Prisma, prisma } from "@saroh/database";
 
 import type { DiscountInputDto } from "./dto";
-import type { DiscountKind, DiscountReach, OrderLineView } from "./redeem";
-import { redeem, refusalMessage } from "./redeem";
+import type {
+    CodeRefusal,
+    DiscountKind,
+    DiscountReach,
+    OrderView,
+} from "./redeem";
+import { codeRefusalMessage, redeem } from "./redeem";
 import type { DiscountView } from "./serialize";
 import { DISCOUNT_INCLUDE, serializeDiscount } from "./serialize";
 
@@ -33,6 +38,11 @@ export interface AppliedDiscount {
     usageLimit: number | null;
     amountCents: number;
 }
+
+/** A code checked against an order: what comes off, or why nothing does. */
+export type CodeCheck =
+    | { ok: true; applied: AppliedDiscount }
+    | { ok: false; code: string; reason: CodeRefusal };
 
 /** "12.5" → 1250. The DTO has already refused more than two decimals. */
 function percentToBps(percent: string): number {
@@ -177,28 +187,46 @@ export class DiscountsService {
     /**
      * Would this code take anything off this order, and how much?
      *
-     * The merchant's order form calls this through order create; a cart
-     * would call the same. Resolved by the business the STOREFRONT belongs
-     * to, from the write guard — never from anything the client sent.
+     * The merchant's order form calls this through order create; the site's
+     * checkout calls {@link checkForOrder}, the same decision without the
+     * throw. Resolved by the business the STOREFRONT belongs to — from the
+     * write guard, or from the site — never from anything the client sent.
      * Every refusal is a 400 on the `discountCode` field with a sentence
      * the merchant can act on.
      */
     async redeemForOrder(
         organizationId: string | null,
         rawCode: string,
-        order: { storeId: string; currency: string; lines: OrderLineView[] },
+        order: OrderView,
     ): Promise<AppliedDiscount> {
+        const check = await this.checkForOrder(organizationId, rawCode, order);
+        if (!check.ok) {
+            fieldError(
+                BadRequestException,
+                codeRefusalMessage(check.code, check.reason),
+                "discountCode",
+            );
+        }
+        return check.applied;
+    }
+
+    /**
+     * The one evaluation behind every code (DEC-104): the counter and the
+     * site's checkout both come here, so a code's dates, its use limit and
+     * its reach read the same wherever it is typed. Answers rather than
+     * throws, so the site's quote can price the bag and say why a code
+     * took nothing off.
+     */
+    async checkForOrder(
+        organizationId: string | null,
+        rawCode: string,
+        order: OrderView,
+    ): Promise<CodeCheck> {
         const code = rawCode.trim().toUpperCase();
         // A legacy storefront with no business has nowhere to look a code up:
         // `organizationId = NULL` matches nothing, and saying so beats
         // quietly charging full price (#173).
-        if (!organizationId) {
-            fieldError(
-                BadRequestException,
-                "This location is not part of a business, so it cannot take a code",
-                "discountCode",
-            );
-        }
+        if (!organizationId) return { ok: false, code, reason: "NO_BUSINESS" };
         const discount = await prisma.discount.findUnique({
             where: { organizationId_code: { organizationId, code } },
             include: {
@@ -208,13 +236,7 @@ export class DiscountsService {
                 _count: { select: { redemptions: true } },
             },
         });
-        if (!discount) {
-            fieldError(
-                BadRequestException,
-                `${code} is not a code in this business`,
-                "discountCode",
-            );
-        }
+        if (!discount) return { ok: false, code, reason: "UNKNOWN" };
 
         // A collection includes the collections inside it: naming "Bakery"
         // means the bread in it too. Walked here, over the business's
@@ -264,22 +286,21 @@ export class DiscountsService {
             order,
             new Date(),
         );
-        if (!result.ok) {
-            fieldError(
-                BadRequestException,
-                refusalMessage(code, result.reason),
-                "discountCode",
-            );
-        }
+        if (!result.ok) return { ok: false, code, reason: result.reason };
         return {
-            discountId: discount.id,
-            code,
-            kind: discount.kind as DiscountKind,
-            percentBps: discount.percentBps,
-            ruleAmount:
-                discount.amount === null ? null : discount.amount.toString(),
-            usageLimit: discount.usageLimit,
-            amountCents: result.amountCents,
+            ok: true,
+            applied: {
+                discountId: discount.id,
+                code,
+                kind: discount.kind as DiscountKind,
+                percentBps: discount.percentBps,
+                ruleAmount:
+                    discount.amount === null
+                        ? null
+                        : discount.amount.toString(),
+                usageLimit: discount.usageLimit,
+                amountCents: result.amountCents,
+            },
         };
     }
 

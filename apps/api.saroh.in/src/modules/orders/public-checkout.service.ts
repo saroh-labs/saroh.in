@@ -12,6 +12,7 @@ import { prisma, runInOrgContext } from "@saroh/database";
 
 import { toMoneyString } from "../../common/money";
 import { FixedWindowRateLimiter } from "../bookings/rate-limiter";
+import { DiscountsService } from "../discounts/discounts.service";
 import { assertOrganizationOpen } from "../organizations/organization-lifecycle.gate";
 import type { CreateIntentResult } from "../payments/payments.service";
 import { PaymentsService } from "../payments/payments.service";
@@ -28,7 +29,7 @@ import {
     SOLD_OUT_REFUNDING,
 } from "../stock/stock-words";
 import type { PickupPlace } from "../stores/pickup-place";
-import type { ShopScope } from "./checkout-bag";
+import type { BagCode, ShopScope } from "./checkout-bag";
 import { priceBag, shopSettings } from "./checkout-bag";
 import type { SiteAccount } from "./checkout-order";
 import { createCheckoutOrder } from "./checkout-order";
@@ -180,6 +181,10 @@ export class PublicCheckoutService {
             STARTS_PER_WINDOW,
             START_WINDOW_MS,
         ),
+        // The counter's discount evaluation (DEC-104); stateless, so a test
+        // that builds this service by hand gets the real one.
+        @Optional()
+        private readonly discounts: DiscountsService = new DiscountsService(),
     ) {}
 
     /** Whether this site can take an online order now, and how it leaves. */
@@ -246,6 +251,7 @@ export class PublicCheckoutService {
                 bagOf(dto.lines),
                 dto.fulfilment ?? null,
                 canPay ? pays : undefined,
+                this.codeOf(scope, dto.discountCode),
             );
             return {
                 ...quote,
@@ -320,11 +326,12 @@ export class PublicCheckoutService {
             }
 
             const payBy: CheckoutPayment = dto.payment ?? "ONLINE";
-            const { quote, lines, settings } = await priceBag(
+            const { quote, lines, settings, applied } = await priceBag(
                 scope,
                 bagOf(dto.lines),
                 dto.fulfilment,
                 ready,
+                this.codeOf(scope, dto.discountCode),
             );
             if (!quote.ready || quote.fulfilment !== dto.fulfilment) {
                 throw new ConflictException({
@@ -343,6 +350,28 @@ export class PublicCheckoutService {
                     details: { reason: "bag-changed" },
                 });
             }
+            // A code that no longer applies (it ended, or its last use went
+            // at the counter meanwhile) is a changed bag: priced again, the
+            // bag says why — never a full-price order the customer didn't
+            // agree to.
+            if (dto.discountCode && !applied) {
+                throw new ConflictException({
+                    message:
+                        quote.discount && !quote.discount.applied
+                            ? quote.discount.message
+                            : "Your code no longer applies. Check your bag, then place your order.",
+                    details: { reason: "bag-changed", field: "discountCode" },
+                });
+            }
+            // Nothing left to pay online: a provider can't take a payment
+            // of nothing, so the order is placed to be settled at the handover.
+            if (payBy === "ONLINE" && applied && Number(quote.total) <= 0) {
+                throw new ConflictException({
+                    message:
+                        "Your code covers the whole order, so there's nothing to pay online. Choose to pay when it reaches you.",
+                    details: { reason: "bag-changed", field: "discountCode" },
+                });
+            }
             // A product that lists how it may leave refuses any other (B12).
             assertItemsAllow(lines, type);
             if (shipsToAddress(type) && !dto.address) {
@@ -359,6 +388,7 @@ export class PublicCheckoutService {
                 currency: settings.currency,
                 dto,
                 payOnHandover: payBy === "ON_HANDOVER",
+                discount: applied,
             });
             return payBy === "ON_HANDOVER"
                 ? this.placed(orderId)
@@ -454,6 +484,19 @@ export class PublicCheckoutService {
     }
 
     // -----------------------------------------------------------------------
+
+    /** A typed code, bound to the counter's evaluation for this business. */
+    private codeOf(
+        scope: ShopScope,
+        code: string | null | undefined,
+    ): BagCode | null {
+        if (!code) return null;
+        return {
+            code,
+            check: (order) =>
+                this.discounts.checkForOrder(scope.organizationId, code, order),
+        };
+    }
 
     private read(siteId: string, callerHash: string | undefined): void {
         // A caller the platform gives no address for shares one bucket per

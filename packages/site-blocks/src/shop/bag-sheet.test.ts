@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import type { CheckoutQuote, QuoteLine } from "./api";
 import { holdReason, overStock, payWords, stockNotice } from "./bag-sheet";
+import { cleanCode, codeSettled } from "./code-field";
 
 /**
  * The line above the bag's button (#837): it says how the customer pays only
@@ -122,5 +123,41 @@ describe("holdReason", () => {
         expect(holdReason({ ...base, addressOk: false, quote: quote() })).toBe(
             "Add the address to deliver to.",
         );
+    });
+});
+
+describe("the bag's discount code (DEC-104)", () => {
+    it("tidies a code as the shop stores it, and refuses what can't be one", () => {
+        expect(cleanCode("  save10 ")).toBe("SAVE10");
+        expect(cleanCode("")).toBeNull();
+        expect(cleanCode("two words")).toBeNull();
+        expect(cleanCode("X".repeat(33))).toBeNull();
+    });
+
+    it("waits for the quote that judged the code, and not on an older API", () => {
+        const base = {
+            currency: "INR",
+            lines: [],
+            ways: [],
+            fulfilment: null,
+            subtotal: "0.00",
+            delivery: "0.00",
+            total: "0.00",
+            ready: false,
+        };
+        expect(codeSettled(null, "SAVE10")).toBe(false);
+        expect(codeSettled({ ...base, discount: null }, "SAVE10")).toBe(false);
+        expect(
+            codeSettled(
+                {
+                    ...base,
+                    discount: { code: "SAVE10", applied: true, amount: "5.00" },
+                },
+                "SAVE10",
+            ),
+        ).toBe(true);
+        expect(codeSettled({ ...base, discount: null }, null)).toBe(true);
+        // An API before site codes never answers for one.
+        expect(codeSettled(base, "SAVE10")).toBe(true);
     });
 });

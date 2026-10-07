@@ -58,6 +58,12 @@ export interface CheckoutQuote {
     fulfilment: ShopWay | null;
     subtotal: string;
     delivery: string;
+    /**
+     * The code typed in the bag: what it took off the lines, or why it took
+     * nothing — the counter's rules (DEC-104). Null without a code; absent
+     * from an API before site codes.
+     */
+    discount?: QuoteDiscount | null;
     total: string;
     ready: boolean;
     /**
@@ -72,6 +78,11 @@ export interface CheckoutQuote {
      */
     pickup?: PickupPlace | null;
 }
+
+/** A discount code as the bag shows it. */
+export type QuoteDiscount =
+    | { code: string; applied: true; amount: string }
+    | { code: string; applied: false; reason: string; message: string };
 
 /** A place customers visit, to collect a pick-up from. */
 export interface PickupPlace {
@@ -98,6 +109,8 @@ export interface StartCheckout {
     notes?: string;
     /** How it is paid; left out, online. */
     payment?: ShopPayment;
+    /** A code the bag applied, judged again by the server. */
+    discountCode?: string;
     /** Stable for one checkout, so a double tap starts it once. */
     key: string;
 }
@@ -156,6 +169,7 @@ export interface ShopCheckoutApi {
     quote(body: {
         lines: BagItem[];
         fulfilment?: ShopWay;
+        discountCode?: string;
     }): Promise<ShopResult<CheckoutQuote>>;
     start(body: StartCheckout): Promise<ShopResult<CheckoutStarted>>;
     standing(orderId: string): Promise<ShopResult<CheckoutStanding>>;

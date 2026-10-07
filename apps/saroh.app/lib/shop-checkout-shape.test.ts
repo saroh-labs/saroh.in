@@ -330,3 +330,85 @@ describe("paying at the handover (2026-10-06)", () => {
         });
     });
 });
+
+describe("a discount code in the bag (DEC-104)", () => {
+    const priced = {
+        currency: "INR",
+        lines: [],
+        ways: [],
+        fulfilment: null,
+        subtotal: "500.00",
+        delivery: "0.00",
+        total: "450.00",
+        ready: false,
+    };
+
+    it("sends a tidied code on with the quote and the start, and nothing else", () => {
+        expect(
+            quoteBody({
+                lines: [{ listingId: "l1", variantId: null, quantity: 1 }],
+                discountCode: " save10 ",
+            }),
+        ).toEqual({
+            lines: [{ listingId: "l1", variantId: null, quantity: 1 }],
+            discountCode: "SAVE10",
+        });
+        // Something no code could be is dropped, never forwarded.
+        expect(
+            quoteBody({
+                lines: [{ listingId: "l1", variantId: null, quantity: 1 }],
+                discountCode: "<script>",
+            }),
+        ).toEqual({
+            lines: [{ listingId: "l1", variantId: null, quantity: 1 }],
+        });
+        expect(
+            startBody({
+                lines: [{ listingId: "l1", variantId: null, quantity: 1 }],
+                fulfilment: "PICKUP",
+                key: "abcdefgh",
+                discountCode: "SAVE10",
+            }),
+        ).toMatchObject({ discountCode: "SAVE10" });
+    });
+
+    it("reads a quote's applied or refused code, and one from an older API", () => {
+        expect(
+            isQuote({
+                ...priced,
+                discount: { code: "SAVE10", applied: true, amount: "50.00" },
+            }),
+        ).toBe(true);
+        expect(
+            isQuote({
+                ...priced,
+                discount: {
+                    code: "OLD",
+                    applied: false,
+                    reason: "EXPIRED",
+                    message: "OLD has ended.",
+                },
+            }),
+        ).toBe(true);
+        expect(isQuote({ ...priced, discount: null })).toBe(true);
+        expect(isQuote(priced)).toBe(true);
+        expect(
+            isQuote({ ...priced, discount: { code: "X", applied: "yes" } }),
+        ).toBe(false);
+    });
+
+    it("says a code that stopped applying in the checkout's words", () => {
+        expect(
+            problemOf(409, {
+                error: {
+                    message: "SAVE10 has ended.",
+                    details: { reason: "bag-changed", field: "discountCode" },
+                },
+            }),
+        ).toEqual({
+            ok: false,
+            reason: "bag-changed",
+            message: "SAVE10 has ended.",
+        });
+    });
+});

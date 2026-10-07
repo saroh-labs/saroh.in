@@ -18,6 +18,7 @@ const BODY = {
     subtotal: "500.00",
     delivery: null,
     discount: null,
+    discountCode: null,
     total: "500.00",
     fulfilment: {
         type: "PICKUP",
@@ -111,6 +112,23 @@ describe("an order paid at the handover (2026-10-06)", () => {
         ).toBe("Pay when you collect");
         const { toPay: _gone, ...older } = BODY;
         expect(confirmationOf(older)?.toPay).toBeNull();
+    });
+});
+
+describe("a discount code (DEC-104)", () => {
+    it("keeps the code that took the discount off, and nothing that isn't one", () => {
+        expect(
+            confirmationOf({
+                ...BODY,
+                discount: "50.00",
+                discountCode: "SAVE10",
+            }),
+        ).toMatchObject({ discount: "50.00", discountCode: "SAVE10" });
+        expect(
+            confirmationOf({ ...BODY, discountCode: "<b>x</b>" })?.discountCode,
+        ).toBeNull();
+        const { discountCode: _gone, ...older } = BODY;
+        expect(confirmationOf(older)?.discountCode).toBeNull();
     });
 });
 

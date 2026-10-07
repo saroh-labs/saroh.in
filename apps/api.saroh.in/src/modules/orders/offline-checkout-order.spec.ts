@@ -52,6 +52,7 @@ jest.mock("@saroh/database", () => {
             findUnique: jest.fn(),
         },
         job: { create: jest.fn() },
+        discountRedemption: { count: jest.fn(), create: jest.fn() },
     };
     return {
         ...actual,
@@ -59,12 +60,13 @@ jest.mock("@saroh/database", () => {
         prisma: {
             ...tx,
             $transaction: jest.fn((cb: (t: typeof tx) => unknown) => cb(tx)),
+            __tx: tx,
         },
     };
 });
 
-import { HttpException } from "@nestjs/common";
-import { prisma } from "@saroh/database";
+import { ConflictException, HttpException } from "@nestjs/common";
+import { Prisma, prisma } from "@saroh/database";
 
 import { planMeter } from "../billing/metering.service";
 import { enqueueTeamAlert } from "../notifications/team-alerts";
@@ -88,6 +90,8 @@ const db = prisma as unknown as {
         create: jest.Mock;
     };
     job: { create: jest.Mock };
+    discountRedemption: { count: jest.Mock; create: jest.Mock };
+    $transaction: jest.Mock;
 };
 
 const scope = {
@@ -107,6 +111,7 @@ const line: QuotedLine = {
     listingId: "listing_1",
     variantId: null,
     productId: "product_1",
+    categoryId: null,
     slug: "sourdough",
     name: "Sourdough",
     variantTitle: null,
@@ -278,5 +283,86 @@ describe("an order paid online, beside it", () => {
                 payload: { orderId: "order_1" },
             }),
         });
+    });
+});
+
+describe("an order with a discount code (DEC-104)", () => {
+    const applied = {
+        discountId: "d_1",
+        code: "SAVE10",
+        kind: "PERCENTAGE" as const,
+        percentBps: 1000,
+        ruleAmount: null,
+        usageLimit: 5,
+        amountCents: 5_000,
+    };
+    const placeWithCode = (payOnHandover: boolean) =>
+        createCheckoutOrder(scope, account, {
+            lines: [line],
+            type: "PICKUP",
+            shippingCents: 0,
+            currency: "INR",
+            dto: {
+                ...dto,
+                discountCode: "SAVE10",
+                payment: payOnHandover ? "ON_HANDOVER" : undefined,
+            },
+            payOnHandover,
+            discount: applied,
+        });
+
+    beforeEach(() => {
+        db.discountRedemption.count.mockResolvedValue(1);
+    });
+
+    it.each([
+        ["paid online", false],
+        ["paid at the handover", true],
+    ])(
+        "%s: records the discount, the discounted total and the code's use",
+        async (_name, onHandover) => {
+            await placeWithCode(onHandover);
+
+            // The online payment is asked for the order's total, so the
+            // total is the discounted one.
+            expect(db.order.create.mock.calls[0][0].data).toMatchObject({
+                subtotal: "500.00",
+                discount: "50.00",
+                total: "450.00",
+            });
+            expect(db.discountRedemption.create).toHaveBeenCalledWith({
+                data: expect.objectContaining({
+                    organizationId: "org_1",
+                    discountId: "d_1",
+                    orderId: "order_1",
+                    amount: "50.00",
+                    code: "SAVE10",
+                }),
+            });
+            // Serializable, so the use count sees a concurrent last use.
+            expect(db.$transaction.mock.calls[0][1]).toEqual({
+                isolationLevel: Prisma.TransactionIsolationLevel.Serializable,
+            });
+        },
+    );
+
+    it("refuses the order when the code's last use went meanwhile", async () => {
+        db.discountRedemption.count.mockResolvedValue(5);
+
+        await expect(placeWithCode(true)).rejects.toBeInstanceOf(
+            ConflictException,
+        );
+        expect(db.discountRedemption.create).not.toHaveBeenCalled();
+    });
+
+    it("runs an order without a code as before", async () => {
+        await place(false);
+
+        expect(db.order.create.mock.calls[0][0].data).toMatchObject({
+            discount: "0.00",
+            total: "500.00",
+        });
+        expect(db.discountRedemption.create).not.toHaveBeenCalled();
+        expect(db.$transaction.mock.calls[0][1]).toBeUndefined();
     });
 });

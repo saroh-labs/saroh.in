@@ -940,3 +940,116 @@ describe("paying at the handover (2026-10-06: Free takes money offline)", () => 
         expect(openCheckout).toHaveBeenCalled();
     });
 });
+
+describe("a discount code in the bag (DEC-104)", () => {
+    /** The server's quote: SAVE10 takes 50 off; any other code is refused. */
+    function judged(body: {
+        discountCode?: string;
+    }): ShopResult<CheckoutQuote> {
+        if (!body.discountCode) {
+            return { ok: true, data: quoteOf({ discount: null }) };
+        }
+        if (body.discountCode === "SAVE10") {
+            return {
+                ok: true,
+                data: quoteOf({
+                    discount: {
+                        code: "SAVE10",
+                        applied: true,
+                        amount: "50.00",
+                    },
+                    total: "450.00",
+                }),
+            };
+        }
+        return {
+            ok: true,
+            data: quoteOf({
+                discount: {
+                    code: body.discountCode,
+                    applied: false,
+                    reason: "EXPIRED",
+                    message: `${body.discountCode} has ended.`,
+                },
+            }),
+        };
+    }
+
+    function withCodes() {
+        const made = setup({ signedIn: true });
+        const quote = made.quote as unknown as {
+            mockImplementation: (
+                fn: (body: {
+                    discountCode?: string;
+                }) => Promise<ShopResult<CheckoutQuote>>,
+            ) => void;
+        };
+        quote.mockImplementation((body) => Promise.resolve(judged(body)));
+        return made;
+    }
+
+    function applyCode(code: string) {
+        fireEvent.click(screen.getByRole("button", { name: "Have a code?" }));
+        fireEvent.change(screen.getByLabelText("Discount code"), {
+            target: { value: code },
+        });
+        fireEvent.click(screen.getByRole("button", { name: "Apply" }));
+    }
+
+    it("applies a code by the server's answer, shows what came off, and places it with the code", async () => {
+        const { quote, start } = withCodes();
+        await openTheBag();
+        applyCode(" save10 ");
+
+        expect(await screen.findByText("Code SAVE10")).toBeInTheDocument();
+        expect(quote).toHaveBeenLastCalledWith({
+            lines: [{ listingId: "l-bread", variantId: null, quantity: 2 }],
+            fulfilment: "PICKUP",
+            discountCode: "SAVE10",
+        });
+        const place = await screen.findByRole("button", {
+            name: /^Place order · .*450/,
+        });
+        fireEvent.click(place);
+        await screen.findByRole("heading", { name: "Order placed" });
+        expect(start.mock.calls[0][0]).toMatchObject({
+            discountCode: "SAVE10",
+        });
+    });
+
+    it("says why a code doesn't apply, keeps the full price, and never sends it", async () => {
+        const { start } = withCodes();
+        await openTheBag();
+        applyCode("OLD");
+
+        expect(await screen.findByRole("alert")).toHaveTextContent(
+            "OLD has ended.",
+        );
+        expect(screen.queryByText(/^Code /)).toBeNull();
+        const place = screen.getByRole("button", {
+            name: /^Place order · .*500/,
+        });
+        fireEvent.click(place);
+        await screen.findByRole("heading", { name: "Order placed" });
+        expect(start.mock.calls[0][0]).not.toHaveProperty("discountCode");
+    });
+
+    it("takes a code off again with Remove", async () => {
+        const { quote } = withCodes();
+        await openTheBag();
+        applyCode("SAVE10");
+        fireEvent.click(
+            await screen.findByRole("button", { name: "Remove code SAVE10" }),
+        );
+
+        await waitFor(() =>
+            expect(quote).toHaveBeenLastCalledWith({
+                lines: [{ listingId: "l-bread", variantId: null, quantity: 2 }],
+                fulfilment: "PICKUP",
+            }),
+        );
+        await waitFor(() =>
+            expect(screen.queryByText("Code SAVE10")).toBeNull(),
+        );
+    });
+});
