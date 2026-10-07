@@ -15,17 +15,37 @@ import { Label } from "@saroh/ui/label";
 import { showError, showSuccess } from "@saroh/ui/toast";
 import { Plus } from "lucide-react";
 import { useRouter } from "next/navigation";
+import type { ReactNode } from "react";
 import { useId, useState } from "react";
 
 import { createContact } from "@/lib/contacts/create";
+
+/** A contact just added, as a picker names it. */
+export interface AddedContact {
+    id: string;
+    name: string;
+    email: string;
+}
 
 /**
  * Add someone the business met — at the counter, on the phone — before they
  * enquire or buy. A dialog: a handful of fields, one decision, committed on
  * Save. The email is the one thing required, because it is how every later
  * enquiry, lead and order finds them.
+ *
+ * From Contacts it opens the new contact. Elsewhere (Who on a new invoice,
+ * UX-047) `onAdded` takes the new contact instead, so the merchant stays
+ * where they were, with its own trigger and words.
  */
-export function AddContactDialog() {
+export function AddContactDialog({
+    onAdded,
+    trigger,
+    description = "Someone you met who has not enquired or bought yet. Saroh will not mail them for you.",
+}: {
+    onAdded?: (contact: AddedContact) => void;
+    trigger?: ReactNode;
+    description?: string;
+} = {}) {
     const router = useRouter();
     const [open, setOpen] = useState(false);
     const [fields, setFields] = useState({
@@ -69,9 +89,14 @@ export function AddContactDialog() {
             if (!res.error.includes("already")) showError(res.error);
             return;
         }
+        const name = fields.name.trim() || fields.email.trim();
         setOpen(false);
         setFields({ name: "", email: "", phone: "", company: "" });
-        showSuccess(`${fields.name.trim() || fields.email.trim()} added`);
+        showSuccess(`${name} added`);
+        if (onAdded) {
+            onAdded({ id: res.data.id, name, email: fields.email.trim() });
+            return;
+        }
         router.push(`/contacts/${res.data.id}`);
     }
 
@@ -84,10 +109,12 @@ export function AddContactDialog() {
             }}
         >
             <DialogTrigger asChild>
-                <Button>
-                    <Plus className="mr-1.5 size-4" />
-                    Add contact
-                </Button>
+                {trigger ?? (
+                    <Button>
+                        <Plus className="mr-1.5 size-4" />
+                        Add contact
+                    </Button>
+                )}
             </DialogTrigger>
             <DialogContent className="max-w-[440px]">
                 <form onSubmit={(e) => void submit(e)} className="space-y-4">
@@ -95,10 +122,7 @@ export function AddContactDialog() {
                         <DialogTitle className="font-display text-[19px] tracking-[-0.025em]">
                             Add contact
                         </DialogTitle>
-                        <DialogDescription>
-                            Someone you met who has not enquired or bought yet.
-                            Saroh will not mail them for you.
-                        </DialogDescription>
+                        <DialogDescription>{description}</DialogDescription>
                     </DialogHeader>
                     <div className="grid gap-1.5">
                         <Label htmlFor={ids.name}>Name</Label>

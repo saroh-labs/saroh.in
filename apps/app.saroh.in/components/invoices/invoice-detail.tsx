@@ -27,10 +27,12 @@ import { ViewerDate } from "@/components/shared/viewer-date";
 import { createPayLink, createViewLink } from "@/lib/invoices/actions";
 import type { DetailActionId } from "@/lib/invoices/detail-actions";
 import { detailActions, owedHere } from "@/lib/invoices/detail-actions";
+import { mintedLink, rememberLink } from "@/lib/invoices/minted-links";
 import { downloadInvoicePdf, hasPdf } from "@/lib/invoices/pdf";
 import { canSend, paysOnline, wasSent } from "@/lib/invoices/send";
 import type { InvoiceSend, InvoiceSent } from "@/lib/invoices/service";
 import type { PillVariant } from "@/lib/invoices/status";
+import type { ConnectLock } from "@/lib/providers/connect-lock";
 import type { OnlineBlocker } from "@/lib/staff/types";
 
 type Dialog =
@@ -99,6 +101,7 @@ export function InvoiceDetail({
     connected,
     after,
     paymentsOn = true,
+    emailLock = null,
 }: {
     invoice: InvoiceRef & { kind: string };
     pill: { label: string; variant: PillVariant };
@@ -135,6 +138,11 @@ export function InvoiceDetail({
      * make the link take payment, so it isn't suggested.
      */
     paymentsOn?: boolean;
+    /**
+     * The plan won't let the business connect its own email (DEC-091,
+     * UX-006): the email hint names the plan, not Providers.
+     */
+    emailLock?: ConnectLock | null;
 }) {
     const [open, setOpen] = useState<Dialog | null>(null);
     // A pay link waits for the registered address (DEC-068): asked here.
@@ -142,7 +150,9 @@ export function InvoiceDetail({
         then: "make its pay link",
         continueLabel: "Save and make link",
     });
-    const [url, setUrl] = useState<string | null>(null);
+    // A pay link made for it earlier in this tab, shown again (UX-048):
+    // its address can't be read back from the API.
+    const [url, setUrl] = useState<string | null>(() => mintedLink(invoice.id));
     // A view link (#833) or a pay link: what the copied address opens.
     const [urlKind, setUrlKind] = useState<"pay" | "view">("pay");
     const [busy, setBusy] = useState(false);
@@ -166,6 +176,7 @@ export function InvoiceDetail({
         if (!res) return;
         // A plan without online payments: its notice and the way up.
         if (!res.ok) return reportFailure(res);
+        rememberLink(invoice.id, res.data.url);
         setUrl(res.data.url);
         setUrlKind("pay");
         showSuccess(
@@ -400,16 +411,7 @@ export function InvoiceDetail({
                         {owed &&
                         canWrite &&
                         send?.reason === "NO_EMAIL_PROVIDER" ? (
-                            <p className="mt-2 text-[12.5px] leading-[1.5] text-muted-foreground">
-                                To send invoices by email, connect your email
-                                provider.{" "}
-                                <Link
-                                    href="/settings/providers"
-                                    className="font-medium text-foreground underline underline-offset-4 hover:decoration-2 active:text-muted-foreground"
-                                >
-                                    Providers
-                                </Link>
-                            </p>
+                            <EmailHint lock={emailLock} />
                         ) : null}
                     </section>
                     {after}
@@ -486,5 +488,33 @@ export function InvoiceDetail({
                 onConfirm={() => void makeViewLink()}
             />
         </div>
+    );
+}
+
+/**
+ * Why an invoice can't be emailed: no email of the business's own. On a
+ * plan that can connect one, the way to Providers; on one that can't
+ * (DEC-091, UX-006), the plan that has it — never a Providers dead end.
+ */
+export function EmailHint({ lock }: { lock: ConnectLock | null }) {
+    const link =
+        "font-medium text-foreground underline underline-offset-4 hover:decoration-2 active:text-muted-foreground";
+    if (lock) {
+        return (
+            <p className="mt-2 text-[12.5px] leading-[1.5] text-muted-foreground">
+                {`Sending invoices by email needs your own email provider, which comes with ${lock.upgrade ?? "a paid plan"}. Copy its link and share it another way.`}{" "}
+                <Link href={lock.href} className={link}>
+                    {lock.cta}
+                </Link>
+            </p>
+        );
+    }
+    return (
+        <p className="mt-2 text-[12.5px] leading-[1.5] text-muted-foreground">
+            To send invoices by email, connect your email provider.{" "}
+            <Link href="/settings/providers" className={link}>
+                Providers
+            </Link>
+        </p>
     );
 }

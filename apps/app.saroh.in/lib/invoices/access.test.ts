@@ -20,6 +20,18 @@ describe("billingLanding — where /billing goes (DEC-070)", () => {
         expect(billingLanding(org, true)).toBe("/billing/invoices");
     });
 
+    it("Free, memberships locked by the plan: lands on Invoices (UX-047)", () => {
+        expect(billingLanding({ role: "OWNER" }, true, true)).toBe(
+            "/billing/invoices",
+        );
+    });
+
+    it("Grow, memberships in the plan: lands on Subscriptions", () => {
+        expect(billingLanding({ role: "OWNER" }, true, false)).toBe(
+            "/billing/subscriptions",
+        );
+    });
+
     it("leaves a role that reads neither to Subscriptions' own gate", () => {
         expect(billingLanding({ role: "MEMBER" }, false)).toBe(
             "/billing/subscriptions",

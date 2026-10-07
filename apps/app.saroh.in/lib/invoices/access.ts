@@ -21,18 +21,20 @@ export function mayRead(
 
 /**
  * Where `/billing` lands: Subscriptions, unless it can't be shown — Payments
- * is off (invoices need no module, DEC-070) or the role reads invoices and
- * not subscriptions — then Invoices. Subscriptions' own gate explains
- * anything else.
+ * is off (invoices need no module, DEC-070), the role reads invoices and
+ * not subscriptions, or the plan locks memberships (UX-047: on a plan
+ * without them the row opened on a locked tab) — then Invoices.
+ * Subscriptions' own gate explains anything else.
  */
 export function billingLanding(
     organization: Pick<Organization, "role" | "actions"> | null,
     paymentsOn: boolean,
+    membershipsLocked = false,
 ): "/billing/subscriptions" | "/billing/invoices" {
     const SUBSCRIPTIONS = "/billing/subscriptions";
     const INVOICES = "/billing/invoices";
     if (!mayRead(organization, "invoice:read")) return SUBSCRIPTIONS;
-    if (!paymentsOn) return INVOICES;
+    if (!paymentsOn || membershipsLocked) return INVOICES;
     return mayRead(organization, "subscription:read")
         ? SUBSCRIPTIONS
         : INVOICES;

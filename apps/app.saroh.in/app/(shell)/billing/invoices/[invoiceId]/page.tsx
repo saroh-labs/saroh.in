@@ -26,6 +26,8 @@ import {
 import { getInvoiceBusiness } from "@/lib/invoices/tax";
 import { invoiceZone } from "@/lib/invoices/zone";
 import { resolveActiveOrganization } from "@/lib/organizations/service";
+import { connectLocksOf } from "@/lib/providers/connect-lock";
+import { billingAccessOrNull } from "@/lib/saroh-billing/service";
 import { requireSession } from "@/lib/session";
 
 export const metadata = { title: "Invoice" };
@@ -77,6 +79,13 @@ export default async function InvoicePage({
     const zone = invoiceZone(business);
     // Whether its link takes payment: the API's word (DEC-070).
     const payOnline = paysOnline(invoice.send, invoice.online);
+    // Only when it can't be emailed for want of the business's own email:
+    // whether the plan lets it connect one picks the hint (DEC-091, UX-006).
+    // Best-effort; unread points at Providers as before.
+    const emailLock =
+        canWrite && invoice.send?.reason === "NO_EMAIL_PROVIDER"
+            ? connectLocksOf(await billingAccessOrNull()).messaging
+            : null;
     const again = payOnline ? "Send the pay link again" : "Send it again";
 
     return (
@@ -118,6 +127,7 @@ export default async function InvoicePage({
                         : null
                 }
                 editHref={`/billing/invoices/${encodeURIComponent(invoice.id)}/edit`}
+                emailLock={emailLock}
                 online={invoice.online ?? null}
                 send={invoice.send ?? null}
                 sent={invoice.sent ?? []}
