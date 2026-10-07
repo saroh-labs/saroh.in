@@ -108,3 +108,45 @@ export function inviteSchema(known: {
 }
 
 export type InviteValues = z.infer<ReturnType<typeof inviteSchema>>;
+
+/**
+ * What the plan's team cap counts, said plainly (UX-028): "2 people
+ * including you · 1 invite waiting". The cap counts everyone in the
+ * business, the owner included, and every invite not yet answered —
+ * Reviewers never (`billing/metering.ts`). Without this the screen read
+ * "Team is full" beside People = 1.
+ */
+export function teamCountLine(people: number, waiting: number): string {
+    const who = people === 1 ? "Just you" : `${people} people including you`;
+    if (waiting === 0) return who;
+    return `${who} · ${waiting === 1 ? "1 invite" : `${waiting} invites`} waiting`;
+}
+
+/** The plan's caps on Team, as the page reads them (U14). */
+export interface TeamLimit {
+    /** The team, open invites counted, has reached its cap. */
+    full: boolean;
+    /** The notice's reason, in the design's words. */
+    why: string;
+    /** The Reviewers cap is reached too (Reviewers have their own, U13). */
+    reviewersFull?: boolean;
+}
+
+/**
+ * Who Invite can still ask (UX-028). A full team stops seats, not
+ * Reviewers, who have a cap of their own: the dialog stays open with
+ * every other role disabled and the reason beside it. Only when both caps
+ * are reached is there no one to invite.
+ */
+export function inviteRoom(limit: TeamLimit | null | undefined): {
+    /** Anyone at all can be invited. */
+    open: boolean;
+    /** Why a role that takes a seat can't be picked; null when it can. */
+    seatReason: string | null;
+} {
+    if (!limit?.full) return { open: true, seatReason: null };
+    return {
+        open: !limit.reviewersFull,
+        seatReason: `${limit.why} (invites count too). A Reviewer doesn't take a seat.`,
+    };
+}
