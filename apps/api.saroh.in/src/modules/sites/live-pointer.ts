@@ -275,9 +275,7 @@ export async function putLive(
                 byUserId: actor.userId,
                 outcome: "BYPASSED",
                 publicationId: publication.id,
-                ...(input.testReleaseId
-                    ? { testReleaseId: input.testReleaseId }
-                    : {}),
+                ...releaseClosing(input),
             },
             select: { id: true },
         });
@@ -290,6 +288,29 @@ export async function putLive(
         overridden,
         route,
     };
+}
+
+/**
+ * What a go-live's own record (BYPASSED, OVERRIDDEN) carries when a test
+ * release went live: the release, and the bytes that went live.
+ *
+ * The fingerprint is what closes the release's open review (DEC-101):
+ * a release's standing reads only rows with its fingerprint
+ * (`releaseVerdicts`), so a record without one left "In review" on a
+ * release that was already live. A closing row never settles anything
+ * (`CLOSING_OUTCOMES`), so stamping it approves nothing. Another release
+ * that froze the same bytes is closed with it: the same content is live.
+ * The draft's record stays unstamped, as before.
+ */
+function releaseClosing(
+    input: PutLiveInput,
+): Partial<{ testReleaseId: string; draftFingerprint: string }> {
+    return input.testReleaseId
+        ? {
+              testReleaseId: input.testReleaseId,
+              draftFingerprint: input.fingerprint,
+          }
+        : {};
 }
 
 /**
@@ -311,9 +332,7 @@ async function recordOverride(
             byUserId: actor.userId,
             outcome: ReviewRoute.Overridden,
             publicationId,
-            ...(input.testReleaseId
-                ? { testReleaseId: input.testReleaseId }
-                : {}),
+            ...releaseClosing(input),
         },
         select: { id: true },
     });
@@ -349,8 +368,9 @@ export type ReviewScope = "draft" | "release";
  * transaction gets its own answer (#278), with the rows that close a review
  * (`CLOSING_OUTCOMES`: WITHDRAWN, BYPASSED, OVERRIDDEN). BYPASSED and
  * OVERRIDDEN are going live's own records: they close the request they were
- * written about (UX-068) and never settle it. A release's go-live rows carry
- * no fingerprint, so a release's standing never reads them.
+ * written about (UX-068, DEC-101) and never settle it. A release's go-live
+ * rows carry its fingerprint, so its standing reads them and its review
+ * closes (`releaseClosing`).
  */
 export async function readVerdicts(
     client: Pick<Prisma.TransactionClient, "siteApproval">,

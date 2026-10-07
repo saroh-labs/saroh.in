@@ -227,14 +227,10 @@ describe("the footer row on the page's column", () => {
         const column = footer?.firstElementChild;
         expect(column?.className).toContain("max-w-site-content");
         expect(column?.className).toContain("sm:px-[var(--site-page-margin)]");
-        // Name, line and "Runs on Saroh" on one row, Saroh at the end.
+        // Name and line on one row; a paid site shows no Saroh credit.
         const row = column?.lastElementChild;
         expect(
             Array.from(row?.children ?? []).map((c) => c.textContent),
-        ).toEqual([
-            "Rye & Co.",
-            "14 Hill Road · Closed Mondays",
-            "Runs on Saroh",
-        ]);
+        ).toEqual(["Rye & Co.", "14 Hill Road · Closed Mondays"]);
     });
 });

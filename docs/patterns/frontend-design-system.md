@@ -53,8 +53,8 @@
   the chrome reads it as `max-w-site-content`, and while it is set `SiteTheme`
   sets the blocks' `max-w-screen-md/lg/xl` inside sections to it. The footer
   may be laid out `left` (`Site.footer.layout`), which a save of the line
-  alone keeps. `left` is the designs' row (name, line, "Runs on Saroh" at
-  the end) with its margins inside `max-w-site-content`, as the header's.
+  alone keeps. `left` is the designs' row (name, line, and on Free
+  "Made with Saroh" at the end, DEC-102) with its margins inside `max-w-site-content`, as the header's.
 - **Current** — **Template round 2.** A palette may name two optional
   status roles, `status` (the "open now" dot on the page) and
   `statusInverse` (over a hero photo's wash or an inverse band), each held

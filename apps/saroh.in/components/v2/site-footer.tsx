@@ -2,6 +2,7 @@ import { Wordmark } from "@saroh/ui/wordmark";
 import Link from "next/link";
 import type { ReactNode } from "react";
 
+import { SAROH_CONTACT_EMAIL } from "@/content/contact";
 import { MADE_BY } from "@/content/resources";
 import { SAROH_SOCIAL } from "@/content/social";
 import { LAUNCH_MODE, SIGN_IN_URL } from "@/lib/links";
@@ -81,7 +82,7 @@ export function SiteFooter({
                 <Link href="/#faq" className={LINK}>
                     Questions
                 </Link>
-                <a href="mailto:hello@saroh.in" className={LINK}>
+                <a href={`mailto:${SAROH_CONTACT_EMAIL}`} className={LINK}>
                     Contact
                 </a>
                 <a href={SIGN_IN_URL} className={LINK}>

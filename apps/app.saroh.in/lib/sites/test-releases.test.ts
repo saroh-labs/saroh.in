@@ -259,6 +259,20 @@ describe("review standing", () => {
             }).text,
         ).toBe("Ravi asked for changes");
     });
+
+    it("no longer reads In review once going live closed it (DEC-101)", () => {
+        expect(
+            standingCopy({
+                outstanding: false,
+                route: "DIRECT",
+                approved: false,
+                latest: { outcome: "BYPASSED", at: "", by: "Asha" },
+            }),
+        ).toEqual({
+            text: "Asha put it live without approval",
+            approved: false,
+        });
+    });
 });
 
 describe("links, going live and what stays live", () => {

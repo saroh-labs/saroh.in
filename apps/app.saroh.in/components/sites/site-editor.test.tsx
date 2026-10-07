@@ -1271,22 +1271,20 @@ describe("SiteEditor header and footer text (G6)", () => {
         expect(actions.updateSiteSettings).not.toHaveBeenCalled();
     });
 
-    it("edits the footer line; the canvas draws it before Runs on Saroh, and it saves as the footer", async () => {
+    it("edits the footer line; the canvas draws it, and it saves as the footer", async () => {
         const { siteId } = render();
         // Nothing written yet: the site's name stands in, as G17 draws it.
-        expect(canvasFooter()?.textContent).toBe(
-            "Flour & Ferment · Runs on Saroh",
-        );
+        expect(canvasFooter()?.textContent).toBe("Flour & Ferment");
         click(button("Footer"));
         expect(host.textContent).toContain(
             "Nothing is written at the foot of this site yet",
         );
         type(field("Footer line"), "Hill Road, Bandra");
 
-        expect(canvasFooter()?.textContent).toBe(
-            "Hill Road, Bandra · Runs on Saroh",
+        expect(canvasFooter()?.textContent).toBe("Hill Road, Bandra");
+        expect(host.textContent).toContain(
+            "On the Free plan, “Made with Saroh” follows it on your site.",
         );
-        expect(host.textContent).toContain("“Runs on Saroh” follows it.");
 
         await wait(700);
         await wait(0);
@@ -1301,14 +1299,12 @@ describe("SiteEditor header and footer text (G6)", () => {
         const { siteId } = render({
             footerPreview: { format: "html", value: "<p>Old line</p>" },
         });
-        expect(canvasFooter()?.textContent).toBe("Old line · Runs on Saroh");
+        expect(canvasFooter()?.textContent).toBe("Old line");
         click(button("Footer"));
         expect(field("Footer line").value).toBe("Old line");
         type(field("Footer line"), "");
 
-        expect(canvasFooter()?.textContent).toBe(
-            "Flour & Ferment · Runs on Saroh",
-        );
+        expect(canvasFooter()?.textContent).toBe("Flour & Ferment");
         await wait(700);
         await wait(0);
         expect(actions.updateSiteFooter).toHaveBeenCalledWith(siteId, null);

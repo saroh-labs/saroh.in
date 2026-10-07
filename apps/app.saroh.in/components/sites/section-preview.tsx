@@ -264,8 +264,9 @@ export function DraftPreview({
     const header = chrome ? (
         <SiteHeader name={chrome.name} navigation={chrome.navigation} />
     ) : null;
-    // Always drawn, as on the live site: the footer ends in "Runs on Saroh"
-    // (G17), and with nothing written its line is the site's name.
+    // Always drawn, as on the live site: with nothing written its line is
+    // the site's name (G17). A Free site's "Made with Saroh" is drawn by the
+    // live site alone (DEC-102), which reads the plan.
     const footer = chrome ? (
         <SiteFooter footer={chrome.footer} name={chrome.name} />
     ) : null;

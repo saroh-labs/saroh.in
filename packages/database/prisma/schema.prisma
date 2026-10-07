@@ -298,6 +298,12 @@ model Organization {
   // dismissed. Only people added after it are listed again.
   storefrontTeamNoticeDismissedAt DateTime?
 
+  // The business's referral code (DEC-102, #812): the `?ref=` its site's
+  // "Made with Saroh" credit links with on Free. 8 characters a reader can't
+  // confuse, never the business name. Null until the credit is first
+  // drawn, which gives it one; referral attribution (#809) reads it.
+  referralCode String? @unique
+
   // A customer's message thread with the business (round-2 A13).
   customerThreads        CustomerThread[]
   customerThreadMessages CustomerThreadMessage[]

@@ -168,8 +168,8 @@ export function FixedBlockInspector({
                 <div className="grid gap-2">
                     <p className="text-[0.8125rem] leading-relaxed">
                         Your footer is more than one line of plain text, so
-                        it&apos;s changed in Website settings. “Runs on Saroh”
-                        follows it on your site.
+                        it&apos;s changed in Website settings. On the Free plan,
+                        “Made with Saroh” follows it on your site.
                     </p>
                     {settings}
                 </div>
@@ -182,8 +182,8 @@ export function FixedBlockInspector({
                         disabled={readOnly}
                         note={
                             text.footerText.trim() === ""
-                                ? "Nothing is written at the foot of this site yet, so visitors see the site's name and “Runs on Saroh”."
-                                : "“Runs on Saroh” follows it."
+                                ? "Nothing is written at the foot of this site yet, so visitors see the site's name."
+                                : "On the Free plan, “Made with Saroh” follows it on your site."
                         }
                     />
                     <div className="grid gap-2 border-t pt-3">

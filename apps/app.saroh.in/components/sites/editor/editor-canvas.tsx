@@ -80,7 +80,7 @@ export function canvasChromeFor({
             pageEntries,
         ),
         // Sanitizing can leave nothing, which is no footer — unless it is
-        // laid out on the left, which keeps its row (name, Runs on Saroh).
+        // laid out on the left, which keeps its row (the name).
         footer:
             footer?.value.trim() || footer?.layout === "left" ? footer : null,
     };

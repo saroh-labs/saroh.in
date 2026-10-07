@@ -22,6 +22,13 @@ vi.mock("next/link", () => ({
 afterEach(cleanup);
 
 describe("SiteFooter", () => {
+    it("writes to contact@saroh.in (DEC-101)", () => {
+        render(<SiteFooter />);
+        expect(
+            screen.getByRole("link", { name: "Contact" }).getAttribute("href"),
+        ).toBe("mailto:contact@saroh.in");
+    });
+
     it("says who makes Saroh, and has no Resources column, Privacy or Terms before they're live", () => {
         render(<SiteFooter />);
         expect(screen.getByText(MADE_BY)).toBeTruthy();

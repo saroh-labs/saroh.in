@@ -17,7 +17,7 @@ import { trimTrailingSlashes } from "./url-path";
 /**
  * How the footer is laid out. Absent is today's: one centred line. `left`
  * is the industry designs' row: the site's name in its heading face, the
- * merchant's line beside it, and "Runs on Saroh" at the far end.
+ * merchant's line beside it, and the Saroh credit (Free only) at the far end.
  */
 export const FOOTER_LAYOUTS = ["centre", "left"] as const;
 export type FooterLayout = (typeof FOOTER_LAYOUTS)[number];
@@ -36,11 +36,11 @@ const BLOCK_OR_BREAK =
 /**
  * A merchant's footer as one line, or `null` when it is more than that.
  *
- * The footer ends in "Runs on Saroh" (G17, default 67), set after the
+ * On Free the footer ends in "Made with Saroh" (DEC-102), set after the
  * merchant's own line with a " · ", as the design draws it. That only works
  * for a line: plain text with no line break, or html that is a single
  * paragraph. Anything richer (two paragraphs, a list, a heading) keeps its
- * own block, and "Runs on Saroh" goes on the line below it.
+ * own block, and the credit goes on the line below it.
  *
  * The html branch hands back the paragraph's inner markup. Publish sanitized
  * the whole value, and a `<p>`'s contents are inline markup, so drawing them
@@ -64,25 +64,44 @@ function nonBlank(value: string | null | undefined): string | null {
     return trimmed === "" ? null : trimmed;
 }
 
-/** The business's public phone and place, for the footer (UX-038). */
+/**
+ * The business's public phone and place (UX-038), and its contact email
+ * when it has added one (DEC-101), for the footer.
+ */
 export interface SiteContact {
     phone: string | null;
     address: string | null;
+    email?: string | null;
 }
 
 /**
- * The foot of every page (#202, G17): the merchant's own line, then
- * "Runs on Saroh" linking to saroh.in.
+ * The Saroh credit a Free site's footer carries (DEC-102): "Made with
+ * Saroh", linking to saroh.in with the business's referral code (#812).
+ * Paid plans have none, and a site drawn with none shows no Saroh credit.
+ */
+export interface SiteCredit {
+    href: string;
+}
+
+/** Where "Made with Saroh" links: saroh.in with the business's code. */
+export function madeWithSarohHref(referralCode: string): string {
+    return `https://saroh.in/?ref=${encodeURIComponent(referralCode)}`;
+}
+
+/**
+ * The foot of every page (#202, G17): the merchant's own line, then on Free
+ * "Made with Saroh" linking to saroh.in with the business's referral code
+ * (DEC-102). Paid plans show no Saroh credit; the renderer reads the plan
+ * and passes `credit` only for Free.
  *
- * "Runs on Saroh" stays on every site this round (default 67), so the footer
- * always renders now. With nothing written, the merchant's line is the site's
- * name, which the header already shows to everyone.
+ * The footer always renders. With nothing written, the merchant's line is
+ * the site's name, which the header already shows to everyone.
  *
  * `contact` (UX-038) is the business's PUBLIC place and phone: the same live
  * read the Visit us block and the booking header show (`/visit`, G8, DEC-053),
- * where Settings › Business calls the number "Phone on your website". Nothing
- * else from the business profile is published here — not the contact email,
- * which `parseSiteFooter` in the API says stays the merchant's to write.
+ * where Settings › Business calls the number "Phone on your website". Its
+ * `email` is the business's contact email, shown when the business has added
+ * one (DEC-101); Settings › Business says the site shows it.
  *
  * The link is plain text in the site's own footer colours and type, never
  * Saroh's colours or font: a merchant's site does not wear the brand. The
@@ -101,22 +120,27 @@ export function SiteFooter({
     footer,
     name,
     contact = null,
+    credit = null,
 }: {
     footer: SiteFooterContent | null | undefined;
     /** The site's name: the footer's line when the merchant wrote none. */
     name: string;
-    /** The business's public phone and place (UX-038); null draws neither. */
+    /** The business's public phone, place and email; null draws none. */
     contact?: SiteContact | null;
+    /** "Made with Saroh" on Free (DEC-102); null shows no Saroh credit. */
+    credit?: SiteCredit | null;
 }) {
     const phone = nonBlank(contact?.phone);
+    const email = nonBlank(contact?.email);
     const address = nonBlank(contact?.address);
     const written = footer && footer.value.trim() !== "" ? footer : null;
     if (footer?.layout === "left") {
-        return <LeftFooter written={written} name={name} />;
+        return <LeftFooter written={written} name={name} credit={credit} />;
     }
     const line = written
         ? footerLine(written)
         : { kind: "text" as const, value: name.trim() };
+    const hasLine = line !== null && line.value !== "";
 
     return (
         <footer className="border-site-border bg-site-footer-bg text-site-footer-fg font-site-body w-full border-t px-5 pb-7 pt-5 sm:px-[var(--site-page-margin)]">
@@ -138,23 +162,28 @@ export function SiteFooter({
                         </p>
                     )
                 ) : null}
-                {phone || address ? (
+                {phone || email || address ? (
                     <p className="mb-2 flex flex-wrap items-center justify-center gap-x-3 gap-y-1 text-[13px]">
                         {phone ? (
                             <a
                                 href={`tel:${phone.replace(/[^\d+]/g, "")}`}
-                                className="focus-visible:ring-site-footer-fg rounded-sm underline underline-offset-2 hover:no-underline focus-visible:outline-none focus-visible:ring-2"
+                                className={FOOTER_LINK}
                             >
                                 Call {phone}
+                            </a>
+                        ) : null}
+                        {email ? (
+                            <a href={`mailto:${email}`} className={FOOTER_LINK}>
+                                {email}
                             </a>
                         ) : null}
                         {address ? <span>{address}</span> : null}
                     </p>
                 ) : null}
-                <p>
-                    {line && line.value !== "" ? (
-                        <>
-                            {line.kind === "html" ? (
+                {hasLine || credit ? (
+                    <p>
+                        {line && hasLine ? (
+                            line.kind === "html" ? (
                                 <span
                                     // Sanitized at publish — see above.
                                     dangerouslySetInnerHTML={{
@@ -163,32 +192,40 @@ export function SiteFooter({
                                 />
                             ) : (
                                 <span>{line.value}</span>
-                            )}
-                            {" · "}
-                        </>
-                    ) : null}
-                    <RunsOnSaroh />
-                </p>
+                            )
+                        ) : null}
+                        {hasLine && credit ? " · " : null}
+                        {credit ? <MadeWithSaroh credit={credit} /> : null}
+                    </p>
+                ) : null}
             </div>
         </footer>
     );
 }
 
-/** "Runs on Saroh" (G17), in the footer's own colours and type. */
-function RunsOnSaroh({ className = "" }: { className?: string }) {
+/** A link in the footer, in the footer's own colours. */
+const FOOTER_LINK =
+    "focus-visible:ring-site-footer-fg rounded-sm underline underline-offset-2 hover:no-underline focus-visible:outline-none focus-visible:ring-2";
+
+/**
+ * "Made with Saroh" (DEC-102), in the footer's own colours and type, never
+ * Saroh's: a merchant's site does not wear the brand.
+ */
+function MadeWithSaroh({
+    credit,
+    className = "",
+}: {
+    credit: SiteCredit;
+    className?: string;
+}) {
     return (
         <a
-            href="https://saroh.in"
+            href={credit.href}
             target="_blank"
             rel="noopener"
-            className={[
-                "focus-visible:ring-site-footer-fg rounded-sm underline underline-offset-2 hover:no-underline focus-visible:outline-none focus-visible:ring-2",
-                className,
-            ]
-                .filter(Boolean)
-                .join(" ")}
+            className={[FOOTER_LINK, className].filter(Boolean).join(" ")}
         >
-            Runs on Saroh
+            Made with Saroh
         </a>
     );
 }
@@ -198,16 +235,18 @@ function RunsOnSaroh({ className = "" }: { className?: string }) {
  * on the page's column, its margins inside the column so it lines up with
  * the header and the sections, wrapping on a phone —
  * the name in the heading face, the merchant's line (an address, the days
- * they open), and "Runs on Saroh" pushed to the far end. A footer richer
+ * they open), and on Free "Made with Saroh" pushed to the far end. A footer richer
  * than a line keeps its own block above the row, left-aligned too. The same
  * safety note as {@link SiteFooter}: html arrives sanitized.
  */
 function LeftFooter({
     written,
     name,
+    credit,
 }: {
     written: SiteFooterContent | null;
     name: string;
+    credit: SiteCredit | null;
 }) {
     const line = written ? footerLine(written) : null;
     return (
@@ -243,7 +282,9 @@ function LeftFooter({
                             <span>{line.value}</span>
                         )
                     ) : null}
-                    <RunsOnSaroh className="ml-auto" />
+                    {credit ? (
+                        <MadeWithSaroh credit={credit} className="ml-auto" />
+                    ) : null}
                 </div>
             </div>
         </footer>

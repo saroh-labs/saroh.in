@@ -10,7 +10,7 @@ import { LegalText } from "./legal-text";
 const table = parseLegal(`| What | Examples | Why |
 | --- | --- | --- |
 | Account | Name, email, phone | To sign you in |
-| Messages | What you write to hello@saroh.in | To help you |`);
+| Messages | What you write to contact@saroh.in | To help you |`);
 
 describe("LegalText tables (audit T1)", () => {
     it("draws each row as a card below sm: a bold heading, then labelled values", () => {
@@ -35,7 +35,7 @@ describe("LegalText tables (audit T1)", () => {
         ]);
         // The email in a card is still a link.
         expect(cards[1].querySelector("a")?.getAttribute("href")).toBe(
-            "mailto:hello@saroh.in",
+            "mailto:contact@saroh.in",
         );
     });
 
