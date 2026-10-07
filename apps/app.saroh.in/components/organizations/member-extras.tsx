@@ -31,6 +31,7 @@ export function useMemberExtras({
     name,
     catalogue,
     myActions,
+    planLocked = null,
 }: {
     /** The person's extras now, as the API sent them. */
     extras: readonly string[] | undefined;
@@ -45,6 +46,8 @@ export function useMemberExtras({
     name: string;
     catalogue: RoleCatalogue | null;
     myActions: string[] | null;
+    /** The plan leaves extras off (UX-030), in its words; null when not. */
+    planLocked?: string | null;
 }) {
     const [draft, setDraft] = useState<string[] | null>(null);
     const current = extrasBeyond(extras, currentGrants);
@@ -57,6 +60,8 @@ export function useMemberExtras({
         reviewer,
         beyondViewer: beyond,
         name,
+        planLocked,
+        holdsExtras: current.length > 0,
     });
     const groups =
         catalogue && lockedReason === null

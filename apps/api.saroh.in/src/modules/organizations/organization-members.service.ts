@@ -820,6 +820,13 @@ export class OrganizationMembersService {
         if (given.length === 0 && taken.length === 0) {
             return { userId, extraActions: next };
         }
+        // Giving someone more than their role is a role of their own, the
+        // plan's "Custom roles" row (UX-030): refused where the plan leaves
+        // it off. Taking extras away never asks, so a business that moved
+        // down can still tidy up.
+        if (given.length > 0) {
+            await planMeter.assertIncluded(organizationId, "roles");
+        }
 
         const { count } = await prisma.membership.updateMany({
             where: {

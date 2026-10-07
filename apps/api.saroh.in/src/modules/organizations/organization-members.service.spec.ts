@@ -1118,6 +1118,34 @@ describe("extra permissions per person (F17)", () => {
         });
     });
 
+    // UX-030: an extra is a role of one's own, the plan's "Custom roles".
+    it("asks the plan's Custom roles row before giving anything", async () => {
+        person("MEMBER");
+        const included = jest
+            .spyOn(planMeter, "assertIncluded")
+            .mockRejectedValueOnce(new ForbiddenException("MODULE_LOCKED"));
+
+        await expect(
+            service.setExtraActions(admin(), "user_2", {
+                actions: ["payment:manage"],
+            }),
+        ).rejects.toThrow(ForbiddenException);
+        expect(included).toHaveBeenCalledWith("org_1", "roles");
+        expect(db.membership.updateMany).not.toHaveBeenCalled();
+        included.mockRestore();
+    });
+
+    it("never asks the plan to take extras away", async () => {
+        person("MEMBER", ["order:refund"]);
+        const included = jest.spyOn(planMeter, "assertIncluded");
+
+        await service.setExtraActions(admin(), "user_2", { actions: [] });
+
+        expect(included).not.toHaveBeenCalled();
+        expect(db.membership.updateMany).toHaveBeenCalled();
+        included.mockRestore();
+    });
+
     it("refuses org:delete as an extra (400), even from an Owner", async () => {
         person("ADMIN");
         await expect(

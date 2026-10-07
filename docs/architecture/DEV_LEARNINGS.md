@@ -3028,3 +3028,22 @@ that closes after "354", so the shape is nodemailer's, not ours.
 library itself (a stub server is minutes of work), not a hand-made object.
 When the stage can't be known, a send that may have gone is never retried.
 **Category**: email · `modules/communications/providers/saroh-email.sender.ts`
+
+## Team — a custom role was lost when the invitation was accepted (UX-004)
+
+**Problem**: Someone invited as "Front desk" joined as a Member: no New
+booking, no order changes, and Roles said "Front desk · 0 people". The
+invitation row read `role=front-desk ACCEPTED`; the membership `MEMBER`.
+**Root cause**: `accept` stored `toRole(invitation.role)`, the helper that
+narrows a stored key to the four built-ins for display. Every unit test
+mocked Prisma and checked a Reviewer invite, so nothing ran invite → accept →
+resolve with a role the business made.
+**Fix**: Accept stores the invited key when that role still exists in the
+business (MEMBER when it was removed since); migration
+`20261029141100_invited_custom_role` puts back the memberships the old accept
+dropped, only where nobody changed the role since.
+`invite-custom-role.db.spec.ts` runs the whole path and then asks the booking
+and order services what the role may do.
+**Category**: roles · rule in `docs/patterns/backend-auth-and-access.md`
+(invitations). `toRole` is for the response's `role` field only — never for
+what is written.

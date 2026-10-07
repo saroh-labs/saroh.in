@@ -133,12 +133,24 @@ export function extrasLockedReason({
     reviewer,
     beyondViewer,
     name,
+    planLocked = null,
+    holdsExtras = false,
 }: {
     isSelf: boolean;
     canEdit: boolean;
     reviewer: boolean;
     beyondViewer: boolean;
     name: string;
+    /**
+     * The plan leaves roles of your own off (UX-030), in its words ("Roles
+     * of your own come with …"). Extras are one person's own role.
+     */
+    planLocked?: string | null;
+    /**
+     * They hold extras already (from before a move down): the switches stay,
+     * so what they have can be taken away; the API refuses adding.
+     */
+    holdsExtras?: boolean;
 }): string | null {
     if (!canEdit) {
         return "Only someone who can change roles can give extra permissions.";
@@ -151,6 +163,9 @@ export function extrasLockedReason({
     }
     if (reviewer) {
         return "A reviewer looks at the websites they were asked to review, and nothing else. Choose another role to give more.";
+    }
+    if (planLocked && !holdsExtras) {
+        return `${planLocked} Extra permissions for one person come with them.`;
     }
     return null;
 }
