@@ -13,6 +13,8 @@ import type { Root } from "react-dom/client";
 import { createRoot } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+import type { DetailsOnFile } from "@/lib/organizations/business-details";
+import { detailsOnFileOf } from "@/lib/organizations/business-details";
 import type { OrganizationSettings } from "@/lib/organizations/settings-service";
 
 import { useBusinessDetailsStep } from "./use-business-details-step";
@@ -347,5 +349,98 @@ describe("the business-details step (DEC-068)", () => {
             error: "The due date has passed.",
         });
         expect(readBusinessDetails).not.toHaveBeenCalled();
+    });
+});
+
+describe("asking up front, from the page's read (#838)", () => {
+    let ready: boolean | undefined;
+
+    function Upfront({ onFile }: { onFile: DetailsOnFile }) {
+        const details = useBusinessDetailsStep({
+            then: "issue it",
+            continueLabel: "Save and issue",
+            onFile,
+        });
+        return (
+            <>
+                <button
+                    type="button"
+                    onClick={() => {
+                        void details.ensure().then((r) => {
+                            ready = r;
+                        });
+                    }}
+                >
+                    Issue now
+                </button>
+                {details.step}
+            </>
+        );
+    }
+
+    beforeEach(() => {
+        ready = undefined;
+    });
+
+    it("opens the sheet at once, with no read and no action, and answers true once saved", async () => {
+        act(() =>
+            root.render(
+                <Upfront
+                    onFile={detailsOnFileOf({ ok: true, data: SETTINGS })}
+                />,
+            ),
+        );
+        await press("Issue now");
+        expect(sheet()?.textContent).toContain("Add your business details");
+        expect(readBusinessDetails).not.toHaveBeenCalled();
+        expect(action).not.toHaveBeenCalled();
+
+        typeInto(byLabel("Address line 1"), "3 Hill Road");
+        typeInto(byLabel("City"), "Bengaluru");
+        typeInto(byLabel("PIN code"), "560038");
+        await press("Save and issue");
+        expect(saveOrganizationSettings).toHaveBeenCalledTimes(1);
+        expect(ready).toBe(true);
+        expect(sheet()).toBeNull();
+
+        // Saved here, the page's read is stale: it isn't asked again.
+        ready = undefined;
+        await press("Issue now");
+        expect(sheet()).toBeNull();
+        expect(ready).toBe(true);
+    });
+
+    it("answers false when closed without saving", async () => {
+        act(() =>
+            root.render(
+                <Upfront
+                    onFile={detailsOnFileOf({ ok: true, data: SETTINGS })}
+                />,
+            ),
+        );
+        await press("Issue now");
+        await press("Not now");
+        expect(ready).toBe(false);
+        expect(saveOrganizationSettings).not.toHaveBeenCalled();
+    });
+
+    it("goes straight on when everything is on file", async () => {
+        const whole = {
+            ...SETTINGS,
+            registeredAddress: {
+                ...SETTINGS.registeredAddress,
+                line1: "3 Hill Road",
+                city: "Bengaluru",
+                postalCode: "560038",
+            },
+        } as OrganizationSettings;
+        act(() =>
+            root.render(
+                <Upfront onFile={detailsOnFileOf({ ok: true, data: whole })} />,
+            ),
+        );
+        await press("Issue now");
+        expect(sheet()).toBeNull();
+        expect(ready).toBe(true);
     });
 });

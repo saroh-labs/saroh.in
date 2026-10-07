@@ -115,7 +115,7 @@ export const ModuleRow = forwardRef<HTMLButtonElement, ModuleRowProps>(
                             )}
                         </Field>
                         <Field
-                            label="Plan card (blank: leave off)"
+                            label="Line on the plan card (optional)"
                             small
                             error={errors.card}
                         >
@@ -132,7 +132,7 @@ export const ModuleRow = forwardRef<HTMLButtonElement, ModuleRowProps>(
                             )}
                         </Field>
                         <NumberField
-                            label="Limit (blank: none)"
+                            label="Limit (empty for none)"
                             small
                             value={cell.limit}
                             format={(v) => (v == null ? "" : String(v))}
@@ -182,8 +182,8 @@ export const ModuleRow = forwardRef<HTMLButtonElement, ModuleRowProps>(
                                         htmlFor={softId}
                                         className="cursor-pointer text-[12.5px] font-semibold text-foreground"
                                     >
-                                        Soft cap: count and tell the business,
-                                        never refuse
+                                        Soft limit: we tell the business, and
+                                        never block it
                                     </label>
                                     <span
                                         id={`${softId}-note`}

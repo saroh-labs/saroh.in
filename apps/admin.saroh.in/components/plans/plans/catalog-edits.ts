@@ -216,7 +216,7 @@ function readable(message: string): string {
 
 /** An id the schema accepts and nothing in `taken` uses. */
 export function freshId(
-    prefix: "p" | "m",
+    prefix: "p" | "m" | "g",
     taken: readonly string[],
     now: number = Date.now(),
 ): string {
@@ -226,7 +226,7 @@ export function freshId(
     return id;
 }
 
-/** "+ Plan": a new free plan with the design's defaults. Returns its id. */
+/** "Add plan": a new free plan with the design's defaults. Returns its id. */
 export function addPlan(catalog: Catalog, now?: number): string {
     const id = freshId(
         "p",
@@ -312,7 +312,7 @@ export function menuLabel(menu: string): string {
 
 /** The matrix's line under a module's name. */
 export function menuLine(module: CatalogModule): string {
-    if (!module.menu) return "Limit or feature, no menu row";
+    if (!module.menu) return "Not in the dashboard menu";
     return (
         `Dashboard: ${menuLabel(module.menu)}` +
         (module.child ? ` › ${module.child}` : "")
@@ -332,12 +332,20 @@ export function menuNote(module: CatalogModule): string {
 }
 
 /**
- * "+ Add module": "New module", coming soon on the pricing page, no cells
- * (so excluded and locked everywhere), at the end of the first group.
- * Returns its id, or null when there is no group to put it in.
+ * "Add module": "New module", coming soon on the pricing page, no cells
+ * (so excluded and locked everywhere), at the end of `group` (the first
+ * group when none is named). Returns its id, or null when there is no group
+ * to put it in.
  */
-export function addModule(catalog: Catalog, now?: number): string | null {
-    const group = catalog.groups[0]?.id;
+export function addModule(
+    catalog: Catalog,
+    now?: number,
+    groupId?: string,
+): string | null {
+    const group =
+        groupId && catalog.groups.some((g) => g.id === groupId)
+            ? groupId
+            : catalog.groups[0]?.id;
     if (!group) return null;
     const id = freshId(
         "m",
@@ -423,6 +431,7 @@ export interface ModuleGroup {
 export function groupModules(
     catalog: Catalog,
     match: (m: CatalogModule) => boolean = () => true,
+    { keepEmpty = false }: { keepEmpty?: boolean } = {},
 ): ModuleGroup[] {
     const out: ModuleGroup[] = catalog.groups.map((g) => ({
         id: g.id,
@@ -432,5 +441,5 @@ export function groupModules(
     const known = new Set(catalog.groups.map((g) => g.id));
     const lost = catalog.modules.filter((m) => !known.has(m.group) && match(m));
     if (lost.length) out.push({ id: "", name: "No group", modules: lost });
-    return out.filter((g) => g.modules.length > 0);
+    return keepEmpty ? out : out.filter((g) => g.modules.length > 0);
 }

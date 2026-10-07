@@ -305,3 +305,83 @@ describe("the tabs", () => {
         ).toBe("true");
     });
 });
+
+describe("an instance with no pricing yet", () => {
+    const empty = () =>
+        fakePricing({ liveVersion: null, versions: [], draft: null });
+
+    it("offers the starter catalogue and a blank start, instead of empty tabs", async () => {
+        actions.savePricingDraftAction.mockResolvedValue({
+            ok: true,
+            data: { revision: 1, valid: true, errors: [], changes: [] },
+        });
+        render(
+            <PlansShell data={data({}, empty())} impact={null} tab="plans" />,
+        );
+
+        expect(screen.getByText("No pricing yet")).toBeTruthy();
+        expect(screen.queryByRole("tablist")).toBeNull();
+
+        fireEvent.click(
+            screen.getByRole("button", {
+                name: "Start from the starter catalogue",
+            }),
+        );
+        // The draft is open, and saved as a new one.
+        expect(screen.getByRole("tablist")).toBeTruthy();
+        expect(screen.queryByText("No pricing yet")).toBeNull();
+        await act(() => vi.advanceTimersByTimeAsync(AUTOSAVE_MS));
+        const sent = actions.savePricingDraftAction.mock.calls[0]?.[0] as {
+            revision: number;
+            catalog: { plans: { pricePaise: number }[] };
+        };
+        expect(sent.revision).toBe(0);
+        expect(sent.catalog.plans.length).toBeGreaterThan(1);
+        expect(sent.catalog.plans.every((p) => p.pricePaise === 0)).toBe(true);
+    });
+
+    it("starts blank with one plan", async () => {
+        actions.savePricingDraftAction.mockResolvedValue({
+            ok: true,
+            data: { revision: 1, valid: true, errors: [], changes: [] },
+        });
+        render(
+            <PlansShell data={data({}, empty())} impact={null} tab="plans" />,
+        );
+        fireEvent.click(screen.getByRole("button", { name: "Start blank" }));
+        await act(() => vi.advanceTimersByTimeAsync(AUTOSAVE_MS));
+        const sent = actions.savePricingDraftAction.mock.calls[0]?.[0] as {
+            catalog: { plans: unknown[]; groups: unknown[] };
+        };
+        expect(sent.catalog.plans).toHaveLength(1);
+        expect(sent.catalog.groups).toHaveLength(1);
+    });
+
+    it("says who can start it, without pricing:edit", () => {
+        render(
+            <PlansShell
+                data={data(
+                    {
+                        access: {
+                            canEdit: false,
+                            canPublish: false,
+                            canManageCoupons: false,
+                        },
+                    },
+                    empty(),
+                )}
+                impact={null}
+                tab="plans"
+            />,
+        );
+        expect(screen.getByText("No pricing yet")).toBeTruthy();
+        expect(
+            screen.getByText(
+                "Someone with permission to edit pricing can start it.",
+            ),
+        ).toBeTruthy();
+        expect(
+            screen.queryByRole("button", { name: "Start blank" }),
+        ).toBeNull();
+    });
+});

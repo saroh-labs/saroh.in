@@ -15,6 +15,8 @@ import {
     ValidateNested,
 } from "class-validator";
 
+import type { PaymentMethod } from "../invoices/invoice-state";
+import { PAYMENT_METHODS } from "../invoices/invoice-state";
 import type { CounterPayment } from "./new-order.dto";
 import {
     COUNTER_PAYMENTS,
@@ -419,6 +421,16 @@ export class UpdateOrderDto {
     @IsString()
     @IsIn(PAYMENT_STATUSES, { message: "Unknown payment status" })
     paymentStatus?: PaymentStatus;
+
+    /**
+     * Marked paid by hand (#834): how the business was paid — cash, UPI, a
+     * bank transfer, a card at the counter or another way. Kept on the
+     * order's invoice and its timeline. Read only with `paymentStatus`
+     * PAID; an app before #834 sends none.
+     */
+    @IsOptional()
+    @IsIn(PAYMENT_METHODS, { message: "Pick how it was paid." })
+    paidHow?: PaymentMethod;
 }
 
 /** A query value that may repeat (`?stage=NEW&stage=READY`) or be a list. */

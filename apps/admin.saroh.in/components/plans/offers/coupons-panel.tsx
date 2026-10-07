@@ -18,6 +18,7 @@ import {
 } from "@/lib/pricing-actions";
 import type { AdminCoupon } from "@/lib/pricing-types";
 
+import { AddButton } from "../add-button";
 import { useDraft } from "../draft-store";
 import { usePlans } from "../plans-context";
 import { useFlash } from "../toast";
@@ -63,14 +64,12 @@ export function CouponsPanel() {
                     use per business, and they work on monthly and yearly.
                 </span>
                 {can && coupons && plans.length > 0 && !adding && (
-                    <Button
-                        type="button"
-                        variant="secondary"
-                        className="ml-auto h-8 rounded-[8px] border border-border-strong px-3 text-[12.5px]"
+                    <AddButton
+                        className="ml-auto"
                         onClick={() => setAdding(true)}
                     >
-                        + New coupon
-                    </Button>
+                        New coupon
+                    </AddButton>
                 )}
             </div>
             {coupons === null ? (
@@ -487,7 +486,7 @@ function CouponFields({
                     id={`${id}-code`}
                     value={form.code}
                     readOnly={!isNew}
-                    // The new row replaces "+ New coupon", so focus lands here.
+                    // The new row replaces "New coupon", so focus lands here.
                     autoFocus={isNew}
                     disabled={disabled}
                     aria-invalid={!!errors.code}

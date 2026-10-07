@@ -1,6 +1,8 @@
+import { accessRow } from "@/lib/billing/access";
 import { listModules } from "@/lib/modules/service";
 import type { OrganizationSettings } from "@/lib/organizations/settings-service";
 import { listCommsProviders } from "@/lib/providers/service";
+import { billingAccessOrNull } from "@/lib/saroh-billing/service";
 
 import { settingsChecklist } from "./nudges";
 import type { ReadyChecklist } from "./ready";
@@ -18,8 +20,22 @@ import { readyChecklist } from "./ready";
 export async function loadReadyChecklist(
     settings: OrganizationSettings,
 ): Promise<ReadyChecklist> {
-    const modules = await listModules().catch(() => null);
-    return readyChecklist({ settings, modules });
+    const [modules, onlineUpgrade] = await Promise.all([
+        listModules().catch(() => null),
+        onlinePaymentsUpgrade(settings),
+    ]);
+    return readyChecklist({ settings, modules, onlineUpgrade });
+}
+
+/**
+ * The plan that takes payment online, for a plan without it (DEC-092): the
+ * catalogue's `payments` row names it. Read only then, and best-effort —
+ * unread, the checklist says "a paid plan" instead of a name.
+ */
+async function onlinePaymentsUpgrade(settings: OrganizationSettings) {
+    if (settings.setup?.onlinePaymentsInPlan !== false) return null;
+    const view = await billingAccessOrNull();
+    return accessRow(view, "payments")?.upgradeTo ?? null;
 }
 
 /**
@@ -32,11 +48,12 @@ export async function loadSettingsChecklist(
     settings: OrganizationSettings,
     mayMessaging: boolean,
 ): Promise<ReadyChecklist> {
-    const [modules, messaging] = await Promise.all([
+    const [modules, messaging, onlineUpgrade] = await Promise.all([
         listModules().catch(() => null),
         mayMessaging
             ? listCommsProviders().catch(() => null)
             : Promise.resolve(null),
+        onlinePaymentsUpgrade(settings),
     ]);
-    return settingsChecklist({ settings, modules, messaging });
+    return settingsChecklist({ settings, modules, messaging, onlineUpgrade });
 }

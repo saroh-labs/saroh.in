@@ -7,7 +7,11 @@ import { Check } from "lucide-react";
 import Link from "next/link";
 import { useId, useSyncExternalStore } from "react";
 
-import type { ReadyChecklist, ReadyStep } from "@/lib/settings/ready";
+import type {
+    ReadyAside,
+    ReadyChecklist,
+    ReadyStep,
+} from "@/lib/settings/ready";
 import {
     SETUP_HIDDEN_KEY,
     checklistHeading,
@@ -29,6 +33,10 @@ import {
  *
  * The heading follows the steps (DEC-070): "Get your site live" when
  * publishing the site is all there is — nothing invoices or takes money.
+ *
+ * What the plan holds back (taking payment online on a plan without it,
+ * DEC-092) follows the steps, outside the count and the bar, with the plan
+ * that has it — the same as Settings › Business.
  *
  * Hide is per person, per business, in this browser (default 123). Both
  * slots read one store so hiding in one moves the other at once; a browser
@@ -166,7 +174,47 @@ export function TakeMoneyChecklist({
                     </li>
                 ))}
             </ul>
+            {list.outside.length > 0 ? (
+                <ul
+                    aria-label="Not counted: comes with another plan"
+                    className="grid border-t border-border pt-1.5"
+                >
+                    {list.outside.map((item) => (
+                        <li key={item.key}>
+                            <AsideRow item={item} />
+                        </li>
+                    ))}
+                </ul>
+            ) : null}
         </section>
+    );
+}
+
+function AsideRow({ item }: { item: ReadyAside }) {
+    return (
+        <Link
+            href={item.href}
+            className="flex items-start gap-[11px] rounded-[9px] px-2 py-[9px] text-foreground transition-colors hover:bg-muted/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+        >
+            <span
+                aria-hidden
+                className="mt-px size-5 flex-none rounded-md border-[1.5px] border-dashed border-border-strong"
+            />
+            <span className="grid min-w-0 flex-1 gap-0.5">
+                <span className="flex flex-wrap items-center gap-2 text-[14px] font-medium">
+                    {item.label}
+                    <span className="rounded-full bg-muted px-2 py-px text-[11.5px] font-medium text-muted-foreground">
+                        {item.comesWith}
+                    </span>
+                </span>
+                <span className="text-pretty text-[12.5px] leading-[1.45] text-muted-foreground">
+                    {item.why}
+                </span>
+            </span>
+            <span className="mt-px flex-none text-[12.5px] font-semibold text-brand">
+                {item.cta}
+            </span>
+        </Link>
     );
 }
 

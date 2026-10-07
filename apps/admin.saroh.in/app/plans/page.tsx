@@ -2,7 +2,7 @@ import { PageContainer } from "@saroh/ui/page-container";
 import { Suspense } from "react";
 
 import { AdminShell } from "@/components/admin-shell";
-import { NotAuthorized } from "@/components/not-authorized";
+import { NoAccessPanel } from "@/components/not-authorized";
 import { PlansFailed } from "@/components/plans/plans-failed";
 import { PlansHeader } from "@/components/plans/plans-header";
 import { PlansShell } from "@/components/plans/plans-shell";
@@ -65,7 +65,7 @@ async function PlansLoaded({
     ]);
     if (pricing === undefined) return <PlansFailed />;
     // Refused after the gate let them in: their access changed mid-visit.
-    if (pricing === null) return <NotAuthorized email={staff.email} />;
+    if (pricing === null) return <NoAccessPanel email={staff.email} />;
     const impact = pricing.draft
         ? await getPricingImpact().catch(() => null)
         : null;

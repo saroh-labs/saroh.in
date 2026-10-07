@@ -89,6 +89,12 @@ export async function createPayLink(id: string) {
     return res;
 }
 
+export async function createViewLink(id: string) {
+    const res = await api.createViewLink(id);
+    if (res.ok) refresh(id);
+    return res;
+}
+
 export async function sendInvoice(id: string) {
     const res = await api.sendInvoice(id);
     if (res.ok) refresh(id);

@@ -37,6 +37,7 @@ import {
     rateOption,
 } from "@/lib/invoices/gst";
 import type { Invoice } from "@/lib/invoices/service";
+import type { DetailsOnFile } from "@/lib/organizations/business-details";
 
 const MONEY = /^\d{1,9}(\.\d{1,2})?$/;
 
@@ -146,6 +147,7 @@ export function InvoiceForm({
     registered,
     businessName,
     providerConnected,
+    detailsOnFile = null,
 }: {
     contacts: { id: string; name: string; email: string }[];
     defaultCurrency: string;
@@ -158,11 +160,17 @@ export function InvoiceForm({
     businessName: string;
     /** A pay link can be made (Payments on, a provider connected), so issuing makes one. */
     providerConnected: boolean;
+    /**
+     * The business details on file, read with the page: Issue asks for any
+     * that are missing before it saves anything (#838).
+     */
+    detailsOnFile?: DetailsOnFile | null;
 }) {
     const router = useRouter();
     const details = useBusinessDetailsStep({
         then: "issue it",
         continueLabel: "Save and issue",
+        onFile: detailsOnFile,
     });
     const ids = {
         contact: useId(),
@@ -243,6 +251,10 @@ export function InvoiceForm({
     const withLink = providerConnected;
 
     async function onSubmit(values: FormValues) {
+        // Missing details are asked for at once, before the save (#838):
+        // asked after it, the sheet waited on a save, a refusal and a read.
+        // Closed without saving, the draft is still kept, as below.
+        const detailsReady = intent === "issue" ? await details.ensure() : true;
         const input = {
             contactId: values.contactId,
             ...(draft ? {} : { currency, tax: "0" }),
@@ -294,7 +306,9 @@ export function InvoiceForm({
             return;
         }
         // No registered address yet (DEC-068): asked here, then it issues.
-        const issued = await details.run(() => issueInvoice(id));
+        const issued = detailsReady
+            ? await details.run(() => issueInvoice(id))
+            : null;
         if (!issued) {
             showSuccess("Saved as a draft. Issue it once your address is in.");
             router.push(to);

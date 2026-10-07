@@ -45,7 +45,8 @@ const PROVIDER_FIX: OnlineFix = {
     href: "/settings/providers",
     label: "Connect one in Settings › Providers",
 };
-const PLAN_FIX: OnlineFix = {
+/** Where a plan without online payments is changed (#821, #835). */
+export const PLAN_FIX: OnlineFix = {
     href: "/settings/billing#change-plan",
     label: "See plans",
 };

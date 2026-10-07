@@ -1,39 +1,37 @@
 "use client";
 
-import type {
-    Catalog,
-    CatalogModule,
-    PricingDisplay,
-} from "@saroh/pricing-catalog";
-import { cellOf, formatInr } from "@saroh/pricing-catalog";
+import type { Catalog, CatalogModule } from "@saroh/pricing-catalog";
+import { formatInr } from "@saroh/pricing-catalog";
 import { Button } from "@saroh/ui/button";
 import { cn } from "@saroh/ui/lib/utils";
-import {
-    ArrowDown,
-    ArrowUp,
-    ChevronDown,
-    ChevronRight,
-    Plus,
-} from "lucide-react";
+import { ScrollX } from "@saroh/ui/scroll-x";
 import { Fragment, useMemo, useState } from "react";
 
+import { AddButton } from "../add-button";
 import { useDraft } from "../draft-store";
 import { usePlans } from "../plans-context";
 import { usePlansNav } from "../plans-nav";
 import {
     addModule,
-    canMove,
     cellChanged,
     errorsByPath,
     groupModules,
     isNewModule,
-    limitWords,
-    menuLine,
     moveModule,
-    setModuleGroup,
 } from "../plans/catalog-edits";
-import { FIELD, SELECT } from "../plans/fields";
-import { ModuleDetails } from "./module-details";
+import { FIELD } from "../plans/fields";
+import {
+    addGroup,
+    canRemoveGroup,
+    isUnpublishedModule,
+    removeGroup,
+    removeModule,
+    renameGroup,
+    restoreModule,
+} from "../plans/structure-edits";
+import { useFlash } from "../toast";
+import { GroupHead } from "./group-head";
+import { DetailsFor, ModuleLine } from "./module-line";
 
 /**
  * The Modules tab: "All modules" (plans catalogue U8, the design's matrix).
@@ -41,24 +39,18 @@ import { ModuleDetails } from "./module-details";
  * per plan a business can choose, then how the pricing page shows the row
  * and its order in its group. A cell opens the Plans tab on that plan and
  * row; a module's name opens its details inline. The matrix scrolls
- * sideways inside itself on a narrow screen.
+ * sideways inside itself on a narrow screen. Row groups are made, renamed
+ * and (once empty) removed here, and a module that was never published can
+ * be removed again, with Undo.
  *
  * Drawn from the shared draft and changed only through `edit`.
  */
-
-const PRICING_LABELS: Record<PricingDisplay, string> = {
-    show: "Shown",
-    soon: "Coming soon",
-    hidden: "Hidden",
-};
-
-const ICON_BUTTON =
-    "inline-flex size-7 cursor-pointer items-center justify-center rounded-[7px] border border-border-strong transition-colors duration-fast hover:bg-muted active:bg-accent-active focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background disabled:cursor-not-allowed disabled:opacity-40";
 
 export function TabModules() {
     const { catalog, live, edit, check, canEdit } = useDraft();
     const { pricing } = usePlans();
     const { setTab } = usePlansNav();
+    const flash = useFlash();
     const liveCatalog = live?.catalog ?? null;
 
     const [search, setSearch] = useState("");
@@ -72,8 +64,12 @@ export function TabModules() {
     const plans = catalog.plans.filter((p) => !p.retired);
     const span = plans.length + 3;
     const q = search.trim().toLowerCase();
-    const groups = groupModules(catalog, (m) =>
-        q ? m.name.toLowerCase().includes(q) : true,
+    // Searching shows only groups with a match; otherwise an empty group
+    // shows too, so it can be filled, renamed or removed.
+    const groups = groupModules(
+        catalog,
+        (m) => (q ? m.name.toLowerCase().includes(q) : true),
+        { keepEmpty: !q },
     );
     const anyOpen = catalog.groups.some((g) => !closed[g.id]);
     const businessesOn = (planId: string) =>
@@ -82,6 +78,38 @@ export function TabModules() {
         isNewModule(liveCatalog, m.id) ||
         plans.some((p) => cellChanged(liveCatalog, m, p.id));
     const change = (fn: (c: Catalog) => void) => edit(fn);
+
+    function addModuleTo(groupId?: string) {
+        const made: { id: string | null; group: string | null } = {
+            id: null,
+            group: null,
+        };
+        edit((c) => {
+            made.id = addModule(c, undefined, groupId);
+            made.group = c.modules.find((x) => x.id === made.id)?.group ?? null;
+        });
+        if (!made.id) return;
+        const id = made.id;
+        const group = made.group;
+        setSearch("");
+        if (group) setClosed((s) => ({ ...s, [group]: false }));
+        setDetail(id);
+        setAdded(id);
+    }
+
+    function removeModuleNow(m: CatalogModule) {
+        const taken: { r: ReturnType<typeof removeModule> } = { r: null };
+        edit((c) => {
+            taken.r = removeModule(c, liveCatalog, m.id);
+        });
+        const removed = taken.r;
+        if (!removed) return;
+        setDetail(null);
+        flash(`${m.name || "Module"} removed`, {
+            label: "Undo",
+            onClick: () => edit((c) => restoreModule(c, removed)),
+        });
+    }
 
     return (
         <section
@@ -112,30 +140,42 @@ export function TabModules() {
                 >
                     {anyOpen ? "Collapse all" : "Expand all"}
                 </Button>
-                <Button
-                    type="button"
-                    variant="secondary"
-                    disabled={!canEdit || catalog.groups.length === 0}
-                    className="h-[34px] rounded-[9px] border border-border-strong px-3.5 text-[13px]"
-                    onClick={() => {
-                        const made: { id: string | null } = { id: null };
-                        edit((c) => {
-                            made.id = addModule(c);
-                        });
-                        if (!made.id) return;
-                        setSearch("");
-                        setClosed((s) => ({
-                            ...s,
-                            [catalog.groups[0].id]: false,
-                        }));
-                        setDetail(made.id);
-                        setAdded(made.id);
-                    }}
-                >
-                    <Plus aria-hidden className="size-3.5" />
-                    Add module
-                </Button>
+                {canEdit && (
+                    <AddButton
+                        onClick={() => {
+                            const made: { id: string | null } = { id: null };
+                            edit((c) => {
+                                made.id = addGroup(c);
+                            });
+                            const id = made.id;
+                            if (id) setClosed((s) => ({ ...s, [id]: false }));
+                        }}
+                    >
+                        Add group
+                    </AddButton>
+                )}
+                {canEdit && (
+                    <AddButton
+                        disabled={catalog.groups.length === 0}
+                        aria-describedby={
+                            catalog.groups.length === 0
+                                ? "add-module-why"
+                                : undefined
+                        }
+                        onClick={() => addModuleTo()}
+                    >
+                        Add module
+                    </AddButton>
+                )}
             </div>
+            {canEdit && catalog.groups.length === 0 && (
+                <p
+                    id="add-module-why"
+                    className="text-[12.5px] text-muted-foreground"
+                >
+                    A module sits in a row group. Add a group first.
+                </p>
+            )}
 
             <p className="flex flex-wrap gap-x-3.5 gap-y-1 text-[12px] text-muted-foreground">
                 <span>Click a cell to edit it plan by plan.</span>
@@ -158,7 +198,12 @@ export function TabModules() {
                 </span>
             </p>
 
-            <div className="overflow-x-auto rounded-[12px] border border-border bg-card">
+            {/* The console's one wide ledger: on a narrow screen it scrolls
+                sideways and says so (ScrollX fades the side with more). */}
+            <ScrollX
+                label="All modules, by plan"
+                className="rounded-[12px] border border-border bg-card"
+            >
                 <table className="w-full min-w-[860px] border-collapse">
                     <thead>
                         <tr className="text-left text-[12px] text-muted-foreground">
@@ -210,37 +255,47 @@ export function TabModules() {
                                     <th
                                         scope="rowgroup"
                                         colSpan={span}
-                                        className="border-t border-border p-0"
+                                        className="border-t border-border p-0 font-normal"
                                     >
-                                        <button
-                                            type="button"
-                                            aria-expanded={open}
-                                            onClick={() =>
+                                        <GroupHead
+                                            name={g.name}
+                                            open={open}
+                                            count={n}
+                                            changed={nch}
+                                            canEdit={canEdit}
+                                            canRemove={
+                                                !!g.id &&
+                                                canRemoveGroup(catalog, g.id)
+                                            }
+                                            onToggle={() =>
                                                 setClosed((s) => ({
                                                     ...s,
                                                     [g.id]: !s[g.id],
                                                 }))
                                             }
-                                            className="flex w-full cursor-pointer items-center gap-2 px-3.5 pb-2 pt-3.5 text-left text-[11px] font-semibold uppercase tracking-[0.1em] text-highlight-subtle-foreground hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring active:bg-accent-active"
-                                        >
-                                            {open ? (
-                                                <ChevronDown
-                                                    aria-hidden
-                                                    className="size-3 text-muted-foreground"
-                                                />
-                                            ) : (
-                                                <ChevronRight
-                                                    aria-hidden
-                                                    className="size-3 text-muted-foreground"
-                                                />
-                                            )}
-                                            {g.name}
-                                            <span className="font-medium normal-case tracking-normal text-muted-foreground">
-                                                {n}{" "}
-                                                {n === 1 ? "module" : "modules"}
-                                                {nch ? ` · ${nch} changed` : ""}
-                                            </span>
-                                        </button>
+                                            onRename={
+                                                g.id
+                                                    ? (name) =>
+                                                          change((c) =>
+                                                              renameGroup(
+                                                                  c,
+                                                                  g.id,
+                                                                  name,
+                                                              ),
+                                                          )
+                                                    : null
+                                            }
+                                            onAddModule={
+                                                g.id
+                                                    ? () => addModuleTo(g.id)
+                                                    : null
+                                            }
+                                            onRemove={() =>
+                                                change((c) =>
+                                                    removeGroup(c, g.id),
+                                                )
+                                            }
+                                        />
                                     </th>
                                 </tr>
                                 {open &&
@@ -305,6 +360,18 @@ export function TabModules() {
                                                                 setDetail(null);
                                                                 setAdded(null);
                                                             }}
+                                                            onRemove={
+                                                                canEdit &&
+                                                                isUnpublishedModule(
+                                                                    liveCatalog,
+                                                                    m.id,
+                                                                )
+                                                                    ? () =>
+                                                                          removeModuleNow(
+                                                                              m,
+                                                                          )
+                                                                    : null
+                                                            }
                                                             change={change}
                                                         />
                                                     </td>
@@ -330,204 +397,7 @@ export function TabModules() {
                         </tbody>
                     )}
                 </table>
-            </div>
+            </ScrollX>
         </section>
-    );
-}
-
-function ModuleLine({
-    module: m,
-    catalog,
-    liveCatalog,
-    plans,
-    canEdit,
-    detailOpen,
-    onDetail,
-    onCell,
-    onPricing,
-    onMove,
-}: {
-    module: CatalogModule;
-    catalog: Catalog;
-    liveCatalog: Catalog | null;
-    plans: Catalog["plans"];
-    canEdit: boolean;
-    detailOpen: boolean;
-    onDetail: () => void;
-    onCell: (planId: string) => void;
-    onPricing: (v: PricingDisplay) => void;
-    onMove: (step: -1 | 1) => void;
-}) {
-    return (
-        <tr className="border-t border-border/70 align-top">
-            <td className="px-3.5 py-2.5">
-                <button
-                    type="button"
-                    aria-expanded={detailOpen}
-                    onClick={onDetail}
-                    className="grid cursor-pointer gap-0.5 rounded-[6px] text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-card [&:active_.name]:text-muted-foreground [&:hover_.name]:underline"
-                >
-                    <span className="name font-semibold text-foreground underline-offset-2">
-                        {m.name || "Unnamed module"}
-                        {isNewModule(liveCatalog, m.id) && (
-                            <span className="ml-1.5 rounded-full bg-info-subtle px-1.5 py-px text-[11px] font-semibold text-info-subtle-foreground no-underline">
-                                New
-                            </span>
-                        )}
-                    </span>
-                    <span className="text-[12px] leading-[1.4] text-muted-foreground">
-                        {menuLine(m)}
-                    </span>
-                </button>
-            </td>
-            {plans.map((p) => {
-                const c = cellOf(m, p.id);
-                const ch = cellChanged(liveCatalog, m, p.id);
-                const lim = limitWords(c);
-                const said = c.inc
-                    ? `${c.text || "Included"}${lim ? `, ${c.soft ? "soft " : ""}limit ${lim}` : ""}`
-                    : c.off === "hidden"
-                      ? "Hidden"
-                      : "Locked";
-                return (
-                    <td key={p.id} className="px-1.5 py-2">
-                        <button
-                            type="button"
-                            onClick={() => onCell(p.id)}
-                            aria-label={`${m.name} on ${p.name}: ${said}${ch ? ", changed" : ""}. Edit plan by plan`}
-                            className={cn(
-                                "relative grid min-h-10 w-full cursor-pointer gap-0.5 rounded-[8px] border px-[9px] py-[7px] text-left text-[12.5px] transition-[filter] duration-fast hover:brightness-125 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-card active:brightness-90",
-                                ch ? "border-highlight/60" : "border-border",
-                                c.inc ? "bg-muted" : "bg-transparent",
-                            )}
-                        >
-                            {ch && (
-                                <span
-                                    aria-hidden
-                                    className="absolute right-1.5 top-1.5 size-[7px] rounded-full bg-highlight"
-                                />
-                            )}
-                            {c.inc ? (
-                                <>
-                                    <span className="pr-2.5 leading-[1.35] text-foreground">
-                                        {c.text || "Included"}
-                                    </span>
-                                    {lim && (
-                                        <span className="flex flex-wrap items-center gap-x-1.5 gap-y-0.5 text-[11.5px] text-muted-foreground">
-                                            Limit {lim}
-                                            {c.soft && (
-                                                <span className="rounded-full bg-info-subtle px-1.5 py-px text-[10.5px] font-semibold text-info-subtle-foreground">
-                                                    soft
-                                                </span>
-                                            )}
-                                        </span>
-                                    )}
-                                </>
-                            ) : (
-                                <span
-                                    className={cn(
-                                        "justify-self-start rounded-full px-2 py-0.5 text-[11px] font-semibold",
-                                        c.off === "hidden"
-                                            ? "bg-muted text-muted-foreground"
-                                            : "bg-warning-subtle text-warning-subtle-foreground",
-                                    )}
-                                >
-                                    {c.off === "hidden" ? "Hidden" : "Locked"}
-                                </span>
-                            )}
-                        </button>
-                    </td>
-                );
-            })}
-            <td className="px-1.5 py-2">
-                <select
-                    aria-label={`Pricing page for ${m.name}`}
-                    value={m.pricing}
-                    disabled={!canEdit}
-                    onChange={(e) =>
-                        onPricing(e.target.value as PricingDisplay)
-                    }
-                    className={cn(
-                        FIELD,
-                        SELECT,
-                        "w-auto bg-muted px-2 text-[12.5px]",
-                    )}
-                >
-                    {(Object.keys(PRICING_LABELS) as PricingDisplay[]).map(
-                        (v) => (
-                            <option key={v} value={v}>
-                                {PRICING_LABELS[v]}
-                            </option>
-                        ),
-                    )}
-                </select>
-            </td>
-            <td className="whitespace-nowrap px-1.5 py-2">
-                <span className="inline-flex gap-1">
-                    <button
-                        type="button"
-                        aria-label={`Move ${m.name} up`}
-                        disabled={!canEdit || !canMove(catalog, m.id, -1)}
-                        onClick={() => onMove(-1)}
-                        className={ICON_BUTTON}
-                    >
-                        <ArrowUp aria-hidden className="size-3.5" />
-                    </button>
-                    <button
-                        type="button"
-                        aria-label={`Move ${m.name} down`}
-                        disabled={!canEdit || !canMove(catalog, m.id, 1)}
-                        onClick={() => onMove(1)}
-                        className={ICON_BUTTON}
-                    >
-                        <ArrowDown aria-hidden className="size-3.5" />
-                    </button>
-                </span>
-            </td>
-        </tr>
-    );
-}
-
-function DetailsFor({
-    module: m,
-    catalog,
-    errors,
-    disabled,
-    autoFocus,
-    onDone,
-    change,
-}: {
-    module: CatalogModule;
-    catalog: Catalog;
-    errors: Map<string, string>;
-    disabled: boolean;
-    autoFocus: boolean;
-    onDone: () => void;
-    change: (fn: (c: Catalog) => void) => void;
-}) {
-    const i = catalog.modules.indexOf(m);
-    const set = (fn: (x: CatalogModule) => void) =>
-        change((c) => {
-            const x = c.modules.find((y) => y.id === m.id);
-            if (x) fn(x);
-        });
-    return (
-        <ModuleDetails
-            module={m}
-            groups={catalog.groups}
-            disabled={disabled}
-            autoFocus={autoFocus}
-            errors={{
-                name:
-                    errors.get(`modules.${i}.name`) ??
-                    errors.get(`modules.${i}.id`),
-                group: errors.get(`modules.${i}.group`),
-                what: errors.get(`modules.${i}.what`),
-            }}
-            onName={(name) => set((x) => (x.name = name))}
-            onGroup={(group) => change((c) => setModuleGroup(c, m.id, group))}
-            onWhat={(what) => set((x) => (x.what = what))}
-            onDone={onDone}
-        />
     );
 }

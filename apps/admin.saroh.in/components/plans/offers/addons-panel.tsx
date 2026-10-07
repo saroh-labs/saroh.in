@@ -11,6 +11,7 @@ import {
 } from "@saroh/ui/select";
 import { useId } from "react";
 
+import { AddButton } from "../add-button";
 import { useDraft } from "../draft-store";
 import { usePlans } from "../plans-context";
 import { fieldClass, RupeesField, WholeField } from "./number-field";
@@ -66,19 +67,15 @@ export function AddonsPanel() {
             ))}
             {canEdit && (
                 <div className="flex flex-wrap items-center gap-1.5">
-                    <span className="text-[12px] text-muted-foreground">
-                        Add:
-                    </span>
                     {ADDON_KIND_ORDER.filter((k) => canAddKind(catalog, k)).map(
                         (k) => (
-                            <button
+                            <AddButton
                                 key={k}
-                                type="button"
+                                className="h-[30px] px-3 text-[12.5px]"
                                 onClick={() => add(k)}
-                                className="h-[30px] cursor-pointer rounded-full border border-dashed border-border-strong px-[11px] text-[12.5px] font-semibold text-foreground/80 transition-colors duration-fast hover:border-foreground hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring active:bg-secondary"
                             >
-                                + {ADDON_KIND_WORDS[k].label}
-                            </button>
+                                Add {ADDON_KIND_WORDS[k].label.toLowerCase()}
+                            </AddButton>
                         ),
                     )}
                 </div>

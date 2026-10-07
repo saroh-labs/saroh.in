@@ -2928,3 +2928,22 @@ test key, as the payments specs do.
 key (mock `../../env`); never rely on the gate's exported one. Check by running
 it with `env -u PAYMENTS_ENC_KEY`.
 **Category**: tests · CI vs local gate
+
+## Plans & modules — an empty instance could never get its first pricing
+
+**Symptom**: on an instance with nothing published (dev, 6 Oct), the console's
+Plans & modules page said "Change anything below to start a draft" with
+nothing below it; the first catalogue had to go in through the API. Once a
+draft existed, Review & publish blocked it with "Nothing differs from the live
+version".
+**Root cause**: every edit cloned the live catalogue (`draft-store.tsx`, `if
+(!base) return`), and the publish check counted changes against live, which
+are always zero when nothing is live. Every test fixture had a live version,
+so neither path was ever drawn.
+**Fix**: a first-run screen (starter catalogue or blank) through the store's
+`start`, and "first version" wording with publishing allowed when nothing is
+live. Tests in `plans-shell.test.tsx` and `tab-publish.test.tsx` start from
+no live version.
+**Rule**: a screen that edits "the live thing" needs a test with no live
+thing; an empty instance is a real state, not an edge case.
+**Category**: admin console · empty states

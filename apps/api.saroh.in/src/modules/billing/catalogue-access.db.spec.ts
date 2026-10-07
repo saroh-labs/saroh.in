@@ -15,6 +15,7 @@ import {
     backfillFreeSubscriptions,
     FREE_ROWS_ACTOR,
     prisma,
+    startMissingFreeRows,
     startOnFreePlan,
     writeCatalogueVersion,
 } from "@saroh/database";
@@ -479,6 +480,57 @@ describe("access from the catalogue (DB, U12)", () => {
                 grandfatheredBefore: release,
             });
             expect(second).toMatchObject({ started: 0, notGrandfathered: 1 });
+        });
+
+        it("at go-live, starts who signed up with no version live, never an older business (#839)", async () => {
+            // Before any version was published on this database.
+            const longAgo = new Date("2000-01-01T00:00:00.000Z");
+            const older = await org("Before pricing", longAgo);
+            const olderOverride = await org("Before pricing, kept", longAgo);
+            await planOverride(
+                olderOverride.id,
+                "grow",
+                new Date(Date.now() + DAY),
+            );
+            // Signed up while no version was live, so sign-up wrote no row.
+            const meanwhile = await org("Signed up meanwhile");
+            const mine = [older.id, olderOverride.id, meanwhile.id];
+
+            await startMissingFreeRows(prisma, { planId: "free" });
+
+            const rows = await prisma.subscription.findMany({
+                where: { organizationId: { in: mine } },
+                select: {
+                    organizationId: true,
+                    plan: { select: { key: true } },
+                },
+            });
+            expect(rows.map((r) => r.organizationId).sort()).toEqual(
+                [meanwhile.id, olderOverride.id].sort(),
+            );
+            expect(rows.every((r) => r.plan.key === "catalog.free")).toBe(true);
+            await expect(access.resolve(older.id)).resolves.toMatchObject({
+                source: "legacy",
+                reason: "no-plan",
+            });
+            await expect(access.resolve(meanwhile.id)).resolves.toMatchObject({
+                source: "catalogue",
+                planId: "free",
+            });
+
+            // A second run writes nothing for them.
+            await startMissingFreeRows(prisma, { planId: "free" });
+            expect(
+                await prisma.subscription.count({
+                    where: { organizationId: { in: mine } },
+                }),
+            ).toBe(2);
+        });
+
+        it("writes nothing when the live version has no such plan", async () => {
+            await expect(
+                startMissingFreeRows(prisma, { planId: "no-such-plan" }),
+            ).resolves.toBeNull();
         });
     });
 });

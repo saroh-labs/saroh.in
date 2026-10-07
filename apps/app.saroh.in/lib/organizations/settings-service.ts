@@ -91,6 +91,12 @@ export interface SetupFacts {
      * alone.
      */
     invoices?: number;
+    /**
+     * The plan takes new online payments (#835). False: the checklist says
+     * online payment comes with a paid plan instead of "Connect payments".
+     * Absent from an older API: asked as before.
+     */
+    onlinePaymentsInPlan?: boolean;
 }
 
 export interface OrganizationSettings {

@@ -212,7 +212,7 @@ describe("All modules", () => {
 
     it("collapses a group, and all of them", () => {
         open();
-        fireEvent.click(matrix().getByRole("button", { name: /Group one/ }));
+        fireEvent.click(matrix().getByRole("button", { name: /^Group one/ }));
         expect(matrix().queryByText("Things")).toBeNull();
         expect(matrix().getByText("Doodads")).toBeTruthy();
         fireEvent.click(screen.getByRole("button", { name: "Collapse all" }));
@@ -311,14 +311,94 @@ describe("All modules", () => {
         expect(
             matrix().getByRole("button", { name: "Move Things down" }),
         ).toHaveProperty("disabled", true);
+        // Nothing to add or rename without pricing:edit: the controls aren't drawn.
+        expect(screen.queryByRole("button", { name: "Add module" })).toBeNull();
+        expect(screen.queryByRole("button", { name: "Add group" })).toBeNull();
         expect(
-            screen.getByRole("button", { name: "Add module" }),
-        ).toHaveProperty("disabled", true);
+            matrix().queryByRole("button", { name: "Rename Group one" }),
+        ).toBeNull();
         fireEvent.click(nameButton(/^Things/));
         expect(
             within(
                 screen.getByRole("region", { name: "Module details: Things" }),
             ).getByLabelText("Name"),
         ).toHaveProperty("disabled", true);
+    });
+});
+
+describe("row groups and taking back new modules", () => {
+    it("adds a group, renames it, fills it and empties it", async () => {
+        open();
+        fireEvent.click(screen.getByRole("button", { name: "Add group" }));
+        // An empty group shows, so it can be used.
+        expect(
+            matrix().getByRole("button", { name: /^New group.*Empty/ }),
+        ).toBeTruthy();
+        fireEvent.click(
+            matrix().getByRole("button", { name: "Rename New group" }),
+        );
+        const input = matrix().getByLabelText("Group name");
+        fireEvent.change(input, { target: { value: "Space and traffic" } });
+        fireEvent.keyDown(input, { key: "Enter" });
+        fireEvent.submit(input);
+        expect(
+            matrix().getByRole("button", { name: /^Space and traffic/ }),
+        ).toBeTruthy();
+        let c = await saved();
+        expect(c.groups.at(-1)?.name).toBe("Space and traffic");
+
+        fireEvent.click(
+            matrix().getByRole("button", {
+                name: "Remove Space and traffic",
+            }),
+        );
+        c = await saved();
+        expect(c.groups.map((g) => g.name)).toEqual(["Group one", "Group two"]);
+    });
+
+    it("offers no Remove on a group that still has modules", () => {
+        open();
+        expect(
+            matrix().queryByRole("button", { name: "Remove Group one" }),
+        ).toBeNull();
+    });
+
+    it("adds a module straight into the group asked for", async () => {
+        open();
+        fireEvent.click(
+            matrix().getByRole("button", { name: "Add a module to Group two" }),
+        );
+        const c = await saved();
+        expect(c.modules.at(-1)).toMatchObject({
+            name: "New module",
+            group: "g2",
+        });
+    });
+
+    it("removes a module that was never published, and Undo brings it back", async () => {
+        open();
+        fireEvent.click(screen.getByRole("button", { name: "Add module" }));
+        const details = screen.getByRole("region", {
+            name: "Module details: New module",
+        });
+        fireEvent.click(
+            within(details).getByRole("button", { name: "Remove module" }),
+        );
+        expect(screen.getByRole("status").textContent).toContain(
+            "New module removed",
+        );
+        let c = await saved();
+        expect(c.modules.some((m) => m.name === "New module")).toBe(false);
+        fireEvent.click(screen.getByRole("button", { name: "Undo" }));
+        c = await saved();
+        expect(c.modules.some((m) => m.name === "New module")).toBe(true);
+    });
+
+    it("never offers Remove on a live module", () => {
+        open();
+        fireEvent.click(nameButton(/^Things/));
+        expect(
+            screen.queryByRole("button", { name: "Remove module" }),
+        ).toBeNull();
     });
 });

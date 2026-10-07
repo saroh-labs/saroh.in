@@ -17,6 +17,7 @@ import { BillingController, PlansController } from "./billing.controller";
 import { CatalogueAccessService } from "./catalogue-access.service";
 import { CheckoutService } from "./checkout.service";
 import { EntitlementService } from "./entitlement.service";
+import { BILLING_FREE_ROWS_TYPE, FreeRowsHandler } from "./free-rows.job";
 import { MeteringService, PLAN_LIMIT_NOTICE_TYPE } from "./metering.service";
 import {
     BILLING_MOVES_APPLY_TYPE,
@@ -73,6 +74,10 @@ const CHAIN_CHECK_MS = 6 * 60 * 60 * 1000;
  * add-ons are {@link AddonsService}, billed on the provider subscription's
  * next charge by {@link AddonsSyncHandler} (`billing.addons.sync`).
  *
+ * {@link FreeRowsHandler} (`billing.free-rows.start`) gives their Free row,
+ * at each go-live, to the businesses that signed up while no version was
+ * live (#839).
+ *
  * NOTE: this module is intentionally NOT self-registering — the app owner wires
  * it into `AppModule`.
  */
@@ -100,6 +105,7 @@ const CHAIN_CHECK_MS = 6 * 60 * 60 * 1000;
         BillingEmailHandler,
         AddonsService,
         AddonsSyncHandler,
+        FreeRowsHandler,
         billingProviderFactoryProvider,
         OrganizationGuard,
     ],
@@ -122,10 +128,11 @@ export class BillingModule implements OnModuleInit, OnModuleDestroy {
         private readonly limitNotice: PlanLimitNoticeHandler,
         private readonly billingEmail: BillingEmailHandler,
         private readonly addonsSync: AddonsSyncHandler,
+        private readonly freeRows: FreeRowsHandler,
     ) {}
 
     /**
-     * Registers the six jobs and starts the sweep's chain — the renewal
+     * Registers the seven jobs and starts the sweep's chain — the renewal
      * job's shape (ADR-007): never under test, where no worker runs, and
      * never throwing, so a database not up yet cannot stop the boot.
      */
@@ -142,6 +149,7 @@ export class BillingModule implements OnModuleInit, OnModuleDestroy {
             BILLING_ADDONS_SYNC_TYPE,
             this.addonsSync.handle,
         );
+        this.registry.register(BILLING_FREE_ROWS_TYPE, this.freeRows.handle);
         if (env.NODE_ENV === "test") return;
         await this.sweep.schedule(new Date());
         this.chainCheck = setInterval(() => {

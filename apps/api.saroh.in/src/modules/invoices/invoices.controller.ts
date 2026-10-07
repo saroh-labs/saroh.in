@@ -190,6 +190,23 @@ export class InvoicesController {
     }
 
     /**
+     * Make a link that only shows the invoice (#833, DEC-070): no Pay
+     * button, with "How to pay us". Not Payments': it takes no money, so
+     * a business on any plan, with Payments off or no provider, can copy
+     * it. Answered once, and it replaces any link out before it.
+     */
+    @Post(":invoiceId/view-link")
+    @HttpCode(201)
+    @Header("Cache-Control", "no-store")
+    async viewLink(
+        @OrgContext() ctx: OrganizationContext,
+        @Param("invoiceId") id: string,
+    ): Promise<{ url: string }> {
+        const { token } = await this.invoices.createViewLink(ctx, id);
+        return { url: await payLinkUrlFor(ctx.organizationId, token) };
+    }
+
+    /**
      * Send it with a fresh link through the business's own email provider
      * (D17): a pay link when it takes payment online, else a link to view
      * the invoice (DEC-070). The link is never in the answer: it goes only

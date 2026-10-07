@@ -5,14 +5,9 @@ import { AdminShell } from "@/components/admin-shell";
 import { FlagCard } from "@/components/flag-card";
 import { FlagInspector } from "@/components/flag-inspector";
 import { NotAuthorized } from "@/components/not-authorized";
-import {
-    explainFlag,
-    getStaffIdentity,
-    listFlags,
-    listOrganizations,
-} from "@/lib/control-plane";
+import { requireStaff } from "@/lib/console";
+import { explainFlag, listFlags, listOrganizations } from "@/lib/control-plane";
 import { todayIso } from "@/lib/format";
-import { requireSession } from "@/lib/session";
 
 /**
  * Feature flags — the rollout control surface (S1-012, DEC feature-flags).
@@ -30,13 +25,9 @@ export default async function FlagsPage({
 }: {
     searchParams: Promise<{ flag?: string; organizationId?: string }>;
 }) {
-    const session = await requireSession();
-
-    const staff = await getStaffIdentity();
-    if (!staff) return <NotAuthorized email={session.user.email} />;
-    if (!staff.permissions.includes("flags:read")) {
-        return <NotAuthorized email={session.user.email} />;
-    }
+    const gate = await requireStaff("flags:read");
+    if (!gate.ok) return gate.screen;
+    const { staff } = gate;
 
     const selected = await searchParams;
     const [flags, organizations, explanation] = await Promise.all([
@@ -50,7 +41,7 @@ export default async function FlagsPage({
     ]);
     const today = todayIso();
     if (!flags || !organizations) {
-        return <NotAuthorized email={session.user.email} />;
+        return <NotAuthorized email={staff.email} staff={staff} />;
     }
 
     return (

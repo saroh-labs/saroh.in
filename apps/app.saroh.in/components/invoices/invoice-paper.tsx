@@ -2,6 +2,7 @@ import { cn } from "@saroh/ui/lib/utils";
 
 import { ViewerDate } from "@/components/shared/viewer-date";
 import { formatMoneyMajor } from "@/lib/format/money";
+import { howToPayLines } from "@/lib/invoices/how-to-pay";
 import {
     isExemptPaper,
     lineGstNote,
@@ -13,6 +14,7 @@ import { printedSeller } from "@/lib/invoices/seller";
 import type { Invoice } from "@/lib/invoices/service";
 import { billedTo, spacedCode } from "@/lib/invoices/status";
 import type { InvoiceBusiness } from "@/lib/invoices/tax";
+import { invoiceZone } from "@/lib/invoices/zone";
 
 /**
  * Line rows: a phone (below `sm`) gives the item the row and the amount the
@@ -40,7 +42,8 @@ const DESK_ONLY = "hidden sm:block print:block";
  * supply (D15): its GSTIN and SAC, and no place of supply or tax columns.
  *
  * Every figure is the API's, frozen when it was issued; nothing is summed
- * here. It is cream paper with dark ink in either theme (`.invoice-paper`),
+ * here. Unpaid paper prints "How to pay us" (#833) when the business set
+ * it, as the PDF does. It is cream paper with dark ink in either theme (`.invoice-paper`),
  * and the only thing left when the page is printed (`.invoice-print`).
  */
 export function InvoicePaper({
@@ -61,6 +64,9 @@ export function InvoicePaper({
         email: business?.email ?? null,
     });
     const businessName = seller.name;
+    // Its dates in the business's zone, as the customer's copy prints them
+    // (#836), never the viewer's.
+    const zone = invoiceZone(business);
     const money = (a: string) => formatMoneyMajor(a, i.currency) ?? a;
     const who = billedTo(i);
     const gst = i.gst ?? null;
@@ -95,6 +101,8 @@ export function InvoicePaper({
     // A bill of supply, a receipt or lines without codes: no HSN column.
     const hsnColumn =
         Boolean(gst) && (i.lines ?? []).some((l) => l.gst?.hsnSac?.trim());
+    // "How to pay us" on unpaid paper (#833), as the PDF prints it.
+    const howToPay = howToPayLines(i, i.payInstructions);
 
     // No line with a rate set: no GST rows, just the total (DEC-072).
     const gstRows = taxed && showsGstTotals(i) ? taxed : null;
@@ -158,6 +166,7 @@ export function InvoicePaper({
                                 <ViewerDate
                                     iso={i.issuedAt}
                                     variant="dayMonth"
+                                    timeZone={zone}
                                 />
                                 {i.dueAt && !credit && !i.order ? (
                                     <>
@@ -165,6 +174,7 @@ export function InvoicePaper({
                                         <ViewerDate
                                             iso={i.dueAt}
                                             variant="dayMonth"
+                                            timeZone={zone}
                                         />
                                     </>
                                 ) : null}
@@ -343,6 +353,25 @@ export function InvoicePaper({
                     ) : null}
                 </div>
             </div>
+
+            {howToPay ? (
+                <section
+                    aria-label="How to pay us"
+                    className="mt-[18px] break-inside-avoid"
+                >
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.1em] text-muted-foreground">
+                        How to pay us
+                    </p>
+                    {howToPay.map((line) => (
+                        <p
+                            key={line}
+                            className="mt-1 text-[12.5px] leading-[1.5]"
+                        >
+                            {line}
+                        </p>
+                    ))}
+                </section>
+            ) : null}
 
             <p className="mt-[18px] border-t border-dashed border-border-strong pt-3 text-[12px] leading-[1.5] text-muted-foreground">
                 {paperFooter(i, businessName)}

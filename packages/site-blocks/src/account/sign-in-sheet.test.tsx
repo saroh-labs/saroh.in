@@ -195,6 +195,37 @@ describe("SignInSheet: the email step", () => {
             screen.getByRole("button", { name: "I'm not a robot" }),
         ).toBeInTheDocument();
     });
+
+    it("keeps what was typed and shows the challenge when the options land late (#838)", () => {
+        const api: SignInApi = {
+            requestCode: vi.fn<SignInApi["requestCode"]>(),
+            verifyCode: vi.fn<SignInApi["verifyCode"]>(),
+        };
+        const sheet = (options: SignInOptions) => (
+            <SignInSheet
+                open
+                onClose={vi.fn()}
+                options={options}
+                api={api}
+                onSignedIn={vi.fn()}
+            />
+        );
+        const { rerender } = render(sheet(OPTIONS));
+        fireEvent.change(emailField(), {
+            target: { value: "farah@example.in" },
+        });
+        rerender(
+            sheet({
+                ...OPTIONS,
+                challenge: { required: true, siteKey: "0x4AAA" },
+            }),
+        );
+        expect(emailField()).toHaveValue("farah@example.in");
+        expect(
+            screen.getByRole("button", { name: "I'm not a robot" }),
+        ).toBeInTheDocument();
+        expect(sendButton()).toBeDisabled();
+    });
 });
 
 describe("SignInSheet: the code step", () => {

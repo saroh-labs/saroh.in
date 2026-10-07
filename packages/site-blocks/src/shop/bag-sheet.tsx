@@ -222,6 +222,7 @@ export function BagSheet({
     const addressOk = !needsAddress(way) || addressReady(address);
     const pays = paysOf(quote);
     const pay = payChosen(pays, draft.pay);
+    const payNote = payWords(pay);
     const canPlace =
         !!quote &&
         quote.ready &&
@@ -476,9 +477,11 @@ export function BagSheet({
                 </p>
             ) : null}
 
-            <p className="text-site-muted mt-2.5 text-[12.5px] leading-normal">
-                {payWords(pay)}
-            </p>
+            {payNote ? (
+                <p className="text-site-muted mt-2.5 text-[12.5px] leading-normal">
+                    {payNote}
+                </p>
+            ) : null}
             <button
                 type="button"
                 onClick={place}
@@ -509,11 +512,16 @@ export function payChosen(
     return pays.find((p) => p.type === picked) ?? pays.at(0) ?? null;
 }
 
-/** What the customer is told about paying, above the button. */
+/**
+ * What the customer is told about paying, above the button. Nothing until
+ * the quote is back: how to pay comes with it, and a shop that only takes
+ * money at the handover must not first claim "You pay online" (#837).
+ */
 export function payWords(
     pay: { type: ShopPayment; label: string } | null,
-): string {
-    if (pay?.type === "ON_HANDOVER") {
+): string | null {
+    if (!pay) return null;
+    if (pay.type === "ON_HANDOVER") {
         return pay.label === "Pay on delivery"
             ? "You'll pay when your order is delivered. Your order is placed now."
             : "You'll pay when you collect your order. Your order is placed now.";

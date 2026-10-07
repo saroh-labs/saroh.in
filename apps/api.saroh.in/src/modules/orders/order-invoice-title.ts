@@ -19,6 +19,8 @@ export interface RawOrderInvoice {
     number: string | null;
     kind: string;
     status: string;
+    /** How it was paid: CASH, UPI… by hand, ONLINE, ORDER or RECORDED. */
+    paymentMethod?: string | null;
     /** Frozen on issue: set means the business was registered then. */
     sellerGstin?: string | null;
     dueAt?: Date | null;

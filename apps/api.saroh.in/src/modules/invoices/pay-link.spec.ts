@@ -30,6 +30,8 @@ jest.mock("@saroh/database", () => {
                 findFirst: jest.fn(),
             },
             paymentIntent: { findMany: jest.fn() },
+            // "How to pay us" on the read of an unpaid one (#833): none set.
+            businessProfile: { findUnique: jest.fn().mockResolvedValue(null) },
             // DEC-070: Payments on (no row) unless a test turns it off.
             organizationModule: {
                 findFirst: jest.fn().mockResolvedValue(null),
@@ -314,6 +316,83 @@ describe("a pay link on a plan without online payments", () => {
         ).resolves.toHaveProperty("token");
         expect(own.invoice.updateMany).toHaveBeenCalled();
     });
+
+    it("copies a view link from Invoice Detail, with no provider (#833)", async () => {
+        db.merchantPaymentProvider.findFirst?.mockResolvedValue(null);
+        const { token } = await service.createViewLink(owner, "inv_1");
+        expect(token).toMatch(/^[A-Za-z0-9_-]{43}$/);
+        expect(db.invoice.updateMany).toHaveBeenCalledWith(
+            expect.objectContaining({
+                data: { payTokenHash: hashPayToken(token) },
+            }),
+        );
+    });
+
+    it("says the plan is what stands in the way on the read (#835)", async () => {
+        const view = await service.get(owner, "inv_1");
+        expect(view.online?.onlineBlocker).toBe("PLAN");
+    });
+
+    it("a renewal's read names no plan blocker: it stays payable", async () => {
+        db.invoice.findFirst?.mockImplementation(
+            (args: { select: Record<string, unknown> }) =>
+                Promise.resolve(
+                    "payTokenHash" in args.select
+                        ? { payTokenHash: null, subscriptionId: "sub_1" }
+                        : row({
+                              source: "SUBSCRIPTION",
+                              subscriptionId: "sub_1",
+                          }),
+                ),
+        );
+        const view = await service.get(owner, "inv_1");
+        expect(view.online?.onlineBlocker).toBeNull();
+    });
+});
+
+describe("a view link (#833)", () => {
+    it("refuses a role without invoice:write", async () => {
+        await expect(
+            service.createViewLink(member, "inv_1"),
+        ).rejects.toBeInstanceOf(ForbiddenException);
+    });
+
+    it("refuses a draft: only issued paper has a link", async () => {
+        db.invoice.findFirst?.mockResolvedValue(
+            row({ status: "DRAFT", number: null }),
+        );
+        await expect(
+            service.createViewLink(owner, "inv_1"),
+        ).rejects.toBeInstanceOf(ConflictException);
+    });
+});
+
+describe("How to pay us on the read (#833)", () => {
+    const PAY = {
+        payUpiId: "rye@okhdfc",
+        payBankAccountName: null,
+        payBankAccountNumber: null,
+        payBankIfsc: null,
+        payBankName: null,
+        payNote: null,
+    };
+    const profile = () =>
+        (prisma as unknown as { businessProfile: Mocked }).businessProfile;
+
+    it("carries it on an unpaid invoice", async () => {
+        profile().findUnique?.mockResolvedValueOnce(PAY);
+        const view = await service.get(owner, "inv_1");
+        expect(view.payInstructions).toMatchObject({ upiId: "rye@okhdfc" });
+    });
+
+    it("leaves it off a paid one", async () => {
+        db.invoice.findFirst?.mockResolvedValue(
+            row({ status: "PAID", paidAt: new Date("2026-09-02T00:00:00Z") }),
+        );
+        const view = await service.get(owner, "inv_1");
+        expect(view).not.toHaveProperty("payInstructions");
+        expect(profile().findUnique).not.toHaveBeenCalled();
+    });
 });
 
 describe("one charge at a time (D13)", () => {
@@ -395,6 +474,8 @@ describe("the invoice read", () => {
             providerConnected: true,
             payLinkActive: true,
             payments: [],
+            // #835: its provider opens a checkout, so nothing stands in the way.
+            onlineBlocker: null,
         });
         expect(JSON.stringify(view)).not.toContain("abc123");
     });

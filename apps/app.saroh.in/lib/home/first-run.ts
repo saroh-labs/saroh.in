@@ -216,3 +216,24 @@ export function onButNotOpen(modules: readonly ModuleView[]): boolean {
             m.blockers.some((b) => b.code === "UNAUTHORIZED"),
     );
 }
+
+/**
+ * Whether what the business turned on is held only by its plan (U14's
+ * lock, `ENTITLEMENT_REQUIRED` and nothing else). Its readiness then reads
+ * DISABLED, so Home has nothing "on" and falls to the first run, yet the
+ * business did pick (#837): Home says the plan holds it, never that nobody
+ * has chosen.
+ */
+export function heldByPlan(modules: readonly ModuleView[]): boolean {
+    return rolledOut(modules).some(
+        (m) =>
+            m.lifecycle === "ENABLED" &&
+            m.blockers.length > 0 &&
+            m.blockers.every((b) => b.code === "ENTITLEMENT_REQUIRED"),
+    );
+}
+
+/** Whether this person may turn modules on and off here (`module:manage`). */
+export function mayManageModules(modules: readonly ModuleView[]): boolean {
+    return modules.some((m) => m.canManage);
+}
