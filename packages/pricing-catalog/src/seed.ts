@@ -253,7 +253,7 @@ const input: CatalogInput = {
             name: "Team members",
             group: "team",
             pricing: "show",
-            what: "People who sign in to your dashboard. Everyone on your calendar is one. Reviewers are free.",
+            what: "People who can change things, and everyone who takes bookings, with a login or without. View-only people use no seat.",
             cells: {
                 free: C("2", "2 team members", 2),
                 grow: C("4", "4 team members", 4),

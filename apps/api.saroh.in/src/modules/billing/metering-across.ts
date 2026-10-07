@@ -11,6 +11,7 @@ import {
     bytesToGb,
     countedSarohEmails,
     countSeatKind,
+    loginlessStaff,
     monthFirstDay,
     monthWindow,
     openInvitations,
@@ -222,7 +223,8 @@ export async function countUsageAcross(
         case "teamMembers":
         case "reviewers": {
             // The same classification as `countUsage` (DEC-105), per business.
-            const [members, invites, roles] = await Promise.all([
+            const kind = seatKindCounted(key);
+            const [members, invites, roles, loginless] = await Promise.all([
                 db.membership.findMany({
                     where: { organizationId: { in: ids } },
                     select: { organizationId: true, ...SEAT_MEMBER_SELECT },
@@ -238,8 +240,20 @@ export async function countUsageAcross(
                     where: { organizationId: { in: ids } },
                     select: { organizationId: true, key: true, actions: true },
                 }),
+                kind === "seat"
+                    ? db.staffMember.groupBy({
+                          by: ["organizationId"],
+                          where: {
+                              organizationId: { in: ids },
+                              ...loginlessStaff(),
+                          },
+                          _count: { _all: true },
+                      })
+                    : [],
             ]);
-            const kind = seatKindCounted(key);
+            const loginlessOf = new Map(
+                loginless.map((r) => [r.organizationId, r._count._all]),
+            );
             const rolesOf = byOrganization(roles);
             const membersOf = byOrganization(members);
             const invitesOf = byOrganization(invites);
@@ -250,6 +264,7 @@ export async function countUsageAcross(
                     rolesOf.get(id) ?? [],
                     membersOf.get(id) ?? [],
                     invitesOf.get(id) ?? [],
+                    loginlessOf.get(id) ?? 0,
                 );
                 if (n > 0) out.set(id, n);
             }

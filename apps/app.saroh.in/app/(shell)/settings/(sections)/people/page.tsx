@@ -4,6 +4,7 @@ import { SettingsPanel } from "@/components/settings/settings-panel";
 import { rowNotice } from "@/lib/billing/access";
 import { modulesOrUnknown } from "@/lib/modules/guard";
 import { shownCatalogue } from "@/lib/organizations/catalogue-shown";
+import { bookableWithNoLogin } from "@/lib/organizations/invitations";
 import {
     getStorefrontTeamNotice,
     listInvitations,
@@ -15,6 +16,7 @@ import { resolveActiveOrganization } from "@/lib/organizations/service";
 import { billingAccessOrNull } from "@/lib/saroh-billing/service";
 import { requireSession } from "@/lib/session";
 import { listSites } from "@/lib/sites/service";
+import { listStaff } from "@/lib/staff/service";
 
 /**
  * Settings → People (#276).
@@ -55,6 +57,7 @@ export default async function PeoplePage() {
         fullCatalogue,
         joinedFromStorefronts,
         modules,
+        staff,
     ] = await Promise.all([
         listMembers(),
         // Empty for anyone who may not see them, rather than an error: this is
@@ -73,6 +76,9 @@ export default async function PeoplePage() {
         // To leave out a hidden module's permissions (DEC-073); null, when
         // they can't be read, holds nothing back.
         modulesOrUnknown(),
+        // Who takes bookings with no login: a team seat each (DEC-105,
+        // UX-053). Unread (no diary, or no right to it), nobody is added.
+        canManage ? listStaff().catch(() => null) : Promise.resolve(null),
     ]);
     // The plan, for whoever changes the team or its roles.
     const access =
@@ -111,6 +117,7 @@ export default async function PeoplePage() {
                 myActions={organization?.actions ?? null}
                 joinedFromStorefronts={joinedFromStorefronts}
                 teamLimit={teamLimit}
+                bookableNoLogin={bookableWithNoLogin(staff?.staff ?? null)}
                 rolesLock={canEditRoles ? rolesLock(access) : null}
                 limitNotice={
                     canManage ? <PlanLimitNotice moduleId="members" /> : null

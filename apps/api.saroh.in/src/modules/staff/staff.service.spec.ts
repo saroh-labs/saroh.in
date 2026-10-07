@@ -33,7 +33,9 @@ jest.mock("@saroh/database", () => {
         merchantPaymentProvider: { findFirst: jest.fn() },
         businessProfile: { findUnique: jest.fn() },
         service: { findFirst: jest.fn(), count: jest.fn() },
-        membership: { findFirst: jest.fn() },
+        membership: { findFirst: jest.fn(), findMany: jest.fn() },
+        // The business's own roles: what a linked member's seat reads (DEC-105).
+        organizationRole: { findMany: jest.fn() },
         booking: { findMany: jest.fn() },
         // No hours saved: opening hours cut nothing (DEC-087, DEC-096).
         store: {
@@ -111,6 +113,8 @@ beforeEach(() => {
     db.staffHours!.findMany!.mockResolvedValue([]);
     db.staffExtraHours!.findMany!.mockResolvedValue([]);
     db.businessClosure!.findMany!.mockResolvedValue([]);
+    db.membership!.findMany!.mockResolvedValue([]);
+    db.organizationRole!.findMany!.mockResolvedValue([]);
 });
 
 describe("StaffService — who may (U3)", () => {

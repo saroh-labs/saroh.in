@@ -15,6 +15,7 @@ const tx = {
     booking: { count: jest.fn() },
     post: { count: jest.fn() },
     membership: { findMany: jest.fn() },
+    staffMember: { count: jest.fn() },
     organizationInvitation: { findMany: jest.fn() },
     organizationRole: { findMany: jest.fn() },
     merchantPaymentProvider: { count: jest.fn() },
@@ -223,8 +224,10 @@ describe("what each count asks", () => {
         members: ReturnType<typeof person>[],
         invites: string[] = [],
         roles: { key: string; actions: string[] }[] = [],
+        loginless = 0,
     ) => {
         tx.membership.findMany.mockResolvedValue(members);
+        tx.staffMember.count.mockResolvedValue(loginless);
         tx.organizationInvitation.findMany.mockResolvedValue(
             invites.map((role) => ({ role })),
         );
@@ -285,6 +288,26 @@ describe("what each count asks", () => {
             2,
         );
         expect(await countUsage(tx as never, "org", "reviewers", now)).toBe(1);
+    });
+
+    // UX-053: someone on the diary with no login takes bookings, so uses a
+    // seat; one who is a team member counts once, through their membership.
+    it("gives a seat to each bookable person with no login, and never twice", async () => {
+        team([person("OWNER"), person("REVIEWER", [], true)], [], [], 2);
+        expect(await countUsage(tx as never, "org", "teamMembers", now)).toBe(
+            4,
+        );
+        expect(tx.staffMember.count).toHaveBeenCalledWith({
+            where: {
+                organizationId: "org",
+                status: "ACTIVE",
+                membershipId: null,
+            },
+        });
+        // Never view-only.
+        tx.staffMember.count.mockClear();
+        expect(await countUsage(tx as never, "org", "reviewers", now)).toBe(0);
+        expect(tx.staffMember.count).not.toHaveBeenCalled();
     });
 
     it("counts only live locations customers visit", async () => {
@@ -756,6 +779,7 @@ describe("MeteringService", () => {
             { role: "OWNER", extraActions: [], staffMember: null },
             { role: "MEMBER", extraActions: [], staffMember: null },
         ]);
+        tx.staffMember.count.mockResolvedValue(0);
         tx.organizationInvitation.findMany.mockResolvedValue([]);
         tx.organizationRole.findMany.mockResolvedValue([]);
         const write = jest.fn(() => Promise.resolve("done"));

@@ -2,6 +2,7 @@ import { Button } from "@saroh/ui/button";
 import { FailedState, PartialNotice } from "@saroh/ui/data-state";
 import Link from "next/link";
 
+import { PlanLimitNotice } from "@/components/billing/plan-limit-notice";
 import { AvailabilityEditor } from "@/components/bookings/availability/availability-editor";
 import { BARE, BookingsTopBar } from "@/components/bookings/calendar/parts";
 import { PageContainer } from "@/components/shared/page-container";
@@ -158,6 +159,10 @@ export default async function AvailabilityPage() {
                         can&apos;t say which bookings they would leave out.
                     </PartialNotice>
                 )}
+                {/* Everyone who takes bookings uses a team seat (DEC-105). */}
+                {may("service:write") ? (
+                    <PlanLimitNotice moduleId="members" className="mb-3" />
+                ) : null}
                 <AvailabilityEditor
                     staff={staffList.staff}
                     closures={staffList.closures}

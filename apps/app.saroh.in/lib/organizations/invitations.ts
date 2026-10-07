@@ -116,18 +116,26 @@ export type InviteValues = z.infer<ReturnType<typeof inviteSchema>>;
 /**
  * What the plan's team cap counts, said plainly (UX-028, DEC-105): "2 people
  * including you · 1 invite waiting · 1 view-only person". The seats count
- * everyone who can change something, the owner included, and every such
- * invite not yet answered; people who only look use no seat, and are said
- * apart (`billing/seats.ts` on the API).
+ * everyone who can change something, the owner included, everyone on the
+ * diary with no login (`noLogin`), and every such invite not yet answered;
+ * people who only look use no seat, and are said apart (`billing/seats.ts`
+ * on the API).
  */
 export function teamCountLine(
     people: number,
     waiting: number,
     viewOnly = 0,
+    noLogin = 0,
 ): string {
     const parts = [
         people === 1 ? "Just you" : `${people} people including you`,
     ];
+    // Bookable staff with no login use a seat too (DEC-105, UX-053).
+    if (noLogin > 0) {
+        parts.push(
+            `${noLogin === 1 ? "1 person" : `${noLogin} people`} taking bookings with no login`,
+        );
+    }
     if (waiting > 0) {
         parts.push(
             `${waiting === 1 ? "1 invite" : `${waiting} invites`} waiting`,
@@ -206,4 +214,16 @@ export function inviteRoom(limit: TeamLimit | null | undefined): {
             ? `${limit.reviewersWhy ?? "You've reached your plan's view-only people"} (invites count too).`
             : null,
     };
+}
+
+/**
+ * The people on the diary who take bookings with no login: each uses a team
+ * seat (DEC-105, UX-053). One who is a team member is counted on Team
+ * already, so is left out.
+ */
+export function bookableWithNoLogin(
+    staff: readonly { status: string; membership: unknown }[] | null,
+): number {
+    return (staff ?? []).filter((s) => s.status === "ACTIVE" && !s.membership)
+        .length;
 }

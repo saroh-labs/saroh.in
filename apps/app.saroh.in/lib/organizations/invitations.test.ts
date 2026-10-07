@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import { shortDate } from "@/lib/sites/format-date";
 
 import {
+    bookableWithNoLogin,
     invitationMeta,
     inviteEmailError,
     inviteRoom,
@@ -174,6 +175,24 @@ describe("the team cap, said (UX-028, DEC-105)", () => {
         expect(teamCountLine(2, 1, 3)).toBe(
             "2 people including you · 1 invite waiting · 3 view-only people, no seat",
         );
+    });
+
+    it("says the bookable staff with no login: they take seats too (UX-053)", () => {
+        expect(teamCountLine(1, 0, 0, 1)).toBe(
+            "Just you · 1 person taking bookings with no login",
+        );
+        expect(teamCountLine(2, 1, 1, 3)).toBe(
+            "2 people including you · 3 people taking bookings with no login · 1 invite waiting · 1 view-only person, no seat",
+        );
+        expect(
+            bookableWithNoLogin([
+                { status: "ACTIVE", membership: null },
+                // A team member: counted once, on Team already.
+                { status: "ACTIVE", membership: { id: "m" } },
+                { status: "ARCHIVED", membership: null },
+            ]),
+        ).toBe(1);
+        expect(bookableWithNoLogin(null)).toBe(0);
     });
 
     it("counts seats by what the API says each uses, never by role name", () => {

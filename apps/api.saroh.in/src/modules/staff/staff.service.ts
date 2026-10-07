@@ -8,6 +8,7 @@ import type { Prisma } from "@saroh/database";
 import { prisma } from "@saroh/database";
 
 import type { OrganizationContext } from "../../common/types/organization-context";
+import { planMeter } from "../billing/metering.service";
 import type { AvailabilityRuleWindow } from "../bookings/availability";
 import { withinIntervals, workingIntervals } from "../bookings/availability";
 import { requireBookingPower } from "../bookings/booking-access";
@@ -39,6 +40,7 @@ import type { BookingBrief } from "./off-bookings";
 import { bookingsInSpans, MAX_LISTED, upcomingBookings } from "./off-bookings";
 import type { OffSpan } from "./off-range";
 import { offRangeRefusal, offSpans } from "./off-range";
+import { diarySeatsAdded } from "./staff-seats";
 
 const DAY = 86_400_000;
 /** How far back a person's read carries time off and extra hours. */
@@ -228,6 +230,19 @@ export class StaffService {
 
         const created = await this.guardLink(() =>
             prisma.$transaction(async (tx) => {
+                // Everyone who takes bookings uses a team seat, with a
+                // login or without (DEC-105, UX-053).
+                await planMeter.roomInTx(tx, ctx.organizationId, "members", {
+                    adding: await diarySeatsAdded(
+                        tx,
+                        ctx.organizationId,
+                        null,
+                        {
+                            status: "ACTIVE",
+                            membershipId: dto.membershipId ?? null,
+                        },
+                    ),
+                });
                 const person = await tx.staffMember.create({
                     data: {
                         organizationId: ctx.organizationId,
@@ -275,29 +290,48 @@ export class StaffService {
         }
         const archiving =
             dto.status === "ARCHIVED" && person.status !== "ARCHIVED";
+        const after = {
+            status: dto.status ?? person.status,
+            membershipId:
+                dto.membershipId !== undefined
+                    ? dto.membershipId
+                    : person.membershipId,
+        };
         await this.guardLink(() =>
-            prisma.staffMember.update({
-                where: { id: person.id },
-                data: {
-                    ...(dto.name !== undefined ? { name: dto.name } : {}),
-                    ...(dto.title !== undefined
-                        ? { title: blankToNull(dto.title) }
-                        : {}),
-                    ...(dto.membershipId !== undefined
-                        ? { membershipId: dto.membershipId }
-                        : {}),
-                    ...(dto.status !== undefined
-                        ? {
-                              status: dto.status,
-                              archivedAt: archiving
-                                  ? new Date()
-                                  : dto.status === "ACTIVE"
-                                    ? null
-                                    : undefined,
-                          }
-                        : {}),
-                },
-                select: { id: true },
+            prisma.$transaction(async (tx) => {
+                // Back from archived, or unlinked from a login: a team seat
+                // again (DEC-105, UX-053). Freeing one never asks.
+                await planMeter.roomInTx(tx, ctx.organizationId, "members", {
+                    adding: await diarySeatsAdded(
+                        tx,
+                        ctx.organizationId,
+                        person,
+                        after,
+                    ),
+                });
+                return tx.staffMember.update({
+                    where: { id: person.id },
+                    data: {
+                        ...(dto.name !== undefined ? { name: dto.name } : {}),
+                        ...(dto.title !== undefined
+                            ? { title: blankToNull(dto.title) }
+                            : {}),
+                        ...(dto.membershipId !== undefined
+                            ? { membershipId: dto.membershipId }
+                            : {}),
+                        ...(dto.status !== undefined
+                            ? {
+                                  status: dto.status,
+                                  archivedAt: archiving
+                                      ? new Date()
+                                      : dto.status === "ACTIVE"
+                                        ? null
+                                        : undefined,
+                              }
+                            : {}),
+                    },
+                    select: { id: true },
+                });
             }),
         );
         return this.read(ctx, person.id);
@@ -632,7 +666,12 @@ export class StaffService {
     private async requireStaff(ctx: OrganizationContext, staffId: string) {
         const person = await prisma.staffMember.findFirst({
             where: { id: staffId, organizationId: ctx.organizationId },
-            select: { id: true, name: true, status: true },
+            select: {
+                id: true,
+                name: true,
+                status: true,
+                membershipId: true,
+            },
         });
         if (!person) throw new NotFoundException("Staff member not found");
         return person;

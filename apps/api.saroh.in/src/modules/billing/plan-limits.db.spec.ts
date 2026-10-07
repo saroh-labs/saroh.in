@@ -62,6 +62,7 @@ import { ProductAccess } from "../products/product-access";
 import { ProductsService } from "../products/products.service";
 import { setPublishNeedsApproval } from "../sites/publish-approval";
 import { SitesService } from "../sites/sites.service";
+import { StaffService } from "../staff/staff.service";
 import { StorefrontsService } from "../stores/storefronts.service";
 import { StoresService } from "../stores/stores.service";
 import { EntitlementService } from "./entitlement.service";
@@ -88,6 +89,7 @@ const roles = new OrganizationRolesService();
 const comms = new CommunicationsService();
 const sites = new SitesService(new EntitlementService());
 const storefronts = new StorefrontsService();
+const staff = new StaffService();
 const aggregate = new AnalyticsAggregateHandler();
 
 interface Business {
@@ -412,6 +414,41 @@ describe("team members (DB, U13)", () => {
             used: 2,
         });
         await expect(invite(asha)).resolves.toBeDefined();
+    });
+});
+
+describe("bookable staff use team seats (DB, DEC-105, UX-053)", () => {
+    it("counts someone on the diary with no login, and frees the seat when archived", async () => {
+        const b = await business("free");
+        // The owner and one person with no login fill Plan A's two seats.
+        const asha = await staff.create(b.owner, { name: "Asha" });
+        expect(await countUsage(prisma, b.orgId, "teamMembers")).toBe(2);
+        const body = await refused(staff.create(b.owner, { name: "Ravi" }));
+        expect(body.details).toMatchObject({
+            code: "PLAN_LIMIT_REACHED",
+            limitKey: "teamMembers",
+            limit: 2,
+            used: 2,
+        });
+        // Invites stop too: the seat is taken.
+        await refused(
+            members.invite(b.owner, {
+                email: `${uniq("meena")}@example.test`,
+                role: "MEMBER",
+            } as never),
+        );
+
+        await staff.archive(b.owner, asha.id);
+        const ravi = await staff.create(b.owner, { name: "Ravi" });
+        // Asha back would take a third seat.
+        await refused(staff.update(b.owner, asha.id, { status: "ACTIVE" }));
+        // The owner on the diary is counted once, through their membership.
+        const own = await prisma.membership.findFirstOrThrow({
+            where: { organizationId: b.orgId, userId: b.ownerId },
+        });
+        await staff.archive(b.owner, ravi.id);
+        await staff.create(b.owner, { name: "Owner", membershipId: own.id });
+        expect(await countUsage(prisma, b.orgId, "teamMembers")).toBe(1);
     });
 });
 

@@ -211,6 +211,7 @@ export function TeamScreen({
     teamLimit = null,
     rolesLock = null,
     limitNotice = null,
+    bookableNoLogin = 0,
 }: {
     organizationName: string;
     members: OrganizationMember[];
@@ -242,6 +243,11 @@ export function TeamScreen({
     rolesLock?: RolesLock | null;
     /** Its 80% / 100% notice, above the tab's content. */
     limitNotice?: ReactNode;
+    /**
+     * People taking bookings with no login: each uses a team seat too
+     * (DEC-105, UX-053), so the count line says them.
+     */
+    bookableNoLogin?: number;
 }) {
     // In the address, so Search settings can open Roles.
     const [tab, setTab] = useTabParam(TEAM_TAB_PARAM, TEAM_TABS, "people");
@@ -381,6 +387,7 @@ export function TeamScreen({
                         counts.people,
                         counts.waiting,
                         counts.viewOnly,
+                        bookableNoLogin,
                     )}
                     {teamLimit.full
                         ? " — the team is at its plan's limit."

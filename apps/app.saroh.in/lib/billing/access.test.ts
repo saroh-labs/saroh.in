@@ -184,7 +184,7 @@ describe("rowNotice", () => {
         );
         expect(n).toMatchObject({
             full: true,
-            body: "New invites are paused. Everyone already on the team keeps access, and view-only people can still be invited. Talk to us if you need more.",
+            body: "New invites, and new people taking bookings, are paused. Everyone already on the team keeps access, and view-only people can still be invited. Talk to us if you need more.",
             cta: "See your plan",
         });
     });
