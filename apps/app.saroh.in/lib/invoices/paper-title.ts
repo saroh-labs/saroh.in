@@ -45,12 +45,30 @@ export function showsGstTotals(i: Pick<Invoice, "lines">): boolean {
     });
 }
 
+/**
+ * How a paid paper says it was paid (UX-082): "by UPI", "in cash" — so the
+ * receipt itself says it, not only its history. Nothing for a way it
+ * doesn't know (marked paid before the way was asked).
+ */
+const PAID_WAY: Record<string, string> = {
+    CASH: " in cash",
+    UPI: " by UPI",
+    BANK_TRANSFER: " by bank transfer",
+    CARD: " by card",
+    ONLINE: " online",
+};
+
+function paidWay(method: string | null | undefined): string {
+    return (method && PAID_WAY[method]) || "";
+}
+
 /** The line at the foot of the paper: the law it is issued under, and how it stands. */
 export function paperFooter(
     i: Pick<
         Invoice,
         "gst" | "exempt" | "kind" | "related" | "standing" | "tax"
-    >,
+    > &
+        Partial<Pick<Invoice, "payment">>,
     businessName: string,
 ): string {
     if (i.gst) {
@@ -70,13 +88,13 @@ export function paperFooter(
             i.standing === "CREDITED"
                 ? " Cancelled by credit note."
                 : i.standing === "PAID"
-                  ? " Paid in full."
+                  ? ` Paid in full${paidWay(i.payment?.method)}.`
                   : "";
         return `${law}${basis}${state}`;
     }
     const paid =
         i.standing === "PAID"
-            ? "Receipt — paid in full. "
+            ? `Receipt — paid in full${paidWay(i.payment?.method)}. `
             : i.standing === "VOID"
               ? "Void — this is not to be paid. "
               : i.standing === "CREDITED"
