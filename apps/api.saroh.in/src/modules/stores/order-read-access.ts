@@ -11,10 +11,13 @@ import type { StoresService } from "./stores.service";
  * holds that and `store:read` but no money read. Store access alone handed
  * them both lists.
  *
- * It refuses exactly the kitchen's roles — `order:stage` without
- * `order:read` — so everyone who reached these reads before (and a legacy
- * store grant, which has no membership to ask) is unchanged. `what` names the
- * list in the refusal: "orders", "customers".
+ * It refuses the kitchen's roles — `order:stage` without `order:read` — and
+ * anyone whose only way into this storefront is a storefront role (Admin,
+ * Manager, Editor, Viewer) without `order:read` on their business role:
+ * seeing amounts follows permissions, never a storefront role (DEC-106).
+ * Whoever reaches the storefront through their business role, or as its
+ * owner on the older per-store path, reads as before. `what` names the list
+ * in the refusal: "orders", "customers".
  */
 export async function requireOrderRead(
     stores: StoresService,
@@ -23,11 +26,19 @@ export async function requireOrderRead(
     what: string,
 ): Promise<void> {
     await stores.getForUser(storeId, userId);
-    const [stage, read] = await Promise.all([
+    const [stage, read, viaBusiness] = await Promise.all([
         stores.memberAllows(storeId, userId, "order:stage"),
         stores.memberAllows(storeId, userId, "order:read"),
+        stores.memberAllows(storeId, userId, "store:read"),
     ]);
-    if (stage && !read) {
+    if (read) return;
+    if (
+        stage ||
+        !(
+            viaBusiness ||
+            (await stores.moneyAllows(storeId, userId, "order:read"))
+        )
+    ) {
         throw new ForbiddenException(
             `Your role doesn't include reading this location's ${what}.`,
         );

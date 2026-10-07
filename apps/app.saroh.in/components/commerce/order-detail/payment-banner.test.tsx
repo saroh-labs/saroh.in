@@ -66,3 +66,19 @@ describe("the pay-on-handover banner with no customer name (#837)", () => {
         );
     });
 });
+
+/**
+ * A storefront Manager without the payment permission (DEC-106): their
+ * storefront role moves orders, never money, so the banner shows Paid in
+ * cash disabled with why — the same words the API refuses with.
+ */
+describe("the banner for someone who can't record payments (DEC-106)", () => {
+    it("shows Paid in cash disabled, described by the reason", () => {
+        const html = render({ handover: undefined, canRecord: false });
+        expect(html).toContain(
+            "Your role can&#x27;t record payments — ask the owner or an admin to mark it paid.",
+        );
+        expect(html).toMatch(/<button[^>]*disabled=""[^>]*aria-describedby=/);
+        expect(html).toContain("Paid in cash");
+    });
+});

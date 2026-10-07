@@ -25,7 +25,11 @@ import { NEW_STOREFRONT_TYPES } from "../orders/fulfilment";
 import { businessCurrency } from "./currency";
 import type { CreateStoreDto, UpdateStoreDto } from "./dto";
 
-/** Staff roles allowed to mutate a store (VIEWER is read-only). */
+/**
+ * Storefront roles allowed to change a store and take its orders (VIEWER is
+ * read-only). Never money: that is the permissions' alone (DEC-106,
+ * `moneyAllows`).
+ */
 const WRITE_ROLES = new Set(["ADMIN", "MANAGER", "EDITOR"]);
 
 /**
@@ -172,13 +176,15 @@ export class StoresService {
      * `store:write`, which changes storefronts, not orders (matrix §3). A
      * storefront role that writes to this storefront (a `StoreOwner`, or a
      * storefront Admin, Manager or Editor) keeps taking and changing its
-     * orders, as it did before the split: storefront bundles stay what they
-     * grant today (DEC-048). The legacy path is unchanged.
+     * orders (DEC-048) — but never its money (DEC-106). A write that
+     * records or takes a payment, or refunds or cancels (`money`, and every
+     * `order:refund`), is asked of the permissions only: `moneyAllows`.
      */
     async orderWriteOrganization(
         storeId: string,
         userId: string,
         action: OrgAction,
+        { money = false }: { money?: boolean } = {},
     ): Promise<{ organizationId: string | null } | null> {
         const store = await prisma.store.findFirst({
             where: { id: storeId, deletedAt: null },
@@ -186,6 +192,17 @@ export class StoresService {
         });
         if (!store) return null;
         const writable = { organizationId: store.organizationId };
+
+        if (money || action === "order:refund") {
+            return (await this.moneyAllowsFor(
+                storeId,
+                store.organizationId,
+                userId,
+                action,
+            ))
+                ? writable
+                : null;
+        }
 
         if (!(await this.useOrgPath(store.organizationId))) {
             return (await this.canWriteLegacy(storeId, userId))
@@ -217,6 +234,52 @@ export class StoresService {
         });
         if (!store?.organizationId) return false;
         return this.orgAllows(store.organizationId, userId, action);
+    }
+
+    /**
+     * Whether this storefront's money is the caller's to see or take
+     * (DEC-106, extending DEC-098 to storefronts): asked of the permissions
+     * the caller's business role carries (ADR-008), and never of a
+     * storefront role — no storefront Admin, Manager or Editor grants money
+     * by its name. A storefront role that should take payments needs a
+     * business role carrying the payment permission.
+     *
+     * With ORG_AUTHORIZATION off (the older per-store model, which has no
+     * permissions to ask) the storefront's owner keeps it too; on the
+     * organization path a `StoreOwner` row is no shortcut either.
+     */
+    async moneyAllows(
+        storeId: string,
+        userId: string,
+        action: OrgAction,
+    ): Promise<boolean> {
+        const store = await prisma.store.findFirst({
+            where: { id: storeId, deletedAt: null },
+            select: { organizationId: true },
+        });
+        if (!store) return false;
+        return this.moneyAllowsFor(
+            storeId,
+            store.organizationId,
+            userId,
+            action,
+        );
+    }
+
+    private async moneyAllowsFor(
+        storeId: string,
+        organizationId: string | null,
+        userId: string,
+        action: OrgAction,
+    ): Promise<boolean> {
+        if (
+            organizationId &&
+            (await this.orgAllows(organizationId, userId, action))
+        ) {
+            return true;
+        }
+        if (await this.useOrgPath(organizationId)) return false;
+        return this.isOwner(storeId, userId);
     }
 
     // ------------------------------------------------------------------

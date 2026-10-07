@@ -10,8 +10,9 @@
  *
  * Words that NAME a role (a locked card telling a Member who sees
  * payments) aren't a grant, and compare with "MEMBER" or "REVIEWER" only.
- * The API's half is `apps/api.saroh.in/src/modules/organizations/
- * money-by-permission.spec.ts`.
+ * Storefront roles too (DEC-106): no money screen reads a storefront
+ * Manager or Editor. The API's half is `apps/api.saroh.in/src/modules/
+ * organizations/money-by-permission.spec.ts`.
  */
 
 import { readdirSync, readFileSync, statSync } from "node:fs";
@@ -46,6 +47,12 @@ const MONEY = [
 
 const ROLE_GRANT =
     /\brole\??\s*(?:===|!==|==|!=)\s*["'](?:OWNER|ADMIN)["']|["']OWNER["']\s*,\s*["']ADMIN["']/;
+
+/**
+ * A storefront role named as a grant (DEC-106): no storefront Admin,
+ * Manager or Editor decides money; their business role's permissions do.
+ */
+const STOREFRONT_GRANT = /["'](?:MANAGER|EDITOR)["']/;
 
 function sourceFiles(path: string): string[] {
     if (!statSync(path).isDirectory()) return [path];
@@ -84,6 +91,46 @@ describe("money is decided by permissions, never role names (DEC-098)", () => {
         expect(
             ROLE_GRANT.test(`viewer.role === "MEMBER" && !seesPayments`),
         ).toBe(false);
+    });
+});
+
+describe("no storefront role decides money (DEC-106)", () => {
+    it("no screen or helper that decides money names a storefront role", () => {
+        const offenders = MONEY.flatMap((root) =>
+            sourceFiles(join(APP, root)),
+        ).flatMap((file) =>
+            readFileSync(file, "utf8")
+                .split("\n")
+                .map((line, i) => ({ line, at: i + 1 }))
+                .filter(({ line }) => STOREFRONT_GRANT.test(line))
+                .map(
+                    ({ line, at }) =>
+                        `${relative(APP, file).split(sep).join("/")}:${at} ${line.trim()}`,
+                ),
+        );
+        expect(offenders).toEqual([]);
+        expect(STOREFRONT_GRANT.test(`storeRole === "MANAGER"`)).toBe(true);
+    });
+
+    it("a storefront Manager on the Location team role records no payment", () => {
+        // What the API resolves for the narrow role someone who joins
+        // through a storefront holds, whatever their storefront role.
+        const locationTeam = {
+            role: "MEMBER",
+            roleKey: "storefront-team",
+            actions: ["store:read", "order:stage"],
+        };
+        expect(permits(locationTeam, "order:stage")).toBe(true);
+        expect(permits(locationTeam, "order:edit")).toBe(false);
+        expect(
+            permits(
+                {
+                    ...locationTeam,
+                    actions: [...locationTeam.actions, "order:edit"],
+                },
+                "order:edit",
+            ),
+        ).toBe(true);
     });
 });
 

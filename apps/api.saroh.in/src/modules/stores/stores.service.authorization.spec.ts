@@ -18,6 +18,9 @@ jest.mock("@saroh/database", () => ({
         membership: {
             findUnique: jest.fn(),
         },
+        organizationRole: {
+            findUnique: jest.fn(),
+        },
         storeOwner: {
             findUnique: jest.fn(),
         },
@@ -37,6 +40,8 @@ const storeFindFirst = prisma.store.findFirst as jest.Mock;
 const membershipFindUnique = prisma.membership.findUnique as jest.Mock;
 const storeOwnerFindUnique = prisma.storeOwner.findUnique as jest.Mock;
 const storeMembersFindUnique = prisma.storeMembers.findUnique as jest.Mock;
+const organizationRoleFindUnique = prisma.organizationRole
+    .findUnique as jest.Mock;
 
 const STORE_B_ID = "store_B";
 const ORG_B = "org_B";
@@ -250,6 +255,118 @@ describe("StoresService authorization (S1-006)", () => {
             await expect(service().canWrite(STORE_B_ID, USER)).resolves.toBe(
                 true,
             );
+        });
+    });
+
+    /**
+     * DEC-106: a storefront role (Admin, Manager, Editor) keeps taking and
+     * changing its storefront's orders (DEC-048), but recording or taking a
+     * payment, and refunding, follow the business role's permissions only.
+     */
+    describe("storefront roles and money (DEC-106)", () => {
+        /** The narrow role someone who joins through a storefront holds. */
+        function storefrontManager(actions: string[]) {
+            setupStore({
+                organizationId: ORG_B,
+                membershipRole: "storefront-team",
+                legacyMemberRole: "MANAGER",
+            });
+            organizationRoleFindUnique.mockResolvedValue({ actions });
+        }
+
+        const orgPath = () => new StoresService(flags(true));
+        const legacyPath = () => new StoresService(flags(false));
+
+        it("a storefront Manager without the payment permission changes orders but records no payment", async () => {
+            storefrontManager(["store:read", "order:stage"]);
+            const stores = orgPath();
+            await expect(
+                stores.orderWriteOrganization(STORE_B_ID, USER, "order:edit"),
+            ).resolves.toEqual({ organizationId: ORG_B });
+            await expect(
+                stores.orderWriteOrganization(STORE_B_ID, USER, "order:edit", {
+                    money: true,
+                }),
+            ).resolves.toBeNull();
+            await expect(
+                stores.orderWriteOrganization(
+                    STORE_B_ID,
+                    USER,
+                    "order:create",
+                    { money: true },
+                ),
+            ).resolves.toBeNull();
+            // Refunding and cancelling are money whatever is asked.
+            await expect(
+                stores.orderWriteOrganization(STORE_B_ID, USER, "order:refund"),
+            ).resolves.toBeNull();
+            await expect(
+                stores.moneyAllows(STORE_B_ID, USER, "order:read"),
+            ).resolves.toBe(false);
+        });
+
+        it("with a role carrying the payment permission, records it", async () => {
+            storefrontManager(["store:read", "order:stage", "order:edit"]);
+            await expect(
+                orgPath().orderWriteOrganization(
+                    STORE_B_ID,
+                    USER,
+                    "order:edit",
+                    { money: true },
+                ),
+            ).resolves.toEqual({ organizationId: ORG_B });
+        });
+
+        it("no storefront role name grants money, Admin and Editor included", async () => {
+            for (const role of ["ADMIN", "EDITOR"]) {
+                setupStore({
+                    organizationId: ORG_B,
+                    membershipRole: null,
+                    legacyMemberRole: role,
+                });
+                await expect(
+                    orgPath().orderWriteOrganization(
+                        STORE_B_ID,
+                        USER,
+                        "order:edit",
+                        { money: true },
+                    ),
+                ).resolves.toBeNull();
+                await expect(
+                    legacyPath().orderWriteOrganization(
+                        STORE_B_ID,
+                        USER,
+                        "order:edit",
+                        { money: true },
+                    ),
+                ).resolves.toBeNull();
+            }
+        });
+
+        it("a StoreOwner row is no shortcut on the organization path", async () => {
+            setupStore({
+                organizationId: ORG_B,
+                membershipRole: null,
+                legacyOwner: true,
+            });
+            await expect(
+                orgPath().moneyAllows(STORE_B_ID, USER, "order:edit"),
+            ).resolves.toBe(false);
+        });
+
+        it("the older per-store path keeps its owner, who has no permissions to ask", async () => {
+            setupStore({
+                organizationId: ORG_B,
+                membershipRole: null,
+                legacyOwner: true,
+            });
+            await expect(
+                legacyPath().orderWriteOrganization(
+                    STORE_B_ID,
+                    USER,
+                    "order:refund",
+                ),
+            ).resolves.toEqual({ organizationId: ORG_B });
         });
     });
 });

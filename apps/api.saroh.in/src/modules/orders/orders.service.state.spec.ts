@@ -543,10 +543,13 @@ describe("OrdersService.updateStatus — the order power each change asks (B16)"
         await service.updateStatus(STORE, ORDER, USER, {
             paymentStatus: "PAID",
         });
+        // Asked as money: the permissions alone, never a storefront role
+        // (DEC-106).
         expect(stores.orderWriteOrganization).toHaveBeenCalledWith(
             STORE,
             USER,
             "order:edit",
+            { money: true },
         );
         expect(orderUpdate).toHaveBeenCalled();
     });

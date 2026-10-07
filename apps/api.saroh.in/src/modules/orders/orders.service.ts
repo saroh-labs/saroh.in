@@ -87,6 +87,18 @@ const ORDER_WRITE_REFUSAL = {
 } as const;
 
 /**
+ * The same, to someone who may take or change this storefront's orders but
+ * not record their money — a storefront role without the payment permission
+ * (DEC-106). In the words Order Detail shows beside a disabled Mark paid.
+ */
+const MONEY_WRITE_REFUSAL = {
+    "order:create":
+        "Your role can't take payments — leave it to pay later, or ask the owner or an admin.",
+    "order:edit":
+        "Your role can't record payments — ask the owner or an admin to mark it paid.",
+} as const;
+
+/**
  * Order management. Authorization delegates to StoresService (read = access;
  * writes = the order power each asks, `requireOrderWrite`, B16). Totals are computed server-side from snapshotted product
  * prices; inventory is reserved on create and committed/released on status
@@ -182,10 +194,13 @@ export class OrdersService {
     }
 
     async create(storeId: string, userId: string, dto: CreateOrderDto) {
+        // Taking the money with it — at the counter or by a pay link — is
+        // the permissions' alone, never a storefront role's (DEC-106).
         const organizationId = await this.requireOrderWrite(
             storeId,
             userId,
             "order:create",
+            dto.payment !== undefined && dto.payment.kind !== "LATER",
         );
         // Who it is for, and how it is paid (B13): checked before anything
         // is priced, so a request that can't be served costs nothing.
@@ -537,11 +552,18 @@ export class OrdersService {
             (dto.status !== undefined && dto.status !== "CANCELLED") ||
             (dto.paymentStatus !== undefined &&
                 dto.paymentStatus !== "REFUNDED");
+        // Recording a payment is money: asked of the permissions only, never
+        // a storefront role (DEC-106); `order:refund` always is.
         if (refunds) {
-            await this.requireOrderWrite(storeId, userId, "order:refund");
+            await this.requireOrderWrite(storeId, userId, "order:refund", true);
         }
         if (edits || !refunds) {
-            await this.requireOrderWrite(storeId, userId, "order:edit");
+            await this.requireOrderWrite(
+                storeId,
+                userId,
+                "order:edit",
+                dto.paymentStatus !== undefined,
+            );
         }
         const nextStatus = dto.status;
         const nextPayment = dto.paymentStatus;
@@ -780,21 +802,37 @@ export class OrdersService {
      * caller may take `action` on this storefront's orders (see
      * `StoresService.orderWriteOrganization`). A storefront they can't reach
      * stays a 404, so nothing says it exists; one they can reach, without
-     * the power, is a 403 in words.
+     * the power, is a 403 in words. `money` (a payment recorded or taken)
+     * is asked of the permissions only (DEC-106).
      */
     private async requireOrderWrite(
         storeId: string,
         userId: string,
         action: "order:create" | "order:edit" | "order:refund",
+        money = false,
     ): Promise<string | null> {
         const writable = await this.stores.orderWriteOrganization(
             storeId,
             userId,
             action,
+            { money },
         );
         if (writable !== null) return writable.organizationId;
         await this.stores.getForUser(storeId, userId);
-        throw new ForbiddenException(ORDER_WRITE_REFUSAL[action]);
+        // Someone who may take or change the order, but not its money, is
+        // told it is the payment they can't record (FB-1).
+        const takesOrders =
+            money &&
+            (await this.stores.orderWriteOrganization(
+                storeId,
+                userId,
+                action,
+            )) !== null;
+        throw new ForbiddenException(
+            takesOrders && action !== "order:refund"
+                ? MONEY_WRITE_REFUSAL[action]
+                : ORDER_WRITE_REFUSAL[action],
+        );
     }
 
     private isUniqueOrderNumber(err: unknown): boolean {

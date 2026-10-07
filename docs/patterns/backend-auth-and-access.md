@@ -82,7 +82,8 @@ what the API allows.
   included — Order Detail sends money to `order:read` or `payment:read`).
   So a role saved before the split keeps what it could do; no backfill. On
   the store-scoped writes `store:write` no longer takes orders; a storefront
-  role that writes to its storefront still does (DEC-048).
+  role that writes to its storefront still does (DEC-048), but never its
+  money (DEC-106, below).
   `order-permissions.db.spec.ts` pins the matrix one row per endpoint; a new
   order endpoint adds its row there.
 - **Current** (C13, DEC-039) — **Each customer endpoint asks its own power.**
@@ -128,8 +129,19 @@ what the API allows.
   `toTake: true|false` in place of `take`, and the app shows Take payment
   (and Mark paid, Paid in cash) **disabled with why**, never hidden.
   Guarded by `organizations/money-by-permission.spec.ts` (API) and
-  `lib/organizations/money-by-permission.test.ts` (app). Storefront roles
-  (DEC-048) are their own bundle and not covered.
+  `lib/organizations/money-by-permission.test.ts` (app).
+- **Current** (DEC-106, 2026-10-07) — **Storefront roles follow permissions
+  for money too.** A storefront Admin, Manager or Editor still takes and
+  changes its storefront's orders (DEC-048), but recording or taking a
+  payment, refunding or cancelling, and reading the store-scoped lists that
+  send amounts are asked of the business role's permissions only —
+  `StoresService.moneyAllows`, and `orderWriteOrganization(…, { money })`,
+  which leaves before the storefront-role fallback (`order:refund` always
+  does). With ORG_AUTHORIZATION off the storefront's owner keeps it; on the
+  organization path a `StoreOwner` row is no shortcut. Refused in Order
+  Detail's words ("Your role can't record payments — …"). A storefront role
+  that should take payments needs a business role carrying `order:edit`.
+  Guarded by the same two scans.
 - **Adopted** — **No money figures without a money read** (ADR-008). Stats,
   takings, fees and payouts go only to a role that may read that money
   (`payment:read`, `invoice:read`, `subscription:read`); the API omits them,
