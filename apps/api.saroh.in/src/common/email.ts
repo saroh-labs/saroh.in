@@ -271,6 +271,44 @@ export function sendEnquiryNotificationEmail(
 }
 
 /**
+ * Tell an owner or admin a customer wrote from their account on the
+ * business's site (UX-014). Sent by the `customer-message.notify` job, once
+ * per recipient, the way an enquiry's notice is: console fallback with no
+ * SMTP, and the in-app notice stays the record. Every value is escaped in
+ * the body (`actionEmail`); the subject is kept to one line.
+ */
+export function sendCustomerMessageNotificationEmail(
+    to: string,
+    details: {
+        customerName: string;
+        /** A short line of what they wrote. */
+        message: string;
+        threadUrl: string;
+    },
+): Promise<void> {
+    const { customerName, message, threadUrl } = details;
+    const name = customerName.replace(/[\r\n]+/g, " ").trim();
+    if (!transporter) {
+        console.info(
+            `[Customer message] (no SMTP) ${to}: ${name} -> ${threadUrl}`,
+        );
+        return Promise.resolve();
+    }
+    void transporter.sendMail({
+        from: FROM,
+        to,
+        subject: `${name} sent you a message`,
+        html: actionEmail(
+            `${name} sent you a message`,
+            `${name} wrote from their account on your website: “${message}” They see your reply when they sign in there.`,
+            threadUrl,
+            "Read and reply",
+        ),
+    });
+    return Promise.resolve();
+}
+
+/**
  * Marker prefix that stamps every self-test/preview email (S6-004). It is
  * applied to BOTH the subject and the top of the body so the message can never
  * be mistaken for production Organization delivery — a template preview goes

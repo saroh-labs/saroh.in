@@ -39,6 +39,8 @@ export interface Notification {
     leadId: string | null;
     /** A product review's notice ("A review needs a reply"). */
     reviewId: string | null;
+    /** A customer's message (UX-014): the customer whose thread it opens. */
+    contactId?: string | null;
     readAt: string | null;
     createdAt: string;
 }
