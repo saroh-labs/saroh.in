@@ -6,8 +6,9 @@ import Link from "next/link";
 import { ChangePaymentMethod } from "@/components/settings/change-payment-method";
 import { ViewerDate } from "@/components/shared/viewer-date";
 import type { NextCharge } from "@/lib/saroh-billing/plan";
-import type { PlanNote } from "@/lib/saroh-billing/plan-view";
+import type { PendingCheckout, PlanNote } from "@/lib/saroh-billing/plan-view";
 
+import { CheckoutPending } from "./checkout-pending";
 import { card } from "./styles";
 
 /** The card's shape, from the catalogue (`yourPlan`) or a legacy row (`planSummary`). */
@@ -21,6 +22,8 @@ export interface YourPlanProps {
     footnote: string;
     notes?: PlanNote[];
     warning?: string | null;
+    /** A plan change waiting for its payment (DEC-093). */
+    pending?: PendingCheckout | null;
 }
 
 /** Where a note's action goes: the picker, with its plan's change open. */
@@ -31,8 +34,9 @@ function changeHref(planId: string, cycle: string) {
 /**
  * "Your plan" ("Saroh Settings" design): the plan, its price, what it's
  * for, the next charge and how it's paid; then anything under way (a move
- * on a date, a payment to authorise, a plan given for a while), and the
- * line about last month along the foot.
+ * on a date, a payment to authorise, a plan given for a while, the term and
+ * its renewal, a checkout waiting for its payment), and the line about last
+ * month along the foot — left out until there is such a summary (UX-080).
  */
 export function YourPlan(props: YourPlanProps) {
     const { next } = props;
@@ -73,6 +77,10 @@ export function YourPlan(props: YourPlanProps) {
                         ) : next.kind === "ends" ? (
                             <>
                                 Ends <ViewerDate iso={next.iso} />
+                            </>
+                        ) : next.kind === "paidTo" ? (
+                            <>
+                                Paid to <ViewerDate iso={next.iso} />
                             </>
                         ) : (
                             next.text
@@ -140,9 +148,12 @@ export function YourPlan(props: YourPlanProps) {
                     ) : null}
                 </div>
             ))}
-            <p className="text-pretty border-t border-border/70 bg-muted/50 px-[18px] py-3 text-[13px] text-foreground/80">
-                {props.footnote}
-            </p>
+            {props.pending ? <CheckoutPending pending={props.pending} /> : null}
+            {props.footnote ? (
+                <p className="text-pretty border-t border-border/70 bg-muted/50 px-[18px] py-3 text-[13px] text-foreground/80">
+                    {props.footnote}
+                </p>
+            ) : null}
         </section>
     );
 }

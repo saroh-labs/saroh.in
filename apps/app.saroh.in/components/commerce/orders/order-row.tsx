@@ -88,7 +88,7 @@ export function OrderGridHead({
             <div aria-hidden>Status</div>
             <div aria-hidden>Placed</div>
             <div aria-hidden className="text-right">
-                {money ? "Total" : ""}
+                {money ? "Total" : "Payment"}
             </div>
             <div aria-hidden />
         </div>
@@ -146,6 +146,19 @@ function AttentionTag({ attention }: { attention: RowAttention }) {
             )}
         >
             {attention.text}
+        </span>
+    );
+}
+
+/**
+ * "Paid" for the kitchen's view (UX-010): whether it is paid, with no
+ * figure; the unpaid words sit under the step.
+ */
+function PaidWord({ paid }: { paid: string | null }) {
+    if (!paid) return null;
+    return (
+        <span className="font-sans text-[12px] font-semibold text-success-subtle-foreground">
+            {paid}
         </span>
     );
 }
@@ -248,7 +261,7 @@ export function OrderGridRow({
                 <BusinessDate iso={row.placedAt} variant="moment" />
             </div>
             <div className="whitespace-nowrap text-right font-display text-[13.5px] font-semibold tabular-nums tracking-[-0.02em]">
-                {v.money.total}
+                {v.money.total ?? <PaidWord paid={v.money.paid} />}
             </div>
             <div className="flex justify-end">{menu}</div>
         </li>
@@ -372,7 +385,9 @@ export function OrderCard({
                     <span className="font-display text-[14px] font-semibold tabular-nums">
                         {v.money.total}
                     </span>
-                ) : null
+                ) : (
+                    <PaidWord paid={v.money.paid} />
+                )
             }
             meta={
                 <>

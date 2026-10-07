@@ -187,7 +187,7 @@ const input: CatalogInput = {
             cells: {
                 free: C(
                     "Up to 8 a month",
-                    "Up to 8 bookings a month",
+                    "Up to 8 online bookings a month",
                     8,
                     "month",
                 ),

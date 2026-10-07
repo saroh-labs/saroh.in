@@ -102,6 +102,10 @@ export function SignInSheet({
     const [busy, setBusy] = useState(false);
     const [problem, setProblem] = useState<Problem | null>(null);
     const [token, setToken] = useState<string | null>(null);
+    // When another code may be asked for, as the API said when it sent
+    // this one, and a clock for "Resend code in 24s" (UX-075).
+    const [resendAt, setResendAt] = useState<number | null>(null);
+    const [now, setNow] = useState(0);
 
     // The challenge's key: the one the API asked with, else the options'
     // when they say a challenge is likely. Derived, not copied, because the
@@ -126,6 +130,13 @@ export function SignInSheet({
         if (open) field.current?.focus();
     }, [open, step]);
 
+    // The resend countdown ticks only while the code step is showing.
+    useEffect(() => {
+        if (!open || step !== "code" || resendAt === null) return;
+        const timer = setInterval(() => setNow(Date.now()), 1_000);
+        return () => clearInterval(timer);
+    }, [open, step, resendAt]);
+
     if (!open) return null;
 
     const { businessName, phone } = options;
@@ -147,6 +158,9 @@ export function SignInSheet({
         // A challenge token is good for one request.
         setToken(null);
         if (result.ok) {
+            const at = Date.now();
+            setResendAt(at + resendDelayMs(result.resendAfterSeconds));
+            setNow(at);
             setCode("");
             setStep("code");
             return;
@@ -221,6 +235,17 @@ export function SignInSheet({
                 ? "Last step: confirm it's you, then we'll finish. No password."
                 : "No password. We'll send you a one-time code.";
     const expired = problem?.reason === "expired";
+    const resendIn = resendWait(resendAt, now);
+
+    function resend() {
+        if (resendIn > 0) return;
+        // A challenge token is good for one request: solve it again first.
+        if (siteKey) {
+            changeEmail();
+            return;
+        }
+        void sendCode();
+    }
 
     return (
         <>
@@ -355,6 +380,21 @@ export function SignInSheet({
                         Send a new code
                     </button>
                 ) : null}
+                {step === "code" && !expired ? (
+                    <button
+                        type="button"
+                        onClick={resend}
+                        disabled={busy || resendIn > 0}
+                        className={cn(
+                            altButton,
+                            resendIn > 0 && "cursor-default opacity-60",
+                        )}
+                    >
+                        {resendIn > 0
+                            ? `Resend code in ${resendIn}s`
+                            : "Resend code"}
+                    </button>
+                ) : null}
                 {step === "code" ? (
                     <button
                         type="button"
@@ -367,6 +407,24 @@ export function SignInSheet({
             </div>
         </>
     );
+}
+
+/** The wait before Resend when the API names none (its own limit's). */
+export const RESEND_FALLBACK_SECONDS = 30;
+
+/** The API's wait, in milliseconds; a missing or odd value falls back. */
+export function resendDelayMs(seconds: number | undefined): number {
+    const s =
+        typeof seconds === "number" && Number.isFinite(seconds) && seconds > 0
+            ? seconds
+            : RESEND_FALLBACK_SECONDS;
+    return s * 1_000;
+}
+
+/** Whole seconds left before Resend, 0 when it may be pressed. */
+export function resendWait(resendAt: number | null, now: number): number {
+    if (resendAt === null) return 0;
+    return Math.max(0, Math.ceil((resendAt - now) / 1_000));
 }
 
 function ProblemText({

@@ -259,7 +259,12 @@ describe("rowMoney", () => {
             unpaidAmount: undefined,
             payment: "UNPAID",
         });
-        expect(rowMoney(kitchen)).toEqual({ total: null, unpaid: null });
+        // No figure — only whether it is paid (UX-010).
+        expect(rowMoney(kitchen)).toEqual({
+            total: null,
+            unpaid: "Not paid yet",
+            paid: null,
+        });
         // …and the pill and the progress still show.
         expect(rowProgress(kitchen).word).toBe("New");
         expect(rowProgress(kitchen).label).toBe(
@@ -276,6 +281,41 @@ describe("rowMoney", () => {
                     unpaidAmount: "480.00",
                 }),
             ).unpaid,
+        ).toBeNull();
+    });
+});
+
+describe("rowMoney for the kitchen (UX-010)", () => {
+    const kitchen = (over: Partial<OrderRow> = {}) =>
+        row({ total: undefined, unpaidAmount: undefined, ...over });
+
+    it("says it is paid, with no figure", () => {
+        expect(rowMoney(kitchen({ payment: "PAID" }))).toEqual({
+            total: null,
+            unpaid: null,
+            paid: "Paid",
+        });
+    });
+
+    it("says it is to be paid on collection, with no figure", () => {
+        expect(
+            rowMoney(
+                kitchen({
+                    payment: "UNPAID",
+                    payOnHandover: true,
+                    fulfilmentType: "PICKUP",
+                }),
+            ).unpaid,
+        ).toBe("To pay on collection");
+    });
+
+    it("asks nothing of a cancelled or refunded order", () => {
+        expect(
+            rowMoney(kitchen({ payment: "UNPAID", standing: "CANCELLED" })),
+        ).toEqual({ total: null, unpaid: null, paid: null });
+        expect(
+            rowMoney(kitchen({ payment: "REFUNDED", standing: "REFUNDED" }))
+                .paid,
         ).toBeNull();
     });
 });

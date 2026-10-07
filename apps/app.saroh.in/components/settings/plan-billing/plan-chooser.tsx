@@ -1,13 +1,18 @@
 "use client";
 
+import { formatInr } from "@saroh/pricing-catalog";
 import { Button } from "@saroh/ui/button";
 import { FailedState } from "@saroh/ui/data-state";
 import { Input } from "@saroh/ui/input";
 import { cn } from "@saroh/ui/lib/utils";
+import { Check } from "lucide-react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import type { ReactNode } from "react";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useTransition } from "react";
 
+import { ViewerDate } from "@/components/shared/viewer-date";
+import type { CouponCheck } from "@/lib/saroh-billing/billing-actions";
+import { checkCouponAction } from "@/lib/saroh-billing/billing-actions";
 import type { Cycle, PickerRow } from "@/lib/saroh-billing/plan-view";
 
 import type { PickedPlan } from "./change-plan-dialog";
@@ -18,9 +23,10 @@ import { card } from "./styles";
 /**
  * The plan picker, add-ons and coupon ("Saroh Settings" design, Plan and
  * billing): Monthly | Yearly when the catalogue offers yearly, a row per
- * plan with its button — "Start N-day trial", "Upgrade", "Switch" — and the
- * Coupon card, whose code goes with the next change's quote. Picking a row
- * opens the change (`ChangePlanDialog`).
+ * plan with what it unlocks (the catalogue's card lines, UX-045) and its
+ * button — "Start N-day trial", "Upgrade", "Switch", "Keep …" — and the
+ * Coupon card, whose code is checked on Apply (UX-046) and goes with the
+ * next change's quote. Picking a row opens the change (`ChangePlanDialog`).
  *
  * `?plan=&cycle=` on the address opens that plan's change straight away:
  * it is where every "Upgrade" in the app lands (`upgradeHref`).
@@ -31,6 +37,7 @@ export function PlanChooser({
     initialCycle,
     canChange,
     addons,
+    currentPlan,
 }: {
     /** Per cycle; null when Saroh's price list couldn't be read. */
     rows: Record<Cycle, PickerRow[]> | null;
@@ -40,6 +47,8 @@ export function PlanChooser({
     canChange: boolean;
     /** The Add-ons card, between the picker and the coupon, as drawn. */
     addons: ReactNode;
+    /** The plan it's on now, for the quote's "you stay on …". */
+    currentPlan: string;
 }) {
     const router = useRouter();
     const pathname = usePathname();
@@ -51,6 +60,8 @@ export function PlanChooser({
     const [couponIn, setCouponIn] = useState("");
     const [coupon, setCoupon] = useState("");
     const [couponErr, setCouponErr] = useState("");
+    const [checked, setChecked] = useState<CouponCheck | null>(null);
+    const [checking, startCheck] = useTransition();
 
     const shown = rows?.[cycle] ?? [];
 
@@ -87,9 +98,21 @@ export function PlanChooser({
             setCouponErr("That code isn't valid.");
             return;
         }
-        setCoupon(code);
-        setCouponIn("");
-        setCouponErr("");
+        // Checked now, against the paid plans on offer here (UX-046).
+        const plans = shown
+            .filter((r) => r.cta !== null && r.price !== "₹0")
+            .map((r) => r.planId);
+        startCheck(async () => {
+            const res = await checkCouponAction({ code, cycle, plans });
+            if (!res.ok) {
+                setCouponErr(res.error);
+                return;
+            }
+            setChecked(res.data);
+            setCoupon(res.data.code);
+            setCouponIn("");
+            setCouponErr("");
+        });
     }
 
     return (
@@ -102,7 +125,7 @@ export function PlanChooser({
                 <div className="flex flex-wrap items-center gap-2.5 border-b border-border/70 px-[18px] py-3">
                     <span className="flex-[1_1_260px] text-[12.5px] text-muted-foreground">
                         {canChange
-                            ? "Change plan any time. Upgrades start today; downgrades from your next charge."
+                            ? "Monthly is autopay for 12 months, then renew with one tap; yearly is one payment. Upgrades start today; downgrades from your next charge."
                             : "Changing plan is the owner's. These are Saroh's plans and what each is for."}
                     </span>
                     {yearly.on && rows ? (
@@ -159,8 +182,40 @@ export function PlanChooser({
                                 <p className="mt-0.5 text-[12px] text-muted-foreground">
                                     {row.what}
                                 </p>
+                                {row.note ? (
+                                    <p className="mt-1 text-[12.5px] font-semibold text-foreground/80">
+                                        {row.note.lead}
+                                        {row.note.iso ? (
+                                            <ViewerDate iso={row.note.iso} />
+                                        ) : null}
+                                    </p>
+                                ) : null}
+                                {row.lines.length > 0 ? (
+                                    <ul
+                                        aria-label={`What ${row.name} gives you`}
+                                        className="mt-1.5 grid gap-0.5 text-[12.5px] text-foreground/80"
+                                    >
+                                        {row.lead ? (
+                                            <li className="text-muted-foreground">
+                                                {row.lead}
+                                            </li>
+                                        ) : null}
+                                        {row.lines.map((l) => (
+                                            <li
+                                                key={l}
+                                                className="flex items-start gap-1.5"
+                                            >
+                                                <Check
+                                                    aria-hidden
+                                                    className="mt-0.5 size-3.5 shrink-0 text-muted-foreground"
+                                                />
+                                                {l}
+                                            </li>
+                                        ))}
+                                    </ul>
+                                ) : null}
                             </div>
-                            {row.current ? (
+                            {row.current && !(row.cta && canChange) ? (
                                 <span className="text-[12.5px] font-semibold text-foreground/80">
                                     Current plan
                                 </span>
@@ -198,13 +253,25 @@ export function PlanChooser({
                     </span>
                     {coupon ? (
                         <div className="flex flex-wrap items-center gap-2.5">
-                            <span className="font-mono text-[13px] font-semibold">
-                                {coupon} · used with the plan you choose above
+                            <span className="text-[13px]">
+                                <span className="font-mono font-semibold">
+                                    {coupon}
+                                </span>
+                                {checked
+                                    ? ` · ${formatInr(checked.discountPaise)} off ${
+                                          checked.cycle === "year"
+                                              ? "the first yearly charge"
+                                              : checked.charges === 1
+                                                ? "the first month"
+                                                : `each of the first ${checked.charges} months`
+                                      } of ${checked.planName}, before GST. Used when you start a paid plan above.`
+                                    : " · used with the plan you choose above"}
                             </span>
                             <button
                                 type="button"
                                 onClick={() => {
                                     setCoupon("");
+                                    setChecked(null);
                                     setCouponErr("");
                                 }}
                                 className="rounded-sm text-[12.5px] font-semibold text-foreground/80 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring active:text-muted-foreground"
@@ -237,8 +304,13 @@ export function PlanChooser({
                                 autoComplete="off"
                                 className="h-[34px] w-[180px] bg-muted/50 font-mono text-[13px] uppercase coarse:h-11"
                             />
-                            <Button type="submit" variant="outline" size="sm">
-                                Apply
+                            <Button
+                                type="submit"
+                                variant="outline"
+                                size="sm"
+                                disabled={checking}
+                            >
+                                {checking ? "Checking…" : "Apply"}
                             </Button>
                             {couponErr ? (
                                 <span
@@ -260,9 +332,11 @@ export function PlanChooser({
                 key={picked ? `${picked.planId}:${picked.cycle}` : "closed"}
                 picked={picked}
                 coupon={coupon}
+                currentPlan={currentPlan}
                 onCouponRefused={(error) => {
                     setCouponErr(error);
                     setCoupon("");
+                    setChecked(null);
                 }}
                 onClose={() => setPicked(null)}
             />

@@ -43,6 +43,11 @@ export const TEAM_ALERT_TYPE = "team.alert";
  *   each refusal is told once; told on the Payment failed row. An email
  *   provider's goes to the bell only: its own email would go through the
  *   keys that were just refused.
+ * - `review`: the website's review (UX-043). A review asked for, or a new
+ *   test release, tells the site's reviewers by Saroh's own mail (they
+ *   have no bell); a verdict, or a reviewer's first note of a round, tells
+ *   the people who publish, on the Website row. Keyed to the approval, the
+ *   release, or the reviewer's round.
  */
 export type TeamAlertPayload =
     | { event: "order"; orderId: string; actorUserId?: string | null }
@@ -56,6 +61,9 @@ export type TeamAlertPayload =
           providerId: string;
           since: string;
       }
+    | { event: "review"; about: "approval"; approvalId: string }
+    | { event: "review"; about: "note"; commentId: string }
+    | { event: "review"; about: "release"; testReleaseId: string }
     | {
           event: "site";
           testReleaseId: string;
@@ -111,5 +119,28 @@ export interface WordedAlert {
     alwaysUserId?: string | null;
     /** The bell only, never an email (an email provider's own alert). */
     bellOnly?: boolean;
+    /** No inbox notice: it is for people with no bell (a site's reviewers). */
+    noBell?: boolean;
+    /**
+     * Saroh's own mail tells them instead of the business's provider, as an
+     * enquiry's notice does (`team-mail.ts`):
+     * - `OWNERS_ADMINS`: a new website order (UX-042), unless they turned
+     *   this row's email off;
+     * - `REVIEWERS`: the reviewers of `siteId` (UX-043).
+     */
+    sarohMail?: "OWNERS_ADMINS" | "REVIEWERS";
+    siteId?: string;
+    /** The email's button. */
+    cta?: string;
     orderId?: string;
+}
+
+/** One email Saroh's own mail sends to someone on the team, after commit. */
+export interface TeamMail {
+    to: string;
+    subject: string;
+    heading: string;
+    text: string;
+    url: string;
+    cta: string;
 }

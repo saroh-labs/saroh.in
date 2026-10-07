@@ -252,3 +252,46 @@ describe("the team's inbox line (A14)", () => {
         });
     });
 });
+
+describe("a website order placed (UX-042)", () => {
+    const placed = (over: Record<string, unknown> = {}): NoticeVars => ({
+        kind: "ORDER_PLACED",
+        placed: {
+            business: "Rye & Co.",
+            firstName: "Asha",
+            number: "ORD-1019",
+            fulfilment: "PICKUP",
+            payOnHandover: true,
+            ...over,
+        },
+    });
+
+    it("says it's in, how it's paid, and only the steps they will hear of", () => {
+        expect(noticeSentence(placed())).toBe(
+            "We have your order ORD-1019. You pay when you collect it. We'll tell you when it's ready to collect.",
+        );
+        expect(noticeSentence(placed({ fulfilment: "LOCAL_DELIVERY" }))).toBe(
+            "We have your order ORD-1019. You pay when it's delivered. We'll tell you when it's on its way.",
+        );
+        expect(
+            noticeSentence(
+                placed({ payOnHandover: false, fulfilment: "SHIPPING" }),
+            ),
+        ).toBe(
+            "We have your order ORD-1019, and it's paid. We'll tell you when it's on its way.",
+        );
+        // Nothing is promised for a step nobody is told about.
+        expect(
+            noticeSentence(
+                placed({ payOnHandover: false, fulfilment: "DIGITAL" }),
+            ),
+        ).toBe("We have your order ORD-1019, and it's paid.");
+    });
+
+    it("emails in the business's voice, everything escaped", () => {
+        const mail = renderNotice(placed({ business: "Rye <&> Co." }));
+        expect(mail.subject).toBe("Your order ORD-1019 from Rye <&> Co.");
+        expect(mail.body).toContain("<p>Hi Asha,</p>");
+        expect(mail.body).toContain("<p>Rye &lt;&amp;&gt; Co.</p>");
+    });
+});

@@ -61,6 +61,7 @@ import {
     meteredModules,
     monthFirstDay,
     monthWindow,
+    quietAtOne,
     windowKey,
 } from "./metering";
 import {
@@ -175,7 +176,7 @@ describe("what each count asks", () => {
         });
     });
 
-    it("counts this month's confirmed bookings, a course's left out", async () => {
+    it("counts this month's confirmed online bookings, a course's and the team's left out", async () => {
         tx.booking.count.mockResolvedValue(2);
         await countUsage(tx as never, "org", "bookingsPerMonth", now);
         expect(tx.booking.count).toHaveBeenCalledWith({
@@ -184,6 +185,7 @@ describe("what each count asks", () => {
                 createdAt: { gte: start },
                 status: "CONFIRMED",
                 courseEnrollmentId: null,
+                bookedOnline: true,
             },
         });
     });
@@ -345,6 +347,29 @@ describe("crossing a notice's line", () => {
         expect(crossesNotice({ limit: 5, used: 1, adding: 3 })).toBe(true);
     });
 
+    it("a total of one, filled by setting the business up, crosses only past it (UX-041)", () => {
+        // The business's one website, made at sign-up: no notice, no job.
+        expect(
+            crossesNotice({ key: "sites", limit: 1, used: 0, adding: 1 }),
+        ).toBe(false);
+        // Past it (a soft cap) is still told.
+        expect(
+            crossesNotice({ key: "storageGb", limit: 1, used: 0.5, adding: 1 }),
+        ).toBe(true);
+        // A monthly one still warns: this month's one booking is news.
+        expect(
+            crossesNotice({
+                key: "bookingsPerMonth",
+                limit: 1,
+                used: 0,
+                adding: 1,
+            }),
+        ).toBe(true);
+        expect(quietAtOne("teamMembers", 1)).toBe(true);
+        expect(quietAtOne("teamMembers", 2)).toBe(false);
+        expect(quietAtOne("bookingsPerMonth", 1)).toBe(false);
+    });
+
     it("words each level as the design does", () => {
         const row = { plan: "Plan A", upgradeTo: "Plan B" };
         expect(limitLevel(3, 5)).toBeNull();
@@ -355,6 +380,13 @@ describe("crossing a notice's line", () => {
             title: "You've used 4 of 5 products on Plan A",
             body: "You'll be stopped at 5. Plan B gives you more.",
         });
+        // One is one thing, never "1 websites" (UX-041).
+        expect(limitNoticeWords(row, "sites", 1, 2, "over").title).toBe(
+            "You're past your 1 website on Plan A",
+        );
+        expect(limitNoticeWords(row, "teamMembers", 2, 2, "full").title).toBe(
+            "You've reached your 2 team members on Plan A",
+        );
         expect(limitNoticeWords(row, "ordersPerMonth", 2, 3, "over")).toEqual({
             title: "You're past your 2 orders a month on Plan A",
             body: "Your site kept taking orders, so no customer was turned away. Plan B raises the limit.",

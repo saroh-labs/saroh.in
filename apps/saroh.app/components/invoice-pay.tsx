@@ -239,13 +239,17 @@ export function InvoicePay({
                                 : `Pay ${money(invoice.total)}`}
                         </button>
                     )}
-                    <button
-                        type="button"
-                        onClick={() => router.refresh()}
-                        className={cn(ctaClasses("secondary"), "w-full")}
-                    >
-                        Check again
-                    </button>
+                    {/* Only once a payment was started: before that there's
+                        nothing to check (UX-080). */}
+                    {intent ? (
+                        <button
+                            type="button"
+                            onClick={() => router.refresh()}
+                            className={cn(ctaClasses("secondary"), "w-full")}
+                        >
+                            Check again
+                        </button>
+                    ) : null}
                 </div>
             ) : offer === "elsewhere" ? (
                 <div className="mt-6 space-y-4">

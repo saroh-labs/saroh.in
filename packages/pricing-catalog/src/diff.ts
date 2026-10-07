@@ -146,6 +146,15 @@ function offersDiff(a: Catalog, b: Catalog): string[] {
         } else if (tb.on && ta.days !== tb.days) {
             out.push(`${p.name} trial: ${ta.days} → ${tb.days} days`);
         }
+        const fa = ta.on ? (ta.firstPaise ?? 0) : 0;
+        const fb = tb.on ? (tb.firstPaise ?? 0) : 0;
+        if (tb.on && fa !== fb) {
+            out.push(
+                fb > 0
+                    ? `${p.name}: first ${tb.days} days cost ${formatInr(fb)} + GST`
+                    : `${p.name}: first ${tb.days} days free`,
+            );
+        }
     }
     for (const x of b.addons) {
         const o = a.addons.find((y) => y.id === x.id);

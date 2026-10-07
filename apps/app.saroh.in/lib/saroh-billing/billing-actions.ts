@@ -4,7 +4,14 @@ import type { ApiResult } from "@/lib/api/failure";
 import { toFailure } from "@/lib/api/failure";
 import { apiFetch, orgBase } from "@/lib/api/http";
 
-import type { AddonsView, ChangeQuote, ChangeResult, Cycle } from "./plan-view";
+import { cleanHandoff } from "./handoff";
+import type {
+    AddonsView,
+    ChangeQuote,
+    ChangeResult,
+    ConfirmResult,
+    Cycle,
+} from "./plan-view";
 
 /**
  * Settings › Plan and billing's writes (plans catalogue U15–U17): quote a
@@ -127,6 +134,7 @@ export async function changePlanAction(
         kind: string;
         effectiveAt?: string;
         authorisationUrl?: string | null;
+        handoff?: unknown;
     }>("/billing/change-plan", CHANGE_FAILED, {
         method: "POST",
         body: JSON.stringify(c),
@@ -143,17 +151,118 @@ export async function changePlanAction(
         d.kind === "NEW" ||
         d.kind === "UPGRADE" ||
         d.kind === "SCHEDULED" ||
-        d.kind === "TRIAL"
+        d.kind === "TRIAL" ||
+        d.kind === "RENEW"
     ) {
         return {
             ok: true,
             data: {
                 kind: d.kind,
                 authorisationUrl: securePage(d.authorisationUrl),
+                handoff: cleanHandoff(d.handoff),
             },
         };
     }
     return { ok: false, error: CHANGE_FAILED };
+}
+
+const CONFIRM_STATES = new Set([
+    "completed",
+    "scheduled",
+    "waiting",
+    "failed",
+    "none",
+]);
+
+/**
+ * Back from paying (DEC-093): ask the API to check the waiting checkout
+ * with Razorpay and move the plan if it's paid. Safe to ask again; a
+ * failure to ask reads as still waiting, never as a reason to pay again.
+ */
+export async function confirmCheckoutAction(): Promise<
+    ApiResult<ConfirmResult>
+> {
+    const res = await send<ConfirmResult>(
+        "/billing/checkout/confirm",
+        "We couldn't check your payment just now. If you've paid, you don't need to pay again.",
+        { method: "POST" },
+    );
+    if (!res.ok) return res;
+    const d = res.data;
+    if (!CONFIRM_STATES.has(d.state)) {
+        return {
+            ok: true,
+            data: { state: "waiting", plan: null, startAt: null },
+        };
+    }
+    return { ok: true, data: d };
+}
+
+/** What a coupon checked on Apply comes to (UX-046). */
+export interface CouponCheck {
+    code: string;
+    planName: string;
+    discountPaise: number;
+    charges: number;
+    cycle: Cycle;
+}
+
+/**
+ * Check a coupon when it's applied (UX-046), against the plans it could be
+ * used with — the paid plans the picker offers on this cycle, in order —
+ * through the same quote that will price it. The first plan it works on
+ * answers; if none, the API's own reason for the first.
+ */
+export async function checkCouponAction(
+    input: unknown,
+): Promise<ApiResult<CouponCheck>> {
+    const { code, cycle, plans } = (input ?? {}) as Record<string, unknown>;
+    const c = typeof code === "string" ? code.trim().toUpperCase() : "";
+    if (!COUPON.test(c)) {
+        return { ok: false, error: "That code isn't valid.", field: "coupon" };
+    }
+    if (cycle !== "month" && cycle !== "year") {
+        return { ok: false, error: QUOTE_FAILED };
+    }
+    const ids = Array.isArray(plans)
+        ? plans
+              .filter(
+                  (p): p is string => typeof p === "string" && PLAN_ID.test(p),
+              )
+              .slice(0, 4)
+        : [];
+    if (ids.length === 0) {
+        return {
+            ok: false,
+            error: "A coupon is used when you start a paid plan, and there's none to start here.",
+            field: "coupon",
+        };
+    }
+    let first: ApiResult<CouponCheck> | null = null;
+    for (const plan of ids) {
+        const res = await quoteChangeAction({ plan, cycle, coupon: c });
+        if (res.ok && res.data.coupon) {
+            return {
+                ok: true,
+                data: {
+                    code: res.data.coupon.code,
+                    planName: res.data.plan.name,
+                    discountPaise: res.data.coupon.discountPaise,
+                    charges: res.data.coupon.charges,
+                    cycle,
+                },
+            };
+        }
+        if (!res.ok && res.field !== "coupon") return res;
+        first ??= res.ok
+            ? {
+                  ok: false,
+                  error: `${c} can't be used with ${res.data.plan.name}.`,
+                  field: "coupon",
+              }
+            : res;
+    }
+    return first ?? { ok: false, error: QUOTE_FAILED };
 }
 
 /** Hold this many of an add-on; zero removes it. */

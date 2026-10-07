@@ -45,6 +45,7 @@ import { CustomerCard } from "./customer-card";
 import { EditPanel } from "./edit-panel";
 import { HoldCard } from "./hold-card";
 import { AllergyBanner, OrderItems } from "./items";
+import { KitchenPaymentCard } from "./kitchen-payment-card";
 import { MoneyCard } from "./money-card";
 import { OrderCrumbs, OrderHeading } from "./order-header";
 import type { PillTone } from "./parts";
@@ -297,6 +298,15 @@ export function OrderDetail({
             {!open && !hold ? (
                 <span className="text-[13px] font-semibold text-success-subtle-foreground">
                     Nothing left to do
+                </span>
+            ) : null}
+            {handover && can.stage && !next && open && !hold ? (
+                // Ready, and paid at the handover: Collected waits for the
+                // payment (the API refuses it before then, UX-010).
+                <span className="text-[13px] font-semibold text-muted-foreground">
+                    {handover === "collection"
+                        ? "Mark collected once it's paid"
+                        : "Mark delivered once it's paid"}
                 </span>
             ) : null}
         </OrderHeading>
@@ -603,7 +613,12 @@ export function OrderDetail({
                                     ) : null
                                 }
                             />
-                        ) : null}
+                        ) : (
+                            <KitchenPaymentCard
+                                order={order}
+                                canRecord={can.edit}
+                            />
+                        )}
                         {aside}
                     </div>
                 </div>

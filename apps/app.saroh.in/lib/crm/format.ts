@@ -48,10 +48,38 @@ export function contactName(c: {
     lastName: string | null;
     email: string;
     removedAt?: string | null;
+    /** The email their site account signs in with (UX-013). */
+    accountEmail?: string | null;
 }): string {
     if (isRemovedContact(c)) return "Removed customer";
     const full = [c.firstName, c.lastName].filter(Boolean).join(" ").trim();
-    return full || (contactEmail(c.email) ?? "No name");
+    return full || (shownEmail(c) ?? "No name");
+}
+
+/**
+ * The email a contact row shows: its own, else the one their site account
+ * signs in with (a site account's separate contact holds only a reserved
+ * placeholder, DEC-049), else null. Never a placeholder (UX-013).
+ */
+export function shownEmail(c: {
+    email: string | null;
+    accountEmail?: string | null;
+}): string | null {
+    return contactEmail(c.email) ?? contactEmail(c.accountEmail);
+}
+
+/**
+ * Open leads in words (UX-051): "₹5,000 · 2 leads" when they carry a
+ * value, "1 open lead" when none does — never "unvalued (1)".
+ */
+export function openLeadsLabel(
+    count: number,
+    value: string | null,
+): string | null {
+    if (count <= 0) return null;
+    const leads = count === 1 ? "1 lead" : `${count} leads`;
+    if (value) return `${value} · ${leads}`;
+    return count === 1 ? "1 open lead" : `${count} open leads`;
 }
 
 /**

@@ -1,3 +1,5 @@
+import type { BookingDays } from "../booking-flow/model";
+import { dateIn } from "../booking-flow/model";
 import { accountMoney, bookingWhen } from "./model";
 
 /**
@@ -33,6 +35,40 @@ export interface AccountBookingRow {
     cancelledLate: boolean;
     move: "sheet" | "page" | "call" | null;
     cancel: AccountCancelTerms | null;
+    /** What was paid for it (UX-049); absent from an older API. */
+    paid?: AccountBookingPaid | null;
+}
+
+/** What a customer has paid for one booking (UX-049). */
+export interface AccountBookingPaid {
+    how: "online" | "desk" | "both" | "pack" | "membership";
+    /** "800.00"; null for a class of a pack or membership. */
+    amount: string | null;
+    currency: string | null;
+}
+
+/**
+ * "Paid ₹800 online", "Paid ₹1,200 at the desk", "Paid with your class
+ * pack" — what a booking row says it was paid (UX-049); null when nothing
+ * is paid yet.
+ */
+export function paidText(
+    paid: AccountBookingPaid | null | undefined,
+): string | null {
+    if (!paid) return null;
+    if (paid.how === "pack") return "Paid with your class pack";
+    if (paid.how === "membership") return "Paid with your membership";
+    const money =
+        paid.amount && paid.currency
+            ? accountMoney(paid.amount, paid.currency)
+            : null;
+    const how =
+        paid.how === "online"
+            ? "online"
+            : paid.how === "desk"
+              ? "at the desk"
+              : "online and at the desk";
+    return money ? `Paid ${money} ${how}` : `Paid ${how}`;
 }
 
 export interface AccountTreatmentVisit {
@@ -107,12 +143,13 @@ export function bookingTitle(row: AccountBookingRow): string {
     return `${row.service} · ${bookingWhen(row.startAt, row.timezone)}`;
 }
 
-/** "Visit 2 of 3 · With Dr. Rao · Video call · Cancelled late". */
+/** "Visit 2 of 3 · With Dr. Rao · Video call · Paid ₹800 online · Cancelled late". */
 export function bookingSub(row: AccountBookingRow): string {
     return [
         row.visit ? `Visit ${row.visit.number} of ${row.visit.of}` : null,
         row.staff ? `With ${row.staff}` : null,
         row.online === true ? "Video call" : null,
+        row.state === "cancelled" ? null : paidText(row.paid),
         row.cancelledLate ? "Cancelled late" : null,
     ]
         .filter(Boolean)
@@ -194,6 +231,48 @@ export function movedText(
     return told
         ? `Moved to ${label}. ${name || "The team"} has been told.`
         : `Moved to ${label}.`;
+}
+
+/** How many days the Move sheet's strip shows: the booking page's two weeks. */
+const STRIP_DAYS = 14;
+
+/**
+ * The sheet's free times as the booking page's two weeks (UX-055), so Move
+ * draws the same day strip and slot grid: one day each from today in the
+ * business's zone, with that day's times. A day with none reads "No times"
+ * — the account doesn't know whether the business is closed then.
+ */
+export function timesAsDays(
+    times: AccountTimes,
+    now: Date = new Date(),
+): BookingDays {
+    const zone = times.timezone;
+    // From today, or from the first free time should a clock be behind.
+    const first = times.times.reduce<string | null>(
+        (min, iso) => (min === null || iso < min ? iso : min),
+        null,
+    );
+    const today = dateIn(now.toISOString(), zone);
+    const from =
+        first && dateIn(first, zone) < today ? dateIn(first, zone) : today;
+    const [y, m, d] = from.split("-").map(Number);
+    const days: BookingDays["days"] = [];
+    for (let i = 0; i < STRIP_DAYS; i += 1) {
+        const date = new Date(Date.UTC(y, m - 1, d + i))
+            .toISOString()
+            .slice(0, 10);
+        const starts = times.times
+            .filter((iso) => dateIn(iso, zone) === date)
+            .map((iso) => ({
+                startAt: iso,
+                endAt: iso,
+                staffId: null,
+                staffName: times.staff,
+                placesLeft: null,
+            }));
+        days.push({ date, open: starts.length > 0, starts });
+    }
+    return { timezone: zone, kind: "one", capacity: 1, days };
 }
 
 /** "Mon 5 Oct at 10:00", a free time in the sheet. */

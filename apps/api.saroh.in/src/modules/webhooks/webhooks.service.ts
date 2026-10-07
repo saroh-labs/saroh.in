@@ -46,6 +46,7 @@ import {
 } from "../payments/mandate-events";
 import { PaymentsService } from "../payments/payments.service";
 import { enqueueRefundSendInTx } from "../payments/send-refund.handler";
+import { enqueueOrderPlacedNotice } from "../site-accounts/customer-notify-queue";
 import { lockOrderShelves, settleRefundStock } from "../stock/reserve";
 import { completePlanJoinInTx } from "../subscriptions/plan-join";
 import { linkMandateInTx } from "./mandate-link";
@@ -583,6 +584,12 @@ export class WebhooksService {
                     event: "order",
                     orderId,
                 });
+                // And the customer hears it is in (UX-042).
+                await enqueueOrderPlacedNotice(
+                    tx,
+                    intent.organizationId,
+                    orderId,
+                );
             }
             return { applied: online.applied };
         }

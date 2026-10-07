@@ -21,6 +21,7 @@ import {
 
 import { mapEntry } from "../billing/catalogue-access";
 import { CatalogueAccessService } from "../billing/catalogue-access.service";
+import { enqueuePlanChangeNotice } from "../billing/plan-change-notice.handler";
 import type { MoveNoticePayload } from "../pricing/moves.service";
 import {
     pendingFromFor,
@@ -41,6 +42,9 @@ import { catalogueUsage } from "./catalogue-usage";
 type Tx = Prisma.TransactionClient;
 
 const DAY_MS = 24 * 60 * 60 * 1000;
+
+/** How long after a plan override's end its "back on your plan" notice runs. */
+const PLAN_END_GRACE_MS = 60 * 1000;
 
 /** The furthest ahead an override's end date may be. */
 const MAX_END_DAYS = 5 * 366;
@@ -232,6 +236,32 @@ export class AdminOverridesService {
                 from: resolved.planOverride?.planKey ?? null,
                 to: plan.id,
             },
+            // The business hears it (UX-041): now, and again when the date
+            // comes and it goes back to its own plan.
+            after: async (tx, row) => {
+                const fromPlanId =
+                    resolved.source === "catalogue" ? resolved.planId : null;
+                await enqueuePlanChangeNotice(tx, command.organizationId, {
+                    eventKey: `plan-change:${row.id}:set`,
+                    fromPlanId,
+                    overrideId: row.id,
+                    reason: "set",
+                });
+                if (!expiresAt) return;
+                await enqueuePlanChangeNotice(
+                    tx,
+                    command.organizationId,
+                    {
+                        eventKey: `plan-change:${row.id}:ended`,
+                        fromPlanId: plan.id,
+                        overrideId: row.id,
+                        reason: "ended",
+                    },
+                    // Just past the end, when the access read no longer
+                    // counts the override.
+                    new Date(expiresAt.getTime() + PLAN_END_GRACE_MS),
+                );
+            },
         });
     }
 
@@ -292,6 +322,16 @@ export class AdminOverridesService {
                 targetId: row.id,
                 metadata,
             });
+            // Ending a plan override moves the business's plan: it hears
+            // which plan it is on now (UX-041).
+            if (row.kind === "plan") {
+                await enqueuePlanChangeNotice(tx, command.organizationId, {
+                    eventKey: `plan-change:${row.id}:removed`,
+                    fromPlanId: row.planKey,
+                    overrideId: row.id,
+                    reason: "removed",
+                });
+            }
             return { ok: true, changed: true };
         });
     }
@@ -447,6 +487,8 @@ export class AdminOverridesService {
             expiresAt: Date | null;
             warning: string | null;
             metadata: Record<string, unknown>;
+            /** More to write on the same transaction, with the new row. */
+            after?: (tx: Tx, row: { id: string }) => Promise<void>;
         },
     ): Promise<WrittenOverride> {
         const now = new Date();
@@ -499,6 +541,7 @@ export class AdminOverridesService {
                     replaced: replaced.map((r) => r.id),
                 },
             });
+            await o.after?.(tx, row);
             return { ...row, warning: o.warning };
         });
     }

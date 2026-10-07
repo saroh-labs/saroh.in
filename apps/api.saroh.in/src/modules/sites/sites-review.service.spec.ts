@@ -3,27 +3,29 @@
 // been deleted under it.
 jest.mock("@saroh/database", () => {
     const actual = jest.requireActual("@saroh/database");
-    return {
-        ...actual,
-        prisma: {
-            site: { findFirst: jest.fn() },
-            page: { findFirst: jest.fn(), findMany: jest.fn() },
-            siteComment: {
-                findMany: jest.fn(),
-                findFirst: jest.fn(),
-                create: jest.fn(),
-                update: jest.fn(),
-                count: jest.fn(),
-            },
-            siteApproval: {
-                create: jest.fn(),
-                findFirst: jest.fn(),
-                // #278 reads every verdict, not just the latest one.
-                findMany: jest.fn(),
-            },
-            siteTestRelease: { findFirst: jest.fn() },
+    const db: Record<string, unknown> = {
+        site: { findFirst: jest.fn() },
+        page: { findFirst: jest.fn(), findMany: jest.fn() },
+        siteComment: {
+            findMany: jest.fn(),
+            findFirst: jest.fn(),
+            create: jest.fn(),
+            update: jest.fn(),
+            count: jest.fn(),
         },
+        siteApproval: {
+            create: jest.fn(),
+            findFirst: jest.fn(),
+            // #278 reads every verdict, not just the latest one.
+            findMany: jest.fn(),
+        },
+        siteTestRelease: { findFirst: jest.fn() },
+        // Review alerts go on the review write's transaction (UX-043).
+        job: { create: jest.fn() },
+        siteReviewer: { count: jest.fn().mockResolvedValue(1) },
     };
+    db.$transaction = jest.fn((fn: (tx: unknown) => unknown) => fn(db));
+    return { ...actual, prisma: db };
 });
 
 // Test releases on or off for the business (KTD-16).
@@ -834,5 +836,113 @@ describe("Ask for changes says what (UX-043)", () => {
             }),
         ).toEqual([]);
         expect(await errorsFor({ outcome: "APPROVED" })).toEqual([]);
+    });
+});
+
+/*
+ * UX-043: every review event tells the other side, through a `team.alert`
+ * written on the review row's own transaction.
+ */
+describe("telling the other side (UX-043)", () => {
+    const jobCreate = (prisma as unknown as { job: { create: jest.Mock } }).job
+        .create;
+    const reviewerCount = (
+        prisma as unknown as { siteReviewer: { count: jest.Mock } }
+    ).siteReviewer.count;
+    const alerts = () =>
+        jobCreate.mock.calls.map(
+            (c: [{ data: { type: string; payload: unknown } }]) => c[0].data,
+        );
+
+    function draftWithSection() {
+        pageFindFirst.mockReset();
+        pageFindFirst
+            .mockResolvedValueOnce({ id: "page_1" })
+            .mockResolvedValueOnce({
+                title: "Home",
+                versions: [{ sections: [{ key: "sec-abc" }] }],
+            });
+    }
+
+    it("a reviewer's note tells the people who publish", async () => {
+        commentCreate.mockResolvedValue({ id: "c9" });
+        draftWithSection();
+        await service.createComment(ctx({ role: "REVIEWER" }), "site_1", {
+            body: "Too long.",
+            pageId: "page_1",
+            sectionKey: "sec-abc",
+        });
+        expect(alerts()).toEqual([
+            {
+                organizationId: "org_1",
+                type: "team.alert",
+                payload: { event: "review", about: "note", commentId: "c9" },
+            },
+        ]);
+    });
+
+    it("a note by someone who publishes tells nobody", async () => {
+        commentCreate.mockResolvedValue({ id: "c9" });
+        draftWithSection();
+        await service.createComment(ctx({ role: "OWNER" }), "site_1", {
+            body: "Reply.",
+            pageId: "page_1",
+            sectionKey: "sec-abc",
+        });
+        expect(jobCreate).not.toHaveBeenCalled();
+    });
+
+    it("a verdict tells the people who publish, whoever reviews the site", async () => {
+        approvalCreate.mockResolvedValue({ id: "a9" });
+        await service.createApproval(ctx({ role: "REVIEWER" }), "site_1", {
+            outcome: "APPROVED",
+        });
+        expect(reviewerCount).not.toHaveBeenCalled();
+        expect(alerts()).toEqual([
+            {
+                organizationId: "org_1",
+                type: "team.alert",
+                payload: {
+                    event: "review",
+                    about: "approval",
+                    approvalId: "a9",
+                },
+            },
+        ]);
+    });
+
+    it("asking for a review tells the site's reviewers", async () => {
+        approvalCreate.mockResolvedValue({ id: "a10" });
+        const fingerprint = jest
+            .spyOn(service, "currentDraftFingerprint")
+            .mockResolvedValue("fp");
+        await service.requestReview(ctx(), "site_1");
+        expect(reviewerCount).toHaveBeenCalledWith({
+            where: { organizationId: "org_1", siteId: "site_1" },
+        });
+        expect(alerts()).toEqual([
+            {
+                organizationId: "org_1",
+                type: "team.alert",
+                payload: {
+                    event: "review",
+                    about: "approval",
+                    approvalId: "a10",
+                },
+            },
+        ]);
+        fingerprint.mockRestore();
+    });
+
+    it("asking with no reviewer on the site queues nothing", async () => {
+        approvalCreate.mockResolvedValue({ id: "a11" });
+        reviewerCount.mockResolvedValueOnce(0);
+        const fingerprint = jest
+            .spyOn(service, "currentDraftFingerprint")
+            .mockResolvedValue("fp");
+        await service.requestReview(ctx(), "site_1");
+        expect(approvalCreate).toHaveBeenCalledTimes(1);
+        expect(jobCreate).not.toHaveBeenCalled();
+        fingerprint.mockRestore();
     });
 });

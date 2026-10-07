@@ -20,6 +20,8 @@ export interface UpgradeTo {
     planId: string;
     name: string;
     pricePaise: number;
+    /** That plan has no cap on the row (UX-083); absent from an older API. */
+    uncapped?: boolean;
 }
 
 /** One catalogue row. */
@@ -102,6 +104,7 @@ export function rowNotice(
             limit: row.limit,
             plan: view.plan?.name ?? "",
             upgradeTo: row.upgradeTo?.name ?? "",
+            upgradeUncapped: row.upgradeTo?.uncapped === true,
             soft: row.soft === true,
         },
         row.usage,
@@ -117,6 +120,22 @@ export function rowNotice(
         },
     );
     return notice;
+}
+
+/**
+ * Why a create button is off before anyone starts (UX-036): the limit's
+ * own title ("You've reached …") once one more wouldn't get past the API's
+ * check, else null. Only for an enforced catalogue business, and never for
+ * a soft cap, which informs and doesn't refuse.
+ */
+export function createBlock(
+    view: BillingAccessView | null,
+    moduleId: string,
+): string | null {
+    if (view?.source !== "catalogue" || !view.enforced) return null;
+    if (roomForOneMore(view, moduleId) !== false) return null;
+    const n = rowNotice(view, moduleId);
+    return n.on ? n.why || n.title : null;
 }
 
 /**

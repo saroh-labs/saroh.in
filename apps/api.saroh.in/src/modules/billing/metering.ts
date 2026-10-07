@@ -11,7 +11,7 @@
  * | ------------------ | ---------------------------------------------------------------------- |
  * | `products`         | products not archived                                                  |
  * | `ordersPerMonth`   | orders placed this month that stand: not cancelled, and not an online checkout nobody paid (OQ-7); one to be paid on handover stands from the start |
- * | `bookingsPerMonth` | bookings made this month that stand (CONFIRMED), a course's sessions left out |
+ * | `bookingsPerMonth` | bookings customers made on the site this month that stand (CONFIRMED), a course's sessions left out; the team's own bookings never count (DEC-095) |
  * | `blogPosts`        | posts live on a site that isn't deleted                                |
  * | `teamMembers`      | people in the business, plus invitations still open; Reviewers left out (they only look at the website) |
  * | `reviewers`        | Reviewers in the business, plus Reviewer invitations still open |
@@ -89,6 +89,21 @@ export const METER_WORDS: Readonly<Record<MeteredLimitKey, MeterWords>> =
     Object.fromEntries(
         METERED_LIMIT_KEYS.map((k) => [k, LIMIT_WORDS[k]]),
     ) as Record<MeteredLimitKey, MeterWords>;
+
+/**
+ * A total limit of one says nothing at 80% or at the cap (UX-041): the one
+ * thing a plan comes with (its website, its owner) is filled by setting the
+ * business up, so "you've reached your 1 website" on day one is noise. Only
+ * going past it (a soft cap) is told. A monthly one still warns: reaching
+ * this month's one booking is news.
+ */
+export function quietAtOne(
+    key: MeteredLimitKey | undefined,
+    limit: number,
+): boolean {
+    if (limit > 1) return false;
+    return key !== undefined && !METER_WORDS[key].monthly;
+}
 
 /** The catalogue rows whose limit metering counts, by row id. */
 export function meteredModules(): Map<string, MeteredLimitKey> {
@@ -191,12 +206,17 @@ export function standingOrders(since: Date): Prisma.OrderWhereInput {
     };
 }
 
-/** Bookings that stand, a course's sessions left out (COURSES' own). */
+/**
+ * Bookings customers made online that stand, a course's sessions left out
+ * (COURSES' own). A booking the team made in the workspace never counts
+ * (DEC-095).
+ */
 export function standingBookings(since: Date): Prisma.BookingWhereInput {
     return {
         createdAt: { gte: since },
         status: "CONFIRMED",
         courseEnrollmentId: null,
+        bookedOnline: true,
     };
 }
 

@@ -168,6 +168,16 @@ describe("orders and Track (A7)", () => {
         expect(orderDetailResult(detail)).toEqual(detail);
         expect(orderDetailResult({ ...detail, courier: null })).not.toBe(null);
         expect(orderDetailResult({ ...detail, state: "lost" })).toBe(null);
+        // A pick-up's place (UX-025).
+        expect(
+            orderDetailResult({
+                ...detail,
+                collectFrom: { address: "12 Hill Road", hours: null },
+            }),
+        ).not.toBe(null);
+        expect(
+            orderDetailResult({ ...detail, collectFrom: { address: 1 } }),
+        ).toBe(null);
         expect(
             orderDetailResult({
                 ...detail,

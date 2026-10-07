@@ -8,7 +8,8 @@ import { formatStatus } from "@/lib/format/status";
  * the old reading, without any id after a colon.
  */
 export function contactSourceLabel(source: string): string {
-    const key = source.trim();
+    // Case-blind: the contacts list drew these upper-cased (UX-051).
+    const key = source.trim().toLowerCase();
     if (key === "customers:added") return "Added on Customers";
     if (key.startsWith("store-customer:")) return "An order at a location";
     if (key.startsWith("enquiry:")) return "An enquiry";

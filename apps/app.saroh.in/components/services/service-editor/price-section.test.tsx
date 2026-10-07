@@ -118,7 +118,7 @@ describe("the deposit's warning (#821)", () => {
         );
     });
 
-    it("online only with no provider warns even with nothing at booking, and says it's all paid online", () => {
+    it("online only with no provider warns even with nothing at booking, and says only that (UX-056)", () => {
         render(draft({ deposit: "NONE" }), {
             bookingPayment: "ONLINE",
             onlineBlocker: "NO_PROVIDER",
@@ -126,9 +126,8 @@ describe("the deposit's warning (#821)", () => {
         expect(warning()?.textContent).toContain(
             "your booking rules take payment online only",
         );
-        expect(host.textContent).toContain(
-            "They pay ₹1,200 online when booking: your booking rules take payment online only.",
-        );
+        // Never what it would take online right beside "can't be booked".
+        expect(host.textContent).not.toContain("They pay ₹1,200 online");
     });
 
     it("says nothing when all is well, when it couldn't tell, or off the booking page", () => {

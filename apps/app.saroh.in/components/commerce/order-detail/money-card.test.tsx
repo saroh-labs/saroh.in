@@ -87,3 +87,21 @@ describe("MoneyCard's Paid by for a payment recorded by hand (#834)", () => {
         expect(out).not.toContain("· recorded by hand");
     });
 });
+
+describe("MoneyCard after Record as refunded (UX-061)", () => {
+    it("says it went back by hand, not only that it was taken", () => {
+        const out = renderToStaticMarkup(
+            <MoneyCard
+                money={money({ paid: "480.00", due: "0.00" })}
+                delivery={false}
+                paymentStatus="REFUNDED"
+                refundStanding="REFUNDED"
+                invoices={null}
+                payments={null}
+                format={(n) => `₹${n.toFixed(2)}`}
+            />,
+        );
+        expect(out).toContain("Refunded");
+        expect(out).toContain("₹480.00 · by hand");
+    });
+});

@@ -521,6 +521,17 @@ export function InvoiceForm({
                     </Card>
 
                     <Card label="Lines">
+                        {/* The desk's column heads (UX-080): a phone labels
+                            each field instead. The fields carry their own
+                            names for a screen reader. */}
+                        <div
+                            aria-hidden
+                            className="hidden gap-1.5 px-0.5 pb-1 text-[12px] text-muted-foreground sm:grid sm:grid-cols-[minmax(0,3fr)_70px_100px_30px]"
+                        >
+                            <span>What it&apos;s for</span>
+                            <span>Qty</span>
+                            <span>Price each</span>
+                        </div>
                         <ul className="grid gap-1.5">
                             {fields.map((line, i) => {
                                 const lineErr = errors.lines?.[i];

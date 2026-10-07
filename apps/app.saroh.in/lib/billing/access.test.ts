@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
+    createBlock,
     depositLock,
     membershipPlansLock,
     offersOnlinePay,
@@ -559,5 +560,32 @@ describe("ownAccountsRoom (DEC-091, UX-006)", () => {
                 }),
             ),
         ).toBe(true);
+    });
+});
+
+describe("createBlock (UX-036)", () => {
+    it("says why before anyone starts, once one more won't fit", () => {
+        expect(
+            createBlock(access({ modules: [row({ usage: 10 })] }), "products"),
+        ).toBe("You've reached your products limit on Plan A");
+    });
+
+    it("is off while there is room, for a soft cap and when not enforced", () => {
+        expect(
+            createBlock(access({ modules: [row({ usage: 9 })] }), "products"),
+        ).toBeNull();
+        expect(
+            createBlock(
+                access({ modules: [row({ usage: 10, soft: true })] }),
+                "products",
+            ),
+        ).toBeNull();
+        expect(
+            createBlock(
+                access({ enforced: false, modules: [row({ usage: 10 })] }),
+                "products",
+            ),
+        ).toBeNull();
+        expect(createBlock(null, "products")).toBeNull();
     });
 });

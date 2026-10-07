@@ -121,7 +121,20 @@ nobody was told. Round-2 A14 closed it (`bookings/booking-notify.handler.ts`).
   `Notification`), and delegates the customer's side to
   `CustomerNotifyService`. **`customer.notify`** carries an order step
   (Ready, handed over), queued 10 seconds ahead so an Undo deletes it
-  unsent (`cancelOrderStepNotice`); A12 adds the waitlist offer.
+  unsent (`cancelOrderStepNotice`); A12 adds the waitlist offer. UX-042
+  adds **a website order placed** (`ORDER_PLACED`, `order-placed:<orderId>`):
+  queued with the order when it is to be paid on handover, and with the
+  payment's hold when it is paid online (`enqueueOrderPlacedNotice`). It
+  goes through the same `emailRoute` as every notice, so Saroh never sends
+  it (DEC-086 is booking notices only): the thread, and the business's own
+  provider.
+- **`customer-message.notify`** (UX-014) tells the team a customer wrote
+  from their site account: one inbox notice (`message.new`, opening the
+  customer's thread, unique on `(messageId, type)`) and an email to the
+  owners and admins, as an enquiry's. Only the first message of a turn is
+  queued — one after the team last answered or opened the thread
+  (`notifications/customer-message-notify.ts`); follow-ups land in the
+  thread the team is already pointed at.
 - **Once per event.** Both claim a `CustomerNotice` row keyed to the event
   (`booking:<BookingEvent id>`, `order:<OrderEvent id>`) with
   `createMany({ skipDuplicates })` before writing anything: a Postgres
@@ -197,6 +210,22 @@ nobody was told. Round-2 A14 closed it (`bookings/booking-notify.handler.ts`).
 - **Once per event**, claimed as a `CustomerNotice` (`TEAM_TOLD`,
   `team:<event>:<id>`), and re-read first: an unpaid checkout, a payment
   that went through after all, or someone who left again is not announced.
+- **Saroh's own mail for two alerts** (`notifications/team-mail.ts`): a new
+  website order emails the owners and admins as an enquiry's notice does,
+  unless they turned the New order email off (UX-042); a review asked of a
+  site's reviewers, and a new test release, email its reviewers, who have
+  no bell (UX-043). `tellTeam` collects these and the handler sends them
+  only after the claim commits, so a rerun sends none. A counter order and
+  every other alert keep the provider path above.
+- **Review alerts** (`team.alert` `{ event: "review" }`,
+  `notifications/review-alerts.ts`, UX-043), queued on the review write's
+  transaction (`sites/review-alert-queue.ts`): a request or a new test
+  release goes to the reviewers (only queued when the site has one); a
+  verdict, or a reviewer's first note of a round
+  (`team:review-note:<site>:<release|draft>:<author>:<request id>`), goes
+  to the bell and the Website row (`site.review.*`), and the person who
+  asked is emailed whatever they chose. A note by someone who can publish
+  queues nothing.
 - **Order alerts live on the New order row** (`event: "order"` in
   `alert-preferences.ts`, notice types `order.new` and `order.uncollected`).
   A new order type of alert adds its notice type there, so the bell switch
@@ -261,6 +290,27 @@ nobody was told. Round-2 A14 closed it (`bookings/booking-notify.handler.ts`).
   before the inbox row (`plan.limit`, owners and admins) is written; a
   monthly limit's window is the month in the business's zone, so next
   month warns again.
+- **A total cap of one says nothing until it is passed** (`quietAtOne`,
+  UX-041): the business's one website or owner is filled by setting it up.
+  A monthly cap of one still warns.
+- **A notice that no longer stands is cleared** when the inbox is read
+  (`billing/limit-notice-clear.ts`): the count back under its line, a new
+  month, a changed limit or an uncapped row deletes the notice and its
+  claim, so crossing the line again tells again. It never throws.
+
+## Plan change notices — **Current** (UX-041)
+
+- **`plan.change.notice`** tells a business its plan changed when it
+  didn't change it itself: staff set a plan until a date (told now, and
+  again just past the date), or ended one early
+  (`admin/admin-overrides.service.ts`). Payload `{ eventKey, fromPlanId,
+overrideId, reason }`. Re-read, then decide
+  (`billing/plan-change-notice.handler.ts`): still on `fromPlanId` says
+  nothing; an override ended before its date says nothing at its date.
+  Once per event (`PLAN_CHANGED`), inbox type `plan.changed`. Gap: a move
+  the hourly sweep applies (`plan-moves.ts`) and the provider halting a
+  subscription queue none yet; `pricing.move.notice` tells the first a week
+  ahead.
 
 ## Pricing catalogue — **Current** (plans catalogue U4)
 

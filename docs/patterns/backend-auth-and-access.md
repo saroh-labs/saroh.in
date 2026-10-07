@@ -248,7 +248,10 @@ orgId)` (`organizations/organization-kind.ts`).
   design's notice) or `MODULE_LOCKED`; the booking page gets 409
   `BOOKINGS_PAUSED`, which names no plan. What each limit counts is
   `billing/metering.ts`, the one place: orders and bookings that stand
-  (never an unpaid online checkout or a pay-now hold), in the business's
+  (never an unpaid online checkout or a pay-now hold; bookings only those
+  customers made on the site, `Booking.bookedOnline` — the team's own are
+  never capped, and the booking page reads `paused` before its form,
+  DEC-095), in the business's
   month in its zone (many businesses at once: `billing/metering-across.ts`,
   the same rules). The site's checkout is never refused (a soft cap,
   OQ-8); a payment once captured never is (OQ-7). A catalogue cell marked

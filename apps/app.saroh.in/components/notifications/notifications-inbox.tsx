@@ -163,9 +163,24 @@ export function NotificationsInbox({
                                 >
                                     {row}
                                 </Link>
-                            ) : n.type === "plan.limit" ? (
-                                // A plan limit's notice (U13): opening it is
-                                // reading it, and it opens the way to more.
+                            ) : n.contactId ? (
+                                // A customer's message (UX-014): it opens
+                                // their thread, and opening it is reading it.
+                                <Link
+                                    href={`/customers/${encodeURIComponent(n.contactId)}?tab=msg`}
+                                    aria-label={label}
+                                    className={rowClass}
+                                    onClick={() => {
+                                        if (isUnread) markOne(n.id, true);
+                                    }}
+                                >
+                                    {row}
+                                </Link>
+                            ) : n.type === "plan.limit" ||
+                              n.type === "plan.changed" ? (
+                                // A plan limit's notice (U13), or the plan
+                                // changing (UX-041): opening it is reading
+                                // it, and it opens the plans.
                                 <Link
                                     href="/settings/billing#change-plan"
                                     aria-label={label}

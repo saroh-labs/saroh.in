@@ -1,5 +1,6 @@
-import { fromMinor, toMoneyString } from "../../common/money";
+import { fromMinor, toMinor, toMoneyString } from "../../common/money";
 import type { CancelMoney } from "../bookings/booking-cancel";
+import { PAYMENT_METHODS } from "../invoices/invoice-state";
 
 /**
  * What a signed-in customer may see of their own bookings (round-2 plan A,
@@ -63,6 +64,20 @@ export interface AccountBookingRow {
     move: "sheet" | "page" | "call" | null;
     /** What cancelling it now does; null when it can't be cancelled here. */
     cancel: AccountCancelTerms | null;
+    /**
+     * What has been paid for it (UX-049): an amount paid online, at the
+     * desk, or both, or a class of a pack or membership; null when nothing
+     * is paid yet, or it is a treatment's visit (paid on its order).
+     */
+    paid: AccountBookingPaid | null;
+}
+
+/** What a customer has paid for one booking (UX-049). */
+export interface AccountBookingPaid {
+    how: "online" | "desk" | "both" | "pack" | "membership";
+    /** "800.00"; null for a class of a pack or membership. */
+    amount: string | null;
+    currency: string | null;
 }
 
 /** One visit of a treatment, as its card lists it (E9, E10). */
@@ -149,6 +164,42 @@ export interface BookingRowInput {
     visitNumber: number | null;
     service: { id: string; name: string; capacity: number; visits: number };
     staff: { name: string } | null;
+    /** How it was paid: PACK and MEMBERSHIP are a class of one. */
+    paidWith?: string | null;
+    /** A treatment's visit: paid on its order, never here. */
+    orderId?: string | null;
+    /** Its own PAID paper (`ROW_SELECT`). */
+    invoices?: readonly {
+        total: { toString(): string };
+        currency: string;
+        paymentMethod: string | null;
+    }[];
+}
+
+/** A way of paying recorded by hand at the desk, never a provider's. */
+function byHand(method: string | null): boolean {
+    return (PAYMENT_METHODS as readonly (string | null)[]).includes(method);
+}
+
+/** What has been paid for a booking — see {@link AccountBookingPaid}. */
+export function paidView(row: BookingRowInput): AccountBookingPaid | null {
+    if (row.orderId) return null;
+    if (row.paidWith === "PACK" || row.paidWith === "MEMBERSHIP") {
+        return {
+            how: row.paidWith === "PACK" ? "pack" : "membership",
+            amount: null,
+            currency: null,
+        };
+    }
+    const paper = row.invoices ?? [];
+    if (paper.length === 0) return null;
+    const desk = paper.filter((p) => byHand(p.paymentMethod)).length;
+    const minor = paper.reduce((n, p) => n + toMinor(p.total), 0);
+    return {
+        how: desk === 0 ? "online" : desk === paper.length ? "desk" : "both",
+        amount: fromMinor(minor),
+        currency: paper[0].currency,
+    };
 }
 
 function online(locationType: string | null): boolean | null {
@@ -201,6 +252,7 @@ export function bookingRowView(
                   credit: actions.cancel.credit,
               }
             : null,
+        paid: paidView(row),
     };
 }
 

@@ -92,6 +92,20 @@ describe("the Bookings answers (A6)", () => {
             isBookingRow({ ...ROW, cancel: { ...ROW.cancel, money: "some" } }),
         ).toBe(false);
         expect(isBookingRow({ ...ROW, visit: { number: "2" } })).toBe(false);
+        // What was paid (UX-049): read when sent, optional from an older API.
+        expect(
+            isBookingRow({
+                ...ROW,
+                paid: { how: "online", amount: "800.00", currency: "INR" },
+            }),
+        ).toBe(true);
+        expect(isBookingRow({ ...ROW, paid: null })).toBe(true);
+        expect(
+            isBookingRow({
+                ...ROW,
+                paid: { how: "card", amount: "800.00", currency: "INR" },
+            }),
+        ).toBe(false);
         expect(
             bookingsResult({
                 comingUp: [ROW],

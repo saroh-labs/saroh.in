@@ -105,7 +105,7 @@ export function WhenStep({
                     day={day}
                     zone={zone}
                     phone={phone}
-                    service={service}
+                    staff={service.staff}
                     chosen={chosen}
                     onDay={onDay}
                     onStart={onStart}

@@ -79,6 +79,13 @@ export const cellSchema = z.discriminatedUnion("inc", [
 export const trialSchema = z.object({
     on: z.boolean(),
     days: z.number().int().min(TRIAL_DAYS_MIN).max(TRIAL_DAYS_MAX),
+    /**
+     * What the first `days` cost, before GST, taken with the autopay set-up
+     * (DEC-093: a nominal first month). Absent or zero: they're free, and the
+     * provider's own small set-up check is refunded. Never more than the plan's
+     * monthly price.
+     */
+    firstPaise: paise.optional(),
 });
 
 export const planSchema = z.object({
@@ -173,6 +180,14 @@ export const catalogSchema = catalogShape.superRefine((c, ctx) => {
                 "trial",
             ]);
         }
+        if ((p.trial?.firstPaise ?? 0) > p.pricePaise) {
+            issue(`${p.name}'s first month can't cost more than a month`, [
+                "plans",
+                i,
+                "trial",
+                "firstPaise",
+            ]);
+        }
     });
 
     const planIds = new Set(c.plans.map((p) => p.id));
@@ -246,6 +261,15 @@ export type Trial = z.infer<typeof trialSchema>;
 
 /** A cell the snapshot leaves out reads as excluded and locked. */
 export const MISSING_CELL: ExcludedCell = { inc: false, off: "locked" };
+
+/**
+ * What a plan's offer charges for its first days, before GST (DEC-093): the
+ * catalogue's nominal first month, or zero when they're free or there's no
+ * offer.
+ */
+export function trialFirstPaise(plan: Pick<Plan, "trial">): number {
+    return plan.trial?.on ? (plan.trial.firstPaise ?? 0) : 0;
+}
 
 export function cellOf(module: CatalogModule, planId: string): Cell {
     return module.cells[planId] ?? MISSING_CELL;

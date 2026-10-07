@@ -276,8 +276,8 @@ function TurnOnBody({
                         !connectButtons &&
                         !plan.order.some((k) => lockOf(k)) ? (
                             <p className="text-[12.5px] text-muted-foreground">
-                                Nothing to fill in. It works as soon as
-                                it&apos;s on.
+                                Nothing to fill in here. Anything it still needs
+                                is said once it&apos;s on.
                             </p>
                         ) : null}
                         {connectButtons ? (

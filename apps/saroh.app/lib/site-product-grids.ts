@@ -37,9 +37,16 @@ function queryOf(content: unknown): string | null {
 export function getProductGridFeeds(
     sections: readonly { type: string; content: unknown }[],
     siteId: string | null,
+    /** The page is the Shop page itself (UX-082). */
+    atShop = false,
 ): Promise<(ProductGridFeed | undefined)[] | undefined> {
-    return productGridFeeds(sections, "/shop", queryOf, (query) =>
-        siteId ? getGridProducts(siteId, query) : Promise.resolve([]),
+    return productGridFeeds(
+        sections,
+        "/shop",
+        queryOf,
+        (query) =>
+            siteId ? getGridProducts(siteId, query) : Promise.resolve([]),
+        atShop,
     );
 }
 

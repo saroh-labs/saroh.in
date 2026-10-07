@@ -10,6 +10,10 @@ import { JobHandlerRegistry } from "../jobs/job-handler.registry";
 import { JobsModule } from "../jobs/jobs.module";
 import { OrganizationsModule } from "../organizations/organizations.module";
 import {
+    CUSTOMER_MESSAGE_NOTIFY_TYPE,
+    CustomerMessageNotifyHandler,
+} from "./customer-message-notify.handler";
+import {
     ENQUIRY_NOTIFY_TYPE,
     EnquiryNotifyHandler,
 } from "./enquiry-notify.handler";
@@ -20,7 +24,8 @@ import { NotificationsService } from "./notifications.service";
 import { TEAM_ALERT_TYPE, TeamAlertHandler } from "./team-alert.handler";
 
 /**
- * New-enquiry notifications (S3-006), and the team's alerts (round-2 F14).
+ * New-enquiry notifications (S3-006), a customer's message from their site
+ * account (UX-014), and the team's alerts (round-2 F14).
  *
  * Wired together:
  *  - The CONSUMERS: {@link EnquiryNotifyHandler} for `enquiry.notify`, and
@@ -52,6 +57,7 @@ import { TEAM_ALERT_TYPE, TeamAlertHandler } from "./team-alert.handler";
         NotificationsService,
         NotificationPreferencesService,
         EnquiryNotifyHandler,
+        CustomerMessageNotifyHandler,
         TeamAlertHandler,
         CommunicationsService,
         OrganizationGuard,
@@ -63,11 +69,16 @@ export class NotificationsModule implements OnModuleInit {
         private readonly registry: JobHandlerRegistry,
         private readonly handler: EnquiryNotifyHandler,
         private readonly teamAlerts: TeamAlertHandler,
+        private readonly customerMessages: CustomerMessageNotifyHandler,
     ) {}
 
-    /** Wire the enquiry and team-alert consumers into the job worker at boot. */
+    /** Wire the enquiry, message and team-alert consumers into the worker at boot. */
     onModuleInit(): void {
         this.registry.register(ENQUIRY_NOTIFY_TYPE, this.handler.handle);
         this.registry.register(TEAM_ALERT_TYPE, this.teamAlerts.handle);
+        this.registry.register(
+            CUSTOMER_MESSAGE_NOTIFY_TYPE,
+            this.customerMessages.handle,
+        );
     }
 }

@@ -216,10 +216,11 @@ function OneToOne({
         // Taken at the desk (P2): how, never how much.
         paidText(b)
     ) : b.paidWith === "PAID" ? (
+        // How it was paid, and how much to someone who sees money (UX-049).
         price ? (
-            `${price} paid`
+            `${price} paid online`
         ) : (
-            "Paid"
+            "Paid online"
         )
     ) : b.paidWith === "DESK" ? (
         "Not yet — pays at the session"

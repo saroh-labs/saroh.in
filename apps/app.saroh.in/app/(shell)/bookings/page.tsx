@@ -30,6 +30,7 @@ import {
     readBookingsCalendar,
     readNow,
 } from "@/lib/services/service";
+import { readServiceHours } from "@/lib/services/service-hours-read";
 import { requireSession } from "@/lib/session";
 import type { StaffList } from "@/lib/staff/service";
 import { getBookingRules, listStaff } from "@/lib/staff/service";
@@ -118,10 +119,16 @@ export default async function BookingsPage({
                     return [days[0] ?? date, days.at(-1) ?? date];
                 })()
               : [date, date];
-    const calendar = await readBookingsCalendar(
-        dayBounds(first, timezone).from.toISOString(),
-        dayBounds(last, timezone).to.toISOString(),
-    );
+    const [calendar, serviceHours] = await Promise.all([
+        readBookingsCalendar(
+            dayBounds(first, timezone).from.toISOString(),
+            dayBounds(last, timezone).to.toISOString(),
+        ),
+        // With nobody on the diary, customers book each service in its own
+        // hours: the calendar draws them, as the booking page offers them
+        // (UX-023).
+        readServiceHours(services, staffList),
+    ]);
 
     if (!calendar) {
         return (
@@ -159,6 +166,7 @@ export default async function BookingsPage({
                 rules={rules}
                 notices={notices}
                 limitNotice={<PlanLimitNotice moduleId="bookings" />}
+                serviceHours={serviceHours}
                 people={people}
                 can={{
                     book: may("booking:write"),

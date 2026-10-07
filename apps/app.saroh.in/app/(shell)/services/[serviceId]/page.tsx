@@ -4,7 +4,6 @@ import { rowLock } from "@/lib/billing/access";
 import { billingAccessOrNull } from "@/lib/saroh-billing/service";
 import { loadEditorContext } from "@/lib/services/editor-data";
 import { listRules, readService } from "@/lib/services/service";
-import { showKind } from "@/lib/services/service-editor";
 import { readServiceUsage } from "@/lib/services/usage-read";
 import { requireSession } from "@/lib/session";
 
@@ -49,7 +48,6 @@ export default async function ServiceEditorPage({
     }
     const service = read.service;
     const {
-        services,
         staff,
         hasPage,
         hasStorefront,
@@ -71,7 +69,6 @@ export default async function ServiceEditorPage({
             currency={service.currency ?? currency}
             timezone={timezone}
             canEdit={canEdit}
-            kindUp={showKind(services, service)}
             hasPage={hasPage}
             hasStorefront={hasStorefront}
             paymentsLock={rowLock(access, "payments")}

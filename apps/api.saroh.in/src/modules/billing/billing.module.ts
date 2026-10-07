@@ -15,6 +15,7 @@ import { BillingWebhookController } from "./billing-webhook.controller";
 import { BillingWebhookService } from "./billing-webhook.service";
 import { BillingController, PlansController } from "./billing.controller";
 import { CatalogueAccessService } from "./catalogue-access.service";
+import { CheckoutConfirmService } from "./checkout-confirm.service";
 import { CheckoutService } from "./checkout.service";
 import { EntitlementService } from "./entitlement.service";
 import { BILLING_FREE_ROWS_TYPE, FreeRowsHandler } from "./free-rows.job";
@@ -23,6 +24,10 @@ import {
     BILLING_MOVES_APPLY_TYPE,
     MovesApplyHandler,
 } from "./moves-apply.handler";
+import {
+    PLAN_CHANGE_NOTICE_TYPE,
+    PlanChangeNoticeHandler,
+} from "./plan-change-notice.handler";
 import { PlanLimitNoticeHandler } from "./plan-limit-notice.handler";
 import { PlansService } from "./plans.service";
 import {
@@ -58,7 +63,8 @@ const CHAIN_CHECK_MS = 6 * 60 * 60 * 1000;
  * `GET …/billing/access` read {@link CatalogueAccessService} (plans catalogue
  * U12), exported for metering (U13). {@link MeteringService} counts and
  * enforces the catalogue's limits behind `PLAN_ENFORCEMENT` (U13), and
- * {@link PlanLimitNoticeHandler} tells a business it is near or at one.
+ * {@link PlanLimitNoticeHandler} tells a business it is near or at one,
+ * and {@link PlanChangeNoticeHandler} that its plan changed (UX-041).
  *
  * Saroh's own checkout and plan changes (plans catalogue U15) are
  * {@link CheckoutService}; three jobs back them: the billing-provider plan
@@ -96,8 +102,10 @@ const CHAIN_CHECK_MS = 6 * 60 * 60 * 1000;
         EntitlementService,
         MeteringService,
         PlanLimitNoticeHandler,
+        PlanChangeNoticeHandler,
         BillingWebhookService,
         CheckoutService,
+        CheckoutConfirmService,
         ProviderPlanSyncService,
         ProviderCancelHandler,
         MovesApplyHandler,
@@ -126,13 +134,14 @@ export class BillingModule implements OnModuleInit, OnModuleDestroy {
         private readonly cancel: ProviderCancelHandler,
         private readonly sweep: MovesApplyHandler,
         private readonly limitNotice: PlanLimitNoticeHandler,
+        private readonly planChange: PlanChangeNoticeHandler,
         private readonly billingEmail: BillingEmailHandler,
         private readonly addonsSync: AddonsSyncHandler,
         private readonly freeRows: FreeRowsHandler,
     ) {}
 
     /**
-     * Registers the seven jobs and starts the sweep's chain — the renewal
+     * Registers the eight jobs and starts the sweep's chain — the renewal
      * job's shape (ADR-007): never under test, where no worker runs, and
      * never throwing, so a database not up yet cannot stop the boot.
      */
@@ -144,6 +153,7 @@ export class BillingModule implements OnModuleInit, OnModuleDestroy {
         );
         this.registry.register(BILLING_MOVES_APPLY_TYPE, this.sweep.handle);
         this.registry.register(PLAN_LIMIT_NOTICE_TYPE, this.limitNotice.handle);
+        this.registry.register(PLAN_CHANGE_NOTICE_TYPE, this.planChange.handle);
         this.registry.register(BILLING_EMAIL_TYPE, this.billingEmail.handle);
         this.registry.register(
             BILLING_ADDONS_SYNC_TYPE,

@@ -1,10 +1,13 @@
 import { BadRequestException, ConflictException } from "@nestjs/common";
 
 import {
+    assertHandedOver,
     assertOneParty,
     assertStorefrontOffers,
     cashReceivedCents,
     COUNTER_NOTE,
+    HANDED_OVER_NOTE,
+    handOverAtCounterInTx,
     isCounterPayment,
     storefrontOffers,
 } from "./new-order";
@@ -99,5 +102,66 @@ describe("the ways a storefront offers", () => {
 
     it("leaves Digital to the product (B12)", () => {
         expect(() => assertStorefrontOffers("DIGITAL", [])).not.toThrow();
+    });
+});
+
+describe("handed over now (UX-059)", () => {
+    it("takes a pick-up paid at the counter now", () => {
+        for (const kind of ["CASH", "UPI", "CARD"]) {
+            expect(() =>
+                assertHandedOver({
+                    handedOver: true,
+                    payment: { kind },
+                    fulfilment: "PICKUP",
+                }),
+            ).not.toThrow();
+        }
+    });
+
+    it("refuses one not paid now, or not picked up", () => {
+        expect(() =>
+            assertHandedOver({
+                handedOver: true,
+                payment: { kind: "LATER" },
+                fulfilment: "PICKUP",
+            }),
+        ).toThrow("paid at the counter now");
+        expect(() =>
+            assertHandedOver({
+                handedOver: true,
+                payment: { kind: "CASH" },
+                fulfilment: "SHIPPING",
+            }),
+        ).toThrow("Only a pick-up");
+        expect(() =>
+            assertHandedOver({ payment: null, fulfilment: "SHIPPING" }),
+        ).not.toThrow();
+    });
+
+    it("makes it Collected with one step, and sells what it held", async () => {
+        const tx = {
+            orderItem: {
+                findMany: jest.fn().mockResolvedValue([]),
+            },
+            order: { update: jest.fn() },
+            orderEvent: { create: jest.fn() },
+        };
+        await handOverAtCounterInTx(tx as never, {
+            orderId: "o1",
+            organizationId: "org1",
+            userId: "u1",
+        });
+        expect(tx.order.update).toHaveBeenCalledWith({
+            where: { id: "o1" },
+            data: { stage: "COLLECTED", status: "DELIVERED" },
+        });
+        expect(tx.orderEvent.create).toHaveBeenCalledWith({
+            data: expect.objectContaining({
+                kind: "STAGE",
+                fromStage: "NEW",
+                toStage: "COLLECTED",
+                note: HANDED_OVER_NOTE,
+            }),
+        });
     });
 });

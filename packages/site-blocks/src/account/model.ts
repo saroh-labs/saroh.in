@@ -107,6 +107,11 @@ export interface AccountOrderDetail {
     } | null;
     refund: string | null;
     receipt: string | null;
+    /**
+     * A pick-up's place (UX-025): the address and hours to collect it
+     * from. Null without one; absent from an older API.
+     */
+    collectFrom?: { address: string; hours: string | null } | null;
 }
 
 export interface AccountPlan {

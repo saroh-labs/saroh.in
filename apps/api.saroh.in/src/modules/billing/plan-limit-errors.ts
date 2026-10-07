@@ -62,7 +62,13 @@ export function planLimitReached(
 ): ForbiddenException {
     const words = METER_WORDS[key];
     const n = limitNotice(
-        { inc: true, limit, plan: row.plan, upgradeTo: row.upgradeTo },
+        {
+            inc: true,
+            limit,
+            plan: row.plan,
+            upgradeTo: row.upgradeTo,
+            upgradeUncapped: row.upgradeUncapped,
+        },
         Math.max(used, limit),
         words.what,
         words.paused,

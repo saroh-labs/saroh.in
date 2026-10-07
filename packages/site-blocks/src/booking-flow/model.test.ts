@@ -78,7 +78,7 @@ describe("the words on the booking page (U19)", () => {
         ).toBe("60 min · class of 12");
     });
 
-    it("tells Full from Closed, and shortens on a phone", () => {
+    it("tells Full from Closed from No times, and shortens only the count on a phone", () => {
         const day = (over: Partial<BookingDay>): BookingDay => ({
             date: "2026-09-20",
             open: true,
@@ -91,9 +91,18 @@ describe("the words on the booking page (U19)", () => {
         expect(dayCountLabel(three, false)).toBe("3 free");
         expect(dayCountLabel(three, true)).toBe("3");
         expect(dayCountLabel(day({}), false)).toBe("Full");
-        expect(dayCountLabel(day({ open: false }), false)).toBe("Closed");
-        expect(dayCountLabel(day({ open: false }), true)).toBe("Shut");
-        expect(dayAria(day({ open: false }))).toBe("Sun 20 Sep: closed");
+        // The business is closed that day: Closed, on both (UX-054).
+        const shut = day({ open: false, closed: true });
+        expect(dayCountLabel(shut, false)).toBe("Closed");
+        expect(dayCountLabel(shut, true)).toBe("Closed");
+        expect(dayAria(shut)).toBe("Sun 20 Sep: closed");
+        // Open, but nobody takes this service that day: never "Closed".
+        const none = day({ open: false, closed: false });
+        expect(dayCountLabel(none, false)).toBe("No times");
+        expect(dayCountLabel(none, true)).toBe("No times");
+        expect(dayAria(none)).toBe("Sun 20 Sep: no times");
+        // An older API that doesn't say: No times, never a false Closed.
+        expect(dayCountLabel(day({ open: false }), false)).toBe("No times");
         expect(dayAria(three)).toBe("Sun 20 Sep: 3 times free");
     });
 
@@ -144,6 +153,21 @@ describe("the words on the booking page (U19)", () => {
             "Need to change it? Get in touch with Pulse Fitness. Free to cancel until 12 hours before the start.",
         );
         expect(text).not.toMatch(/email|text|link|SMS/i);
+        // Signed in, it is moved or cancelled from their bookings (UX-055).
+        expect(
+            changeText(
+                "Pulse Fitness",
+                {
+                    bookAheadDays: null,
+                    latestBookingMinutes: null,
+                    freeCancelHours: 12,
+                },
+                false,
+                true,
+            ),
+        ).toBe(
+            "Need to change it? Move or cancel it from your bookings on Pulse Fitness's website. Free to cancel until 12 hours before the start.",
+        );
     });
 
     it("states a no-refund policy only to someone paying online (E30)", () => {

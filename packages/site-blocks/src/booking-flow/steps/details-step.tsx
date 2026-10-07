@@ -10,11 +10,12 @@ import { WhereAndNote } from "./where-and-note";
  * Step 3: who is booking, then where (for a service offered either way) and
  * anything the team should know (E7).
  *
- * Sign-in is always on (A9, ADR-011): nobody types an email or a phone here.
- * A signed-in customer reads "Booking as ‹name› · Not you?"; a visitor who
+ * Sign-in is always on (A9, ADR-011): nobody types an email here. A
+ * signed-in customer reads "Booking as ‹name› · Not you?"; a visitor who
  * isn't signed in yet gives their name, and confirms their email with a
  * code at the last step. A name is asked for only while the account has
- * none, so the team never gets a booking without one.
+ * none, so the team never gets a booking without one. A phone is optional
+ * (UX-049): the business can call them, and paying online starts with it.
  */
 export function DetailsStep({
     ids,
@@ -31,6 +32,8 @@ export function DetailsStep({
     note,
     onWhere,
     onNote,
+    phone = "",
+    onPhone,
     forWaitlist = false,
 }: {
     /** The flow's `useId()`, so each field's id is its own. */
@@ -51,6 +54,9 @@ export function DetailsStep({
     note: string;
     onWhere: (where: BookingWhere) => void;
     onNote: (note: string) => void;
+    /** A phone to reach them on, optional (UX-049). */
+    phone?: string;
+    onPhone?: (phone: string) => void;
     /**
      * Joining a full class's waitlist (A12): who they are is all it needs,
      * so Where and the note wait for the booking.
@@ -101,6 +107,18 @@ export function DetailsStep({
                     }
                 />
             ) : null}
+            {forWaitlist || !onPhone ? null : (
+                <Field
+                    id={`${ids}-phone`}
+                    label="Phone (optional)"
+                    type="tel"
+                    autoComplete="tel"
+                    placeholder={`So ${business} can call you about it`}
+                    value={phone}
+                    onChange={onPhone}
+                    error={null}
+                />
+            )}
             {forWaitlist ? null : (
                 <WhereAndNote
                     ids={ids}

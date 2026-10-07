@@ -9,6 +9,9 @@ describe("contactSourceLabel", () => {
         ["enquiry:form:f_1", "An enquiry"],
         ["site-account", "Signed in on your website"],
         ["manual", "Added by hand"],
+        // The contacts list drew these upper-cased (UX-051).
+        ["MANUAL", "Added by hand"],
+        ["SITE-ACCOUNT", "Signed in on your website"],
     ])("says %s in words", (source, words) => {
         expect(contactSourceLabel(source)).toBe(words);
     });

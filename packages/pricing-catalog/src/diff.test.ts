@@ -87,6 +87,17 @@ describe("diff", () => {
         ]);
     });
 
+    it("words a first month that starts or stops costing something", () => {
+        const a = edit(fixture(), (c) => {
+            c.plans[1].trial = { on: true, days: 30 };
+        });
+        const b = edit(a, (c) => {
+            c.plans[1].trial = { on: true, days: 30, firstPaise: 700 };
+        });
+        expect(diff(a, b)).toEqual(["Plan B: first 30 days cost ₹7 + GST"]);
+        expect(diff(b, a)).toEqual(["Plan B: first 30 days free"]);
+    });
+
     it("notices removed modules and reordered rows", () => {
         const b = edit(fixture(), (c) => {
             c.modules = c.modules.filter((m) => m.id !== "roles");

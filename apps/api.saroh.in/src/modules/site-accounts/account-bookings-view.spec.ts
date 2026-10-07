@@ -88,8 +88,46 @@ describe("a booking row in the account (A6)", () => {
                 money: "refund",
                 credit: null,
             },
+            paid: null,
         });
         expect(leaks(view)).toEqual([]);
+    });
+
+    it("says what was paid for it and how, never a payment reference (UX-049)", () => {
+        const paper = (paymentMethod: string | null, total = "800.00") => ({
+            total,
+            currency: "INR",
+            paymentMethod,
+            providerRef: "pay_ref_123",
+        });
+        const online = bookingRowView(row({ invoices: [paper(null)] }));
+        expect(online.paid).toEqual({
+            how: "online",
+            amount: "800.00",
+            currency: "INR",
+        });
+        expect(leaks(online)).toEqual([]);
+        expect(
+            bookingRowView(row({ invoices: [paper("CASH")] })).paid,
+        ).toMatchObject({ how: "desk", amount: "800.00" });
+        // A deposit online, the rest at the desk.
+        expect(
+            bookingRowView(
+                row({
+                    invoices: [paper(null, "300.00"), paper("UPI", "900.00")],
+                }),
+            ).paid,
+        ).toEqual({ how: "both", amount: "1200.00", currency: "INR" });
+        expect(bookingRowView(row({ paidWith: "PACK" })).paid).toEqual({
+            how: "pack",
+            amount: null,
+            currency: null,
+        });
+        // A treatment's visit is paid on its order, not here.
+        expect(
+            bookingRowView(row({ orderId: "ord_1", invoices: [paper(null)] }))
+                .paid,
+        ).toBeNull();
     });
 
     it("says how it went, a class from a one-to-one, and a treatment's visit as N of M", () => {

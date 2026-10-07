@@ -82,6 +82,12 @@ describe("AccountHeader", () => {
         expect(screen.queryByRole("button")).toBeNull();
     });
 
+    it("names the business, a link back to the site (UX-075)", () => {
+        render(<AccountHeader businessName="Kavi Dental" tabs={TABS} />);
+        const name = screen.getByRole("link", { name: "Kavi Dental" });
+        expect(name.getAttribute("href")).toBe("/");
+    });
+
     it("takes the caller's title while signed out", () => {
         render(<AccountHeader businessName="Pulse" title="Your account" />);
         expect(

@@ -51,7 +51,11 @@ export async function PublishedPage({
         getJournalFeed(page.sections, snapshot, siteId),
         getPlansFeed(page.sections, snapshot, siteId),
         getPacksFeed(page.sections, snapshot, siteId),
-        getProductGridFeeds(page.sections, siteId),
+        getProductGridFeeds(
+            page.sections,
+            siteId,
+            page.kind === "SHOP" || page.path === "/shop",
+        ),
     ]);
     const [prices, thread] = await Promise.all([
         pricesActions(snapshot.site.name, plans, packs),

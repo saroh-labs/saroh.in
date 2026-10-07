@@ -28,6 +28,10 @@ jest.mock("@saroh/database", () => {
         // Recording a payment by hand keeps what was taken (`paidByHand`).
         findUnique: jest.fn().mockResolvedValue({ total: "250.00" }),
         update: jest.fn(),
+        // What a refund by hand hands back is read first (UX-061).
+        findUniqueOrThrow: jest
+            .fn()
+            .mockResolvedValue({ total: "450.00", paidByHand: "450.00" }),
         // Cancelling or refunding retires the order's pay link (B11).
         updateMany: jest.fn().mockResolvedValue({ count: 0 }),
     };
@@ -271,12 +275,22 @@ describe("OrdersService.updateStatus lifecycle guard (mocked Prisma)", () => {
         const service = makeService();
         orderFindFirst.mockResolvedValue({
             id: ORDER,
+            organizationId: "org1",
             status: "DELIVERED",
             paymentStatus: "PAID",
             items: [{ productId: "p1", quantity: 1 }],
         });
         await service.updateStatus(STORE, ORDER, USER, {
             paymentStatus: "REFUNDED",
+            refundedHow: "CASH",
+        });
+        // On the timeline: how much went back, and how (UX-061).
+        expect(eventCreate).toHaveBeenCalledWith({
+            data: expect.objectContaining({
+                kind: "REFUND",
+                note: "Handed back in cash",
+                amountCents: 45_000,
+            }),
         });
         expect(creditRestOfOrder).toHaveBeenCalledWith(
             expect.anything(),

@@ -86,3 +86,46 @@ describe("DepositField on a plan without online payments", () => {
         expect(html).toContain("when booking, and the rest");
     });
 });
+
+describe("DepositField when online can't take the deposit (UX-056)", () => {
+    const atDesk = {
+        blocked: false,
+        text: "Paid at the desk for now: no payment provider is connected, so nothing is taken when people book.",
+        line: "",
+        fix: { href: "/settings/providers", label: "Connect one" },
+    };
+
+    it("says only the desk outcome, never what it would take when booking", () => {
+        const html = renderToStaticMarkup(
+            <DepositField
+                deposit="PERCENT_25"
+                price="1200"
+                currency="INR"
+                problem={atDesk}
+                onChange={() => undefined}
+            />,
+        );
+        expect(html).toContain("Paid at the desk for now");
+        expect(html).toContain("at the visit.");
+        expect(html).not.toContain("when booking");
+        expect(html).not.toContain("Refunded if they cancel in time");
+    });
+
+    it("says only the problem when it can't be booked online at all", () => {
+        const html = renderToStaticMarkup(
+            <DepositField
+                deposit="PERCENT_25"
+                price="1200"
+                currency="INR"
+                problem={{
+                    ...atDesk,
+                    blocked: true,
+                    text: "People can't book this online: no provider.",
+                }}
+                onChange={() => undefined}
+            />,
+        );
+        expect(html).toContain("People can&#x27;t book this online");
+        expect(html).not.toContain("They pay");
+    });
+});

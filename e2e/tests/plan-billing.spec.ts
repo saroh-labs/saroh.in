@@ -46,10 +46,13 @@ test("shows the plan, the picker and Saroh's invoices", async ({ page }) => {
     const picker = page.getByRole("region", { name: "Change plan" });
     await expect(
         picker.getByText(
-            "Change plan any time. Upgrades start today; downgrades from your next charge.",
+            "Monthly is autopay for 12 months, then renew with one tap; yearly is one payment. Upgrades start today; downgrades from your next charge.",
         ),
     ).toBeVisible();
-    await expect(picker.getByText("Current plan")).toHaveCount(1);
+    // The plan it's on: "Current plan", or a plan given for a while (UX-044).
+    await expect(
+        picker.getByText(/^(Current plan|You're on this)/),
+    ).toHaveCount(1);
 
     await expect(
         page.getByRole("region", { name: "Invoices from Saroh" }),
@@ -64,7 +67,7 @@ test("a plan's change opens its quote, and Cancel leaves it", async ({
     const picker = page.getByRole("region", { name: "Change plan" });
     const change = picker
         .getByRole("button", {
-            name: /^(Upgrade|Switch|Start \d+-day trial|Bill (yearly|monthly)): /,
+            name: /^(Upgrade|Switch|Start \d+-day trial|Start with the first month|Keep .+|Bill (yearly|monthly)): /,
         })
         .first();
     await change.click();

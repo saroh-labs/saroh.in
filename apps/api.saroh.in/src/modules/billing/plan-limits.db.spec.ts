@@ -2,8 +2,8 @@
  * Every catalogue limit and lock, refused where the write happens (plans
  * catalogue U13, R7), against a real Postgres: products (made, copied,
  * brought back from the archive), orders a month taken by hand, bookings a
- * month (by hand, and the booking page told only that the business isn't
- * taking bookings), blog posts put live, team members invited, integrations
+ * month made online (the booking page told only that the business isn't
+ * taking bookings; the team's own bookings never capped, DEC-095), blog posts put live, team members invited, integrations
  * connected, websites made, locations turned into places customers visit,
  * Reviewers left off the team count, the soft caps (storage, visits) that
  * tell and never refuse, and the switches — custom roles, themes, site
@@ -65,7 +65,7 @@ import { SitesService } from "../sites/sites.service";
 import { StorefrontsService } from "../stores/storefronts.service";
 import { StoresService } from "../stores/stores.service";
 import { EntitlementService } from "./entitlement.service";
-import { monthWindow } from "./metering";
+import { countUsage, monthWindow } from "./metering";
 import { PLAN_LIMIT_NOTICE_TYPE } from "./metering.service";
 import { BOOKINGS_PAUSED_MESSAGE } from "./plan-limit-errors";
 
@@ -316,11 +316,12 @@ describe("bookings a month (DB, U13)", () => {
                 timezone: "Asia/Kolkata",
                 snapshot: {},
                 bookerEmail: `${uniq("seed")}@example.test`,
+                bookedOnline: true,
                 createdAt,
             },
         });
 
-    it("counts the month in the business's zone, then refuses", async () => {
+    it("counts the month's online bookings in the business's zone, then pauses the booking page only", async () => {
         const b = await business("free");
         service = await prisma.service.create({
             data: {
@@ -335,17 +336,22 @@ describe("bookings a month (DB, U13)", () => {
         // Last month in India (the cap was full then): not counted.
         await seeded(b.orgId, new Date(monthStart.getTime() - 15 * MINUTE));
         await seeded(b.orgId, new Date(monthStart.getTime() - 10 * MINUTE));
-        await expect(book(b.ownerId)).resolves.toHaveProperty("id");
+        // One made online counts…
+        await expect(book(null)).resolves.toMatchObject({
+            bookedOnline: true,
+        });
         // This month in India, though still last month in UTC.
         await seeded(b.orgId, new Date(monthStart.getTime() + 15 * MINUTE));
+        expect(await countUsage(prisma, b.orgId, "bookingsPerMonth")).toBe(2);
 
-        const byHand = await refused(book(b.ownerId));
-        expect(byHand.details).toMatchObject({
-            code: "PLAN_LIMIT_REACHED",
-            limitKey: "bookingsPerMonth",
-            limit: 2,
-            used: 2,
+        // …one the team makes at the desk is never capped, nor counted
+        // (DEC-095).
+        await expect(book(b.ownerId)).resolves.toMatchObject({
+            bookedOnline: false,
         });
+        await expect(book(b.ownerId)).resolves.toHaveProperty("id");
+        expect(await countUsage(prisma, b.orgId, "bookingsPerMonth")).toBe(2);
+
         // The booking page names no plan or limit, and holds nothing.
         const online = await refused(book(null), ConflictException);
         expect(online).toEqual({

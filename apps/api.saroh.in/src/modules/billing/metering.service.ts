@@ -8,7 +8,7 @@ import { FeatureFlagService } from "../feature-flags/feature-flags.service";
 import { FlagKey } from "../feature-flags/flags";
 import { CatalogueAccessService } from "./catalogue-access.service";
 import type { MeteredLimitKey } from "./metering";
-import { countUsage, meteredKeyOf } from "./metering";
+import { countUsage, meteredKeyOf, quietAtOne } from "./metering";
 import { moduleLocked, planLimitReached } from "./plan-limit-errors";
 
 /** The job that tells a business it is near or at a limit. */
@@ -333,13 +333,18 @@ export function rowGate(
 
 /**
  * Whether a write takes a business over a notice's line: to 80% of its cap,
- * to the cap, or (a soft cap) past it for the first time.
+ * to the cap, or (a soft cap) past it for the first time. A total cap of
+ * one has only the last line (`quietAtOne`).
  */
 export function crossesNotice(
-    room: Pick<PlanRoom, "limit" | "used" | "adding">,
+    room: Pick<PlanRoom, "limit" | "used" | "adding"> &
+        Partial<Pick<PlanRoom, "key">>,
 ): boolean {
     const { limit, used } = room;
     const after = used + room.adding;
+    // A total of one is reached by setting the business up (its one
+    // website): no notice, so no job (UX-041, `quietAtOne`). Past it is.
+    if (quietAtOne(room.key, limit)) return used <= limit && after > limit;
     const warnAt = Math.ceil(LIMIT_WARN_AT * limit);
     return (
         (used < warnAt && after >= warnAt) ||
