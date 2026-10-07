@@ -5,7 +5,8 @@ import reactConfig from "@saroh/eslint-config/react";
 /** @type {import('typescript-eslint').Config} */
 export default [
     {
-        ignores: [".next/**"],
+        // .open-next and .wrangler are the Cloudflare build output (cf:build).
+        ignores: [".next/**", ".open-next/**", ".wrangler/**"],
     },
     ...baseConfig,
     ...reactConfig,

@@ -9,7 +9,10 @@
         "lint": "eslint .",
         "start": "next start",
         "test": "vitest run",
-        "typecheck": "tsc --noEmit"
+        "typecheck": "tsc --noEmit",
+        "cf:build": "opennextjs-cloudflare build",
+        "cf:preview": "opennextjs-cloudflare preview",
+        "cf:deploy": "opennextjs-cloudflare deploy"
     },
     "portless": "app.saroh",
     "dependencies": {
@@ -81,6 +84,7 @@
         "zod": "catalog:"
     },
     "devDependencies": {
+        "@opennextjs/cloudflare": "1.20.9",
         "@saroh/eslint-config": "workspace:*",
         "@saroh/tailwind-config": "workspace:*",
         "@tailwindcss/forms": "^0.5.11",
@@ -97,6 +101,7 @@
         "tailwindcss": "catalog:",
         "tailwindcss-animate": "^1.0.7",
         "typescript": "catalog:",
-        "vitest": "^4.1.11"
+        "vitest": "^4.1.11",
+        "wrangler": "4.148.0"
     }
 }

@@ -1,0 +1,44 @@
+// Cloudflare Worker for the merchant workspace, built by OpenNext (`pnpm cf:build`).
+// The top level is dev; `env.production` is production. Neither has routes
+// until its cutover. The account comes from CLOUDFLARE_ACCOUNT_ID.
+{
+    "$schema": "node_modules/wrangler/config-schema.json",
+    "name": "saroh-app-dev",
+    "main": ".open-next/worker.js",
+    "compatibility_date": "2026-10-01",
+    "compatibility_flags": ["nodejs_compat", "global_fetch_strictly_public"],
+    "assets": {
+        "directory": ".open-next/assets",
+        "binding": "ASSETS",
+    },
+    "services": [
+        {
+            "binding": "WORKER_SELF_REFERENCE",
+            "service": "saroh-app-dev",
+        },
+    ],
+    "images": {
+        "binding": "IMAGES",
+    },
+    "observability": {
+        "enabled": true,
+    },
+    "workers_dev": true,
+    "routes": [],
+    "env": {
+        "production": {
+            "name": "saroh-app",
+            "workers_dev": true,
+            "routes": [],
+            "services": [
+                {
+                    "binding": "WORKER_SELF_REFERENCE",
+                    "service": "saroh-app",
+                },
+            ],
+            "images": {
+                "binding": "IMAGES",
+            },
+        },
+    },
+}

@@ -35,3 +35,6 @@ yarn-error.log*
 next-env.d.ts
 
 .env*
+# Cloudflare build output (OpenNext, wrangler)
+.open-next
+.wrangler
