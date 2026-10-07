@@ -148,9 +148,12 @@ async function onPlanB(
                 how.cycle === "year" ? ONE_TIME_PAYMENT : "plan_test_b",
             pricePaise: plan.priceCents,
             chargeNowPaise: trial?.chargeNowPaise ?? 0,
-            startAt:
-                how.cycle === "month" ? (trial?.endsAt ?? how.startAt) : null,
-            completedAt: new Date(),
+            // A NEW checkout starts at authorisation (no startAt, the
+            // BillingCheckout_start_shape constraint): its term counts from
+            // completedAt. A TRIAL starts when the trial ends.
+            startAt: trial ? trial.endsAt : null,
+            completedAt:
+                !trial && how.cycle === "month" ? how.startAt : new Date(),
             expiresAt: new Date(Date.now() + DAY),
         },
     });
