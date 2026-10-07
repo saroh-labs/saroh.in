@@ -495,6 +495,45 @@ describe("accepting", () => {
         expect(db.siteReviewer.upsert).not.toHaveBeenCalled();
         expect(result.siteId).toBeNull();
     });
+
+    // UX-004: a role the business made used to be narrowed to MEMBER here,
+    // so "Front desk" joined with a Member's powers and its own never applied.
+    it("keeps a role the business made, as invited", async () => {
+        db.organizationInvitation.findUnique.mockResolvedValue({
+            ...pending,
+            role: "front-desk",
+            siteIds: [],
+        });
+        db.site.findMany.mockResolvedValue([]);
+        db.organizationRole.findUnique.mockResolvedValue({ key: "front-desk" });
+
+        const result = await service.accept(invitee, "a-token");
+
+        expect(db.organizationRole.findUnique.mock.calls[0][0].where).toEqual({
+            organizationId_key: { organizationId: "org_1", key: "front-desk" },
+        });
+        const upsert = db.membership.upsert.mock.calls[0][0];
+        expect(upsert.create.role).toBe("front-desk");
+        expect(upsert.update.role).toBe("front-desk");
+        expect(result).toMatchObject({ role: "MEMBER", roleKey: "front-desk" });
+    });
+
+    it("joins at the floor when the made role was removed since the invite", async () => {
+        db.organizationInvitation.findUnique.mockResolvedValue({
+            ...pending,
+            role: "front-desk",
+            siteIds: [],
+        });
+        db.site.findMany.mockResolvedValue([]);
+        db.organizationRole.findUnique.mockResolvedValue(null);
+
+        const result = await service.accept(invitee, "a-token");
+
+        expect(db.membership.upsert.mock.calls[0][0].create.role).toBe(
+            "MEMBER",
+        );
+        expect(result.roleKey).toBe("MEMBER");
+    });
 });
 
 describe("the last owner", () => {
