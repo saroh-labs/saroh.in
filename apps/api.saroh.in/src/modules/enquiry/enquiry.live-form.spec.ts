@@ -15,6 +15,7 @@ jest.mock("@saroh/database", () => {
         lead: { create: jest.fn() },
         job: { create: jest.fn() },
         activity: { create: jest.fn() },
+        analyticsEvent: { create: jest.fn() },
     };
     return {
         ...actual,

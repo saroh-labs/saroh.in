@@ -19,6 +19,7 @@ jest.mock("@saroh/database", () => {
         lead: { create: jest.fn() },
         job: { create: jest.fn() },
         activity: { create: jest.fn() },
+        analyticsEvent: { create: jest.fn() },
     };
     return {
         ...actual,
@@ -50,6 +51,7 @@ const leadCreate = prisma.lead.create as jest.Mock;
 const jobCreate = prisma.job.create as jest.Mock;
 const activityCreate = prisma.activity.create as jest.Mock;
 const transaction = prisma.$transaction as jest.Mock;
+const analyticsEventCreate = prisma.analyticsEvent.create as jest.Mock;
 
 const FORM = {
     id: "form_1",
@@ -146,6 +148,26 @@ describe("EnquiryService.submit — one submission produces one correct lead", (
             type: "automation.run",
             payload: { leadId: "lead_1" },
         });
+    });
+
+    it("counts the enquiry for Insights in the same transaction (UX-032)", async () => {
+        const service = new EnquiryService();
+        wireHappyPath();
+
+        await service.submit("form_1", validData, undefined, "iphash");
+
+        expect(analyticsEventCreate).toHaveBeenCalledTimes(1);
+        const data = analyticsEventCreate.mock.calls[0][0].data;
+        expect(data).toMatchObject({
+            organizationId: "org_FORM",
+            type: "enquiry.submitted",
+            properties: { formId: "form_1", leadId: "lead_1" },
+            consent: "anonymous",
+            visitorHash: null,
+            dedupeKey: "enquiry.submitted:sub_1",
+        });
+        // Nothing the visitor typed reaches the analytics ledger.
+        expect(JSON.stringify(data)).not.toContain("Jane");
     });
 
     it("ISOLATION: every created row is stamped with form.organizationId, never a client value", async () => {

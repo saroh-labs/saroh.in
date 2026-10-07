@@ -8,6 +8,7 @@ import {
 } from "@nestjs/common";
 import { Prisma, prisma } from "@saroh/database";
 
+import { enquirySubmittedEvent } from "../analytics/enquiry-event";
 import type { FieldType, FormField } from "../forms/dto";
 import { assertOrganizationOpen } from "../organizations/organization-lifecycle.gate";
 import { fieldsFromSnapshot } from "./live-form-fields";
@@ -219,6 +220,17 @@ export class EnquiryService {
                         type: "CREATED",
                         body: "Lead created from enquiry",
                     },
+                });
+
+                // Insights' Enquiries figure (UX-032), committed with the lead.
+                await tx.analyticsEvent.create({
+                    data: enquirySubmittedEvent({
+                        organizationId,
+                        siteId: form.siteId ?? null,
+                        formId,
+                        leadId: lead.id,
+                        submissionId: submission.id,
+                    }),
                 });
 
                 return {

@@ -11,6 +11,7 @@ import {
     TestReleaseProvider,
 } from "@saroh/site-blocks";
 
+import { SiteViewBeacon } from "@/components/site-view-beacon";
 import { TestReleaseBar } from "@/components/test-release-bar";
 import { TestReleaseGate } from "@/components/test-release-gate";
 import { accountAreaOn } from "@/lib/account-area";
@@ -280,6 +281,11 @@ export default async function SiteLayout({
                     </>
                 ) : null}
                 <SiteTheme variables={snapshot.site.styleVariables} />
+                {/* Page views for Insights (UX-032): live hosts only, never a
+                test release, whose visits are not the business's. */}
+                {siteId && test.mode !== "test" && !resolved.release ? (
+                    <SiteViewBeacon siteId={siteId} apiUrl={publicApiUrl()} />
+                ) : null}
                 {/* The account area draws its own compact header and no
                 footer (DEC-073 #10): the frame leaves these out there. */}
                 <SiteChromeFrame

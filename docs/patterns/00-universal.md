@@ -330,9 +330,8 @@ proxies file bytes.
 ## 12. Say what is true
 
 **Adopted** — A comment, a UI string or a doc must match what ships (see
-`saroh-product.md`). Gap: Insights' website figures say "No views recorded" for a
-real business, since the renderer sends no view beacon (the rollups are
-scheduled since DEC-075). Two booking comments that
+`saroh-product.md`). Insights' website figures were the last known gap: the
+renderer sends a view beacon since UX-032. Two booking comments that
 claimed delivery were corrected in `fb778b9`.
 
 ## 13. Leave a trail
