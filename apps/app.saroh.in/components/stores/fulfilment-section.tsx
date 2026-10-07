@@ -23,6 +23,7 @@ import {
     lateAfterWords,
     ORDERS_NOUN,
 } from "@/lib/stores/late-after";
+import { pickupNotOffered } from "@/lib/stores/pickup-place";
 import type {
     StorefrontFulfilmentType,
     StorefrontInput,
@@ -73,6 +74,8 @@ export function FulfilmentSection({
         (t) => t !== "PICKUP" || store.kind === "SHOP" || types.includes(t),
     );
     const late = store.lateAfterMinutes ?? DEFAULT_LATE_AFTER;
+    // Pick-up on, but nowhere to collect from (UX-025): said here, inline.
+    const noPlace = pickupNotOffered({ ...store, fulfilmentTypes: types });
 
     const toggle = (type: StorefrontFulfilmentType) => {
         const on = types.includes(type);
@@ -117,6 +120,14 @@ export function FulfilmentSection({
                         );
                     })}
                 </div>
+                {noPlace ? (
+                    <p
+                        role="note"
+                        className="text-pretty rounded-lg bg-warning-subtle px-3 py-2 text-[12.5px] leading-[1.5] text-warning-subtle-foreground"
+                    >
+                        {noPlace}
+                    </p>
+                ) : null}
                 <Note id="storefront-ways-note">
                     {types.length === 0
                         ? "None chosen: orders from here are only ever digital or booked visits."

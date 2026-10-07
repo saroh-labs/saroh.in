@@ -1,4 +1,8 @@
-import { pickupPlaceOf, waysWithPlace } from "./pickup-place";
+import {
+    pickupPlaceOf,
+    registeredAddressText,
+    waysWithPlace,
+} from "./pickup-place";
 
 /** Pick-up needs a place customers visit, with its address (UX-025). */
 describe("pickupPlaceOf", () => {
@@ -43,5 +47,30 @@ describe("waysWithPlace", () => {
                 hours: null,
             }),
         ).toEqual(["PICKUP", "SHIPPING"]);
+    });
+});
+
+describe("registeredAddressText", () => {
+    it("is the registered address as one line", () => {
+        expect(
+            registeredAddressText({
+                addressLine1: " 12 Hill Road ",
+                addressLine2: "Bandra",
+                city: "Mumbai",
+                postalCode: "400050",
+            }),
+        ).toBe("12 Hill Road, Bandra, Mumbai 400050");
+    });
+
+    it("is none without a first line and a town", () => {
+        expect(
+            registeredAddressText({
+                addressLine1: "12 Hill Road",
+                addressLine2: null,
+                city: " ",
+                postalCode: null,
+            }),
+        ).toBeNull();
+        expect(registeredAddressText(null)).toBeNull();
     });
 });

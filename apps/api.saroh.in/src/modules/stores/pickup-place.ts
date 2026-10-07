@@ -53,3 +53,29 @@ export function waysWithPlace<T extends StorefrontFulfilmentType>(
 /** The Locations editor's words when Pick-up isn't offered on the website. */
 export const PICKUP_NEEDS_PLACE =
     "Pick-up needs a place customers visit, with its address.";
+
+/**
+ * The business's registered address as one line, for seeding its first
+ * location (UX-025): "12 Hill Road, Bandra, Mumbai 400050". Null without a
+ * first line and a town — half an address sends nobody anywhere.
+ */
+export function registeredAddressText(
+    profile:
+        | {
+              addressLine1: string | null;
+              addressLine2: string | null;
+              city: string | null;
+              postalCode: string | null;
+          }
+        | null
+        | undefined,
+): string | null {
+    const clean = (v: string | null | undefined) => v?.trim() ?? "";
+    const line1 = clean(profile?.addressLine1);
+    const city = clean(profile?.city);
+    if (!line1 || !city) return null;
+    const town = [city, clean(profile?.postalCode)].filter(Boolean).join(" ");
+    return [line1, clean(profile?.addressLine2), town]
+        .filter(Boolean)
+        .join(", ");
+}
