@@ -27,11 +27,10 @@ export function answersToShow(
     answers: EnquiryAnswer[],
     knownEmail: string | null,
 ): EnquiryAnswer[] {
-    const rest = answers.filter(
-        (a) =>
-            !knownEmail ||
-            a.value.trim().toLowerCase() !== knownEmail.trim().toLowerCase(),
-    );
+    const known = knownEmail?.trim().toLowerCase();
+    const rest = known
+        ? answers.filter((a) => a.value.trim().toLowerCase() !== known)
+        : answers;
     return rest.length > 0 ? rest : answers;
 }
 
