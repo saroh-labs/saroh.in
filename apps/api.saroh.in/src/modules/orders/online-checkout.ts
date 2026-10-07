@@ -78,7 +78,8 @@ export const CHECKOUT_PAID_LATE =
 /**
  * Close an online order that was never paid: CANCELLED, with a STATUS step
  * on its timeline and no one named (the system did it). No message is
- * sent, and nothing is released: its lines never held.
+ * sent, and no stock is released: its lines never held. A discount code it
+ * carried is given back.
  *
  * Only a checkout still PENDING and not paid closes; anything else — paid
  * a moment ago, closed already, or an order to be paid on handover, which
@@ -114,6 +115,10 @@ export async function closeCheckoutInTx(
         where: { id: orderId },
         data: { status: "CANCELLED" },
     });
+    // A checkout that never became an order gives its code's use back
+    // (DEC-104): an abandoned bag must not use up a limited code. A staff
+    // order cancelled later keeps its use, as it always has.
+    await tx.discountRedemption.deleteMany({ where: { orderId } });
     await tx.orderEvent.create({
         data: {
             organizationId: order.organizationId,

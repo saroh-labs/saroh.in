@@ -169,6 +169,7 @@ export type {
     CheckoutStanding,
     CheckoutStarted,
     DeliveryAddress,
+    QuoteDiscount,
     QuoteLine,
     QuotePayment,
     QuoteWay,

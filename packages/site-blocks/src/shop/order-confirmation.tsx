@@ -34,6 +34,8 @@ export interface OrderConfirmationData {
     subtotal: string;
     delivery: string | null;
     discount: string | null;
+    /** The code that took the discount off, "SAVE10"; absent or null without one. */
+    discountCode?: string | null;
     total: string;
     fulfilment: {
         type: string;
@@ -126,7 +128,11 @@ function Summary({ order }: { order: OrderConfirmationData }) {
                 </div>
                 {order.discount ? (
                     <div className="flex justify-between gap-3">
-                        <dt className="text-site-body">Discount</dt>
+                        <dt className="text-site-body">
+                            {order.discountCode
+                                ? `Discount (${order.discountCode})`
+                                : "Discount"}
+                        </dt>
                         <dd className="text-site-fg tabular-nums">
                             −{money(order.discount)}
                         </dd>

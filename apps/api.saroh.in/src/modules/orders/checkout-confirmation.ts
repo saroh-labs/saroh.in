@@ -53,6 +53,8 @@ export interface CheckoutConfirmation {
     delivery: string | null;
     /** Taken off at checkout, "50.00"; null when nothing was. */
     discount: string | null;
+    /** The code that took it off (DEC-104), "SAVE10"; null without one. */
+    discountCode: string | null;
     total: string;
     fulfilment: {
         type: FulfilmentType;
@@ -89,6 +91,8 @@ export interface ConfirmationRow {
     subtotal: { toString(): string };
     shipping: { toString(): string };
     discount: { toString(): string };
+    /** The code the order used, as its redemption recorded it. */
+    discountRedemption?: { code: string } | null;
     total: { toString(): string };
     paymentStatus: string;
     payOnHandover?: boolean;
@@ -152,6 +156,7 @@ export function confirmationView(row: ConfirmationRow): CheckoutConfirmation {
         subtotal: toMoneyString(row.subtotal),
         delivery: unlessZero(row.shipping),
         discount: unlessZero(row.discount),
+        discountCode: row.discountRedemption?.code ?? null,
         total: toMoneyString(row.total),
         fulfilment: {
             type,
@@ -220,6 +225,7 @@ export class CheckoutConfirmationService {
                     subtotal: true,
                     shipping: true,
                     discount: true,
+                    discountRedemption: { select: { code: true } },
                     total: true,
                     paymentStatus: true,
                     payOnHandover: true,

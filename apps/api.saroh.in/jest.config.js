@@ -239,6 +239,10 @@ module.exports = {
         "<rootDir>/src/modules/discounts/redeem.spec.ts",
         "<rootDir>/src/modules/discounts/discounts.service.spec.ts",
         "<rootDir>/src/modules/discounts/discounts.controller.spec.ts",
+        // DEC-104: one discount evaluation for the counter and the site's
+        // checkout, and the code in the site's bag.
+        "<rootDir>/src/modules/discounts/check-for-order.spec.ts",
+        "<rootDir>/src/modules/orders/site-discount-quote.spec.ts",
         // ADR-007 invoices: pure totals, numbering and standing, and the
         // service with a jest-mocked Prisma. Never touch a DB. (The numbering
         // races in invoices.db.spec.ts need Postgres and run in integration.)

@@ -55,6 +55,7 @@ describe("confirmationView (P4)", () => {
             subtotal: "500.00",
             delivery: null,
             discount: null,
+            discountCode: null,
             total: "500.00",
             fulfilment: {
                 type: "PICKUP",
@@ -202,6 +203,14 @@ describe("confirmationView (P4)", () => {
         expect(view.placedAt).toBe("2026-09-29T08:00:00.000Z");
         expect(view.refunded).toBe(true);
         expect(view.discount).toBe("50.00");
+    });
+
+    it("names the code that took the discount off (DEC-104)", () => {
+        const view = confirmationView(
+            row({ discount: "50", discountRedemption: { code: "SAVE10" } }),
+        );
+        expect(view.discount).toBe("50.00");
+        expect(view.discountCode).toBe("SAVE10");
     });
 
     it("names a line by its product, its service, or plainly", () => {

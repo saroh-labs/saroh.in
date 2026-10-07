@@ -36,6 +36,8 @@ export interface QuoteListing {
         name: string;
         status: string;
         price: { toString(): string };
+        /** The collection it sits in, for a collection-wide code. */
+        categoryId?: string | null;
         stockTracked: boolean;
         fulfilmentTypes: readonly string[];
         cover: { url: string; alt: string } | null;
@@ -68,6 +70,8 @@ export interface QuotedLine {
     variantId: string | null;
     /** Null when the line is gone: there is nothing to name. */
     productId: string | null;
+    /** The product's collection, for a collection-wide code; null when gone. */
+    categoryId: string | null;
     slug: string | null;
     name: string;
     variantTitle: string | null;
@@ -135,6 +139,7 @@ export function quoteLines(
             listingId: line.listingId,
             variantId: line.variantId,
             productId: null,
+            categoryId: null,
             slug: shown?.slug ?? null,
             name: shown?.name ?? name,
             variantTitle: null,
@@ -179,6 +184,7 @@ export function quoteLines(
             listingId: line.listingId,
             variantId: variant?.id ?? null,
             productId: product.id,
+            categoryId: product.categoryId ?? null,
             slug: product.slug,
             name: product.name,
             variantTitle: variant?.title ?? null,
@@ -264,9 +270,44 @@ export interface CheckoutQuote {
     fulfilment: StorefrontFulfilmentType | null;
     subtotal: string;
     delivery: string;
+    /**
+     * The code typed in the bag (DEC-104): what it took off, or why it took
+     * nothing. Null when no code was typed.
+     */
+    discount: QuoteDiscount | null;
     total: string;
     /** Every line can be sold and a way is chosen: it can be paid for now. */
     ready: boolean;
+}
+
+/**
+ * A code as the bag shows it: applied, with what came off the lines, or
+ * refused, with the reason (the counter's reasons, `redeem.ts`) and the
+ * customer's sentence for it.
+ */
+export type QuoteDiscount =
+    | { code: string; applied: true; amount: string }
+    | { code: string; applied: false; reason: string; message: string };
+
+/**
+ * The lines a code is judged against, as the counter's order form hands
+ * them to the discount evaluation: every line that can be named, at its
+ * price now. A line that is gone carries nothing a code could reach.
+ */
+export function discountLines(lines: readonly QuotedLine[]): {
+    productId: string | null;
+    categoryId: string | null;
+    unitCents: number;
+    quantity: number;
+}[] {
+    return lines
+        .filter((l) => l.state !== "gone" && l.productId !== null)
+        .map((l) => ({
+            productId: l.productId,
+            categoryId: l.categoryId,
+            unitCents: l.unitCents,
+            quantity: l.quantity,
+        }));
 }
 
 /** The whole quote, from the priced lines and the storefront's ways. */
@@ -276,6 +317,12 @@ export function buildQuote(input: {
     storefrontWays: readonly StorefrontFulfilmentType[];
     fees: DeliveryFees;
     asked: StorefrontFulfilmentType | null;
+    /**
+     * The code's answer, worked out by the one discount evaluation over
+     * these lines (`DiscountsService.checkForOrder`); its amount in minor
+     * units when it applies.
+     */
+    discount?: { view: QuoteDiscount; cents: number } | null;
 }): CheckoutQuote {
     const ways = checkoutWays(input.lines, input.storefrontWays);
     const chosen =
@@ -290,6 +337,8 @@ export function buildQuote(input: {
         0,
     );
     const delivery = chosen ? feeCents(chosen, input.fees) : 0;
+    // A code comes off the lines, never the delivery, and never below zero.
+    const off = Math.min(subtotal, Math.max(0, input.discount?.cents ?? 0));
     return {
         currency: input.currency,
         lines: input.lines.map((l) => ({
@@ -318,7 +367,8 @@ export function buildQuote(input: {
         fulfilment: chosen,
         subtotal: fromMinor(subtotal),
         delivery: fromMinor(delivery),
-        total: fromMinor(subtotal + delivery),
+        discount: input.discount?.view ?? null,
+        total: fromMinor(subtotal - off + delivery),
         ready:
             input.lines.length > 0 &&
             input.lines.every((l) => l.state === "ok") &&

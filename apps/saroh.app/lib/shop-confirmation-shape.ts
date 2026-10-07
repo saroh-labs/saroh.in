@@ -94,6 +94,12 @@ export function confirmationOf(body: unknown): OrderConfirmationData | null {
         subtotal: body.subtotal,
         delivery,
         discount,
+        // The code that took it off (DEC-104); absent from an older API.
+        discountCode:
+            isString(body.discountCode) &&
+            /^[A-Z0-9_-]{1,32}$/.test(body.discountCode)
+                ? body.discountCode
+                : null,
         total: body.total,
         fulfilment,
         refunded: body.refunded,
