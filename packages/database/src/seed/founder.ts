@@ -9,9 +9,9 @@ import { hashPassword, id } from "./helpers";
  * and the two after them (`SITE_STARTS`, K15) for making a first site.
  *
  * A business she made in an earlier run is hers, not the seed's, and is
- * left as it is.
+ * left as it is. Returns her id.
  */
-export async function seedFounder(prisma: Db): Promise<void> {
+export async function seedFounder(prisma: Db): Promise<string> {
     const founder = await prisma.user.upsert({
         where: { email: FOUNDER_EMAIL },
         update: { name: "Asha Rao", emailVerified: true },
@@ -36,6 +36,7 @@ export async function seedFounder(prisma: Db): Promise<void> {
     });
     await seedFirstRuns(prisma, founder.id, "first-run", FIRST_RUNS);
     await seedFirstRuns(prisma, founder.id, "site-start", SITE_STARTS);
+    return founder.id;
 }
 
 /**

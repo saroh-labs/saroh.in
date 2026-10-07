@@ -2,8 +2,10 @@ import { describe, expect, it } from "vitest";
 
 import type { ProviderHealth } from "@/lib/provider-health/service";
 
+import { CONTACT_EMAIL_HREF } from "./booking-emails";
 import type { ProviderRowsInput } from "./rows";
 import { buildProvidersView, dashboardFor, RAZORPAY_KEY_ID } from "./rows";
+import type { SarohEmailState } from "./service";
 
 describe("Razorpay key id check", () => {
     it("takes a test or live key id and nothing else", () => {
@@ -406,5 +408,258 @@ describe("provider rows", () => {
     it("knows only real dashboards", () => {
         expect(dashboardFor("stripe")).toBe("https://dashboard.stripe.com");
         expect(dashboardFor("SMTP")).toBeNull();
+    });
+});
+
+describe("booking emails Saroh sends (DEC-086)", () => {
+    const sending = (
+        over: Partial<{
+            state: "SENDING" | "NEAR" | "PAUSED";
+            used: number;
+            replyTo: string | null;
+            canConnectOwn: boolean | null;
+        }> = {},
+    ): SarohEmailState => ({
+        state: over.state ?? "SENDING",
+        used: over.used ?? 3,
+        cap: 10,
+        resetsOn: "1 Nov",
+        sender: {
+            name: "Rye Studio via Saroh",
+            address: "bookings@notify.saroh.in",
+        },
+        replyTo:
+            over.replyTo === undefined ? "hello@rye.example" : over.replyTo,
+        canConnectOwn:
+            over.canConnectOwn === undefined ? true : over.canConnectOwn,
+    });
+    const block = (view: ReturnType<typeof buildProvidersView>) => {
+        const b = view.bookingEmails;
+        if (b?.kind !== "block") throw new Error(`no block: ${b?.kind}`);
+        return b.block;
+    };
+
+    it("says Saroh sends them, the month's count, the sender, where replies go, and jumps to an email provider", () => {
+        const view = buildProvidersView(input({ sarohEmail: sending() }));
+        const b = block(view);
+        expect(b.status).toBe("Saroh sends your booking emails for now");
+        expect(b.usage).toBe("3 of 10 this month · starts again 1 Nov");
+        expect(b.sender).toBe(
+            '"Rye Studio via Saroh" <bookings@notify.saroh.in>',
+        );
+        expect(b.replyTo).toBe("hello@rye.example");
+        expect(b.noReply).toBeNull();
+        expect(b.body).toContain("Connect your own email");
+        // Connect goes to the first email provider on offer.
+        expect(view.connectEmailKey).toBe("EMAIL:RESEND");
+        // Never in Connected: Saroh is not a provider the business added.
+        expect(view.connected).toEqual([]);
+    });
+
+    it("asks for a contact email when replies have nowhere to go", () => {
+        const b = block(
+            buildProvidersView(
+                input({ sarohEmail: sending({ replyTo: null }) }),
+            ),
+        );
+        expect(b.replyTo).toBeNull();
+        expect(b.noReply).toMatch(/Add a contact email/);
+        expect(CONTACT_EMAIL_HREF).toBe(
+            "/settings/organization?section=contact",
+        );
+    });
+
+    it("warns near the allowance with the day it starts again", () => {
+        const b = block(
+            buildProvidersView(
+                input({ sarohEmail: sending({ state: "NEAR", used: 8 }) }),
+            ),
+        );
+        expect(b.tone).toBe("near");
+        expect(b.usage).toBe("8 of 10 this month · starts again 1 Nov");
+        expect(b.body).toContain(
+            "At 10, Saroh stops sending them until 1 Nov.",
+        );
+    });
+
+    it("says paused until the month starts again at the allowance", () => {
+        const b = block(
+            buildProvidersView(
+                input({ sarohEmail: sending({ state: "PAUSED", used: 10 }) }),
+            ),
+        );
+        expect(b.tone).toBe("paused");
+        expect(b.status).toBe("Paused until 1 Nov");
+        expect(b.body).toContain("in their account on your site");
+    });
+
+    describe("when its plan has no room to connect its own email (DEC-086)", () => {
+        const higher =
+            "A higher plan lets you connect your own email, and then they go through it with no monthly limit.";
+
+        it("offers connecting when it can", () => {
+            const b = block(
+                buildProvidersView(input({ sarohEmail: sending() })),
+            );
+            expect(b.own).toBe("connect");
+            expect(b.body).toBe(
+                "Confirmed, moved and cancelled bookings, counted against your plan. Connect your own email and they go through it, with no monthly limit.",
+            );
+        });
+
+        it("offers seeing plans instead, in every state, and never Connect", () => {
+            const words = {
+                SENDING: `Confirmed, moved and cancelled bookings, counted against your plan. ${higher}`,
+                NEAR: `At 10, Saroh stops sending them until 1 Nov. ${higher}`,
+                PAUSED: `Saroh has sent all 10 booking emails your plan includes this month. Customers still see each booking update in their account on your site. ${higher}`,
+            } as const;
+            for (const [state, body] of Object.entries(words)) {
+                const b = block(
+                    buildProvidersView(
+                        input({
+                            sarohEmail: sending({
+                                state: state as keyof typeof words,
+                                used:
+                                    state === "SENDING"
+                                        ? 3
+                                        : state === "NEAR"
+                                          ? 8
+                                          : 10,
+                                canConnectOwn: false,
+                            }),
+                        }),
+                    ),
+                );
+                expect(b.own).toBe("upgrade");
+                expect(b.body).toBe(body);
+                expect(b.body).not.toMatch(/Connect your own email/);
+            }
+        });
+
+        it("claims neither when that couldn't be read", () => {
+            const b = block(
+                buildProvidersView(
+                    input({ sarohEmail: sending({ canConnectOwn: null }) }),
+                ),
+            );
+            expect(b.own).toBe("unread");
+            expect(b.body).toMatch(
+                /We couldn't read whether your plan lets you connect your own email\./,
+            );
+        });
+
+        it("offers connecting, as before, from an API that predates the field", () => {
+            const old: SarohEmailState = { ...sending() };
+            delete (old as { canConnectOwn?: boolean | null }).canConnectOwn;
+            expect(
+                block(buildProvidersView(input({ sarohEmail: old }))).own,
+            ).toBe("connect");
+        });
+    });
+
+    it("names what it couldn't read, and never shows a zero", () => {
+        const view = buildProvidersView(
+            input({ sarohEmail: { state: "UNREAD" } }),
+        );
+        expect(view.bookingEmails?.kind).toBe("unread");
+        const text =
+            view.bookingEmails?.kind === "unread"
+                ? view.bookingEmails.text
+                : "";
+        expect(text).toMatch(/^Booking emails: we couldn't read/);
+        expect(text).not.toMatch(/\b0 of\b/);
+    });
+
+    it("shows nothing new when Saroh doesn't send them", () => {
+        for (const sarohEmail of [
+            { state: "OFF", takesOver: false } as const,
+            null,
+            undefined,
+        ]) {
+            const view = buildProvidersView(input({ sarohEmail }));
+            expect(view.bookingEmails).toBeNull();
+            expect(view).toEqual(buildProvidersView(input()));
+        }
+    });
+
+    it("tells a disconnected email provider's row that Saroh sends booking emails now", () => {
+        const view = buildProvidersView(
+            input({
+                messaging: [comms("EMAIL", "RESEND", "DISABLED")],
+                sarohEmail: sending(),
+            }),
+        );
+        const [resend] = view.connected;
+        expect(resend.state).toBe("DISCONNECTED");
+        expect(resend.note).toBe(
+            "Disconnected — Saroh sends your booking emails for now, counted against your plan; other email isn't sent until a provider is connected again.",
+        );
+        // The block still shows, and Connect jumps to another provider.
+        expect(view.bookingEmails?.kind).toBe("block");
+        expect(view.connectEmailKey).toBe("EMAIL:SENDGRID");
+
+        const paused = buildProvidersView(
+            input({
+                messaging: [comms("EMAIL", "RESEND", "DISABLED")],
+                sarohEmail: sending({ state: "PAUSED", used: 10 }),
+            }),
+        ).connected[0];
+        expect(paused.note).toContain("paused until 1 Nov");
+
+        const off = buildProvidersView(
+            input({ messaging: [comms("EMAIL", "RESEND", "DISABLED")] }),
+        ).connected[0];
+        expect(off.note).toBe(
+            "Disconnected — email isn't sent until a provider is connected again.",
+        );
+    });
+
+    it("warns before disconnecting that booking emails switch to Saroh, counted, and other email stops", () => {
+        const takesOver = buildProvidersView(
+            input({
+                messaging: [comms("EMAIL", "RESEND")],
+                sarohEmail: { state: "OFF", takesOver: true },
+            }),
+        ).connected[0];
+        expect(takesOver.consequence).toMatch(
+            /^Booking emails switch to Saroh's email straight away and count against your plan's monthly allowance\. All other email stops being sent\./,
+        );
+        const not = buildProvidersView(
+            input({
+                messaging: [comms("EMAIL", "RESEND")],
+                sarohEmail: { state: "OFF", takesOver: false },
+            }),
+        ).connected[0];
+        expect(not.consequence).toMatch(
+            /^Email stops being sent straight away/,
+        );
+        // WhatsApp is never Saroh's.
+        const wa = buildProvidersView(
+            input({
+                messaging: [comms("WHATSAPP", "META")],
+                sarohEmail: { state: "OFF", takesOver: true },
+            }),
+        ).connected[0];
+        expect(wa.consequence).toMatch(/^WhatsApp messages stop/);
+    });
+
+    it("once the business connects its own email, the block goes", () => {
+        const view = buildProvidersView(
+            input({
+                messaging: [comms("EMAIL", "RESEND")],
+                sarohEmail: { state: "OFF", takesOver: true },
+            }),
+        );
+        expect(view.bookingEmails).toBeNull();
+        expect(view.connectEmailKey).toBeNull();
+    });
+
+    it("shows the block even with no module that uses a provider", () => {
+        const view = buildProvidersView(
+            input({ health: [], sarohEmail: sending() }),
+        );
+        expect(view.any).toBe(true);
+        // Nothing to connect here, so no jump.
+        expect(view.connectEmailKey).toBeNull();
     });
 });

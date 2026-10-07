@@ -1,4 +1,5 @@
 import type { ModuleAccess } from "./access";
+import type { LimitAction } from "./limit-words";
 import { formatCount } from "./price";
 
 /** A notice shows from this share of the limit. */
@@ -19,7 +20,30 @@ export type LimitNotice =
           why: string;
           /** A soft cap: the notice informs, it never says anything stops. */
           soft: boolean;
+          /**
+           * Where `cta` goes when the limit names its own way out
+           * (`LimitWords.action`); absent, `cta` is the upgrade.
+           */
+          href?: string;
       };
+
+/** What a notice may add to the shared words. */
+export interface LimitNoticeOptions {
+    /**
+     * The limit's own first way out (`LimitWords.action`): said first, with
+     * a higher plan second and no add-on.
+     */
+    action?: LimitAction;
+    /**
+     * Whether the business can take `action` now (default true). false: it
+     * can't (Saroh's emails on a plan with no room to connect its own), so
+     * a higher plan leads with `action.closed`'s words and button. null:
+     * that couldn't be read, so neither is claimed — only the higher plan.
+     */
+    actionOpen?: boolean | null;
+    /** When a monthly count starts again ("1 Nov"), said at the cap. */
+    resetsOn?: string | null;
+}
 
 /**
  * The limit notice every screen shares: nothing under 80%, a warning from
@@ -29,6 +53,12 @@ export type LimitNotice =
  * A soft cap (`access.soft`) never refuses, so its notice never says
  * anything stops: from 80% it says nothing will, and at 100% `pausedText`
  * (the soft rows' words begin "Nothing is blocked") with no `why`.
+ *
+ * A limit with its own way out (`options.action`, Saroh's emails) says it
+ * first, a higher plan second, and offers no add-on; its button is the
+ * action's. When the business can't take it (`options.actionOpen`), the
+ * higher plan leads and the button is the plan picker's, still with no
+ * add-on. `options.resetsOn` says when a monthly count starts again.
  */
 export function limitNotice(
     access: Pick<ModuleAccess, "inc" | "limit" | "plan" | "upgradeTo"> &
@@ -36,6 +66,7 @@ export function limitNotice(
     count: number,
     what: string,
     pausedText: string,
+    options: LimitNoticeOptions = {},
 ): LimitNotice {
     if (!access.inc || access.limit === null) return { on: false, full: false };
     const L = access.limit;
@@ -46,6 +77,38 @@ export function limitNotice(
     const soft = access.soft === true;
     // Storage counts in GB, so a count can have a fraction: one place.
     const used = formatCount(Math.round(n * 10) / 10);
+    const { action } = options;
+    // An action the business can't take now isn't offered (DEC-086).
+    const open =
+        options.actionOpen === undefined || options.actionOpen === true;
+    const again =
+        full && options.resetsOn
+            ? ` It starts again on ${options.resetsOn}.`
+            : "";
+    const first = full
+        ? pausedText + again
+        : soft
+          ? `Nothing stops at ${formatCount(L)}; we'll let you know when you reach it.`
+          : `You'll be stopped at ${formatCount(L)}.`;
+    const higher = full ? "raises the limit" : "gives you more";
+    // A limit's own way out comes first, a higher plan second, no add-on;
+    // closed, the higher plan leads and says what it opens.
+    const more = action
+        ? open
+            ? ` ${action.sentence}` + (up ? ` Or ${up} ${higher}.` : "")
+            : up
+              ? ` ${up} ${higher}.` +
+                (options.actionOpen === false
+                    ? ` ${action.closed.sentence}`
+                    : "")
+              : ""
+        : full
+          ? up
+              ? ` ${up} raises the limit, or add more with an add-on.`
+              : " Add more with an add-on."
+          : up
+            ? ` ${up} gives you more.`
+            : " An add-on gives you more.";
     return {
         on: true,
         full,
@@ -54,16 +117,15 @@ export function limitNotice(
         title: full
             ? `You've reached your ${formatCount(L)} ${what} on ${access.plan}`
             : `You've used ${used} of ${formatCount(L)} ${what} on ${access.plan}`,
-        body: full
-            ? pausedText +
-              (up
-                  ? ` ${up} raises the limit, or add more with an add-on.`
-                  : " Add more with an add-on.")
-            : (soft
-                  ? `Nothing stops at ${formatCount(L)}; we'll let you know when you reach it.`
-                  : `You'll be stopped at ${formatCount(L)}.`) +
-              (up ? ` ${up} gives you more.` : " An add-on gives you more."),
-        cta: up ? "Upgrade or add more" : "Add more",
+        body: first + more,
+        cta: action
+            ? open
+                ? action.label
+                : action.closed.label
+            : up
+              ? "Upgrade or add more"
+              : "Add more",
+        ...(action && open ? { href: action.href } : {}),
         why:
             full && !soft
                 ? `You've reached your ${what} limit on ${access.plan}`

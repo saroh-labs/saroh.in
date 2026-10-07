@@ -5,17 +5,34 @@ jest.mock("./account-area", () => ({ accountAreaOn: jest.fn() }));
 jest.mock("../customer-workspace/resolve-contact", () => ({
     resolveContact: jest.fn(),
 }));
+jest.mock("../communications/saroh-may-send", () => ({
+    ...jest.requireActual<object>("../communications/saroh-may-send"),
+    emailRoute: jest.fn(),
+    sarohRoomLeft: jest.fn(),
+}));
 
 import type { Prisma } from "@saroh/database";
 
 import { accountThreadOn } from "../communications/account-thread";
+import { emailRoute, sarohRoomLeft } from "../communications/saroh-may-send";
 import { resolveContact } from "../customer-workspace/resolve-contact";
 import { accountAreaOn } from "./account-area";
-import { contactReach, noticeChannels, reachOf } from "./notice-reach";
+import {
+    contactReach,
+    noticeChannels,
+    noticeEmailRoute,
+    reachOf,
+} from "./notice-reach";
 
 const threadFlag = accountThreadOn as jest.Mock;
 const areaOn = accountAreaOn as jest.Mock;
 const resolve = resolveContact as jest.Mock;
+const route = emailRoute as jest.Mock;
+/** Whether the stood-in rule lets Saroh send a kind, with no provider. */
+const sarohMay = jest.fn();
+const roomLeft = sarohRoomLeft as jest.Mock;
+/** The allowance row the rule read. */
+const ROW = { moduleId: "saroh-emails", state: "on", limit: 5 };
 
 function makeDb(provider: string | null = "CONNECTED", accounts = 1) {
     return {
@@ -34,6 +51,23 @@ const asDb = (db: ReturnType<typeof makeDb>) =>
 
 beforeEach(() => {
     jest.clearAllMocks();
+    sarohMay.mockResolvedValue(false);
+    roomLeft.mockResolvedValue(true);
+    // `emailRoute` as it answers: the provider once, then Saroh's say.
+    route.mockImplementation(
+        async (db: ReturnType<typeof makeDb>, org: string, kind?: string) => {
+            const p = (await db.communicationProvider.findUnique()) as {
+                status: string;
+            } | null;
+            if (p?.status === "CONNECTED") {
+                return { route: "PROVIDER", provider: "RESEND" };
+            }
+            if (kind === undefined) return { route: null, refusal: null };
+            return (await sarohMay(db, org, kind))
+                ? { route: "SAROH", allowance: ROW }
+                : { route: null, refusal: "SWITCHED_OFF" };
+        },
+    );
     areaOn.mockReturnValue(true);
     threadFlag.mockResolvedValue(true);
     resolve.mockImplementation((_db: unknown, id: string) =>
@@ -136,5 +170,100 @@ describe("how a notice reaches a customer (A14)", () => {
                 status: "ACTIVE",
             },
         });
+    });
+});
+
+describe("email reach per notice kind (DEC-086)", () => {
+    it("a booking notice with no provider is emailed when Saroh sends it", async () => {
+        sarohMay.mockResolvedValue(true);
+        const db = makeDb(null);
+        expect(
+            (await noticeChannels(asDb(db), "org_1", "BOOKING_CONFIRMED"))
+                .email,
+        ).toBe(true);
+        expect(sarohMay).toHaveBeenCalledWith(db, "org_1", "BOOKING_CONFIRMED");
+        // Room is counted against the row the rule read, not read again.
+        expect(roomLeft).toHaveBeenCalledWith(
+            "org_1",
+            expect.any(Date),
+            undefined,
+            ROW,
+        );
+        expect(
+            await noticeEmailRoute(
+                asDb(makeDb("DISABLED")),
+                "org_1",
+                "BOOKING_MOVED",
+            ),
+        ).toBe("SAROH");
+        expect(
+            await contactReach(
+                asDb(makeDb(null)),
+                "org_1",
+                "ct_1",
+                undefined,
+                "BOOKING_CANCELLED",
+            ),
+        ).toBe("EMAIL_AND_ACCOUNT");
+    });
+
+    it("says emailed only while this month's allowance has room (U3)", async () => {
+        sarohMay.mockResolvedValue(true);
+        roomLeft.mockResolvedValue(false);
+        expect(
+            await contactReach(
+                asDb(makeDb(null)),
+                "org_1",
+                "ct_1",
+                undefined,
+                "BOOKING_CONFIRMED",
+            ),
+        ).toBe("ACCOUNT");
+        // Its own provider is never counted, so never runs out.
+        expect(
+            (await noticeChannels(asDb(makeDb()), "org_1", "BOOKING_CONFIRMED"))
+                .email,
+        ).toBe(true);
+    });
+
+    it("account only when Saroh doesn't send it", async () => {
+        sarohMay.mockResolvedValue(false);
+        expect(
+            await contactReach(
+                asDb(makeDb(null)),
+                "org_1",
+                "ct_1",
+                undefined,
+                "BOOKING_CONFIRMED",
+            ),
+        ).toBe("ACCOUNT");
+    });
+
+    it("its own provider first: Saroh is never asked", async () => {
+        expect(
+            await noticeEmailRoute(
+                asDb(makeDb("CONNECTED")),
+                "org_1",
+                "BOOKING_CONFIRMED",
+            ),
+        ).toBe("PROVIDER");
+        expect(sarohMay).not.toHaveBeenCalled();
+    });
+
+    it("an order or waitlist notice, or no kind at all, reads the provider alone, as before", async () => {
+        sarohMay.mockImplementation(
+            (_db: unknown, _org: string, kind: string) =>
+                Promise.resolve(kind.startsWith("BOOKING")),
+        );
+        expect(
+            (await noticeChannels(asDb(makeDb(null)), "org_1", "ORDER_READY"))
+                .email,
+        ).toBe(false);
+        expect((await noticeChannels(asDb(makeDb(null)), "org_1")).email).toBe(
+            false,
+        );
+        expect(await contactReach(asDb(makeDb(null)), "org_1", "ct_1")).toBe(
+            "ACCOUNT",
+        );
     });
 });

@@ -16,6 +16,8 @@ import {
     COMMS_PROVIDER_FACTORY,
     isCommsChannel,
 } from "./providers/provider.port";
+import { SAROH_PROVIDER, SAROH_STOPPED, SAROH_UNKNOWN } from "./saroh-delivery";
+import { deliverThroughSaroh } from "./saroh-send";
 import { fillSecretLink, SECRET_LINK_SLOT } from "./transactional";
 
 /** The `type` this handler is registered under (matches the send producer). */
@@ -59,6 +61,12 @@ export const MAX_ATTACHMENT_BYTES = 5 * 1024 * 1024;
 
 /** Delivery states that are terminal-success — a re-run must NOT re-send. */
 const SENT_STATES = new Set(["SENT", "DELIVERED"]);
+
+/**
+ * A Saroh delivery's own terminal states (DEC-086): STOPPED never goes, and
+ * UNKNOWN may already have gone, so a re-run must not send either.
+ */
+const SAROH_TERMINAL_STATES = new Set([SAROH_STOPPED, SAROH_UNKNOWN]);
 
 /**
  * Consumer for the `message.send` job (S6-001): take a QUEUED Delivery and hand
@@ -123,6 +131,15 @@ export class MessageSendHandler {
             );
             return;
         }
+        if (
+            delivery.provider === SAROH_PROVIDER &&
+            SAROH_TERMINAL_STATES.has(delivery.status)
+        ) {
+            this.logger.log(
+                `message.send: Saroh delivery ${deliveryId} already ${delivery.status}; skipping.`,
+            );
+            return;
+        }
 
         const message = await prisma.message.findUnique({
             where: { id: messageId },
@@ -140,6 +157,23 @@ export class MessageSendHandler {
                 message.id,
                 `unsupported channel "${message.channel}"`,
             );
+            return;
+        }
+
+        // Saroh sends it for a business with no email of its own (DEC-086):
+        // the route stamped when it was queued wins, so a provider connected
+        // since never sends it a second way.
+        if (delivery.provider === SAROH_PROVIDER) {
+            try {
+                if (await deliverThroughSaroh(delivery.id, message)) {
+                    await this.stamp(message);
+                }
+            } catch (err) {
+                if (job.attempts + 1 >= job.maxAttempts) {
+                    await this.sarohGaveUp(delivery.id, message.organizationId);
+                }
+                throw err;
+            }
             return;
         }
 
@@ -216,9 +250,15 @@ export class MessageSendHandler {
             throw err;
         }
 
-        // The email went: a confirmation proves the address (A14). The send
-        // is done either way, so a failure here is logged, never retried
-        // into a second email.
+        await this.stamp(message);
+    };
+
+    /**
+     * The email went: a confirmation proves the address (A14). The send is
+     * done either way, so a failure here is logged, never retried into a
+     * second email.
+     */
+    private async stamp(message: Message): Promise<void> {
         try {
             await stampConfirmedEmail(prisma, message, new Date());
         } catch (err) {
@@ -228,7 +268,7 @@ export class MessageSendHandler {
                 })`,
             );
         }
-    };
+    }
 
     /**
      * The invoice's PDF for its email (DEC-083), or nothing. Nothing when
@@ -272,6 +312,29 @@ export class MessageSendHandler {
             );
             return [];
         }
+    }
+
+    /**
+     * The last attempt at a Saroh send ended with it still QUEUED (its
+     * switch couldn't be read each time, DEC-086): nothing more will try
+     * it, yet a QUEUED delivery counts against the business's allowance
+     * and nobody is told. Said once at WARN, by business only — never the
+     * address or the words — so someone can look.
+     */
+    private async sarohGaveUp(
+        deliveryId: string,
+        organizationId: string,
+    ): Promise<void> {
+        try {
+            const now = await prisma.delivery.findUnique({
+                where: { id: deliveryId },
+                select: { status: true },
+            });
+            if (now?.status !== "QUEUED") return;
+        } catch {
+            // Unreadable now too: it is most likely still QUEUED; say so.
+        }
+        this.logger.warn(`saroh_business_email_gave_up org=${organizationId}`);
     }
 
     /** Mark the Delivery FAILED (+ sanitized error, attempts++) and Message FAILED. */

@@ -1,5 +1,35 @@
 import { MODULE_MAP } from "./module-map";
 
+/**
+ * A notice's own first way out, ahead of a higher plan: for Saroh's emails
+ * (DEC-086), connecting the business's own email, which is never counted.
+ * A limit with one offers no add-on.
+ */
+export interface LimitAction {
+    /** The button: "Connect your email". */
+    label: string;
+    /** Where it goes, in the merchant app. */
+    href: string;
+    /** The sentence the notice says it in. */
+    sentence: string;
+    /**
+     * The catalogue row the action adds to (connecting an email is one
+     * more `integrations` connection): with no room there, it is closed.
+     */
+    room: string;
+    /**
+     * Said instead when the business can't take the action now (its plan
+     * has no room to connect its own email, DEC-086): upgrading leads, and
+     * the button is the plan picker's.
+     */
+    closed: {
+        /** The button: "See plans". */
+        label: string;
+        /** Said after the higher plan, only when there is one. */
+        sentence: string;
+    };
+}
+
 /** How a metered limit reads to the merchant, for `limitNotice`'s sentences. */
 export interface LimitWords {
     /** The counted thing, after a number: "5 products". */
@@ -8,6 +38,8 @@ export interface LimitWords {
     paused: string;
     /** Counted per calendar month in the business's zone, not in total. */
     monthly: boolean;
+    /** The notice's primary action, before an upgrade; none offers an add-on. */
+    action?: LimitAction;
 }
 
 /**
@@ -71,6 +103,30 @@ export const LIMIT_WORDS: Readonly<Record<string, LimitWords>> = {
         what: "connections",
         paused: "You can't connect more tools.",
         monthly: false,
+    },
+    /**
+     * Booking emails Saroh sends for a business with no email of its own
+     * (DEC-086). A hard cap: past it, the customer sees the notice in their
+     * account on the site, and the email waits for the business's own.
+     */
+    sarohEmailsPerMonth: {
+        what: "emails Saroh sends for you a month",
+        paused: "Saroh has stopped sending your booking emails for this month.",
+        monthly: true,
+        action: {
+            label: "Connect your email",
+            href: "/settings/providers",
+            room: "integrations",
+            sentence:
+                "Connect your own email and your booking emails go through it, with no monthly limit.",
+            // Free has no room to connect one; Grow and Pro do, the
+            // catalogue's `integrations` row decides (DEC-086).
+            closed: {
+                label: "See plans",
+                sentence:
+                    "A higher plan lets you connect your own email, and then your booking emails go through it with no monthly limit.",
+            },
+        },
     },
 };
 

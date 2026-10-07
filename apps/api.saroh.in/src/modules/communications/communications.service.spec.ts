@@ -632,6 +632,7 @@ describe("CommunicationsService.queueTransactional (D17)", () => {
             id: "msg_1",
             status: "QUEUED",
             toAddress: "asha@example.com",
+            route: "PROVIDER",
         });
         expect(messageCreate.mock.calls[0][0].data).toMatchObject({
             organizationId: "org_1",

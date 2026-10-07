@@ -42,6 +42,12 @@ export interface RoomOptions {
     soft?: boolean;
     /** The refusal to throw instead of `PLAN_LIMIT_REACHED` (the booking page's). */
     refuse?: () => Error;
+    /**
+     * For a write that must never go unmetered (Saroh's emails, DEC-086):
+     * the error to throw, before anything is counted or told, when the
+     * catalogue marks the row soft — a soft row would never refuse it.
+     */
+    refuseSoft?: () => Error;
     now?: Date;
 }
 
@@ -112,16 +118,31 @@ export class MeteringService {
         now: Date = new Date(),
     ): Promise<ModuleAccess | null> {
         try {
-            if (!(await this.enforcing(organizationId))) return null;
-            const a = await this.access.resolve(organizationId, now);
-            if (a.source !== "catalogue") return null;
-            return a.modules.find((m) => m.moduleId === moduleId) ?? null;
+            return await this.enforcedRowOrThrow(organizationId, moduleId, now);
         } catch (err) {
             this.logger.warn(
                 `plan_meter_unresolved org=${organizationId} module=${moduleId} error=${err instanceof Error ? err.name : "unknown"}`,
             );
             return null;
         }
+    }
+
+    /**
+     * {@link enforcedRow}, letting a failed lookup throw instead of reading
+     * as null. For a caller that must tell "couldn't read the plan" from
+     * "the plan has no such row": Saroh's emails (DEC-086) fail closed on
+     * it, and Settings says it couldn't read the allowance rather than
+     * that Saroh is off.
+     */
+    async enforcedRowOrThrow(
+        organizationId: string,
+        moduleId: string,
+        now: Date = new Date(),
+    ): Promise<ModuleAccess | null> {
+        if (!(await this.enforcing(organizationId))) return null;
+        const a = await this.access.resolve(organizationId, now);
+        if (a.source !== "catalogue") return null;
+        return a.modules.find((m) => m.moduleId === moduleId) ?? null;
     }
 
     /**
@@ -152,11 +173,20 @@ export class MeteringService {
         tx: MeterTx,
         organizationId: string,
         moduleId: string,
-        options: RoomOptions = {},
+        options: RoomOptions & {
+            /**
+             * The row as the caller already read it ({@link enforcedRow}),
+             * so it isn't read again: Saroh's route (DEC-086) has it from
+             * deciding to send.
+             */
+            row?: ModuleAccess;
+        } = {},
     ): Promise<PlanRoom | null> {
         if ((options.adding ?? 1) <= 0) return null;
         const now = options.now ?? new Date();
-        const row = await this.enforcedRow(organizationId, moduleId, now);
+        const row =
+            options.row ??
+            (await this.enforcedRow(organizationId, moduleId, now));
         if (!row) return null;
         return this.room(tx, row, organizationId, { ...options, now });
     }
@@ -214,6 +244,38 @@ export class MeteringService {
         );
     }
 
+    /**
+     * Whether a write adding `adding` (default 1) would get past
+     * {@link withRoom} now, without writing or telling anyone: for a screen
+     * that offers the write only when it would go through (Settings offers
+     * connecting the business's own email only when `integrations` has
+     * room, DEC-086). The same row and the same decision as the write's
+     * ({@link rowGate}); enforcement off, off the catalogue or a row its
+     * version doesn't have is room, as the write goes ahead then.
+     * A plan or count that can't be read throws, so a caller never claims
+     * room it couldn't check.
+     */
+    async hasRoom(
+        organizationId: string,
+        moduleId: string,
+        options: { adding?: number; now?: Date } = {},
+    ): Promise<boolean> {
+        const now = options.now ?? new Date();
+        const adding = options.adding ?? 1;
+        if (adding <= 0) return true;
+        const row = await this.enforcedRowOrThrow(
+            organizationId,
+            moduleId,
+            now,
+        );
+        if (!row) return true;
+        const gate = rowGate(row, false);
+        if (gate === "locked") return false;
+        if (gate === "open") return true;
+        const used = await countUsage(prisma, organizationId, gate.key, now);
+        return gate.soft || used + adding <= gate.limit;
+    }
+
     /** The check itself, for a row already read. */
     private async room(
         tx: MeterTx,
@@ -224,16 +286,12 @@ export class MeteringService {
         const adding = options.adding ?? 1;
         const { now } = options;
         const moduleId = row.moduleId;
-        // The catalogue's word wins over the call site's: a soft cell
-        // counts and tells, and never refuses.
-        const soft = options.soft === true || row.soft === true;
-        if (row.state !== "on") {
-            if (soft) return null;
-            throw moduleLocked(row);
-        }
-        const key = meteredKeyOf(moduleId);
-        if (!key || row.limit === null) return null;
-        const limit = row.limit;
+        // A write that must stay metered takes no soft cell at all.
+        if (row.soft && options.refuseSoft) throw options.refuseSoft();
+        const gate = rowGate(row, options.soft === true);
+        if (gate === "locked") throw moduleLocked(row);
+        if (gate === "open") return null;
+        const { key, limit, soft } = gate;
 
         await lockMeter(tx, organizationId, key);
         const used = await countUsage(tx, organizationId, key, now);
@@ -251,6 +309,26 @@ export class MeteringService {
         if (crossesNotice(room)) await queueLimitNoticeInTx(tx, room);
         return room;
     }
+}
+
+/**
+ * What a write's check decides from the row alone, before counting: the
+ * plan leaves it off ("locked"), nothing caps it ("open": off but soft, not
+ * metered, or no limit), or the cap to count against. The catalogue's word
+ * wins over the call site's: a soft cell counts and tells, never refuses.
+ * One rule for {@link MeteringService.withRoom} and
+ * {@link MeteringService.hasRoom}, so a screen never offers what the write
+ * would refuse.
+ */
+export function rowGate(
+    row: Pick<ModuleAccess, "moduleId" | "state" | "limit" | "soft">,
+    callerSoft: boolean,
+): "locked" | "open" | { key: MeteredLimitKey; limit: number; soft: boolean } {
+    const soft = callerSoft || row.soft === true;
+    if (row.state !== "on") return soft ? "open" : "locked";
+    const key = meteredKeyOf(row.moduleId);
+    if (!key || row.limit === null) return "open";
+    return { key, limit: row.limit, soft };
 }
 
 /**

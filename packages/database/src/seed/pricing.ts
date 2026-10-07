@@ -26,6 +26,12 @@ import type { Db } from "./helpers";
 export const SEED_PLAN_ID = "pro";
 
 /**
+ * The catalogue's entry plan: the one Saroh-email business that shows a
+ * plan with no room to connect its own email (DEC-086) is on it.
+ */
+export const SEED_ENTRY_PLAN_ID = "free";
+
+/**
  * When the seed's version 1 went live: long before any seed's `now`. The
  * base seed runs on the wall clock and the showcase on the clock rounded
  * down to the half hour, so a version live from the base seed's `now` was
@@ -64,12 +70,16 @@ async function ensureCatalogue(prisma: Db): Promise<void> {
  * monthly, on the live version. Throws when the live version has no such
  * plan, rather than seeding a business onto nothing.
  */
-export async function seedPlanId(prisma: Db, now: Date): Promise<string> {
+export async function seedPlanId(
+    prisma: Db,
+    now: Date,
+    planKey: string = SEED_PLAN_ID,
+): Promise<string> {
     await ensureCatalogue(prisma);
-    const row = await liveCataloguePlanRow(prisma, SEED_PLAN_ID, "month", now);
+    const row = await liveCataloguePlanRow(prisma, planKey, "month", now);
     if (!row) {
         throw new Error(
-            `The live pricing catalogue has no "${SEED_PLAN_ID}" plan to seed businesses on.`,
+            `The live pricing catalogue has no "${planKey}" plan to seed businesses on.`,
         );
     }
     return row.id;

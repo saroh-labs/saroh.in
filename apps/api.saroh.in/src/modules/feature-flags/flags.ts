@@ -105,6 +105,19 @@ export const FlagKey = {
      * and switch) and the `plan.limit.notice` handler.
      */
     PLAN_ENFORCEMENT: "PLAN_ENFORCEMENT",
+
+    /**
+     * Saroh sends a business's booking emails while it has no email
+     * provider of its own (DEC-086): confirmed, moved and cancelled, from
+     * `bookings@notify.saroh.in`, counted against the plan's
+     * `sarohEmailsPerMonth`. Per business, off by default; the env's
+     * `SAROH_BUSINESS_EMAIL_STOP` overrides it for everyone. Readers, all
+     * through `communications/saroh-may-send.ts`: the notify handler and
+     * `queueTransactional` (whether Saroh sends), notice reach (what the
+     * workspace says), and `message.send` (a queued send re-checks it).
+     * Deleted once the route is on for every business for a release.
+     */
+    SAROH_BUSINESS_EMAIL: "SAROH_BUSINESS_EMAIL",
 } as const;
 
 export type FlagKey = (typeof FlagKey)[keyof typeof FlagKey];
@@ -210,6 +223,14 @@ export const FLAG_METADATA: Record<FlagKey, FlagMetadata> = {
         reviewBy: "2027-06-30",
         removeWhen:
             "The catalogue has been enforced for every business on every instance for a release with no need to switch it off, and its readers no longer ask it.",
+    },
+    SAROH_BUSINESS_EMAIL: {
+        purpose:
+            "Lets Saroh email a business's booking confirmations, moves and cancellations from its own notify address while the business has no email provider connected, counted against the plan's monthly allowance. Turn it on for one business first, only once the notify subdomain is verified in SES and the plan versions carry the allowance; off, those customers are told in their account alone, as before. SAROH_BUSINESS_EMAIL_STOP on the API stops it for everyone at once.",
+        owner: "Release manager",
+        reviewBy: "2027-03-31",
+        removeWhen:
+            "Saroh's booking emails have been on for every business on every instance for a release with no need to switch them off, and the four readers in saroh-may-send.ts no longer ask it.",
     },
     WEB_ADDRESS_CHANGE: {
         purpose:

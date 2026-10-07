@@ -87,6 +87,84 @@ export async function listPaymentWebhooks(): Promise<
     return (await res.json().catch(() => null)) as PaymentWebhookSetup[] | null;
 }
 
+/**
+ * Saroh sending the business's booking emails while it has no email of its
+ * own (DEC-086), as the API works it out from the rule the send follows.
+ * OFF says nothing new; `takesOver` (its own email connected) says
+ * disconnecting it would hand booking emails to Saroh.
+ */
+export type SarohEmailState =
+    | { state: "OFF"; takesOver: boolean }
+    | {
+          state: "SENDING" | "NEAR" | "PAUSED";
+          used: number;
+          cap: number;
+          /** The day the business's month starts again: "1 Nov". */
+          resetsOn: string;
+          sender: { name: string; address: string };
+          /** Where customers' replies go; null without a clean contact email. */
+          replyTo: string | null;
+          /**
+           * Whether connecting its own email would go through now (its
+           * plan's `integrations` room, DEC-086); null when that couldn't
+           * be read. Absent from an API that predates it: offered, as before.
+           */
+          canConnectOwn?: boolean | null;
+      }
+    | { state: "UNREAD" };
+
+const SAROH_EMAIL_OFF: SarohEmailState = { state: "OFF", takesOver: false };
+
+/**
+ * Whether Saroh sends the business's booking emails, and how much of the
+ * month's allowance is used. Never throws and never reads a failure as a
+ * zero: a failed read is UNREAD. An API without the read (404) says
+ * nothing new — OFF.
+ */
+export async function getSarohEmail(): Promise<SarohEmailState> {
+    const base = await orgBase();
+    if (!base) return { state: "UNREAD" };
+    const res = await apiFetch(`${base}/comms-providers/saroh-email`).catch(
+        () => null,
+    );
+    if (res?.status === 404) return SAROH_EMAIL_OFF;
+    if (!res?.ok) return { state: "UNREAD" };
+    const body: unknown = await res.json().catch(() => null);
+    return isSarohEmailState(body) ? body : { state: "UNREAD" };
+}
+
+/** Only a body shaped as one of the states is read; anything else is UNREAD. */
+function isSarohEmailState(body: unknown): body is SarohEmailState {
+    if (typeof body !== "object" || body === null) return false;
+    const b = body as Record<string, unknown>;
+    switch (b.state) {
+        case "OFF":
+            return typeof b.takesOver === "boolean";
+        case "UNREAD":
+            return true;
+        case "SENDING":
+        case "NEAR":
+        case "PAUSED": {
+            const sender = b.sender as Record<string, unknown> | null;
+            return (
+                typeof b.used === "number" &&
+                typeof b.cap === "number" &&
+                typeof b.resetsOn === "string" &&
+                typeof sender === "object" &&
+                sender !== null &&
+                typeof sender.name === "string" &&
+                typeof sender.address === "string" &&
+                (b.replyTo === null || typeof b.replyTo === "string") &&
+                (b.canConnectOwn === undefined ||
+                    b.canConnectOwn === null ||
+                    typeof b.canConnectOwn === "boolean")
+            );
+        }
+        default:
+            return false;
+    }
+}
+
 export async function listCommsProviders(): Promise<
     ConnectedCommsProvider[] | null
 > {
