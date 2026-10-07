@@ -82,6 +82,13 @@ async function extendedEvents(
 }
 
 test.describe("Pack Detail on Northwind (E16)", () => {
+    // Class packs aren't offered on any plan for now (DEC-099): their pages
+    // are no page (class-packs-list.spec.ts checks it), so this waits for
+    // packs to be offered again.
+    test.skip(
+        true,
+        "Class packs aren't offered on any plan for now (DEC-099).",
+    );
     test("Open a pack; extend a holder by 7 days; a pack nobody holds offers Sell", async ({
         page,
     }) => {
@@ -196,6 +203,13 @@ const northwindDay = (at: Date | string) =>
  * with the pack shows under Used this week.
  */
 test.describe("Pack Detail's other tabs on Northwind (E17)", () => {
+    // Class packs aren't offered on any plan for now (DEC-099): their pages
+    // are no page (class-packs-list.spec.ts checks it), so this waits for
+    // packs to be offered again.
+    test.skip(
+        true,
+        "Class packs aren't offered on any plan for now (DEC-099).",
+    );
     test("Sales says None for no payment; Activity has the sale; Used this week has today's class", async ({
         page,
     }) => {

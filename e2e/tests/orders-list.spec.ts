@@ -781,8 +781,15 @@ test.describe("orders quick view and row menu (B5)", () => {
             await expect(
                 panel.getByRole("list", { name: "Steps" }),
             ).toBeVisible();
+            // Whether it is paid, never a figure (UX-010, DEC-024): the
+            // Payment line stays, with no amount and nothing to refund or pay.
             await expect(panel.getByText(/₹/)).toHaveCount(0);
-            await expect(panel.getByText("Payment")).toHaveCount(0);
+            await expect(
+                panel.getByRole("button", { name: /Refund|pay link/i }),
+            ).toHaveCount(0);
+            await expect(
+                panel.getByRole("link", { name: /Refund|pay link/i }),
+            ).toHaveCount(0);
         }
         await page.close();
     });

@@ -1,4 +1,4 @@
-// @covers accounts:/login app:/open app:/settings/modules app:/services app:/analytics app:/class-packs api:capabilities
+// @covers accounts:/login app:/open app:/settings/modules app:/services app:/analytics app:/courses app:/class-packs api:capabilities
 import type { APIRequestContext, Locator, Page } from "@playwright/test";
 import { expect, test } from "@playwright/test";
 
@@ -109,7 +109,7 @@ test.describe(
                 await expect(sheet).toContainText(
                     "Figures across whatever else is turned on.",
                 );
-                await expect(sheet).toContainText("Nothing to fill in.");
+                await expect(sheet).toContainText("Nothing to fill in here.");
                 await (await turnOnButton(page, sheet)).click();
 
                 await expect(page).toHaveURL(/\/analytics/);
@@ -129,30 +129,38 @@ test.describe(
             }
         });
 
-        test("Also sell: ticking Class packs opens the sheet, and Cancel turns nothing on", async ({
+        // Courses, since class packs aren't offered on any plan (DEC-099):
+        // Also sell never shows them.
+        test("Also sell: ticking Courses opens the sheet, Cancel turns nothing on, and Class packs isn't offered", async ({
             page,
         }) => {
             test.setTimeout(90_000);
             await signIn(page);
             const bookings = await lifecycleOf(page.request, "APPOINTMENTS");
-            const was = await lifecycleOf(page.request, "CLASS_PACKS");
+            const was = await lifecycleOf(page.request, "COURSES");
             test.skip(
                 bookings !== "ENABLED" || was === null,
-                "Northwind isn't taking bookings, or has no Class packs.",
+                "Northwind isn't taking bookings, or has no Courses.",
             );
             try {
                 if (was === "ENABLED") {
-                    await setLifecycle(page.request, "CLASS_PACKS", "DISABLED");
+                    await setLifecycle(page.request, "COURSES", "DISABLED");
                 }
                 await page.goto("/services");
                 const alsoSell = page
                     .getByRole("group", { name: "Also sell" })
                     .filter({ visible: true });
+                await expect(
+                    alsoSell.getByRole("checkbox", { name: /Courses/ }),
+                ).toBeVisible();
+                await expect(
+                    alsoSell.getByRole("checkbox", { name: /Class packs/ }),
+                ).toHaveCount(0);
                 await alsoSell
-                    .getByRole("checkbox", { name: /Class packs/ })
+                    .getByRole("checkbox", { name: /Courses/ })
                     .click();
 
-                let sheet = await theSheet(page, "Turn on Class packs");
+                let sheet = await theSheet(page, "Turn on Courses");
                 // Bookings is on already: nothing comes with it.
                 await expect(sheet).not.toContainText("What comes with it");
                 await sheet
@@ -160,28 +168,26 @@ test.describe(
                     .filter({ visible: true })
                     .click();
                 await expect(sheet).toBeHidden();
-                expect(await lifecycleOf(page.request, "CLASS_PACKS")).toBe(
+                expect(await lifecycleOf(page.request, "COURSES")).toBe(
                     "DISABLED",
                 );
 
                 await alsoSell
-                    .getByRole("checkbox", { name: /Class packs/ })
+                    .getByRole("checkbox", { name: /Courses/ })
                     .click();
-                sheet = await theSheet(page, "Turn on Class packs");
+                sheet = await theSheet(page, "Turn on Courses");
                 await (await turnOnButton(page, sheet)).click();
-                await expect(page).toHaveURL(/\/class-packs/);
-                await expect(
-                    page.getByText(/Class packs is on\./),
-                ).toBeVisible();
-                expect(await lifecycleOf(page.request, "CLASS_PACKS")).toBe(
+                await expect(page).toHaveURL(/\/courses/);
+                await expect(page.getByText(/Courses is on\./)).toBeVisible();
+                expect(await lifecycleOf(page.request, "COURSES")).toBe(
                     "ENABLED",
                 );
             } finally {
-                const now = await lifecycleOf(page.request, "CLASS_PACKS");
+                const now = await lifecycleOf(page.request, "COURSES");
                 if (was && now !== was) {
                     await setLifecycle(
                         page.request,
-                        "CLASS_PACKS",
+                        "COURSES",
                         was === "ENABLED" ? "ENABLED" : "DISABLED",
                     );
                 }
