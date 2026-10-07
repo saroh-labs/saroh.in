@@ -5,6 +5,7 @@ import { showError, showUndo } from "@saroh/ui/toast";
 import { Plus } from "lucide-react";
 import { useRef, useState } from "react";
 
+import { formatMoneyMajor } from "@/lib/format/money";
 import { isMoney, LIMITS, trimMoney } from "@/lib/products/editor-sections";
 import type { ProductListingView } from "@/lib/products/listing-changes";
 import { newVariantStores, soldAtFrom } from "@/lib/products/listing-changes";
@@ -19,6 +20,7 @@ import {
 
 import { useEditor, useSection } from "./editor-state";
 import { FieldHelp } from "./fields";
+import { OptionValuesInline } from "./option-values-inline";
 import { SectionCard } from "./section-card";
 import { OptionChoice, VariantAddRow } from "./variant-add-row";
 import { VARIANT_GRID, VariantRowView } from "./variant-row";
@@ -104,11 +106,16 @@ export function VariantsSection({
         values.find((x) => x.id === r.valueId)?.value ?? r.legacyTitle;
     const takenIds = rows.map((r) => r.valueId).filter(Boolean);
     const productPrice = isMoney(product.price) ? trimMoney(product.price) : "";
+    // Said in a sentence with its separators ("₹1,299", UX-082); the field's
+    // placeholder keeps the plain figure it would type.
+    const shown = (m: string) =>
+        formatMoneyMajor(m, product.currency) ?? `${symbol}${m}`;
+    const shownPrice = productPrice ? shown(productPrice) : "";
     const cents = (m: string) => Math.round(Number(m) * 100);
     // The API refuses a price over the MRP customers see struck through;
     // said here first, beside the price, rather than after a Save.
     const mrpNote = (mrp: string | null) =>
-        `Above the MRP of ${symbol}${trimMoney(mrp ?? product.mrp ?? "")}. Lower it, or raise the MRP in Basics.`;
+        `Above the MRP of ${shown(trimMoney(mrp ?? product.mrp ?? ""))}. Lower it, or raise the MRP in Basics.`;
     const overMrp = (price: string, mrp: string | null) => {
         const cap = mrp ?? product.mrp;
         return (
@@ -252,10 +259,10 @@ export function VariantsSection({
                 <>
                     <p className="mb-3 text-pretty text-[12.5px] leading-[1.55] text-foreground/75">
                         Sold as itself
-                        {productPrice ? ` at ${symbol}${productPrice}` : ""}.
-                        Add variants if it comes in sizes, shades or colours —
-                        each keeps the product&apos;s description and category,
-                        and gets its own stock count.
+                        {shownPrice ? ` at ${shownPrice}` : ""}. Add variants if
+                        it comes in sizes, shades or colours — each keeps the
+                        product&apos;s description and category, and gets its
+                        own stock count.
                     </p>
                     <button
                         type="button"
@@ -277,8 +284,7 @@ export function VariantsSection({
                         Each variant is the same product — same description and
                         category. Its value comes from Settings → Options; SKU,
                         price and photo can differ; a grey price is the
-                        product&apos;s {symbol}
-                        {productPrice}.
+                        product&apos;s {shownPrice}.
                     </FieldHelp>
                     <OptionChoice
                         options={options}
@@ -297,6 +303,15 @@ export function VariantsSection({
                             setNewValue("");
                         }}
                     />
+                    {canWrite && (values.length === 0 || allTaken) ? (
+                        <OptionValuesInline
+                            optionId={option?.id ?? null}
+                            optName={optName}
+                            existing={values.map((v) => v.value)}
+                            locked={locked}
+                            onOption={setOptionId}
+                        />
+                    ) : null}
 
                     {rows.length > 0 ? (
                         <>
@@ -367,16 +382,16 @@ export function VariantsSection({
                         noteBad={dupSku || newPriceBad}
                         note={
                             values.length === 0
-                                ? `No values for ${opt} yet — add them in Settings → Options.`
+                                ? `No values for ${opt} yet — add them above.`
                                 : allTaken
-                                  ? `Every ${opt} is already a variant. Add another value in Settings → Options.`
+                                  ? `Every ${opt} is already a variant. Add another value above.`
                                   : dupSku
                                     ? "That SKU is already on this product."
                                     : newOverMrp
                                       ? mrpNote(null)
                                       : newPriceBad
                                         ? "A number with at most two decimal places."
-                                        : `Blank price uses the product's ${symbol}${productPrice}. Save variants to keep it.`
+                                        : `Blank price uses the product's ${shownPrice}. Save variants to keep it.`
                         }
                         onValue={setNewValue}
                         onSku={setNewSku}
