@@ -61,6 +61,29 @@ export async function hadTrial(
     return Boolean(done);
 }
 
+/**
+ * Whether the business's trial was DEC-093's nominal first month: its
+ * trial checkout (one per business, `hadTrial`) took a charge as it was
+ * authorised. A trial that cost nothing is a free trial, worded as one.
+ * Another plan chosen during it keeps the first checkout's month, so any
+ * completed trial checkout with a charge counts.
+ */
+export async function paidFirstMonth(
+    db: Pick<Tx, "billingCheckout">,
+    organizationId: string,
+): Promise<boolean> {
+    const paid = await db.billingCheckout.findFirst({
+        where: {
+            organizationId,
+            kind: "TRIAL",
+            status: "COMPLETED",
+            chargeNowPaise: { gt: 0 },
+        },
+        select: { id: true },
+    });
+    return paid !== null;
+}
+
 /** The plan's trial in days, when the catalogue offers one; else null. */
 export function planTrialDays(catalog: Catalog, planId: string): number | null {
     const plan = catalog.plans.find((p) => p.id === planId);

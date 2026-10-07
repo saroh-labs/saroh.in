@@ -1,0 +1,80 @@
+import type { Logger } from "@nestjs/common";
+import { prisma } from "@saroh/database";
+
+import { businessTimezone } from "../bookings/staff-availability";
+import { paperDay } from "../invoices/invoice-paper-view";
+import { enqueueBillingEmail } from "./billing-email.job";
+import { termEndingNotice } from "./billing-emails";
+import { PLAN_ENDING_NOTIFICATION_TYPE } from "./plan-ending";
+import {
+    TERM_ENDING_NOTICE_KIND,
+    termEndingCandidates,
+    termEndingEventKey,
+    termEndingOf,
+} from "./term-ending";
+
+/**
+ * The billing sweep's step for terms that end (DEC-100, `term-ending.ts`):
+ * every subscription whose 12-month term ends within the renew window is
+ * asked, once per stage, to pay for the next term — an inbox notice
+ * (`plan.ending`, opening the plans) and a `TERM_ENDING` billing email,
+ * claimed as a `CustomerNotice` on one transaction. One that fails never
+ * stops the rest. Returns how many were told.
+ */
+export async function remindEndingTerms(
+    now: Date,
+    logger: Pick<Logger, "error">,
+): Promise<number> {
+    const ids = await termEndingCandidates(prisma, now);
+    let told = 0;
+    for (const id of ids) {
+        try {
+            if (await remindTerm(id, now)) told += 1;
+        } catch (error) {
+            logger.error(
+                `term_ending_notice_failed subscription=${id}: ${String(error)}`,
+            );
+        }
+    }
+    return told;
+}
+
+async function remindTerm(subscriptionId: string, now: Date): Promise<boolean> {
+    const ending = await termEndingOf(prisma, subscriptionId, now);
+    if (!ending) return false;
+    const { organizationId, term, stage } = ending;
+    const eventKey = termEndingEventKey(subscriptionId, term.endsAt, stage);
+    const zone = await businessTimezone(prisma, organizationId);
+    const words = termEndingNotice({
+        planName: ending.planName,
+        endsOn: paperDay(term.endsAt.toISOString(), zone),
+    });
+    return prisma.$transaction(async (tx) => {
+        const claim = await tx.customerNotice.createMany({
+            data: [{ organizationId, eventKey, kind: TERM_ENDING_NOTICE_KIND }],
+            skipDuplicates: true,
+        });
+        if (claim.count === 0) return false;
+        const notice = await tx.notification.create({
+            data: {
+                organizationId,
+                type: PLAN_ENDING_NOTIFICATION_TYPE,
+                title: words.title,
+                body: words.body,
+            },
+            select: { id: true },
+        });
+        await tx.customerNotice.updateMany({
+            where: { organizationId, eventKey },
+            data: { notificationId: notice.id },
+        });
+        await enqueueBillingEmail(tx, {
+            kind: "TERM_ENDING",
+            organizationId,
+            subscriptionId,
+            endsAt: term.endsAt.toISOString(),
+            stage,
+        });
+        return true;
+    });
+}
