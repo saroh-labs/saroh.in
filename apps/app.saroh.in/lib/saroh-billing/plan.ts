@@ -69,8 +69,8 @@ export function planPrice(
  * What a plan includes, from the limits the API enforces — never from a
  * hand-written list that could promise more than the server allows.
  *
- * Sites are not counted: a business has one website for now whatever its
- * plan says (ADR-006), so "up to 5 websites" would be untrue.
+ * Sites are not counted: a business has one website on every plan
+ * (ADR-006, DEC-094), so "up to 5 websites" would be untrue.
  */
 export function planIncludes(entitlements: Record<string, unknown>): string {
     const parts: string[] = ["Website, bookings and selling"];
