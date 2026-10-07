@@ -521,4 +521,11 @@ export const DIETICIAN_GALLERY_SAMPLE = {
         "My work is mostly translation. We start from what you already eat and what your week actually looks like, and change the smallest number of things that will make a measurable difference — then check whether it held.\n\n" +
         "I do not sell supplements, meal-kit subscriptions or programmes, and I have nothing to recommend that you cannot buy in a normal shop.",
     note: "Sample credentials, shown to demonstrate how the template presents them.",
+    /** The facts row under the practitioner: figure, then its label. */
+    facts: [
+        { value: "14 years", title: "In practice" },
+        { value: "45 min", title: "First consultation" },
+        { value: "Hindi, English, Marathi", title: "Consultations in" },
+    ],
+    footer: "Koregaon Park, Pune",
 } as const;

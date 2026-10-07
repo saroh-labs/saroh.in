@@ -174,7 +174,7 @@ export function templateRender(
         navigation: inPageNavigation(home.sections),
         action,
         shopServes: sells,
-        footer: footerOf(template),
+        footer: footerOf(template, fixture),
         sections,
         journal: fixture?.posts
             ? {
@@ -232,11 +232,18 @@ export function templateRender(
     };
 }
 
-/** The footer a site made from the template starts with (`site-create.ts`). */
-function footerOf(template: TemplateManifest): SiteFooterContent | null {
+/**
+ * The footer a site made from the template starts with (`site-create.ts`),
+ * its line the sample business's (`fixture.footer`) where the template
+ * leaves one for the owner to write.
+ */
+function footerOf(
+    template: TemplateManifest,
+    fixture: TemplateFixture | undefined,
+): SiteFooterContent | null {
     const footer = template.footer;
     if (!footer) return null;
-    const line = (footer.line ?? "").trim();
+    const line = (fixture?.footer ?? footer.line ?? "").trim();
     const layout = footer.layout ?? "centre";
     if (line === "" && layout === "centre") return null;
     return { format: "markdown", value: line, layout };

@@ -407,4 +407,6 @@ export const SALON_GALLERY_SAMPLE = {
         "Move or cancel up to three hours ahead.",
         "Walk-ins welcome on weekdays when a chair is free.",
     ],
+    /** The footer's line: the sample salon's street, and the day it shuts. */
+    footer: "22 Linking Road, Khar West · Closed Mondays",
 } as const;

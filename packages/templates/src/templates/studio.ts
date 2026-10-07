@@ -296,3 +296,32 @@ export const studioTemplate: TemplateManifest = {
         },
     ],
 };
+
+/**
+ * The design's words for the gallery's render of this template (KTD-6), in
+ * place of the placeholders a live site starts with: the five projects
+ * (name and meta; their photo briefs stay {@link STUDIO_PROJECT_BRIEFS}),
+ * the studio's paragraphs and facts, the studio's address beside the email,
+ * and the footer's line. Never laid down on a merchant's site — only the
+ * gallery render applies it.
+ */
+export const STUDIO_GALLERY_SAMPLE = {
+    footer: "Bandra West, Mumbai",
+    projects: [
+        { title: "Kadak Coffee", caption: "Identity, packaging · 2026" },
+        { title: "Meridian", caption: "Brand, website · 2025" },
+        { title: "Northwind Supply", caption: "Identity, livery · 2025" },
+        { title: "Halcyon", caption: "Menus, signage · 2024" },
+        { title: "Kiln Ceramics", caption: "Identity, print · 2024" },
+    ],
+    studio: {
+        paragraphs: [
+            "We are a two-person studio in Mumbai. We do identity and the things identity has to survive — packaging, signage, a website, the form somebody fills in at the counter.",
+            "We take on six or seven projects a year and both of us work on all of them. There is no account manager, which means the person you brief is the person who draws it.",
+            "We are better on things that get printed, painted or stuck to a vehicle than on campaigns, and we will say so early if a project needs the other thing.",
+        ],
+        /** The facts' values, in the template's order (its labels stay). */
+        facts: ["Bandra, Mumbai", "Anaya Pillai and Rohan Desai", "2019"],
+    },
+    address: "St Leo Road, Bandra West, Mumbai",
+} as const;

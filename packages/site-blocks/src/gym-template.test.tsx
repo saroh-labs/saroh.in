@@ -170,10 +170,14 @@ describe("the gym template, rendered live", () => {
         const { container } = renderPage("/membership");
         expect(headings(container)).toEqual([
             "Membership",
-            "Memberships",
+            "Plans",
             "Class packs",
             "Your first visit",
         ]);
+        // The page's line is said once, not again under the plans' title.
+        expect(container.textContent.match(/Every way in/g) ?? []).toHaveLength(
+            1,
+        );
     });
 
     it("Trainers: placeholders that say what to write, with no photo", () => {

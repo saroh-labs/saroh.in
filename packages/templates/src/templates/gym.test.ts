@@ -315,6 +315,27 @@ describe("gym@1 (industry templates, U6)", () => {
         expect(copy).not.toMatch(/₹|\$|£|\d{1,2}:\d{2}|\d+ (classes|sessions)/);
     });
 
+    it("says what the Membership page is once: its heading, then the plans as Plans", () => {
+        const membership = instantiateTemplate(
+            gymTemplate,
+            everythingOn,
+        ).pages.find((p) => p.path === "/membership");
+        const hero = membership?.sections.at(0);
+        const plans = membership?.sections.at(1);
+        expect(hero?.content).toMatchObject({
+            heading: "Membership",
+            subheading: "Every way in, and what it costs.",
+        });
+        expect(plans?.type).toBe("plans");
+        expect(plans?.content).toEqual({ title: "Plans", highlight: "none" });
+        // No second "Memberships / Every way in…" under the page's own.
+        const copy = (membership?.sections ?? []).flatMap((s) =>
+            strings(s.content),
+        );
+        expect(copy.filter((t) => /^every way in/i.test(t))).toHaveLength(1);
+        expect(copy).not.toContain("Memberships");
+    });
+
     it("gives Home the business's name as its h1, for screen readers only", () => {
         const home = instantiateTemplate(gymTemplate, nameOnly).pages[0];
         expect(home.sections[0]?.content).toEqual({

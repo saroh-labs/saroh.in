@@ -1,8 +1,12 @@
 import { openState } from "@saroh/site-blocks";
 import {
     CLINIC_GALLERY_SAMPLE,
+    DEVELOPER_GALLERY_SAMPLE,
     DIETICIAN_GALLERY_SAMPLE,
+    GALLERY_SAMPLES,
+    instantiateTemplate,
     SALON_GALLERY_SAMPLE,
+    templatePlaceholderIn,
 } from "@saroh/templates";
 import { describe, expect, it } from "vitest";
 
@@ -219,6 +223,126 @@ describe("templateRender", () => {
             const email = sampleContext(t).contactEmail;
             if (email) expect(email).toMatch(/@[a-z0-9-]+\.saroh\.app$/);
         }
+    });
+});
+
+/**
+ * The words a visitor reads in a render: every section's text and the
+ * footer's line, an HTML value read as its runs of text between tags, each
+ * line its own. Photo briefs, image addresses, links and ids are not read.
+ */
+const NOT_READ = new Set([
+    "imageBrief",
+    "image",
+    "images",
+    "src",
+    "alt",
+    "href",
+    "link",
+    "anchor",
+    "variant",
+    "serviceIds",
+]);
+
+function visitorRuns(value: unknown, key = ""): string[] {
+    if (NOT_READ.has(key)) return [];
+    if (typeof value === "string") {
+        return value
+            .split(/<[^>]*>|\n/)
+            .map((r) => r.trim())
+            .filter(Boolean);
+    }
+    if (Array.isArray(value)) return value.flatMap((v) => visitorRuns(v, key));
+    if (typeof value === "object" && value !== null) {
+        // An enquiry field's `name` is its key, not words; a person's is.
+        const field = "type" in value && "label" in value;
+        return Object.entries(value).flatMap(([k, v]) =>
+            field && k === "name" ? [] : visitorRuns(v, k),
+        );
+    }
+    return [];
+}
+
+/**
+ * Stricter than the pre-publish check, for the gallery only: anything that
+ * still speaks to the owner ("Your role", "What you made · the year",
+ * "Year") — a render shows a business, not a form to fill in. The few
+ * lines below speak to the visitor, as any site's would.
+ */
+const OWNER_WORDS = [
+    /^your\b/i,
+    /^what (you|they) (made|coach)\b/i,
+    /^years?$/i,
+    /^the stack\b/i,
+    /^replace\b/i,
+];
+const VISITOR_LINES = new Set([
+    "Your name",
+    "Your first visit",
+    "Say what you are building and when you need it.",
+]);
+
+describe("the gallery's sample business (KTD-6)", () => {
+    it.each(cases)(
+        "%s/%s %s has no placeholder words left",
+        (id, style, path) => {
+            const render = templateRender(id, style, path);
+            const runs = [
+                ...(render?.sections ?? []).flatMap((s) =>
+                    visitorRuns(s.content),
+                ),
+                ...visitorRuns(render?.footer?.value ?? ""),
+            ];
+            expect(runs.length).toBeGreaterThan(0);
+            for (const run of runs) {
+                if (VISITOR_LINES.has(run)) continue;
+                // The pre-publish check's own matcher (`@saroh/templates`).
+                expect(templatePlaceholderIn(run), `${id} ${path}`).toBeNull();
+                for (const re of OWNER_WORDS) {
+                    expect(run, `${id} ${path}`).not.toMatch(re);
+                }
+            }
+        },
+    );
+
+    it("would catch the placeholders a merchant's site starts with", () => {
+        // The same scan over the template as a merchant gets it finds them,
+        // so the test above is not passing on a scan that reads nothing.
+        for (const t of galleryTemplates()) {
+            const built = instantiateTemplate(t, sampleContext(t));
+            const runs = [
+                ...built.pages.flatMap((p) =>
+                    p.sections.flatMap((s) => visitorRuns(s.content)),
+                ),
+                ...visitorRuns(t.footer?.line ?? ""),
+            ].filter((r) => !VISITOR_LINES.has(r));
+            const found = runs.filter(
+                (r) =>
+                    templatePlaceholderIn(r) !== null ||
+                    OWNER_WORDS.some((re) => re.test(r)),
+            );
+            expect(found.length, t.id).toBeGreaterThan(0);
+        }
+    });
+
+    it("ends every page on the sample's footer line, never the owner's", () => {
+        for (const t of index) {
+            for (const p of t.pages) {
+                const footer = templateRender(t.id, undefined, p.path)?.footer;
+                expect(footer?.value, `${t.id} ${p.path}`).toBe(
+                    GALLERY_SAMPLES[t.id].footer,
+                );
+            }
+        }
+    });
+
+    it("lists the developer's five engagements, year, role and stack each", () => {
+        const render = templateRender("developer", undefined, "/");
+        const work = render?.sections.find((s) => s.type === "projects")
+            ?.content as { items: Record<string, unknown>[] };
+        expect(work.items).toEqual(
+            DEVELOPER_GALLERY_SAMPLE.work.map((w) => ({ ...w })),
+        );
     });
 });
 

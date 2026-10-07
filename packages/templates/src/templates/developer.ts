@@ -321,3 +321,119 @@ export const developerTemplate: TemplateManifest = {
         },
     ],
 };
+
+/**
+ * The design's words for the gallery's render of this template (KTD-6), in
+ * place of the placeholders a live site starts with: Kiran Menon's intro
+ * and facts, five engagements, the case study, the rates (the design's
+ * illustrative figures, with its note saying so), the availability and the
+ * footer's line. Never laid down on a merchant's site — `instantiateTemplate`
+ * does not read it, so a live site never carries a figure the owner did not
+ * set; only the gallery render applies it.
+ */
+export const DEVELOPER_GALLERY_SAMPLE = {
+    footer: "Bengaluru",
+    intro: {
+        paragraphs: [
+            "I build the parts of a product that have to keep working when the company grows — payments, dispatch, anything with a queue behind it. Mostly Go and TypeScript, mostly for teams between five and fifty people.",
+            "I work alone and take one project at a time. That means I am slower to start than an agency and considerably faster once I have.",
+        ],
+        /** The facts' values, in the template's order (its labels stay). */
+        facts: [
+            "Bengaluru, UTC+5:30",
+            "Go, TypeScript, Postgres, AWS",
+            "Independent since 2019",
+        ],
+    },
+    work: [
+        {
+            year: "2026",
+            title: "Northwind Supply",
+            summary:
+                "Replaced a dispatch process that ran on three spreadsheets and a WhatsApp group with a single board the warehouse actually uses.",
+            meta: "Go · Postgres · React · AWS",
+            role: "Sole engineer",
+        },
+        {
+            year: "2025",
+            title: "Halcyon Cafe Group",
+            summary:
+                "Built the ordering and payments layer behind eleven outlets, including the reconciliation nobody wanted to own.",
+            meta: "TypeScript · Node · Razorpay · Postgres",
+            role: "Lead, team of 3",
+        },
+        {
+            year: "2024",
+            title: "Meridian Coaching",
+            summary:
+                "Booking and scheduling for a practice running six coaches across two cities, replacing a calendar that double-booked.",
+            meta: "TypeScript · Next · Postgres",
+            role: "Contract",
+        },
+        {
+            year: "2023",
+            title: "Kiln Ceramics",
+            summary:
+                "A small storefront and stock system for a maker who sells in runs. Intentionally boring, still running untouched.",
+            meta: "TypeScript · Postgres",
+            role: "Sole engineer",
+        },
+        {
+            year: "2019–2022",
+            title: "Zeta (salaried)",
+            summary:
+                "Payments infrastructure. Learned most of what I know about idempotency the expensive way.",
+            meta: "Go · Kafka · Postgres",
+            role: "Senior engineer",
+        },
+    ],
+    caseStudy: {
+        title: "Taking a warehouse off three spreadsheets and a WhatsApp group",
+        meta: "Northwind Supply · 2026 · Five months, sole engineer",
+        /**
+         * Each part's paragraphs, in the template's order: the problem,
+         * constraints, what I decided, what I would do differently (its
+         * part labels stay).
+         */
+        parts: [
+            [
+                "Northwind sold to cafes across four cities and ran dispatch on three spreadsheets: one for orders, one for stock, one the drivers could see. The three disagreed by the middle of every morning, and the reconciliation was a person.",
+                "They had already bought two off-the-shelf systems. Both assumed a warehouse with barcodes and fixed bin locations, and Northwind has neither.",
+            ],
+            [
+                "Nothing could stop for a migration — the warehouse packs from 5am and the spreadsheets had to keep working until the day they did not. Two of the four staff who would use it had never used software that was not WhatsApp or Excel.",
+            ],
+            [
+                "I wrote the new system to read the existing spreadsheets rather than replace them, so for six weeks both were true and the staff could check one against the other. That cost two weeks of throwaway sync code and bought the only thing that mattered, which was trust.",
+                "The board itself is one page with no navigation. Every action is a single tap and every state is a colour and a word, because the packing floor is read at arm's length while holding a box.",
+            ],
+            [
+                "I built the driver view second and should have built it first. The drivers were the people whose day the spreadsheets ruined most, and they were the last to be asked.",
+            ],
+        ],
+        result: "Dispatch moved off the spreadsheets in five months with no day of downtime. The reconciliation role no longer exists — that person now runs stock — and mis-picks are rare enough that Northwind stopped counting them separately.",
+    },
+    rates: {
+        items: [
+            {
+                value: "₹42,000",
+                body: "For short pieces of work and reviews. Minimum two days.",
+            },
+            {
+                value: "₹6–18 lakh",
+                body: "Fixed price after a paid week of scoping. Most land near the middle.",
+            },
+            {
+                value: "₹1,60,000",
+                body: "A month, for two days a week. Three-month minimum, then rolling.",
+            },
+        ],
+        note: "Figures are illustrative for this template. I quote fixed prices wherever the work can be scoped, because an hourly rate makes my incentive the opposite of yours. Scoping weeks are paid and the fee comes off the project if you go ahead.",
+    },
+    availability: {
+        label: "Taking one project from November · as of 21 Sep 2026",
+        text:
+            "I have one slot from early November and nothing before it. If that is too far out, say so — I would rather point you at someone who is free than hold a conversation open for six weeks.\n" +
+            "Not looking for salaried work, equity-only arrangements, or projects where the architecture is already decided and the job is typing.",
+    },
+} as const;
