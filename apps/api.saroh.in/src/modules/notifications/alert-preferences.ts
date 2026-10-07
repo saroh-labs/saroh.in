@@ -91,7 +91,14 @@ export const ALERT_NOTIFICATION_TYPES: Record<AlertEvent, readonly string[]> = {
     // UX-012: a provider that refused the business's keys.
     failed: ["payment.failed", "provider.attention"],
     team: ["team.joined"],
-    site: ["site.live", "site.not_live"],
+    // UX-043: a reviewer's verdict, or their first note of a round.
+    site: [
+        "site.live",
+        "site.not_live",
+        "site.review.approved",
+        "site.review.changes",
+        "site.review.note",
+    ],
 };
 
 /** Which row an inbox notice type belongs to, or null (enquiries, reviews). */

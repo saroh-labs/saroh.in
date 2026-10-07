@@ -176,9 +176,11 @@ export function NotificationsInbox({
                                 >
                                     {row}
                                 </Link>
-                            ) : n.type === "plan.limit" ? (
-                                // A plan limit's notice (U13): opening it is
-                                // reading it, and it opens the way to more.
+                            ) : n.type === "plan.limit" ||
+                              n.type === "plan.changed" ? (
+                                // A plan limit's notice (U13), or the plan
+                                // changing (UX-041): opening it is reading
+                                // it, and it opens the plans.
                                 <Link
                                     href="/settings/billing#change-plan"
                                     aria-label={label}

@@ -3149,3 +3149,27 @@ and `message-send.handler.spec.ts`.
 **Fix**: renamed the unapplied one (`20261029160000_billing_first_month`). `check:migration-ids` (prepush and CI) fails on any shared timestamp. The applied 24 Oct pair is allowlisted, because a migration that has run can't be renamed.
 **Rule**: before merging parallel units, the orchestrator runs `check:migration-ids`. A clash is fixed by renaming the migration that hasn't reached any database.
 **Category**: database · `scripts/check-migration-ids.mjs`
+
+## Notifications — the audit saw no booking confirmation, order notice or review alert (UX-041–043)
+
+**Problem**: The 7 Oct audit found no booking confirmation in any log, no
+"order placed" message in the customer's thread, no email to the owner for
+a web order, nothing for review events or a plan change, and "You've
+reached your 1 websites on Free" on day one.
+**Root cause**: Several. Booking notices did work: every `booking.notify`
+wrote its thread message (the audit database had 24); nothing was emailed
+because the business had no provider and `SAROH_BUSINESS_EMAIL` is off by
+default, so there was no log line to find. "Order placed" was never a
+notice kind. Team alert email went only through the business's own
+provider with New order off by default, so a Free business (which can't
+connect one, DEC-091) could never hear of a web order. Review writes and
+plan overrides queued nothing. A total cap of one was crossed by setup, and
+limit notices were never taken back when the count fell.
+**Fix**: `ORDER_PLACED` through the one `emailRoute`; Saroh's own mail
+(after commit) for a web order to owners and admins and for reviewers;
+`team.alert` `review`; `plan.change.notice`; `quietAtOne` and
+`limit-notice-clear.ts`; `countedWhat` for "1 website". Tests beside each.
+**Lesson**: when checking a notice by hand, read `CustomerNotice` and the
+thread before the mail log: a missing email is often the route saying no.
+**Category**: jobs · rules in `docs/patterns/backend-jobs.md` (Customer
+notices, Team alerts, Plan limit notices, Plan change notices)

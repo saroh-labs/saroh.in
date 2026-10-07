@@ -309,6 +309,39 @@ export function sendCustomerMessageNotificationEmail(
 }
 
 /**
+ * Tell someone on a business's team about something Saroh noticed for them
+ * (UX-042: a new website order; UX-043: a site review asked of them).
+ * Saroh's own mail to its own users, as an enquiry's notice is: console
+ * fallback with no SMTP, never throws, and the job's once-only claim is the
+ * record. Every value is escaped in the body; the subject is one line.
+ */
+export function sendTeamNoticeEmail(
+    to: string,
+    mail: {
+        subject: string;
+        heading: string;
+        text: string;
+        url: string;
+        cta: string;
+    },
+): Promise<void> {
+    const subject = mail.subject.replace(/[\r\n]+/g, " ").trim();
+    if (!transporter) {
+        console.info(
+            `[Team notice] (no SMTP) ${to}: ${subject} -> ${mail.url}`,
+        );
+        return Promise.resolve();
+    }
+    void transporter.sendMail({
+        from: FROM,
+        to,
+        subject,
+        html: actionEmail(mail.heading, mail.text, mail.url, mail.cta),
+    });
+    return Promise.resolve();
+}
+
+/**
  * Marker prefix that stamps every self-test/preview email (S6-004). It is
  * applied to BOTH the subject and the top of the body so the message can never
  * be mistaken for production Organization delivery — a template preview goes

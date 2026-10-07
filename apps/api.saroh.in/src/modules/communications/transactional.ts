@@ -26,6 +26,9 @@ export const NOTICE_TEMPLATES = [
     "BOOKING_CONFIRMED",
     "BOOKING_MOVED",
     "BOOKING_CANCELLED",
+    // A website order the customer placed (UX-042): paid, or to pay on
+    // handover.
+    "ORDER_PLACED",
     "ORDER_READY",
     "ORDER_HANDED_OVER",
     "WAITLIST_OFFER",

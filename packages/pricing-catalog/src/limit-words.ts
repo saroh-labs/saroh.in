@@ -34,6 +34,8 @@ export interface LimitAction {
 export interface LimitWords {
     /** The counted thing, after a number: "5 products". */
     what: string;
+    /** After the number one: "1 product", never "1 products" (UX-041). */
+    one: string;
     /** What stops at the limit, the notice's first sentence. */
     paused: string;
     /** Counted per calendar month in the business's zone, not in total. */
@@ -51,11 +53,13 @@ export interface LimitWords {
 export const LIMIT_WORDS: Readonly<Record<string, LimitWords>> = {
     products: {
         what: "products",
+        one: "product",
         paused: "You can't add more products.",
         monthly: false,
     },
     ordersPerMonth: {
         what: "orders a month",
+        one: "order a month",
         paused: "New orders at the counter are paused until next month; your site keeps taking them.",
         monthly: true,
     },
@@ -63,46 +67,55 @@ export const LIMIT_WORDS: Readonly<Record<string, LimitWords>> = {
     // own are never capped, so the notice says the desk still books.
     bookingsPerMonth: {
         what: "online bookings a month",
+        one: "online booking a month",
         paused: "Online booking on your site is paused until next month; you can still book customers in yourself.",
         monthly: true,
     },
     blogPosts: {
         what: "blog posts",
+        one: "blog post",
         paused: "You can't put more posts live.",
         monthly: false,
     },
     teamMembers: {
         what: "team members",
+        one: "team member",
         paused: "New invites are paused. Everyone already on the team keeps access.",
         monthly: false,
     },
     reviewers: {
         what: "reviewers",
+        one: "reviewer",
         paused: "New reviewer invites are paused. Reviewers you have keep access.",
         monthly: false,
     },
     shopLocations: {
         what: "places customers visit",
+        one: "place customers visit",
         paused: "You can't add another place customers visit.",
         monthly: false,
     },
     sites: {
         what: "websites",
+        one: "website",
         paused: "You can't add another website.",
         monthly: false,
     },
     storageGb: {
         what: "GB of photos and videos",
+        one: "GB of photos and videos",
         paused: "Nothing is blocked: your uploads keep working, and we'll be in touch about the space you need.",
         monthly: false,
     },
     visitsPerMonth: {
         what: "site visits a month",
+        one: "site visit a month",
         paused: "Nothing is blocked: your site keeps working, and we'll be in touch about your traffic.",
         monthly: true,
     },
     integrations: {
         what: "connections",
+        one: "connection",
         paused: "You can't connect more tools.",
         monthly: false,
     },
@@ -113,6 +126,7 @@ export const LIMIT_WORDS: Readonly<Record<string, LimitWords>> = {
      */
     sarohEmailsPerMonth: {
         what: "emails Saroh sends for you a month",
+        one: "email Saroh sends for you a month",
         paused: "Saroh has stopped sending your booking emails for this month.",
         monthly: true,
         action: {
@@ -131,6 +145,16 @@ export const LIMIT_WORDS: Readonly<Record<string, LimitWords>> = {
         },
     },
 };
+
+/**
+ * The counted thing after `count`: `one` for exactly one ("1 website"),
+ * else `what` ("2 websites"). A `what` no limit uses comes back as given.
+ */
+export function countedWhat(what: string, count: number): string {
+    if (count !== 1) return what;
+    const words = Object.values(LIMIT_WORDS).find((w) => w.what === what);
+    return words?.one ?? what;
+}
 
 /** The words for a catalogue row's limit, or null for a row nothing counts. */
 export function limitWordsFor(moduleId: string): LimitWords | null {

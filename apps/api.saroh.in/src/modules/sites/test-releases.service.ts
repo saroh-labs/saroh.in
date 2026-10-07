@@ -17,6 +17,7 @@ import { authorize } from "../organizations/organization-policy";
 import { lockSite, readVerdicts } from "./live-pointer";
 import { checkRenderability } from "./publication-renderability";
 import { assertOverrideAllowed, isOwner } from "./publish-approval";
+import { queueReviewAlert } from "./review-alert-queue";
 import { draftFingerprint } from "./review-route";
 import { assertSiteInOrg } from "./site-access";
 import { SitesService } from "./sites.service";
@@ -173,6 +174,17 @@ export class TestReleasesService {
                 },
                 select: { id: true },
             });
+            // The site's reviewers hear there is one to look at (UX-043).
+            await queueReviewAlert(
+                tx,
+                ctx.organizationId,
+                {
+                    event: "review",
+                    about: "release",
+                    testReleaseId: release.id,
+                },
+                siteId,
+            );
             return release.id;
         });
 

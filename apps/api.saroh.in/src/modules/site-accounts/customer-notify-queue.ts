@@ -51,6 +51,11 @@ export function orderNoticeKey(orderEventId: string): string {
     return `order:${orderEventId}`;
 }
 
+/** A placed order's key: once per order, however it came to be placed. */
+export function orderPlacedNoticeKey(orderId: string): string {
+    return `order-placed:${orderId}`;
+}
+
 /** Queue one notice on the caller's transaction. */
 export async function enqueueCustomerNotice(
     tx: Tx,
@@ -99,6 +104,24 @@ export async function enqueueOrderStepNotice(
         new Date(input.now.getTime() + ORDER_NOTICE_DELAY_MS),
     );
     return true;
+}
+
+/**
+ * A website order placed (UX-042): to pay on handover, when it is made; paid
+ * online, once its payment holds. The customer hears it is in, in their
+ * account thread and by email where the business's own provider sends.
+ * Once per order (`orderPlacedNoticeKey`).
+ */
+export async function enqueueOrderPlacedNotice(
+    tx: Tx,
+    organizationId: string,
+    orderId: string,
+): Promise<void> {
+    await enqueueCustomerNotice(tx, organizationId, {
+        kind: "ORDER_PLACED",
+        eventKey: orderPlacedNoticeKey(orderId),
+        orderId,
+    });
 }
 
 /**

@@ -9,6 +9,7 @@ import { gstInsideOrder } from "../invoices/order-invoice";
 import { loadTaxProfile } from "../invoices/order-invoicing";
 import { enqueueTeamAlert } from "../notifications/team-alerts";
 import { queueUncollectedAlert } from "../notifications/uncollected-alert";
+import { enqueueOrderPlacedNotice } from "../site-accounts/customer-notify-queue";
 import type { ShopScope } from "./checkout-bag";
 import type { QuotedLine } from "./checkout-quote";
 import type { CheckoutStartDto } from "./checkout.dto";
@@ -276,6 +277,12 @@ export async function createCheckoutOrder(
                         orderId: order.id,
                         actorUserId: null,
                     });
+                    // And the customer hears it is in (UX-042).
+                    await enqueueOrderPlacedNotice(
+                        tx,
+                        scope.organizationId,
+                        order.id,
+                    );
                     // And, three days on in the business's zone, the
                     // team's "Not collected" if it is still waiting (R34).
                     // It only tells: nothing cancels it on its own.

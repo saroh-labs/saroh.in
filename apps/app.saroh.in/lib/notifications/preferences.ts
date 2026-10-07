@@ -61,12 +61,13 @@ export const ALERTS = [
         label: "Someone joins the team",
         note: "When an invite is accepted",
     },
-    // Not in the design: a test release's scheduled go-live (DEC-071, T10).
-    // The API offers it only to who can publish, with test releases on.
+    // Not in the design: a test release's scheduled go-live (DEC-071, T10),
+    // and a reviewer's verdict or notes (UX-043). The API offers it only to
+    // who can publish, with test releases on.
     {
         key: "site",
-        label: "Website goes live",
-        note: "When a scheduled go-live runs, or couldn't",
+        label: "Your website",
+        note: "A reviewer's verdict or notes, and a scheduled go-live",
     },
 ] as const;
 export type AlertKey = (typeof ALERTS)[number]["key"];
