@@ -366,58 +366,13 @@ export function sendOrganizationInvitationEmail(
     return Promise.resolve();
 }
 
-/** Whether an email actually left — the one sender that has to know. */
+/** Whether an email actually left, for a sender that has to know. */
 export type EmailOutcome = "sent" | "not-configured" | "failed";
-
-/**
- * Ask a customer to review what they bought (product reviews, plan
- * 2026-09-21-001).
- *
- * Unlike the senders above it AWAITS the send and says how it went: an
- * invitation is only recorded once its email has left, so a failed send never
- * leaves the merchant believing a customer was asked. The link carries a
- * token that is stored only as a hash — so without SMTP it is printed ONLY in
- * development (an allowlist, per devops-environments-and-flags), never into a
- * production log.
- */
-export async function sendReviewInvitationEmail(
-    to: string,
-    reviewUrl: string,
-    storeName: string,
-): Promise<EmailOutcome> {
-    if (!transporter) {
-        // In development the console IS the delivery, as for every sender
-        // here; everywhere else no SMTP means nothing left.
-        if (env.NODE_ENV === "development") {
-            console.info(
-                `[Review invite] (no SMTP) ${to} -> ${storeName}: ${reviewUrl}`,
-            );
-            return "sent";
-        }
-        return "not-configured";
-    }
-    try {
-        await transporter.sendMail({
-            from: FROM,
-            to,
-            subject: `How was your order from ${storeName}?`,
-            html: actionEmail(
-                `How was your order?`,
-                `${storeName} would like to hear what you thought of what you bought. It takes a minute, and you can review each item. The link works for 30 days.`,
-                reviewUrl,
-                "Leave a review",
-            ),
-        });
-        return "sent";
-    } catch {
-        return "failed";
-    }
-}
 
 /**
  * The opening-day invite off the waitlist (marketing plan U31): "Your Saroh
  * invite", with a link that is the invitee's alone. Awaited and it says how
- * it went, like the review invitation: the batch records an invite as sent
+ * it went: the batch records an invite as sent
  * only once its email has left.
  *
  * With no SMTP it never leaves the process: where the fake transport is

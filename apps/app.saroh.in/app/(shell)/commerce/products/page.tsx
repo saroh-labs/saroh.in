@@ -10,9 +10,11 @@ import { ProductsTabs } from "@/components/stores/products-tabs";
 import { ReviewsView } from "@/components/stores/reviews-view";
 import { listCollections } from "@/lib/collections/service";
 import { resolveActiveOrganization } from "@/lib/organizations/service";
+import { reviewEmailNote } from "@/lib/product-reviews/describe";
 import {
     invitableOrders,
     listReviews,
+    reviewEmailSetup,
     reviewSummary,
 } from "@/lib/product-reviews/service";
 import { canStockProducts, canWriteProducts } from "@/lib/products/access";
@@ -132,9 +134,17 @@ export default async function CataloguePage({
         ) : null;
 
     if (onReviews) {
-        const invitable = canWriteReviews
-            ? await invitableOrders().catch(() => [])
-            : [];
+        const [invitable, emailSetup] = canWriteReviews
+            ? await Promise.all([
+                  invitableOrders().catch(() => []),
+                  reviewEmailSetup().catch(() => null),
+              ])
+            : [[], null];
+        // Invitations go only through the business's own email (D11).
+        const emailNote = reviewEmailNote(emailSetup, {
+            connect: may("comms:manage"),
+            plans: may("billing:read"),
+        });
         const review =
             typeof params.review === "string" ? params.review : undefined;
         // From Home's "Last 24 hours" (F6): the reviews left since then.
@@ -148,6 +158,7 @@ export default async function CataloguePage({
                     reviews={shown}
                     invitable={invitable}
                     canWrite={canWriteReviews}
+                    emailNote={emailNote}
                     tabs={
                         since ? (
                             <>

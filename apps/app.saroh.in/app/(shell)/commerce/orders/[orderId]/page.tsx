@@ -168,6 +168,10 @@ export default async function OrderPage({
                         canWrite={
                             may("product-review:write") && may("order:read")
                         }
+                        may={{
+                            connect: may("comms:manage"),
+                            plans: may("billing:read"),
+                        }}
                     />
                 ) : null
             }
