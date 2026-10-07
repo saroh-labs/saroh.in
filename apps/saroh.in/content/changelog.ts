@@ -166,7 +166,7 @@ export const CHANGELOG = {
     // It joins the waitlist's list (KTD-5), so the early access invite
     // reaches it too, and the line says so.
     signupNote:
-        "Only email about Saroh: what ships, and an invite to early access. Write to hello@saroh.in to be taken off the list.",
+        "Only email about Saroh: what ships, and an invite to early access. Write to contact@saroh.in to be taken off the list.",
     signupDone: "Done. We'll email you when something ships.",
     comingTitle: "Coming next",
     comingSub:

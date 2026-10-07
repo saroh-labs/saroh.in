@@ -12,11 +12,11 @@ export const REFUNDS = {
     href: "/refunds",
     description:
         "How cancelling a Saroh plan works, why payments aren't refunded, and what happens if we charge you by mistake.",
-    body: `Saroh is a product of Virashi Softwares LLP, Unit 309, 3rd Floor, Tower-A, SAS Tower, Support Area, Medicity, Sector-38, Gurgaon, Haryana 122001, India. Write to us at hello@saroh.in.
+    body: `Saroh is a product of Virashi Softwares LLP, Unit 309, 3rd Floor, Tower-A, SAS Tower, Support Area, Medicity, Sector-38, Gurgaon, Haryana 122001, India. Write to us at contact@saroh.in.
 
 ## Cancelling
 
-You can cancel your Saroh plan at any time by writing to hello@saroh.in. Your plan stays until the end of the period you've paid for, then moves to Free. Nothing you've made is deleted.
+You can cancel your Saroh plan at any time by writing to contact@saroh.in. Your plan stays until the end of the period you've paid for, then moves to Free. Nothing you've made is deleted.
 
 ## Refunds
 
@@ -40,5 +40,5 @@ Saroh is an online service. There are no physical goods and no delivery.
 
 ## Questions or complaints
 
-Write to hello@saroh.in, or to our grievance officer, Mohit Mehta, at the address above. We reply within 30 days.`,
+Write to contact@saroh.in, or to our grievance officer, Mohit Mehta, at the address above. We reply within 30 days.`,
 } as const;

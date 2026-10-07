@@ -24,7 +24,7 @@ These terms are an agreement between you and Virashi Softwares LLP ("Saroh", "we
 
 ## Your account and team
 
-Keep your sign-in safe. You're responsible for what happens in your account, including what the team members you invite do, within the roles you give them. Tell us at once at hello@saroh.in if you think someone else got in.
+Keep your sign-in safe. You're responsible for what happens in your account, including what the team members you invite do, within the roles you give them. Tell us at once at contact@saroh.in if you think someone else got in.
 
 ## Plans and billing
 
@@ -42,7 +42,7 @@ If your plan moves to a lower one (you cancel, don't renew, or a payment fails),
 
 ## Cancelling and refunds
 
-You can cancel at any time by writing to hello@saroh.in. Payments aren't refunded, monthly or yearly: you keep your plan until the end of the period you've paid for, then it moves to Free. If you cancel during an introductory first month, nothing more is charged. Our Refund and Cancellation Policy says the same in full.
+You can cancel at any time by writing to contact@saroh.in. Payments aren't refunded, monthly or yearly: you keep your plan until the end of the period you've paid for, then it moves to Free. If you cancel during an introductory first month, nothing more is charged. Our Refund and Cancellation Policy says the same in full.
 
 ## Early access
 
@@ -54,7 +54,7 @@ Your customers pay you through your own payment account (Razorpay or Cashfree). 
 
 ## Your data and content
 
-What you put into Saroh stays yours: your products, photos, bookings, customer records and website. You let us store, process and show it only to run Saroh for you. You can download your orders yourself, and we'll send you a copy of everything else if you ask at hello@saroh.in. When you close your account we delete it as the Privacy Policy says, except invoices the law makes us keep.
+What you put into Saroh stays yours: your products, photos, bookings, customer records and website. You let us store, process and show it only to run Saroh for you. You can download your orders yourself, and we'll send you a copy of everything else if you ask at contact@saroh.in. When you close your account we delete it as the Privacy Policy says, except invoices the law makes us keep.
 
 For your customers' personal data, your business is responsible for having the right to collect and use it, and we process it only for you.
 
@@ -96,5 +96,5 @@ We'll email you at least 30 days before a change that matters takes effect. If y
 
 ## Law and disputes
 
-These terms are governed by the laws of India. Courts in Gurugram, Haryana, have jurisdiction. Write to hello@saroh.in first; most things are sorted out that way.`,
+These terms are governed by the laws of India. Courts in Gurugram, Haryana, have jurisdiction. Write to contact@saroh.in first; most things are sorted out that way.`,
 } as const;

@@ -18,7 +18,7 @@ export const PRIVACY = {
         "How Saroh, a product of Virashi Softwares LLP, collects and uses personal data, who it is shared with, how long it is kept and what you can ask for.",
     body: `## Who we are
 
-Saroh is a product of Virashi Softwares LLP, Unit 309, 3rd Floor, Tower-A, SAS Tower, Support Area, Medicity, Sector-38, Gurgaon, Haryana 122001, India. Write to us at hello@saroh.in. Our grievance officer is Mohit Mehta, at the same address.
+Saroh is a product of Virashi Softwares LLP, Unit 309, 3rd Floor, Tower-A, SAS Tower, Support Area, Medicity, Sector-38, Gurgaon, Haryana 122001, India. Write to us at contact@saroh.in. Our grievance officer is Mohit Mehta, at the same address.
 
 This policy covers saroh.in, app.saroh.in, accounts.saroh.in and the emails we send. It explains what we collect, why, who we share it with and what you can ask us to do.
 
@@ -35,7 +35,7 @@ This policy covers saroh.in, app.saroh.in, accounts.saroh.in and the emails we s
 | Business | Business name, address, GSTIN, locations, team members | To run Saroh for your business and put the right details on invoices |
 | Billing | Your plan, invoices from Saroh, payment status | To bill you. Card and UPI details are handled by Razorpay; we never see or store full card numbers |
 | Waitlist and tool emails | Email, kind of business, where you heard of us, your country (worked out from your connection, never asked); for the link preview tool, the link you checked | To send what you asked for: the launch invite, or the link report |
-| Messages | What you write to hello@saroh.in | To help you |
+| Messages | What you write to contact@saroh.in | To help you |
 | Security logs | IP address, browser, sign-in times, errors | To keep accounts safe and fix problems. Kept 90 days |
 | Website visits | Pages visited on saroh.in, rough location, device, through Google Analytics cookies | To learn which pages help people. Only on saroh.in, never on your customers' sites |
 
@@ -84,7 +84,7 @@ Under India's Digital Personal Data Protection Act, 2023 you can ask us to:
 - stop using it for anything you consented to;
 - name someone to act for you if you can't.
 
-Write to hello@saroh.in. We reply within 30 days. If you're not satisfied, you can write to our grievance officer, and then complain to the Data Protection Board of India.
+Write to contact@saroh.in. We reply within 30 days. If you're not satisfied, you can write to our grievance officer, and then complain to the Data Protection Board of India.
 
 ## Cookies
 

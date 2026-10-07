@@ -125,7 +125,7 @@ describe("the Terms and the Refund and Cancellation Policy", () => {
 
     it("both say cancelling is by email, and neither promises what isn't built", () => {
         for (const body of [TERMS.body, REFUNDS.body]) {
-            expect(body).toContain("by writing to hello@saroh.in");
+            expect(body).toContain("by writing to contact@saroh.in");
             // Cancelling in Settings and the reminder before each payment wait for #805.
             expect(body).not.toMatch(/cancel[^.]*in Settings/i);
             expect(body).not.toMatch(/before each (monthly )?payment/i);
