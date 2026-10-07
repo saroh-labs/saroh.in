@@ -85,10 +85,7 @@ const input: CatalogInput = {
                     "On your own domain",
                     "Your website on your own domain",
                 ),
-                pro: C(
-                    "On your own domains",
-                    "Your websites on your own domains",
-                ),
+                pro: C("On your own domain", "Your website on your own domain"),
             },
         },
         {
