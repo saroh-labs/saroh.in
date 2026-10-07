@@ -1,8 +1,10 @@
 import { SettingsTabs } from "@/components/settings/settings-tabs";
 import { settingsPagesFor } from "@/components/shared/nav-items";
+import { ownAccountsRoom } from "@/lib/billing/access";
 import { listModules } from "@/lib/modules/service";
 import { resolveActiveOrganization } from "@/lib/organizations/service";
 import { listCommsProviders } from "@/lib/providers/service";
+import { billingAccessOrNull } from "@/lib/saroh-billing/service";
 import { emailAttention, providersTabNote } from "@/lib/settings/ready";
 
 /**
@@ -23,7 +25,8 @@ import { emailAttention, providersTabNote } from "@/lib/settings/ready";
  * When email needs a person, the Providers tab says so in place of its line
  * ("Needs you: email is disconnected"), so it is seen from any tab. Asked only
  * of someone who may manage messaging, and best-effort: a failed read drops
- * the line, never the screen.
+ * the line, never the screen. A plan that can't connect its own email is
+ * never told it has none (DEC-091).
  */
 export default async function SettingsLayout({
     children,
@@ -44,7 +47,13 @@ export default async function SettingsLayout({
             listModules().catch(() => null),
             listCommsProviders().catch(() => null),
         ]);
-        providersNote = providersTabNote(emailAttention(modules, messaging));
+        const attention = emailAttention(modules, messaging);
+        // The plan is read only when it would change the line (DEC-091).
+        const ownEmail =
+            attention === "not-connected"
+                ? ownAccountsRoom(await billingAccessOrNull())
+                : true;
+        providersNote = providersTabNote(attention, ownEmail);
     }
 
     return (

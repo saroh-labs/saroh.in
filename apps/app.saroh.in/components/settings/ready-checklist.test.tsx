@@ -99,3 +99,92 @@ describe("the plan's aside on the setup checklists (DEC-092)", () => {
         expect(renderToStaticMarkup(<ReadyChecklist list={done} />)).toBe("");
     });
 });
+
+describe("one checklist on Home and Settings (UX-019)", () => {
+    const logo = {
+        key: "logo" as const,
+        label: "Add your logo",
+        why: "It goes on every receipt and invoice.",
+        cta: "Add logo",
+        href: "/settings/organization?section=identity",
+        broken: false,
+        done: false,
+    };
+
+    it("Settings and Home carry the same title and count", () => {
+        const settings = renderToStaticMarkup(<ReadyChecklist list={list} />);
+        const home = renderToStaticMarkup(
+            <TakeMoneyChecklist list={list} businessId="org_1" slot="late" />,
+        );
+        for (const html of [settings, home]) {
+            expect(html).toContain("Get ready to take money");
+            expect(html).toContain("1 of 2 done");
+        }
+        expect(settings).not.toContain("Ready to take payments");
+    });
+
+    it("lists Settings' suggestions apart as Make it yours, outside the count", () => {
+        const html = renderToStaticMarkup(
+            <ReadyChecklist list={{ ...list, extras: [logo] }} />,
+        );
+        expect(html).toContain("1 of 2 done");
+        expect(html).toContain('aria-label="Make it yours"');
+        expect(html).toContain("Add your logo");
+    });
+
+    it("keeps Make it yours once the counted steps are done, and drops done suggestions", () => {
+        const done: Checklist = {
+            ...list,
+            left: [],
+            done: 2,
+            extras: [
+                logo,
+                {
+                    ...logo,
+                    key: "pipeline",
+                    label: "Create a pipeline",
+                    done: true,
+                },
+            ],
+        };
+        const html = renderToStaticMarkup(<ReadyChecklist list={done} />);
+        expect(html).not.toContain("of 2 done");
+        expect(html).toContain("Add your logo");
+        expect(html).not.toContain("Create a pipeline");
+    });
+});
+
+describe("Free's How to pay us step (UX-007)", () => {
+    it("is a counted step on the card, linked to How to pay us", () => {
+        const free: Checklist = {
+            steps: [
+                {
+                    key: "howToPay",
+                    label: "Tell customers how to pay you",
+                    why: "Add your UPI ID or bank details.",
+                    cta: "Add UPI or bank",
+                    href: "/settings/organization?section=pay",
+                    broken: false,
+                    done: false,
+                },
+            ],
+            left: [
+                {
+                    key: "howToPay",
+                    label: "Tell customers how to pay you",
+                    why: "Add your UPI ID or bank details.",
+                    cta: "Add UPI or bank",
+                    href: "/settings/organization?section=pay",
+                    broken: false,
+                },
+            ],
+            done: 0,
+            total: 1,
+            outside: list.outside,
+        };
+        const html = renderToStaticMarkup(<ReadyChecklist list={free} />);
+        expect(html).toContain("0 of 1 done");
+        expect(html).toContain('href="/settings/organization?section=pay"');
+        expect(html).toContain("Get ready to take money");
+    });
+});

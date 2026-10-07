@@ -66,12 +66,20 @@ export function emailAttention(
         : "not-connected";
 }
 
-/** The Providers tab's line in the settings tabs, when email needs a person. */
-export function providersTabNote(attention: EmailAttention | null) {
+/**
+ * The Providers tab's line in the settings tabs, when email needs a person.
+ * "No email provider yet" only where the plan lets the business connect
+ * its own (`ownEmail`, DEC-091): on Free, Saroh sends its booking emails
+ * (DEC-086) and nothing needs anyone (UX-006).
+ */
+export function providersTabNote(
+    attention: EmailAttention | null,
+    ownEmail = true,
+) {
     if (attention === "disconnected") {
         return "Needs you: email is disconnected";
     }
-    if (attention === "not-connected") {
+    if (attention === "not-connected" && ownEmail) {
         return "Needs you: no email provider yet";
     }
     return null;
@@ -79,6 +87,7 @@ export function providersTabNote(attention: EmailAttention | null) {
 
 export type ReadyStepKey =
     | "payments"
+    | "howToPay"
     | "address"
     | "businessType"
     | "tax"
@@ -133,6 +142,13 @@ export interface ReadyChecklist {
     total: number;
     /** What the plan holds back: shown, outside `done` and `total`. */
     outside: ReadyAside[];
+    /**
+     * Settings' "Make it yours" (UX-019): what Settings also suggests —
+     * email, business type, logo, a pipeline — listed apart and never
+     * counted, so Settings and Home show the same count for the same
+     * business. Absent on Home.
+     */
+    extras?: ReadyStep[];
 }
 
 export const business = (section: string) =>
@@ -261,6 +277,37 @@ function payments(
 const filled = (v: string | null | undefined) => !!v?.trim();
 
 /**
+ * How customers pay a business on a plan without online payments (UX-007):
+ * the UPI ID or bank details its invoices, orders and desk bookings show
+ * (How to pay us, R32). It is how such a business gets paid, so it counts,
+ * in the place connecting payments has on a plan with them. Done once a
+ * UPI ID or whole bank details are in: a note alone names no way to pay.
+ * Only where taking money applies, and only on that plan — read as the API
+ * says it (`onlinePaymentsInPlan`), so an unread plan never asks. Absent
+ * from an API older than How to pay us: unknown, not a step.
+ */
+function howToPay(
+    settings: Pick<OrganizationSettings, "setup" | "payInstructions">,
+    money: boolean,
+): Check | null {
+    if (!money || settings.setup?.onlinePaymentsInPlan !== false) return null;
+    const pay = settings.payInstructions;
+    if (!pay) return null;
+    const set =
+        filled(pay.upiId) ||
+        (filled(pay.bankAccountNumber) && filled(pay.bankIfsc));
+    return {
+        key: "howToPay",
+        label: "Tell customers how to pay you",
+        why: "Add your UPI ID or bank details. Customers see them on every unpaid invoice, order and booking.",
+        cta: "Add UPI or bank",
+        href: business("pay"),
+        broken: false,
+        left: !set,
+    };
+}
+
+/**
  * The registered address, the API's rule for an invoice (DEC-068): its
  * first line, city and PIN, and an Indian address its state. Until it is
  * in, Issue, Send, a pay link and connecting payments ask for it first.
@@ -270,6 +317,24 @@ function address(
     country: string | null | undefined,
     kind: unknown,
 ): Check {
+    const rest =
+        filled(registered.line1) &&
+        filled(registered.city) &&
+        filled(registered.postalCode);
+    const state = filled(registered.state) || !inIndia(country);
+    // Saved without its state (UX-018): name the state, so the step doesn't
+    // read as if nothing had been saved.
+    if (rest && !state) {
+        return {
+            key: "address",
+            label: "Add the state to your address",
+            why: "It's printed on your invoices, and GST depends on it.",
+            cta: "Add state",
+            href: business("address"),
+            broken: false,
+            left: true,
+        };
+    }
     return {
         key: "address",
         // "your registered address", or "your address" (DEC-070).
@@ -278,12 +343,7 @@ function address(
         cta: "Add address",
         href: business("address"),
         broken: false,
-        left: !(
-            filled(registered.line1) &&
-            filled(registered.city) &&
-            filled(registered.postalCode) &&
-            (filled(registered.state) || !inIndia(country))
-        ),
+        left: !(rest && state),
     };
 }
 
@@ -472,7 +532,8 @@ export function readyChecklist({
     settings: Pick<
         OrganizationSettings,
         "tax" | "profile" | "registeredAddress" | "setup" | "kind"
-    >;
+    > &
+        Partial<Pick<OrganizationSettings, "payInstructions">>;
     modules: readonly ModuleView[] | null;
     /** The plan that takes payment online, when the catalogue names one. */
     onlineUpgrade?: UpgradeTo | null;
@@ -482,6 +543,9 @@ export function readyChecklist({
     const money = handlesMoney(modules, settings.setup) !== false;
     const checks = [
         modules ? payments(modules, settings.setup) : null,
+        // On a plan without online payments, How to pay us is how the
+        // business gets paid (UX-007): a step where connecting would be.
+        howToPay(settings, money),
         // Absent from an API older than the registered address: unknown.
         // Asked only once something invoices or takes money (DEC-070).
         settings.registeredAddress && money
@@ -521,6 +585,7 @@ export function readyChecklist({
 /** The steps that are about money, rather than getting the site live. */
 const MONEY_STEPS: ReadonlySet<ReadyItem["key"]> = new Set<ReadyItem["key"]>([
     "payments",
+    "howToPay",
     "address",
     "tax",
     "catalogue",
@@ -544,22 +609,17 @@ export function takesMoney(
 }
 
 /**
- * The checklist's heading follows its steps, never the kind (DEC-070): Home's
- * "Get ready to take money" and Settings' "Ready to take payments" while a
- * money step is in the list. Without one, a list that publishes the site is
- * "Get your site live", and Settings' other asks (email, a pipeline) are
- * "Finish setting up".
+ * The checklist's heading follows its counted steps, never the kind
+ * (DEC-070), and is the same on Home and Settings › Business (UX-019): "Get
+ * ready to take money" while a money step is in the list. Without one, a
+ * list that publishes the site is "Get your site live", and anything else
+ * "Finish setting up". Settings' "Make it yours" never changes it.
  */
 export function checklistHeading(
     list: Pick<ReadyChecklist, "steps"> &
         Partial<Pick<ReadyChecklist, "outside">>,
-    where: "home" | "settings",
 ): string {
-    if (takesMoney(list)) {
-        return where === "home"
-            ? "Get ready to take money"
-            : "Ready to take payments";
-    }
+    if (takesMoney(list)) return "Get ready to take money";
     return list.steps.some((s) => s.key === "site")
         ? "Get your site live"
         : "Finish setting up";

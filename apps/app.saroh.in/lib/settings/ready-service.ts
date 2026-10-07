@@ -1,4 +1,5 @@
-import { accessRow } from "@/lib/billing/access";
+import type { BillingAccessView } from "@/lib/billing/access";
+import { accessRow, ownAccountsRoom } from "@/lib/billing/access";
 import { listModules } from "@/lib/modules/service";
 import type { OrganizationSettings } from "@/lib/organizations/settings-service";
 import { listCommsProviders } from "@/lib/providers/service";
@@ -39,21 +40,37 @@ async function onlinePaymentsUpgrade(settings: OrganizationSettings) {
 }
 
 /**
- * Settings › Business's card: the same steps, then what Settings also asks
- * for (`nudges.ts`, DEC-056). The messaging providers are read only for
- * someone who may manage them (`comms:manage`) — a refusal there would turn
- * the page into a denial — and, like the modules, best-effort.
+ * Settings › Business's card: the same steps and count, then what Settings
+ * also suggests apart (`nudges.ts`, DEC-056, UX-019). The messaging
+ * providers are read only for someone who may manage them (`comms:manage`)
+ * — a refusal there would turn the page into a denial — and, like the
+ * modules and the plan, best-effort. The plan says whether connecting the
+ * business's own email is offered at all (DEC-091).
  */
 export async function loadSettingsChecklist(
     settings: OrganizationSettings,
     mayMessaging: boolean,
 ): Promise<ReadyChecklist> {
-    const [modules, messaging, onlineUpgrade] = await Promise.all([
+    const [modules, messaging, access] = await Promise.all([
         listModules().catch(() => null),
         mayMessaging
             ? listCommsProviders().catch(() => null)
             : Promise.resolve(null),
-        onlinePaymentsUpgrade(settings),
+        billingAccessOrNull(),
     ]);
-    return settingsChecklist({ settings, modules, messaging, onlineUpgrade });
+    return settingsChecklist({
+        settings,
+        modules,
+        messaging,
+        onlineUpgrade: onlineUpgradeOf(settings, access),
+        ownEmail: ownAccountsRoom(access),
+    });
+}
+
+function onlineUpgradeOf(
+    settings: OrganizationSettings,
+    access: BillingAccessView | null,
+) {
+    if (settings.setup?.onlinePaymentsInPlan !== false) return null;
+    return accessRow(access, "payments")?.upgradeTo ?? null;
 }

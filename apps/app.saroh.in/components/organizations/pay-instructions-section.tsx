@@ -344,8 +344,10 @@ function PayPreview({
                 </SiteThemeScope>
             ) : (
                 <p className="rounded-xl border border-dashed border-border px-4 py-3 text-[12.5px] leading-normal text-muted-foreground">
-                    Nothing set yet. Customers see &ldquo;Pay {businessName} the
-                    way they&apos;ve asked you to.&rdquo;
+                    {/* One string: text split over lines here rendered with
+                        different whitespace on the server and the client,
+                        a hydration mismatch (UX-086). */}
+                    {`Nothing set yet. Customers see “Pay ${businessName} the way they've asked you to.”`}
                 </p>
             )}
         </aside>

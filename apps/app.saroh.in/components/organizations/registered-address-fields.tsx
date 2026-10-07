@@ -135,7 +135,7 @@ export function RegisteredAddressFields<T extends FieldValues>({
                             <FormDescription>
                                 {registered
                                     ? "Set by your GSTIN."
-                                    : "Printed with the address."}
+                                    : "Needed: it's printed on your invoices."}
                             </FormDescription>
                             <FormMessage />
                         </FormItem>

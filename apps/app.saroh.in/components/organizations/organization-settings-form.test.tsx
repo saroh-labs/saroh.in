@@ -28,9 +28,10 @@ vi.mock("@/lib/organizations/settings-actions", () => ({
 }));
 
 const showUndo = vi.fn();
+const showError = vi.fn();
 vi.mock("@saroh/ui/toast", () => ({
     showUndo: (...args: unknown[]) => showUndo(...args) as unknown,
-    showError: vi.fn(),
+    showError: (...args: unknown[]) => showError(...args) as unknown,
     showInfo: vi.fn(),
     showSuccess: vi.fn(),
     dismissToast: vi.fn(),
@@ -329,5 +330,53 @@ describe("How to pay us (R32)", () => {
         ).toBe(true);
         // Another tab: the card is kept, out of sight.
         expect(host.querySelector("#business-panel")).toBeNull();
+    });
+});
+
+describe("an Indian address isn't saved without its state (UX-018)", () => {
+    const noState = () =>
+        settings({
+            tax: {
+                registered: false,
+                state: null,
+                stateName: null,
+                invoicePrefix: null,
+                deliveryRate: "18",
+                deliverySac: null,
+            },
+            registeredAddress: {
+                line1: "12 Hill Road",
+                line2: null,
+                city: "Bengaluru",
+                postalCode: "560001",
+                state: null,
+                stateName: null,
+            },
+        });
+
+    const type = async (el: HTMLInputElement, value: string) => {
+        await act(async () => {
+            Object.getOwnPropertyDescriptor(
+                HTMLInputElement.prototype,
+                "value",
+            )?.set?.call(el, value);
+            el.dispatchEvent(new Event("input", { bubbles: true }));
+            await Promise.resolve();
+        });
+        await settle();
+    };
+
+    it("asks for the state on the address card's save, and sends nothing", async () => {
+        params = new URLSearchParams("section=address");
+        draw(noState());
+        await click(button("Edit registered address"));
+        const city = host.querySelector<HTMLInputElement>('input[name="city"]');
+        if (!city) throw new Error("No city field");
+        await type(city, "Bengaluru North");
+        await click(button("Save"));
+        expect(save).not.toHaveBeenCalled();
+        expect(host.textContent).toContain(
+            "Choose your state. It's printed on your invoices, and GST depends on it.",
+        );
     });
 });

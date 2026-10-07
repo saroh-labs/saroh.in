@@ -5,6 +5,7 @@ import {
     membershipPlansLock,
     offersOnlinePay,
     onlinePaymentsLock,
+    ownAccountsRoom,
     planLocks,
     rowLock,
     rowNotice,
@@ -521,5 +522,42 @@ describe("takesOnlinePayment and offersOnlinePay (R33)", () => {
             takesOnlinePayment(offlinePlan({ source: "legacy", modules: [] })),
         ).toBe(true);
         expect(takesOnlinePayment(access())).toBe(true);
+    });
+});
+
+describe("ownAccountsRoom (DEC-091, UX-006)", () => {
+    const links = (over: Parameters<typeof row>[0]) =>
+        row({ moduleId: "integrations", limit: null, usage: 0, ...over });
+
+    it("Free: the row is locked, so no room", () => {
+        expect(
+            ownAccountsRoom(
+                access({ modules: [links({ state: "locked", usage: null })] }),
+            ),
+        ).toBe(false);
+    });
+
+    it("Grow: included with no cap, room", () => {
+        expect(ownAccountsRoom(access({ modules: [links({})] }))).toBe(true);
+    });
+
+    it("a capped plan at its cap has no room", () => {
+        expect(
+            ownAccountsRoom(
+                access({ modules: [links({ limit: 2, usage: 2 })] }),
+            ),
+        ).toBe(false);
+    });
+
+    it("unread, legacy or unenforced fails open", () => {
+        expect(ownAccountsRoom(null)).toBe(true);
+        expect(
+            ownAccountsRoom(
+                access({
+                    enforced: false,
+                    modules: [links({ state: "locked", usage: null })],
+                }),
+            ),
+        ).toBe(true);
     });
 });

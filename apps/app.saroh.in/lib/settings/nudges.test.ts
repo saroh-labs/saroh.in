@@ -306,19 +306,53 @@ describe("settingsChecklist", () => {
         }),
     ];
 
-    it("is Home's steps, then the nudges, counted together", () => {
+    it("counts exactly Home's steps, and lists the nudges apart (UX-019)", () => {
         const home = readyChecklist({ settings, modules });
         const list = settingsChecklist({ settings, modules, messaging: null });
 
-        expect(keys(list.steps)).toEqual([
-            ...keys(home.steps),
-            "businessType",
-            "logo",
-        ]);
-        expect(keys(list.left)).toEqual(["catalogue", "businessType", "logo"]);
+        expect(keys(list.steps)).toEqual(keys(home.steps));
+        expect(keys(list.left)).toEqual(keys(home.left));
         expect(list.done).toBe(home.done);
-        expect(list.total).toBe(home.total + 2);
+        expect(list.total).toBe(home.total);
+        // "Make it yours": never in the count.
+        expect(keys(list.extras ?? [])).toEqual(["businessType", "logo"]);
     });
+
+    it("never counts a pipeline as payment readiness (UX-019)", () => {
+        const crm = [
+            ...modules,
+            mod("CRM", {
+                readiness: "SETUP_REQUIRED",
+                blockers: [{ code: "CRM_NO_PIPELINE" }],
+            }),
+        ];
+        const home = readyChecklist({ settings, modules: crm });
+        const list = settingsChecklist({
+            settings,
+            modules: crm,
+            messaging: null,
+        });
+        expect(list.total).toBe(home.total);
+        expect(keys(list.steps)).not.toContain("pipeline");
+        expect(keys(list.extras ?? [])).toContain("pipeline");
+    });
+
+    it.each([
+        ["Free, own email locked", false, false],
+        ["Grow, room to connect", true, true],
+    ])(
+        "asks to connect email only where the plan allows it (%s, UX-006)",
+        (_plan, ownEmail, asked) => {
+            const comms = [...modules, mod("COMMUNICATIONS")];
+            const list = settingsChecklist({
+                settings,
+                modules: comms,
+                messaging: [],
+                ownEmail,
+            });
+            expect(keys(list.extras ?? []).includes("email")).toBe(asked);
+        },
+    );
 });
 
 describe("readyChecklist and rollout (DEC-057)", () => {

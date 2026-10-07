@@ -3028,3 +3028,45 @@ that closes after "354", so the shape is nodemailer's, not ours.
 library itself (a stub server is minutes of work), not a hand-made object.
 When the stage can't be known, a send that may have gone is never retried.
 **Category**: email · `modules/communications/providers/saroh-email.sender.ts`
+
+## Readiness — a step the plan can't let the business finish is not "setup left"
+
+**Symptom** (UX audit, 7 Oct, UX-006/017/019): on Free, Home's Needs you,
+Settings › Modules ("Finish setup"), the Turn on sheet ("Connect Razorpay or
+Cashfree now", pre-selected), its toast, every Connect on Providers, the
+Providers tab note and Profile all sent the owner to connect a payment or
+email provider. The API refused the connect correctly, but only after the
+whole key form was typed. Home and Settings also counted different steps
+("1 of 2" against "2 of 5"), Settings counting a logo and a pipeline as
+payment readiness.
+**Root cause**: readiness was worked out from the data alone (no provider →
+SETUP_REQUIRED) while the plan's say (`payments`, `integrations`, DEC-091)
+was only asked by the write. And Settings added its nudges to the count.
+**Fix**: the PAYMENTS readiness adapter reads the plan first: no provider on
+a plan without online payments is ACTIVE (offline Payments), with no
+blocker, since a blocker on an ACTIVE module would shut its routes
+(`ModuleEnforcementGuard`). Home skips "connect a messaging provider" where
+`integrations` has no room. The app reads the plan once per screen
+(`connectLocksOf`, `ownAccountsRoom`) and says "Comes with ‹plan› · See
+plans" in place of Connect, before any form. Provider connect asks the plan
+before the business details. Settings counts exactly Home's steps; its
+nudges are "Make it yours", never counted. On a plan without online
+payments, How to pay us is the counted step.
+**Rule**: anything that offers an action asks the same plan check the
+write does, up front. A step the plan holds back is said beside the steps,
+never counted, never a Connect.
+**Category**: plans · `capabilities/readiness/module-readiness.registry.ts`, `app.saroh.in/lib/providers/connect-lock.ts`, `lib/settings/ready.ts`
+
+## React — JSX text split across lines can hydrate differently
+
+**Symptom** (UX audit, 7 Oct, UX-086): Settings › Business (and Hours,
+the same page) logged a hydration mismatch in `PayPreview`: the server's
+text ended `asked you to.”` and the client's had trailing spaces.
+**Root cause**: a sentence written as JSX text across several lines, with
+an interpolation and HTML entities (`&ldquo;`, `&apos;`), was collapsed
+differently by the two renders under dev.
+**Fix**: the sentence is one template string in a single `{…}` expression;
+the component test asserts the exact text.
+**Rule**: a sentence with an interpolation in it is one string expression,
+not JSX text wrapped over lines.
+**Category**: react · `components/organizations/pay-instructions-section.tsx`

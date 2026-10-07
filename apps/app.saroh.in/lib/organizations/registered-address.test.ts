@@ -1,6 +1,10 @@
 import { describe, expect, it } from "vitest";
 
-import { addressProblems, printedAddress } from "./registered-address";
+import {
+    addressProblems,
+    printedAddress,
+    stateProblem,
+} from "./registered-address";
 
 const RYE = {
     line1: "3 Hill Road",
@@ -75,5 +79,35 @@ describe("what the settings form refuses before the API does", () => {
                 postalCode: "",
             }),
         ).toEqual([]);
+    });
+});
+
+describe("stateProblem (UX-018)", () => {
+    const typed = {
+        gstRegistered: false,
+        country: "IN",
+        gstState: "",
+        addressLine1: "12 Hill Road",
+        city: "Bengaluru",
+        postalCode: "560001",
+    };
+
+    it("asks an Indian address being filled in for its state", () => {
+        expect(stateProblem(typed)).toMatch(/^Choose your state/);
+        expect(stateProblem({ ...typed, country: "" })).toMatch(/state/);
+    });
+
+    it("is fine with a state, abroad, registered, or no address at all", () => {
+        expect(stateProblem({ ...typed, gstState: "29" })).toBeNull();
+        expect(stateProblem({ ...typed, country: "GB" })).toBeNull();
+        expect(stateProblem({ ...typed, gstRegistered: true })).toBeNull();
+        expect(
+            stateProblem({
+                ...typed,
+                addressLine1: "",
+                city: "",
+                postalCode: "",
+            }),
+        ).toBeNull();
     });
 });

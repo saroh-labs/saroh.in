@@ -72,3 +72,28 @@ export function addressProblems(v: {
     }
     return problems;
 }
+
+/**
+ * An Indian address saved without its state (UX-018): every invoice and the
+ * readiness rule (DEC-068) need it, and so does connecting payments, so the
+ * address card asks before it saves rather than letting the checklist ask
+ * again. Only for an address being filled in (any line typed) and only in
+ * India (country unsaid or IN); a GST-registered business's state is its
+ * GSTIN's, set for it. Null when nothing is missing.
+ */
+export function stateProblem(v: {
+    gstRegistered: boolean;
+    country?: string;
+    gstState: string;
+    addressLine1: string;
+    city: string;
+    postalCode: string;
+}): string | null {
+    if (v.gstRegistered) return null;
+    if (!["", "IN"].includes((v.country ?? "").toUpperCase())) return null;
+    const typed = [v.addressLine1, v.city, v.postalCode].some(
+        (x) => x.trim() !== "",
+    );
+    if (!typed || v.gstState.trim() !== "") return null;
+    return "Choose your state. It's printed on your invoices, and GST depends on it.";
+}

@@ -122,6 +122,12 @@ describe("How to pay us (R32)", () => {
         expect(host.textContent).toContain(
             "Shown to customers on invoices and unpaid orders, so they can pay you by UPI or bank transfer.",
         );
+        // Exactly this, with no stray whitespace: the server's and the
+        // client's text must match, or React reports a hydration mismatch
+        // (UX-086).
+        expect(preview()?.querySelector("p.border-dashed")?.textContent).toBe(
+            "Nothing set yet. Customers see “Pay Northwind the way they've asked you to.”",
+        );
         expect(preview()?.textContent).toContain(
             "Customers see “Pay Northwind the way they've asked you to.”",
         );

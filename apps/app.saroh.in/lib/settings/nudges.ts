@@ -17,7 +17,7 @@ import {
 } from "./ready";
 
 /**
- * Settings › Business's "Ready to take payments" is the take-money steps
+ * Settings › Business's "Get ready to take money" is the take-money steps
  * (`readyChecklist`, the same as Home's) and then what else the design's
  * card asks for there (DEC-056 brought them back after F8 dropped them):
  *
@@ -36,8 +36,8 @@ import {
  * or takes money (`handlesMoney`, DEC-070): a site with nothing to sell is
  * never told to pick a company type.
  *
- * Home keeps only the steps: these are not about taking money, so Home's
- * count is the steps' and Settings' is the steps' and these together.
+ * These are not about taking money, so they are never counted (UX-019):
+ * Settings lists them apart, as "Make it yours", and its count is Home's.
  *
  * Each is left, done, or not asked at all. Unknown (a read that failed, an
  * older API) is not asked, so the count never claims what nobody checked.
@@ -49,10 +49,15 @@ type Nudge = ReadyItem & { left: boolean };
 function email(
     modules: readonly ModuleView[] | null,
     messaging: readonly ConnectedCommsProvider[] | null,
+    ownEmail: boolean,
 ): Nudge | null {
     // Asked only once both lists are read and Communications is on.
     if (!modules || !messaging || !on(modules, "COMMUNICATIONS")) return null;
     const attention = emailAttention(modules, messaging);
+    // A plan that can't connect its own email (DEC-091) is never asked to:
+    // Saroh sends its booking emails (DEC-086), and the Providers tab says
+    // what comes with a paid plan (UX-006). One that stopped is still said.
+    if (attention === "not-connected" && !ownEmail) return null;
     const sends = messaging.some(
         (c) => c.channel === "EMAIL" && c.status === "CONNECTED",
     );
@@ -133,44 +138,45 @@ export function settingsNudges({
     settings,
     modules,
     messaging,
+    ownEmail = true,
 }: {
     settings: Pick<OrganizationSettings, "profile" | "logo" | "setup">;
     modules: readonly ModuleView[] | null;
     messaging: readonly ConnectedCommsProvider[] | null;
+    /**
+     * Whether the plan lets the business connect its own email
+     * (`integrations`, DEC-091). Unread is yes, as the connect's own check
+     * fails open; the connect still says no if it must.
+     */
+    ownEmail?: boolean;
 }): Nudge[] {
     // Unknown (the modules could not be read) asks as it always did.
     const money = handlesMoney(modules, settings.setup) !== false;
     return [
-        email(modules, messaging),
+        email(modules, messaging, ownEmail),
         money ? businessType(settings) : null,
         money ? logo(settings) : null,
         pipeline(modules),
     ].filter((n): n is Nudge => n !== null);
 }
 
-/** Settings › Business's card: the take-money steps, then the nudges. */
+/**
+ * Settings › Business's card: the take-money steps, counted exactly as
+ * Home counts them, and the nudges apart as "Make it yours" (UX-019) —
+ * never in the count, so the two screens can't disagree, and a pipeline or
+ * a logo is never "payment readiness".
+ */
 export function settingsChecklist(input: {
     settings: Parameters<typeof readyChecklist>[0]["settings"] &
         Pick<OrganizationSettings, "logo">;
     modules: readonly ModuleView[] | null;
     messaging: readonly ConnectedCommsProvider[] | null;
     onlineUpgrade?: Parameters<typeof readyChecklist>[0]["onlineUpgrade"];
+    ownEmail?: boolean;
 }): ReadyChecklist {
     const ready = readyChecklist(input);
-    const nudges = settingsNudges(input);
-    const steps: ReadyStep[] = [
-        ...ready.steps,
-        ...nudges.map(({ left, ...item }) => ({ ...item, done: !left })),
-    ];
-    const left: ReadyItem[] = [
-        ...ready.left,
-        ...nudges.filter((n) => n.left).map(({ left: _left, ...item }) => item),
-    ];
-    return {
-        steps,
-        left,
-        done: steps.length - left.length,
-        total: steps.length,
-        outside: ready.outside,
-    };
+    const extras: ReadyStep[] = settingsNudges(input).map(
+        ({ left, ...item }) => ({ ...item, done: !left }),
+    );
+    return { ...ready, extras };
 }

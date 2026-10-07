@@ -369,3 +369,14 @@ export function offersOnlinePay(
 ): boolean {
     return takesOnlinePayment(view) && also.every(Boolean);
 }
+
+/**
+ * Whether the plan has room for one more of the business's own email or
+ * payment accounts (`integrations`, DEC-091), from the access read: only a
+ * real no is no. Unread, legacy or unenforced is yes, failing open as the
+ * connect's own check does.
+ */
+export function ownAccountsRoom(access: BillingAccessView | null): boolean {
+    if (access?.source !== "catalogue" || !access.enforced) return true;
+    return roomForOneMore(access, "integrations") !== false;
+}

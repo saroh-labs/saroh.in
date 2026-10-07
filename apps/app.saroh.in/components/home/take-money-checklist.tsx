@@ -129,7 +129,7 @@ export function TakeMoneyChecklist({
         >
             <div className="flex flex-wrap items-baseline gap-2.5">
                 <h2 id={headingId} className="text-[15px] font-semibold">
-                    {checklistHeading(list, "home")}
+                    {checklistHeading(list)}
                 </h2>
                 <span className="text-[12.5px] text-muted-foreground">
                     {count}
