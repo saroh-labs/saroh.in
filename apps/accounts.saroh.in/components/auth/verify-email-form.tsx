@@ -4,6 +4,7 @@ import { AuthHeading } from "@/components/auth/field";
 import { OtpInput } from "@/components/auth/otp-input";
 import { getOnboardingUrl } from "@/lib/app-urls";
 import { authClient } from "@/lib/auth.client";
+import { withCarry } from "@/lib/joining";
 import {
     VERIFICATION_OTP_EXPIRY_SECONDS,
     VERIFICATION_OTP_LENGTH,
@@ -156,7 +157,9 @@ export function VerifyEmailForm({
                     asChild
                     className="sa-cta sa-rise h-10 w-full rounded-[9px] text-[13.5px] font-semibold"
                 >
-                    <Link href="/signup">Back to sign up</Link>
+                    <Link href={withCarry("/signup", returnTo)}>
+                        Back to sign up
+                    </Link>
                 </Button>
             </div>
         );
@@ -276,7 +279,12 @@ export function VerifyEmailForm({
                         variant="outline"
                         className="h-10 rounded-[9px]"
                     >
-                        <Link href="/signup" aria-label="Back to sign up">
+                        {/* Back keeps where this ends and the address, so an
+                            invitee doesn't lose the invitation (UX-029). */}
+                        <Link
+                            href={withCarry("/signup", returnTo, email)}
+                            aria-label="Back to sign up"
+                        >
                             Back
                         </Link>
                     </Button>
