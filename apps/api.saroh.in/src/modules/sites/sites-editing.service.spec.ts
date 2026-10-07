@@ -827,10 +827,18 @@ describe("SitesService.publishSite", () => {
             outcome: "BYPASSED",
             publicationId: "pub_1",
         });
-        // The outstanding question reads VERDICTS only: a BYPASSED row from an
-        // earlier publish must not count as the reviewer changing their mind.
+        // The outstanding question reads the verdicts and the rows that close
+        // a review (UX-068): an earlier publish's BYPASSED closes what it went
+        // past, and never counts as an approval.
         expect(approvalFindMany.mock.calls[0][0].where.outcome).toEqual({
-            in: ["REQUESTED", "APPROVED", "CHANGES_REQUESTED"],
+            in: [
+                "REQUESTED",
+                "APPROVED",
+                "CHANGES_REQUESTED",
+                "WITHDRAWN",
+                "BYPASSED",
+                "OVERRIDDEN",
+            ],
         });
         // And the publication says which route it took (#278).
         expect(publicationCreate.mock.calls[0][0].data.reviewRoute).toBe(

@@ -12,7 +12,7 @@ import {
     OVERRIDE_OWNER_ONLY_MESSAGE,
 } from "./publish-approval";
 import type { ReviewStanding } from "./review-route";
-import { ReviewRoute, reviewStanding } from "./review-route";
+import { CLOSING_OUTCOMES, ReviewRoute, reviewStanding } from "./review-route";
 import type { VerdictRow } from "./test-release-review";
 import {
     draftVerdicts,
@@ -346,9 +346,11 @@ export type ReviewScope = "draft" | "release";
 
 /**
  * Every verdict on the site, newest first, asked of `client` so a
- * transaction gets its own answer (#278). Verdicts only: BYPASSED and
- * OVERRIDDEN are going live's own records, and must not settle the request
- * they were written about.
+ * transaction gets its own answer (#278), with the rows that close a review
+ * (`CLOSING_OUTCOMES`: WITHDRAWN, BYPASSED, OVERRIDDEN). BYPASSED and
+ * OVERRIDDEN are going live's own records: they close the request they were
+ * written about (UX-068) and never settle it. A release's go-live rows carry
+ * no fingerprint, so a release's standing never reads them.
  */
 export async function readVerdicts(
     client: Pick<Prisma.TransactionClient, "siteApproval">,
@@ -358,7 +360,14 @@ export async function readVerdicts(
         where: {
             siteId: input.siteId,
             organizationId: input.organizationId,
-            outcome: { in: ["REQUESTED", "APPROVED", "CHANGES_REQUESTED"] },
+            outcome: {
+                in: [
+                    "REQUESTED",
+                    "APPROVED",
+                    "CHANGES_REQUESTED",
+                    ...CLOSING_OUTCOMES,
+                ],
+            },
         },
         // Two reviews can share a millisecond; the id (a cuid, which grows)
         // keeps "newest" deterministic.
@@ -369,6 +378,7 @@ export async function readVerdicts(
             draftFingerprint: true,
             createdAt: true,
             testReleaseId: true,
+            reason: true,
         },
     });
 }

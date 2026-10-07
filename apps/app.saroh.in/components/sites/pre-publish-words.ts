@@ -53,9 +53,13 @@ export const APPROVAL_LINE: Record<
         text: ({ by }) => `${by} asked for a review, and nobody has replied`,
     },
     APPROVED: { approved: true, text: ({ by }) => `${by} approved this site` },
+    // In their words when they gave a reason (UX-043).
     CHANGES_REQUESTED: {
         approved: false,
-        text: ({ by }) => `${by} asked for changes`,
+        text: ({ by, reason }) =>
+            reason
+                ? `${by} asked for changes: “${reason}”`
+                : `${by} asked for changes`,
     },
     BYPASSED: {
         approved: false,
@@ -67,6 +71,12 @@ export const APPROVAL_LINE: Record<
         approved: false,
         text: ({ by, at }, zone) =>
             `${by} went live without approval on ${shortDate(at, zone)}`,
+    },
+    // The request was taken back (UX-068).
+    WITHDRAWN: {
+        approved: false,
+        text: ({ by, at }, zone) =>
+            `${by} withdrew the review request on ${shortDate(at, zone)}`,
     },
 };
 

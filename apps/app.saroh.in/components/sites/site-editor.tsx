@@ -219,6 +219,12 @@ export function SiteEditor({
                 }}
                 {...viewport}
                 openFeedback={() => setInspector("feedback")}
+                openSitePreview={() => {
+                    // The whole site's Feedback, where a preview link is
+                    // made, not a block's (UX-068).
+                    setSelectedIndex(null);
+                    setInspector("feedback");
+                }}
                 canUpdateSite={canUpdateSite}
                 addablePageKinds={addablePageKinds}
                 scheduled={releases.scheduled}

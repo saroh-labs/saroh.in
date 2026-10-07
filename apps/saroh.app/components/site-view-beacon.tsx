@@ -31,7 +31,7 @@ export function SiteViewBeacon({
             globalPrivacyControl?: boolean;
         };
         const body = siteViewBody({
-            path: pathname ?? window.location.pathname,
+            path: pathname,
             referrer: document.referrer,
             ownHost: window.location.host,
             signals: {

@@ -3183,7 +3183,8 @@ model SiteApproval {
   byUserId String
   by       User   @relation(fields: [byUserId], references: [id], onDelete: Cascade)
 
-  // REQUESTED | APPROVED | CHANGES_REQUESTED | BYPASSED | OVERRIDDEN.
+  // REQUESTED | APPROVED | CHANGES_REQUESTED | BYPASSED | OVERRIDDEN |
+  // WITHDRAWN (the merchant took a request back, UX-068).
   //
   // REQUESTED is the merchant asking for a review (#278) — the act that makes a
   // review pending, which the model previously had no way to express: a review
@@ -3209,6 +3210,10 @@ model SiteApproval {
   // Written on REQUESTED and APPROVED; null on the other two, which record an
   // act rather than a state of the work.
   draftFingerprint String?
+
+  // What a reviewer asked to change (UX-043): required on a new
+  // CHANGES_REQUESTED, null on every other outcome.
+  reason String?
 
   // The publication a BYPASSED row is about, so version history can show
   // which publish went past an outstanding review. Null on a verdict.

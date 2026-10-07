@@ -36,7 +36,7 @@ import type {
 /**
  * The editor's top bar: where you are (Website, site, page, status), how the
  * page is shown (theme, width, zoom, Preview), and the two ways
- * work leaves the editor (Share for review, Publish). Moved out of
+ * work leaves the editor (Share, Publish). Moved out of
  * `site-editor.tsx` (#260), then laid out as Saroh Site Editor.dc.html draws
  * it (G2): the status is true after a reload, Publish says what it puts
  * live, and Style moved to the rail's Brand tab.
@@ -65,6 +65,7 @@ export function EditorTopBar({
     openNotes,
     asking,
     askForReview,
+    withdrawReview,
     neverPublished,
     pendingSummary,
     pendingShort,
@@ -80,6 +81,7 @@ export function EditorTopBar({
     setPreviewing,
     layout,
     openFeedback,
+    openSitePreview,
     canUpdateSite,
     addablePageKinds,
     needsApproval = false,
@@ -104,6 +106,8 @@ export function EditorTopBar({
     openNotes: number;
     asking: boolean;
     askForReview: () => Promise<void>;
+    /** Take the open review request back (UX-068). */
+    withdrawReview: () => Promise<void>;
     neverPublished: boolean;
     pendingSummary: string | null;
     pendingShort: string | null;
@@ -121,6 +125,8 @@ export function EditorTopBar({
     layout: EditorLayout;
     /** Narrow: open the inspector on Feedback, with nothing selected. */
     openFeedback: () => void;
+    /** Open the whole site's Feedback, where preview links are (UX-068). */
+    openSitePreview: () => void;
     /** Whether this person holds `site:update`: page settings and Add a page. */
     canUpdateSite: boolean;
     /** The module pages the site can have now (G14), for Add a page. */
@@ -180,6 +186,8 @@ export function EditorTopBar({
         ...{ needsApproval, canOverride, testRelease },
         inReview: review.pending,
         askForReview: () => void askForReview(),
+        withdrawReview: () => void withdrawReview(),
+        onSharePreview: openSitePreview,
         publishDisabled: publishing || dirty || saving || styleDirty,
         flagCount: siteFlags.flags.length,
         onPublish: () => void openCheck({ dirty, onlyHeldBack, heldBack }),
@@ -301,7 +309,12 @@ export function EditorTopBar({
             {phone ? (
                 <PhoneMenu status={readout} actions={actions} />
             ) : (
-                <TopBarActions {...actions} />
+                <TopBarActions
+                    {...actions}
+                    // Tablet width (UX-035): the secondary actions fold into
+                    // "More" so Publish never runs off the bar.
+                    compact={layout === "narrow"}
+                />
             )}
         </header>
     );
@@ -392,6 +405,19 @@ function PhoneMenu({
                     onPublish={() => {
                         setOpen(false);
                         actions.onPublish();
+                    }}
+                    // Share's choices end the visit too (UX-068).
+                    askForReview={() => {
+                        setOpen(false);
+                        actions.askForReview();
+                    }}
+                    withdrawReview={() => {
+                        setOpen(false);
+                        actions.withdrawReview();
+                    }}
+                    onSharePreview={() => {
+                        setOpen(false);
+                        actions.onSharePreview();
                     }}
                     // A test release's sheets open over the editor, so
                     // the menu goes away first.

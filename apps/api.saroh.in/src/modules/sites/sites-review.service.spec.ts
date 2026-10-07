@@ -309,23 +309,96 @@ describe("SitesService.getReviewState — outstanding (#199)", () => {
         expect(state.latestApproval?.outcome).toBe("CHANGES_REQUESTED");
     });
 
-    it("stays outstanding after a bypass — publish's own record is not the reviewer's approval", async () => {
-        // Latest event of any kind is the bypass; the latest VERDICT is still
-        // the change request.
+    it("is closed by going live past it (UX-068): the editor stops saying In review", async () => {
         approvalFindFirst.mockResolvedValue({
             outcome: "BYPASSED",
             createdAt: new Date("2026-09-04T10:00:00Z"),
             by: { name: "Demo Owner", email: "demo@saroh.dev" },
         });
-        // The service does not select BYPASSED rows at all (#278): publish's
-        // own record must not settle the request it was written about.
+        // Publish's own record closes the request it went past. It is not
+        // an approval: the bypass stays in version history.
         approvalFindMany.mockResolvedValue(
-            verdicts({ outcome: "CHANGES_REQUESTED" }),
+            verdicts({ outcome: "BYPASSED" }, { outcome: "CHANGES_REQUESTED" }),
         );
         commentCount.mockResolvedValue(1);
         const state = await service.getReviewState(ctx(), "site_1");
         expect(state.latestApproval?.outcome).toBe("BYPASSED");
-        expect(state.outstanding).toBe(true);
+        expect(state.outstanding).toBe(false);
+        expect(state.pending).toBe(false);
+    });
+
+    it("opens again when someone asks after the publish", async () => {
+        approvalFindFirst.mockResolvedValue(null);
+        approvalFindMany.mockResolvedValue(
+            verdicts(
+                { outcome: "REQUESTED", byUserId: "user_1" },
+                { outcome: "BYPASSED" },
+                { outcome: "CHANGES_REQUESTED" },
+            ),
+        );
+        commentCount.mockResolvedValue(0);
+        const state = await service.getReviewState(ctx(), "site_1");
+        expect(state.pending).toBe(true);
+    });
+});
+
+describe("SitesService.getReviewState — whose request (UX-068)", () => {
+    it("says the open request is the caller's own, so they aren't offered Approve", async () => {
+        approvalFindFirst.mockResolvedValue({
+            outcome: "REQUESTED",
+            byUserId: "user_1",
+            createdAt: new Date("2026-09-04T10:00:00Z"),
+            by: { name: "Owner", email: "o@example.test" },
+        });
+        approvalFindMany.mockResolvedValue(
+            verdicts({ outcome: "REQUESTED", byUserId: "user_1" }),
+        );
+        commentCount.mockResolvedValue(0);
+        const mine = await service.getReviewState(ctx(), "site_1");
+        expect(mine.askedByYou).toBe(true);
+        // A reviewer reads the same request as someone else's.
+        const theirs = await service.getReviewState(
+            ctx({ userId: "reviewer", role: "REVIEWER" }),
+            "site_1",
+        );
+        expect(theirs.askedByYou).toBe(false);
+    });
+});
+
+describe("SitesService.withdrawReview (UX-068)", () => {
+    it("writes WITHDRAWN when a request is open", async () => {
+        jest.spyOn(service, "currentDraftFingerprint").mockResolvedValue("fp");
+        approvalFindMany.mockResolvedValue(
+            verdicts({ outcome: "REQUESTED", byUserId: "user_1" }),
+        );
+        approvalCreate.mockResolvedValue({ id: "w1" });
+        await service.withdrawReview(ctx(), "site_1");
+        expect(approvalCreate.mock.calls[0][0].data).toMatchObject({
+            siteId: "site_1",
+            byUserId: "user_1",
+            outcome: "WITHDRAWN",
+        });
+    });
+
+    it("refuses when nothing is open, and closes what it withdrew", async () => {
+        jest.spyOn(service, "currentDraftFingerprint").mockResolvedValue("fp");
+        approvalFindMany.mockResolvedValue(
+            verdicts(
+                { outcome: "WITHDRAWN", byUserId: "user_1" },
+                { outcome: "REQUESTED", byUserId: "user_1" },
+            ),
+        );
+        await expect(service.withdrawReview(ctx(), "site_1")).rejects.toThrow(
+            "no open review request",
+        );
+        expect(approvalCreate).not.toHaveBeenCalled();
+    });
+
+    it("is not a reviewer's to take back", async () => {
+        await expect(
+            service.withdrawReview(ctx({ role: "REVIEWER" }), "site_1"),
+        ).rejects.toThrow();
+        expect(approvalCreate).not.toHaveBeenCalled();
     });
 });
 
@@ -717,5 +790,49 @@ describe("review on a test release (T8)", () => {
                 testReleaseId: null,
             });
         });
+    });
+});
+
+describe("Ask for changes says what (UX-043)", () => {
+    it("keeps the reason on a change request, and none on an approval", async () => {
+        approvalCreate.mockResolvedValue({ id: "a1" });
+        await service.createApproval(ctx({ role: "REVIEWER" }), "site_1", {
+            outcome: "CHANGES_REQUESTED",
+            reason: "The hero photo is last year's.",
+        });
+        expect(approvalCreate.mock.calls[0][0].data).toMatchObject({
+            outcome: "CHANGES_REQUESTED",
+            reason: "The hero photo is last year's.",
+        });
+
+        jest.spyOn(service, "currentDraftFingerprint").mockResolvedValue("fp");
+        await service.createApproval(ctx({ role: "REVIEWER" }), "site_1", {
+            outcome: "APPROVED",
+            reason: "ignored",
+        });
+        expect(approvalCreate.mock.calls[1][0].data.reason).toBeNull();
+    });
+
+    it("refuses a change request without one", async () => {
+        const { plainToInstance } = await import("class-transformer");
+        const { validate } = await import("class-validator");
+        const { CreateApprovalDto } = await import("./dto");
+        const errorsFor = async (body: object) =>
+            (await validate(plainToInstance(CreateApprovalDto, body))).map(
+                (e) => e.property,
+            );
+        expect(await errorsFor({ outcome: "CHANGES_REQUESTED" })).toContain(
+            "reason",
+        );
+        expect(
+            await errorsFor({ outcome: "CHANGES_REQUESTED", reason: "  " }),
+        ).toContain("reason");
+        expect(
+            await errorsFor({
+                outcome: "CHANGES_REQUESTED",
+                reason: "Fix the hours",
+            }),
+        ).toEqual([]);
+        expect(await errorsFor({ outcome: "APPROVED" })).toEqual([]);
     });
 });

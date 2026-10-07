@@ -193,6 +193,19 @@ export function standingCopy(standing: TestReleaseStanding): {
     }
 }
 
+/**
+ * The Go live sheet's warning when a reviewer's newest word on this release
+ * was "change it" (UX-068): who, what, and that going live is recorded as
+ * without approval. Null otherwise.
+ */
+export function changesAskedLine(standing: TestReleaseStanding): string | null {
+    const latest = standing.latest;
+    if (latest?.outcome !== "CHANGES_REQUESTED") return null;
+    const who = latest.by ?? "A reviewer";
+    const what = latest.reason ? `: “${latest.reason}”` : "";
+    return `${who} asked for changes on this release${what}. Going live now is recorded as without approval.`;
+}
+
 // ---------------------------------------------------------------------------
 // What this person may do with a release
 // ---------------------------------------------------------------------------

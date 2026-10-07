@@ -33,8 +33,8 @@ vi.mock("next/dynamic", () => ({
         },
 }));
 
-const createPost = vi.fn();
-const updatePost = vi.fn();
+const createPost = vi.fn<(...a: unknown[]) => Promise<unknown>>();
+const updatePost = vi.fn<(...a: unknown[]) => Promise<unknown>>();
 vi.mock("@/lib/content/actions", () => ({
     createPost: (...a: unknown[]) => createPost(...a),
     updatePost: (...a: unknown[]) => updatePost(...a),
@@ -85,14 +85,21 @@ function field(label: string): HTMLInputElement | HTMLTextAreaElement {
 /** Type into a controlled field the way React hears it. */
 function type(el: HTMLInputElement | HTMLTextAreaElement, value: string) {
     const proto = Object.getPrototypeOf(el) as object;
-    const setter = Object.getOwnPropertyDescriptor(proto, "value")?.set;
-    setter?.call(el, value);
+    Reflect.set(proto, "value", value, el);
     el.dispatchEvent(new Event("input", { bubbles: true }));
+}
+
+/** Let the promises a step started settle. */
+async function settle(run: () => void) {
+    await act(async () => {
+        run();
+        await Promise.resolve();
+    });
 }
 
 describe("PostEditor, a new post's first save (UX-034)", () => {
     it("keeps the body typed while the draft is being created", async () => {
-        let finish: (v: unknown) => void = () => {};
+        let finish: (v: unknown) => void = () => undefined;
         createPost.mockReturnValue(
             new Promise((resolve) => {
                 finish = resolve;
@@ -104,17 +111,13 @@ describe("PostEditor, a new post's first save (UX-034)", () => {
         act(() => type(field("Post title"), "Wedding flowers"));
 
         // The autosave fires and the create is out.
-        await act(async () => {
-            vi.advanceTimersByTime(2600);
-        });
+        await settle(() => vi.advanceTimersByTime(2600));
         expect(createPost).toHaveBeenCalledTimes(1);
 
         // The merchant goes straight on to the body.
         act(() => type(field("Post body"), "We dress mandaps in marigold."));
 
-        await act(async () => {
-            finish({ ok: true, data: { id: "p1" } });
-        });
+        await settle(() => finish({ ok: true, data: { id: "p1" } }));
 
         // The address says the post exists, without a navigation …
         expect(window.location.pathname).toBe("/sites/s1/posts/p1");
@@ -123,9 +126,7 @@ describe("PostEditor, a new post's first save (UX-034)", () => {
         expect(field("Post body").value).toBe("We dress mandaps in marigold.");
 
         // The next autosave sends them to the post just created.
-        await act(async () => {
-            vi.advanceTimersByTime(2600);
-        });
+        await settle(() => vi.advanceTimersByTime(2600));
         expect(updatePost).toHaveBeenCalledWith(
             "s1",
             "p1",

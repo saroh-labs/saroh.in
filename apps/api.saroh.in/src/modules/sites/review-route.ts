@@ -61,6 +61,23 @@ function stableJson(value: unknown): string {
     return `{${entries.map(([k, v]) => `${JSON.stringify(k)}:${stableJson(v)}`).join(",")}}`;
 }
 
+/**
+ * The rows that close whatever review was open before them (UX-068):
+ *
+ * - WITHDRAWN: the merchant took the request back;
+ * - BYPASSED and OVERRIDDEN: the work went live past it. The request was
+ *   about the draft before that publish, so it no longer stands — the
+ *   editor said "In review" after going live, about work already out.
+ *
+ * Closing is not settling: none of these is an approval, and the bypass is
+ * still in version history. A newer request opens a review again.
+ */
+export const CLOSING_OUTCOMES: ReadonlySet<string> = new Set([
+    "WITHDRAWN",
+    ReviewRoute.Bypassed,
+    ReviewRoute.Overridden,
+]);
+
 export interface ReviewStanding {
     /** A review was asked for or changes were asked for, and neither is settled. */
     outstanding: boolean;
@@ -99,12 +116,18 @@ export interface ReviewStanding {
  * the same question of its own client and get the same answer.
  */
 export function reviewStanding(
-    /** Every REQUESTED / APPROVED / CHANGES_REQUESTED row, newest first. */
-    verdicts: ApprovalRow[],
+    /**
+     * Every REQUESTED / APPROVED / CHANGES_REQUESTED row, newest first, and
+     * the rows that close a review ({@link CLOSING_OUTCOMES}).
+     */
+    rows: ApprovalRow[],
     currentFingerprint: string,
     publisherUserId: string | null,
 ): ReviewStanding {
-    const newestApproval = verdicts.find((v) => v.outcome === "APPROVED");
+    const newestApproval = rows.find((v) => v.outcome === "APPROVED");
+    // Only what came after the newest closing row is still open (UX-068).
+    const cut = rows.findIndex((v) => CLOSING_OUTCOMES.has(v.outcome));
+    const verdicts = cut === -1 ? rows : rows.slice(0, cut);
     const approvalIsStale =
         newestApproval !== undefined &&
         newestApproval.draftFingerprint !== currentFingerprint;

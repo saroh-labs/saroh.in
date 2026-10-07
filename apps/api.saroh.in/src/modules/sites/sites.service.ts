@@ -166,7 +166,13 @@ export interface ReviewState {
      * The latest event of any kind — a reviewer's verdict, or a BYPASSED row
      * publish wrote (#199). What the badge shows.
      */
-    latestApproval: { outcome: string; at: Date; by: string } | null;
+    latestApproval: {
+        outcome: string;
+        at: Date;
+        by: string;
+        /** What a change request asked for (UX-043); null otherwise. */
+        reason: string | null;
+    } | null;
     /**
      * True while a reviewer's most recent VERDICT is CHANGES_REQUESTED and no
      * approval has followed it (#199). Publishing then still succeeds, and is
@@ -174,6 +180,12 @@ export interface ReviewState {
      * it is unreviewed, which is the normal state and must not nag.
      */
     outstanding: boolean;
+    /**
+     * The open request is the caller's own (UX-068): the workspace hides
+     * Approve and Ask for changes from them — approving your own request is
+     * not a second pair of eyes, and would not settle it anyway.
+     */
+    askedByYou: boolean;
 }
 
 /** A page as returned by the page endpoints and by getSite. */
@@ -2433,6 +2445,7 @@ export class SitesService {
                     organizationId: ctx.organizationId,
                     byUserId: ctx.userId,
                     outcome: dto.outcome,
+                    reason: reasonOf(dto),
                     draftFingerprint: release.fingerprint,
                     testReleaseId: release.id,
                 },
@@ -2446,6 +2459,7 @@ export class SitesService {
                 organizationId: ctx.organizationId,
                 byUserId: ctx.userId,
                 outcome: dto.outcome,
+                reason: reasonOf(dto),
                 // An approval names the draft it approved (#278), so later
                 // edits do not inherit it. A change request does not: it is
                 // about the work as a whole and stands until it is answered.
@@ -2481,31 +2495,32 @@ export class SitesService {
               })
             : null;
 
-        const [latest, standing, openNotes] = await Promise.all([
+        // A release's verdicts (by fingerprint, as the standing reads them)
+        // and its go-live's own record; or the draft's.
+        const scope = release
+            ? {
+                  OR: [
+                      {
+                          testReleaseId: { not: null },
+                          draftFingerprint: release.fingerprint,
+                      },
+                      { testReleaseId: release.id },
+                  ],
+              }
+            : { testReleaseId: null };
+        const [latest, standing, openNotes, newestAsk] = await Promise.all([
             prisma.siteApproval.findFirst({
                 where: {
                     siteId,
                     organizationId: ctx.organizationId,
-                    ...(release
-                        ? {
-                              // Its verdicts (by fingerprint, as the
-                              // standing reads them), and its go-live's
-                              // own record.
-                              OR: [
-                                  {
-                                      testReleaseId: { not: null },
-                                      draftFingerprint: release.fingerprint,
-                                  },
-                                  { testReleaseId: release.id },
-                              ],
-                          }
-                        : { testReleaseId: null }),
+                    ...scope,
                 },
                 // Two reviews can share a millisecond; the id (a cuid, which grows)
                 // keeps "newest" deterministic.
                 orderBy: [{ createdAt: "desc" }, { id: "desc" }],
                 select: {
                     outcome: true,
+                    reason: true,
                     createdAt: true,
                     by: { select: { name: true, email: true } },
                 },
@@ -2539,7 +2554,19 @@ export class SitesService {
                     testReleaseId: release?.id ?? null,
                 },
             }),
+            prisma.siteApproval.findFirst({
+                where: {
+                    siteId,
+                    organizationId: ctx.organizationId,
+                    outcome: "REQUESTED",
+                    ...scope,
+                },
+                orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+                select: { byUserId: true },
+            }),
         ]);
+        const pending =
+            standing.outstanding && latest?.outcome !== "CHANGES_REQUESTED";
 
         return {
             testRelease: release
@@ -2547,10 +2574,10 @@ export class SitesService {
                 : null,
             openNotes,
             outstanding: standing.outstanding,
-            // "In review" is the state a REQUESTED row creates and only a
-            // verdict clears (#278).
-            pending:
-                standing.outstanding && latest?.outcome !== "CHANGES_REQUESTED",
+            // "In review" is the state a REQUESTED row creates and a
+            // verdict, a withdrawal or going live clears (#278, UX-068).
+            pending,
+            askedByYou: pending && newestAsk?.byUserId === ctx.userId,
             approvalIsStale: standing.approvalIsStale,
             latestApproval:
                 latest === null
@@ -2559,6 +2586,7 @@ export class SitesService {
                           outcome: latest.outcome,
                           at: latest.createdAt,
                           by: latest.by.name ?? latest.by.email,
+                          reason: latest.reason ?? null,
                       },
         };
     }
@@ -2618,6 +2646,42 @@ export class SitesService {
                     ctx,
                     siteId,
                 ),
+            },
+            select: { id: true },
+        });
+    }
+
+    /**
+     * Take back the draft's open review request (UX-068): `site:update`,
+     * like asking. Refused with 409 when nothing is open. Writes WITHDRAWN,
+     * which closes the request (`CLOSING_OUTCOMES`); asking again opens a
+     * new one.
+     */
+    async withdrawReview(
+        ctx: OrganizationContext,
+        siteId: string,
+    ): Promise<{ id: string }> {
+        authorize(ctx, "site:update");
+        await assertSiteInOrg(ctx, siteId);
+        const standing = await this.reviewStandingFor(
+            prisma,
+            siteId,
+            ctx.organizationId,
+            await this.currentDraftFingerprint(ctx, siteId),
+            ctx.userId,
+        );
+        if (!standing.outstanding) {
+            throw new ConflictException({
+                code: "NO_OPEN_REVIEW",
+                message: "There's no open review request to withdraw.",
+            });
+        }
+        return prisma.siteApproval.create({
+            data: {
+                siteId,
+                organizationId: ctx.organizationId,
+                byUserId: ctx.userId,
+                outcome: "WITHDRAWN",
             },
             select: { id: true },
         });
@@ -3051,4 +3115,9 @@ function sectionLabel(content: unknown): string | null {
         }
     }
     return null;
+}
+
+/** A change request's reason (UX-043); nothing on an approval. */
+function reasonOf(dto: CreateApprovalDto): string | null {
+    return dto.outcome === "CHANGES_REQUESTED" ? (dto.reason ?? null) : null;
 }

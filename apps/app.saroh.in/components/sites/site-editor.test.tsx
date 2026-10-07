@@ -40,6 +40,8 @@ const actions = vi.hoisted(() => ({
     listComments: vi.fn(),
     publishSite: vi.fn(),
     requestReview: vi.fn(),
+    withdrawReview: vi.fn(),
+    listPreviewLinks: vi.fn(() => Promise.resolve([])),
     saveDraftSections: vi.fn(),
     updateSiteStyle: vi.fn(),
     updateSiteSettings: vi.fn(),
@@ -49,6 +51,71 @@ const actions = vi.hoisted(() => ({
     updatePage: vi.fn(),
 }));
 vi.mock("@/lib/sites/actions", () => actions);
+/*
+ * A plain popover: Radix's, once opened in the bar, never let an async
+ * `act` settle under jsdom (the Share menu, UX-068). What is tested is what
+ * the menus offer, not how they float.
+ */
+vi.mock("@saroh/ui/popover", async () => {
+    const React = await import("react");
+    interface Ctx {
+        open: boolean;
+        setOpen: (next: boolean) => void;
+    }
+    const PopoverCtx = React.createContext<Ctx>({
+        open: false,
+        setOpen: () => undefined,
+    });
+    function Popover({
+        open,
+        onOpenChange,
+        children,
+    }: {
+        open?: boolean;
+        onOpenChange?: (next: boolean) => void;
+        children: React.ReactNode;
+    }) {
+        const [own, setOwn] = React.useState(false);
+        const value = open ?? own;
+        const setOpen = (next: boolean) => {
+            setOwn(next);
+            onOpenChange?.(next);
+        };
+        return React.createElement(
+            PopoverCtx.Provider,
+            { value: { open: value, setOpen } },
+            children,
+        );
+    }
+    function PopoverTrigger({ children }: { children: React.ReactElement }) {
+        const { open, setOpen } = React.useContext(PopoverCtx);
+        return React.cloneElement(
+            children as React.ReactElement<Record<string, unknown>>,
+            {
+                "aria-expanded": open,
+                "data-state": open ? "open" : "closed",
+                onClick: () => setOpen(!open),
+            },
+        );
+    }
+    function PopoverContent({
+        children,
+        className,
+    }: {
+        children: React.ReactNode;
+        className?: string;
+    }) {
+        const { open } = React.useContext(PopoverCtx);
+        return open
+            ? React.createElement(
+                  "div",
+                  { className, role: "dialog" },
+                  children,
+              )
+            : null;
+    }
+    return { Popover, PopoverTrigger, PopoverContent };
+});
 /*
  * Server-only: other panels' actions reach the API client, which reads server
  * environment variables at import. Nothing here may call it for real.
@@ -170,7 +237,12 @@ function render(overrides: Partial<Props> = {}) {
 const $ = (sel: string) => host.querySelector<HTMLElement>(sel);
 const $$ = (sel: string) => Array.from(host.querySelectorAll<HTMLElement>(sel));
 
-function button(name: string | RegExp): HTMLButtonElement {
+function button(name: string | RegExp): HTMLButtonElement;
+function button(name: string | RegExp, maybe: true): HTMLButtonElement | null;
+function button(
+    name: string | RegExp,
+    maybe = false,
+): HTMLButtonElement | null {
     const all = Array.from(
         document.querySelectorAll<HTMLButtonElement>("button,[role=tab]"),
     );
@@ -180,8 +252,13 @@ function button(name: string | RegExp): HTMLButtonElement {
             ? label.trim() === name
             : name.test(label.trim());
     });
-    if (!hit) throw new Error(`No button ${String(name)}`);
-    return hit;
+    if (!hit && !maybe) throw new Error(`No button ${String(name)}`);
+    return hit ?? null;
+}
+
+/** Narrow (UX-035): Preview, Feedback and Test release sit in "More". */
+function openMore() {
+    click(button(/^More: preview, feedback/));
 }
 
 function click(el: HTMLElement) {
@@ -360,7 +437,12 @@ describe("SiteEditor shell", () => {
         expect(button("Preview")).toBeTruthy();
         // G2: Style is the rail's Brand tab, not a button in the bar.
         expect(() => button("Style")).toThrow();
-        expect(button("Share for review").disabled).toBe(false);
+        // Share (UX-068): one button, two named choices.
+        expect(button("Share").disabled).toBe(false);
+        click(button("Share"));
+        expect(button(/^Ask a teammate to review/)).toBeTruthy();
+        expect(button(/^Share a preview link/)).toBeTruthy();
+        click(button("Share"));
         // Nothing waiting, and it still publishes: that makes a new version.
         expect(button("Publish").disabled).toBe(false);
         expect(button("Publish").title).toBe(
@@ -1052,9 +1134,30 @@ describe("SiteEditor shell", () => {
     it("asks for a review and reads the state back", async () => {
         actions.getReviewState.mockResolvedValue({ ...REVIEW, pending: true });
         render();
-        await press(button("Share for review"));
+        click(button("Share"));
+        click(button(/^Ask a teammate to review/));
+        await wait(0);
         expect(actions.requestReview).toHaveBeenCalledTimes(1);
-        expect(button("In review").disabled).toBe(true);
+        // In review now, and it can be taken back (UX-068).
+        click(button("In review"));
+        expect(button(/^Ask a teammate to review/, true)).toBeNull();
+        actions.withdrawReview.mockResolvedValue({ ok: true, data: {} });
+        actions.getReviewState.mockResolvedValue(REVIEW);
+        click(button(/^Withdraw the review request/));
+        await wait(0);
+        await wait(0);
+        expect(actions.withdrawReview).toHaveBeenCalledTimes(1);
+        expect(button("Share")).toBeTruthy();
+    });
+
+    it("opens the whole site's Feedback for a preview link (UX-068)", () => {
+        render();
+        click(button("Share"));
+        click(button(/^Share a preview link/));
+        const tab = $(
+            "aside[aria-label=Inspector] [role=tab][aria-selected=true]",
+        );
+        expect(tab?.textContent).toContain("Feedback");
     });
 
     it("opens a block's notes in the inspector", () => {
@@ -1378,9 +1481,13 @@ describe("SiteEditor narrow and phone (G4)", () => {
         expect(button("Welcome in").getAttribute("aria-current")).toBe("true");
         expect(sheet()).toBeNull();
         expect($("aside[aria-label=Inspector]")).toBeNull();
-        // The bar keeps every action, and the whole review has a way in.
+        // Publish stays on the bar (UX-035); the rest fold into More, and
+        // the whole review still has a way in.
         expect(button("Publish")).toBeTruthy();
+        expect(button("Feedback", true)).toBeNull();
+        openMore();
         expect(button("Feedback")).toBeTruthy();
+        expect(button("Preview")).toBeTruthy();
     });
 
     it("opens the inspector over the page when a block is chosen, and Close hands focus back to it", async () => {
@@ -1468,6 +1575,7 @@ describe("SiteEditor narrow and phone (G4)", () => {
     it("opens the whole site's feedback from the bar", () => {
         atWidth(1000);
         render({ initialReview: { ...REVIEW, openNotes: 2 } });
+        openMore();
         click(button(/^Feedback/));
         const tab = sheet()?.querySelector("[role=tab][aria-selected=true]");
         expect(tab?.textContent).toContain("Feedback");
@@ -1479,6 +1587,7 @@ describe("SiteEditor narrow and phone (G4)", () => {
         render();
         click(button("Our story"));
         expect(sheet()).not.toBeNull();
+        openMore();
         click(button("Preview"));
         expect(sheet()).toBeNull();
         expect($("[data-previewing]")).not.toBeNull();
@@ -1520,7 +1629,7 @@ describe("SiteEditor narrow and phone (G4)", () => {
         for (const d of ["desktop", "tablet", "phone"]) {
             expect(button(`Show at ${d} width`)).toBeTruthy();
         }
-        expect(button("Share for review")).toBeTruthy();
+        expect(button(/^Ask a teammate to review/)).toBeTruthy();
 
         // The rail is a bar at the foot, not a column.
         expect($("[aria-label='Resize the block list']")).toBeNull();

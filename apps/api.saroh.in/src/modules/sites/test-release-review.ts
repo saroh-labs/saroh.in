@@ -25,6 +25,8 @@ import { ReviewRoute, reviewStanding } from "./review-route";
 /** A verdict row, and the release it was given on (null: the draft). */
 export interface VerdictRow extends ApprovalRow {
     testReleaseId?: string | null;
+    /** What a change request asked for (UX-043). */
+    reason?: string | null;
 }
 
 /** The verdicts about the draft: every one that names no release. */

@@ -164,6 +164,18 @@ export class SitesController {
     }
 
     /**
+     * Take back the draft's open review request (UX-068). Requires
+     * `site:update`, like asking.
+     */
+    @Post(":siteId/review/withdraw")
+    withdrawReview(
+        @OrgContext() ctx: OrganizationContext,
+        @Param("siteId") siteId: string,
+    ) {
+        return this.sites.withdrawReview(ctx, siteId);
+    }
+
+    /**
      * Record a reviewer's verdict, on the draft or on a test release (T8).
      * Requires `site:approve`.
      */

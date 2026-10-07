@@ -40,6 +40,7 @@ import {
     updateSiteNavigation as updateSiteNavigationApi,
     updateSiteSettings as updateSiteSettingsApi,
     updateSiteStyle as updateSiteStyleApi,
+    withdrawReview as withdrawReviewApi,
 } from "./service";
 
 /**
@@ -84,8 +85,15 @@ export async function createApproval(
     siteId: string,
     outcome: ReviewerVerdict,
     testReleaseId?: string,
+    /** What needs changing, with CHANGES_REQUESTED (UX-043). */
+    reason?: string,
 ) {
-    return createApprovalApi(siteId, outcome, testReleaseId);
+    return createApprovalApi(siteId, outcome, testReleaseId, reason);
+}
+
+/** Take back the draft's open review request (UX-068). */
+export async function withdrawReview(siteId: string) {
+    return withdrawReviewApi(siteId);
 }
 
 /** Ask for a review (#278), of the draft or of a test release (T12). */

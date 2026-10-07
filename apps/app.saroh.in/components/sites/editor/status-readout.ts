@@ -49,6 +49,11 @@ export const APPROVAL_BADGE: Record<
         approved: () => false,
         text: (by) => `Gone live without approval by ${by}`,
     },
+    // The merchant took the request back (UX-068).
+    WITHDRAWN: {
+        approved: () => false,
+        text: (by) => `Review request withdrawn by ${by}`,
+    },
 };
 
 /**
@@ -160,6 +165,11 @@ export function statusReadout({
                   review.latestApproval.by,
                   review.approvalIsStale,
               )} · ${exactDate(review.latestApproval.at, zone)}`
+            : null,
+        // What they asked to change, in their words (UX-043).
+        review.latestApproval?.outcome === "CHANGES_REQUESTED" &&
+        review.latestApproval.reason
+            ? `“${review.latestApproval.reason}”`
             : null,
         openNotes > 0
             ? `${openNotes} open ${openNotes === 1 ? "note" : "notes"}`
