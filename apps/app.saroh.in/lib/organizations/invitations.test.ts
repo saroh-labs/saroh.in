@@ -8,6 +8,7 @@ import {
     inviteRoom,
     inviteSchema,
     teamCountLine,
+    teamCounts,
 } from "./invitations";
 
 const ZONE = "Asia/Kolkata";
@@ -157,7 +158,7 @@ describe("invitationMeta", () => {
     });
 });
 
-describe("the team cap, said (UX-028)", () => {
+describe("the team cap, said (UX-028, DEC-105)", () => {
     it("counts the owner and the invites waiting", () => {
         expect(teamCountLine(1, 0)).toBe("Just you");
         expect(teamCountLine(1, 1)).toBe("Just you · 1 invite waiting");
@@ -166,19 +167,58 @@ describe("the team cap, said (UX-028)", () => {
         );
     });
 
-    it("keeps Invite open for a Reviewer while the team is full", () => {
-        expect(inviteRoom(null)).toEqual({ open: true, seatReason: null });
-        expect(inviteRoom({ full: false, why: "" })).toEqual({
+    it("says view-only people apart: they use no seat", () => {
+        expect(teamCountLine(1, 0, 1)).toBe(
+            "Just you · 1 view-only person, no seat",
+        );
+        expect(teamCountLine(2, 1, 3)).toBe(
+            "2 people including you · 1 invite waiting · 3 view-only people, no seat",
+        );
+    });
+
+    it("counts seats by what the API says each uses, never by role name", () => {
+        expect(
+            teamCounts(
+                [
+                    { usesSeat: true },
+                    { usesSeat: false },
+                    // An older API: counted.
+                    {},
+                ],
+                [{ usesSeat: false }, { usesSeat: true }],
+            ),
+        ).toEqual({ people: 2, waiting: 1, viewOnly: 2 });
+    });
+
+    it("keeps Invite open for view-only people while the seats are full", () => {
+        expect(inviteRoom(null)).toEqual({
             open: true,
             seatReason: null,
+            viewOnlyReason: null,
         });
         const full = inviteRoom({ full: true, why: "Your team is full" });
         expect(full.open).toBe(true);
         expect(full.seatReason).toBe(
-            "Your team is full (invites count too). A Reviewer doesn't take a seat.",
+            "Your team is full (invites count too). View-only people don't take a seat.",
         );
+        expect(full.viewOnlyReason).toBeNull();
         expect(
             inviteRoom({ full: true, why: "x", reviewersFull: true }).open,
         ).toBe(false);
+    });
+
+    it("keeps Invite open for seats while view-only people are full", () => {
+        const room = inviteRoom({
+            full: false,
+            why: "",
+            reviewersFull: true,
+            reviewersWhy: "You've reached your 1 view-only person on Plan A",
+        });
+        expect(room).toEqual({
+            open: true,
+            seatReason: null,
+            viewOnlyReason:
+                "You've reached your 1 view-only person on Plan A (invites count too).",
+        });
     });
 });

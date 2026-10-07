@@ -8,6 +8,7 @@ import {
     AuditOutcome,
 } from "../audit/audit.service";
 import {
+    approvalApplies,
     approvalRequired,
     OVERRIDE_OWNER_ONLY_MESSAGE,
 } from "./publish-approval";
@@ -218,7 +219,13 @@ export async function putLive(
             { fingerprint: input.fingerprint },
             actor.userId,
         );
-    const overridden = settings.publishNeedsApproval && !approved;
+    // Switched on under a plan without the approval row, it stops applying
+    // (DEC-103).
+    const needsApproval = await approvalApplies(
+        site.organizationId,
+        settings.publishNeedsApproval,
+    );
+    const overridden = needsApproval && !approved;
     if (overridden && input.override !== true) throw approvalRequired();
 
     // An override is recorded as itself, not as a bypass as well: one row

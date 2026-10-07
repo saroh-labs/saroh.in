@@ -114,43 +114,96 @@ export function inviteSchema(known: {
 export type InviteValues = z.infer<ReturnType<typeof inviteSchema>>;
 
 /**
- * What the plan's team cap counts, said plainly (UX-028): "2 people
- * including you · 1 invite waiting". The cap counts everyone in the
- * business, the owner included, and every invite not yet answered —
- * Reviewers never (`billing/metering.ts`). Without this the screen read
- * "Team is full" beside People = 1.
+ * What the plan's team cap counts, said plainly (UX-028, DEC-105): "2 people
+ * including you · 1 invite waiting · 1 view-only person". The seats count
+ * everyone who can change something, the owner included, and every such
+ * invite not yet answered; people who only look use no seat, and are said
+ * apart (`billing/seats.ts` on the API).
  */
-export function teamCountLine(people: number, waiting: number): string {
-    const who = people === 1 ? "Just you" : `${people} people including you`;
-    if (waiting === 0) return who;
-    return `${who} · ${waiting === 1 ? "1 invite" : `${waiting} invites`} waiting`;
+export function teamCountLine(
+    people: number,
+    waiting: number,
+    viewOnly = 0,
+): string {
+    const parts = [
+        people === 1 ? "Just you" : `${people} people including you`,
+    ];
+    if (waiting > 0) {
+        parts.push(
+            `${waiting === 1 ? "1 invite" : `${waiting} invites`} waiting`,
+        );
+    }
+    if (viewOnly > 0) {
+        parts.push(
+            `${viewOnly === 1 ? "1 view-only person" : `${viewOnly} view-only people`}, no seat`,
+        );
+    }
+    return parts.join(" · ");
 }
 
-/** The plan's caps on Team, as the page reads them (U14). */
-export interface TeamLimit {
-    /** The team, open invites counted, has reached its cap. */
-    full: boolean;
-    /** The notice's reason, in the design's words. */
-    why: string;
-    /** The Reviewers cap is reached too (Reviewers have their own, U13). */
-    reviewersFull?: boolean;
+/** Whether a role, a person or an invite uses a team seat (DEC-105). */
+export function usesSeat(x: { usesSeat?: boolean } | undefined): boolean {
+    // Unknown (an older API): counted, the way the API meters what it can't
+    // tell apart.
+    return x?.usesSeat !== false;
 }
 
 /**
- * Who Invite can still ask (UX-028). A full team stops seats, not
- * Reviewers, who have a cap of their own: the dialog stays open with
- * every other role disabled and the reason beside it. Only when both caps
- * are reached is there no one to invite.
+ * The Team line's three counts: seats taken, seat invites waiting, and
+ * view-only people with their invites.
+ */
+export function teamCounts(
+    members: readonly { usesSeat?: boolean }[],
+    invitations: readonly { usesSeat?: boolean }[],
+): { people: number; waiting: number; viewOnly: number } {
+    const seated = (xs: readonly { usesSeat?: boolean }[]) =>
+        xs.filter((x) => usesSeat(x)).length;
+    return {
+        people: seated(members),
+        waiting: seated(invitations),
+        viewOnly:
+            members.length +
+            invitations.length -
+            seated(members) -
+            seated(invitations),
+    };
+}
+
+/** The plan's caps on Team, as the page reads them (U14, DEC-105). */
+export interface TeamLimit {
+    /** The team seats, open invites counted, have reached their cap. */
+    full: boolean;
+    /** The notice's reason, in the design's words. */
+    why: string;
+    /** The view-only people cap is reached too (their own, DEC-105). */
+    reviewersFull?: boolean;
+    /** Its reason, in the same words. */
+    reviewersWhy?: string;
+}
+
+/**
+ * Who Invite can still ask (UX-028, DEC-105). Full seats stop roles that
+ * can change something, not view-only ones, which have a cap of their
+ * own, and the other way round: the dialog stays open with the roles that
+ * don't fit disabled and the reason beside them. Only when both caps are
+ * reached is there no one to invite.
  */
 export function inviteRoom(limit: TeamLimit | null | undefined): {
     /** Anyone at all can be invited. */
     open: boolean;
     /** Why a role that takes a seat can't be picked; null when it can. */
     seatReason: string | null;
+    /** Why a view-only role can't be picked; null when it can. */
+    viewOnlyReason: string | null;
 } {
-    if (!limit?.full) return { open: true, seatReason: null };
+    if (!limit) return { open: true, seatReason: null, viewOnlyReason: null };
     return {
-        open: !limit.reviewersFull,
-        seatReason: `${limit.why} (invites count too). A Reviewer doesn't take a seat.`,
+        open: !(limit.full && limit.reviewersFull === true),
+        seatReason: limit.full
+            ? `${limit.why} (invites count too). View-only people don't take a seat.`
+            : null,
+        viewOnlyReason: limit.reviewersFull
+            ? `${limit.reviewersWhy ?? "You've reached your plan's view-only people"} (invites count too).`
+            : null,
     };
 }

@@ -159,6 +159,22 @@ export class MeteringService {
     }
 
     /**
+     * Whether a switch row applies to this business now: the
+     * {@link assertIncluded} answer, as a boolean, for a setting that stops
+     * applying under a plan without it ("Publishing needs approval",
+     * DEC-103). Fail safe as `assertIncluded` is: nothing enforced, or a
+     * plan that can't be read, reads as included.
+     */
+    async isIncluded(
+        organizationId: string,
+        moduleId: string,
+        now: Date = new Date(),
+    ): Promise<boolean> {
+        const row = await this.enforcedRow(organizationId, moduleId, now);
+        return !row || row.state === "on";
+    }
+
+    /**
      * Before a write adds `adding` of a metered row's things, on the write's
      * own transaction: refuse (403 `PLAN_LIMIT_REACHED`, or `refuse`) when
      * they would pass the cap, or (403 `MODULE_LOCKED`) when the plan leaves

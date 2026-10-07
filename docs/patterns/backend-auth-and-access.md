@@ -176,8 +176,18 @@ what the API allows.
   drops their non-review extras. Each change writes
   `membership.extras.update` (given and taken, keys and labels), which
   Settings › Activity reads as "gave Ravi Refund orders". Giving an extra
-  asks the plan's `roles` row ("Custom roles", UX-030) — taking one away
-  never does.
+  asks the plan's `roles` row ("Custom roles", UX-030; Pro only, DEC-099) —
+  taking one away never does. So does giving an invented role a permission
+  it didn't have; taking one away or renaming never asks.
+- **Current** (DEC-105) — **Seats follow permissions, never role names.**
+  `billing/seats.ts` decides who uses a team seat: anyone whose role and
+  extras hold a permission outside `VIEW_ONLY_ACTIONS` (every `…:read`,
+  `customer:sensitive`, `order:export`, `site:comment`, `site:approve`), or
+  who takes bookings (an ACTIVE `StaffMember`). Everyone else is view-only
+  and counts toward the `reviewers` row ("View-only people"). Metering,
+  inviting, changing a role, giving an extra and re-permissioning a role all
+  classify through it, and the member, invitation and role views carry
+  `usesSeat` so Team never guesses from a key.
 - **Current** (F16, DEC-048) — **A storefront's people are on the team.**
   Accepting a storefront invite (`members/members.service.ts`) also makes a
   `Membership` in the store's business, in the same transaction, in the

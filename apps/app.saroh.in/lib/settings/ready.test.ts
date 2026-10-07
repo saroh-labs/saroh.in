@@ -723,7 +723,8 @@ describe("steps only when something invoices or takes money (DEC-070)", () => {
         expect(handlesMoney([mod("WEBSITE")], facts(0))).toBe(false);
         expect(handlesMoney([mod("WEBSITE")], facts(2))).toBe(true);
         expect(handlesMoney([mod("COURSES")], facts(0))).toBe(true);
-        expect(handlesMoney([mod("CLASS_PACKS")], undefined)).toBe(true);
+        // Not offered (DEC-099): hidden, so it says nothing.
+        expect(handlesMoney([mod("CLASS_PACKS")], facts(0))).toBe(false);
         expect(handlesMoney([mod("PAYMENTS")], undefined)).toBe(true);
         expect(handlesMoney(null, facts(1))).toBe(true);
         expect(handlesMoney(null, facts(0))).toBeNull();

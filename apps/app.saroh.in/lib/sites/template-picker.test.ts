@@ -163,8 +163,9 @@ describe("what a card says", () => {
         expect(moduleNote(of("bakery"), states)).toBe(
             "Its products show once Sell is on.",
         );
+        // Class packs aren't offered (DEC-099), so they are never named.
         expect(moduleNote(of("gym"), states)).toBe(
-            "Its plans and class packs show once Payments and Class packs are on.",
+            "Its plans show once Payments is on.",
         );
         // Contacts off holds nothing back: enquiries still arrive.
         expect(moduleNote(of("developer"), states)).toBeNull();

@@ -12,7 +12,11 @@ jest.mock("@saroh/database", () => ({
         membership: {
             groupBy: jest.fn(),
             count: jest.fn(),
+            findMany: jest.fn(),
         },
+        organizationInvitation: { findMany: jest.fn() },
+        // The role save and its seat checks share one transaction (DEC-105).
+        $transaction: jest.fn(),
     },
 }));
 
@@ -28,11 +32,17 @@ import type {
     OrganizationContext,
     OrgRole,
 } from "../../common/types/organization-context";
+import { planMeter } from "../billing/metering.service";
 import { resolveCapabilities } from "./organization-policy";
 import { OrganizationRolesService } from "./organization-roles.service";
 
 const role = prisma.organizationRole as unknown as Record<string, jest.Mock>;
 const membership = prisma.membership as unknown as Record<string, jest.Mock>;
+const invitation = prisma.organizationInvitation as unknown as Record<
+    string,
+    jest.Mock
+>;
+const $transaction = prisma.$transaction as unknown as jest.Mock;
 
 const service = () => new OrganizationRolesService();
 
@@ -132,6 +142,11 @@ beforeEach(() => {
     role.deleteMany!.mockResolvedValue({ count: 1 });
     membership.groupBy!.mockResolvedValue([]);
     membership.count!.mockResolvedValue(0);
+    membership.findMany!.mockResolvedValue([]);
+    invitation.findMany!.mockResolvedValue([]);
+    $transaction.mockImplementation((fn: (tx: unknown) => unknown) =>
+        fn(prisma),
+    );
 });
 
 describe("list", () => {
@@ -474,5 +489,115 @@ describe("within reach (F19)", () => {
             ],
         });
         expect(current().actions).toHaveLength(4);
+    });
+});
+
+// DEC-099: roles of your own are Pro's. Free and Grow can't make one or give
+// one more; taking permissions away is never blocked.
+describe("the plan's Custom roles row (DEC-099)", () => {
+    it("asks the plan before a role is given a permission it hadn't", async () => {
+        stored(STOCK_CLERK);
+        const included = jest
+            .spyOn(planMeter, "assertIncluded")
+            .mockRejectedValueOnce(new ForbiddenException("MODULE_LOCKED"));
+        await expect(
+            service().update(OWNER, "stock-clerk", {
+                actions: ["order:read", "booking:write"],
+            }),
+        ).rejects.toThrow(ForbiddenException);
+        expect(included).toHaveBeenCalledWith("org_1", "roles");
+        expect(role.updateMany).not.toHaveBeenCalled();
+        included.mockRestore();
+    });
+
+    it("never asks to take a permission away, or to rename", async () => {
+        stored({ ...STOCK_CLERK, actions: ["order:read", "booking:read"] });
+        const included = jest.spyOn(planMeter, "assertIncluded");
+        await service().update(OWNER, "stock-clerk", {
+            actions: ["order:read"],
+        });
+        await service().update(OWNER, "stock-clerk", { label: "Counter" });
+        expect(included).not.toHaveBeenCalled();
+        expect(role.updateMany).toHaveBeenCalledTimes(2);
+        included.mockRestore();
+    });
+});
+
+// DEC-105: a role's people move between seats and view-only places with it.
+describe("seats follow a role's permissions (DEC-105)", () => {
+    it("says whether holding a role uses a seat, by its permissions", async () => {
+        role.findMany!.mockResolvedValue([
+            { ...STOCK_CLERK, key: "looker", actions: ["order:read"] },
+            { ...STOCK_CLERK, key: "desk", actions: ["booking:write"] },
+        ]);
+        const roles = await service().list("org_1");
+        const seat = Object.fromEntries(roles.map((r) => [r.key, r.usesSeat]));
+        expect(seat).toEqual({
+            OWNER: true,
+            ADMIN: true,
+            MEMBER: true,
+            REVIEWER: false,
+            looker: false,
+            desk: true,
+        });
+    });
+
+    it("checks the team seats for the people a write permission moves onto them", async () => {
+        stored(STOCK_CLERK);
+        membership.findMany!.mockResolvedValue([
+            { extraActions: [], staffMember: null },
+            // Takes bookings: already on a seat.
+            { extraActions: [], staffMember: { status: "ACTIVE" } },
+        ]);
+        invitation.findMany!.mockResolvedValue([{ id: "inv_1" }]);
+        const room = jest.spyOn(planMeter, "roomInTx").mockResolvedValue(null);
+        const out = await service().update(OWNER, "stock-clerk", {
+            actions: ["order:read", "booking:write"],
+        });
+        expect(room).toHaveBeenCalledWith(prisma, "org_1", "members", {
+            adding: 2,
+        });
+        expect(room).toHaveBeenCalledWith(prisma, "org_1", "reviewers", {
+            adding: 0,
+        });
+        expect(out.usesSeat).toBe(true);
+        room.mockRestore();
+    });
+
+    it("a full team stops the save", async () => {
+        stored(STOCK_CLERK);
+        membership.findMany!.mockResolvedValue([
+            { extraActions: [], staffMember: null },
+        ]);
+        const room = jest
+            .spyOn(planMeter, "roomInTx")
+            .mockRejectedValueOnce(
+                new ForbiddenException("PLAN_LIMIT_REACHED"),
+            );
+        await expect(
+            service().update(OWNER, "stock-clerk", {
+                actions: ["order:read", "booking:write"],
+            }),
+        ).rejects.toThrow(ForbiddenException);
+        expect(role.updateMany).not.toHaveBeenCalled();
+        room.mockRestore();
+    });
+
+    it("counts people a role sheds its writes from toward view-only people", async () => {
+        stored({ ...STOCK_CLERK, actions: ["order:read", "booking:write"] });
+        membership.findMany!.mockResolvedValue([
+            { extraActions: [], staffMember: null },
+        ]);
+        const room = jest.spyOn(planMeter, "roomInTx").mockResolvedValue(null);
+        await service().update(OWNER, "stock-clerk", {
+            actions: ["order:read"],
+        });
+        expect(room).toHaveBeenCalledWith(prisma, "org_1", "reviewers", {
+            adding: 1,
+        });
+        expect(room).toHaveBeenCalledWith(prisma, "org_1", "members", {
+            adding: 0,
+        });
+        room.mockRestore();
     });
 });

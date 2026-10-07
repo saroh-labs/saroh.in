@@ -27,7 +27,8 @@ const off = (key: string, over: Partial<ModuleView> = {}) =>
     });
 
 describe("Also sell (E12)", () => {
-    it("offers Courses and Class packs, each as the business has it", () => {
+    // Class packs aren't offered on any plan for now (DEC-099).
+    it("offers Courses as the business has it, never Class packs", () => {
         const features = alsoSellFeatures([
             view("APPOINTMENTS"),
             view("COURSES"),
@@ -35,11 +36,7 @@ describe("Also sell (E12)", () => {
         ]);
         expect(features?.map((f) => [f.key, f.label, f.on])).toEqual([
             ["COURSES", "Courses", true],
-            ["CLASS_PACKS", "Class packs", false],
         ]);
-        expect(features?.[1]?.note).toBe(
-            "A number of visits bought up front and used over time.",
-        );
     });
 
     it("is there only for someone who may switch modules", () => {

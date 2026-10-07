@@ -12,7 +12,14 @@ import type {
     OrgRole,
 } from "../../common/types/organization-context";
 import { ORG_ROLES } from "../../common/types/organization-context";
+import { openInvitations } from "../billing/metering";
 import { planMeter } from "../billing/metering.service";
+import {
+    BOOKABLE_STAFF,
+    onlyViews,
+    roleActionsOf,
+    seatOf,
+} from "../billing/seats";
 import {
     CAPABILITY_BY_ACTION,
     grantableCapabilities,
@@ -41,6 +48,12 @@ export interface RoleView {
      * extra permissions show these as coming with the role (F17).
      */
     grants?: OrgAction[];
+    /**
+     * Whoever holds it uses a team seat (DEC-105): it carries a permission
+     * that changes something. False for a role that only looks, whose
+     * people count toward the plan's view-only people instead.
+     */
+    usesSeat: boolean;
 }
 
 /** What a built-in is called, before a business ever stores a row for it. */
@@ -119,6 +132,7 @@ export class OrganizationRolesService {
                 ringTone: row?.ringTone ?? BUILT_IN_RING[key],
                 system: true,
                 members: held.get(key) ?? 0,
+                usesSeat: !onlyViews(builtInActions(key)),
             };
         });
 
@@ -132,6 +146,7 @@ export class OrganizationRolesService {
                 system: false,
                 members: held.get(r.key) ?? 0,
                 grants: [...resolveCapabilities(r.key, r.actions)],
+                usesSeat: !onlyViews(resolveCapabilities(r.key, r.actions)),
             }));
 
         return [...builtIns, ...invented];
@@ -197,6 +212,7 @@ export class OrganizationRolesService {
             ringTone: created.ringTone,
             system: false,
             members: 0,
+            usesSeat: !onlyViews(resolveCapabilities(key, actions)),
         };
     }
 
@@ -225,18 +241,37 @@ export class OrganizationRolesService {
                 ? this.vetActions(input.actions)
                 : undefined;
         if (actions) this.assertCanGrant(ctx, key, actions);
+        // Giving a role more is a role of your own, the plan's Custom roles
+        // row (DEC-099): refused where the plan leaves it off. Taking
+        // permissions away, or renaming, never asks.
+        if (actions?.some((a) => !role.actions.includes(a))) {
+            await planMeter.assertIncluded(organizationId, "roles");
+        }
+        const moves = actions
+            ? await this.seatMoves(organizationId, key, role.actions, actions)
+            : { toSeat: 0, toViewOnly: 0 };
 
         // Only if nobody saved it since it was checked: a role widened by
         // someone else in between would otherwise be written over by a
-        // person it is now beyond.
-        const { count } = await prisma.organizationRole.updateMany({
-            where: { id: role.id, updatedAt: role.updatedAt },
-            data: {
-                ...(input.label !== undefined
-                    ? { label: input.label.trim() }
-                    : {}),
-                ...(actions ? { actions } : {}),
-            },
+        // person it is now beyond. Its people moving onto team seats, or
+        // onto view-only places, are checked on the same transaction
+        // (DEC-105).
+        const { count } = await prisma.$transaction(async (tx) => {
+            await planMeter.roomInTx(tx, organizationId, "members", {
+                adding: moves.toSeat,
+            });
+            await planMeter.roomInTx(tx, organizationId, "reviewers", {
+                adding: moves.toViewOnly,
+            });
+            return tx.organizationRole.updateMany({
+                where: { id: role.id, updatedAt: role.updatedAt },
+                data: {
+                    ...(input.label !== undefined
+                        ? { label: input.label.trim() }
+                        : {}),
+                    ...(actions ? { actions } : {}),
+                },
+            });
         });
         if (count === 0) throw roleChangedMeanwhile();
         const updated = await prisma.organizationRole.findUnique({
@@ -255,7 +290,57 @@ export class OrganizationRolesService {
             ringTone: updated.ringTone,
             system: false,
             members,
+            usesSeat: !onlyViews(resolveCapabilities(key, updated.actions)),
         };
+    }
+
+    /**
+     * How many of a role's people, and its open invitations, would move
+     * from view-only onto a team seat, or the other way, if its permissions
+     * changed from `from` to `to` (DEC-105). Someone who takes bookings
+     * keeps their seat either way.
+     */
+    private async seatMoves(
+        organizationId: string,
+        key: string,
+        from: readonly string[],
+        to: readonly string[],
+    ): Promise<{ toSeat: number; toViewOnly: number }> {
+        const [people, invites] = await Promise.all([
+            prisma.membership.findMany({
+                where: { organizationId, role: key },
+                select: {
+                    extraActions: true,
+                    staffMember: { select: { status: true } },
+                },
+            }),
+            prisma.organizationInvitation.findMany({
+                where: {
+                    organizationId,
+                    role: key,
+                    ...openInvitations(new Date()),
+                },
+                select: { id: true },
+            }),
+        ]);
+        const before = roleActionsOf([{ key, actions: [...from] }]);
+        const after = roleActionsOf([{ key, actions: [...to] }]);
+        const holders = [
+            ...people.map((p) => ({
+                extras: p.extraActions,
+                bookable: p.staffMember?.status === BOOKABLE_STAFF,
+            })),
+            ...invites.map(() => ({ extras: [], bookable: false })),
+        ];
+        let toSeat = 0;
+        let toViewOnly = 0;
+        for (const h of holders) {
+            const was = seatOf(before, key, h.extras, h.bookable);
+            const now = seatOf(after, key, h.extras, h.bookable);
+            if (was === "viewOnly" && now === "seat") toSeat += 1;
+            if (was === "seat" && now === "viewOnly") toViewOnly += 1;
+        }
+        return { toSeat, toViewOnly };
     }
 
     /**

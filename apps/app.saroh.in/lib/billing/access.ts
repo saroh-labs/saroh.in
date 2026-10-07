@@ -81,6 +81,22 @@ export function accessRow(
     return view?.modules.find((m) => m.moduleId === moduleId) ?? null;
 }
 
+/**
+ * Whether the plan includes a switch row, for a screen that hides what the
+ * plan leaves off rather than upselling it ("Publishing needs approval",
+ * DEC-103). As the API's `isIncluded`: true while nothing enforces the
+ * catalogue, off it, when the version has no such row, or when the plan
+ * couldn't be read.
+ */
+export function rowIncluded(
+    view: BillingAccessView | null,
+    moduleId: string,
+): boolean {
+    if (view?.source !== "catalogue" || !view.enforced) return true;
+    const row = accessRow(view, moduleId);
+    return !row || row.state === "on";
+}
+
 const OFF: LimitNotice = { on: false, full: false };
 
 /**

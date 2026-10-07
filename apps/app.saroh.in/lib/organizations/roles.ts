@@ -28,6 +28,12 @@ export interface Role {
      * API, and for a built-in.
      */
     grants?: string[];
+    /**
+     * Holding it uses a team seat (DEC-105): it carries a permission that
+     * changes something. False for a role that only looks, whose people
+     * count toward the plan's view-only people. Absent from an older API.
+     */
+    usesSeat?: boolean;
 }
 
 export interface Capability {

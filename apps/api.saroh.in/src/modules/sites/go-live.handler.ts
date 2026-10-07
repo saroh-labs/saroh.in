@@ -6,6 +6,7 @@ import { businessTimezone } from "../bookings/staff-availability";
 import { enqueueTeamAlert } from "../notifications/team-alerts";
 import { resolveCapabilities } from "../organizations/organization-policy";
 import { lockSite, readVerdicts } from "./live-pointer";
+import { approvalApplies } from "./publish-approval";
 import { goLiveWithRelease } from "./test-release-go-live";
 import { releaseApproved } from "./test-release-review";
 import type { SiteGoLivePayload } from "./test-release-schedule";
@@ -264,7 +265,7 @@ async function mayGoLive(
     }
 
     let override = false;
-    if (site.publishNeedsApproval) {
+    if (await approvalApplies(organizationId, site.publishNeedsApproval)) {
         const approved = releaseApproved(
             await readVerdicts(tx, { siteId: release.siteId, organizationId }),
             release,

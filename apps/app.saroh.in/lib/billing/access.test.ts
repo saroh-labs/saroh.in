@@ -8,6 +8,7 @@ import {
     onlinePaymentsLock,
     ownAccountsRoom,
     planLocks,
+    rowIncluded,
     rowLock,
     rowNotice,
     takesOnlinePayment,
@@ -183,7 +184,7 @@ describe("rowNotice", () => {
         );
         expect(n).toMatchObject({
             full: true,
-            body: "New invites are paused. Everyone already on the team keeps access. Add more with an add-on.",
+            body: "New invites are paused. Everyone already on the team keeps access, and view-only people can still be invited. Add more with an add-on.",
             cta: "Add more",
         });
     });
@@ -587,5 +588,34 @@ describe("createBlock (UX-036)", () => {
             ),
         ).toBeNull();
         expect(createBlock(null, "products")).toBeNull();
+    });
+});
+
+// DEC-103: a switch a plan leaves off is hidden, never upsold.
+describe("rowIncluded", () => {
+    const review = (state: "on" | "locked" | "hidden") =>
+        row({ moduleId: "review", state, limit: null, usage: null });
+
+    it("is off only where an enforced plan leaves the row off", () => {
+        for (const state of ["locked", "hidden"] as const) {
+            expect(
+                rowIncluded(access({ modules: [review(state)] }), "review"),
+            ).toBe(false);
+        }
+        expect(rowIncluded(access({ modules: [review("on")] }), "review")).toBe(
+            true,
+        );
+    });
+
+    it("includes it while nothing enforces it, or it can't be read", () => {
+        expect(
+            rowIncluded(
+                access({ enforced: false, modules: [review("locked")] }),
+                "review",
+            ),
+        ).toBe(true);
+        expect(rowIncluded(access({ source: "legacy" }), "review")).toBe(true);
+        expect(rowIncluded(null, "review")).toBe(true);
+        expect(rowIncluded(access({ modules: [] }), "review")).toBe(true);
     });
 });

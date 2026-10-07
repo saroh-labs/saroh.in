@@ -77,10 +77,24 @@ export default async function PeoplePage() {
     // The plan, for whoever changes the team or its roles.
     const access =
         canManage || canEditRoles ? await billingAccessOrNull() : null;
-    // The plan's team limit (U14): people plus open invites, as the API counts.
+    // The plan's team seats (U14, DEC-105): people who can change something
+    // plus such invites, as the API counts.
     const team = canManage ? rowNotice(access, "members") : null;
-    // Reviewers have their own cap (U13): a full team still invites one.
+    // View-only people have their own cap (DEC-105): full seats still
+    // invite one, and the other way round. A soft cap never stops an invite.
     const reviewers = canManage ? rowNotice(access, "reviewers") : null;
+    const seats = team?.on && !team.soft ? team : null;
+    const viewOnly =
+        reviewers?.on && !reviewers.soft && reviewers.full ? reviewers : null;
+    const teamLimit =
+        seats || viewOnly
+            ? {
+                  full: seats?.full === true,
+                  why: seats?.why ?? "",
+                  reviewersFull: viewOnly !== null,
+                  reviewersWhy: viewOnly?.why,
+              }
+            : null;
     const catalogue = shownCatalogue(fullCatalogue, modules);
 
     return (
@@ -96,20 +110,7 @@ export default async function PeoplePage() {
                 catalogue={catalogue}
                 myActions={organization?.actions ?? null}
                 joinedFromStorefronts={joinedFromStorefronts}
-                teamLimit={
-                    // A soft cap never stops an invite.
-                    team?.on && !team.soft
-                        ? {
-                              full: team.full,
-                              why: team.why,
-                              reviewersFull: !!(
-                                  reviewers?.on &&
-                                  !reviewers.soft &&
-                                  reviewers.full
-                              ),
-                          }
-                        : null
-                }
+                teamLimit={teamLimit}
                 rolesLock={canEditRoles ? rolesLock(access) : null}
                 limitNotice={
                     canManage ? <PlanLimitNotice moduleId="members" /> : null

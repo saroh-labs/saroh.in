@@ -9,11 +9,13 @@ import { FALLBACK_TIMEZONE } from "../bookings/staff-availability";
 import type { MeterDb, MeteredLimitKey } from "./metering";
 import {
     bytesToGb,
-    countedRole,
     countedSarohEmails,
+    countSeatKind,
     monthFirstDay,
     monthWindow,
-    reviewerRole,
+    openInvitations,
+    SEAT_MEMBER_SELECT,
+    seatKindCounted,
     SHOP_KIND,
     siteViewTotals,
     standingBookings,
@@ -41,6 +43,19 @@ function tally<K extends string>(
         into.set(org, (into.get(org) ?? 0) + r._count._all);
     }
     return into;
+}
+
+/** Rows grouped by their business. */
+function byOrganization<T extends { organizationId: string }>(
+    rows: readonly T[],
+): Map<string, T[]> {
+    const out = new Map<string, T[]>();
+    for (const r of rows) {
+        const list = out.get(r.organizationId);
+        if (list) list.push(r);
+        else out.set(r.organizationId, [r]);
+    }
+    return out;
 }
 
 /**
@@ -206,29 +221,39 @@ export async function countUsageAcross(
         }
         case "teamMembers":
         case "reviewers": {
-            const roleFilter = key === "reviewers" ? reviewerRole : countedRole;
-            const [members, invites] = await Promise.all([
-                db.membership.groupBy({
-                    by: ["organizationId"],
-                    where: { organizationId: { in: ids }, ...roleFilter },
-                    _count: { _all: true },
+            // The same classification as `countUsage` (DEC-105), per business.
+            const [members, invites, roles] = await Promise.all([
+                db.membership.findMany({
+                    where: { organizationId: { in: ids } },
+                    select: { organizationId: true, ...SEAT_MEMBER_SELECT },
                 }),
-                db.organizationInvitation.groupBy({
-                    by: ["organizationId"],
+                db.organizationInvitation.findMany({
                     where: {
                         organizationId: { in: ids },
-                        status: "PENDING",
-                        expiresAt: { gt: now },
-                        ...roleFilter,
+                        ...openInvitations(now),
                     },
-                    _count: { _all: true },
+                    select: { organizationId: true, role: true },
+                }),
+                db.organizationRole.findMany({
+                    where: { organizationId: { in: ids } },
+                    select: { organizationId: true, key: true, actions: true },
                 }),
             ]);
-            return tally(
-                invites,
-                "organizationId",
-                tally(members, "organizationId"),
-            );
+            const kind = seatKindCounted(key);
+            const rolesOf = byOrganization(roles);
+            const membersOf = byOrganization(members);
+            const invitesOf = byOrganization(invites);
+            const out = new Map<string, number>();
+            for (const id of ids) {
+                const n = countSeatKind(
+                    kind,
+                    rolesOf.get(id) ?? [],
+                    membersOf.get(id) ?? [],
+                    invitesOf.get(id) ?? [],
+                );
+                if (n > 0) out.set(id, n);
+            }
+            return out;
         }
         case "integrations": {
             const [payments, messaging] = await Promise.all([

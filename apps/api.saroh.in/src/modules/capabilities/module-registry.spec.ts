@@ -187,10 +187,18 @@ describe("hidden modules (DEC-068)", () => {
     const flagsOn = { isEnabled: jest.fn().mockResolvedValue(true) };
     const flagsOff = { isEnabled: jest.fn().mockResolvedValue(false) };
 
-    it("Automations is the one module hidden until it has a screen", () => {
+    // Automations until it has a screen; class packs on no plan (DEC-099).
+    it("hides Automations and class packs, and nothing else", () => {
         expect(MODULES.filter((m) => m.hidden).map((m) => m.key)).toEqual([
+            "CLASS_PACKS",
             "AUTOMATIONS",
         ]);
+    });
+
+    it("reads class packs as not rolled out whatever its flag says (DEC-099)", async () => {
+        await expect(
+            moduleRolledOut(flagsOn, "CLASS_PACKS", "org_1"),
+        ).resolves.toBe(false);
     });
 
     it("reads as not rolled out whatever its flag says", async () => {

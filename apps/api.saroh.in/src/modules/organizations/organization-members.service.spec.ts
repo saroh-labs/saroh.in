@@ -578,10 +578,10 @@ describe("the last owner", () => {
     });
 });
 
-describe("the plan's team members (U13): Reviewers aren't counted, and have their own cap", () => {
-    it("inviting a Reviewer checks the Reviewers cap, never the team's", async () => {
+describe("the plan's team seats (DEC-105): people who only look use none, and have their own cap", () => {
+    it("inviting a Reviewer checks the view-only cap, never the team's", async () => {
         const withRoom = jest.spyOn(planMeter, "withRoom");
-        const count = jest.fn().mockResolvedValue(0);
+        const findFirst = jest.fn().mockResolvedValue(null);
         await service.invite(ctx(), {
             email: "reviewer@example.test",
             role: "REVIEWER",
@@ -591,20 +591,19 @@ describe("the plan's team members (U13): Reviewers aren't counted, and have thei
         const options = withRoom.mock.calls[0][3] as {
             addingIn: (tx: unknown) => Promise<number>;
         };
-        const tx = { organizationInvitation: { count } };
+        const tx = { organizationInvitation: { findFirst } };
         expect(await options.addingIn(tx)).toBe(1);
-        // Only an open Reviewer invitation already counts this person.
-        expect(count.mock.calls[0][0].where).toMatchObject({
-            role: "REVIEWER",
-        });
-        count.mockResolvedValue(1);
+        // Only an open view-only invitation already counts this person.
+        findFirst.mockResolvedValue({ role: "REVIEWER" });
         expect(await options.addingIn(tx)).toBe(0);
+        findFirst.mockResolvedValue({ role: "MEMBER" });
+        expect(await options.addingIn(tx)).toBe(1);
         withRoom.mockRestore();
     });
 
-    it("inviting anyone else adds one, unless a counted invite is open", async () => {
+    it("inviting anyone who can change something adds a seat, unless a seat invite is open", async () => {
         const withRoom = jest.spyOn(planMeter, "withRoom");
-        const count = jest.fn().mockResolvedValue(0);
+        const findFirst = jest.fn().mockResolvedValue(null);
         await service.invite(ctx(), {
             email: "member@example.test",
             role: "MEMBER",
@@ -613,14 +612,34 @@ describe("the plan's team members (U13): Reviewers aren't counted, and have thei
         const options = withRoom.mock.calls[0][3] as {
             addingIn: (tx: unknown) => Promise<number>;
         };
-        const tx = { organizationInvitation: { count } };
+        const tx = { organizationInvitation: { findFirst } };
         expect(await options.addingIn(tx)).toBe(1);
-        // An open invitation as a Reviewer didn't count; this one does.
-        expect(count.mock.calls[0][0].where).toMatchObject({
-            role: { not: "REVIEWER" },
-        });
-        count.mockResolvedValue(1);
+        // An open invitation as a Reviewer didn't take a seat; this one does.
+        findFirst.mockResolvedValue({ role: "REVIEWER" });
+        expect(await options.addingIn(tx)).toBe(1);
+        findFirst.mockResolvedValue({ role: "ADMIN" });
         expect(await options.addingIn(tx)).toBe(0);
+        withRoom.mockRestore();
+    });
+
+    it("a view-only role of the business's own uses no seat; one with booking:write does", async () => {
+        const withRoom = jest.spyOn(planMeter, "withRoom");
+        db.organizationRole.findUnique.mockResolvedValue({
+            actions: ["booking:read", "order:read"],
+        });
+        await service.invite(ctx(), {
+            email: "looker@example.test",
+            role: "looker",
+        });
+        expect(withRoom.mock.calls[0][1]).toBe("reviewers");
+        db.organizationRole.findUnique.mockResolvedValue({
+            actions: ["booking:write"],
+        });
+        await service.invite(ctx(), {
+            email: "desk@example.test",
+            role: "front-desk",
+        });
+        expect(withRoom.mock.calls[1][1]).toBe("members");
         withRoom.mockRestore();
     });
 
@@ -652,7 +671,7 @@ describe("the plan's team members (U13): Reviewers aren't counted, and have thei
         roomInTx.mockRestore();
     });
 
-    it("making someone a Reviewer checks the Reviewers cap; other changes aren't metered", async () => {
+    it("making someone a Reviewer checks the view-only cap; seat to seat isn't metered", async () => {
         const roomInTx = jest
             .spyOn(planMeter, "roomInTx")
             .mockResolvedValue(null);
@@ -669,6 +688,69 @@ describe("the plan's team members (U13): Reviewers aren't counted, and have thei
         expect(roomInTx).toHaveBeenCalledTimes(1);
         expect(roomInTx).toHaveBeenCalledWith(prisma, "org_1", "reviewers");
         roomInTx.mockRestore();
+    });
+
+    it("someone on the diary keeps their seat at a view-only role", async () => {
+        const roomInTx = jest
+            .spyOn(planMeter, "roomInTx")
+            .mockResolvedValue(null);
+        db.membership.findUnique.mockResolvedValue({
+            role: "MEMBER",
+            extraActions: [],
+            staffMember: { status: "ACTIVE" },
+        });
+        db.organizationRole.findUnique.mockResolvedValue({
+            actions: ["booking:read"],
+        });
+        await service.updateRole(ctx(), "user_2", { role: "looker" });
+        expect(roomInTx).not.toHaveBeenCalled();
+        roomInTx.mockRestore();
+    });
+
+    it("says on the roster and the invitations who uses a seat", async () => {
+        db.membership.findMany.mockResolvedValue([
+            {
+                userId: "u1",
+                role: "OWNER",
+                extraActions: [],
+                user: { name: "Asha", email: "a@example.test" },
+                staffMember: null,
+            },
+            {
+                userId: "u2",
+                role: "looker",
+                extraActions: [],
+                user: { name: "Ravi", email: "r@example.test" },
+                staffMember: null,
+            },
+            {
+                userId: "u3",
+                role: "looker",
+                extraActions: [],
+                user: { name: "Meera", email: "m@example.test" },
+                staffMember: { status: "ACTIVE" },
+            },
+        ]);
+        db.siteReviewer.findMany.mockResolvedValue([]);
+        db.organizationRole.findMany.mockResolvedValue([
+            { key: "looker", actions: ["booking:read"] },
+        ]);
+        const roster = await service.list(ctx());
+        expect(roster.map((m) => [m.userId, m.usesSeat])).toEqual([
+            ["u1", true],
+            ["u2", false],
+            ["u3", true],
+        ]);
+
+        db.organizationInvitation.findMany.mockResolvedValue([
+            { id: "i1", role: "looker", siteIds: [] },
+            { id: "i2", role: "MEMBER", siteIds: [] },
+        ]);
+        const invites = await service.listInvitations(ctx());
+        expect(invites.map((i) => [i.id, i.usesSeat])).toEqual([
+            ["i1", false],
+            ["i2", true],
+        ]);
     });
 });
 

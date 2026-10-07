@@ -54,6 +54,7 @@ import { assertGridRefsOwned, productGridFlags } from "./product-grid-checks";
 import type { Renderability } from "./publication-renderability";
 import { checkRenderability } from "./publication-renderability";
 import {
+    approvalApplies,
     assertOverrideAllowed,
     isOwner,
     setPublishNeedsApproval,
@@ -952,6 +953,12 @@ export class SitesService {
             : null;
         return {
             ...rest,
+            // As it applies now (DEC-103): switched on under a plan without
+            // the approval row, it reads as off, as publishing treats it.
+            publishNeedsApproval: await approvalApplies(
+                ctx.organizationId,
+                rest.publishNeedsApproval,
+            ),
             canEdit: allows(ctx, "section:write"),
             // Only an owner goes live past "Publishing needs approval", and
             // only an owner changes it (DEC-071, KTD-11).
@@ -1112,7 +1119,13 @@ export class SitesService {
                 postsPrefix: true,
             },
         });
-        return site;
+        return {
+            ...site,
+            publishNeedsApproval: await approvalApplies(
+                ctx.organizationId,
+                site.publishNeedsApproval,
+            ),
+        };
     }
 
     /**
