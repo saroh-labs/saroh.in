@@ -2,8 +2,8 @@ import Link from "next/link";
 import type { ReactNode } from "react";
 
 import { focusRing } from "../booking-flow/styles";
+import { formatAmount } from "../lib/money";
 import { cn } from "../lib/utils";
-import { formatAmount } from "../product/product-page";
 
 /**
  * The order confirmation on a merchant's site (round-2 P4), at
@@ -34,11 +34,18 @@ export interface OrderConfirmationData {
     subtotal: string;
     delivery: string | null;
     discount: string | null;
+    /** The code that took the discount off, "SAVE10"; absent or null without one. */
+    discountCode?: string | null;
     total: string;
     fulfilment: {
         type: string;
         label: string;
-        pickup: { name: string; address: string | null } | null;
+        /** `hours` (UX-025): when the place is open; absent when not set. */
+        pickup: {
+            name: string;
+            address: string | null;
+            hours?: string | null;
+        } | null;
         deliverTo: { name: string | null; lines: string[] } | null;
     };
     refunded: boolean;
@@ -121,7 +128,11 @@ function Summary({ order }: { order: OrderConfirmationData }) {
                 </div>
                 {order.discount ? (
                     <div className="flex justify-between gap-3">
-                        <dt className="text-site-body">Discount</dt>
+                        <dt className="text-site-body">
+                            {order.discountCode
+                                ? `Discount (${order.discountCode})`
+                                : "Discount"}
+                        </dt>
                         <dd className="text-site-fg tabular-nums">
                             −{money(order.discount)}
                         </dd>
@@ -177,6 +188,11 @@ function Handover({ order }: { order: OrderConfirmationData }) {
                     {pickup.address ? (
                         <span className="block whitespace-pre-line break-words">
                             {pickup.address}
+                        </span>
+                    ) : null}
+                    {pickup.hours ? (
+                        <span className="text-site-muted mt-1 block">
+                            Open {pickup.hours}
                         </span>
                     ) : null}
                 </address>

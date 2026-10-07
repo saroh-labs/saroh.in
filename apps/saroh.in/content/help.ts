@@ -1,5 +1,6 @@
 import { z } from "zod";
 
+import { SAROH_CONTACT_EMAIL } from "./contact";
 import type { IsoDay, PublishContext } from "./resources";
 import { isLive } from "./resources";
 
@@ -59,7 +60,7 @@ export const HELP_PATH = "/help";
 export const helpHref = (slug: string) => `${HELP_PATH}/${slug}`;
 
 /** The one address a person answers (the home's footer row, the article's foot). */
-export const HELP_EMAIL = "hello@saroh.in";
+export const HELP_EMAIL = SAROH_CONTACT_EMAIL;
 
 export const helpHome = {
     title: "How can we help?",

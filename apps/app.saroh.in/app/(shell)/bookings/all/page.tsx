@@ -10,6 +10,7 @@ import { canReadPacks, canUsePacksOnBookings } from "@/lib/class-packs/access";
 import { packsOn } from "@/lib/class-packs/switched-on";
 import { onlinePayReady } from "@/lib/invoices/payments-on";
 import { modulesOrUnknown } from "@/lib/modules/guard";
+import { permitsFor } from "@/lib/organizations/permits";
 import { resolveActiveOrganization } from "@/lib/organizations/service";
 import { listBookingsWithPast, listServices } from "@/lib/services/service";
 import { requireSession } from "@/lib/session";
@@ -51,10 +52,7 @@ export default async function BookingsPage({
         listServices().catch(() => []),
         resolveActiveOrganization(),
     ]);
-    const may = (action: string) =>
-        organization?.actions
-            ? organization.actions.includes(action)
-            : organization?.role === "OWNER" || organization?.role === "ADMIN";
+    const may = permitsFor(organization);
     // New booking finds the customer by search (E4) and can send a pay link.
     const people = {
         canSearch: may("contact:read"),

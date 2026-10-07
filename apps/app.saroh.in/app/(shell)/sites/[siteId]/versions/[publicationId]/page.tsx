@@ -7,6 +7,7 @@ import { notFound } from "next/navigation";
 import { PageContainer } from "@/components/shared/page-container";
 import { PastVersionPreview } from "@/components/sites/past-version-preview";
 import { RestoreVersion } from "@/components/sites/restore-version";
+import { activeBusinessZone } from "@/lib/organizations/service";
 import { requireSession } from "@/lib/session";
 import { exactDate } from "@/lib/sites/format-date";
 import { releaseTitle } from "@/lib/sites/release-review";
@@ -36,9 +37,10 @@ export default async function PastVersionPage({
     const { path } = await searchParams;
     await requireSession();
 
-    const [site, publication] = await Promise.all([
+    const [site, publication, zone] = await Promise.all([
         getSite(siteId),
         getPublication(siteId, publicationId),
+        activeBusinessZone(),
     ]);
     if (!site || !publication) notFound();
 
@@ -69,7 +71,7 @@ export default async function PastVersionPage({
     return (
         <PageContainer>
             <PageHeader
-                title={`Version from ${exactDate(publication.publishedAt)}`}
+                title={`Version from ${exactDate(publication.publishedAt, zone)}`}
                 description={
                     publication.publishedBy
                         ? `${site.name} · published by ${publication.publishedBy}`

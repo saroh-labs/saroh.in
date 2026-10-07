@@ -119,6 +119,12 @@ export interface TemplatePage {
     title: string;
     /** Marks the site's home page. At most one page should set this. */
     isHome?: boolean;
+    /**
+     * Put in the site's menu, in page order (UX-070). A new site starts
+     * with a real menu, so Settings, the pre-publish check and the live
+     * header all name the same one.
+     */
+    inMenu?: boolean;
     /** Ordered sections; array index becomes the persisted `order`. */
     sections: TemplateSection[];
     /**
@@ -245,7 +251,7 @@ export interface TemplateManifest {
      * Site settings like any footer; it is sample text, like a template's
      * headings, so a pre-publish check can tell it is still the template's
      * by comparing it with this. Absent: no footer is written, and the site
-     * ends in its name and "Runs on Saroh", as every site has.
+     * ends in its name (and "Made with Saroh" on Free, DEC-102).
      */
     footer?: TemplateFooter;
 }

@@ -332,7 +332,7 @@ export function NewBookingDialog({
                     <DialogDescription>
                         {visit
                             ? `${service?.name ?? "The treatment"} for ${visit.who}. It's paid for on order #${visit.orderNumber}, so there's only the time to choose.`
-                            : "Choosing the service sets how long it takes, so there are really two things to decide: who, and when."}
+                            : "Pick the service, then who and when."}
                     </DialogDescription>
                 </DialogHeader>
 

@@ -239,9 +239,15 @@ export function sendDeleteAccountEmail(
  */
 export function sendEnquiryNotificationEmail(
     to: string,
-    details: { contactName: string; formName: string; leadUrl: string },
+    details: {
+        contactName: string;
+        formName: string;
+        leadUrl: string;
+        /** A short line of what they wrote (UX-002); null when nothing but an address. */
+        message?: string | null;
+    },
 ): Promise<void> {
-    const { contactName, formName, leadUrl } = details;
+    const { contactName, formName, leadUrl, message } = details;
     if (!transporter) {
         console.info(
             `[New enquiry] (no SMTP) ${to}: ${contactName} via ${formName} -> ${leadUrl}`,
@@ -254,7 +260,9 @@ export function sendEnquiryNotificationEmail(
         subject: `New enquiry from ${contactName}`,
         html: actionEmail(
             `New enquiry from ${contactName}`,
-            `${contactName} submitted the "${formName}" form. Open the lead to follow up.`,
+            message
+                ? `${contactName} wrote through the "${formName}" form: “${message}” Open the lead to reply.`
+                : `${contactName} submitted the "${formName}" form. Open the lead to follow up.`,
             leadUrl,
             "View lead",
         ),
@@ -269,13 +277,18 @@ export interface TeamAlertMail {
     body: string;
     /** Where it opens in the workspace; none when there is nowhere to open. */
     url: string | null;
+    /** The button's words; "Open it in Saroh" when not said. */
+    cta?: string;
     /** Why they got it, and where to change it. */
     footer: string;
 }
 
 /**
  * A team alert (round-2 F14: a new order, a booking, a failed payment,
- * someone joining, a scheduled go-live) to one person on a business's team.
+ * someone joining, a scheduled go-live, a provider that refused its keys,
+ * a website review) to one person on a business's team. The only mail
+ * helper for the team's alerts: every one goes through
+ * `notifications/team-alert.handler.ts`.
  * Saroh telling a business about its own business, so Saroh sends it, as
  * the new-enquiry alert above, whether or not the business has an email
  * provider (DEC-011, amended 2026-10-07).
@@ -296,7 +309,7 @@ export function sendTeamAlertEmail(
         return Promise.resolve();
     }
     const button = mail.url
-        ? `<p><a href="${esc(mail.url)}" style="display:inline-block;padding:10px 16px;background:#111;color:#fff;text-decoration:none;border-radius:6px">Open it in Saroh</a></p>`
+        ? `<p><a href="${esc(mail.url)}" style="display:inline-block;padding:10px 16px;background:#111;color:#fff;text-decoration:none;border-radius:6px">${esc(mail.cta ?? "Open it in Saroh")}</a></p>`
         : "";
     void transporter.sendMail({
         from: FROM,
@@ -308,6 +321,44 @@ export function sendTeamAlertEmail(
   ${button}
   <p style="color:#666;font-size:12px">${esc(mail.footer)}</p>
 </div>`,
+    });
+    return Promise.resolve();
+}
+
+/**
+ * Tell an owner or admin a customer wrote from their account on the
+ * business's site (UX-014). Sent by the `customer-message.notify` job, once
+ * per recipient, the way an enquiry's notice is: console fallback with no
+ * SMTP, and the in-app notice stays the record. Every value is escaped in
+ * the body (`actionEmail`); the subject is kept to one line.
+ */
+export function sendCustomerMessageNotificationEmail(
+    to: string,
+    details: {
+        customerName: string;
+        /** A short line of what they wrote. */
+        message: string;
+        threadUrl: string;
+    },
+): Promise<void> {
+    const { customerName, message, threadUrl } = details;
+    const name = customerName.replace(/[\r\n]+/g, " ").trim();
+    if (!transporter) {
+        console.info(
+            `[Customer message] (no SMTP) ${to}: ${name} -> ${threadUrl}`,
+        );
+        return Promise.resolve();
+    }
+    void transporter.sendMail({
+        from: FROM,
+        to,
+        subject: `${name} sent you a message`,
+        html: actionEmail(
+            `${name} sent you a message`,
+            `${name} wrote from their account on your website: “${message}” They see your reply when they sign in there.`,
+            threadUrl,
+            "Read and reply",
+        ),
     });
     return Promise.resolve();
 }

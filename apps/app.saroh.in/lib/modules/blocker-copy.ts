@@ -44,7 +44,11 @@ export const BLOCKER_COPY: Readonly<Record<string, string>> = {
         "A connected provider is switched off. Switch it back on to take payments.",
     PAYMENTS_WEBHOOK_SECRET_MISSING:
         "Payments can't be confirmed. Add the webhook signing secret to your payment provider's connection.",
+    PAYMENTS_KEYS_REFUSED:
+        "Your payment provider refused its keys. Enter them again to take payments.",
     COMMUNICATIONS_NO_PROVIDER: "Connect a provider to send messages.",
+    COMMUNICATIONS_KEYS_REFUSED:
+        "Your messaging provider refused its keys. Enter them again to send messages.",
     COMMUNICATIONS_PROVIDER_DISABLED:
         "A connected provider is switched off. Switch it back on to send messages.",
     AUTOMATIONS_NO_RULE: "Create a rule to automate follow-up.",

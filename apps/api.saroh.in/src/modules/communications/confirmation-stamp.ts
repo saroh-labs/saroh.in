@@ -37,6 +37,7 @@ export function confirmationVia(
     switch (template) {
         case "BOOKING_CONFIRMED":
             return "BOOKING_CONFIRMATION";
+        case "ORDER_PLACED":
         case "ORDER_READY":
         case "ORDER_HANDED_OVER":
             return "ORDER_CONFIRMATION";

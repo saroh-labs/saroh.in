@@ -21,6 +21,13 @@ jest.mock("../../payments/webhook-setup", () => ({
         row.encryptedCredentials === "no-webhook-secret",
 }));
 
+// The plan's online payments (catalogue row `payments`), switched per test;
+// the real check is pinned in billing/online-payments-plan.spec.ts.
+jest.mock("../../billing/online-payments-plan", () => ({
+    planTakesOnlinePayment: jest.fn(() => Promise.resolve(true)),
+}));
+
+import { planTakesOnlinePayment } from "../../billing/online-payments-plan";
 import { accountAreaOn } from "../../site-accounts/account-area";
 import { shopRolloutOn } from "../../sites/sells-from";
 import { siteAwaitingSellsFrom } from "../../sites/sells-from-awaiting";
@@ -257,6 +264,23 @@ describe("ModuleReadinessRegistry", () => {
         ).toBe("ACTIVE");
     });
 
+    it("Payments: on a plan without online payments, no provider is no step (UX-017)", async () => {
+        (planTakesOnlinePayment as jest.Mock).mockResolvedValueOnce(false);
+        const result = await registry({}).evaluate("PAYMENTS", input);
+        // Offline Payments is ready, and carries no blocker: one would shut
+        // its routes (ModuleEnforcementGuard).
+        expect(result).toEqual({ readiness: "ACTIVE", blockers: [] });
+    });
+
+    it("Payments: a provider switched off still needs attention on any plan", async () => {
+        (planTakesOnlinePayment as jest.Mock).mockResolvedValue(false);
+        const result = await new ModuleReadinessRegistry(
+            dbWithProviders({ payments: { total: 1, connected: 0 } }),
+        ).evaluate("PAYMENTS", input);
+        (planTakesOnlinePayment as jest.Mock).mockResolvedValue(true);
+        expect(result.blockers[0]?.code).toBe("PAYMENTS_PROVIDER_DISABLED");
+    });
+
     it("Commerce: open orders block a full disable", async () => {
         expect(
             await registry({}).deactivationBlockers("COMMERCE", input),
@@ -290,6 +314,8 @@ function dbWithProviders(opts: {
         total: number;
         connected: number;
         blobs?: string[];
+        /** How many of the rows refused their keys (UX-012). */
+        refused?: number;
     }) => ({
         count: jest.fn((args?: { where?: { status?: string } }) =>
             Promise.resolve(
@@ -301,11 +327,13 @@ function dbWithProviders(opts: {
         // The connected rows, each with its sealed blob (DEC-063).
         findMany: jest.fn(() =>
             Promise.resolve(
-                (counts?.blobs ?? []).map((blob) => ({
+                (counts?.blobs ?? []).map((blob, i) => ({
                     provider: "RAZORPAY",
                     encryptedCredentials: blob,
                     credentialsIv: "iv",
                     credentialsAuthTag: "tag",
+                    attentionReason:
+                        i < (counts?.refused ?? 0) ? "KEYS_REFUSED" : null,
                 })),
             ),
         ),
@@ -405,6 +433,42 @@ describe("provider readiness reflects provider STATUS, not row count", () => {
             }),
         ).evaluate("PAYMENTS", input);
 
+        expect(result.readiness).toBe("ACTIVE");
+    });
+
+    it.each([
+        ["PAYMENTS", "payments", "PAYMENTS_KEYS_REFUSED"],
+        ["COMMUNICATIONS", "communications", "COMMUNICATIONS_KEYS_REFUSED"],
+    ] as const)(
+        "%s: every connection refused its keys → needs attention (UX-012)",
+        async (moduleKey, kind, code) => {
+            const result = await new ModuleReadinessRegistry(
+                dbWithProviders({
+                    [kind]: {
+                        total: 1,
+                        connected: 1,
+                        blobs: ["sealed-with-secret"],
+                        refused: 1,
+                    },
+                }),
+            ).evaluate(moduleKey, input);
+            expect(result.readiness).toBe("ATTENTION_REQUIRED");
+            expect(result.blockers[0]?.code).toBe(code);
+            expect(result.blockers[0]?.actionHref).toBe("/settings/providers");
+        },
+    );
+
+    it("one connection whose keys still work is enough", async () => {
+        const result = await new ModuleReadinessRegistry(
+            dbWithProviders({
+                payments: {
+                    total: 2,
+                    connected: 2,
+                    blobs: ["sealed-with-secret", "sealed-with-secret"],
+                    refused: 1,
+                },
+            }),
+        ).evaluate("PAYMENTS", input);
         expect(result.readiness).toBe("ACTIVE");
     });
 

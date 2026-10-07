@@ -67,6 +67,17 @@ paper view. Written by the billing webhook with the charge, once per
 charge; rules in `docs/architecture/PRICING_ROLLOUT.md` › "Saroh's own
 invoices (U17)".
 
+**How a plan is paid (DEC-093, #803).** Monthly is autopay for 12 charges
+(`TERM_CHARGES`), yearly one payment for the year (a provider order, never
+autopay, never a trial). The catalogue's trial may carry a nominal first
+month (`trial.firstPaise`), taken as the mandate is authorised and invoiced
+on its own (`first-month:<checkout>`). The term's end is `billing-term.ts`:
+in its last 30 days the same plan quotes as `RENEW` (a SCHEDULED checkout
+from the term's end that cancels nothing), and a term nobody renews runs to
+the end of what was paid and then moves to Free (`term-end.ts`: a monthly
+subscription's `completed`; the hourly sweep for a year paid once). Rules
+in `PRICING_ROLLOUT.md` › "Checkout and term (DEC-093)".
+
 Trials, coupons and add-ons (U16) ride the same path: a coupon is
 redeemed and its discount invoiced with the charge it comes off, never at
 checkout, and an add-on is a line on the charge after the period it covers

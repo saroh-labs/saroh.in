@@ -41,13 +41,8 @@ const keys = (offers: AccountOffers, shipped = ALL_SHIPPED) =>
     accountTabs(offers, shipped).map((t) => t.label);
 
 describe("accountTabs", () => {
-    it("a clinic sees Appointments; a bakery sees Orders and no Appointments", () => {
-        expect(keys(clinic)).toEqual([
-            "Home",
-            "Appointments",
-            "Messages",
-            "Me",
-        ]);
+    it("a clinic sees Bookings; a bakery sees Orders and no Bookings", () => {
+        expect(keys(clinic)).toEqual(["Home", "Bookings", "Messages", "Me"]);
         expect(keys(bakery)).toEqual([
             "Home",
             "Orders",
@@ -57,7 +52,7 @@ describe("accountTabs", () => {
         ]);
     });
 
-    it("a gym that runs classes calls them Bookings", () => {
+    it("the tab is Bookings whatever the pages call them, so it fits a phone (UX-075)", () => {
         expect(
             keys({ ...clinic, plans: true, bookingsLabel: "Bookings" }),
         ).toEqual(["Home", "Bookings", "Plan", "Messages", "Me"]);
@@ -74,7 +69,7 @@ describe("accountTabs", () => {
         ]);
         expect(accountTabs(clinic)).toEqual([
             { key: "home", label: "Home" },
-            { key: "bookings", label: "Appointments" },
+            { key: "bookings", label: "Bookings" },
             { key: "messages", label: "Messages" },
             { key: "me", label: "Me" },
         ]);

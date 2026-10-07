@@ -2,6 +2,7 @@ import { notFound } from "next/navigation";
 
 import { AccessDenied } from "@/components/shared/access-denied";
 import { PlanEditor } from "@/components/subscriptions/plan-editor/plan-editor";
+import { permitsFor } from "@/lib/organizations/permits";
 import { resolveActiveOrganization } from "@/lib/organizations/service";
 import { requireSession } from "@/lib/session";
 import { readPlanEditor } from "@/lib/subscriptions/plan-drafts";
@@ -27,10 +28,7 @@ export default async function EditPlanPage({
         params,
         resolveActiveOrganization(),
     ]);
-    const may = (action: string) =>
-        organization?.actions
-            ? organization.actions.includes(action)
-            : organization?.role === "OWNER" || organization?.role === "ADMIN";
+    const may = permitsFor(organization);
 
     if (organization?.actions && !may("subscription:read")) {
         return (

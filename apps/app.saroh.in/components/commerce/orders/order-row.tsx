@@ -3,7 +3,7 @@ import { cn } from "@saroh/ui/lib/utils";
 import Link from "next/link";
 import type { ReactNode } from "react";
 
-import { ViewerDate } from "@/components/shared/viewer-date";
+import { BusinessDate } from "@/components/shared/business-zone";
 import type { RowAttention } from "@/lib/orders/attention";
 import { rowAttention } from "@/lib/orders/attention";
 import type { OrderRow } from "@/lib/orders/business-service";
@@ -88,7 +88,7 @@ export function OrderGridHead({
             <div aria-hidden>Status</div>
             <div aria-hidden>Placed</div>
             <div aria-hidden className="text-right">
-                {money ? "Total" : ""}
+                {money ? "Total" : "Payment"}
             </div>
             <div aria-hidden />
         </div>
@@ -146,6 +146,19 @@ function AttentionTag({ attention }: { attention: RowAttention }) {
             )}
         >
             {attention.text}
+        </span>
+    );
+}
+
+/**
+ * "Paid" for the kitchen's view (UX-010): whether it is paid, with no
+ * figure; the unpaid words sit under the step.
+ */
+function PaidWord({ paid }: { paid: string | null }) {
+    if (!paid) return null;
+    return (
+        <span className="font-sans text-[12px] font-semibold text-success-subtle-foreground">
+            {paid}
         </span>
     );
 }
@@ -245,10 +258,10 @@ export function OrderGridRow({
                 ) : null}
             </div>
             <div className="min-w-0 truncate text-[12.5px] text-neutral-700 dark:text-muted-foreground">
-                <ViewerDate iso={row.placedAt} variant="moment" />
+                <BusinessDate iso={row.placedAt} variant="moment" />
             </div>
             <div className="whitespace-nowrap text-right font-display text-[13.5px] font-semibold tabular-nums tracking-[-0.02em]">
-                {v.money.total}
+                {v.money.total ?? <PaidWord paid={v.money.paid} />}
             </div>
             <div className="flex justify-end">{menu}</div>
         </li>
@@ -372,7 +385,9 @@ export function OrderCard({
                     <span className="font-display text-[14px] font-semibold tabular-nums">
                         {v.money.total}
                     </span>
-                ) : null
+                ) : (
+                    <PaidWord paid={v.money.paid} />
+                )
             }
             meta={
                 <>

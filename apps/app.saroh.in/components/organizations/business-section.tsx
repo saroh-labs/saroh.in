@@ -2,6 +2,7 @@ import { Badge } from "@saroh/ui/badge";
 import { Button } from "@saroh/ui/button";
 import { cn } from "@saroh/ui/lib/utils";
 import { Lock } from "lucide-react";
+import type { ReactNode } from "react";
 
 /** One read-only line of a section: what it is, and what it is set to. */
 export interface BusinessRow {
@@ -56,7 +57,7 @@ export function BusinessSection({
     /** What the card holds, in a line — the tab already names it. */
     lead: string;
     rows: BusinessRow[];
-    note?: string;
+    note?: ReactNode;
     editing: boolean;
     canEdit: boolean;
     onEdit: () => void;

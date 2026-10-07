@@ -37,6 +37,15 @@ export const TEAM_ALERT_TYPE = "team.alert";
  *   unpaid and not handed over three days after it was placed (R34,
  *   `orders/uncollected.ts`). Queued with the order, for the instant it
  *   becomes due; told on the New order row's choices, once per order.
+ * - `provider`: a connected payment or email provider refused the
+ *   business's keys on a live call and was marked as needing attention
+ *   (UX-012). Keyed to the connection and the instant it was flagged, so
+ *   each refusal is told once; told on the Payment failed row. Saroh
+ *   sends the email, so an email provider's refusal is emailed too.
+ * - `review`: the website's review (UX-043). A review asked for, or a new
+ *   test release, emails the site's reviewers (they have no bell); a verdict, or a reviewer's first note of a round, tells
+ *   the people who publish, on the Website row. Keyed to the approval, the
+ *   release, or the reviewer's round.
  */
 export type TeamAlertPayload =
     | { event: "order"; orderId: string; actorUserId?: string | null }
@@ -44,6 +53,15 @@ export type TeamAlertPayload =
     | { event: "team"; userId: string; invitationId: string }
     | { event: "booking"; notificationId: string }
     | { event: "uncollected"; orderId: string }
+    | {
+          event: "provider";
+          channel: "PAYMENTS" | "EMAIL";
+          providerId: string;
+          since: string;
+      }
+    | { event: "review"; about: "approval"; approvalId: string }
+    | { event: "review"; about: "note"; commentId: string }
+    | { event: "review"; about: "release"; testReleaseId: string }
     | {
           event: "site";
           testReleaseId: string;
@@ -104,5 +122,20 @@ export interface WordedAlert {
      * scheduled a go-live hears how it went (DEC-071, T10).
      */
     alwaysUserId?: string | null;
+    /** No inbox notice: it is for people with no bell (a site's reviewers). */
+    noBell?: boolean;
+    /**
+     * A new website order (UX-042): the owners and admins are emailed
+     * unless they turned this row's email off, as of an enquiry, whatever
+     * the row's default.
+     */
+    ownersAdminsByDefault?: boolean;
+    /**
+     * Email this site's reviewers instead of the row's choices (UX-043): a
+     * review asked of them, or a new test release.
+     */
+    emailReviewersOf?: string;
+    /** The email's button; "Open it in Saroh" when not said. */
+    cta?: string;
     orderId?: string;
 }

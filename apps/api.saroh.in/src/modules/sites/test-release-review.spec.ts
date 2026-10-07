@@ -140,6 +140,53 @@ describe("draftVerdicts and releaseVerdicts", () => {
     });
 });
 
+describe("going live closes the release's review (DEC-101)", () => {
+    /** A go-live's own record, as `putLive` writes it for a release. */
+    function closing(
+        outcome: "BYPASSED" | "OVERRIDDEN",
+        on: { id: string; fingerprint: string },
+    ): VerdictRow {
+        return {
+            outcome,
+            byUserId: "owner",
+            testReleaseId: on.id,
+            draftFingerprint: on.fingerprint,
+            createdAt: new Date(Date.UTC(2026, 9, 1, 13)),
+        };
+    }
+
+    it.each(["BYPASSED", "OVERRIDDEN"] as const)(
+        "a %s record with the release's bytes closes its open request",
+        (outcome) => {
+            const asked = verdicts({ outcome: "REQUESTED", by: "owner" });
+            expect(releaseStanding(asked, R2, "owner").outstanding).toBe(true);
+
+            const rows = [closing(outcome, R2), ...asked];
+            expect(releaseStanding(rows, R2, "owner").outstanding).toBe(false);
+            // Closing is not approving.
+            expect(releaseApproved(rows, R2, "owner")).toBe(false);
+        },
+    );
+
+    it("leaves another release with other bytes in review", () => {
+        const rows = [
+            closing("BYPASSED", R2),
+            ...verdicts({ outcome: "REQUESTED", on: R3 }),
+        ];
+        expect(releaseStanding(rows, R3, "owner").outstanding).toBe(true);
+    });
+
+    it("leaves the draft's own review alone", () => {
+        const rows = [
+            closing("BYPASSED", R2),
+            ...verdicts({ outcome: "REQUESTED", on: "draft" }),
+        ];
+        expect(draftVerdicts(rows).map((v) => v.outcome)).toEqual([
+            "REQUESTED",
+        ]);
+    });
+});
+
 describe("a note's section on a frozen page", () => {
     it("is named by its position", () => {
         expect(releaseSectionKey(0)).toBe("0");

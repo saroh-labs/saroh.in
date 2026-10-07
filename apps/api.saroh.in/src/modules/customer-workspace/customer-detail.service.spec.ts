@@ -76,6 +76,12 @@ const BOOKING = {
     paidWith: null,
     subscriptionId: null,
     cancelledLate: false,
+    invoices: [] as {
+        total: string;
+        currency: string;
+        paymentMethod: string | null;
+        paidAt: Date | null;
+    }[],
     service: { id: "svc_1", name: "Spin class", capacity: 12 },
     staff: { id: "staff_1", name: "Vikram" },
     packRedemption: {
@@ -383,6 +389,7 @@ describe("CustomerDetailService", () => {
                 isClass: true,
                 staff: { id: "staff_1", name: "Vikram" },
                 cancelledLate: false,
+                paid: null,
             }),
         );
         // No legacy word beside the type since the contract release (B2d).

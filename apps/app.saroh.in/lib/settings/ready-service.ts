@@ -41,10 +41,12 @@ async function onlinePaymentsUpgrade(settings: OrganizationSettings) {
 }
 
 /**
- * Settings › Business's card: the same steps, then what Settings also asks
- * for (`nudges.ts`, DEC-056). The messaging providers are read only for
- * someone who may manage them (`comms:manage`) — a refusal there would turn
- * the page into a denial — and, like the modules, best-effort.
+ * Settings › Business's card: the same steps and count, then what Settings
+ * also suggests apart (`nudges.ts`, DEC-056, UX-019). The messaging
+ * providers are read only for someone who may manage them (`comms:manage`)
+ * — a refusal there would turn the page into a denial — and, like the
+ * modules and the plan, best-effort. The plan says whether connecting the
+ * business's own email is offered at all (DEC-091).
  */
 export async function loadSettingsChecklist(
     settings: OrganizationSettings,

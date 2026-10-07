@@ -6,6 +6,7 @@
  * `activity-detail.ts` the sheet.
  */
 
+import { moduleName as railName } from "@/lib/modules/turn-on";
 import { businessTypeLabel } from "@/lib/organizations/business-types";
 import { KIND_CHOICES } from "@/lib/organizations/kind";
 
@@ -315,11 +316,18 @@ export function profileChange(
     return { what: `updated ${named.join(", ")} and ${others}`, tab };
 }
 
-/** A module's name as recorded, else its key in words ("PAYMENTS" → "Payments"). */
+/**
+ * A module's name as the rail says it ("COMMERCE" → "Sell", UX-078), else as
+ * recorded, else its key in words ("PAYMENTS" → "Payments").
+ */
 export function moduleName(
     meta: Record<string, unknown>,
     key: string | null,
 ): string {
+    if (key) {
+        const rail = railName(key);
+        if (rail !== key) return rail;
+    }
     const named = text(meta.module);
     if (named) return named;
     if (!key) return "a module";

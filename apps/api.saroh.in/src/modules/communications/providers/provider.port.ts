@@ -9,6 +9,8 @@
  * retained by the port or logged.
  */
 
+import type { CredentialCheck } from "../../../common/providers/provider-attention";
+
 /** The channels an org can message a contact on. */
 export const COMMS_CHANNELS = ["EMAIL", "WHATSAPP"] as const;
 export type CommsChannel = (typeof COMMS_CHANNELS)[number];
@@ -68,6 +70,13 @@ export interface CommsSendInput {
     attachments?: CommsAttachment[];
 }
 
+/** The keys to check on connect, and the address they will send from. */
+export interface CommsVerifyInput {
+    provider: string;
+    credentials: CommsCredentials;
+    fromAddress?: string | null;
+}
+
 /** The provider's accepted-for-delivery receipt. */
 export interface CommsSendResult {
     /** The provider's own message id — recorded on the Delivery for audit. */
@@ -89,6 +98,20 @@ export interface CommsProvider {
      * goes as it is, never failed for a file it can't carry.
      */
     takesAttachments?(provider: string): boolean;
+    /**
+     * Check a business's keys with one cheap authenticated read before they
+     * are stored (UX-012), and, where the provider can say, that the
+     * sending address's domain is verified. Never throws, never logs a
+     * credential. Absent, or answering null for a provider it can't
+     * check, and the keys are not checked.
+     */
+    verifyCredentials?(
+        input: CommsVerifyInput,
+    ): Promise<CredentialCheck | null>;
+    /**
+     * Hand one message over. A 401 or 403 throws
+     * `ProviderKeysRefusedError` (`common/providers/provider-attention.ts`).
+     */
     send(input: CommsSendInput): Promise<CommsSendResult>;
 }
 

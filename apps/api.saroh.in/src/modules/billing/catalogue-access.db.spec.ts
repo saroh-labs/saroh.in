@@ -361,6 +361,8 @@ describe("access from the catalogue (DB, U12)", () => {
             planOverride: null,
             pendingMove: {
                 planId: "free",
+                // Free to Free on a new version: no plan change (N1).
+                fromPlanId: "free",
                 version: V2,
                 from: from.toISOString(),
             },
@@ -374,6 +376,8 @@ describe("access from the catalogue (DB, U12)", () => {
                     planId: "grow",
                     name: "Plan B",
                     pricePaise: 22_200,
+                    // Included with no cap there (UX-083).
+                    uncapped: true,
                 },
             }),
         );

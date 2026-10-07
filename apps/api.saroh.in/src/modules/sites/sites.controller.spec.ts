@@ -149,6 +149,15 @@ const ROUTES: Route[] = [
         expect: [ctx, SITE, RELEASE],
     },
     {
+        handler: "withdrawReview",
+        method: RequestMethod.POST,
+        path: ":siteId/review/withdraw",
+        target: "sites",
+        call: "withdrawReview",
+        args: [ctx, SITE],
+        expect: [ctx, SITE],
+    },
+    {
         handler: "createApproval",
         method: RequestMethod.POST,
         path: ":siteId/approvals",

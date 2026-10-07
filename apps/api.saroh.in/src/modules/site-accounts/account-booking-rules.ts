@@ -8,6 +8,7 @@ import {
     withinBookingWindow,
 } from "../bookings/booking-rules";
 import { openSlots } from "../bookings/booking-slots";
+import { BOOKING_PAPER } from "../bookings/desk-take";
 import type { BookingLocationType } from "../bookings/dto";
 import { bookingPaymentInTx } from "../payments/booking-refund";
 import type { AccountCancelTerms } from "./account-bookings-view";
@@ -27,9 +28,12 @@ export type Ctx = Pick<
 
 /** How far ahead free times are offered: the booking page's two weeks. */
 const TIMES_DAYS = 14;
-/** At most this many free times a day, and in all (the design's sheet). */
-const TIMES_PER_DAY = 3;
-const TIMES_MAX = 12;
+/**
+ * At most this many free times in all — a guard, not a design limit: the
+ * sheet draws the booking page's day strip and every free time of the
+ * chosen day (UX-055), so a customer moving sees what the page offers.
+ */
+const TIMES_MAX = 500;
 
 /** What a customer hears when the time went while they chose. */
 export const TIME_WENT = "That time just went. Pick another one.";
@@ -57,6 +61,11 @@ export const ROW_SELECT = {
     staff: { select: { name: true } },
     order: { select: { status: true, paymentStatus: true } },
     packRedemption: { select: { reversedAt: true } },
+    // Its own paper, paid (UX-049): how much was paid, and how.
+    invoices: {
+        where: { ...BOOKING_PAPER, status: "PAID" },
+        select: { total: true, currency: true, paymentMethod: true },
+    },
 } as const satisfies Prisma.BookingSelect;
 
 export type Row = Prisma.BookingGetPayload<{ select: typeof ROW_SELECT }>;
@@ -155,8 +164,9 @@ export async function cancelTerms(
 
 /**
  * Free starts over the next two weeks — with one person, when named — that
- * the customer could book now: a few a day, as the sheet lists them. `where`
- * is where the booking happens: in person keeps to opening hours (DEC-087).
+ * the customer could book now: every one, as the booking page offers them
+ * (UX-055). `where` is where the booking happens: in person keeps to
+ * opening hours (DEC-087).
  */
 export async function freeTimes(
     service: Service,
@@ -176,7 +186,6 @@ export async function freeTimes(
         staffId,
         where,
     );
-    const perDay = new Map<string, number>();
     const out: string[] = [];
     for (const slot of [...slots].sort(
         (a, b) => a.startAt.getTime() - b.startAt.getTime(),
@@ -187,10 +196,6 @@ export async function freeTimes(
         if (staffId && slot.staffIds && !slot.staffIds.includes(staffId)) {
             continue;
         }
-        const day = dayIn(slot.startAt, service.timezone);
-        const n = perDay.get(day) ?? 0;
-        if (n >= TIMES_PER_DAY) continue;
-        perDay.set(day, n + 1);
         out.push(slot.startAt.toISOString());
         if (out.length >= TIMES_MAX) break;
     }
@@ -199,12 +204,4 @@ export async function freeTimes(
 
 export function first<T>(list: readonly T[]): T | undefined {
     return list.length > 0 ? list[0] : undefined;
-}
-
-function dayIn(at: Date, timeZone: string): string {
-    try {
-        return new Intl.DateTimeFormat("en-CA", { timeZone }).format(at);
-    } catch {
-        return at.toISOString().slice(0, 10);
-    }
 }

@@ -5,14 +5,18 @@
  * `starter@1` drafted a hero and a gallery pointing at
  * `/templates/starter/*.jpg`, files no app serves, so every new site opened
  * in the editor with broken images, and its copy spoke as a company to "our
- * customers". A new site now starts from `starter@2`: its draft names no
+ * customers". A new site now starts from `starter@3` (v2's words, UX-070's menu): its draft names no
  * image, links only to its own pages, and says nothing a person working for
  * themselves could not publish as it stands.
  *
  * Every business here is its own, made by this file.
  */
 import { prisma } from "@saroh/database";
-import { STARTER_TEMPLATE_ID, starterTemplate } from "@saroh/templates";
+import {
+    HERO_PROMPT,
+    STARTER_TEMPLATE_ID,
+    starterTemplate,
+} from "@saroh/templates";
 
 import type { OrganizationContext } from "../../common/types/organization-context";
 import { EntitlementService } from "../billing/entitlement.service";
@@ -77,11 +81,11 @@ beforeAll(async () => {
     }
 });
 
-describe("Turning Website on drafts starter@2", () => {
+describe("Turning Website on drafts starter@3", () => {
     it("names no image, and no business words, on any drafted page", async () => {
         expect(starterTemplate).toMatchObject({
             id: STARTER_TEMPLATE_ID,
-            version: 2,
+            version: 3,
         });
         const ctx = await business("Asha Rao");
         const out = await setup.enable(ctx, "WEBSITE", {
@@ -109,11 +113,12 @@ describe("Turning Website on drafts starter@2", () => {
         const sections = pages.flatMap((p) =>
             p.versions.flatMap((v) => v.sections),
         );
+        // No closing button without an email: the hero's About is the one
+        // (UX-070).
         expect(sections.map((s) => s.type)).toEqual([
             "hero",
             "richText",
             "richText",
-            "cta",
             "hero",
             "richText",
         ]);
@@ -128,8 +133,25 @@ describe("Turning Website on drafts starter@2", () => {
         expect(sections[0]?.content).toMatchObject({
             variant: "centered",
             heading: "Asha Rao",
-            subheading: "Welcome — here's what Asha Rao does.",
+            subheading: HERO_PROMPT,
         });
+
+        // A real menu from the first draft (UX-070): Home, then About.
+        const site = await prisma.site.findUniqueOrThrow({
+            where: { id: out.created.siteId },
+            select: { navigation: true },
+        });
+        const ids = new Map(
+            (
+                await prisma.page.findMany({
+                    where: { siteId: out.created.siteId },
+                    select: { id: true, path: true },
+                })
+            ).map((p) => [p.id, p.path]),
+        );
+        const items = (site.navigation as { items: { pageId: string }[] })
+            .items;
+        expect(items.map((i) => ids.get(i.pageId))).toEqual(["/", "/about"]);
     });
 
     it("links only to pages the site has, when there is no contact email", async () => {
@@ -159,7 +181,7 @@ describe("Turning Website on drafts starter@2", () => {
                     (h): h is string => typeof h === "string",
                 );
             });
-        expect(hrefs).toEqual(["/about", "/about"]);
+        expect(hrefs).toEqual(["/about"]);
         for (const href of hrefs) expect(paths.has(href)).toBe(true);
     });
 });

@@ -8,6 +8,7 @@ import { CatalogueScreen } from "@/components/stores/catalogue-screen";
 import type { ProductsTab } from "@/components/stores/products-tabs";
 import { ProductsTabs } from "@/components/stores/products-tabs";
 import { ReviewsView } from "@/components/stores/reviews-view";
+import { planMeter } from "@/lib/billing/meter";
 import { listCollections } from "@/lib/collections/service";
 import { resolveActiveOrganization } from "@/lib/organizations/service";
 import { reviewEmailNote } from "@/lib/product-reviews/describe";
@@ -26,9 +27,11 @@ import {
 } from "@/lib/products/list-query";
 import type { CataloguePage } from "@/lib/products/service";
 import { listCataloguePage, listCategories } from "@/lib/products/service";
+import { billingAccessOrNull } from "@/lib/saroh-billing/service";
 import { requireSession } from "@/lib/session";
 import { getStockTracking } from "@/lib/stock/service";
 import { listBusinessStores } from "@/lib/stores/service";
+import { listStorefronts } from "@/lib/stores/storefronts";
 import { isSince, sinceParam } from "@/lib/views/since";
 
 /**
@@ -58,11 +61,20 @@ export default async function CataloguePage({
     searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
     await requireSession();
-    const [stores, params, organization] = await Promise.all([
+    const [ownStores, storefronts, params, organization] = await Promise.all([
         listBusinessStores(),
+        listStorefronts().catch(() => null),
         searchParams,
         resolveActiveOrganization(),
     ]);
+    // The business's locations, as anyone who may read them sees them
+    // (UX-027). The catalogue is the business's, read org-scoped; the
+    // stores a person is on (`GET /stores`) left staff who aren't on one
+    // with "No location yet" while Stock showed its products.
+    const stores =
+        storefronts && storefronts.length > 0
+            ? storefronts.map(({ id, name }) => ({ id, name }))
+            : ownStores.map(({ id, name }) => ({ id, name }));
     // From what the API resolved this person may do; the role's name only as
     // the fallback for a response that predates permissions.
     const may = (action: string) =>
@@ -81,7 +93,7 @@ export default async function CataloguePage({
         query.storefront = null;
     }
 
-    const [page, reviews, tracking, categories, collections] =
+    const [page, reviews, tracking, categories, collections, access] =
         await Promise.all([
             stores.length > 0
                 ? listCataloguePage(
@@ -97,6 +109,9 @@ export default async function CataloguePage({
             // Either failing leaves its part out, said, never the list.
             listCategories().catch(() => null),
             listCollections().catch(() => null),
+            // The plan's product limit, shown before the work (UX-036);
+            // unread, nothing is shown and the API still refuses.
+            billingAccessOrNull(),
         ]);
     const choices = choicesFrom(categories, collections);
 
@@ -193,7 +208,7 @@ export default async function CataloguePage({
             <CatalogueScreen
                 query={query}
                 page={page}
-                stores={stores.map((s) => ({ id: s.id, name: s.name }))}
+                stores={stores}
                 tabs={tabs}
                 notice={
                     <>
@@ -204,6 +219,7 @@ export default async function CataloguePage({
                 ratings={ratings}
                 choices={choices}
                 canWrite={canWrite}
+                meter={canWrite ? planMeter(access, "products") : null}
                 canStock={canStockProducts(organization)}
                 collectionCount={collections ? collections.length : null}
                 collectionsPanel={

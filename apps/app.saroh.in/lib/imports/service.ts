@@ -49,6 +49,8 @@ export interface ApplyResult {
     updated: number;
     skipped: number;
     failed: number;
+    /** New products left out to fit the plan (UX-036); absent from an older API. */
+    overLimit?: number;
     plan: ImportPlan;
 }
 
@@ -56,6 +58,8 @@ export interface ImportDescriptor {
     entity: ImportEntity;
     requiredFields: string[];
     mappableFields: string[];
+    /** Each field in words (UX-065); absent from an older API. */
+    fieldLabels?: Record<string, string>;
     keyLabel: string;
 }
 
@@ -68,6 +72,11 @@ export interface ImportInput {
     /** Empty asks the api to suggest a mapping from the file's headers. */
     mapping: Record<string, string>;
     policy: DuplicatePolicy;
+    /**
+     * Apply only: bring in only the first N new products, what the plan
+     * has room for (UX-036).
+     */
+    createAtMost?: number;
 }
 
 async function post<T>(path: string, body: unknown): Promise<Result<T>> {

@@ -14,12 +14,16 @@ import { cn } from "@saroh/ui/lib/utils";
 export function ReadOnlyNote({
     children = "Your role can read these settings but not change them.",
     className,
+    id,
 }: {
     children?: React.ReactNode;
     className?: string;
+    /** For a disabled control the note explains (`aria-describedby`). */
+    id?: string;
 }) {
     return (
         <p
+            id={id}
             role="note"
             className={cn(
                 "mb-3.5 rounded-[9px] bg-muted/60 px-3 py-2.5 text-[12.5px] leading-[1.5] text-foreground/75",

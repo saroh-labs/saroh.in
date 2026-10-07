@@ -75,8 +75,8 @@ describe("toFailure", () => {
                         upgradeTo: null,
                         notice: {
                             title: "You've reached your 10 products on Plan A",
-                            body: "You can't add more products. Add more with an add-on.",
-                            cta: "Add more",
+                            body: "You can't add more products. Talk to us if you need more.",
+                            cta: "See your plan",
                         },
                     },
                 },
@@ -86,7 +86,7 @@ describe("toFailure", () => {
         expect(f.error).toBe("You've reached your 10 products on Plan A");
         expect(f.plan).toMatchObject({
             code: "PLAN_LIMIT_REACHED",
-            cta: "Add more",
+            cta: "See your plan",
         });
     });
 });

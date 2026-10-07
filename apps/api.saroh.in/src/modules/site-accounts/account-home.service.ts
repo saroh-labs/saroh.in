@@ -37,7 +37,12 @@ import type {
     AccountView,
     Block,
 } from "./customer-view";
-import { accountView, noteView, receiptView } from "./customer-view";
+import {
+    accountView,
+    noteView,
+    notesKindOf,
+    receiptView,
+} from "./customer-view";
 import type { AddNoteDto, UpdateDetailsDto } from "./dto";
 import { unreadCount } from "./thread-store";
 
@@ -103,7 +108,7 @@ export class AccountHomeService {
             },
         });
         if (!account) throw new NotFoundException();
-        const [offers, unreadMessages] = await Promise.all([
+        const [offers, unreadMessages, site] = await Promise.all([
             this.offers(ctx),
             // The tab's dot (A13); a failed count never hides the account.
             unreadCount(
@@ -112,6 +117,13 @@ export class AccountHomeService {
                 ctx.contactId,
                 "customer",
             ).catch(() => 0),
+            // What the business is, for the notes card's words (UX-040):
+            // the template its website was made from (one website, DEC-094).
+            prisma.site.findFirst({
+                where: { organizationId: ctx.organizationId, deletedAt: null },
+                orderBy: { createdAt: "asc" },
+                select: { templateId: true },
+            }),
         ]);
         return accountView({
             account,
@@ -121,6 +133,7 @@ export class AccountHomeService {
             offers,
             bookingsLabel: offers.bookingsLabel,
             healthNotes: this.notesOpen,
+            notesKind: notesKindOf(site?.templateId),
             unreadMessages,
         });
     }

@@ -23,7 +23,7 @@ import {
 } from "./ready";
 
 /**
- * Settings › Business's "Ready to take payments" is the take-money steps
+ * Settings › Business's "Get ready to take money" is the take-money steps
  * (`readyChecklist`, the same as Home's) and then what else the design's
  * card asks for there (DEC-056 brought them back after F8 dropped them):
  *
@@ -42,8 +42,8 @@ import {
  * or takes money (`handlesMoney`, DEC-070): a site with nothing to sell is
  * never told to pick a company type.
  *
- * Home keeps only the steps: these are not about taking money, so Home's
- * count is the steps' and Settings' is the steps' and these together.
+ * These are not about taking money, so they are never counted (UX-019):
+ * Settings lists them apart, as "Make it yours", and its count is Home's.
  *
  * Each is left, done, or not asked at all. Unknown (a read that failed, an
  * older API) is not asked, so the count never claims what nobody checked.
@@ -70,6 +70,17 @@ function email(
     // Sending on WhatsApp alone, with no email set up: not asked, rather
     // than ticked for something they never did.
     if (attention === null && !sends) return null;
+    if (attention === "refused") {
+        return {
+            key: "email",
+            label: "Enter your email keys again",
+            why: "Your email provider refused its keys, so receipts and messages to customers aren't sending.",
+            cta: "Enter keys again",
+            href: "/settings/providers",
+            broken: true,
+            left: true,
+        };
+    }
     if (attention === "disconnected") {
         return {
             key: "email",
@@ -192,7 +203,12 @@ export function settingsNudges({
     ].filter((n): n is Nudge => n !== null);
 }
 
-/** Settings › Business's card: the take-money steps, then the nudges. */
+/**
+ * Settings › Business's card: the take-money steps, counted exactly as
+ * Home counts them, and the nudges apart as "Make it yours" (UX-019) —
+ * never in the count, so the two screens can't disagree, and a pipeline or
+ * a logo is never "payment readiness".
+ */
 export function settingsChecklist(input: {
     settings: Parameters<typeof readyChecklist>[0]["settings"] &
         Pick<OrganizationSettings, "logo">;
@@ -204,22 +220,15 @@ export function settingsChecklist(input: {
     mayPlans?: boolean;
 }): ReadyChecklist {
     const ready = readyChecklist(input);
-    const nudges = settingsNudges(input);
-    const steps: ReadyStep[] = [
-        ...ready.steps,
-        ...nudges.map(({ left, ...item }) => ({ ...item, done: !left })),
-    ];
-    const left: ReadyItem[] = [
-        ...ready.left,
-        ...nudges.filter((n) => n.left).map(({ left: _left, ...item }) => item),
-    ];
+    const extras: ReadyStep[] = settingsNudges(input).map(
+        ({ left, ...item }) => ({ ...item, done: !left }),
+    );
+    // A plan that can't connect its own email: beside the steps, outside
+    // the count, as DEC-092's payments.
+    const email = emailAside(input);
     return {
-        steps,
-        left,
-        done: steps.length - left.length,
-        total: steps.length,
-        outside: [ready.outside, [emailAside(input)]]
-            .flat()
-            .filter((a): a is ReadyAside => a !== null),
+        ...ready,
+        outside: email ? [...ready.outside, email] : ready.outside,
+        extras,
     };
 }

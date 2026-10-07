@@ -117,3 +117,22 @@ export function requestOrigin(headers: {
         forwarded === undefined || forwarded === "" ? "https" : forwarded;
     return `${proto}://${host}`;
 }
+
+/**
+ * Whether a destination ends at accepting a workspace invitation: the
+ * workspace's `/join/:token` (UX-029). Sign-up and log-in speak to an
+ * invitee then — they join someone else's business — and fix the address
+ * to the invitation's, which accepting insists on. Pure; the destination
+ * itself is vetted by {@link safeDestination}.
+ */
+export function isJoinDestination(
+    destination: string | null | undefined,
+): boolean {
+    if (!destination) return false;
+    try {
+        const { pathname } = new URL(destination, "https://accounts.invalid");
+        return /^\/join\/[^/]+\/?$/.test(pathname);
+    } catch {
+        return false;
+    }
+}

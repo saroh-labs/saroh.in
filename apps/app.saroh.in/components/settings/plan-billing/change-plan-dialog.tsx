@@ -13,6 +13,7 @@ import { Input } from "@saroh/ui/input";
 import { Label } from "@saroh/ui/label";
 import { Skeleton } from "@saroh/ui/skeleton";
 import { showError, showSuccess } from "@saroh/ui/toast";
+import { LoaderCircle } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useEffect, useState, useTransition } from "react";
 
@@ -25,7 +26,10 @@ import {
     quoteChangeAction,
 } from "@/lib/saroh-billing/billing-actions";
 import type { ChangeQuote, Cycle } from "@/lib/saroh-billing/plan-view";
-import { quoteSummary } from "@/lib/saroh-billing/plan-view";
+import { quoteSummary } from "@/lib/saroh-billing/quote-words";
+import { openRazorpayWindow } from "@/lib/saroh-billing/razorpay-window";
+
+import { useCheckoutConfirm } from "./use-checkout-confirm";
 
 /** The plan picked: which, on which cycle, and what the row's button said. */
 export interface PickedPlan {
@@ -51,9 +55,13 @@ const STATE_OPTIONS = [
 
 /**
  * Changing plan (U15–U17), after a row on the picker: the API's quote first
- * — what kind of change, when, and every amount — then Confirm, then the
- * payment page. Nothing is charged until the owner authorises it there; a
- * move to Free needs no payment page. The coupon held on the Coupon card
+ * — what kind of change, when, and every amount, in DEC-093's honest words
+ * — then Confirm, then Razorpay's own window over the page, with the
+ * owner's details pre-filled. Nothing is charged until the owner pays
+ * there; a move to Free needs no payment. Paying brings the dialog back as
+ * "Confirming your payment…" while the API checks with Razorpay (UX-003);
+ * the plan moves as soon as Razorpay says so, webhook or not. Where the
+ * window can't open, the provider's page link is the fallback. The coupon held on the Coupon card
  * goes with the quote; one the API refuses is said here, with a way on
  * without it.
  *
@@ -63,16 +71,25 @@ const STATE_OPTIONS = [
 export function ChangePlanDialog({
     picked,
     coupon,
+    currentPlan,
     onCouponRefused,
     onClose,
 }: {
     picked: PickedPlan | null;
     coupon: string;
+    /** The plan the business is on now, for "you stay on …". */
+    currentPlan: string;
     /** The coupon couldn't be used: the Coupon card shows why. */
     onCouponRefused: (error: string) => void;
     onClose: () => void;
 }) {
     const router = useRouter();
+    // Paying: hidden while Razorpay's window is up (a dialog over it would
+    // trap its focus), then back to say it's confirming.
+    const [paying, setPaying] = useState<"no" | "away" | "confirming">("no");
+    const { phase, confirm: confirmPaid } = useCheckoutConfirm(
+        picked?.name ?? "",
+    );
     const [answer, setAnswer] = useState<Answer | null>(null);
     const [dropped, setDropped] = useState<{
         code: string;
@@ -120,7 +137,9 @@ export function ChangePlanDialog({
     }, [key]);
 
     const summary =
-        quoting.state === "ready" ? quoteSummary(quoting.quote) : null;
+        quoting.state === "ready"
+            ? quoteSummary(quoting.quote, { currentPlan })
+            : null;
 
     function confirm() {
         if (!picked || quoting.state !== "ready") return;
@@ -157,10 +176,37 @@ export function ChangePlanDialog({
                 router.refresh();
                 return;
             }
+            if (res.data.handoff) {
+                setPaying("away");
+                const outcome = await openRazorpayWindow(
+                    res.data.handoff,
+                    `${picked.name}, ${picked.cycle === "year" ? "yearly" : "monthly"}`,
+                );
+                if (outcome === "paid") {
+                    setPaying("confirming");
+                    const state = await confirmPaid(8);
+                    if (state !== "waiting") {
+                        setPaying("no");
+                        onClose();
+                    }
+                    return;
+                }
+                if (outcome === "closed") {
+                    // Kept: "Your plan" offers to continue the same payment.
+                    setPaying("no");
+                    onClose();
+                    router.refresh();
+                    return;
+                }
+                setPaying("no");
+            }
             if (!res.data.authorisationUrl) {
                 showError(
-                    "The payment page couldn't be opened, so nothing changed. Try again.",
+                    "Razorpay's payment window couldn't open, so nothing was charged.",
+                    "Your plan change is kept under Your plan: continue it from there.",
                 );
+                onClose();
+                router.refresh();
                 return;
             }
             // Given once and kept nowhere: straight to the browser.
@@ -168,9 +214,74 @@ export function ChangePlanDialog({
         });
     }
 
+    if (paying === "confirming") {
+        const still = phase === "waiting";
+        return (
+            <Dialog
+                open={picked !== null}
+                onOpenChange={(open) => {
+                    if (!open && still) {
+                        setPaying("no");
+                        onClose();
+                        router.refresh();
+                    }
+                }}
+            >
+                <DialogContent className="max-w-[480px]">
+                    <DialogHeader className="text-left">
+                        <DialogTitle className="font-display text-[17px] font-semibold tracking-[-0.02em]">
+                            {still
+                                ? "Razorpay hasn't told us yet"
+                                : "Confirming your payment…"}
+                        </DialogTitle>
+                        <DialogDescription className="text-pretty text-[13px] leading-[1.55] text-foreground/80">
+                            {still
+                                ? `If you paid, ${picked?.name ?? "the plan"} switches on as soon as Razorpay tells us — you don't need to pay again. Your plan shows it while it's waiting.`
+                                : `Checking with Razorpay, then switching you to ${picked?.name ?? "the plan"}. This takes a few seconds.`}
+                        </DialogDescription>
+                    </DialogHeader>
+                    {still ? null : (
+                        <div
+                            role="status"
+                            aria-live="polite"
+                            className="flex items-center gap-2 text-[13px] text-muted-foreground"
+                        >
+                            <LoaderCircle
+                                aria-hidden
+                                className="size-4 animate-spin motion-reduce:animate-none"
+                            />
+                            Confirming with Razorpay
+                        </div>
+                    )}
+                    {still ? (
+                        <DialogFooter className="gap-2 sm:space-x-0">
+                            <Button
+                                type="button"
+                                variant="outline"
+                                onClick={() => void confirmPaid(3)}
+                            >
+                                Check again
+                            </Button>
+                            <Button
+                                type="button"
+                                onClick={() => {
+                                    setPaying("no");
+                                    onClose();
+                                    router.refresh();
+                                }}
+                            >
+                                Done
+                            </Button>
+                        </DialogFooter>
+                    ) : null}
+                </DialogContent>
+            </Dialog>
+        );
+    }
+
     return (
         <Dialog
-            open={picked !== null}
+            open={picked !== null && paying === "no"}
             onOpenChange={(open) => {
                 if (!open && !pending) onClose();
             }}
@@ -311,7 +422,7 @@ export function ChangePlanDialog({
                         >
                             {pending
                                 ? summary.toPayment
-                                    ? "Opening the payment page…"
+                                    ? "Opening the payment…"
                                     : "Changing…"
                                 : summary.confirm}
                         </Button>

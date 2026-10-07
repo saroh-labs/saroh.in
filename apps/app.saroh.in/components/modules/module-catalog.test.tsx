@@ -186,3 +186,62 @@ describe("Settings › Modules (DEC-057)", () => {
         );
     });
 });
+
+describe("Settings › Modules on a plan that won't let it connect (UX-006, UX-017)", () => {
+    const lock = {
+        comesWith: "Comes with Grow",
+        cta: "See Grow",
+        href: "/settings/billing?plan=grow#change-plan",
+        upgrade: "Grow",
+        full: false,
+    };
+    const on = (key: string, over: Partial<ModuleView> = {}) =>
+        view(key, { lifecycle: "ENABLED", readiness: "ACTIVE", ...over });
+    const comms = on("COMMUNICATIONS", {
+        readiness: "SETUP_REQUIRED",
+        blockers: [
+            {
+                code: "COMMUNICATIONS_NO_PROVIDER",
+                actionHref: "/settings/providers",
+            },
+        ],
+    });
+
+    it("Free: Payments says it is offline and the plan; Communications isn't Finish setup", () => {
+        act(() =>
+            root.render(
+                <ModuleCatalog
+                    modules={[on("PAYMENTS"), comms]}
+                    locks={{ payments: lock, messaging: lock }}
+                />,
+            ),
+        );
+        const text = host.textContent;
+        expect(text).toContain(
+            "Taking payment online comes with Grow. Until then, customers pay you the ways you set in How to pay us.",
+        );
+        expect(text).toContain("Connecting your own email comes with Grow.");
+        expect(text).not.toContain("Finish setup");
+        expect(text).not.toContain("Connect a provider to send messages.");
+        expect(
+            host.querySelectorAll(
+                'a[href="/settings/billing?plan=grow#change-plan"]',
+            ),
+        ).toHaveLength(2);
+        expect(host.querySelector('a[href="/settings/providers"]')).toBeNull();
+    });
+
+    it("Grow: Communications still asks to connect, Payments says nothing of plans", () => {
+        act(() =>
+            root.render(
+                <ModuleCatalog
+                    modules={[on("PAYMENTS"), comms]}
+                    locks={{ payments: null, messaging: null }}
+                />,
+            ),
+        );
+        const text = host.textContent;
+        expect(text).toContain("Finish setup");
+        expect(text).not.toContain("comes with Grow");
+    });
+});

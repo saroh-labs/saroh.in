@@ -62,7 +62,13 @@ export function planLimitReached(
 ): ForbiddenException {
     const words = METER_WORDS[key];
     const n = limitNotice(
-        { inc: true, limit, plan: row.plan, upgradeTo: row.upgradeTo },
+        {
+            inc: true,
+            limit,
+            plan: row.plan,
+            upgradeTo: row.upgradeTo,
+            upgradeUncapped: row.upgradeUncapped,
+        },
         Math.max(used, limit),
         words.what,
         words.paused,
@@ -72,7 +78,7 @@ export function planLimitReached(
         : {
               title: `You've reached your ${words.what} limit on ${row.plan}`,
               body: words.paused,
-              cta: "Add more",
+              cta: "See your plan",
           };
     const details: PlanLimitDetails = {
         code: PLAN_LIMIT_REACHED,

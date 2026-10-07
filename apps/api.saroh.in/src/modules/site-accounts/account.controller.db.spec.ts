@@ -240,13 +240,15 @@ describe("Me", () => {
             // Home and Me (A5), Appointments (A6) and Messages (A13).
             tabs: [
                 { key: "home", label: "Home" },
-                { key: "bookings", label: "Appointments" },
+                { key: "bookings", label: "Bookings" },
                 { key: "messages", label: "Messages" },
                 { key: "me", label: "Me" },
             ],
             offers: { appointments: true, orders: false, plans: false },
             bookingsLabel: "Appointments",
             healthNotes: true,
+            // Its site records no template: general words (UX-040).
+            notesKind: "general",
             unreadMessages: 0,
         });
 

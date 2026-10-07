@@ -133,7 +133,9 @@ export function weekRows(week: HomeWeek | null): WeekRow[] {
                     ? owed.totals
                           .map((t) => formatMoney(t.amountMinor, t.currency))
                           .join(" + ")
-                    : "All paid",
+                    : // Invoices only: a booking paid at the desk is no
+                      // invoice until it's taken (UX-083).
+                      "All invoices paid",
             sub: owedLine(owed),
             bad: owed.overdue > 0,
             href: owed.href,

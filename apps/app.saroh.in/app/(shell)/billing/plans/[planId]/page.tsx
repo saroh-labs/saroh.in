@@ -4,6 +4,7 @@ import { AccessDenied } from "@/components/shared/access-denied";
 import { PageContainer } from "@/components/shared/page-container";
 import { PlanDetail } from "@/components/subscriptions/plan-detail/detail-screen";
 import { modulesOrUnknown } from "@/lib/modules/guard";
+import { permitsFor } from "@/lib/organizations/permits";
 import { resolveActiveOrganization } from "@/lib/organizations/service";
 import { requireSession } from "@/lib/session";
 import { plansShowClasses } from "@/lib/subscriptions/plan-cards";
@@ -41,10 +42,7 @@ export default async function PlanPage({
         searchParams,
         resolveActiveOrganization(),
     ]);
-    const may = (action: string) =>
-        organization?.actions
-            ? organization.actions.includes(action)
-            : organization?.role === "OWNER" || organization?.role === "ADMIN";
+    const may = permitsFor(organization);
 
     // Told so, and who can change it — not a "not found" that reads like a
     // broken link.

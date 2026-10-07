@@ -10,6 +10,7 @@ import {
     isPayInvoice,
     payAutopayOf,
     payChargingOf,
+    payContactOf,
     payOnlineOf,
     payUrlOf,
 } from "./invoice-pay-shape";
@@ -65,6 +66,8 @@ export async function getPayInvoice(token: string): Promise<PayLookup> {
                       payOnline: payOnlineOf(body.payOnline),
                       // How to pay offline (R32), checked field by field.
                       payInstructions: payInstructionsOf(body.payInstructions),
+                      // A way to reach them when none is set (UX-007).
+                      businessContact: payContactOf(body.businessContact),
                   },
               }
             : { ok: false, reason: "unavailable" };

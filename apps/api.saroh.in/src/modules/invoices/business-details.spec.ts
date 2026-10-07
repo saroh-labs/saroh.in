@@ -6,6 +6,7 @@ import {
     BUSINESS_DETAILS_MISSING,
     businessDetailsMessage,
     missingFrom,
+    onlyStateMissing,
 } from "./business-details";
 
 const complete: BusinessDetailsColumns = {
@@ -112,5 +113,37 @@ describe("assertBusinessDetails", () => {
                 missing: ["address"],
             },
         });
+    });
+
+    it("names the state when only the state is missing (UX-018)", async () => {
+        const err = await assertBusinessDetails(
+            db({ ...complete, gstState: null }) as never,
+            "org_1",
+        ).catch((e: unknown) => e);
+        expect((err as ConflictException).getResponse()).toEqual({
+            message:
+                "Add your state to your address first. It's printed on every invoice, and GST depends on it.",
+            details: {
+                reason: BUSINESS_DETAILS_MISSING,
+                missing: ["address"],
+                onlyState: true,
+            },
+        });
+    });
+});
+
+describe("onlyStateMissing", () => {
+    it("is true only when the address is whole but for an Indian state", () => {
+        expect(onlyStateMissing({ ...complete, gstState: null })).toBe(true);
+        expect(onlyStateMissing({ ...complete, gstState: "" })).toBe(true);
+        expect(onlyStateMissing(complete)).toBe(false);
+        expect(
+            onlyStateMissing({ ...complete, gstState: null, city: null }),
+        ).toBe(false);
+        // Abroad, no Indian state is asked at all.
+        expect(
+            onlyStateMissing({ ...complete, gstState: null, country: "GB" }),
+        ).toBe(false);
+        expect(onlyStateMissing(null)).toBe(false);
     });
 });

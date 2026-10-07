@@ -115,6 +115,27 @@ export function paidSinceFilter(since: Date) {
     } satisfies Prisma.InvoiceWhereInput;
 }
 
+/**
+ * The where for money handed back in `[from, to)`: a credit note issued
+ * then, on an order (a refund, or an edit down that gave money back — the
+ * calendar's takings read them the same) or made by a refund of an
+ * invoice's payment. A credit note that only corrects an unpaid invoice
+ * gave nobody money back, so it takes nothing off.
+ */
+export function refundedBetweenWhere(
+    organizationId: string,
+    from: Date,
+    to: Date,
+): Prisma.InvoiceWhereInput {
+    return {
+        organizationId,
+        kind: "CREDIT_NOTE",
+        status: { notIn: ["DRAFT", "VOID"] },
+        issuedAt: { gte: from, lt: to },
+        OR: [{ orderId: { not: null } }, { paymentRefundId: { not: null } }],
+    };
+}
+
 /** Issued invoices fall due this many days after issue unless told otherwise. */
 export const DEFAULT_DUE_DAYS = 7;
 

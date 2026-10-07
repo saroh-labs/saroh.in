@@ -28,15 +28,21 @@ export interface PublishApprovalFields {
 /**
  * The setting to show, or null to show nothing.
  *
- * Hidden while test releases are off for the business (`SITE_TEST_RELEASES`):
- * the setting is about them, and the API refuses to turn it on without them.
- * The one exception is a setting already on — the API still enforces it, so
- * it stays in sight, and the owner can turn it off.
+ * Hidden on a plan without the catalogue's approval row (DEC-103: Pro
+ * only), never upsold from a switch: there the API reads it as off and
+ * publishing goes through as normal, so there is nothing to show.
+ *
+ * Hidden too while test releases are off for the business
+ * (`SITE_TEST_RELEASES`): the setting is about them, and the API refuses to
+ * turn it on without them. The one exception is a setting already on — the
+ * API still enforces it, so it stays in sight, and the owner can turn it off.
  */
 export function publishApprovalOf(
     site: PublishApprovalFields,
     testReleasesOn: boolean,
+    inPlan = true,
 ): PublishApproval | null {
+    if (!inPlan) return null;
     const on = site.publishNeedsApproval === true;
     if (!testReleasesOn && !on) return null;
     return { on, canChange: site.canOverride === true };

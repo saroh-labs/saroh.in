@@ -5,6 +5,7 @@ import {
     getReviewState,
     listComments,
     requestReview,
+    withdrawReview,
 } from "@/lib/sites/actions";
 import type { ReviewState, SiteCommentView } from "@/lib/sites/service";
 
@@ -75,6 +76,25 @@ export function useEditorReview({
         }
     }
 
+    /**
+     * Take the request back (UX-068): the site stops reading In review.
+     * Notes stay where they are.
+     */
+    async function withdraw() {
+        setAsking(true);
+        try {
+            const res = await withdrawReview(siteId);
+            if (!res.ok) {
+                showError(res.error);
+                return;
+            }
+            showSuccess("Review request withdrawn.");
+            await refreshReview();
+        } finally {
+            setAsking(false);
+        }
+    }
+
     /*
      * Section keys on this page carrying an unresolved note. The issue asks
      * for it directly: "the section list should show which sections carry
@@ -105,6 +125,7 @@ export function useEditorReview({
         asking,
         refreshReview,
         askForReview,
+        withdrawReview: withdraw,
         notedKeys,
         notesByKey,
     };

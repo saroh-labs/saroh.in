@@ -21,7 +21,7 @@
  * has a draft Shop page when that location delivers or ships. Only what is
  * missing is added: a site keeps the Sells from and the pages it has.
  */
-import { ForbiddenException } from "@nestjs/common";
+import { ForbiddenException, HttpException } from "@nestjs/common";
 import { prisma } from "@saroh/database";
 
 import { toMinor } from "../../../common/money";
@@ -40,6 +40,7 @@ import {
     writeSiteFromTemplate,
 } from "../../sites/site-create";
 import { businessCurrency } from "../../stores/currency";
+import { registeredAddressText } from "../../stores/pickup-place";
 import type { ModuleTransaction } from "../module-lifecycle.service";
 import type { ModuleKey } from "../module-registry";
 import type {
@@ -204,17 +205,60 @@ async function writeCommerce(
         return { storefrontId: existing.id };
     }
 
+    // Pick-up needs a place customers visit, with its address (UX-025):
+    // a business that gave its registered address starts from it.
+    const place = fulfilmentTypes.includes("PICKUP")
+        ? await seededPlace(tx, ctx.organizationId)
+        : null;
     const store = await tx.store.create({
         data: {
             name: setup.storefrontName,
             organization: { connect: { id: ctx.organizationId } },
             owners: { create: { userId: ctx.userId, role: "OWNER" } },
-            settings: { create: { currency, ...ways } },
+            settings: {
+                create: {
+                    currency,
+                    ...ways,
+                    ...(place ? { kind: "SHOP", address: place } : {}),
+                },
+            },
         },
         select: { id: true },
     });
     await shopForSell(tx, ctx, store.id, fulfilmentTypes);
     return { storefrontId: store.id };
+}
+
+/**
+ * The first location's address, from the business's registered address,
+ * when it has one and the plan has room for a place customers visit (the
+ * `locations` meter, checked as becoming one is); else null, and the
+ * location starts with no counter, as it always has.
+ */
+async function seededPlace(
+    tx: ModuleTransaction,
+    organizationId: string,
+): Promise<string | null> {
+    const profile = await tx.businessProfile.findUnique({
+        where: { organizationId },
+        select: {
+            addressLine1: true,
+            addressLine2: true,
+            city: true,
+            postalCode: true,
+        },
+    });
+    const address = registeredAddressText(profile);
+    if (!address) return null;
+    try {
+        await planMeter.roomInTx(tx, organizationId, "locations");
+    } catch (error) {
+        // No room on the plan: a refusal, not a failure. Nothing was
+        // written, so the transaction carries on.
+        if (error instanceof HttpException) return null;
+        throw error;
+    }
+    return address;
 }
 
 // --- Bookings --------------------------------------------------------------

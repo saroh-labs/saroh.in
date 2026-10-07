@@ -337,6 +337,58 @@ read as REFUSED, the same 409), and how the Offer's discount shows on the
 `subscription.charged` amount. Check both with a test payment before the
 first real coupon.
 
+## Checkout and term (DEC-093)
+
+Code: `checkout-quote.ts` (the rule, with `TERM_CHARGES` and
+`RENEW_WINDOW_DAYS`), `billing-term.ts`, `term-end.ts`,
+`checkout-confirm.service.ts`, `billing-webhook.service.ts`
+(`reconcileCheckout`), the sweep's `endPaidYears`. Migration
+`20261029160000_billing_first_month` lets a TRIAL checkout charge now.
+
+- **Monthly** is a provider subscription made for 12 charges, never
+  open-ended. **Yearly** is one payment for the year: a provider order for
+  exactly what the quote says is due (`payNowTotalPaise`, a coupon already
+  off), no mandate and no Offer; the checkout keeps `providerPlanId`
+  `"one-time"`. A yearly plan never has a trial; yearly while a trial runs
+  starts the year now. A move to yearly from monthly is paid now for a year
+  that starts at the period's end (SCHEDULED); a pricier year mid-year pays
+  the difference now.
+- **The first month.** The catalogue's trial may carry `firstPaise` (before
+  GST; never more than a month). The TRIAL checkout takes it as an upfront
+  item with the mandate (`chargeNowPaise`), and the webhook invoices it on
+  its own (source NEW, `chargeKey` `first-month:<checkout>`); the first full
+  charge at the trial's end is still the plan's first invoice. Without it
+  the days are free and the provider's small set-up check is refunded.
+- **The quote names the mandate check** (`mandateCheck`): `PAID` — today's
+  payment is a real charge and kept; `REFUNDED` — nothing is owed, the
+  provider takes a small amount and refunds it; `NONE` — no autopay. The
+  app says exactly that (`lib/saroh-billing/quote-words.ts`), and words the
+  failure from the plan the business is on, not "back on Free".
+- **Back from paying.** The app opens Razorpay's window from the
+  checkout's `handoff` and, when it says paid, asks
+  `POST …/billing/checkout/confirm`, which reads the provider and
+  reconciles by the webhook's rule (idempotent with it). "Your plan" shows
+  a checkout waiting for its payment as "checking" and offers "Check again"
+  and "Continue payment" (the same subscription or order) — never "Start
+  again", which made a second mandate.
+- **The term's end.** Monthly ends 12 months after its charges start;
+  yearly with the year. Inside the last 30 days the same plan quotes as
+  `RENEW`: a SCHEDULED checkout (stored as SCHEDULED for the same plan)
+  from the term's end, at the live price, that cancels nothing — the
+  running term's last charges are still owed. A term nobody renews keeps
+  the plan to the end of what was paid, then Free: a monthly subscription's
+  `completed` with its period still running sets the move to Free on the
+  period's end instead of cancelling at once; for a year paid once, which no
+  provider event ends, the hourly sweep sets it (`endPaidYears`).
+  **Assumed (the safest reading of DEC-093):** no grace period after the
+  end; R15's 30-day price notice and 7-day move-down notice are not built
+  here (they belong with #800–#802).
+- **Unverified in Razorpay test mode:** that a subscription with an upfront
+  item and a later `start_at` charges that item as the authorisation payment
+  (spike row 2 says so for upgrades); the subscription status read
+  (`paid_count`, `current_end`) and `order.paid`'s payload; when Razorpay
+  sends `subscription.completed` relative to the last period's end.
+
 ## Saroh's own invoices (U17)
 
 The GST invoice Saroh issues a business for each charge it takes for a
@@ -450,6 +502,8 @@ correct the adapter and this list.
    can resume.
 6. **`total_count`.** Required by Razorpay; sent as 120 monthly / 10 yearly
    charges so a plan runs until cancelled. Unverified: the maximum allowed.
+   Since DEC-093 the checkout sends 12 (a monthly term) and yearly is an
+   order; 120/10 is only the adapter's fallback.
 
 ## The merchant app (U14)
 
@@ -464,8 +518,12 @@ What a business sees of its plan, in `apps/app.saroh.in`. Code:
   N-day trial" only where `GET …/billing/change-plan` quotes a `TRIAL`),
   add-ons, a coupon held for the next change, and Saroh's invoices with
   their PDF (`/api/saroh-invoices/:id/pdf`, a proxy). Changing plan is the
-  quote, a confirm, then the browser goes to the `authorisationUrl`; a
-  move to Free needs none. `?plan=&cycle=` opens that plan's change: every
+  quote, a confirm, then Razorpay's window over the page (the
+  `authorisationUrl` page only as a fallback) and a confirm with the
+  provider (DEC-093); a move to Free needs none. The picker lists what each
+  plan unlocks from the catalogue's card lines, prices before GST, and
+  under a plan given for a while marks that plan "You're on this until …"
+  (UX-044/045); a coupon is checked on Apply (UX-046). `?plan=&cycle=` opens that plan's change: every
   "Upgrade" in the app links there (`upgradeHref`).
 - **Limit notices** at 80% and 100% on Products, Orders, Bookings, Blog
   (Posts), Team and Providers, in `limitNotice`'s words with

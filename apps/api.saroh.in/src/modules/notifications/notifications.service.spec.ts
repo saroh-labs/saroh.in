@@ -13,6 +13,12 @@ jest.mock("@saroh/database", () => ({
     },
 }));
 
+// UX-041's clear of stale limit notices is its own spec
+// (`billing/limit-notice-clear.spec.ts`); here it clears nothing.
+jest.mock("../billing/limit-notice-clear", () => ({
+    clearStaleLimitNotices: jest.fn().mockResolvedValue(0),
+}));
+
 import { ForbiddenException, NotFoundException } from "@nestjs/common";
 import { prisma } from "@saroh/database";
 
@@ -229,8 +235,12 @@ describe("what each person sees of the inbox (F14)", () => {
                 "booking.moved",
                 "booking.cancelled",
                 "payment.failed",
+                "provider.attention",
                 "site.live",
                 "site.not_live",
+                "site.review.approved",
+                "site.review.changes",
+                "site.review.note",
             ],
         });
     });

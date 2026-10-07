@@ -16,7 +16,7 @@ describe("planRefusalOf", () => {
                     notice: {
                         title: "You've reached your 10 products on Plan A",
                         body: "You can't add more products.",
-                        cta: "Upgrade or add more",
+                        cta: "See plans",
                     },
                 },
                 "You've reached your 10 products on Plan A",
@@ -25,7 +25,7 @@ describe("planRefusalOf", () => {
             code: "PLAN_LIMIT_REACHED",
             title: "You've reached your 10 products on Plan A",
             body: "You can't add more products.",
-            cta: "Upgrade or add more",
+            cta: "See plans",
             upgradeTo: UP,
             limit: 10,
             used: 10,

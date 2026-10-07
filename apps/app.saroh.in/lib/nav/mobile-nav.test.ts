@@ -32,13 +32,13 @@ const ownerNav = (moduleKeys: string[] | null = EVERYTHING) =>
 const labels = (tabs: { label: string }[]) => tabs.map((t) => t.label);
 
 describe("seats", () => {
-    it("seats Home, Sell, Calendar and Insights by default", () => {
-        // Notifications is in the top bar (2026-09-25); Calendar has its seat.
+    it("seats Home, Sell, Overview and Insights by default", () => {
+        // Notifications is in the top bar (2026-09-25); Overview has its seat.
         const nav = buildMobileNav({ groups: ownerNav(), pathname: "/" });
         expect(labels(nav.tabs)).toEqual([
             "Home",
             "Sell",
-            "Calendar",
+            "Overview",
             "Insights",
         ]);
         expect(nav.tabs).toHaveLength(TAB_SEATS);
@@ -53,7 +53,7 @@ describe("seats", () => {
             "Home",
             "Payments",
             "Sell",
-            "Calendar",
+            "Overview",
         ]);
     });
 
@@ -80,7 +80,7 @@ describe("seats", () => {
         expect(seatPreference("Sell")).toEqual([
             "Home",
             "Sell",
-            "Calendar",
+            "Overview",
             "Insights",
         ]);
         const nav = buildMobileNav({
@@ -88,23 +88,23 @@ describe("seats", () => {
             pathname: "/commerce/orders",
         });
         const tabs = labels(nav.tabs);
-        expect(tabs).toEqual(["Home", "Sell", "Calendar", "Insights"]);
+        expect(tabs).toEqual(["Home", "Sell", "Overview", "Insights"]);
         expect(new Set(tabs).size).toBe(tabs.length);
         expect(tabs).toHaveLength(TAB_SEATS);
     });
 
-    it("seats Calendar second while you are on it, then Sell", () => {
+    it("seats Overview second while you are on it, then Sell", () => {
         const nav = buildMobileNav({
             groups: ownerNav(),
             pathname: "/calendar",
         });
         expect(labels(nav.tabs)).toEqual([
             "Home",
-            "Calendar",
+            "Overview",
             "Sell",
             "Insights",
         ]);
-        expect(nav.tabs.find((t) => t.label === "Calendar")?.current).toBe(
+        expect(nav.tabs.find((t) => t.label === "Overview")?.current).toBe(
             true,
         );
     });
@@ -121,7 +121,7 @@ describe("seats", () => {
         expect(labels(nav.tabs)).toEqual([
             "Home",
             "Sell",
-            "Calendar",
+            "Overview",
             "Website",
         ]);
     });

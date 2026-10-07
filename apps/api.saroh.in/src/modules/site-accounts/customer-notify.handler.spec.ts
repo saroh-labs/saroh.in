@@ -518,3 +518,107 @@ describe("the customer.notify job", () => {
         expect(prisma.$transaction).not.toHaveBeenCalled();
     });
 });
+
+describe("customer.notify — a website order placed (UX-042)", () => {
+    const PLACED: CustomerNotifyPayload = {
+        kind: "ORDER_PLACED",
+        eventKey: "order-placed:order_1",
+        orderId: "order_1",
+    };
+    function placed(tx: FakeTx, over: Record<string, unknown> = {}) {
+        tx.order.findFirst.mockResolvedValue({
+            id: "order_1",
+            orderId: "ORD-1019",
+            status: "PENDING",
+            paymentStatus: "UNPAID",
+            placedOnline: true,
+            payOnHandover: true,
+            fulfilment: "PICKUP",
+            customerId: "cus_1",
+            customerAccountId: "acc_1",
+            customer: { firstName: "Asha" },
+            ...over,
+        });
+    }
+
+    it("to pay on collection: the thread says it's in and how it's paid, and the provider emails it", async () => {
+        const tx = makeTx();
+        placed(tx);
+        const out = await service.notify(asTx(tx), ORG, PLACED, NOW);
+        expect(out).toEqual({
+            duplicate: false,
+            threadMessageId: "ctm_1",
+            messageId: "msg_1",
+        });
+        expect(append.mock.calls[0][1]).toMatchObject({
+            contactId: "ct_1",
+            author: "SYSTEM",
+            body: "We have your order ORD-1019. You pay when you collect it. We'll tell you when it's ready to collect.",
+            event: "ORDER_PLACED",
+        });
+        expect(queueTransactional.mock.calls[0][2]).toMatchObject({
+            template: "ORDER_PLACED",
+            route: { route: "PROVIDER", provider: "RESEND" },
+            recipient: { kind: "SITE_ACCOUNT", contactId: "ct_1" },
+        });
+        expect(tx.customerNotice.createMany.mock.calls[0][0].data[0]).toEqual({
+            organizationId: ORG,
+            eventKey: "order-placed:order_1",
+            kind: "ORDER_PLACED",
+            bookingId: null,
+            orderId: "order_1",
+        });
+    });
+
+    it("paid online and delivered: says it's paid and what comes next", async () => {
+        const tx = makeTx();
+        placed(tx, {
+            payOnHandover: false,
+            paymentStatus: "PAID",
+            fulfilment: "SHIPPING",
+        });
+        await service.notify(asTx(tx), ORG, PLACED, NOW);
+        expect(append.mock.calls[0][1].body).toBe(
+            "We have your order ORD-1019, and it's paid. We'll tell you when it's on its way.",
+        );
+    });
+
+    it("no provider: the thread only, and Saroh never sends it (DEC-086 is booking notices)", async () => {
+        const tx = makeTx();
+        placed(tx);
+        tx.communicationProvider.findUnique.mockResolvedValue(null);
+        const out = await service.notify(asTx(tx), ORG, PLACED, NOW);
+        expect(out.threadMessageId).toBe("ctm_1");
+        expect(out.messageId).toBeNull();
+        expect(queueTransactional).not.toHaveBeenCalled();
+        expect(tx.$executeRaw).not.toHaveBeenCalled();
+    });
+
+    it("an online checkout not paid, or an order cancelled since, says nothing", async () => {
+        for (const over of [
+            { payOnHandover: false, paymentStatus: "UNPAID" },
+            { status: "CANCELLED" },
+        ]) {
+            const tx = makeTx();
+            placed(tx, over);
+            const out = await service.notify(asTx(tx), ORG, PLACED, NOW);
+            expect(out).toEqual({
+                duplicate: false,
+                threadMessageId: null,
+                messageId: null,
+            });
+        }
+        expect(append).not.toHaveBeenCalled();
+    });
+
+    it("run twice, the customer hears once", async () => {
+        const tx = makeTx();
+        placed(tx);
+        await service.notify(asTx(tx), ORG, PLACED, NOW);
+        tx.customerNotice.createMany.mockResolvedValue({ count: 0 });
+        const again = await service.notify(asTx(tx), ORG, PLACED, NOW);
+        expect(again.duplicate).toBe(true);
+        expect(append).toHaveBeenCalledTimes(1);
+        expect(queueTransactional).toHaveBeenCalledTimes(1);
+    });
+});

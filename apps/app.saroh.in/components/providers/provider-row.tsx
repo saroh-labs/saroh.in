@@ -186,9 +186,25 @@ export function ProviderRowView({
                         someone disconnected. Outline, all of them: a row
                         per provider would otherwise put several solid
                         buttons on one screen. */}
-                    {!connected && !attention
-                        ? setupDialog("Connect", false)
-                        : null}
+                    {/* The plan won't let the business connect it, or
+                        connect it again (DEC-091, UX-006, UX-017): the plan
+                        that has it and See plans, before any key form
+                        opens. */}
+                    {(available || entry.state === "DISCONNECTED") &&
+                    entry.lock ? (
+                        <>
+                            <span className="rounded-full bg-muted px-2 py-0.5 text-[11.5px] font-medium text-muted-foreground">
+                                {entry.lock.comesWith}
+                            </span>
+                            <Button asChild variant="outline" size="sm">
+                                <Link href={entry.lock.href}>
+                                    {entry.lock.cta}
+                                </Link>
+                            </Button>
+                        </>
+                    ) : !connected && !attention ? (
+                        setupDialog("Connect", false)
+                    ) : null}
                     {/* The one thing this row needs, so the one solid
                         button on it. */}
                     {attention

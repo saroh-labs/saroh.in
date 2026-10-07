@@ -360,6 +360,17 @@ export class CreateApprovalDto {
     outcome!: "APPROVED" | "CHANGES_REQUESTED";
 
     /**
+     * What needs changing (UX-043): required with CHANGES_REQUESTED, so the
+     * person whose work it is knows what to do; ignored on an approval.
+     */
+    @ValidateIf((o: CreateApprovalDto) => o.outcome === "CHANGES_REQUESTED")
+    @Transform(trim)
+    @IsString({ message: "Say what needs changing." })
+    @MinLength(3, { message: "Say what needs changing." })
+    @MaxLength(500, { message: "Keep it under 500 characters." })
+    reason?: string;
+
+    /**
      * The test release the verdict is on (DEC-071, T8). The verdict is then
      * bound to that release's frozen bytes, not the moving draft (KTD-10).
      */

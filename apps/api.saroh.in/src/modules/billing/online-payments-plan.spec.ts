@@ -17,6 +17,7 @@ import {
     assertPlanStartsSubscriptions,
     assertPlanTakesOnlinePayment,
     isRenewalInvoice,
+    noProviderReason,
     planStartsSubscriptions,
     planTakesInvoiceOnline,
     planTakesOnlinePayment,
@@ -149,5 +150,19 @@ describe("renewals the business already has (never refused)", () => {
         await expect(planTakesInvoiceOnline("org_1", undefined)).resolves.toBe(
             false,
         );
+    });
+});
+
+describe("no provider connected: whose fix it is (UX-017)", () => {
+    it("says the plan when it has no room for one more own account", async () => {
+        jest.spyOn(planMeter, "hasRoom").mockResolvedValue(false);
+        await expect(noProviderReason("org_1")).resolves.toBe("PLAN");
+    });
+
+    it("says connect one where the plan lets it, or can't be read", async () => {
+        const room = jest.spyOn(planMeter, "hasRoom").mockResolvedValue(true);
+        await expect(noProviderReason("org_1")).resolves.toBe("NO_PROVIDER");
+        room.mockRejectedValue(new Error("down"));
+        await expect(noProviderReason("org_1")).resolves.toBe("NO_PROVIDER");
     });
 });

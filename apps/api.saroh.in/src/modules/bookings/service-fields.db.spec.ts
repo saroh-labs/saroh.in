@@ -24,6 +24,22 @@ let other: OrganizationContext;
 let siteId: string;
 let existing: string;
 
+/**
+ * Monday mornings, so the service has times to offer: one with none is
+ * left off the public reads (UX-024), and this spec is about the fields.
+ */
+async function withHours(serviceId: string) {
+    await prisma.availabilityRule.create({
+        data: {
+            organizationId: owner.organizationId,
+            serviceId,
+            dayOfWeek: 1,
+            startMinute: 9 * 60,
+            endMinute: 13 * 60,
+        },
+    });
+}
+
 beforeAll(async () => {
     const [org, rival] = await Promise.all([
         prisma.organization.create({
@@ -78,6 +94,7 @@ beforeAll(async () => {
             },
         })
     ).id;
+    await withHours(existing);
 });
 
 describe("service fields (E1, real database)", () => {
@@ -107,6 +124,7 @@ describe("service fields (E1, real database)", () => {
             locationType: "EITHER",
             meetingUrl: "https://meet.example.com/kavi",
         });
+        await withHours(made.id);
         expect(made).toMatchObject({
             visits: 3,
             depositMode: "PERCENT_50",
@@ -148,6 +166,7 @@ describe("service fields (E1, real database)", () => {
             timezone: "Asia/Kolkata",
             showOnBookingPage: false,
         });
+        await withHours(hidden.id);
         const page = await publicBookings.publicBookingPage(siteId);
         expect(page.services.map((s) => s.id)).not.toContain(hidden.id);
         await expect(

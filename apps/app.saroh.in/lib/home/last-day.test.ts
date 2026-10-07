@@ -88,6 +88,15 @@ describe("dateLine", () => {
         );
     });
 
+    it("gets a site for someone's work online, not ready to take money (UX-074)", () => {
+        expect(dateLine(day({ fresh: true }), "Asha Rao", null, "WORK")).toBe(
+            "Let's get Asha Rao online.",
+        );
+        expect(dateLine(day({ fresh: true }), "Asha Rao", null, "SOLO")).toBe(
+            "Let's get Asha Rao ready for clients.",
+        );
+    });
+
     it("is just the business without the header", () => {
         expect(dateLine(null, "Rye & Co.")).toBe("Rye & Co.");
     });

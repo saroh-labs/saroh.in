@@ -7,6 +7,7 @@ import { PageContainer } from "@/components/shared/page-container";
 import { PaymentsCrumbs } from "@/components/subscriptions/payments-crumbs";
 import { PlanEditor } from "@/components/subscriptions/plan-editor/plan-editor";
 import { membershipPlansLock } from "@/lib/billing/access";
+import { permitsFor } from "@/lib/organizations/permits";
 import { resolveActiveOrganization } from "@/lib/organizations/service";
 import { billingAccessOrNull } from "@/lib/saroh-billing/service";
 import { requireSession } from "@/lib/session";
@@ -27,10 +28,7 @@ export const metadata = { title: "New plan" };
 export default async function NewPlanPage() {
     await requireSession();
     const organization = await resolveActiveOrganization();
-    const may = (action: string) =>
-        organization?.actions
-            ? organization.actions.includes(action)
-            : organization?.role === "OWNER" || organization?.role === "ADMIN";
+    const may = permitsFor(organization);
 
     if (organization?.actions && !may("subscription:write")) {
         return (

@@ -3,6 +3,8 @@ import { prisma, runInOrgContext } from "@saroh/database";
 
 import { fromMinor, toMinor, toMoneyString } from "../../common/money";
 import type { CustomerContext } from "../site-accounts/customer-context.decorator";
+import { openingHoursText } from "../stores/opening-hours-text";
+import type { OpeningHoursDay } from "../stores/storefronts.dto";
 import { onHandoverLabel } from "./checkout-readiness";
 import type { FulfilmentType } from "./fulfilment";
 import { FULFILMENT_RULES, shipsToAddress, typeOf } from "./fulfilment";
@@ -51,13 +53,19 @@ export interface CheckoutConfirmation {
     delivery: string | null;
     /** Taken off at checkout, "50.00"; null when nothing was. */
     discount: string | null;
+    /** The code that took it off (DEC-104), "SAVE10"; null without one. */
+    discountCode: string | null;
     total: string;
     fulfilment: {
         type: FulfilmentType;
         /** "Pick-up", "Local delivery", "Shipping". */
         label: string;
-        /** Pick-up: where to collect it. */
-        pickup: { name: string; address: string | null } | null;
+        /** Pick-up: where to collect it, and when it's open (UX-025). */
+        pickup: {
+            name: string;
+            address: string | null;
+            hours: string | null;
+        } | null;
         /** Delivery and shipping: where it goes, as they typed it. */
         deliverTo: {
             name: string | null;
@@ -83,6 +91,8 @@ export interface ConfirmationRow {
     subtotal: { toString(): string };
     shipping: { toString(): string };
     discount: { toString(): string };
+    /** The code the order used, as its redemption recorded it. */
+    discountRedemption?: { code: string } | null;
     total: { toString(): string };
     paymentStatus: string;
     payOnHandover?: boolean;
@@ -93,7 +103,10 @@ export interface ConfirmationRow {
     deliveryCity: string | null;
     deliveryState: string | null;
     deliveryPostalCode: string | null;
-    store: { name: string; settings: { address: string | null } | null };
+    store: {
+        name: string;
+        settings: { address: string | null; openingHours?: unknown } | null;
+    };
     items: {
         quantity: number;
         price: { toString(): string };
@@ -143,6 +156,7 @@ export function confirmationView(row: ConfirmationRow): CheckoutConfirmation {
         subtotal: toMoneyString(row.subtotal),
         delivery: unlessZero(row.shipping),
         discount: unlessZero(row.discount),
+        discountCode: row.discountRedemption?.code ?? null,
         total: toMoneyString(row.total),
         fulfilment: {
             type,
@@ -152,6 +166,12 @@ export function confirmationView(row: ConfirmationRow): CheckoutConfirmation {
                     ? {
                           name: row.store.name,
                           address: clean(row.store.settings?.address),
+                          hours: openingHoursText(
+                              Array.isArray(row.store.settings?.openingHours)
+                                  ? (row.store.settings
+                                        .openingHours as OpeningHoursDay[])
+                                  : null,
+                          ),
                       }
                     : null,
             deliverTo:
@@ -205,6 +225,7 @@ export class CheckoutConfirmationService {
                     subtotal: true,
                     shipping: true,
                     discount: true,
+                    discountRedemption: { select: { code: true } },
                     total: true,
                     paymentStatus: true,
                     payOnHandover: true,
@@ -218,7 +239,9 @@ export class CheckoutConfirmationService {
                     store: {
                         select: {
                             name: true,
-                            settings: { select: { address: true } },
+                            settings: {
+                                select: { address: true, openingHours: true },
+                            },
                         },
                     },
                     items: {

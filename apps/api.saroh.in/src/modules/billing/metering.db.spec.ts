@@ -170,6 +170,8 @@ async function booking(
             timezone: "Asia/Kolkata",
             snapshot: {},
             bookerEmail: `${uniq("b")}@example.test`,
+            // Made on the site unless a test says the team made it.
+            bookedOnline: true,
             ...over,
         },
     });
@@ -308,6 +310,11 @@ describe("what each limit counts (DB, U13)", () => {
             createdAt: new Date(start.getTime() - 15 * MINUTE),
         });
         await booking(orgId, { status: "CANCELLED" });
+        // One the team made in the workspace is never counted (DEC-095).
+        await booking(orgId, {
+            createdAt: new Date(start.getTime() + 20 * MINUTE),
+            bookedOnline: false,
+        });
         // A pay-now hold isn't a booking until it is paid.
         await booking(orgId, {
             status: "PENDING",
@@ -452,6 +459,51 @@ describe("what each limit counts (DB, U13)", () => {
         expect(await countUsage(prisma, orgId, "teamMembers")).toBe(2);
         // The Reviewer in the business and the open Reviewer invitation.
         expect(await countUsage(prisma, orgId, "reviewers")).toBe(2);
+    });
+
+    // DEC-105: a role of the business's own is judged on its permissions.
+    it("seats a role that books, not one that only looks; bookable staff always", async () => {
+        const { orgId } = await business("pro");
+        await prisma.organizationRole.createMany({
+            data: [
+                {
+                    organizationId: orgId,
+                    key: "looker",
+                    label: "Looker",
+                    actions: ["order:read", "booking:read"],
+                },
+                {
+                    organizationId: orgId,
+                    key: "front-desk",
+                    label: "Front desk",
+                    actions: ["booking:write"],
+                },
+            ],
+        });
+        const join = async (role: string) => {
+            const user = await prisma.user.create({
+                data: { email: `${uniq("m")}@example.test` },
+            });
+            return prisma.membership.create({
+                data: { organizationId: orgId, userId: user.id, role },
+            });
+        };
+        await join("looker");
+        await join("front-desk");
+        const trainer = await join("looker");
+        expect(await countUsage(prisma, orgId, "teamMembers")).toBe(1);
+        expect(await countUsage(prisma, orgId, "reviewers")).toBe(2);
+
+        // On the diary, taking bookings: a seat whatever the role.
+        await prisma.staffMember.create({
+            data: {
+                organizationId: orgId,
+                membershipId: trainer.id,
+                name: "Trainer",
+            },
+        });
+        expect(await countUsage(prisma, orgId, "teamMembers")).toBe(2);
+        expect(await countUsage(prisma, orgId, "reviewers")).toBe(1);
     });
 
     it("counts live locations customers visit, never an online one", async () => {
@@ -652,7 +704,7 @@ describe("enforcement behind PLAN_ENFORCEMENT (DB, U13)", () => {
             used: 3,
             plan: { id: "free", name: "Plan A" },
             upgradeTo: { planId: "grow", name: "Plan B" },
-            notice: { cta: "Upgrade or add more" },
+            notice: { cta: "See plans" },
         });
     });
 
@@ -858,11 +910,12 @@ describe("limit notices (DB, U13)", () => {
         expect(await notices(orgId)).toEqual([
             {
                 title: "You've used 4 of 5 products on Plan B",
-                body: "You'll be stopped at 5. Plan C gives you more.",
+                // Plan C has no cap on products, so it says so (UX-083).
+                body: "You'll be stopped at 5. Plan C has no limit.",
             },
             {
                 title: "You've reached your 5 products on Plan B",
-                body: "You can't add more products. Plan C raises the limit, or add more with an add-on.",
+                body: "You can't add more products. Plan C has no limit.",
             },
         ]);
     });

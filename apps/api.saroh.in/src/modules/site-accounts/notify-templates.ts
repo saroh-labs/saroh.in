@@ -49,6 +49,17 @@ export interface OrderNoticeVars {
     trackingUrl: string | null;
 }
 
+/** A website order the customer just placed (UX-042). */
+export interface PlacedOrderVars {
+    business: string;
+    firstName: string | null;
+    number: string;
+    /** How it reaches them (`OrderFulfilment`): collected, delivered, … */
+    fulfilment: string;
+    /** Paid when it is handed over, not online. */
+    payOnHandover: boolean;
+}
+
 export interface WaitlistNoticeVars {
     business: string;
     firstName: string | null;
@@ -64,6 +75,7 @@ export type NoticeVars =
           kind: "BOOKING_CONFIRMED" | "BOOKING_MOVED" | "BOOKING_CANCELLED";
           booking: BookingNoticeVars;
       }
+    | { kind: "ORDER_PLACED"; placed: PlacedOrderVars }
     | { kind: "ORDER_READY" | "ORDER_HANDED_OVER"; order: OrderNoticeVars }
     | { kind: "WAITLIST_OFFER"; waitlist: WaitlistNoticeVars };
 
@@ -112,6 +124,8 @@ export function noticeSentence(vars: NoticeVars): string {
         case "BOOKING_MOVED":
         case "BOOKING_CANCELLED":
             return bookingSentence(vars.kind, vars.booking);
+        case "ORDER_PLACED":
+            return placedSentence(vars.placed);
         case "ORDER_READY":
         case "ORDER_HANDED_OVER":
             return orderSentence(vars.kind, vars.order);
@@ -145,6 +159,27 @@ function bookingSentence(
     }
 }
 
+function placedSentence(p: PlacedOrderVars): string {
+    const pickup = p.fulfilment === "PICKUP";
+    const delivered =
+        p.fulfilment === "LOCAL_DELIVERY" || p.fulfilment === "SHIPPING";
+    // Only the steps they are told about are promised (`orderNoticeKind`).
+    const next = pickup
+        ? " We'll tell you when it's ready to collect."
+        : delivered
+          ? " We'll tell you when it's on its way."
+          : "";
+    if (p.payOnHandover) {
+        const pay = pickup
+            ? "You pay when you collect it."
+            : delivered
+              ? "You pay when it's delivered."
+              : "You pay when you get it.";
+        return `We have your order ${p.number}. ${pay}${next}`;
+    }
+    return `We have your order ${p.number}, and it's paid.${next}`;
+}
+
 function orderSentence(
     kind: "ORDER_READY" | "ORDER_HANDED_OVER",
     o: OrderNoticeVars,
@@ -173,6 +208,8 @@ function noticeSubject(vars: NoticeVars): string {
             return `Your booking with ${vars.booking.business} has moved`;
         case "BOOKING_CANCELLED":
             return `Your booking with ${vars.booking.business} is cancelled`;
+        case "ORDER_PLACED":
+            return `Your order ${vars.placed.number} from ${vars.placed.business}`;
         case "ORDER_READY":
             return vars.order.pickup
                 ? `Your order ${vars.order.number} from ${vars.order.business} is ready to collect`
@@ -186,6 +223,8 @@ function noticeSubject(vars: NoticeVars): string {
 
 function businessOf(vars: NoticeVars): string {
     switch (vars.kind) {
+        case "ORDER_PLACED":
+            return vars.placed.business;
         case "ORDER_READY":
         case "ORDER_HANDED_OVER":
             return vars.order.business;
@@ -198,6 +237,8 @@ function businessOf(vars: NoticeVars): string {
 
 function firstNameOf(vars: NoticeVars): string | null {
     switch (vars.kind) {
+        case "ORDER_PLACED":
+            return vars.placed.firstName;
         case "ORDER_READY":
         case "ORDER_HANDED_OVER":
             return vars.order.firstName;

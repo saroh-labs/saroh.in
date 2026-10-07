@@ -9,7 +9,11 @@ import { gymTemplate } from "./templates/gym";
 import { personalTemplate } from "./templates/personal";
 import { portfolioTemplate } from "./templates/portfolio";
 import { salonTemplate } from "./templates/salon";
-import { starterTemplate, starterTemplateV1 } from "./templates/starter";
+import {
+    starterTemplate,
+    starterTemplateV1,
+    starterTemplateV2,
+} from "./templates/starter";
 import { studioTemplate } from "./templates/studio";
 import { writingTemplate } from "./templates/writing";
 
@@ -26,12 +30,12 @@ function key(id: string, version: number): string {
  *
  * In the order the picker offers them: the starter, then the three DEC-070
  * added for someone working for themselves or showing their work (K15),
- * then the industry templates (plan Phase B).
  * then the industry templates (industry templates plan, Phase B).
  */
 const REGISTRY: Record<string, TemplateManifest> = Object.fromEntries(
     [
         starterTemplateV1,
+        starterTemplateV2,
         starterTemplate,
         personalTemplate,
         portfolioTemplate,

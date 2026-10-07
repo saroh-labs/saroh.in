@@ -1,4 +1,5 @@
 import { apiFetch, orgBase } from "@/lib/api/http";
+import { resolveActiveOrganization } from "@/lib/organizations/service";
 
 import type { EmailMay, EmailSetup } from "./email-setup";
 
@@ -21,6 +22,25 @@ export async function readEmailSetup(
     if (!res?.ok) return null;
     const body: unknown = await res.json().catch(() => null);
     return isEmailSetup(body) ? body : null;
+}
+
+/**
+ * What this person may do about the business's email, from their role in
+ * the active business: `comms:manage` connects one, `billing:read` sees the
+ * plans (an older API without actions: owners and admins).
+ */
+export async function myEmailMay(): Promise<EmailMay> {
+    const org = await resolveActiveOrganization().catch(() => null);
+    const may = (action: string) =>
+        org?.actions
+            ? org.actions.includes(action)
+            : org?.role === "OWNER" || org?.role === "ADMIN";
+    return { connect: may("comms:manage"), plans: may("billing:read") };
+}
+
+/** {@link readEmailSetup} for the signed-in person. */
+export async function readMyEmailSetup(): Promise<EmailSetup | null> {
+    return readEmailSetup(await myEmailMay());
 }
 
 function isEmailSetup(body: unknown): body is EmailSetup {

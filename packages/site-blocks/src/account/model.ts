@@ -31,6 +31,12 @@ export interface AccountView {
     bookingsLabel: "Bookings" | "Appointments";
     healthNotes: boolean;
     /**
+     * What the notes card asks for, by what the business is (UX-040):
+     * health for a practice, food for a kitchen, else general. Absent from
+     * an API before it: a business booking appointments reads as health.
+     */
+    notesKind?: "health" | "food" | "general";
+    /**
      * Messages from the business not yet opened (A13): the Messages tab's
      * dot. Absent from an API that predates it: read as none.
      */
@@ -107,6 +113,11 @@ export interface AccountOrderDetail {
     } | null;
     refund: string | null;
     receipt: string | null;
+    /**
+     * A pick-up's place (UX-025): the address and hours to collect it
+     * from. Null without one; absent from an older API.
+     */
+    collectFrom?: { address: string; hours: string | null } | null;
 }
 
 export interface AccountPlan {

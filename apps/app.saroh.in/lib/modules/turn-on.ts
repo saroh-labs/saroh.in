@@ -151,6 +151,15 @@ export function comesWithLines(
     });
 }
 
+/**
+ * What a module gives on a plan that won't let the business connect its
+ * provider (UX-006): Payments there is the offline kind.
+ */
+export const GIVES_OFFLINE: Readonly<Record<string, string>> = {
+    PAYMENTS:
+        "Invoices, payments you record, and How to pay us for customers who pay you directly.",
+};
+
 /** What turning each one on gives, said once in the sheet. Only what is true. */
 export const GIVES: Readonly<Record<string, string>> = {
     COMMERCE: "Orders, products and customers, sold from your first location.",
@@ -409,7 +418,9 @@ const FIRST_SCREEN: Readonly<Record<string, string>> = {
     APPOINTMENTS: "/bookings",
     CRM: "/contacts",
     WEBSITE: "/sites",
-    PAYMENTS: "/billing/subscriptions",
+    // Billing's own landing: Subscriptions, or Invoices where the plan locks
+    // memberships (UX-047).
+    PAYMENTS: "/billing",
     INSIGHTS: "/analytics",
     COURSES: "/courses",
     CLASS_PACKS: "/class-packs",
@@ -435,6 +446,12 @@ export function landingHref(
     return null;
 }
 
+/** "Connect a provider", which a plan without it can't finish (UX-006). */
+const NO_PROVIDER = new Set([
+    "PAYMENTS_NO_PROVIDER",
+    "COMMUNICATIONS_NO_PROVIDER",
+]);
+
 /** The gates, which are not setup a merchant can finish. */
 const GATES = new Set([
     "UNAUTHORIZED",
@@ -450,12 +467,19 @@ const GATES = new Set([
  */
 export function finishSetupItems(
     views: readonly (ModuleView | null)[],
+    /**
+     * Whether the plan won't let the business connect this module's
+     * provider (UX-006): then "connect a provider" isn't setup to finish,
+     * and the toast never asks it.
+     */
+    connectLocked: (key: string) => boolean = () => false,
 ): string[] {
     const out: string[] = [];
     for (const view of views) {
         if (!view || view.readiness === "ACTIVE") continue;
         for (const b of view.blockers) {
             if (GATES.has(b.code)) continue;
+            if (NO_PROVIDER.has(b.code) && connectLocked(view.key)) continue;
             const said = blockerSentence(b);
             if (!out.includes(said)) out.push(said);
         }

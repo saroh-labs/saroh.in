@@ -13,6 +13,8 @@ jest.mock("@saroh/database", () => {
                 delete: jest.fn(),
             },
             lead: { groupBy: jest.fn(), count: jest.fn() },
+            // A contact's detail carries what they wrote (UX-002).
+            submission: { findMany: jest.fn().mockResolvedValue([]) },
             // Either form: a batch resolves each queued call in order, and a
             // callback runs against the same mocked client.
             $transaction: jest.fn((arg: unknown) =>
@@ -92,6 +94,8 @@ const CONTACT = {
     email: "ananya@example.com",
     firstName: "Ananya",
     lastName: "Rao",
+    // The list's include: their live site account, if any (UX-013).
+    customerAccounts: [] as { email: string }[],
 };
 
 function ctx(over: Partial<OrganizationContext> = {}): OrganizationContext {
@@ -120,14 +124,16 @@ describe("ContactsService.list", () => {
 
         await service.list(ctx());
 
-        expect(findMany).toHaveBeenCalledWith({
-            where: {
-                organizationId: "org_1",
-                mergedIntoId: null,
-                removedAt: null,
-            },
-            orderBy: { createdAt: "desc" },
-        });
+        expect(findMany).toHaveBeenCalledWith(
+            expect.objectContaining({
+                where: {
+                    organizationId: "org_1",
+                    mergedIntoId: null,
+                    removedAt: null,
+                },
+                orderBy: { createdAt: "desc" },
+            }),
+        );
     });
 
     it("denies a REVIEWER (website only) before any I/O", async () => {
@@ -172,6 +178,33 @@ describe("ContactsService.list", () => {
             openLeadCount: 2,
             nextBookingAt: startAt,
         });
+    });
+
+    it("carries the email their site account signs in with, and drops the include (UX-013)", async () => {
+        const service = new ContactsService();
+        findMany.mockResolvedValue([
+            {
+                ...CONTACT,
+                email: "account+c_1@account.invalid",
+                customerAccounts: [{ email: "ananya@example.com" }],
+            },
+            { ...CONTACT, id: "c_2" },
+        ]);
+
+        const [separate, plain] = await service.list(ctx());
+
+        expect(separate?.accountEmail).toBe("ananya@example.com");
+        expect(plain?.accountEmail).toBeNull();
+        expect(separate).not.toHaveProperty("customerAccounts");
+        expect(findMany).toHaveBeenCalledWith(
+            expect.objectContaining({
+                include: {
+                    customerAccounts: expect.objectContaining({
+                        where: { status: "ACTIVE" },
+                    }),
+                },
+            }),
+        );
     });
 
     it("aggregates the whole page in one query per relation, not one per contact", async () => {
@@ -412,6 +445,7 @@ describe("ContactsService.get", () => {
             id: "c_1",
             organizationId: "org_1",
             leads: [],
+            customerAccounts: [],
         });
 
         const res = await service.get(ctx(), "c_1");
@@ -427,6 +461,22 @@ describe("ContactsService.get", () => {
         );
     });
 
+    it("names the email their site account signs in with (UX-013)", async () => {
+        const service = new ContactsService();
+        findUnique.mockResolvedValue({
+            id: "c_1",
+            organizationId: "org_1",
+            email: "account+c_1@account.invalid",
+            leads: [],
+            customerAccounts: [{ email: "priya@example.in" }],
+        });
+
+        const res = await service.get(ctx(), "c_1");
+
+        expect(res.accountEmail).toBe("priya@example.in");
+        expect(res).not.toHaveProperty("customerAccounts");
+    });
+
     it("asks for no leads when the role cannot read them", async () => {
         // The leak this test exists for: `get` used to include every lead
         // unconditionally, so a Member opening a contact saw the pipeline.
@@ -435,6 +485,7 @@ describe("ContactsService.get", () => {
             id: "c_1",
             organizationId: "org_1",
             leads: [],
+            customerAccounts: [],
         });
 
         const res = await service.get(ctx({ role: "MEMBER" }), "c_1");
@@ -442,6 +493,9 @@ describe("ContactsService.get", () => {
         expect(res.id).toBe("c_1");
         const include = findUnique.mock.calls[0]?.[0]?.include;
         expect(include.leads).toMatchObject({ where: { id: { in: [] } } });
+        // Nor what they wrote through a form: an enquiry is sales data.
+        expect(res.enquiries).toEqual([]);
+        expect(prisma.submission.findMany).not.toHaveBeenCalled();
     });
 
     it("404s a cross-tenant contact", async () => {

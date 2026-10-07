@@ -131,11 +131,13 @@ export {
 } from "./lib/opening-hours";
 export type { OpenState, OpeningHoursDay, Weekday } from "./lib/opening-hours";
 
+// A price as the site shows it; no directive, so server pages can call it.
+export { formatAmount } from "./lib/money";
+
 // Not a page block: a product as its shop page shows it (#465) — the
 // workspace's Customer view today, the storefront product page later.
 export {
     default as ProductPage,
-    formatAmount,
     percentOff,
     stockLabel,
     useProductSelection,
@@ -167,6 +169,7 @@ export type {
     CheckoutStanding,
     CheckoutStarted,
     DeliveryAddress,
+    QuoteDiscount,
     QuoteLine,
     QuotePayment,
     QuoteWay,
@@ -312,6 +315,7 @@ export type {
 export { AccountBookingsTab } from "./account/bookings-list";
 export { BOOKINGS_HREF, moveClassHref } from "./account/bookings-model";
 export type {
+    AccountBookingPaid,
     AccountBookingRow,
     AccountBookingState,
     AccountBookings,
@@ -413,12 +417,15 @@ export {
     SiteFooter,
     SiteHeader,
     footerLine,
+    madeWithSarohHref,
     siteMenu,
     withShopLink,
 } from "./site-chrome";
 export type {
     FooterLayout,
     ModulePageStates,
+    SiteContact,
+    SiteCredit,
     SiteFooterContent,
 } from "./site-chrome";
 // A module page's address while its module is off (G15).

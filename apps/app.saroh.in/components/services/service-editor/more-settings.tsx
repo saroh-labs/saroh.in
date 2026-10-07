@@ -7,7 +7,6 @@ import { ChevronDown } from "lucide-react";
 import { useId, useState } from "react";
 
 import { AvailabilityRulesEditor } from "@/components/bookings/availability-rules-editor";
-import { Chip, Eyebrow } from "@/components/bookings/calendar/parts";
 import { OptionSelect } from "@/components/shared/option-select";
 import { TimezoneSelect } from "@/components/shared/timezone-select";
 import type { GstRateValue } from "@/lib/invoices/gst";
@@ -21,12 +20,11 @@ import { FIELD, HELP, LABEL, NumberField, Section } from "./fields";
  * More settings (E2, default 42): what the old service forms had that the
  * design's page leaves out, kept one click away (00-universal §15) — the
  * time zone, the buffer before, GST, the service's own weekly hours and
- * Delete. Kind sits here too for a business that runs no classes.
+ * Delete. Closed until opened (UX-056: `hidden` alone lost to `grid`).
  */
 export function MoreSettings({
     draft,
     set,
-    kindHere,
     serviceId,
     rules,
     canEdit,
@@ -34,8 +32,6 @@ export function MoreSettings({
 }: {
     draft: ServiceDraft;
     set: (patch: Partial<ServiceDraft>) => void;
-    /** Kind isn't shown up front, so it is offered here. */
-    kindHere: boolean;
     /** Null while creating: hours and Delete need a saved service. */
     serviceId: string | null;
     /** Null when the hours couldn't be read. */
@@ -46,7 +42,6 @@ export function MoreSettings({
     const [open, setOpen] = useState(false);
     const ids = {
         body: useId(),
-        kind: useId(),
         tz: useId(),
         gst: useId(),
         sac: useId(),
@@ -71,35 +66,11 @@ export function MoreSettings({
                     className={open ? "size-4 rotate-180" : "size-4"}
                 />
             </Button>
-            <div id={ids.body} hidden={!open} className="mt-3.5 grid gap-4">
-                {kindHere ? (
-                    <div>
-                        <Eyebrow id={ids.kind}>Kind</Eyebrow>
-                        <div
-                            role="radiogroup"
-                            aria-labelledby={ids.kind}
-                            className="flex flex-wrap gap-1.5"
-                        >
-                            <Chip
-                                on={draft.kind === "one"}
-                                className="h-[34px] text-[13px]"
-                                onClick={() => set({ kind: "one" })}
-                            >
-                                One-to-one
-                            </Chip>
-                            <Chip
-                                on={draft.kind === "class"}
-                                className="h-[34px] text-[13px]"
-                                onClick={() => set({ kind: "class" })}
-                            >
-                                Class
-                            </Chip>
-                        </div>
-                        <p className={HELP}>
-                            A class runs at set times with a number of places.
-                        </p>
-                    </div>
-                ) : null}
+            <div
+                id={ids.body}
+                hidden={!open}
+                className={cn("mt-3.5 gap-4", open ? "grid" : "hidden")}
+            >
                 <div className="flex flex-wrap gap-3">
                     <div className="min-w-0 flex-[1_1_220px]">
                         <label htmlFor={ids.tz} className={LABEL}>

@@ -45,6 +45,34 @@ export function planTakesOnlinePayment(
     return included(organizationId, PAYMENTS_ROW);
 }
 
+/**
+ * Whether the plan lets the business connect one more of its own email or
+ * payment accounts (catalogue row `integrations`, DEC-091): the connect's
+ * own check (`MeteringService.hasRoom`), without writing. A plan or count
+ * that can't be read is room, failing open as every plan check here does:
+ * this only decides what a screen offers, and the connect still refuses.
+ */
+export function planConnectsOwnAccounts(
+    organizationId: string,
+): Promise<boolean> {
+    return planMeter.hasRoom(organizationId, "integrations").catch(() => true);
+}
+
+/**
+ * Why no payment provider can take money online when none is connected:
+ * `NO_PROVIDER` when the business could connect one, `PLAN` when its plan
+ * won't let it (no room on `integrations`, DEC-091) — Free on a version
+ * with no `payments` row still can't connect one, so no screen says
+ * "Connect one" to a key form the connect refuses (UX-006, UX-017).
+ */
+export async function noProviderReason(
+    organizationId: string,
+): Promise<"PLAN" | "NO_PROVIDER"> {
+    return (await planConnectsOwnAccounts(organizationId))
+        ? "NO_PROVIDER"
+        : "PLAN";
+}
+
 /** 403 `MODULE_LOCKED` when the plan leaves online payments off. */
 export async function assertPlanTakesOnlinePayment(
     organizationId: string,

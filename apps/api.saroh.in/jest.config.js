@@ -94,6 +94,9 @@ module.exports = {
         // the real starter template — never touch a DB.
         "<rootDir>/src/modules/sites/**/*.spec.ts",
         "<rootDir>/src/modules/domains/**/*.spec.ts",
+        // The category refusal's words (UX-066); the rest of content's
+        // specs read the dev database.
+        "<rootDir>/src/modules/content/post-categories.slug.spec.ts",
         // S3-003 jobs: nextBackoff (pure), PrismaJobQueue.fail branch selection
         // (mocked prisma.job), the worker dispatch loop (in-memory FakeJobQueue
         // + real registry), and the registry — all DB-free / timer-free.
@@ -226,6 +229,8 @@ module.exports = {
         "<rootDir>/src/modules/orders/offline-checkout-start.spec.ts",
         // R34: an order to pay on handover nobody came for, pure.
         "<rootDir>/src/modules/orders/uncollected.spec.ts",
+        // Record as refunded's amount and words (UX-061).
+        "<rootDir>/src/modules/orders/hand-payments.spec.ts",
         // P4: the site's order confirmation, DB-free. Its access rules are
         // in checkout-confirmation.db.spec.ts.
         "<rootDir>/src/modules/orders/checkout-confirmation.spec.ts",
@@ -234,6 +239,10 @@ module.exports = {
         "<rootDir>/src/modules/discounts/redeem.spec.ts",
         "<rootDir>/src/modules/discounts/discounts.service.spec.ts",
         "<rootDir>/src/modules/discounts/discounts.controller.spec.ts",
+        // DEC-104: one discount evaluation for the counter and the site's
+        // checkout, and the code in the site's bag.
+        "<rootDir>/src/modules/discounts/check-for-order.spec.ts",
+        "<rootDir>/src/modules/orders/site-discount-quote.spec.ts",
         // ADR-007 invoices: pure totals, numbering and standing, and the
         // service with a jest-mocked Prisma. Never touch a DB. (The numbering
         // races in invoices.db.spec.ts need Postgres and run in integration.)

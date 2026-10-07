@@ -19,7 +19,7 @@ import type {
 } from "@saroh/database";
 import { prisma } from "@saroh/database";
 import type { BillingCycle } from "@saroh/pricing-catalog";
-import { catalogPlanIdForKey } from "@saroh/pricing-catalog";
+import { catalogPlanIdForKey, withGstPaise } from "@saroh/pricing-catalog";
 
 import { prismaErrorCode } from "../../common/prisma-errors";
 import type { OrganizationContext } from "../../common/types/organization-context";
@@ -33,13 +33,34 @@ import { gstinProblem, stateCode } from "../invoices/gst-states";
 import { authorize } from "../organizations/organization-policy";
 import { findUsableCoupon } from "../pricing/coupons.service";
 import { clearAddonsInTx } from "./addon-charges";
-import type { ChangeKind, ChangeQuote } from "./checkout-quote";
-import { billedByProvider, COUPON_KINDS, quoteChange } from "./checkout-quote";
-import { catalogueOfVersion, hadTrial, planTrialDays } from "./offers";
+import type { Term } from "./billing-term";
+import { isOneTime, ONE_TIME_PAYMENT, termOf } from "./billing-term";
+import type {
+    ChangeKind,
+    ChangeQuote,
+    MandateCheck,
+    PaymentKind,
+} from "./checkout-quote";
+import {
+    billedByProvider,
+    COUPON_KINDS,
+    quoteChange,
+    TERM_CHARGES,
+} from "./checkout-quote";
+import {
+    catalogueOfVersion,
+    hadTrial,
+    planFirstPaise,
+    planTrialDays,
+} from "./offers";
 import { PlansService } from "./plans.service";
 import { enqueueProviderCancel } from "./provider-cancel.job";
 import { CATALOGUE_BILLING_PROVIDER } from "./provider-plan-sync.service";
-import type { BillingProviderFactory } from "./providers/billing-provider.port";
+import type {
+    BillingProvider,
+    BillingProviderFactory,
+    CheckoutHandoff,
+} from "./providers/billing-provider.port";
 import {
     BILLING_PROVIDER_FACTORY,
     BillingProviderError,
@@ -90,6 +111,16 @@ export interface ChangePlanQuoteView {
     firstChargePaise: number;
     firstChargeGstPaise: number;
     firstChargeTotalPaise: number;
+    /**
+     * How it's paid (DEC-093): monthly autopay for `termCharges` charges,
+     * then a one-tap renewal; or yearly's one payment.
+     */
+    payment: PaymentKind;
+    termCharges: number;
+    /** Exactly what is taken as it's authorised, GST included. */
+    payNowTotalPaise: number;
+    /** What setting up autopay takes now, named honestly (DEC-093). */
+    mandateCheck: MandateCheck;
 }
 
 /** A checkout as the business sees it; never the provider's link. */
@@ -108,6 +139,8 @@ export interface CheckoutView {
     startAt: string | null;
     expiresAt: string;
     createdAt: string;
+    /** Monthly autopay, or yearly's one payment (DEC-093). */
+    payment: PaymentKind;
 }
 
 /** `POST …/billing/change-plan`. */
@@ -119,20 +152,40 @@ export type ChangePlanResult =
           effectiveAt: string;
       }
     | {
-          kind: "NEW" | "UPGRADE" | "SCHEDULED" | "TRIAL";
+          kind: CheckoutKind;
           quote: ChangePlanQuoteView;
           checkout: CheckoutView;
           /**
            * The provider's page where the business authorises it. Given once,
-           * here; Saroh doesn't keep it. Null when the provider makes none.
+           * here; Saroh doesn't keep it. Null when the provider makes none
+           * (a yearly order is paid in the provider's window).
            */
           authorisationUrl: string | null;
+          /**
+           * What opens the provider's own checkout window over Saroh, with
+           * the owner's details pre-filled (DEC-093); null when the
+           * provider has none. Paying there comes back to the page, which
+           * confirms it with the provider (`POST …/billing/checkout/confirm`).
+           */
+          handoff: CheckoutHandoff | null;
       };
+
+/** The kinds of change that make a checkout. */
+export type CheckoutKind = "NEW" | "UPGRADE" | "SCHEDULED" | "TRIAL" | "RENEW";
 
 /** `GET …/billing/checkout`: the checkouts still in play. */
 export interface CheckoutsView {
-    open: CheckoutView | null;
+    /**
+     * Waiting for the business to pay; `handoff` reopens the same payment
+     * (never a second mandate) when the provider has a window.
+     */
+    open: (CheckoutView & { handoff: CheckoutHandoff | null }) | null;
     scheduled: CheckoutView | null;
+    /**
+     * The 12-month term of the plan it's on (DEC-093, #803), when it has
+     * one: its end, how it's paid, and whether the one-tap renewal is open.
+     */
+    term: { endsAt: string; payment: PaymentKind; renewOpen: boolean } | null;
 }
 
 const SUB_SELECT = {
@@ -221,20 +274,138 @@ export class CheckoutService {
         return this.quoteView(target, quote, coupon);
     }
 
-    async current(ctx: OrganizationContext): Promise<CheckoutsView> {
+    async current(
+        ctx: OrganizationContext,
+        now: Date = new Date(),
+    ): Promise<CheckoutsView> {
         authorize(ctx, "billing:read");
-        const rows = await prisma.billingCheckout.findMany({
-            where: {
-                organizationId: ctx.organizationId,
-                status: { in: ["OPEN", "SCHEDULED"] },
-            },
-            include: { plan: true },
-        });
+        const [rows, subscription] = await Promise.all([
+            prisma.billingCheckout.findMany({
+                where: {
+                    organizationId: ctx.organizationId,
+                    status: { in: ["OPEN", "SCHEDULED"] },
+                },
+                include: { plan: true },
+            }),
+            prisma.subscription.findUnique({
+                where: { organizationId: ctx.organizationId },
+                select: SUB_SELECT,
+            }),
+        ]);
         const view = (status: string) => {
             const row = rows.find((r) => r.status === status);
             return row ? checkoutView(row, row.plan) : null;
         };
-        return { open: view("OPEN"), scheduled: view("SCHEDULED") };
+        const openRow = rows.find((r) => r.status === "OPEN");
+        const open = openRow
+            ? {
+                  ...checkoutView(openRow, openRow.plan),
+                  handoff: await this.handoff(ctx, openRow, payNowOf(openRow)),
+              }
+            : null;
+        const term = await this.termOfSubscription(subscription, now);
+        return {
+            open,
+            scheduled: view("SCHEDULED"),
+            term: term
+                ? {
+                      endsAt: term.endsAt.toISOString(),
+                      payment: term.payment,
+                      renewOpen: term.renewOpen,
+                  }
+                : null,
+        };
+    }
+
+    /** The term of the plan the subscription is billed for (DEC-093). */
+    private async termOfSubscription(
+        sub: {
+            status: string;
+            provider: string | null;
+            providerSubscriptionId: string | null;
+            currentPeriodEnd: Date | null;
+            plan: { priceCents: number };
+        } | null,
+        now: Date,
+    ): Promise<Term | null> {
+        if (
+            !sub ||
+            sub.status === "CANCELLED" ||
+            !sub.provider ||
+            !sub.providerSubscriptionId ||
+            sub.plan.priceCents <= 0
+        ) {
+            return null;
+        }
+        const checkout = await prisma.billingCheckout.findUnique({
+            where: {
+                provider_providerSubscriptionId: {
+                    provider: sub.provider,
+                    providerSubscriptionId: sub.providerSubscriptionId,
+                },
+            },
+            select: {
+                providerPlanId: true,
+                cycle: true,
+                startAt: true,
+                completedAt: true,
+                createdAt: true,
+            },
+        });
+        return termOf(sub, checkout, now);
+    }
+
+    /**
+     * What the browser opens the provider's checkout window with: the
+     * provider's public key, the subscription or order, and the owner's
+     * email and the business's phone, pre-filled. Null when the provider
+     * has no window (its page link is used instead).
+     */
+    private async handoff(
+        ctx: OrganizationContext,
+        row: Pick<
+            BillingCheckout,
+            "provider" | "providerSubscriptionId" | "providerPlanId"
+        >,
+        amountPaise: number,
+    ): Promise<CheckoutHandoff | null> {
+        let provider: BillingProvider;
+        try {
+            provider = this.providers.get(row.provider);
+        } catch {
+            // A provider no longer known: the page link, if any, is the way.
+            return null;
+        }
+        const keyId = provider.publicKey?.() ?? null;
+        if (!keyId) return null;
+        const [user, profile, org] = await Promise.all([
+            prisma.user.findUnique({
+                where: { id: ctx.userId },
+                select: { email: true, name: true },
+            }),
+            prisma.businessProfile.findUnique({
+                where: { organizationId: ctx.organizationId },
+                select: { phone: true },
+            }),
+            prisma.organization.findUnique({
+                where: { id: ctx.organizationId },
+                select: { name: true },
+            }),
+        ]);
+        const oneTime = isOneTime(row);
+        return {
+            provider: row.provider,
+            keyId,
+            subscriptionId: oneTime ? null : row.providerSubscriptionId,
+            orderId: oneTime ? row.providerSubscriptionId : null,
+            amountPaise: oneTime ? amountPaise : null,
+            currency: "INR",
+            prefill: {
+                name: org?.name ?? user?.name ?? null,
+                email: user?.email ?? null,
+                contact: profile?.phone ?? null,
+            },
+        };
     }
 
     /** Change plan: to Free at once or at period end, else a checkout. */
@@ -345,10 +516,21 @@ export class CheckoutService {
             catalog && !(await hadTrial(prisma, organizationId))
                 ? planTrialDays(catalog, planId)
                 : null;
+        // DEC-093's nominal first month, from the same version's offer.
+        const trialFirstPaise = catalog ? planFirstPaise(catalog, planId) : 0;
+        const term = await this.termOfSubscription(subscription, now);
+        const termEndsAt = term?.endsAt ?? null;
         let coupon: PricingCoupon | null = null;
         const code = input.coupon?.trim();
         if (code) {
-            const plain = quoteChange({ subscription, target, now, trialDays });
+            const plain = quoteChange({
+                subscription,
+                target,
+                now,
+                trialDays,
+                trialFirstPaise,
+                termEndsAt,
+            });
             if (!COUPON_KINDS.includes(plain.kind)) {
                 throw new BadRequestException({
                     message:
@@ -369,6 +551,8 @@ export class CheckoutService {
             target,
             now,
             trialDays,
+            trialFirstPaise,
+            termEndsAt,
             coupon,
         });
         return { target, quote, subscription, coupon };
@@ -407,6 +591,10 @@ export class CheckoutService {
             firstChargePaise: quote.firstChargePaise,
             firstChargeGstPaise: quote.firstChargeGstPaise,
             firstChargeTotalPaise: quote.firstChargeTotalPaise,
+            payment: quote.payment,
+            termCharges: quote.termCharges,
+            payNowTotalPaise: quote.payNowTotalPaise,
+            mandateCheck: quote.mandateCheck,
         };
     }
 
@@ -517,7 +705,10 @@ export class CheckoutService {
         billTo: CheckoutBillTo = { billToState: null, billToGstin: null },
         coupon: PricingCoupon | null = null,
     ): Promise<ChangePlanResult> {
-        const kind = quote.kind as "NEW" | "UPGRADE" | "SCHEDULED" | "TRIAL";
+        const kind = quote.kind as CheckoutKind;
+        // A renewal is a scheduled change to the plan it's on (DEC-093).
+        const stored = kind === "RENEW" ? "SCHEDULED" : kind;
+        const oneTime = quote.payment === "ONE_TIME";
         const discounted = Boolean(coupon) && quote.discountCharges > 0;
         const providerPlan = await prisma.pricingProviderPlan.findUnique({
             where: {
@@ -539,11 +730,32 @@ export class CheckoutService {
         }
 
         const id = randomUUID();
-        let made;
+        const provider = this.providers.get(CATALOGUE_BILLING_PROVIDER);
+        let made: {
+            providerSubscriptionId: string;
+            providerCustomerId?: string;
+            authorisationUrl?: string;
+        };
         try {
-            made = await this.providers
-                .get(CATALOGUE_BILLING_PROVIDER)
-                .createSubscription({
+            if (oneTime) {
+                // Yearly is one payment for the year (DEC-093): an order for
+                // exactly what the quote says is due now, coupon and all —
+                // no mandate, no provider plan, no Offer.
+                if (!provider.orders) {
+                    throw new ConflictException(
+                        `${target.name} yearly can't be bought yet.`,
+                    );
+                }
+                const order = await provider.orders.createOrder({
+                    amountPaise: quote.payNowTotalPaise,
+                    currency: target.currency,
+                    reference: id,
+                    organizationId: ctx.organizationId,
+                    planKey: target.key,
+                });
+                made = { providerSubscriptionId: order.providerOrderId };
+            } else {
+                made = await provider.createSubscription({
                     planKey: target.key,
                     planId: target.id,
                     priceCents: target.priceCents,
@@ -552,10 +764,15 @@ export class CheckoutService {
                     organizationId: ctx.organizationId,
                     providerPlanId: providerPlan.providerPlanId,
                     startAt: quote.startAt,
+                    // A 12-month term, then a one-tap renewal (DEC-093).
+                    totalCount: TERM_CHARGES,
                     upfront:
                         quote.chargeNowTotalPaise > 0
                             ? {
-                                  name: `${target.name}: the rest of this period`,
+                                  name:
+                                      kind === "TRIAL"
+                                          ? `${target.name}: first month`
+                                          : `${target.name}: the rest of this period`,
                                   amountPaise: quote.chargeNowTotalPaise,
                               }
                             : null,
@@ -570,7 +787,9 @@ export class CheckoutService {
                             : null,
                     reference: id,
                 });
+            }
         } catch (error) {
+            if (error instanceof HttpException) throw error;
             this.logger.warn(
                 `billing_checkout_provider_failed org=${ctx.organizationId}: ${error instanceof Error ? error.message : "unknown"}`,
             );
@@ -602,11 +821,13 @@ export class CheckoutService {
             organizationId: ctx.organizationId,
             planId: target.id,
             cycle,
-            kind,
+            kind: stored,
             status: "OPEN",
             provider: CATALOGUE_BILLING_PROVIDER,
             providerSubscriptionId: made.providerSubscriptionId,
-            providerPlanId: providerPlan.providerPlanId,
+            providerPlanId: oneTime
+                ? ONE_TIME_PAYMENT
+                : providerPlan.providerPlanId,
             providerCustomerId: made.providerCustomerId ?? null,
             pricePaise: target.priceCents,
             chargeNowPaise: quote.chargeNowPaise,
@@ -614,7 +835,7 @@ export class CheckoutService {
             couponId: discounted ? (coupon?.id ?? null) : null,
             discountPaise: discounted ? quote.discountPaise : 0,
             discountCharges: discounted ? quote.discountCharges : 0,
-            startAt: kind === "NEW" ? null : quote.startAt,
+            startAt: stored === "NEW" ? null : quote.startAt,
             expiresAt: new Date(now.getTime() + CHECKOUT_TTL_MS),
             createdByUserId: ctx.userId,
             ...billTo,
@@ -626,7 +847,8 @@ export class CheckoutService {
                 return tx.billingCheckout.create({ data });
             });
         } catch (error) {
-            // Not recorded: the provider subscription made for it must go.
+            // Not recorded: the provider subscription made for it must go
+            // (an unpaid order simply lapses at the provider).
             await prisma.$transaction((tx) =>
                 enqueueProviderCancel(tx, {
                     organizationId: ctx.organizationId,
@@ -647,6 +869,7 @@ export class CheckoutService {
             quote: view,
             checkout: checkoutView(row, target),
             authorisationUrl: made.authorisationUrl ?? null,
+            handoff: await this.handoff(ctx, row, quote.payNowTotalPaise),
         };
     }
 
@@ -762,5 +985,20 @@ export function checkoutView(row: BillingCheckout, plan: Plan): CheckoutView {
         startAt: row.startAt?.toISOString() ?? null,
         expiresAt: row.expiresAt.toISOString(),
         createdAt: row.createdAt.toISOString(),
+        payment: isOneTime(row) ? "ONE_TIME" : "AUTOPAY",
     };
+}
+
+/**
+ * What a checkout takes as it's paid, GST included, from what it kept: a
+ * year paid once is its first charge (an upgrade, its difference); an
+ * autopay checkout its first charge (NEW) or its upfront amount.
+ */
+export function payNowOf(row: BillingCheckout): number {
+    const first = withGstPaise(
+        row.pricePaise - (row.discountCharges > 0 ? row.discountPaise : 0),
+    );
+    const upfront = row.chargeNowPaise + row.chargeNowGstPaise;
+    if (isOneTime(row)) return row.kind === "UPGRADE" ? upfront : first;
+    return row.kind === "NEW" ? first : row.chargeNowPaise > 0 ? upfront : 0;
 }

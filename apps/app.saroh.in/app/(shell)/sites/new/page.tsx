@@ -76,8 +76,8 @@ export default async function NewSitePage({
     }
 
     /*
-     * One website per business for now (ADR-006), and the API refuses a
-     * second. Nothing links here once there is one; this is for whoever
+     * One website per business, on every plan (ADR-006, DEC-094), and the
+     * API refuses a second. Nothing links here once there is one; this is for whoever
      * arrives with the address, told before the template picker.
      */
     const existing = sites.at(0);
@@ -89,7 +89,7 @@ export default async function NewSitePage({
                 <EmptyState
                     icon={<Globe />}
                     title={`${name} is this business's website`}
-                    description="A business has one website for now. Its pages, posts, look and address are all changed from Website."
+                    description="A business has one website. Its pages, posts, look and address are all changed from Website."
                     action={
                         <Button asChild variant="outline">
                             <Link href={`/sites/${existing.id}/pages`}>

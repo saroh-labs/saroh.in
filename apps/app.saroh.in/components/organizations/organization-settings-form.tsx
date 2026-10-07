@@ -14,9 +14,11 @@ import { Input } from "@saroh/ui/input";
 import { cn } from "@saroh/ui/lib/utils";
 import { Switch } from "@saroh/ui/switch";
 import { showError, showInfo } from "@saroh/ui/toast";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
-import type { FieldErrors } from "react-hook-form";
+import type { ReactNode } from "react";
+import { useEffect, useRef, useState } from "react";
+import type { FieldErrors, Resolver } from "react-hook-form";
 import { useForm, useWatch } from "react-hook-form";
 import { z } from "zod";
 
@@ -95,7 +97,10 @@ import {
     kindWords,
     ORGANIZATION_KINDS,
 } from "@/lib/organizations/kind";
-import { addressProblems } from "@/lib/organizations/registered-address";
+import {
+    addressProblems,
+    stateProblem,
+} from "@/lib/organizations/registered-address";
 import { saveOrganizationSettings } from "@/lib/organizations/settings-actions";
 import type { OrganizationSettings } from "@/lib/organizations/settings-service";
 import { browserZone, zoneLabel } from "@/lib/organizations/time-zones";
@@ -424,8 +429,29 @@ export function OrganizationSettingsForm({
     const [hoursDirty, setHoursDirty] = useState(false);
     // How to pay us (R32) keeps its own form too.
     const [payDirty, setPayDirty] = useState(false);
+    // An Indian address isn't whole without its state (UX-018): asked only
+    // while the address card is being edited, so a saved address without
+    // one never holds up another card's save. In the resolver, so the form's
+    // own checks keep it (a manual error would be cleared by the next one).
+    const editingRef = useRef(editing);
+    useEffect(() => {
+        editingRef.current = editing;
+    }, [editing]);
+    const resolver: Resolver<FormValues> = async (values, context, options) => {
+        const result = await zodResolver(formSchema)(values, context, options);
+        const noState =
+            editingRef.current === "address" ? stateProblem(values) : null;
+        if (!noState) return result;
+        return {
+            values: {},
+            errors: {
+                ...result.errors,
+                gstState: { type: "custom", message: noState },
+            },
+        };
+    };
     const form = useForm<FormValues>({
-        resolver: zodResolver(formSchema),
+        resolver,
         defaultValues: valuesOf(initial),
         mode: "onChange",
     });
@@ -761,7 +787,21 @@ export function OrganizationSettingsForm({
             },
         ],
     };
-    const notes: Partial<Record<SectionKey, string>> = {
+    const notes: Partial<Record<SectionKey, ReactNode>> = {
+        // The invoices themselves, from here too: a site for my work has
+        // no Invoices row in the rail until Payments is on (UX-074).
+        tax: (
+            <>
+                The invoices you send, and their numbers, are in{" "}
+                <Link
+                    href="/billing/invoices"
+                    className="font-medium text-foreground underline underline-offset-4 hover:decoration-2"
+                >
+                    Invoices
+                </Link>
+                .
+            </>
+        ),
         identity:
             "Invoices are issued in the legal name, if you've set one. Your links keep working if you rename the business.",
         address:
@@ -934,7 +974,8 @@ export function OrganizationSettingsForm({
                                 <Input {...field} type="email" />
                             </FormControl>
                             <FormDescription>
-                                Where customers can reach the business.
+                                Where customers can reach the business. Your
+                                website shows it at the foot of every page.
                             </FormDescription>
                             <FormMessage />
                         </FormItem>

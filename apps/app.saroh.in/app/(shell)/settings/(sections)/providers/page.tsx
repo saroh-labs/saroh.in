@@ -14,6 +14,7 @@ import { listOrgDomains } from "@/lib/domains/service";
 import { resolveActiveOrganization } from "@/lib/organizations/service";
 import { listProviderHealth } from "@/lib/provider-health/service";
 import { CONNECT_EMAIL_ANCHOR } from "@/lib/providers/booking-emails";
+import { connectLocksOf } from "@/lib/providers/connect-lock";
 import { buildProvidersView } from "@/lib/providers/rows";
 import {
     getSarohEmail,
@@ -21,6 +22,7 @@ import {
     listPaymentProviders,
     listPaymentWebhooks,
 } from "@/lib/providers/service";
+import { billingAccessOrNull } from "@/lib/saroh-billing/service";
 import { requireSession } from "@/lib/session";
 import { listCheckoutProviders } from "@/lib/stores/storefronts";
 
@@ -57,10 +59,11 @@ export default async function ProvidersSettingsPage() {
         checkout,
         webhooks,
         sarohEmail,
+        access,
         emailSetup,
     ] =
         result.status === "denied"
-            ? [null, null, null, [], null, null, null]
+            ? [null, null, null, [], null, null, null, null]
             : await Promise.all([
                   listPaymentProviders(),
                   listCommsProviders(),
@@ -72,8 +75,13 @@ export default async function ProvidersSettingsPage() {
                   // Saroh sending booking emails (DEC-086). Never throws:
                   // a failed read is UNREAD, said in its own notice.
                   getSarohEmail(),
-                  // Whether customers get emails at all (DEC-011): asked
-                  // only of who can act on it. Null when unread.
+                  // What the plan lets the business connect (DEC-091):
+                  // locked payment rows offer See plans in place of
+                  // Connect, before any key form opens. Best-effort.
+                  billingAccessOrNull(),
+                  // Whether customers get emails at all (DEC-011), and
+                  // whether the plan lets it connect its own: the prompt
+                  // and the email rows' lock read it. Null when unread.
                   readEmailSetup(emailMay),
               ]);
     const view =
@@ -87,6 +95,7 @@ export default async function ProvidersSettingsPage() {
                   checkout,
                   webhooks,
                   sarohEmail,
+                  locks: connectLocksOf(access, emailSetup),
               });
     // Connect jumps to the first email provider to connect on this page.
     const prompt = emailPrompt(

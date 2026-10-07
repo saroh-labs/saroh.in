@@ -20,6 +20,8 @@ export interface UpgradeTo {
     planId: string;
     name: string;
     pricePaise: number;
+    /** That plan has no cap on the row (UX-083); absent from an older API. */
+    uncapped?: boolean;
 }
 
 /** One catalogue row. */
@@ -66,7 +68,10 @@ export interface BillingAccessView {
         nextPlanName: string;
     } | null;
     pendingMove: {
+        /** The plan it moves to, on `version`. */
         planId: string;
+        /** The plan it moves from; `planId` again when only the version changes. */
+        fromPlanId: string;
         version: number;
         from: string;
         waiting: "held" | "authorise" | null;
@@ -86,6 +91,22 @@ export function accessRow(
     moduleId: string,
 ): ModuleAccessView | null {
     return view?.modules.find((m) => m.moduleId === moduleId) ?? null;
+}
+
+/**
+ * Whether the plan includes a switch row, for a screen that hides what the
+ * plan leaves off rather than upselling it ("Publishing needs approval",
+ * DEC-103). As the API's `isIncluded`: true while nothing enforces the
+ * catalogue, off it, when the version has no such row, or when the plan
+ * couldn't be read.
+ */
+export function rowIncluded(
+    view: BillingAccessView | null,
+    moduleId: string,
+): boolean {
+    if (view?.source !== "catalogue" || !view.enforced) return true;
+    const row = accessRow(view, moduleId);
+    return !row || row.state === "on";
 }
 
 const OFF: LimitNotice = { on: false, full: false };
@@ -111,6 +132,7 @@ export function rowNotice(
             limit: row.limit,
             plan: view.plan?.name ?? "",
             upgradeTo: row.upgradeTo?.name ?? "",
+            upgradeUncapped: row.upgradeTo?.uncapped === true,
             soft: row.soft === true,
         },
         row.usage,
@@ -126,6 +148,22 @@ export function rowNotice(
         },
     );
     return notice;
+}
+
+/**
+ * Why a create button is off before anyone starts (UX-036): the limit's
+ * own title ("You've reached …") once one more wouldn't get past the API's
+ * check, else null. Only for an enforced catalogue business, and never for
+ * a soft cap, which informs and doesn't refuse.
+ */
+export function createBlock(
+    view: BillingAccessView | null,
+    moduleId: string,
+): string | null {
+    if (view?.source !== "catalogue" || !view.enforced) return null;
+    if (roomForOneMore(view, moduleId) !== false) return null;
+    const n = rowNotice(view, moduleId);
+    return n.on ? n.why || n.title : null;
 }
 
 /**
@@ -377,4 +415,15 @@ export function offersOnlinePay(
     ...also: boolean[]
 ): boolean {
     return takesOnlinePayment(view) && also.every(Boolean);
+}
+
+/**
+ * Whether the plan has room for one more of the business's own email or
+ * payment accounts (`integrations`, DEC-091), from the access read: only a
+ * real no is no. Unread, legacy or unenforced is yes, failing open as the
+ * connect's own check does.
+ */
+export function ownAccountsRoom(access: BillingAccessView | null): boolean {
+    if (access?.source !== "catalogue" || !access.enforced) return true;
+    return roomForOneMore(access, "integrations") !== false;
 }

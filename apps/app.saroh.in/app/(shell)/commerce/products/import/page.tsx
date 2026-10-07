@@ -5,7 +5,9 @@ import { sellCrumbs } from "@/components/commerce/sell-crumbs";
 import { StorefrontChooser } from "@/components/commerce/storefront-chooser";
 import { PageContainer } from "@/components/shared/page-container";
 import { CsvImport } from "@/components/stores/csv-import";
+import { planMeter } from "@/lib/billing/meter";
 import { describeImport } from "@/lib/imports/service";
+import { billingAccessOrNull } from "@/lib/saroh-billing/service";
 import { requireSession } from "@/lib/session";
 import { importProductsHref } from "@/lib/stores/links";
 import { pickStorefront } from "@/lib/stores/pick";
@@ -45,7 +47,10 @@ export default async function ImportProductsPage({
         );
     }
 
-    const descriptor = await describeImport(store.id, "products");
+    const [descriptor, access] = await Promise.all([
+        describeImport(store.id, "products"),
+        billingAccessOrNull(),
+    ]);
     if (!descriptor) notFound();
 
     return (
@@ -62,6 +67,7 @@ export default async function ImportProductsPage({
                 storeId={store.id}
                 descriptor={descriptor}
                 backHref="/commerce/products"
+                meter={planMeter(access, "products")}
             />
         </PageContainer>
     );

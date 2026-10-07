@@ -5,10 +5,12 @@ import { PageHeader } from "@saroh/ui/page-header";
 import Link from "next/link";
 
 import { MoveStageControl } from "@/components/crm/move-stage-control";
+import { PipelineBoardStart } from "@/components/crm/pipeline-board-start";
 import { AddLeadDialog } from "@/components/leads/add-lead-dialog";
 import { StagesDialog } from "@/components/leads/stages-dialog";
 import { PageContainer } from "@/components/shared/page-container";
 import { contactName, formatValue } from "@/lib/crm/format";
+import { firstStageWithLeads, stageAnchor } from "@/lib/crm/pipeline-board";
 import { loadAddLead } from "@/lib/leads/add-lead-data";
 import type { LeadListItem, LeadStage } from "@/lib/leads/service";
 import { listLeads } from "@/lib/leads/service";
@@ -99,13 +101,46 @@ export default async function PipelinePage() {
                 }
             />
 
-            <div className="mt-6 flex gap-4 overflow-x-auto pb-4">
+            {/* On a phone the board shows one column at a time (UX-077):
+                every stage and its count, to jump to, and the board opens
+                on the first one with a lead. */}
+            <nav
+                aria-label="Stages"
+                className="mt-4 flex gap-2 overflow-x-auto pb-1 md:hidden"
+            >
+                {pipeline.stages.map((stage) => (
+                    <a
+                        key={stage.id}
+                        href={`#${stageAnchor(stage.id)}`}
+                        className="flex min-h-11 shrink-0 items-center gap-1.5 rounded-full border px-3 text-sm"
+                    >
+                        {stage.name}
+                        <span className="tabular-nums text-muted-foreground">
+                            {byStage.get(stage.id)?.length ?? 0}
+                        </span>
+                    </a>
+                ))}
+            </nav>
+            <PipelineBoardStart
+                stageId={firstStageWithLeads(
+                    pipeline.stages,
+                    new Map(
+                        pipeline.stages.map((s) => [
+                            s.id,
+                            byStage.get(s.id)?.length ?? 0,
+                        ]),
+                    ),
+                )}
+            />
+
+            <div className="mt-6 flex snap-x gap-4 overflow-x-auto pb-4">
                 {pipeline.stages.map((stage) => {
                     const stageLeads = byStage.get(stage.id) ?? [];
                     return (
                         <section
                             key={stage.id}
-                            className="flex w-72 shrink-0 flex-col rounded-lg bg-muted/40 p-3"
+                            id={stageAnchor(stage.id)}
+                            className="flex w-72 shrink-0 snap-start flex-col rounded-lg bg-muted/40 p-3"
                             aria-label={`Stage ${stage.name}`}
                         >
                             <div className="mb-3 flex items-center justify-between">

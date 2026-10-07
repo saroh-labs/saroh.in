@@ -17,6 +17,8 @@ import { Controller, useFieldArray, useForm, useWatch } from "react-hook-form";
 import { z } from "zod";
 
 import { reportFailure } from "@/components/billing/plan-refusal";
+import type { AddedContact } from "@/components/contacts/add-contact-dialog";
+import { AddContactDialog } from "@/components/contacts/add-contact-dialog";
 import { useBusinessDetailsStep } from "@/components/organizations/use-business-details-step";
 import { ContactPicker } from "@/components/shared/contact-picker";
 import { OptionSelect } from "@/components/shared/option-select";
@@ -140,7 +142,7 @@ async function copy(text: string): Promise<boolean> {
  * only sum the browser does, and only to read.
  */
 export function InvoiceForm({
-    contacts,
+    contacts: listed,
     defaultCurrency,
     draft,
     initialContactId,
@@ -180,6 +182,9 @@ export function InvoiceForm({
         lines: useId(),
     };
     const [intent, setIntent] = useState<"issue" | "draft">("issue");
+    // Someone added from Who (UX-047) joins the list here, chosen.
+    const [added, setAdded] = useState<AddedContact[]>([]);
+    const contacts = [...added, ...listed];
     const hasBuyerGst = Boolean(
         draft?.billToGst?.gstin ??
         draft?.billToGst?.state ??
@@ -356,16 +361,25 @@ export function InvoiceForm({
         }
     }
 
+    function onContactAdded(c: AddedContact) {
+        setAdded((a) => [c, ...a]);
+        form.setValue("contactId", c.id, { shouldValidate: true });
+    }
+
     if (contacts.length === 0 && !draft) {
         return (
             <div className="max-w-xl rounded-[12px] border border-border bg-card p-5 text-[13.5px]">
                 <p className="text-muted-foreground">
                     An invoice is for someone in your contacts, and there is no
-                    one there yet — or Contacts is switched off.
+                    one there yet. Add who it&apos;s for here, then write the
+                    invoice.
                 </p>
-                <Button variant="outline" asChild className="mt-4">
-                    <Link href="/contacts">Go to Contacts</Link>
-                </Button>
+                <div className="mt-4 flex flex-wrap gap-2">
+                    <NewContact onAdded={onContactAdded} solid />
+                    <Button variant="ghost" asChild>
+                        <Link href="/contacts">Go to Contacts</Link>
+                    </Button>
+                </div>
             </div>
         );
     }
@@ -410,6 +424,11 @@ export function InvoiceForm({
                             <p className="mt-1.5 text-[12px] text-destructive-subtle-foreground">
                                 {errors.contactId.message}
                             </p>
+                        ) : null}
+                        {!draft ? (
+                            <div className="mt-1.5">
+                                <NewContact onAdded={onContactAdded} />
+                            </div>
                         ) : null}
                         {registered ? (
                             buyerOpen ? (
@@ -502,6 +521,17 @@ export function InvoiceForm({
                     </Card>
 
                     <Card label="Lines">
+                        {/* The desk's column heads (UX-080): a phone labels
+                            each field instead. The fields carry their own
+                            names for a screen reader. */}
+                        <div
+                            aria-hidden
+                            className="hidden gap-1.5 px-0.5 pb-1 text-[12px] text-muted-foreground sm:grid sm:grid-cols-[minmax(0,3fr)_70px_100px_30px]"
+                        >
+                            <span>What it&apos;s for</span>
+                            <span>Qty</span>
+                            <span>Price each</span>
+                        </div>
                         <ul className="grid gap-1.5">
                             {fields.map((line, i) => {
                                 const lineErr = errors.lines?.[i];
@@ -795,5 +825,35 @@ function RemoveLine({
         >
             <X aria-hidden className="size-4" />
         </button>
+    );
+}
+
+/**
+ * "New contact" in Who (UX-047): adds someone without leaving the invoice,
+ * and picks them. The API still decides (Contacts off, or no
+ * `contact:write`), and the dialog says why it couldn't.
+ */
+function NewContact({
+    onAdded,
+    solid = false,
+}: {
+    onAdded: (c: AddedContact) => void;
+    solid?: boolean;
+}) {
+    return (
+        <AddContactDialog
+            onAdded={onAdded}
+            description="Who this invoice is for. They're added to your contacts and picked here."
+            trigger={
+                <Button
+                    type="button"
+                    variant={solid ? "default" : "link"}
+                    size="sm"
+                    className={solid ? undefined : "h-auto px-0 text-[12.5px]"}
+                >
+                    New contact
+                </Button>
+            }
+        />
     );
 }

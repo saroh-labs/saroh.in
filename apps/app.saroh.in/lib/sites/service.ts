@@ -619,7 +619,7 @@ export interface SiteFooter {
     format: "html" | "markdown";
     value: string;
     /**
-     * `left`: the designs' row (name, line, Runs on Saroh), set by a template
+     * `left`: the designs' row (name, line, Saroh credit on Free), set by a template
      * (industry templates). The API keeps it when a save sends only the line.
      */
     layout?: "left";
@@ -1331,7 +1331,13 @@ export interface SiteCommentView {
  * that quietly renders as "asked for changes", or a lookup that throws.
  */
 export type ApprovalOutcome =
-    "REQUESTED" | "APPROVED" | "CHANGES_REQUESTED" | "BYPASSED" | "OVERRIDDEN";
+    | "REQUESTED"
+    | "APPROVED"
+    | "CHANGES_REQUESTED"
+    | "BYPASSED"
+    | "OVERRIDDEN"
+    /** The merchant took the request back (UX-068). */
+    | "WITHDRAWN";
 
 export interface ReviewState {
     /**
@@ -1345,6 +1351,8 @@ export interface ReviewState {
         outcome: ApprovalOutcome;
         at: string;
         by: string;
+        /** What a change request asked for (UX-043). */
+        reason?: string | null;
     } | null;
     /**
      * A review was asked for, or changes were, and neither has been settled
@@ -1359,6 +1367,11 @@ export interface ReviewState {
      * live now: approved, then the work carried on (#278).
      */
     approvalIsStale: boolean;
+    /**
+     * The open request is this person's own (UX-068): they are not offered
+     * Approve or Ask for changes on it.
+     */
+    askedByYou?: boolean;
 }
 
 /**
@@ -1427,6 +1440,7 @@ export async function getReviewState(
         outstanding: data.outstanding === true,
         pending: data.pending === true,
         approvalIsStale: data.approvalIsStale === true,
+        askedByYou: data.askedByYou === true,
     };
 }
 
@@ -1469,7 +1483,7 @@ export async function createComment(
  */
 export type ReviewerVerdict = Exclude<
     ApprovalOutcome,
-    "REQUESTED" | "BYPASSED" | "OVERRIDDEN"
+    "REQUESTED" | "BYPASSED" | "OVERRIDDEN" | "WITHDRAWN"
 >;
 
 /**
@@ -1483,14 +1497,18 @@ export async function createApproval(
     outcome: ReviewerVerdict,
     /** A verdict on a test release's frozen bytes, not the draft (T8, T12). */
     testReleaseId?: string,
+    /** What needs changing: required with CHANGES_REQUESTED (UX-043). */
+    reason?: string,
 ): Promise<SitesResult<{ id: string }>> {
     const base = await sitesBase();
     if (!base) return { ok: false, error: "No active organization." };
     const res = await apiFetch(`${base}/${siteId}/approvals`, {
         method: "POST",
-        body: JSON.stringify(
-            testReleaseId ? { outcome, testReleaseId } : { outcome },
-        ),
+        body: JSON.stringify({
+            outcome,
+            ...(testReleaseId ? { testReleaseId } : {}),
+            ...(outcome === "CHANGES_REQUESTED" && reason ? { reason } : {}),
+        }),
     });
     const data = (await res.json().catch(() => null)) as { id?: string } | null;
     if (res.ok && data?.id) return { ok: true, data: { id: data.id } };
@@ -1549,6 +1567,26 @@ export async function requestReview(
     const data = (await res.json().catch(() => null)) as { id?: string } | null;
     if (res.ok && data?.id) return { ok: true, data: { id: data.id } };
     return { ok: false, ...readError(data, "Could not ask for a review.") };
+}
+
+/**
+ * Take back the draft's open review request (UX-068). Requires
+ * `site:update`, like asking.
+ */
+export async function withdrawReview(
+    siteId: string,
+): Promise<SitesResult<{ id: string }>> {
+    const base = await sitesBase();
+    if (!base) return { ok: false, error: "No active organization." };
+    const res = await apiFetch(`${base}/${siteId}/review/withdraw`, {
+        method: "POST",
+    });
+    const data = (await res.json().catch(() => null)) as { id?: string } | null;
+    if (res.ok && data?.id) return { ok: true, data: { id: data.id } };
+    return {
+        ok: false,
+        ...readError(data, "Could not withdraw the review request."),
+    };
 }
 
 /** Mark a note settled, or reopen it. Requires `section:write` on the api. */

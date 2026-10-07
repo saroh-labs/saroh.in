@@ -6,7 +6,7 @@ import { showError, showSuccess } from "@saroh/ui/toast";
 import { Copy } from "lucide-react";
 import Link from "next/link";
 import type { ReactNode } from "react";
-import { useState } from "react";
+import { useId, useState } from "react";
 
 import { reportFailure } from "@/components/billing/plan-refusal";
 import { EmailNoteText } from "@/components/communications/email-note";
@@ -30,6 +30,7 @@ import { INVOICE_EMAIL_WORDS } from "@/lib/communications/email-setup";
 import { createPayLink, createViewLink } from "@/lib/invoices/actions";
 import type { DetailActionId } from "@/lib/invoices/detail-actions";
 import { detailActions, owedHere } from "@/lib/invoices/detail-actions";
+import { mintedLink, rememberLink } from "@/lib/invoices/minted-links";
 import { downloadInvoicePdf, hasPdf } from "@/lib/invoices/pdf";
 import { canSend, paysOnline, wasSent } from "@/lib/invoices/send";
 import type { InvoiceSend, InvoiceSent } from "@/lib/invoices/service";
@@ -151,7 +152,9 @@ export function InvoiceDetail({
         then: "make its pay link",
         continueLabel: "Save and make link",
     });
-    const [url, setUrl] = useState<string | null>(null);
+    // A pay link made for it earlier in this tab, shown again (UX-048):
+    // its address can't be read back from the API.
+    const [url, setUrl] = useState<string | null>(() => mintedLink(invoice.id));
     // A view link (#833) or a pay link: what the copied address opens.
     const [urlKind, setUrlKind] = useState<"pay" | "view">("pay");
     const [busy, setBusy] = useState(false);
@@ -175,6 +178,7 @@ export function InvoiceDetail({
         if (!res) return;
         // A plan without online payments: its notice and the way up.
         if (!res.ok) return reportFailure(res);
+        rememberLink(invoice.id, res.data.url);
         setUrl(res.data.url);
         setUrlKind("pay");
         showSuccess(
@@ -254,6 +258,7 @@ export function InvoiceDetail({
         refund: { onClick: () => setOpen("refund") },
         refundOrder: { href: orderHref ?? undefined },
     };
+    const readOnlyId = useId();
     const actions = detailActions({
         standing: s,
         credit,
@@ -312,6 +317,9 @@ export function InvoiceDetail({
                                 variant={variant}
                                 className={cls}
                                 disabled={a.disabled}
+                                aria-describedby={
+                                    a.reason ? readOnlyId : undefined
+                                }
                                 onClick={a.onClick}
                             >
                                 {a.label}
@@ -322,8 +330,9 @@ export function InvoiceDetail({
             </div>
 
             {!canWrite ? (
-                <ReadOnlyNote className="print:hidden">
-                    Your role can read this invoice but not change it.
+                <ReadOnlyNote id={readOnlyId} className="print:hidden">
+                    {actions.find((a) => a.reason)?.reason ??
+                        "Your role can read this invoice but not change it."}
                 </ReadOnlyNote>
             ) : null}
 

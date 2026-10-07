@@ -59,6 +59,12 @@ export type FormsResult<T> =
 export interface EnsureFormInput {
     /** The existing backing Form id, when the section already has one. */
     formId?: string;
+    /**
+     * The site whose editor holds the section. A new Form is made on it, and
+     * one saved without a site is bound to it, so the site's Forms tab lists
+     * it (UX-002); the API never moves a Form already on a site.
+     */
+    siteId: string;
     /** A human name for the Form (usually the site/section title). */
     name: string;
     /** The section's fields — become the Form's `fields` verbatim. */
@@ -86,7 +92,11 @@ async function createForm(
 ): Promise<FormsResult<{ formId: string }>> {
     const res = await apiFetch(base, {
         method: "POST",
-        body: JSON.stringify({ name: input.name, fields: input.fields }),
+        body: JSON.stringify({
+            name: input.name,
+            fields: input.fields,
+            siteId: input.siteId,
+        }),
     });
     const data = (await res.json().catch(() => null)) as Partial<Form> | null;
     if (res.ok && data?.id) {
@@ -106,7 +116,11 @@ async function patchForm(
 ): Promise<FormsResult<{ formId: string }>> {
     const res = await apiFetch(`${base}/${formId}`, {
         method: "PATCH",
-        body: JSON.stringify({ name: input.name, fields: input.fields }),
+        body: JSON.stringify({
+            name: input.name,
+            fields: input.fields,
+            siteId: input.siteId,
+        }),
     });
     const data = (await res.json().catch(() => null)) as Partial<Form> | null;
     if (res.ok && data?.id) {

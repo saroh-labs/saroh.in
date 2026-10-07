@@ -3,7 +3,8 @@ import type { TestReleaseGone } from "@/lib/test-release";
 /**
  * A test host that shows no release explains why (DEC-071, T5): no link, a
  * link that stopped working, a release thrown away, or one that is live now
- * (Q6, with the live site's address). Never the live site in its place (R12).
+ * (Q6, with the live site's address). Never the live site in its place (R12),
+ * but a way to it: with no link in hand, "Go to the live site" (UX-081).
  *
  * Shared by the gate route (a test host with no link at all) and the tenant
  * layout (a link the API no longer opens). Deliberately NOT drawn in the
@@ -60,7 +61,7 @@ export function TestReleaseGate({
                 </p>
                 <h1 className="text-xl font-semibold">{copy.title}</h1>
                 <p className="text-sm text-neutral-600">{copy.body}</p>
-                {reason === "live" && liveUrl ? (
+                {(reason === "live" || reason === "missing") && liveUrl ? (
                     <p className="pt-2">
                         <a href={liveUrl} className={LINK}>
                             Go to the live site

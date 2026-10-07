@@ -36,6 +36,10 @@ const TEST_HOST_PATTERNS = ["test--.+", "test\\..+\\..+"];
 
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+    // Development logs every server action's arguments by default, and some
+    // carry secrets: provider keys, sign-in codes (UX-005, 7 Oct). Production
+    // never logs them; this keeps local logs clean too.
+    logging: { serverFunctions: false },
     // @saroh/ui ships its entries as source, so Next must compile it.
     transpilePackages: ["@saroh/ui", "@saroh/site-blocks"],
 

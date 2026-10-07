@@ -7,6 +7,7 @@ import { showError, showSuccess } from "@saroh/ui/toast";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 
+import { useBusinessZone } from "@/components/shared/business-zone";
 import { useSiteFaces } from "@/components/sites/site-faces";
 import { env } from "@/env";
 import { createComment } from "@/lib/sites/actions";
@@ -179,6 +180,7 @@ function SectionSlot({
     onOpen: () => void;
     onClose: () => void;
 }) {
+    const zone = useBusinessZone();
     const router = useRouter();
     const [body, setBody] = useState("");
     const [saving, setSaving] = useState(false);
@@ -291,7 +293,7 @@ function SectionSlot({
                                             {note.author.name}
                                         </span>
                                         <span className="text-[11px] text-muted-foreground">
-                                            {shortDate(note.createdAt)}
+                                            {shortDate(note.createdAt, zone)}
                                             {note.resolvedAt === null
                                                 ? ""
                                                 : " · settled"}

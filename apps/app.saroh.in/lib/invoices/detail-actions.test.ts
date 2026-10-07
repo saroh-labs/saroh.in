@@ -127,7 +127,25 @@ describe("detailActions", () => {
         ]);
     });
 
-    it("a role that only reads it gets Print and the PDF", () => {
-        expect(labels({ canWrite: false })).toEqual(["Print", "Download PDF"]);
+    it("a role that only reads an owed invoice sees Mark paid disabled, with why (FB-1, DEC-098)", () => {
+        expect(labels({ canWrite: false })).toEqual([
+            "Mark paid",
+            "Print",
+            "Download PDF",
+        ]);
+        const pay = detailActions({ ...base, canWrite: false }).find(
+            (a) => a.id === "pay",
+        );
+        expect(pay).toMatchObject({
+            disabled: true,
+            reason: "Your role can read this invoice but can't mark it paid.",
+        });
+    });
+
+    it("a role that only reads a paid invoice gets Print and the PDF", () => {
+        expect(labels({ canWrite: false, standing: "PAID" })).toEqual([
+            "Print",
+            "Download PDF",
+        ]);
     });
 });

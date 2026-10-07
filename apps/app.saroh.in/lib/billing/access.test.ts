@@ -1,11 +1,14 @@
 import { describe, expect, it } from "vitest";
 
 import {
+    createBlock,
     depositLock,
     membershipPlansLock,
     offersOnlinePay,
     onlinePaymentsLock,
+    ownAccountsRoom,
     planLocks,
+    rowIncluded,
     rowLock,
     rowNotice,
     takesOnlinePayment,
@@ -32,7 +35,7 @@ describe("rowNotice", () => {
             pct: "80%",
             title: "You've used 8 of 10 products on Plan A",
             body: "You'll be stopped at 10. Plan B gives you more.",
-            cta: "Upgrade or add more",
+            cta: "See plans",
         });
     });
 
@@ -45,7 +48,7 @@ describe("rowNotice", () => {
             on: true,
             full: true,
             title: "You've reached your 10 products on Plan A",
-            body: "You can't add more products. Plan B raises the limit, or add more with an add-on.",
+            body: "You can't add more products. Plan B raises the limit.",
             why: "You've reached your products limit on Plan A",
         });
     });
@@ -181,8 +184,8 @@ describe("rowNotice", () => {
         );
         expect(n).toMatchObject({
             full: true,
-            body: "New invites are paused. Everyone already on the team keeps access. Add more with an add-on.",
-            cta: "Add more",
+            body: "New invites, and new people taking bookings, are paused. Everyone already on the team keeps access, and view-only people can still be invited. Talk to us if you need more.",
+            cta: "See your plan",
         });
     });
 
@@ -521,5 +524,98 @@ describe("takesOnlinePayment and offersOnlinePay (R33)", () => {
             takesOnlinePayment(offlinePlan({ source: "legacy", modules: [] })),
         ).toBe(true);
         expect(takesOnlinePayment(access())).toBe(true);
+    });
+});
+
+describe("ownAccountsRoom (DEC-091, UX-006)", () => {
+    const links = (over: Parameters<typeof row>[0]) =>
+        row({ moduleId: "integrations", limit: null, usage: 0, ...over });
+
+    it("Free: the row is locked, so no room", () => {
+        expect(
+            ownAccountsRoom(
+                access({ modules: [links({ state: "locked", usage: null })] }),
+            ),
+        ).toBe(false);
+    });
+
+    it("Grow: included with no cap, room", () => {
+        expect(ownAccountsRoom(access({ modules: [links({})] }))).toBe(true);
+    });
+
+    it("a capped plan at its cap has no room", () => {
+        expect(
+            ownAccountsRoom(
+                access({ modules: [links({ limit: 2, usage: 2 })] }),
+            ),
+        ).toBe(false);
+    });
+
+    it("unread, legacy or unenforced fails open", () => {
+        expect(ownAccountsRoom(null)).toBe(true);
+        expect(
+            ownAccountsRoom(
+                access({
+                    enforced: false,
+                    modules: [links({ state: "locked", usage: null })],
+                }),
+            ),
+        ).toBe(true);
+    });
+});
+
+describe("createBlock (UX-036)", () => {
+    it("says why before anyone starts, once one more won't fit", () => {
+        expect(
+            createBlock(access({ modules: [row({ usage: 10 })] }), "products"),
+        ).toBe("You've reached your products limit on Plan A");
+    });
+
+    it("is off while there is room, for a soft cap and when not enforced", () => {
+        expect(
+            createBlock(access({ modules: [row({ usage: 9 })] }), "products"),
+        ).toBeNull();
+        expect(
+            createBlock(
+                access({ modules: [row({ usage: 10, soft: true })] }),
+                "products",
+            ),
+        ).toBeNull();
+        expect(
+            createBlock(
+                access({ enforced: false, modules: [row({ usage: 10 })] }),
+                "products",
+            ),
+        ).toBeNull();
+        expect(createBlock(null, "products")).toBeNull();
+    });
+});
+
+// DEC-103: a switch a plan leaves off is hidden, never upsold.
+describe("rowIncluded", () => {
+    const review = (state: "on" | "locked" | "hidden") =>
+        row({ moduleId: "review", state, limit: null, usage: null });
+
+    it("is off only where an enforced plan leaves the row off", () => {
+        for (const state of ["locked", "hidden"] as const) {
+            expect(
+                rowIncluded(access({ modules: [review(state)] }), "review"),
+            ).toBe(false);
+        }
+        expect(rowIncluded(access({ modules: [review("on")] }), "review")).toBe(
+            true,
+        );
+    });
+
+    it("includes it while nothing enforces it, or it can't be read", () => {
+        expect(
+            rowIncluded(
+                access({ enforced: false, modules: [review("locked")] }),
+                "review",
+            ),
+        ).toBe(true);
+        expect(rowIncluded(access({ source: "legacy" }), "review")).toBe(true);
+        expect(rowIncluded(null, "review")).toBe(true);
+        expect(rowIncluded(access({ modules: [] }), "review")).toBe(true);
     });
 });

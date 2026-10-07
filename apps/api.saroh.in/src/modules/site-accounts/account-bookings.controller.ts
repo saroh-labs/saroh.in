@@ -64,6 +64,7 @@ export class AccountBookingsController {
                 pay: dto.pay,
                 locationType: dto.locationType,
                 intakeNote: dto.intakeNote,
+                bookerPhone: dto.bookerPhone,
                 packPurchaseId: dto.packPurchaseId,
                 subscriptionId: dto.subscriptionId,
             },

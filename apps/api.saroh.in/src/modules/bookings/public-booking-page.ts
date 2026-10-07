@@ -1,7 +1,8 @@
-import { NotFoundException } from "@nestjs/common";
+import { Logger, NotFoundException } from "@nestjs/common";
 import { prisma } from "@saroh/database";
 import { DateTime } from "luxon";
 
+import { planMeter } from "../billing/metering.service";
 import { APPOINTMENTS_OPEN, appointmentsOpen } from "./appointments-open";
 import type { OpeningHours, Slot } from "./availability";
 import {
@@ -12,6 +13,7 @@ import {
     outsideClosures,
     staffSlots,
 } from "./availability";
+import { HAS_BOOKABLE_HOURS } from "./bookable-hours";
 import { onlinePaymentBlocker } from "./booking-payment";
 import type { BookingRulesValue } from "./booking-rules";
 import {
@@ -25,6 +27,7 @@ import {
     loadStaffing,
     toAvailabilityService,
 } from "./booking-slots";
+import { businessClosedOn } from "./closed-days";
 import type { BookingLocationType, LocationType } from "./dto";
 import { openingFor } from "./opening-hours";
 import { loadBookableService } from "./reservation";
@@ -40,6 +43,8 @@ import {
  * services, days and starts, the services list, and a booking as its booker
  * sees it. Only fields a visitor is meant to see leave here.
  */
+
+const pageLogger = new Logger("PublicBookingPage");
 
 /** A service as a website visitor sees it (#255). No internal fields. */
 export interface PublicService {
@@ -72,6 +77,12 @@ export interface PublicDay {
     /** `YYYY-MM-DD` in the business's zone. */
     date: string;
     open: boolean;
+    /**
+     * The business itself is closed that day (UX-054): a closure covers
+     * it, or its opening hours have none that day. A day it is open but
+     * this service has no times is not closed ("No times" on the page).
+     */
+    closed: boolean;
     starts: PublicStart[];
 }
 
@@ -88,6 +99,12 @@ export interface PublicBookingPage {
     businessName: string;
     /** False when the business has Appointments switched off. */
     open: boolean;
+    /**
+     * True when the business has had all the online bookings its plan
+     * takes this month (DEC-095): the page says so before the form, and
+     * names no plan. Its own team still books by hand.
+     */
+    paused: boolean;
     timezone: string;
     /**
      * Whether pay now is on offer: the business lets people pay online
@@ -286,6 +303,14 @@ export async function publicDays(
             open:
                 hours.some((slot) => inDay(slot.startAt)) &&
                 (aheadEnd === null || dayFrom <= aheadEnd),
+            closed: businessClosedOn(
+                {
+                    startAt: new Date(dayFrom),
+                    endAt: new Date(dayTo),
+                },
+                opening,
+                closed,
+            ),
             starts: starts.filter((start) => inDay(start.startAt)),
         });
     }
@@ -340,10 +365,11 @@ export function offeredOnSite(organizationId: string, siteId: string) {
 
 /**
  * What a site's booking page opens with (U19): the business, the services
- * it may offer (active, of this site or of no site, Appointments on), who
- * takes each — names only — the booking rules (how people pay among them,
- * DEC-088) and whether it can take payment online. A site that is not
- * published is a 404, like its pages.
+ * it may offer (active, of this site or of no site, Appointments on, with
+ * times to offer — UX-024), who takes each — names only — the booking
+ * rules (how people pay among them, DEC-088), whether it can take payment
+ * online, and whether online booking is paused at the plan's monthly cap
+ * (DEC-095). A site that is not published is a 404, like its pages.
  */
 export async function publicBookingPage(
     siteId: string,
@@ -362,10 +388,15 @@ export async function publicBookingPage(
     if (!site) throw new NotFoundException("Site not found");
     const organizationId = site.organizationId;
     const open = await appointmentsOpen(organizationId);
-    const [services, rules, zone, online] = await Promise.all([
+    const [services, rules, zone, online, paused] = await Promise.all([
         open
             ? prisma.service.findMany({
-                  where: offeredOnSite(organizationId, siteId),
+                  where: {
+                      AND: [
+                          offeredOnSite(organizationId, siteId),
+                          HAS_BOOKABLE_HOURS,
+                      ],
+                  },
                   orderBy: [{ createdAt: "asc" }, { id: "asc" }],
                   select: {
                       id: true,
@@ -388,10 +419,12 @@ export async function publicBookingPage(
         loadBookingRules(prisma, organizationId),
         businessTimezone(prisma, organizationId),
         takesOnlinePayment(organizationId),
+        open ? onlineBookingsPaused(organizationId) : Promise.resolve(false),
     ]);
     return {
         businessName: site.organization.name,
         open,
+        paused,
         timezone: zone,
         payOnline: online && allowsOnline(rules),
         rules,
@@ -427,6 +460,25 @@ export async function publicBookingPage(
 }
 
 /**
+ * Whether the plan's monthly cap on online bookings is reached (DEC-095),
+ * read the way the booking's own write decides (`planMeter.hasRoom`). A
+ * plan that can't be read is not paused: the write lets a booking through
+ * then too, so the page never turns customers away on a guess.
+ */
+export async function onlineBookingsPaused(
+    organizationId: string,
+): Promise<boolean> {
+    try {
+        return !(await planMeter.hasRoom(organizationId, "bookings"));
+    } catch (err) {
+        pageLogger.warn(
+            `plan_meter_unresolved org=${organizationId} module=bookings read=booking-page error=${err instanceof Error ? err.name : "unknown"}`,
+        );
+        return false;
+    }
+}
+
+/**
  * The public view of a merchant's chosen services, for the website's
  * services list (#255). Guardless like availability: the ids come from a
  * published section, and only fields a visitor is meant to see leave here.
@@ -435,6 +487,7 @@ export async function publicBookingPage(
  * is right on the next page view. Filtered to what may be offered:
  * - not deleted, and ACTIVE (an archived service is not on offer);
  * - shown on the booking page (E1): a hidden service is booked by staff;
+ * - with times to offer (UX-024): its own hours, or someone to take it;
  * - its Organization has not DISABLED Appointments. A missing module row
  *   counts as on: enforcement is still dark (#117) and the backfill may not
  *   have written one, and hiding a merchant's services over an absent row
@@ -454,6 +507,8 @@ export async function publicServices(ids: string[]): Promise<PublicService[]> {
             // The same rule public booking closes on (#327), so a list
             // never offers a service its booking block would refuse.
             organization: APPOINTMENTS_OPEN,
+            // Nothing to book yet (UX-024): no hours, nobody to take it.
+            ...HAS_BOOKABLE_HOURS,
         },
         select: {
             id: true,

@@ -55,7 +55,7 @@ describe("planIncludes", () => {
         );
     });
 
-    it("never counts websites: a business has one for now (ADR-006)", () => {
+    it("never counts websites: one on every plan (ADR-006, DEC-094)", () => {
         expect(planIncludes({ sites: 5 })).not.toMatch(/5|websites/);
     });
 });

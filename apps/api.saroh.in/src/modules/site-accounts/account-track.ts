@@ -48,6 +48,11 @@ export interface TrackInput {
     paymentStatus: string;
     courierName: string | null;
     trackingNumber: string | null;
+    /**
+     * Where a pick-up is collected (UX-025): the storefront's address, when
+     * it is a place customers visit and has one. Absent or null: none.
+     */
+    collectFrom?: string | null;
 }
 
 export interface Track {
@@ -92,9 +97,10 @@ function stepLine(
         case "PREPARING":
             return goes ? "Being made and packed" : "Being made";
         case "READY":
-            return type === "PICKUP"
-                ? `At the counter — show #${order.number}`
-                : "Packed, waiting to leave";
+            if (type !== "PICKUP") return "Packed, waiting to leave";
+            return order.collectFrom
+                ? `Collect from ${order.collectFrom} — show #${order.number}`
+                : `At the counter — show #${order.number}`;
         case "COLLECTED":
             return "Picked up";
         case "OUT_FOR_DELIVERY":

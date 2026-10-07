@@ -461,6 +461,35 @@ describe("Me", () => {
         ).toBeInTheDocument();
     });
 
+    it("words the notes card by what the business is (UX-040)", () => {
+        const at = (notesKind: "health" | "food" | "general") =>
+            render(
+                <Me
+                    account={{ ...ACCOUNT, healthNotes: true, notesKind }}
+                    receipts={{ ok: true, value: [] }}
+                    notes={{ ok: true, value: [] }}
+                    options={OPTIONS}
+                    api={meApi()}
+                />,
+            );
+        const bakery = at("food");
+        expect(
+            screen.getByRole("heading", { name: "Allergies and notes" }),
+        ).toBeInTheDocument();
+        expect(screen.queryByText(/medicines/)).toBeNull();
+        bakery.unmount();
+        const shop = at("general");
+        expect(
+            screen.getByRole("heading", { name: "Notes for the team" }),
+        ).toBeInTheDocument();
+        expect(screen.queryByText("Health notes")).toBeNull();
+        shop.unmount();
+        at("health");
+        expect(
+            screen.getByRole("heading", { name: "Health notes" }),
+        ).toBeInTheDocument();
+    });
+
     it("signs out here, or everywhere", async () => {
         const api = meApi();
         render(
@@ -498,6 +527,52 @@ describe("the header's account entry", () => {
         const link = screen.getByRole("link", { name: "My account" });
         expect(link).toHaveAttribute("href", "/account");
         expect(link).toHaveTextContent("FK");
+    });
+
+    async function signInThrough(variant: "header" | "page") {
+        const api = {
+            requestCode: vi
+                .fn()
+                .mockResolvedValue({ ok: true, resendAfterSeconds: 30 }),
+            verifyCode: vi.fn().mockResolvedValue({
+                ok: true,
+                customer: { email: "farah@example.in", name: "Farah" },
+            }),
+        };
+        render(
+            <AccountEntry
+                customer={null}
+                businessName="Kavi Dental"
+                api={api}
+                loadOptions={vi.fn().mockResolvedValue(OPTIONS)}
+                variant={variant}
+            />,
+        );
+        fireEvent.click(screen.getByRole("button", { name: "Sign in" }));
+        fireEvent.change(screen.getByLabelText("Email"), {
+            target: { value: "farah@example.in" },
+        });
+        await click(screen.getByRole("button", { name: "Send code" }));
+        fireEvent.change(screen.getByLabelText("Code"), {
+            target: { value: "123456" },
+        });
+        const dialog = screen.getByRole("dialog");
+        await click(
+            Array.from(dialog.querySelectorAll("button")).find(
+                (b) => b.textContent === "Sign in",
+            ) as HTMLElement,
+        );
+    }
+
+    it("the account's own prompt keeps the page that asked (UX-052)", async () => {
+        await signInThrough("page");
+        expect(router.push).not.toHaveBeenCalled();
+        expect(router.refresh).toHaveBeenCalled();
+    });
+
+    it("the header's Sign in opens the account", async () => {
+        await signInThrough("header");
+        expect(router.push).toHaveBeenCalledWith("/account");
     });
 
     it("Sign in opens the sheet at once and reads its options behind it (#838)", async () => {

@@ -9,7 +9,9 @@ import { DeleteContactMenu } from "@/components/contacts/delete-contact-menu";
 import { EditContactDialog } from "@/components/contacts/edit-contact-dialog";
 import { InvoicesPanel } from "@/components/contacts/invoices-panel";
 import { PacksPanel } from "@/components/contacts/packs-panel";
+import { SamePersonPrompt } from "@/components/contacts/same-person-prompt";
 import { SubscriptionsPanel } from "@/components/contacts/subscriptions-panel";
+import { EnquiryCard } from "@/components/crm/enquiry-card";
 import { AddLeadDialog } from "@/components/leads/add-lead-dialog";
 import { PageContainer } from "@/components/shared/page-container";
 import type { ContactHoldings } from "@/lib/contacts/holdings";
@@ -19,12 +21,15 @@ import type { Holdings } from "@/lib/contacts/removal";
 import { getContact } from "@/lib/contacts/service";
 import { contactSourceLabel } from "@/lib/contacts/source";
 import {
-    contactEmail,
     contactName,
     formatValue,
     isRemovedContact,
     LEAD_STATUS,
+    shownEmail,
 } from "@/lib/crm/format";
+import { shownDuplicates } from "@/lib/customer-workspace/merge";
+import type { DuplicateSuggestion } from "@/lib/customer-workspace/service";
+import { getSuggestions } from "@/lib/customer-workspace/service";
 import { loadAddLead } from "@/lib/leads/add-lead-data";
 import type { LeadStatus } from "@/lib/leads/service";
 import { modulesOrUnknown } from "@/lib/modules/guard";
@@ -42,6 +47,9 @@ export const metadata = { title: "Contact" };
  * seats and invoices — the one place a merchant looks when this person calls.
  * A panel this viewer may not read, or whose module is off, is not asked for
  * at all (`lib/contacts/panels.ts`); one whose read fails says so on its own.
+ *
+ * Another contact with the same email is offered to merge, "This may be the
+ * same person" (DEC-097), with the merge Customer Detail uses.
  */
 export default async function ContactDetailPage({
     params,
@@ -71,9 +79,27 @@ export default async function ContactDetailPage({
     // opens for them, but nothing can put details back.
     const removed = isRemovedContact(contact);
     const canEdit = can("contact:write") && !removed;
-    const email = contactEmail(contact.email);
+    // Never the placeholder a site account's own record holds (UX-013).
+    const email = shownEmail(contact);
     const seesLeads = can("lead:read");
-    const holdings = await loadContactHoldings(contact.id, plan);
+    // Another contact with the same email (DEC-097): offered to whoever can
+    // edit contacts, never merged on its own. A failed read shows no prompt.
+    const [holdings, duplicates] = await Promise.all([
+        loadContactHoldings(contact.id, plan),
+        canEdit
+            ? getSuggestions(contact.id, { includeContacts: true })
+                  .then((all) =>
+                      shownDuplicates(
+                          all.filter(
+                              (s): s is DuplicateSuggestion =>
+                                  s.kind === "contact",
+                          ),
+                          { canEdit, emailOnly: true },
+                      ),
+                  )
+                  .catch((): DuplicateSuggestion[] => [])
+            : Promise.resolve<DuplicateSuggestion[]>([]),
+    ]);
     const person = { id: contact.id, name, email: email ?? "" };
     // The clock is read once, here, for the pack balances.
     const now = new Date().toISOString();
@@ -139,6 +165,36 @@ export default async function ContactDetailPage({
                         ) : undefined
                     }
                 />
+
+                <SamePersonPrompt
+                    contactId={contact.id}
+                    duplicates={duplicates}
+                    canMerge={can("customer:merge")}
+                />
+
+                {removed ? null : (
+                    // One person, one record a click away (UX-050): this
+                    // page holds their leads and what they hold; their
+                    // bookings, orders, messages and notes are on the
+                    // customer page.
+                    <p className="text-[13px] text-muted-foreground">
+                        Bookings, orders, messages and notes are on{" "}
+                        <Link
+                            href={`/customers/${encodeURIComponent(contact.id)}`}
+                            className="font-medium text-foreground underline-offset-4 hover:underline"
+                        >
+                            {`${name}'s full record`}
+                        </Link>
+                        .
+                    </p>
+                )}
+
+                {seesLeads ? (
+                    <EnquiryCard
+                        enquiries={contact.enquiries ?? []}
+                        knownEmail={email}
+                    />
+                ) : null}
 
                 <section className="overflow-hidden rounded-[12px] border border-border bg-card">
                     <h2 className="border-b border-muted px-4 py-[13px] text-[11px] font-semibold uppercase tracking-[0.1em] text-muted-foreground">

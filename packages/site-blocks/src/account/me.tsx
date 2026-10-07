@@ -30,7 +30,8 @@ import { SignInSheet } from "./sign-in-sheet";
  *   way to sign in (default 75). The email changes only with a code sent to
  *   the new address, through the sign-in sheet.
  * - **Health notes** (default 12) arrive as a suggestion the team confirms,
- *   and show only once the team can act on them (C12): `healthNotes`.
+ *   and show only once the team can act on them (C12): `healthNotes`. The
+ *   card is worded by what the business is (`notesKind`, UX-040).
  * - **Receipts:** paid invoices, each opening its paper.
  * - There is no "Remove my details" (user, 2026-09-27): a customer asks the
  *   business by message or in person.
@@ -39,6 +40,32 @@ import { SignInSheet } from "./sign-in-sheet";
  */
 
 export type { DetailsResult, MeApi, NoteResult } from "./me-api";
+
+/**
+ * The notes card in the words of what the business is (UX-040): a clinic
+ * asks about medicines, a bakery about allergies, anyone else in general
+ * words — never health on a bakery or a boutique.
+ */
+const NOTES_WORDS = {
+    health: {
+        title: "Health notes",
+        lead: "Tell us about medicines, allergies, injuries or anything else. Only the team sees this.",
+        sheet: "Add a health note",
+        placeholder: "e.g. I started taking blood thinners",
+    },
+    food: {
+        title: "Allergies and notes",
+        lead: "Tell us about allergies, or anything else we should know. Only the team sees this.",
+        sheet: "Add a note",
+        placeholder: "e.g. I'm allergic to peanuts",
+    },
+    general: {
+        title: "Notes for the team",
+        lead: "Tell us anything we should know. Only the team sees this.",
+        sheet: "Add a note",
+        placeholder: "e.g. Mornings suit me best",
+    },
+} as const;
 
 export interface MeProps {
     account: AccountView;
@@ -67,8 +94,13 @@ export function Me({
     const [problem, setProblem] = useState<string | null>(null);
     const [said, setSaid] = useState<string | null>(null);
 
-    const clinic = account.bookingsLabel === "Appointments";
-    const notesTitle = clinic ? "Health notes" : "Notes for the team";
+    const words =
+        NOTES_WORDS[
+            account.notesKind ??
+                (account.bookingsLabel === "Appointments"
+                    ? "health"
+                    : "general")
+        ];
     const contact = [account.phone, account.email].filter(Boolean).join(" · ");
 
     async function signOut(everywhere: boolean) {
@@ -131,8 +163,8 @@ export function Me({
             {account.healthNotes && notes ? (
                 <AccountCard
                     labelledBy="me-notes"
-                    title={notesTitle}
-                    lead="Tell us about medicines, allergies, injuries or anything else. Only the team sees this."
+                    title={words.title}
+                    lead={words.lead}
                     actions={
                         <button
                             type="button"
@@ -252,12 +284,8 @@ export function Me({
             />
             <NoteSheet
                 open={open === "note"}
-                title={clinic ? "Add a health note" : "Add a note"}
-                placeholder={
-                    clinic
-                        ? "e.g. I started taking blood thinners"
-                        : "e.g. Sore left knee"
-                }
+                title={words.sheet}
+                placeholder={words.placeholder}
                 onClose={() => setOpen(null)}
                 send={api.addNote}
                 onSent={(note) => {

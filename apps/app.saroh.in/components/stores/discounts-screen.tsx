@@ -167,8 +167,11 @@ export function DiscountsScreen({
                 }}
             />
             <p className="max-w-[68ch] text-pretty text-[11.5px] leading-[1.45] text-muted-foreground">
-                An expired code keeps its figures — how often something was used
-                is a fact about the past, not a setting.
+                A code works on an order you take at the counter and, when your
+                website sells, in your customers&rsquo; bag there — with the
+                same dates, limit and reach, and one count of uses. An expired
+                code keeps its figures — how often something was used is a fact
+                about the past, not a setting.
             </p>
         </>
     );

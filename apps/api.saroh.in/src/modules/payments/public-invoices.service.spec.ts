@@ -187,6 +187,8 @@ describe("PublicInvoicesService.read", () => {
                 "payOnline",
                 // R32: owed and not payable online, how to pay offline.
                 "payInstructions",
+                // UX-007: none set, how to reach the business instead.
+                "businessContact",
                 "status",
                 "tax",
                 "theme",
@@ -219,6 +221,8 @@ describe("PublicInvoicesService.read", () => {
             payOnline: false,
             // R32: the business set none.
             payInstructions: null,
+            // UX-007: nor a phone or email.
+            businessContact: null,
         });
         // Asked only for what it shows: no email, contact, ids or notes.
         const select = invoiceFindFirst.mock.calls[0][0].select;
@@ -482,6 +486,39 @@ describe("PublicInvoicesService.createIntent", () => {
         const paid = await makeService().service.read(TOKEN);
         expect(paid).not.toHaveProperty("payInstructions");
         expect(profileFindUnique).not.toHaveBeenCalled();
+        profileFindUnique.mockResolvedValue(null);
+    });
+
+    it("names a way to reach the business when it set no way to pay (UX-007)", async () => {
+        const profileFindUnique = prisma.businessProfile
+            .findUnique as jest.Mock;
+        // Made-up details: no pay instructions, a phone and an email.
+        profileFindUnique.mockResolvedValue({
+            payUpiId: null,
+            payBankAccountName: null,
+            payBankAccountNumber: null,
+            payBankIfsc: null,
+            payBankName: null,
+            payNote: null,
+            phone: "+919800000000",
+            contactEmail: "hello@lotus.example",
+        });
+        invoiceFindFirst.mockResolvedValue(STORED);
+        providerFindFirst.mockResolvedValue(null);
+        const view = await makeService().service.read(TOKEN);
+        expect(view.payInstructions).toBeNull();
+        expect(view.businessContact).toEqual({
+            phone: "+919800000000",
+            email: "hello@lotus.example",
+        });
+
+        // With a way to pay set, the page shows that, and no contact.
+        profileFindUnique.mockResolvedValue({
+            payUpiId: "lotus.yoga@okexample",
+            phone: "+919800000000",
+        });
+        const withUpi = await makeService().service.read(TOKEN);
+        expect(withUpi).not.toHaveProperty("businessContact");
         profileFindUnique.mockResolvedValue(null);
     });
 

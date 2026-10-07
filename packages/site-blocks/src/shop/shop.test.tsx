@@ -127,6 +127,31 @@ describe("Add to bag on the product page", () => {
         expect(screen.queryByText(/added to your bag/)).toBeNull();
     });
 
+    it("stops at what is left, and says it's all in the bag (UX-058)", () => {
+        render(
+            <ProductPage
+                product={{
+                    ...bread,
+                    variants: [
+                        { ...bread.variants[0], stock: "LOW", left: 1 },
+                        bread.variants[1],
+                    ],
+                }}
+                preview={false}
+                action={<AddToBag site={SITE} listingId="l-bread" />}
+            />,
+        );
+        fireEvent.click(screen.getByRole("button", { name: "Add to bag" }));
+        const off = screen.getByRole("button", {
+            name: "The last one is in your bag",
+        });
+        expect(off).toBeDisabled();
+        fireEvent.click(off);
+        expect(readBag(SITE)).toEqual([
+            { listingId: "l-bread", variantId: "v-small", quantity: 1 },
+        ]);
+    });
+
     it("is off, reading Sold out, for an option that can't be sold", () => {
         render(
             <ProductPage
@@ -511,6 +536,41 @@ describe("the header's bag", () => {
         expect(
             screen.getByRole("button", { name: /^Place order/ }),
         ).toBeDisabled();
+        // The bag is set to what is left, and says so (UX-058).
+        expect(
+            await screen.findByText("Only 1 left — we've set your bag to 1."),
+        ).toBeInTheDocument();
+        expect(readBag(SITE)).toEqual([
+            { listingId: "l-bread", variantId: null, quantity: 1 },
+        ]);
+        expect(
+            screen.getByText(
+                "Fewer are left than you asked for. Lower the amount to continue.",
+            ),
+        ).toBeInTheDocument();
+    });
+
+    it("says where to collect a pick-up, and when it's open (UX-025)", async () => {
+        setup({
+            signedIn: true,
+            quote: {
+                ok: true,
+                data: quoteOf({
+                    pickup: {
+                        address: "12 Hill Road, Bandra",
+                        hours: "Mon–Sat 10:00–19:00, Sun closed",
+                    },
+                }),
+            },
+        });
+        await openTheBag();
+        expect(
+            screen.getByText("12 Hill Road, Bandra", { exact: false }),
+        ).toBeInTheDocument();
+        expect(screen.getByText("Collect from")).toBeInTheDocument();
+        expect(
+            screen.getByText("Mon–Sat 10:00–19:00, Sun closed"),
+        ).toBeInTheDocument();
     });
 
     it("says a start was refused in the page's words, and keeps the bag", async () => {
@@ -878,5 +938,118 @@ describe("paying at the handover (2026-10-06: Free takes money offline)", () => 
         await screen.findByRole("heading", { name: "Order placed" });
         expect(start.mock.calls[0][0]).not.toHaveProperty("payment");
         expect(openCheckout).toHaveBeenCalled();
+    });
+});
+
+describe("a discount code in the bag (DEC-104)", () => {
+    /** The server's quote: SAVE10 takes 50 off; any other code is refused. */
+    function judged(body: {
+        discountCode?: string;
+    }): ShopResult<CheckoutQuote> {
+        if (!body.discountCode) {
+            return { ok: true, data: quoteOf({ discount: null }) };
+        }
+        if (body.discountCode === "SAVE10") {
+            return {
+                ok: true,
+                data: quoteOf({
+                    discount: {
+                        code: "SAVE10",
+                        applied: true,
+                        amount: "50.00",
+                    },
+                    total: "450.00",
+                }),
+            };
+        }
+        return {
+            ok: true,
+            data: quoteOf({
+                discount: {
+                    code: body.discountCode,
+                    applied: false,
+                    reason: "EXPIRED",
+                    message: `${body.discountCode} has ended.`,
+                },
+            }),
+        };
+    }
+
+    function withCodes() {
+        const made = setup({ signedIn: true });
+        const quote = made.quote as unknown as {
+            mockImplementation: (
+                fn: (body: {
+                    discountCode?: string;
+                }) => Promise<ShopResult<CheckoutQuote>>,
+            ) => void;
+        };
+        quote.mockImplementation((body) => Promise.resolve(judged(body)));
+        return made;
+    }
+
+    function applyCode(code: string) {
+        fireEvent.click(screen.getByRole("button", { name: "Have a code?" }));
+        fireEvent.change(screen.getByLabelText("Discount code"), {
+            target: { value: code },
+        });
+        fireEvent.click(screen.getByRole("button", { name: "Apply" }));
+    }
+
+    it("applies a code by the server's answer, shows what came off, and places it with the code", async () => {
+        const { quote, start } = withCodes();
+        await openTheBag();
+        applyCode(" save10 ");
+
+        expect(await screen.findByText("Code SAVE10")).toBeInTheDocument();
+        expect(quote).toHaveBeenLastCalledWith({
+            lines: [{ listingId: "l-bread", variantId: null, quantity: 2 }],
+            fulfilment: "PICKUP",
+            discountCode: "SAVE10",
+        });
+        const place = await screen.findByRole("button", {
+            name: /^Place order · .*450/,
+        });
+        fireEvent.click(place);
+        await screen.findByRole("heading", { name: "Order placed" });
+        expect(start.mock.calls[0][0]).toMatchObject({
+            discountCode: "SAVE10",
+        });
+    });
+
+    it("says why a code doesn't apply, keeps the full price, and never sends it", async () => {
+        const { start } = withCodes();
+        await openTheBag();
+        applyCode("OLD");
+
+        expect(await screen.findByRole("alert")).toHaveTextContent(
+            "OLD has ended.",
+        );
+        expect(screen.queryByText(/^Code /)).toBeNull();
+        const place = screen.getByRole("button", {
+            name: /^Place order · .*500/,
+        });
+        fireEvent.click(place);
+        await screen.findByRole("heading", { name: "Order placed" });
+        expect(start.mock.calls[0][0]).not.toHaveProperty("discountCode");
+    });
+
+    it("takes a code off again with Remove", async () => {
+        const { quote } = withCodes();
+        await openTheBag();
+        applyCode("SAVE10");
+        fireEvent.click(
+            await screen.findByRole("button", { name: "Remove code SAVE10" }),
+        );
+
+        await waitFor(() =>
+            expect(quote).toHaveBeenLastCalledWith({
+                lines: [{ listingId: "l-bread", variantId: null, quantity: 2 }],
+                fulfilment: "PICKUP",
+            }),
+        );
+        await waitFor(() =>
+            expect(screen.queryByText("Code SAVE10")).toBeNull(),
+        );
     });
 });

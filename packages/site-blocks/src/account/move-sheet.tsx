@@ -3,19 +3,21 @@
 import { useEffect, useId, useState } from "react";
 
 import { destructiveAlertClasses } from "../alert";
+import { OneToOne } from "../booking-flow/steps/one-to-one";
 import { accentTint, focusRing } from "../booking-flow/styles";
 import { cn } from "../lib/utils";
 import type { TimesResult } from "./bookings-api";
 import { OFFLINE } from "./bookings-api";
 import type { AccountTimes } from "./bookings-model";
-import { timeLabel } from "./bookings-model";
+import { timeLabel, timesAsDays } from "./bookings-model";
 import { Sheet, sheetButton } from "./sheet";
 import { ACCOUNT_TAB_HREF } from "./tab-bar";
 
 /**
  * Picking a new time in a sheet (round-2 plan A, A6; Saroh Customer Site
- * design, the Move sheet): free times over the next days with the same
- * person, one to choose, and "Move to ‹time›". The same sheet books a
+ * design, the Move sheet): the booking page's two-week day strip and the
+ * chosen day's free times with the same person (UX-055), one to choose,
+ * and "Move to ‹time›". The same sheet books a
  * treatment's next visit. The times come from the site's server as the
  * sheet opens; a time that went meanwhile is said, and the list read again.
  *
@@ -91,6 +93,7 @@ function OpenTimesSheet({
 }: TimesSheetProps) {
     const [state, setState] = useState<Load>({ kind: "loading" });
     const [pick, setPick] = useState<string | null>(null);
+    const [date, setDate] = useState<string | null>(null);
     const [busy, setBusy] = useState(false);
     const [problem, setProblem] = useState<string | null>(null);
     const [round, setRound] = useState(0);
@@ -118,6 +121,12 @@ function OpenTimesSheet({
 
     const times = state.kind === "ready" ? state.times : null;
     const label = pick && times ? timeLabel(pick, times.timezone) : null;
+    const strip = times ? timesAsDays(times) : null;
+    // The chosen day, else the first with a free time, as the booking page.
+    const day =
+        strip?.days.find((d) => d.date === date && d.starts.length > 0) ??
+        strip?.days.find((d) => d.starts.length > 0) ??
+        null;
     const off = busy || !pick;
 
     async function go() {
@@ -170,41 +179,36 @@ function OpenTimesSheet({
                     and {businessName} will fit you in.
                 </p>
             ) : (
-                <>
+                <div role="group" aria-labelledby={groupId} className="mt-3.5">
                     <div
                         id={groupId}
-                        className="text-site-muted mb-1.5 mt-3.5 text-xs font-bold uppercase tracking-[0.08em]"
+                        className="text-site-muted mb-1.5 text-xs font-bold uppercase tracking-[0.08em]"
                     >
                         {groupLabel}
                     </div>
-                    <div
-                        role="radiogroup"
-                        aria-labelledby={groupId}
-                        className="grid gap-1.5"
-                    >
-                        {state.times.times.map((iso) => (
-                            <button
-                                key={iso}
-                                type="button"
-                                role="radio"
-                                aria-checked={pick === iso}
-                                onClick={() => setPick(iso)}
-                                className={sheetOption(pick === iso)}
-                            >
-                                <span className="grid gap-0.5">
-                                    <span className="text-[14.5px] font-semibold">
-                                        {timeLabel(iso, state.times.timezone)}
-                                    </span>
-                                    {state.times.staff ? (
-                                        <span className="text-site-muted text-[12.5px]">
-                                            {state.times.staff}
-                                        </span>
-                                    ) : null}
-                                </span>
-                            </button>
-                        ))}
-                    </div>
-                </>
+                    {strip ? (
+                        <OneToOne
+                            days={strip}
+                            day={day}
+                            zone={strip.timezone}
+                            phone
+                            staff={state.times.staff ? [state.times.staff] : []}
+                            chosen={
+                                pick
+                                    ? (day?.starts.find(
+                                          (s) => s.startAt === pick,
+                                      ) ?? null)
+                                    : null
+                            }
+                            onDay={(d) => {
+                                setDate(d);
+                                setPick(null);
+                            }}
+                            onStart={(s) => setPick(s.startAt)}
+                            business={businessName}
+                        />
+                    ) : null}
+                </div>
             )}
             {problem ? (
                 <p role="alert" className={cn(destructiveAlertClasses, "mt-3")}>

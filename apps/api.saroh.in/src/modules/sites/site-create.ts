@@ -468,10 +468,13 @@ export async function writeSiteFromTemplate(
         plan.pages,
     );
 
-    // A template's other pages go in the menu, in its order (industry
-    // templates): the menu lists only what `Site.navigation` names, so a
-    // Timetable or Trainers page would otherwise be unreachable from the
-    // header. The home page is the site name's link, not an entry.
+    // The template's menu, in page order: the pages it puts there
+    // (`inMenu`, UX-070: the starter names Home and About), else every page
+    // but the home page (industry templates), whose link is the site name.
+    // The menu lists only what `Site.navigation` names, so a Timetable or
+    // Trainers page would otherwise be unreachable from the header; and
+    // Settings › Menu, the pre-publish check and the live header name the
+    // same one from the first draft.
     const menuPageIds: string[] = [];
     for (const page of pages) {
         const created = await tx.page.create({
@@ -504,7 +507,7 @@ export async function writeSiteFromTemplate(
                 },
             },
         });
-        if (!page.isHome) menuPageIds.push(created.id);
+        if (page.inMenu ?? !page.isHome) menuPageIds.push(created.id);
     }
     if (menuPageIds.length > 0) {
         const navigation: SiteNavigation = {

@@ -13,11 +13,14 @@ import type { BookingLocationType } from "./dto";
 import { businessTimezone } from "./staff-availability";
 
 /*
- * Opening hours for bookings (DEC-087): when a business has a walk-in
- * storefront with its hours set, an in-person booking is offered, and
- * taken, only while it is open. Online bookings are not cut, and a business
- * with no shop, or none with hours, books as it always did. The geometry is
- * `availability.ts`; this is the reading, and who it applies to.
+ * Opening hours for bookings (DEC-087, DEC-096): the hours set in Settings ›
+ * Hours limit in-person bookings for every business — an in-person booking
+ * is offered, and taken, only while it is open. Online bookings are not cut,
+ * and a business with no hours saved books as it always did. The week is
+ * read as the site's Visit us reads it (`public-visit.service.ts`): the
+ * walk-in shops' weeks when the business has any, otherwise the business's
+ * own week. The geometry is `availability.ts`; this is the reading, and who
+ * it applies to.
  */
 
 const DAY_OF_WEEK: Record<string, number> = {
@@ -62,9 +65,11 @@ export function openingWindows(week: unknown): AvailabilityRuleWindow[] | null {
 }
 
 /**
- * When the business is open, or null when it has no walk-in storefront
- * with hours set. Every open shop's week counts: a time is open when any
- * of them is.
+ * When the business is open, or null when it has no hours saved. With
+ * walk-in storefronts, every shop's week counts — a time is open when any
+ * of them is. Without one, the business's week: Settings › Hours writes the
+ * same week to every storefront (DEC-034), so the first one says it, online
+ * or not — the hours the site header shows (DEC-096).
  */
 export async function loadOpeningHours(
     db: Pick<Prisma.TransactionClient, "store" | "businessProfile" | "service">,
@@ -78,8 +83,22 @@ export async function loadOpeningHours(
         },
         select: { settings: { select: { openingHours: true } } },
     });
-    const weeks = shops
-        .map((shop) => openingWindows(shop.settings?.openingHours))
+    const stored =
+        shops.length > 0
+            ? shops.map((shop) => shop.settings?.openingHours)
+            : [
+                  (
+                      await db.store.findFirst({
+                          where: { organizationId, deletedAt: null },
+                          orderBy: [{ createdAt: "asc" }, { id: "asc" }],
+                          select: {
+                              settings: { select: { openingHours: true } },
+                          },
+                      })
+                  )?.settings?.openingHours,
+              ];
+    const weeks = stored
+        .map((week) => openingWindows(week))
         .filter((week) => week !== null);
     if (weeks.length === 0) return null;
     return {

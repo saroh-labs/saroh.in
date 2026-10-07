@@ -163,6 +163,12 @@ export interface SignedInBookRequest {
     locationType?: BookingWhere;
     /** "Anything we should know?" (E7), when they wrote something. */
     intakeNote?: string;
+    /**
+     * A phone the business can reach them on (UX-049), optional: kept on
+     * the booking, given to their record when it has none, and filled into
+     * the payment window.
+     */
+    bookerPhone?: string;
 }
 
 /** Book it, signed in: the site's server action that does. */

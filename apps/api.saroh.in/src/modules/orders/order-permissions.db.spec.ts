@@ -27,6 +27,10 @@
  * The Storefront team role (DEC-074) holds `order:stage` narrowed to the
  * storefronts its holder works on: every read and move above for their
  * storefront's orders; another storefront's read is a 404, its move a 403.
+ *
+ * A storefront role (Admin, Manager, Editor) still takes and changes its
+ * storefront's orders (DEC-048), but records, takes and refunds no money
+ * by its name: that follows the business role's permissions only (DEC-106).
  */
 jest.mock("../../env", () => ({
     env: {
@@ -58,7 +62,10 @@ import { OrganizationContextService } from "../organizations/organization-contex
 import { OrganizationMembersService } from "../organizations/organization-members.service";
 import type { OrgAction } from "../organizations/organization-policy";
 import { resolveCapabilities } from "../organizations/organization-policy";
-import { joinTeamFromStorefront } from "../organizations/storefront-team-role";
+import {
+    joinTeamFromStorefront,
+    STOREFRONT_TEAM_ACTIONS,
+} from "../organizations/storefront-team-role";
 import { PaymentsService } from "../payments/payments.service";
 import {
     FakeMerchantProvider,
@@ -715,5 +722,121 @@ describe("a location's team: the Storefront team role (DEC-074)", () => {
                 orders.create(storeId, clerkId, newOrderDto()),
             ),
         ).toBe("refused");
+    });
+});
+
+/**
+ * A storefront Manager (DEC-106): the storefront role takes and moves this
+ * storefront's orders, and records no payment unless a role carrying the
+ * payment permission (`order:edit`) says so.
+ */
+describe("a storefront Manager and money (DEC-106)", () => {
+    const contexts = new OrganizationContextService();
+    const CASHIER = "storefront-cashier-dec106";
+    let managerId = "";
+
+    const setRole = (role: string) =>
+        prisma.membership.update({
+            where: {
+                organizationId_userId: {
+                    organizationId: orgId,
+                    userId: managerId,
+                },
+            },
+            data: { role },
+        });
+
+    beforeAll(async () => {
+        managerId = (
+            await prisma.user.create({
+                data: { email: `dec106-manager-${tag}@example.com` },
+            })
+        ).id;
+        await prisma.$transaction(async (tx) => {
+            await tx.storeMembers.create({
+                data: { storeId, userId: managerId, role: "MANAGER" },
+            });
+            await joinTeamFromStorefront(tx, {
+                organizationId: orgId,
+                userId: managerId,
+                store: { id: storeId, name: "Hill Road" },
+                source: "invite",
+                actorUserId: managerId,
+            });
+        });
+        await prisma.organizationRole.create({
+            data: {
+                organizationId: orgId,
+                key: CASHIER,
+                label: "Location cashier",
+                actions: [...STOREFRONT_TEAM_ACTIONS, "order:edit"],
+            },
+        });
+    });
+
+    it("stages orders and takes them, but records no payment and is told why", async () => {
+        const manager = await contexts.resolve(managerId, orgId);
+        const id = await freshOrder();
+        expect(
+            await gate(() =>
+                controller.moveStage(manager, id, { to: "PREPARING" }),
+            ),
+        ).toBe("allowed");
+        // Taking an order to pay later is the storefront role's (DEC-048).
+        expect(
+            await storeGate(() =>
+                orders.create(storeId, managerId, newOrderDto()),
+            ),
+        ).toBe("allowed");
+
+        await expect(
+            orders.updateStatus(storeId, id, managerId, {
+                paymentStatus: "PAID",
+            }),
+        ).rejects.toThrow(
+            "Your role can't record payments — ask the owner or an admin to mark it paid.",
+        );
+        expect(
+            (await prisma.order.findUniqueOrThrow({ where: { id } }))
+                .paymentStatus,
+        ).not.toBe("PAID");
+        // Nor taken at the counter with a new order, nor handed back.
+        await expect(
+            orders.create(storeId, managerId, {
+                ...newOrderDto(),
+                payment: { kind: "UPI" },
+            } as CreateOrderDto),
+        ).rejects.toThrow(/can't take payments/);
+        expect(
+            await storeGate(() =>
+                orders.updateStatus(storeId, id, managerId, {
+                    status: "CANCELLED",
+                }),
+            ),
+        ).toBe("refused");
+        // And reads no amounts: the store-scoped list sends totals.
+        expect(await storeGate(() => orders.list(storeId, managerId))).toBe(
+            "refused",
+        );
+    });
+
+    it("with a role carrying the payment permission, records it", async () => {
+        await setRole(CASHIER);
+        try {
+            const id = await freshOrder();
+            expect(
+                await storeGate(() =>
+                    orders.updateStatus(storeId, id, managerId, {
+                        paymentStatus: "PAID",
+                    }),
+                ),
+            ).toBe("allowed");
+            expect(
+                (await prisma.order.findUniqueOrThrow({ where: { id } }))
+                    .paymentStatus,
+            ).toBe("PAID");
+        } finally {
+            await setRole("storefront-team");
+        }
     });
 });

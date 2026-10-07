@@ -3,7 +3,7 @@ import { describe, expect, it, vi } from "vitest";
 
 import type { Invoice } from "@/lib/invoices/service";
 
-import { TaxRows } from "./invoice-quick-look";
+import { ShownLink, TaxRows } from "./invoice-quick-look";
 
 vi.mock("@/lib/invoices/actions", () => ({
     createPayLink: vi.fn(),
@@ -81,5 +81,20 @@ describe("TaxRows' seller (DEC-082)", () => {
         );
         expect(html).toContain("No GST — Rye &amp; Co. isn&#x27;t registered");
         expect(html).not.toContain("Rye Bakehouse");
+    });
+});
+
+describe("ShownLink (UX-048)", () => {
+    it("shows the pay link's address in place, selectable, with a copy button", () => {
+        const html = renderToStaticMarkup(
+            <ShownLink
+                url="https://rye.saroh.app/pay/tok_1"
+                onCopy={vi.fn()}
+            />,
+        );
+        expect(html).toContain("https://rye.saroh.app/pay/tok_1");
+        expect(html).toContain("select-all");
+        expect(html).toContain('aria-label="Copy the pay link"');
+        expect(html).toContain("doesn&#x27;t");
     });
 });

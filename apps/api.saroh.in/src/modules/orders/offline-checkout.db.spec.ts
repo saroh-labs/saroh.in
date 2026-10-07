@@ -132,6 +132,10 @@ async function shop(
             currency: "INR",
             fulfilmentTypes: ["PICKUP", "LOCAL_DELIVERY", "SHIPPING"],
             collectionEnabled: true,
+            // Pick-up is offered from a place customers visit, with its
+            // address (UX-025).
+            kind: "SHOP",
+            address: "12 Hill Road, Bandra",
             shippingEnabled: true,
             offerPayOnHandover: over.offerPayOnHandover ?? false,
         },

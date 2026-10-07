@@ -30,6 +30,7 @@ import {
 } from "@/lib/invoices/status";
 import { getInvoiceBusiness } from "@/lib/invoices/tax";
 import { invoiceZone } from "@/lib/invoices/zone";
+import { permitsFor } from "@/lib/organizations/permits";
 import { resolveActiveOrganization } from "@/lib/organizations/service";
 import { requireSession } from "@/lib/session";
 
@@ -71,10 +72,7 @@ export default async function InvoicePage({
         ? await listInvoicesFor(invoice.contact.id).catch(() => null)
         : [];
 
-    const may = (action: string) =>
-        organization?.actions
-            ? organization.actions.includes(action)
-            : organization?.role === "OWNER" || organization?.role === "ADMIN";
+    const may = permitsFor(organization);
     const canWrite = may("invoice:write");
     // It can't be emailed for want of the business's own email (DEC-011):
     // why, and Connect or See plans (DEC-091) for whoever may.

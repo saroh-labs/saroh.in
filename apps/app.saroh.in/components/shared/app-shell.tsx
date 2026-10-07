@@ -5,6 +5,7 @@ import { PlanEndingBanner } from "@/components/billing/plan-ending-banner";
 import { PlanRefusalHost } from "@/components/billing/plan-refusal";
 import { AppHeader } from "@/components/shared/app-header";
 import { AppSidebar } from "@/components/shared/app-sidebar";
+import { BusinessZoneProvider } from "@/components/shared/business-zone";
 import { CommandMenu } from "@/components/shared/command-menu";
 import type { NavCounts } from "@/components/shared/nav-items";
 import { NOTIFICATIONS_NAV, navCan } from "@/components/shared/nav-items";
@@ -13,6 +14,7 @@ import {
     planLockedModuleKeys,
 } from "@/components/shared/nav-locks";
 import { TabBar } from "@/components/shared/tab-bar";
+import { businessZone } from "@/lib/format/business-zone";
 import { getHome } from "@/lib/home/service";
 import { listModules } from "@/lib/modules/service";
 import { RAIL_COLLAPSED, RAIL_COOKIE } from "@/lib/nav/rail-cookie";
@@ -217,6 +219,7 @@ export async function AppShell({ children }: { children: React.ReactNode }) {
                     locked={lockedHrefs}
                     stockTracked={stockTracked}
                     storefronts={storefronts?.used ?? null}
+                    kind={activeOrg?.kind ?? null}
                 />
                 {/* The working area is white and the rail sits on Paper: the
                 product spends white surfaces, and the page you work on is
@@ -240,9 +243,16 @@ export async function AppShell({ children }: { children: React.ReactNode }) {
                         tabIndex={-1}
                         className="flex flex-1 flex-col pb-[var(--tab-bar-inset)] outline-none"
                     >
-                        {/* A plan that ends within 30 days (#805). */}
-                        <PlanEndingBanner ending={billing?.planEnding} />
-                        {children}
+                        {/*
+                         * The business's zone (UX-008): every time a page
+                         * writes with `BusinessDate` reads as the business
+                         * keeps it, on the server's first paint too.
+                         */}
+                        <BusinessZoneProvider zone={businessZone(activeOrg)}>
+                            {/* A plan that ends within 30 days (#805). */}
+                            <PlanEndingBanner ending={billing?.planEnding} />
+                            {children}
+                        </BusinessZoneProvider>
                     </div>
                 </div>
             </div>
@@ -258,6 +268,7 @@ export async function AppShell({ children }: { children: React.ReactNode }) {
                 counts={counts}
                 stockTracked={stockTracked}
                 storefronts={storefronts?.used ?? null}
+                kind={activeOrg?.kind ?? null}
             />
         </div>
     );

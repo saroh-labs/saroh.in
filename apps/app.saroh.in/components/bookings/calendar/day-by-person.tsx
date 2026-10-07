@@ -196,14 +196,14 @@ export function DayByPerson({
                                 }}
                             />
                         ))}
-                        {canBook
-                            ? c.day?.free.map((f) => (
-                                  <button
+                        {c.key === UNASSIGNED
+                            ? // The services' own hours (UX-023): free time
+                              // customers can book, with nobody to tap-book
+                              // it with — New booking takes any service.
+                              c.day?.free.map((f) => (
+                                  <div
                                       key={`f${f[0]}`}
-                                      type="button"
-                                      onClick={() => onFree(c, f)}
-                                      aria-label={`Book ${c.name} at ${clock(f[0])}, free until ${clock(f[1])}`}
-                                      className="absolute inset-x-1 z-[1] box-border flex cursor-pointer flex-col items-start justify-start overflow-hidden rounded-[7px] border border-dashed border-success-subtle-foreground bg-success-subtle px-[7px] py-[3px] text-left transition-[filter,border-style] duration-fast hover:border-solid focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1 active:brightness-95"
+                                      className="absolute inset-x-1 z-[1] box-border overflow-hidden rounded-[7px] border border-dashed border-success-subtle-foreground bg-success-subtle px-[7px] py-[3px]"
                                       style={{
                                           top: at(f[0], from),
                                           height: tall(f[0], f[1]),
@@ -212,9 +212,27 @@ export function DayByPerson({
                                       <span className="block text-[11px] font-semibold text-success-subtle-foreground">
                                           Free {clock(f[0])}–{clock(f[1])}
                                       </span>
-                                  </button>
+                                  </div>
                               ))
-                            : null}
+                            : canBook
+                              ? c.day?.free.map((f) => (
+                                    <button
+                                        key={`f${f[0]}`}
+                                        type="button"
+                                        onClick={() => onFree(c, f)}
+                                        aria-label={`Book ${c.name} at ${clock(f[0])}, free until ${clock(f[1])}`}
+                                        className="absolute inset-x-1 z-[1] box-border flex cursor-pointer flex-col items-start justify-start overflow-hidden rounded-[7px] border border-dashed border-success-subtle-foreground bg-success-subtle px-[7px] py-[3px] text-left transition-[filter,border-style] duration-fast hover:border-solid focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1 active:brightness-95"
+                                        style={{
+                                            top: at(f[0], from),
+                                            height: tall(f[0], f[1]),
+                                        }}
+                                    >
+                                        <span className="block text-[11px] font-semibold text-success-subtle-foreground">
+                                            Free {clock(f[0])}–{clock(f[1])}
+                                        </span>
+                                    </button>
+                                ))
+                              : null}
                         {c.blocks.map((b) => {
                             const lane = lanesByColumn
                                 .get(c.key)

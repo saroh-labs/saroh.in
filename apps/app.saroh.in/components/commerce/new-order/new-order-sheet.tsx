@@ -317,6 +317,8 @@ function NewOrderBody({
                     format={o.format}
                     discount={o.discount}
                     onDiscount={o.setDiscount}
+                    handedOver={o.handedOver}
+                    onHandedOver={o.setHandedOver}
                 />
             </div>
             <div
@@ -416,6 +418,8 @@ function request(o: NewOrderState): Parameters<typeof makeNewOrder>[1] {
         ...(o.off ? { discount: fromCents(o.off) } : {}),
         ...(o.code ? { discountCode: o.code } : {}),
         ...(o.data ? { currency: o.data.currency } : {}),
+        // Handed over now (UX-059): made Collected at once.
+        ...(o.handedOver ? { handedOver: true } : {}),
         payment: {
             kind: o.pay,
             ...(Number.isFinite(received)

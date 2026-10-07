@@ -35,6 +35,7 @@ import {
     ORGANIZATION_KINDS,
 } from "@/lib/organizations/kind";
 import type { AddressAvailability } from "@/lib/organizations/service";
+import { browserZone } from "@/lib/organizations/time-zones";
 import {
     startCheckoutAfterOnboarding,
     takeLaunchOfferAfterOnboarding,
@@ -142,6 +143,10 @@ export function BusinessSetupForm({
         },
     });
     const { isSubmitting } = form.formState;
+    // Set up, and on the way to Home: the push takes a moment, and the
+    // button stays "Setting up…" until the page goes (UX-076).
+    const [leaving, setLeaving] = useState(false);
+    const busy = isSubmitting || leaving;
 
     /** Whether the merchant has typed an address of their own. */
     const [edited, setEdited] = useState(false);
@@ -212,6 +217,7 @@ export function BusinessSetupForm({
         // A site for my work is not asked (KTD-6), so it sends no type even
         // if one was picked under another answer first.
         const asked = kindDefaults(values.kind).asksRegistered;
+        const zone = browserZone();
         const res = await createOrganization({
             name: values.name.trim(),
             kind: values.kind,
@@ -225,6 +231,9 @@ export function BusinessSetupForm({
                     ? { registered: true }
                     : {}),
                 country: values.country,
+                // The browser's zone (UX-008): the business's for a country
+                // that keeps several; one that keeps one zone uses that.
+                ...(zone ? { timezone: zone } : {}),
             },
         });
         if (!res.ok) {
@@ -264,6 +273,7 @@ export function BusinessSetupForm({
                 );
             }
         }
+        setLeaving(true);
         router.push("/");
         router.refresh();
     }
@@ -395,7 +405,7 @@ export function BusinessSetupForm({
                                             aria-hidden
                                             className="size-3.5"
                                         />
-                                        Free — your website will live here.
+                                        Available. Your website will live here.
                                     </span>
                                 ) : taken ? (
                                     availability.reason
@@ -544,14 +554,14 @@ export function BusinessSetupForm({
                     <Button
                         type="submit"
                         className="wk-press h-10 flex-1 font-semibold"
-                        disabled={isSubmitting || taken}
+                        disabled={busy || taken}
                         title={
                             taken && availability.reason
                                 ? availability.reason
                                 : undefined
                         }
                     >
-                        {isSubmitting
+                        {busy
                             ? "Setting up…"
                             : kind === "BUSINESS"
                               ? "Create the business"

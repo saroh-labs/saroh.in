@@ -95,10 +95,10 @@ export default async function PlanBillingPage() {
     const access = accessRead.data;
     const catalog = pricing?.catalog ?? null;
     const businessName = org?.name ?? "this business";
+    // No summary exists yet: the line is left out rather than promised
+    // (UX-080).
     const footnote =
-        usage.status === "ok"
-            ? usageLine(usage.usage, businessName)
-            : `A monthly summary of what Saroh did for ${businessName} isn't ready yet.`;
+        usage.status === "ok" ? usageLine(usage.usage, businessName) : "";
 
     const addonsView = addons?.status === "ok" ? addons.data : null;
     const checkoutsView = checkouts?.status === "ok" ? checkouts.data : null;
@@ -140,11 +140,17 @@ export default async function PlanBillingPage() {
         ).filter((id): id is string => id !== null),
     );
 
+    // A plan given for a while (a launch offer) is the one it's on (UX-044).
+    const override =
+        access?.source === "catalogue" ? access.planOverride : null;
+    const given = override
+        ? { planId: override.planKey, until: override.expiresAt ?? null }
+        : null;
     const rows = catalog
         ? (Object.fromEntries(
               (["month", "year"] as const).map((cycle) => [
                   cycle,
-                  pickerRows({ catalog, subscription, cycle, trials }),
+                  pickerRows({ catalog, subscription, cycle, trials, given }),
               ]),
           ) as Record<Cycle, ReturnType<typeof pickerRows>>)
         : null;
@@ -174,6 +180,11 @@ export default async function PlanBillingPage() {
                     rows={rows}
                     yearly={yearlyOffer(catalog)}
                     initialCycle={billedCycle(subscription)}
+                    currentPlan={
+                        access?.source === "catalogue"
+                            ? (access.plan?.name ?? "Free")
+                            : (subscription?.plan.name ?? "Free")
+                    }
                     canChange
                     addons={
                         addonList.length > 0 ? (

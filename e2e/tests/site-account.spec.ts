@@ -79,15 +79,13 @@ test.describe("the account area (A5)", () => {
         // The account's compact header (DEC-073 #10): the tab's title and
         // the business's letter back to the site, no site header or footer.
         await expect(page.getByRole("heading", { level: 1 })).toHaveText("Me");
-        await expect(page.getByText("Runs on Saroh")).toHaveCount(0);
+        await expect(page.getByRole("contentinfo")).toHaveCount(0);
         await page
             .getByRole("banner")
             .getByRole("link", { name: /^Back to the site/ })
             .click();
         await expect(page).toHaveURL(new RegExp(`^${SITE}/?$`));
-        await expect(
-            page.getByRole("contentinfo").getByText("Runs on Saroh"),
-        ).toBeVisible();
+        await expect(page.getByRole("contentinfo")).toBeVisible();
         await expect(
             page.getByRole("banner").getByRole("link", { name: "My account" }),
         ).toHaveText("AR");

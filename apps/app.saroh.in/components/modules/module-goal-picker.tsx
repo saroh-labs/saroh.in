@@ -28,7 +28,7 @@ import { kindWords, preselect } from "@/lib/organizations/kind";
  *
  * Dependencies come from the server-owned read model (`view.dependencies`), so
  * the client never hardcodes the capability graph. They are also SHOWN: picking
- * "Take appointments" quietly enabling CRM is the kind of thing a merchant
+ * "Take bookings" quietly enabling CRM is the kind of thing a merchant
  * should be told before it happens, not discover in the navigation afterwards.
  */
 interface Goal {
@@ -60,7 +60,7 @@ function goalsFor(kind: unknown): Goal[] {
         },
         {
             moduleKey: "APPOINTMENTS",
-            title: "Take appointments",
+            title: "Take bookings",
             description: `Offer services and let ${people} book time with you.`,
         },
         {

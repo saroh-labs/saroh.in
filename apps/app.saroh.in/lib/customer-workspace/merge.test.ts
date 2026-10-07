@@ -8,6 +8,7 @@ import {
     columnName,
     consentLines,
     defaultPicks,
+    duplicateHeading,
     duplicateLine,
     isMergedRedirect,
     keptColumn,
@@ -19,6 +20,7 @@ import {
     mergeSubtitle,
     movesLine,
     pickable,
+    shownDuplicates,
     sideOf,
     suggestedTarget,
 } from "./merge";
@@ -436,5 +438,35 @@ describe("the old address", () => {
         expect(isMergedRedirect({ mergedInto: "c_1" })).toBe(true);
         expect(isMergedRedirect({ contact: { id: "c_1" } })).toBe(false);
         expect(isMergedRedirect(null)).toBe(false);
+    });
+});
+
+describe("the same-person prompt (DEC-097)", () => {
+    const byEmail = { id: "e", matchedOn: ["email"] as const };
+    const byBoth = { id: "b", matchedOn: ["email", "phone"] as const };
+    const byPhone = { id: "p", matchedOn: ["phone"] as const };
+    const all = [byEmail, byBoth, byPhone];
+
+    it("shows a same-email record only to someone who can edit contacts", () => {
+        expect(shownDuplicates(all, { canEdit: true })).toEqual(all);
+        expect(shownDuplicates(all, { canEdit: false })).toEqual([byPhone]);
+    });
+
+    it("offers only the email prompt on the Contacts page", () => {
+        expect(
+            shownDuplicates(all, { canEdit: true, emailOnly: true }),
+        ).toEqual([byEmail, byBoth]);
+        expect(
+            shownDuplicates(all, { canEdit: false, emailOnly: true }),
+        ).toEqual([]);
+        expect(
+            shownDuplicates([byPhone], { canEdit: true, emailOnly: true }),
+        ).toEqual([]);
+    });
+
+    it('leads with "This may be the same person" on a same email', () => {
+        expect(duplicateHeading(byEmail)).toBe("This may be the same person:");
+        expect(duplicateHeading(byBoth)).toBe("This may be the same person:");
+        expect(duplicateHeading(byPhone)).toBe("Looks like the same person:");
     });
 });

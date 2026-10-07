@@ -26,6 +26,11 @@ export interface InstantiatedPage {
     path: string;
     title: string;
     isHome: boolean;
+    /**
+     * In the site's menu (UX-070); the menu keeps page order. Unsaid, the
+     * site write puts every page but the home page there.
+     */
+    inMenu?: boolean;
     sections: InstantiatedSection[];
 }
 
@@ -161,6 +166,7 @@ export function instantiateTemplate(
             path: page.path,
             title: page.title,
             isHome: page.isHome ?? false,
+            ...(page.inMenu === undefined ? {} : { inMenu: page.inMenu }),
             sections,
         };
     });

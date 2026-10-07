@@ -61,8 +61,11 @@ export const getBookingPage = cache(async function getBookingPage(
  *
  * Never takes the page down: anything but a good answer is null, and the
  * header then names the business only.
+ *
+ * Every page's footer reads it too (UX-038), for the public phone and place;
+ * `cache` makes `/book` one read, not two, within a request.
  */
-export async function getBookingVisit(
+export const getBookingVisit = cache(async function bookingVisit(
     siteId: string,
 ): Promise<PublicVisit | null> {
     try {
@@ -86,4 +89,4 @@ export async function getBookingVisit(
     } catch {
         return null;
     }
-}
+});

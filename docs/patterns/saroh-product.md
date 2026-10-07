@@ -312,6 +312,15 @@ organizations/:org/customers`: everyone who has paid (an order through a
   name". Version history says which release a go-live came from, badges
   Approved, Bypassed and "Overridden by ‹owner›", and lists scheduled
   go-lives.
+- **Current** (UX-068, UX-043) — **A review closes.** Withdrawing the
+  request (`WITHDRAWN`) or putting the draft live past it (`BYPASSED`,
+  `OVERRIDDEN`) closes every request and change request before it
+  (`CLOSING_OUTCOMES` in `sites/review-route.ts`); closing never counts as
+  an approval. The person who asked isn't offered Approve or Ask for
+  changes on their own request (`askedByYou`). Ask for changes needs a
+  short reason, kept on the row and shown wherever the verdict is. Share in
+  the editor names its two choices: ask a teammate to review, or make a
+  preview link anyone can open.
 - **Current** — Section content validates against the versioned contract in
   `packages/block-contract/src/section-contract.ts`. A breaking change ships as a
   new version beside the old one, never an in-place edit, so existing
@@ -393,10 +402,13 @@ organizations/:org/customers`: everyone who has paid (an order through a
   payments, else it says why ("N/A"); flat is "level". The read needs
   `analytics:read` and `payment:read`, and answers before Insights' setup
   is done (`@IgnoreModuleReadiness`).
-- **Adopted** — Insights' website figures reflect real events. The hourly
-  `analytics.rollup` (DEC-075) now builds the rollups, but the renderer still
-  sends no view beacon and nothing emits `enquiry.submitted`, so a real
-  business's views and enquiries read zero (`MARKETING_CLAIMS.md` IN13).
+- **Current** — Insights' website figures reflect real events. The hourly
+  `analytics.rollup` (DEC-075) builds the rollups (the page says "Updated
+  every hour"); a live site sends one cookieless `site.view` per page
+  (`apps/saroh.app/lib/site-view.ts`: path only, the referrer's origin only,
+  nothing when the browser sends Do Not Track or Global Privacy Control,
+  nothing from the account area, never on a test release or preview), and an
+  enquiry writes `enquiry.submitted` in its own transaction (UX-032).
 
 ## Saying what is true
 

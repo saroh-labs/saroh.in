@@ -112,3 +112,17 @@ export function classifySiteHost(
 export function isTestShapedHost(host: string, rootDomain: string): boolean {
     return classifySiteHost(host, rootDomain).mode === "test";
 }
+
+/**
+ * The live host a test host stands beside (UX-081): `test--acme.saroh.app`
+ * → `acme.saroh.app`, `test.shop.acme.com` → `shop.acme.com`. Null for a
+ * host that names no live site. The gate offers "Go to the live site" with
+ * it, so a visitor without the link isn't left at a dead end.
+ */
+export function liveHostOf(rawHost: string, rootDomain: string): string | null {
+    const found = classifySiteHost(rawHost, rootDomain);
+    if (found.mode !== "test" || !found.lookup) return null;
+    return found.lookup.by === "subdomain"
+        ? `${found.lookup.subdomain}.${normaliseSiteHost(rootDomain)}`
+        : found.lookup.hostname;
+}

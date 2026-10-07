@@ -24,7 +24,8 @@ import { emailAttention, providersTabNote } from "@/lib/settings/ready";
  * When email needs a person, the Providers tab says so in place of its line
  * ("Needs you: email is disconnected"), so it is seen from any tab. Asked only
  * of someone who may manage messaging, and best-effort: a failed read drops
- * the line, never the screen.
+ * the line, never the screen. A plan that can't connect its own email is
+ * never told it has none (DEC-091).
  */
 export default async function SettingsLayout({
     children,

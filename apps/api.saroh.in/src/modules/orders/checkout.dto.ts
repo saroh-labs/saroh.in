@@ -34,6 +34,10 @@ const trim = ({ value }: { value: unknown }) =>
 const blankToNull = ({ value }: { value: unknown }) =>
     typeof value === "string" && value.trim() === "" ? null : value;
 
+/** "  save10 " → "save10"; blank → null (no code). */
+const trimToNull = ({ value }: { value: unknown }) =>
+    typeof value === "string" ? value.trim() || null : value;
+
 const CHECKOUT_PAYMENTS: readonly CheckoutPayment[] = ["ONLINE", "ON_HANDOVER"];
 
 export class BagLineInput {
@@ -67,6 +71,17 @@ export class CheckoutQuoteDto {
     @IsOptional()
     @IsIn(STOREFRONT_FULFILMENT_TYPES)
     fulfilment?: StorefrontFulfilmentType;
+
+    /**
+     * A discount code from Sell › Discounts (DEC-104). The server judges
+     * it, by the counter's rules, against the bag it prices; nothing the
+     * browser says it takes off is read.
+     */
+    @IsOptional()
+    @Transform(trimToNull)
+    @IsString()
+    @MaxLength(32)
+    discountCode?: string | null;
 }
 
 export class CheckoutStartDto {
@@ -103,6 +118,17 @@ export class CheckoutStartDto {
     @IsString()
     @MaxLength(500)
     notes?: string | null;
+
+    /**
+     * A discount code from Sell › Discounts (DEC-104). The server judges
+     * it, by the counter's rules, against the bag it prices; nothing the
+     * browser says it takes off is read.
+     */
+    @IsOptional()
+    @Transform(trimToNull)
+    @IsString()
+    @MaxLength(32)
+    discountCode?: string | null;
 
     /**
      * The checkout sheet's key: a double tap or a retry with the same key

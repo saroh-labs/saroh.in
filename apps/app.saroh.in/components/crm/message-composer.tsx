@@ -9,8 +9,12 @@ import { useState } from "react";
 
 import { OptionSelect } from "@/components/shared/option-select";
 import { sendMessage } from "@/lib/messages/actions";
+import type { ComposerGate } from "@/lib/messages/composer-gate";
+import { sendFailureWords } from "@/lib/messages/composer-gate";
 import type { ConsentStatus, MessageChannel } from "@/lib/messages/constants";
 import { CHANNEL_LABEL, MESSAGE_CHANNELS } from "@/lib/messages/constants";
+
+import { ComposerNotice } from "./composer-notice";
 
 /**
  * Compose + send a message to a lead's contact (S6-002). Picks a channel
@@ -24,14 +28,22 @@ import { CHANNEL_LABEL, MESSAGE_CHANNELS } from "@/lib/messages/constants";
  * for this contact, a warning explains that a send will be SUPPRESSED (the api
  * records it but hands nothing to a provider). The send button stays enabled so
  * the (auditable) suppression can still be exercised deliberately.
+ *
+ * A channel that can't send (no provider connected, or the plan doesn't
+ * let the business connect one, UX-067) shows why and the way on in place
+ * of the subject, body and Send (`gates`), so nobody writes a whole message
+ * into a refusal; a refusal that still comes is said in the owner's words.
  */
 export function MessageComposer({
     leadId,
     contactId,
     consent,
+    gates,
 }: {
     leadId: string;
     contactId: string;
+    /** Per channel, whether it can send; absent, every channel composes. */
+    gates?: Partial<Record<MessageChannel, ComposerGate>>;
     /** Current consent status per channel; absent = allowed. */
     consent: Partial<Record<MessageChannel, ConsentStatus>>;
 }) {
@@ -42,11 +54,12 @@ export function MessageComposer({
     const [busy, setBusy] = useState(false);
 
     const revoked = consent[channel] === "REVOKED";
+    const gate: ComposerGate = gates?.[channel] ?? { kind: "compose" };
 
     async function onSubmit(e: React.FormEvent) {
         e.preventDefault();
         const text = body.trim();
-        if (!text) return;
+        if (!text || gate.kind !== "compose") return;
         setBusy(true);
         const res = await sendMessage({
             leadId,
@@ -60,7 +73,7 @@ export function MessageComposer({
         });
         setBusy(false);
         if (!res.ok) {
-            showError(res.error);
+            showError(sendFailureWords(res.error, channel));
             return;
         }
         setSubject("");
@@ -90,7 +103,9 @@ export function MessageComposer({
                 />
             </div>
 
-            {channel === "EMAIL" && (
+            {gate.kind !== "compose" ? <ComposerNotice gate={gate} /> : null}
+
+            {gate.kind === "compose" && channel === "EMAIL" && (
                 <Input
                     aria-label="Subject"
                     placeholder="Subject (optional)"
@@ -100,32 +115,36 @@ export function MessageComposer({
                 />
             )}
 
-            <Textarea
-                aria-label="Message body"
-                placeholder="Write your message…"
-                value={body}
-                disabled={busy}
-                onChange={(e) => setBody(e.target.value)}
-                rows={4}
-            />
+            {gate.kind === "compose" ? (
+                <Textarea
+                    aria-label="Message body"
+                    placeholder="Write your message…"
+                    value={body}
+                    disabled={busy}
+                    onChange={(e) => setBody(e.target.value)}
+                    rows={4}
+                />
+            ) : null}
 
-            {revoked && (
+            {gate.kind === "compose" && revoked && (
                 <p className="text-xs text-destructive">
                     This contact has revoked {channel} consent — sending will be
                     suppressed (recorded, but not delivered).
                 </p>
             )}
 
-            <div className="flex justify-end">
-                <Button
-                    type="submit"
-                    size="sm"
-                    className="wk-press"
-                    disabled={busy || !body.trim()}
-                >
-                    {busy ? "Sending…" : "Send message"}
-                </Button>
-            </div>
+            {gate.kind === "compose" ? (
+                <div className="flex justify-end">
+                    <Button
+                        type="submit"
+                        size="sm"
+                        className="wk-press"
+                        disabled={busy || !body.trim()}
+                    >
+                        {busy ? "Sending…" : "Send message"}
+                    </Button>
+                </div>
+            ) : null}
         </form>
     );
 }

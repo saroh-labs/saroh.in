@@ -12,6 +12,7 @@ vi.mock("@/lib/invoices/actions", () => ({
     issueInvoice: vi.fn(),
     updateInvoice: vi.fn(),
 }));
+vi.mock("@/lib/contacts/create", () => ({ createContact: vi.fn() }));
 vi.mock("@/components/organizations/use-business-details-step", () => ({
     useBusinessDetailsStep: () => ({
         run: vi.fn(),
@@ -75,5 +76,35 @@ describe("InvoiceForm's line editor", () => {
         );
         expect(at("size-11 sm:hidden")).toBeLessThan(at("Line 1: quantity"));
         expect(at("Line 1: price each")).toBeLessThan(at("hidden sm:grid"));
+    });
+});
+
+/** Who on a new invoice (UX-047): a contact is added in place. */
+describe("InvoiceForm's New contact", () => {
+    const props = {
+        defaultCurrency: "INR",
+        registered: false,
+        businessName: "Rye & Co.",
+        providerConnected: false,
+    };
+
+    it("with no contacts yet, offers New contact rather than only a way out", () => {
+        const out = renderToStaticMarkup(
+            <InvoiceForm contacts={[]} {...props} />,
+        );
+        expect(out).toContain("New contact");
+        expect(out).toContain("Add who it&#x27;s for here");
+    });
+
+    it("with contacts, offers New contact under the picker", () => {
+        const out = renderToStaticMarkup(
+            <InvoiceForm
+                contacts={[
+                    { id: "c_1", name: "Asha Rao", email: "asha@example.com" },
+                ]}
+                {...props}
+            />,
+        );
+        expect(out).toContain("New contact");
     });
 });

@@ -13,6 +13,8 @@ import {
     setModuleStatusAction,
 } from "@/lib/modules/actions";
 import { blockerSentence, refusalSentence } from "@/lib/modules/blocker-copy";
+import type { RowPlanLock } from "@/lib/modules/plan-locks";
+import { asShown, rowPlanLock } from "@/lib/modules/plan-locks";
 import type { ModuleBlocker, ModuleView } from "@/lib/modules/schema";
 import {
     listWords,
@@ -22,6 +24,7 @@ import {
     refusalActionLabel,
     setupActionLabel,
 } from "@/lib/modules/switch-plan";
+import type { ConnectLocks } from "@/lib/providers/connect-lock";
 
 /**
  * Settings → Modules ("Saroh Settings" design): one bordered list, a switch
@@ -42,14 +45,23 @@ import {
  * from what the rail does. A module with nothing to say goes off at once.
  */
 export function ModuleList({
-    modules,
-    all = modules,
+    modules: listed,
+    all = listed,
+    locks = null,
 }: {
     /** The modules shown: the ones Saroh has rolled out (DEC-057). */
     modules: ModuleView[];
     /** Every module, hidden ones too, for what goes off with what. */
     all?: ModuleView[];
+    /** What the plan won't let the business connect (UX-006); null unread. */
+    locks?: ConnectLocks | null;
 }) {
+    // A provider the plan won't let it connect is said up front, never as
+    // "Finish setup" (UX-006).
+    const planLocks = new Map(
+        listed.map((m) => [m.key, rowPlanLock(m, locks)] as const),
+    );
+    const modules = listed.map((m) => asShown(m, planLocks.get(m.key) ?? null));
     const canManage = modules.some((m) => m.canManage);
     // Turning one on asks for its minimum first, in the one sheet (DEC-068).
     const [turningOn, setTurningOn] = useState<string[] | null>(null);
@@ -70,6 +82,7 @@ export function ModuleList({
                         modules={modules}
                         all={all}
                         first={i === 0}
+                        planLock={planLocks.get(module.key) ?? null}
                         onTurnOn={(key) => setTurningOn([key])}
                     />
                 ))}
@@ -102,7 +115,10 @@ const DISPLAY: Partial<Record<string, { label?: string; note: string }>> = {
         note: "Take subscriptions, sell plans and take payment online.",
     },
     WEBSITE: { note: "Pages, posts and a domain." },
-    APPOINTMENTS: { note: "A calendar, services and bookings." },
+    APPOINTMENTS: {
+        label: "Bookings",
+        note: "A calendar, services and bookings.",
+    },
     COURSES: { note: "A run of dated sessions with seats and a price." },
     CLASS_PACKS: {
         note: "A number of visits bought up front and used over time.",
@@ -156,12 +172,15 @@ function ModuleRow({
     modules,
     all,
     first,
+    planLock,
     onTurnOn,
 }: {
     module: ModuleView;
     modules: ModuleView[];
     all: ModuleView[];
     first: boolean;
+    /** What the plan holds back for this row (UX-006); null for none. */
+    planLock: RowPlanLock | null;
     /** Open the "Turn on" sheet, which brings what it needs (DEC-068). */
     onTurnOn: (key: string) => void;
 }) {
@@ -379,6 +398,16 @@ function ModuleRow({
                     >
                         Turn on {listWords([...missingLabels, label])}
                     </Button>
+                ) : null}
+                {planLock ? (
+                    <div className="mt-2.5 flex flex-wrap items-center gap-2.5">
+                        <span className="text-pretty text-[12.5px] text-foreground/80">
+                            {planLock.line}
+                        </span>
+                        <Button asChild variant="outline" size="sm">
+                            <Link href={planLock.href}>{planLock.cta}</Link>
+                        </Button>
+                    </div>
                 ) : null}
                 {step ? (
                     <div className="mt-2.5 flex flex-wrap items-center gap-2.5">

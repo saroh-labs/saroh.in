@@ -56,6 +56,11 @@ export interface ProductGridFeed {
      * cards without links (a preview, which has no shop of its own).
      */
     basePath: string | null;
+    /**
+     * The grid is on the Shop page itself: no "Shop →" link back to the
+     * page the visitor is on (UX-082).
+     */
+    atShop?: boolean;
 }
 
 /** What the section is called when the merchant left the title empty. */
@@ -379,7 +384,7 @@ function ProductCards({
             count={content.showAvailability ? availabilityLine(products) : null}
             note={said(content.note)}
             more={
-                base !== null ? (
+                feed.atShop ? null : base !== null ? (
                     <a
                         href={base || "/"}
                         className={cn(textButton, "shrink-0")}

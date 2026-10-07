@@ -23,12 +23,15 @@ import {
 } from "@/lib/modules/turn-on";
 import {
     enableModuleAction,
+    readConnectLocksAction,
     readSetupDefaultsAction,
 } from "@/lib/modules/turn-on-actions";
 import type { FieldErrors } from "@/lib/modules/turn-on-errors";
 import type { SetupDefaults } from "@/lib/modules/turn-on-schema";
 import { decodeSetupDefaults } from "@/lib/modules/turn-on-schema";
 import type { EnableResult } from "@/lib/modules/turn-on-service";
+import type { ConnectLocks } from "@/lib/providers/connect-lock";
+import { connectLockFor } from "@/lib/providers/connect-lock";
 import {
     moduleStatesWith,
     suggestedTemplates,
@@ -60,6 +63,9 @@ export function useTurnOn({
     // A free address the API offered for one that is taken (DEC-069).
     const [suggestion, setSuggestion] = useState<string | null>(null);
     const [saving, setSaving] = useState(false);
+    // What the plan won't let the business connect (UX-006); null until
+    // read, and unread locks nothing.
+    const [locks, setLocks] = useState<ConnectLocks | null>(null);
     // What is on already from an earlier press that stopped part-way: a
     // retry doesn't send it again.
     const done = useRef<{ key: string; view: ModuleView | null }[]>([]);
@@ -71,6 +77,12 @@ export function useTurnOn({
         // and Website, which selling online brings (DEC-069).
         const wide = turnOnPlan({ picked, modules, sellsOnline: true }).order;
         const keys = Array.from(new Set([...picked, ...wide]));
+        readConnectLocksAction().then(
+            (read) => {
+                if (live) setLocks(read);
+            },
+            () => undefined,
+        );
         readSetupDefaultsAction(keys).then(
             (defaults) => {
                 if (!live) return;
@@ -121,7 +133,7 @@ export function useTurnOn({
      */
     const submit = async (connect?: boolean) => {
         if (!draft || saving || hidden.length > 0) return;
-        const sent: TurnOnDraft =
+        const asked: TurnOnDraft =
             connect === undefined
                 ? draft
                 : {
@@ -130,6 +142,16 @@ export function useTurnOn({
                           Array.from(CONNECT_KEYS).map((k) => [k, connect]),
                       ),
                   };
+        // Never sent to connect what the plan won't let it (UX-006).
+        const sent: TurnOnDraft = {
+            ...asked,
+            connect: Object.fromEntries(
+                Object.entries(asked.connect).map(([k, v]) => [
+                    k,
+                    v && !connectLockFor(k, locks),
+                ]),
+            ),
+        };
         const problems = problemsOf(sent, plan.order);
         setErrors(problems);
         setFailure(null);
@@ -195,7 +217,10 @@ export function useTurnOn({
         showSuccess(
             turnedOnToast(
                 names,
-                finishSetupItems(done.current.map((d) => d.view)),
+                finishSetupItems(
+                    done.current.map((d) => d.view),
+                    (key) => connectLockFor(key, locks) !== null,
+                ),
             ),
         );
         const href = landingHref(picked, plan, sent);
@@ -230,6 +255,7 @@ export function useTurnOn({
         failure,
         suggestion,
         saving,
+        locks,
         update,
         submit,
     };

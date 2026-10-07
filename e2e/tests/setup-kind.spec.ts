@@ -36,7 +36,7 @@ async function openSetup(page: Page) {
 async function setUp(page: Page, name: string, button: string) {
     await page.getByLabel("Your name or brand").fill(name);
     await expect(
-        page.getByText("Free — your website will live here."),
+        page.getByText("Available. Your website will live here."),
     ).toBeVisible();
     await page.getByRole("button", { name: button }).click();
     await page.waitForURL((url) => !url.pathname.startsWith("/onboarding"));

@@ -433,9 +433,7 @@ describe("after it is on", () => {
         const pay = turnOnPlan({ picked: ["PAYMENTS"], modules: allOff });
         expect(landingHref(["PAYMENTS"], pay, d)).toBe(PROVIDERS_HREF);
         d.connect.PAYMENTS = false;
-        expect(landingHref(["PAYMENTS"], pay, d)).toBe(
-            "/billing/subscriptions",
-        );
+        expect(landingHref(["PAYMENTS"], pay, d)).toBe("/billing");
         const comms = turnOnPlan({
             picked: ["COMMUNICATIONS"],
             modules: allOff,
@@ -561,5 +559,27 @@ describe("decoding setup-defaults", () => {
         expect(setupFor("WEBSITE", draft)).toMatchObject({
             templateId: "bakery",
         });
+    });
+});
+
+describe("finishSetupItems on a plan that won't let it connect (UX-006)", () => {
+    const comms = {
+        key: "COMMUNICATIONS",
+        label: "Communications",
+        lifecycle: "ENABLED" as const,
+        readiness: "SETUP_REQUIRED" as const,
+        selectedForProject: false,
+        canManage: true,
+        dependencies: [],
+        blockers: [{ code: "COMMUNICATIONS_NO_PROVIDER" }],
+    };
+
+    it("Free: connecting a provider isn't setup left", () => {
+        expect(finishSetupItems([comms], () => true)).toEqual([]);
+    });
+
+    it("Grow: it still is", () => {
+        expect(finishSetupItems([comms], () => false)).toHaveLength(1);
+        expect(finishSetupItems([comms])).toHaveLength(1);
     });
 });

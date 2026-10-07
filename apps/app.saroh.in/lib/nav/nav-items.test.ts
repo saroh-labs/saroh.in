@@ -862,6 +862,31 @@ describe("Payments (ADR-007)", () => {
         );
     });
 
+    it("gives a site for my work no Invoices row of its own; Payments still holds it (UX-074)", () => {
+        const off = navFor({
+            role: "OWNER",
+            moduleKeys: ["WEBSITE", "CRM"],
+            kind: "WORK",
+        });
+        expect(hrefs(off)).not.toContain("/billing/invoices");
+        // A business and Just me keep it.
+        for (const kind of ["BUSINESS", "SOLO", undefined]) {
+            expect(
+                hrefs(navFor({ role: "OWNER", moduleKeys: ["CRM"], kind })),
+            ).toContain("/billing/invoices");
+        }
+        // Once Payments is on, its Invoices is there for a site too.
+        expect(
+            hrefs(
+                navFor({
+                    role: "OWNER",
+                    moduleKeys: AVAILABLE_TO.OWNER,
+                    kind: "WORK",
+                }),
+            ),
+        ).toContain("/billing/invoices");
+    });
+
     it("gives a business with no modules on its Invoices row", () => {
         const offered = hrefs(navFor({ role: "OWNER", moduleKeys: [] }));
         expect(offered).toContain("/billing/invoices");

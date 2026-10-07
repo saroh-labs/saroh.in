@@ -102,12 +102,15 @@ export type {
     InstantiatedTemplate,
 } from "./instantiate";
 
-// The starter production template: `starterTemplate` is the latest (v2),
-// `starterTemplateV1` the version sites built before DEC-070 came from.
+// The starter production template: `starterTemplate` is the latest (v3,
+// UX-070), `starterTemplateV2` and `starterTemplateV1` the versions earlier
+// sites came from.
 export {
+    HERO_PROMPT,
     STARTER_TEMPLATE_ID,
     starterTemplate,
     starterTemplateV1,
+    starterTemplateV2,
 } from "./templates/starter";
 
 // Blog/writing (DEC-070, K13). Registered; no kind's default.

@@ -8,6 +8,8 @@ import {
     movable,
     moveRefusal,
     promisedRefusal,
+    sellLineName,
+    sellRefusal,
     shelfNeed,
     shortBy,
     shortWords,
@@ -101,5 +103,20 @@ describe("stock words", () => {
         expect(promisedRefusal(1)).toBe(
             "1 is promised to open orders — fulfil or cancel them first.",
         );
+    });
+});
+
+describe("a refusal names the size (UX-026)", () => {
+    it("says which variant ran out", () => {
+        expect(
+            sellRefusal(sellLineName("Linen kurta", "L"), 0, "Hill Road"),
+        ).toBe("Linen kurta (L) — Sold out");
+        expect(sellRefusal(sellLineName("Tee", "S"), 2, "Hill Road")).toBe(
+            "Tee (S) — Only 2 left at Hill Road",
+        );
+    });
+
+    it("names a product without variants alone", () => {
+        expect(sellLineName("Rye loaf", null)).toBe("Rye loaf");
     });
 });

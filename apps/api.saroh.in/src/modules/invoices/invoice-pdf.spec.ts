@@ -309,6 +309,20 @@ describe("the invoice's paper as words", () => {
         expect(paid.footer).toBe(
             "Receipt — paid in full. Pulse Studio is not registered for GST, so no tax is charged.",
         );
+
+        // The receipt says how it was paid (UX-082).
+        const byUpi = view(
+            row({
+                number: "PS-0007",
+                status: "PAID",
+                paidAt: new Date("2026-09-06T05:00:00Z"),
+                paymentMethod: "UPI",
+            }),
+            pulse,
+        );
+        expect(byUpi.footer).toBe(
+            "Receipt — paid in full by UPI. Pulse Studio is not registered for GST, so no tax is charged.",
+        );
     });
 
     it("an unregistered paper with a typed tax shows its subtotal and tax", () => {

@@ -104,7 +104,7 @@ export function Today({ today, now }: { today: HomeToday; now: string }) {
             <ul className="overflow-hidden rounded-xl border border-border bg-card">
                 {view.empty ? (
                     <li className="px-4 py-3.5 text-[13.5px] text-muted-foreground">
-                        Nothing else booked today.
+                        Nothing booked today.
                     </li>
                 ) : null}
                 {view.rows.map((row, i) => (

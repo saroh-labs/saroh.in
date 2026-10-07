@@ -73,11 +73,12 @@ describe("alertGrid", () => {
             }),
         });
         expect(grid.rows.map((r) => [r.label, r.note])).toEqual([
-            ["Website goes live", "When a scheduled go-live runs, or couldn't"],
+            [
+                "Your website",
+                "A reviewer's verdict or notes, and a scheduled go-live",
+            ],
         ]);
-        expect(grid.rows[0]?.cells[0]?.label).toBe(
-            "Website goes live by Bell, on",
-        );
+        expect(grid.rows[0]?.cells[0]?.label).toBe("Your website by Bell, on");
     });
 
     it("never offers the Monday summary: nothing sends it (default 127)", () => {

@@ -55,6 +55,7 @@ import {
 } from "@nestjs/common";
 import { prisma } from "@saroh/database";
 
+import type { CredentialCheck } from "../../common/providers/provider-attention";
 import type { OrganizationContext } from "../../common/types/organization-context";
 import { decryptSecret } from "../payments/crypto";
 import { CommunicationsService } from "./communications.service";
@@ -147,6 +148,7 @@ describe("CommunicationsService.connectProvider", () => {
             provider: "RESEND",
             status: "CONNECTED",
             fromAddress: "hi@acme.com",
+            attention: null,
             createdAt: new Date(0),
             updatedAt: new Date(0),
         });
@@ -187,6 +189,108 @@ describe("CommunicationsService.connectProvider", () => {
             }),
         ).rejects.toBeInstanceOf(ForbiddenException);
         expect(providerUpsert).not.toHaveBeenCalled();
+    });
+});
+
+describe("CommunicationsService.connectProvider — the key checked first (UX-012)", () => {
+    beforeEach(() => {
+        jest.clearAllMocks();
+        providerUpsert.mockImplementation(
+            ({ create }: { create: Record<string, unknown> }) =>
+                Promise.resolve({
+                    id: "cp_1",
+                    ...create,
+                    createdAt: new Date(0),
+                    updatedAt: new Date(0),
+                }),
+        );
+    });
+
+    /** A factory whose adapter answers the key check with `check`. */
+    function serviceAnswering(check: CredentialCheck | null) {
+        const verifyCredentials = jest.fn().mockResolvedValue(check);
+        const adapter = {
+            channel: "EMAIL" as const,
+            supports: () => true,
+            verifyCredentials,
+            send: jest.fn(),
+        };
+        return {
+            service: new CommunicationsService({ get: () => adapter }),
+            verifyCredentials,
+        };
+    }
+
+    const RESEND = {
+        channel: "email",
+        provider: "resend",
+        fromAddress: "hello@bakery.in",
+        credentials: { apiKey: SECRET },
+    };
+
+    it("refuses a key Resend rejects: 400 under the key, nothing stored", async () => {
+        const { service, verifyCredentials } = serviceAnswering("REJECTED");
+
+        const err = await service
+            .connectProvider(ctx(), RESEND)
+            .catch((e: unknown) => e);
+
+        expect(err).toBeInstanceOf(BadRequestException);
+        expect((err as BadRequestException).getResponse()).toEqual({
+            message: expect.stringContaining(
+                "Resend didn't accept this API key",
+            ),
+            field: "apiKey",
+        });
+        expect(
+            JSON.stringify((err as BadRequestException).getResponse()),
+        ).not.toContain(SECRET);
+        expect(providerUpsert).not.toHaveBeenCalled();
+        expect(verifyCredentials).toHaveBeenCalledWith({
+            provider: "RESEND",
+            credentials: { apiKey: SECRET },
+            fromAddress: "hello@bakery.in",
+        });
+    });
+
+    it("refuses a sending address whose domain Resend hasn't verified, under that field", async () => {
+        const { service } = serviceAnswering("DOMAIN_UNVERIFIED");
+
+        const err = await service
+            .connectProvider(ctx(), RESEND)
+            .catch((e: unknown) => e);
+
+        expect((err as BadRequestException).getResponse()).toEqual({
+            message: expect.stringContaining("hasn't verified bakery.in"),
+            field: "fromAddress",
+        });
+        expect(providerUpsert).not.toHaveBeenCalled();
+    });
+
+    it("keeps a key the provider accepts, clearing an earlier Needs attention", async () => {
+        const { service } = serviceAnswering("ACCEPTED");
+
+        const result = await service.connectProvider(ctx(), RESEND);
+
+        expect(providerUpsert.mock.calls[0][0].update).toEqual(
+            expect.objectContaining({
+                attentionReason: null,
+                attentionAt: null,
+            }),
+        );
+        expect(result.attention).toBeNull();
+    });
+
+    it("lets through a provider the adapter can't check (an SMTP relay)", async () => {
+        const { service } = serviceAnswering(null);
+
+        await service.connectProvider(ctx(), {
+            ...RESEND,
+            provider: "smtp",
+            credentials: { host: "smtp.example.in", pass: "x" },
+        });
+
+        expect(providerUpsert).toHaveBeenCalledTimes(1);
     });
 });
 

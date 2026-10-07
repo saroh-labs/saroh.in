@@ -131,7 +131,7 @@ export function bulkActions(
     const note =
         unpaid === 0
             ? null
-            : `${unpaid} ${unpaid === 1 ? "isn't" : "aren't"} paid yet — the kitchen can't start ${unpaid === 1 ? "it" : "them"}`;
+            : `${unpaid} ${unpaid === 1 ? "isn't" : "aren't"} paid yet, so ${unpaid === 1 ? "it" : "they"} can't be started`;
     return { actions, note };
 }
 

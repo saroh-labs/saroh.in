@@ -204,3 +204,28 @@ describe("showsGstTotals (DEC-072)", () => {
         expect(showsGstTotals({})).toBe(true);
     });
 });
+
+describe("paperFooter says how a paid paper was paid (UX-082)", () => {
+    const payment = (method: "UPI" | "CASH") => ({
+        payment: { method, reference: null, note: null },
+    });
+
+    it("on a registered paper", () => {
+        expect(
+            paperFooter({ ...paper({}), ...payment("UPI") }, "Kavi Dental"),
+        ).toBe(
+            "Bill of supply under section 31(3)(c), CGST Act. Supply exempt from GST. Paid in full by UPI.",
+        );
+    });
+
+    it("on a receipt", () => {
+        expect(
+            paperFooter(
+                { ...paper({ gst: null }), ...payment("CASH") },
+                "Rye & Co.",
+            ),
+        ).toBe(
+            "Receipt — paid in full in cash. Rye & Co. is not registered for GST, so no tax is charged.",
+        );
+    });
+});

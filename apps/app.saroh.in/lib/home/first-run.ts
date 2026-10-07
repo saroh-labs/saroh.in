@@ -2,6 +2,7 @@ import { rolledOut, rolledOutKeys } from "@/lib/modules/rollout";
 import type { ModuleView } from "@/lib/modules/schema";
 import type { OrganizationKind } from "@/lib/organizations/kind";
 import { firstRunOrder, INVOICE_JOB, kindOf } from "@/lib/organizations/kind";
+import { permits } from "@/lib/organizations/permits";
 
 /**
  * The first-run question on Home (Saroh Workspace): what a business with
@@ -193,15 +194,13 @@ export function firstRunJobs(
 
 /**
  * Whether this person may write invoices here (`invoice:write`), for
- * "Invoice a client". Without resolved actions (an older response) the
- * built-in roles decide, as the rail does: an Owner and an Admin.
+ * "Invoice a client". The role's permissions only, never its name
+ * (DEC-098).
  */
 export function mayWriteInvoices(
     business: { role: string; actions?: string[] } | null,
 ): boolean {
-    if (!business) return false;
-    if (business.actions) return business.actions.includes("invoice:write");
-    return business.role === "OWNER" || business.role === "ADMIN";
+    return permits(business, "invoice:write");
 }
 
 /**

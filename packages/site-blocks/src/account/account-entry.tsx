@@ -16,7 +16,8 @@ import { SignInSheet } from "./sign-in-sheet";
  * design's header): "Sign in" for a visitor, which opens the sign-in sheet
  * and lands on the account; the signed-in customer's initials, which open
  * it. The header's `account` slot (G17) draws it on every page of the site
- * while the account area is switched on.
+ * while the account area is switched on. On the account's own sign-in
+ * prompt ("page") a sign-in stays on the page that asked for it (UX-052).
  *
  * The sheet's options (the business's phone, whether a challenge is likely)
  * are read when "Sign in" is pressed, not on every page view — but the sheet
@@ -99,7 +100,11 @@ export function AccountEntry({
                     }
                     api={api}
                     onSignedIn={() => {
-                        router.push("/account");
+                        // The account's own prompt keeps the page that
+                        // asked (UX-052): signed out on /account/plan, they
+                        // land on their plan. The header's entry opens
+                        // the account.
+                        if (variant !== "page") router.push("/account");
                         router.refresh();
                     }}
                 />

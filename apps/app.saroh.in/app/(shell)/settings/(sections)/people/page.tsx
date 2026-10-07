@@ -4,16 +4,19 @@ import { SettingsPanel } from "@/components/settings/settings-panel";
 import { rowNotice } from "@/lib/billing/access";
 import { modulesOrUnknown } from "@/lib/modules/guard";
 import { shownCatalogue } from "@/lib/organizations/catalogue-shown";
+import { bookableWithNoLogin } from "@/lib/organizations/invitations";
 import {
     getStorefrontTeamNotice,
     listInvitations,
     listMembers,
 } from "@/lib/organizations/members";
 import { getRoleCatalogue, listRoles } from "@/lib/organizations/roles";
+import { rolesLock } from "@/lib/organizations/roles-lock";
 import { resolveActiveOrganization } from "@/lib/organizations/service";
 import { billingAccessOrNull } from "@/lib/saroh-billing/service";
 import { requireSession } from "@/lib/session";
 import { listSites } from "@/lib/sites/service";
+import { listStaff } from "@/lib/staff/service";
 
 /**
  * Settings → People (#276).
@@ -54,6 +57,7 @@ export default async function PeoplePage() {
         fullCatalogue,
         joinedFromStorefronts,
         modules,
+        staff,
     ] = await Promise.all([
         listMembers(),
         // Empty for anyone who may not see them, rather than an error: this is
@@ -72,11 +76,31 @@ export default async function PeoplePage() {
         // To leave out a hidden module's permissions (DEC-073); null, when
         // they can't be read, holds nothing back.
         modulesOrUnknown(),
+        // Who takes bookings with no login: a team seat each (DEC-105,
+        // UX-053). Unread (no diary, or no right to it), nobody is added.
+        canManage ? listStaff().catch(() => null) : Promise.resolve(null),
     ]);
-    // The plan's team limit (U14): people plus open invites, as the API counts.
-    const team = canManage
-        ? rowNotice(await billingAccessOrNull(), "members")
-        : null;
+    // The plan, for whoever changes the team or its roles.
+    const access =
+        canManage || canEditRoles ? await billingAccessOrNull() : null;
+    // The plan's team seats (U14, DEC-105): people who can change something
+    // plus such invites, as the API counts.
+    const team = canManage ? rowNotice(access, "members") : null;
+    // View-only people have their own cap (DEC-105): full seats still
+    // invite one, and the other way round. A soft cap never stops an invite.
+    const reviewers = canManage ? rowNotice(access, "reviewers") : null;
+    const seats = team?.on && !team.soft ? team : null;
+    const viewOnly =
+        reviewers?.on && !reviewers.soft && reviewers.full ? reviewers : null;
+    const teamLimit =
+        seats || viewOnly
+            ? {
+                  full: seats?.full === true,
+                  why: seats?.why ?? "",
+                  reviewersFull: viewOnly !== null,
+                  reviewersWhy: viewOnly?.why,
+              }
+            : null;
     const catalogue = shownCatalogue(fullCatalogue, modules);
 
     return (
@@ -92,12 +116,9 @@ export default async function PeoplePage() {
                 catalogue={catalogue}
                 myActions={organization?.actions ?? null}
                 joinedFromStorefronts={joinedFromStorefronts}
-                teamLimit={
-                    // A soft cap never stops an invite.
-                    team?.on && !team.soft
-                        ? { full: team.full, why: team.why }
-                        : null
-                }
+                teamLimit={teamLimit}
+                bookableNoLogin={bookableWithNoLogin(staff?.staff ?? null)}
+                rolesLock={canEditRoles ? rolesLock(access) : null}
                 limitNotice={
                     canManage ? <PlanLimitNotice moduleId="members" /> : null
                 }

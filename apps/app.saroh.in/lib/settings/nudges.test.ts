@@ -237,13 +237,7 @@ describe("business type and logo only when money is involved (DEC-070)", () => {
     });
 
     it("asks both while anything that takes money is on", () => {
-        for (const key of [
-            "COMMERCE",
-            "APPOINTMENTS",
-            "COURSES",
-            "CLASS_PACKS",
-            "PAYMENTS",
-        ]) {
+        for (const key of ["COMMERCE", "APPOINTMENTS", "COURSES", "PAYMENTS"]) {
             expect(ask([website, mod(key)], none), key).toEqual([
                 "businessType",
                 "logo",
@@ -306,19 +300,53 @@ describe("settingsChecklist", () => {
         }),
     ];
 
-    it("is Home's steps, then the nudges, counted together", () => {
+    it("counts exactly Home's steps, and lists the nudges apart (UX-019)", () => {
         const home = readyChecklist({ settings, modules });
         const list = settingsChecklist({ settings, modules, messaging: null });
 
-        expect(keys(list.steps)).toEqual([
-            ...keys(home.steps),
-            "businessType",
-            "logo",
-        ]);
-        expect(keys(list.left)).toEqual(["catalogue", "businessType", "logo"]);
+        expect(keys(list.steps)).toEqual(keys(home.steps));
+        expect(keys(list.left)).toEqual(keys(home.left));
         expect(list.done).toBe(home.done);
-        expect(list.total).toBe(home.total + 2);
+        expect(list.total).toBe(home.total);
+        // "Make it yours": never in the count.
+        expect(keys(list.extras ?? [])).toEqual(["businessType", "logo"]);
     });
+
+    it("never counts a pipeline as payment readiness (UX-019)", () => {
+        const crm = [
+            ...modules,
+            mod("CRM", {
+                readiness: "SETUP_REQUIRED",
+                blockers: [{ code: "CRM_NO_PIPELINE" }],
+            }),
+        ];
+        const home = readyChecklist({ settings, modules: crm });
+        const list = settingsChecklist({
+            settings,
+            modules: crm,
+            messaging: null,
+        });
+        expect(list.total).toBe(home.total);
+        expect(keys(list.steps)).not.toContain("pipeline");
+        expect(keys(list.extras ?? [])).toContain("pipeline");
+    });
+
+    it.each([
+        ["Free, own email locked", false, false],
+        ["Grow, room to connect", true, true],
+    ])(
+        "asks to connect email only where the email setup allows it (%s, UX-006)",
+        (_plan, canConnect, asked) => {
+            const comms = [...modules, mod("COMMUNICATIONS")];
+            const list = settingsChecklist({
+                settings,
+                modules: comms,
+                messaging: [],
+                emailSetup: { connected: false, canConnect },
+            });
+            expect(keys(list.extras ?? []).includes("email")).toBe(asked);
+        },
+    );
 });
 
 describe("readyChecklist and rollout (DEC-057)", () => {
@@ -367,9 +395,13 @@ describe("the email nudge follows the plan (DEC-091, #850)", () => {
                 emailSetup,
                 mayPlans: true,
             });
-            expect(list.left.find((i) => i.key === "email")).toMatchObject({
+            // Among "Make it yours", never counted (UX-019).
+            expect(
+                (list.extras ?? []).find((i) => i.key === "email"),
+            ).toMatchObject({
                 cta: "Connect email",
                 href: "/settings/providers",
+                done: false,
             });
             expect(list.outside).toEqual([]);
         }
@@ -382,6 +414,7 @@ describe("the email nudge follows the plan (DEC-091, #850)", () => {
             mayPlans: true,
         });
         expect(keys(list.steps)).not.toContain("email");
+        expect(keys(list.extras ?? [])).not.toContain("email");
         expect(list.outside).toEqual([
             {
                 key: "email",
@@ -401,6 +434,7 @@ describe("the email nudge follows the plan (DEC-091, #850)", () => {
             mayPlans: false,
         });
         expect(keys(list.steps)).not.toContain("email");
+        expect(keys(list.extras ?? [])).not.toContain("email");
         expect(list.outside).toEqual([]);
     });
 
@@ -411,7 +445,7 @@ describe("the email nudge follows the plan (DEC-091, #850)", () => {
             emailSetup: free,
             mayPlans: true,
         });
-        expect(list.left.find((i) => i.key === "email")?.label).toBe(
+        expect((list.extras ?? []).find((i) => i.key === "email")?.label).toBe(
             "Reconnect email",
         );
         expect(list.outside).toEqual([]);

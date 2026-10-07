@@ -22,8 +22,9 @@ jest.mock("@saroh/database", () => {
             findMany: jest.fn(),
             count: jest.fn(),
             create: jest.fn(),
-            // A template's other pages go in its menu.
-            update: jest.fn(),
+            // The template's menu (UX-070; a template's other pages when it
+            // names none), written after the pages.
+            update: jest.fn(async () => ({ id: "site_1" })),
         },
         page: {
             create: jest.fn(async () => ({ id: "page_1" })),
@@ -365,7 +366,7 @@ describe("SitesService.createFromTemplate", () => {
                 subdomain: "acme",
                 // The template it came from (KTD-7): the kind's default.
                 templateId: STARTER_TEMPLATE_ID,
-                templateVersion: 2,
+                templateVersion: 3,
                 templateStyleId: null,
                 storefrontId: null,
             },
@@ -423,15 +424,26 @@ describe("SitesService.createFromTemplate", () => {
             }
         }
 
-        // The real starter template's section shape flows through: Home has 4
-        // ordered sections starting with a validated hero.
+        // The real starter template's section shape flows through: Home has 3
+        // ordered sections without a contact email (one About button, UX-070),
+        // starting with a validated hero.
         const homeSections = home.versions.create.sections.create;
-        expect(homeSections).toHaveLength(4);
-        expect(homeSections.map((s) => s.order)).toEqual([0, 1, 2, 3]);
+        expect(homeSections).toHaveLength(3);
+        expect(homeSections.map((s) => s.order)).toEqual([0, 1, 2]);
         expect(homeSections[0].type).toBe("hero");
         // Content is the CONTRACT-NORMALIZED output seeded with the org name.
         expect(homeSections[0].content).toMatchObject({ heading: "Acme" });
         expect(about.versions.create.sections.create).toHaveLength(2);
+
+        // A real menu from the first draft (UX-070): Home, then About.
+        expect(prisma.site.update).toHaveBeenCalledWith({
+            where: { id: "site_1" },
+            data: {
+                navigation: {
+                    items: [{ pageId: "page_x" }, { pageId: "page_x" }],
+                },
+            },
+        });
     });
 
     it("seeds the TemplateContext from the org's business profile", async () => {

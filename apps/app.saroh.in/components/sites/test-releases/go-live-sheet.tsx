@@ -24,6 +24,7 @@ import type {
     TestRelease,
 } from "@/lib/sites/test-releases";
 import {
+    changesAskedLine,
     nextSlot,
     OVERRIDE_RECORD,
     replacesLine,
@@ -234,6 +235,17 @@ function Body({
                     </p>
                 </div>
             )}
+
+            {/* A reviewer asked for changes here (UX-068): said before the
+            press, not only in Versions afterwards. */}
+            {changesAskedLine(release.standing) ? (
+                <p
+                    role="note"
+                    className="rounded-lg bg-warning-subtle px-3.5 py-3 text-[12.5px] leading-normal text-warning-subtle-foreground"
+                >
+                    {changesAskedLine(release.standing)}
+                </p>
+            ) : null}
 
             {release.draftChangedSince ? (
                 <p className="text-[12.5px] leading-normal text-muted-foreground">

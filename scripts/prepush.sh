@@ -798,6 +798,7 @@ bg_step catalog-lock pnpm run check:catalog-lock
 bg_step blocks pnpm run check:blocks
 bg_step cycles pnpm run check:cycles
 bg_step e2e-covers pnpm run check:e2e-covers
+bg_step migration-ids pnpm run check:migration-ids
 
 # Unit tests. The quick run takes only the specs the change reaches; --int and
 # --all run the full suites. As CI: the api's unit tests mock the environment,

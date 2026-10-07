@@ -336,6 +336,153 @@ describe("RazorpayBillingProvider plans, checkout and cancel (U15)", () => {
         });
     });
 
+    it("makes a subscription for the term it's told: 12 charges (DEC-093)", async () => {
+        const { provider, calls } = recorded([
+            { status: 200, body: { id: "sub_12", status: "created" } },
+        ]);
+        await provider.createSubscription({
+            planKey: "catalog.b",
+            planId: "row_b",
+            priceCents: 22_200,
+            currency: "INR",
+            interval: "month",
+            organizationId: "org_1",
+            providerPlanId: "plan_b",
+            totalCount: 12,
+        });
+        expect(calls[0]?.body).toMatchObject({ total_count: 12 });
+    });
+
+    it("makes a yearly plan's one payment as an order for the amount given (DEC-093)", async () => {
+        const { provider, calls } = recorded([
+            { status: 200, body: { id: "order_1" } },
+        ]);
+        await expect(
+            provider.orders.createOrder({
+                amountPaise: 261_960,
+                currency: "INR",
+                reference: "chk_year",
+                organizationId: "org_1",
+                planKey: "catalog.b",
+            }),
+        ).resolves.toEqual({ providerOrderId: "order_1" });
+        expect(calls[0]).toEqual({
+            url: "https://api.razorpay.com/v1/orders",
+            method: "POST",
+            body: {
+                amount: 261_960,
+                currency: "INR",
+                receipt: "chk_year",
+                notes: {
+                    sarohPlanKey: "catalog.b",
+                    organizationId: "org_1",
+                    saroh_ref: "chk_year",
+                },
+            },
+        });
+    });
+
+    it("reads how a subscription stands as the event its webhook would send", async () => {
+        const end = 1_790_000_000;
+        const { provider, calls } = recorded([
+            { status: 200, body: { status: "created" } },
+            { status: 200, body: { status: "authenticated" } },
+            {
+                status: 200,
+                body: { status: "active", paid_count: 1, current_end: end },
+            },
+            { status: 200, body: { status: "cancelled" } },
+        ]);
+        const ask = () => provider.statuses.checkoutStatus("sub_1", false);
+        await expect(ask()).resolves.toEqual({
+            phase: "other",
+            status: "IGNORED",
+        });
+        await expect(ask()).resolves.toEqual({
+            phase: "authenticated",
+            status: "IGNORED",
+        });
+        await expect(ask()).resolves.toEqual({
+            phase: "charged",
+            status: "ACTIVE",
+            currentPeriodEnd: new Date(end * 1000),
+        });
+        await expect(ask()).resolves.toEqual({
+            phase: "cancelled",
+            status: "CANCELLED",
+        });
+        expect(calls[0]).toMatchObject({
+            url: "https://api.razorpay.com/v1/subscriptions/sub_1",
+            method: "GET",
+        });
+    });
+
+    it("reads an order as paid only once Razorpay says so, with the payment that paid it", async () => {
+        const { provider, calls } = recorded([
+            { status: 200, body: { status: "attempted" } },
+            { status: 200, body: { status: "paid" } },
+            {
+                status: 200,
+                body: {
+                    items: [
+                        { id: "pay_failed", status: "failed" },
+                        { id: "pay_ok", status: "captured" },
+                    ],
+                },
+            },
+        ]);
+        await expect(
+            provider.statuses.checkoutStatus("order_1", true),
+        ).resolves.toEqual({ phase: "other", status: "IGNORED" });
+        await expect(
+            provider.statuses.checkoutStatus("order_1", true),
+        ).resolves.toEqual({
+            phase: "charged",
+            status: "ACTIVE",
+            providerPaymentId: "pay_ok",
+        });
+        expect(calls.map((c) => c.url)).toEqual([
+            "https://api.razorpay.com/v1/orders/order_1",
+            "https://api.razorpay.com/v1/orders/order_1",
+            "https://api.razorpay.com/v1/orders/order_1/payments",
+        ]);
+    });
+
+    it("has nothing to cancel for an order, and asks Razorpay nothing", async () => {
+        const { provider, calls } = recorded([]);
+        await provider.cancelSubscription("order_1", { atCycleEnd: false });
+        expect(calls).toHaveLength(0);
+    });
+
+    it("reads order.paid as the charge of the order it names", () => {
+        const provider = new RazorpayBillingProvider();
+        expect(
+            provider.parseWebhook(
+                {
+                    event: "order.paid",
+                    created_at: 1_790_000_000,
+                    payload: {
+                        order: { entity: { id: "order_1" } },
+                        payment: { entity: { id: "pay_1" } },
+                    },
+                },
+                { "x-razorpay-event-id": "evt_o1" },
+            ),
+        ).toMatchObject({
+            providerEventId: "evt_o1",
+            providerSubscriptionId: "order_1",
+            status: "ACTIVE",
+            phase: "charged",
+            providerPaymentId: "pay_1",
+        });
+    });
+
+    it("gives Checkout its key id, the public half, and nothing else", () => {
+        expect(new RazorpayBillingProvider().publicKey()).toBe(
+            "rzp_test_platform",
+        );
+    });
+
     it("cancels at the cycle's end unless told now", async () => {
         const { provider, calls } = recorded([
             { status: 200 },

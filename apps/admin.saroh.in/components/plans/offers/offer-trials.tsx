@@ -5,13 +5,15 @@ import { Checkbox } from "@saroh/ui/checkbox";
 import { useId } from "react";
 
 import { useDraft } from "../draft-store";
-import { WholeField } from "./number-field";
+import { RupeesField, WholeField } from "./number-field";
 import { paidPlans, trialOf } from "./offers";
 import { CHECKBOX_SAFFRON, ChangedDot, OfferCard } from "./parts";
 
 /**
- * A free trial per paid plan, 1–60 days. Free can't have one (the schema
- * refuses it), so Free isn't listed.
+ * A first period per paid plan, 1–60 days: free, or at a nominal amount
+ * taken as autopay is set up (DEC-093's first month). Free can't have one
+ * (the schema refuses it), so Free isn't listed. Monthly only: a yearly
+ * plan is one payment and never has a trial.
  */
 export function OfferTrials() {
     const { catalog, live, edit, canEdit } = useDraft();
@@ -19,7 +21,10 @@ export function OfferTrials() {
     if (!catalog) return null;
     const plans = paidPlans(catalog);
 
-    function set(planId: string, patch: { on?: boolean; days?: number }) {
+    function set(
+        planId: string,
+        patch: { on?: boolean; days?: number; firstPaise?: number },
+    ) {
         edit((c) => {
             c.plans = c.plans.map((p) =>
                 p.id === planId
@@ -33,9 +38,11 @@ export function OfferTrials() {
         <OfferCard label="Free trials">
             <span className="font-semibold">Free trials</span>
             <span className="text-[12.5px] leading-normal text-muted-foreground">
-                Off unless you switch one on. The business adds a card or UPI
-                Autopay first and is charged when the trial ends. If that charge
-                fails, they drop to Free.
+                Off unless you switch one on. The business sets up UPI Autopay
+                or a card first, paying the first-month amount then (0 makes the
+                days free, and Razorpay refunds its small check), and the
+                plan&apos;s own charges start when the days end. If that charge
+                fails, they drop to Free. Monthly plans only.
             </span>
             {plans.length === 0 && (
                 <span className="text-[12.5px] text-muted-foreground">
@@ -47,7 +54,10 @@ export function OfferTrials() {
                 const o = live?.catalog.plans.find((x) => x.id === p.id);
                 const was = o ? trialOf(o) : null;
                 const changed =
-                    was?.on !== t.on || (t.on && was.days !== t.days);
+                    was?.on !== t.on ||
+                    (t.on &&
+                        (was.days !== t.days ||
+                            (was.firstPaise ?? 0) !== (t.firstPaise ?? 0)));
                 const box = `${id}-${p.id}`;
                 return (
                     <div
@@ -78,7 +88,24 @@ export function OfferTrials() {
                             onValue={(days) => set(p.id, { days })}
                         />
                         <span className="text-[12.5px] text-muted-foreground">
-                            days · {t.on ? "shown on the pricing page" : "off"}
+                            days for ₹
+                        </span>
+                        <RupeesField
+                            aria-label={`${p.name} first month, before GST`}
+                            paise={t.firstPaise ?? 0}
+                            disabled={!canEdit || !t.on}
+                            className="w-20"
+                            onPaise={(firstPaise) =>
+                                set(p.id, {
+                                    firstPaise: Math.min(
+                                        firstPaise,
+                                        p.pricePaise,
+                                    ),
+                                })
+                            }
+                        />
+                        <span className="text-[12.5px] text-muted-foreground">
+                            + GST · {t.on ? "shown on the pricing page" : "off"}
                         </span>
                         <ChangedDot on={changed} />
                     </div>

@@ -3029,6 +3029,167 @@ library itself (a stub server is minutes of work), not a hand-made object.
 When the stage can't be known, a send that may have gone is never retried.
 **Category**: email · `modules/communications/providers/saroh-email.sender.ts`
 
+## Readiness — a step the plan can't let the business finish is not "setup left"
+
+**Symptom** (UX audit, 7 Oct, UX-006/017/019): on Free, Home's Needs you,
+Settings › Modules ("Finish setup"), the Turn on sheet ("Connect Razorpay or
+Cashfree now", pre-selected), its toast, every Connect on Providers, the
+Providers tab note and Profile all sent the owner to connect a payment or
+email provider. The API refused the connect correctly, but only after the
+whole key form was typed. Home and Settings also counted different steps
+("1 of 2" against "2 of 5"), Settings counting a logo and a pipeline as
+payment readiness.
+**Root cause**: readiness was worked out from the data alone (no provider →
+SETUP_REQUIRED) while the plan's say (`payments`, `integrations`, DEC-091)
+was only asked by the write. And Settings added its nudges to the count.
+**Fix**: the PAYMENTS readiness adapter reads the plan first: no provider on
+a plan without online payments is ACTIVE (offline Payments), with no
+blocker, since a blocker on an ACTIVE module would shut its routes
+(`ModuleEnforcementGuard`). Home skips "connect a messaging provider" where
+`integrations` has no room. The app reads the plan once per screen
+(`connectLocksOf`, `ownAccountsRoom`) and says "Comes with ‹plan› · See
+plans" in place of Connect, before any form. Provider connect asks the plan
+before the business details. Settings counts exactly Home's steps; its
+nudges are "Make it yours", never counted. On a plan without online
+payments, How to pay us is the counted step.
+**Rule**: anything that offers an action asks the same plan check the
+write does, up front. A step the plan holds back is said beside the steps,
+never counted, never a Connect.
+**Category**: plans · `capabilities/readiness/module-readiness.registry.ts`, `app.saroh.in/lib/providers/connect-lock.ts`, `lib/settings/ready.ts`
+
+## React — JSX text split across lines can hydrate differently
+
+**Symptom** (UX audit, 7 Oct, UX-086): Settings › Business (and Hours,
+the same page) logged a hydration mismatch in `PayPreview`: the server's
+text ended `asked you to.”` and the client's had trailing spaces.
+**Root cause**: a sentence written as JSX text across several lines, with
+an interpolation and HTML entities (`&ldquo;`, `&apos;`), was collapsed
+differently by the two renders under dev.
+**Fix**: the sentence is one template string in a single `{…}` expression;
+the component test asserts the exact text.
+**Rule**: a sentence with an interpolation in it is one string expression,
+not JSX text wrapped over lines.
+**Category**: react · `components/organizations/pay-instructions-section.tsx`
+
+### Next's dev server logged provider keys and sign-in codes from server actions
+
+**Symptom**: during the 7 Oct local UX audit, the stack log held the Razorpay and email API keys typed into Settings › Providers, plus sign-in codes.
+**Cause**: Next 16 defaults `logging.serverFunctions` to true. In development (`NODE_ENV === 'development'` only; production never logs them) every server action's arguments go to the terminal, and a dev log captures them.
+**Fix**: `logging: { serverFunctions: false }` in the Next config of every app whose server actions carry a secret (app, admin, accounts, saroh.app). Local logs that already held keys were scrubbed.
+**Rule**: A server action that takes a credential or code must not rely on logs staying private. Turn off dev argument logging in any app that has one, and never treat a dev log as safe to share.
+**Category**: security · `apps/*/next.config.*`
+
+## Time zones — server-rendered times read UTC for a business that never set its zone
+
+**Symptom** (UX audit, 7 Oct; #836): Order Detail said "Today, 04:28" on a
+full load and 09:58 after a client navigation; the site editor said "In
+review … 04:39 UTC" and "Last published 04:24 UTC"; the console showed the
+business's time zone as "Not set".
+**Root cause**: two halves. A business set up with no profile fields had no
+`BusinessProfile`, and setup never stored a zone, so most businesses had
+none. And the app had no shared way to write a time in the business's
+zone: `ViewerDate` renders the server's UTC first and corrects in the
+browser, and the site editor's `exactDate` pinned UTC on purpose to dodge
+hydration mismatches.
+**Fix**: setup always stores a zone (the country's when it keeps one, else
+the browser's, else India's; `organizations/business-zone.ts`), and
+`20261029153000_business_time_zone_backfill` gives every existing business
+the zone its readers already fell back to, never overwriting one. `GET
+/organizations` carries `timeZone`; the app shell provides it
+(`BusinessZoneProvider`), and `BusinessDate` / `useBusinessZone` /
+`activeBusinessZone()` write times in it, so server and browser agree from
+the first paint. `invoiceZone` (#836) is the same rule (`businessZone`).
+**Rule**: A time a business reads about its own work (an order, a version,
+a review) is written in the business's zone, never the viewer's or the
+server's: `BusinessDate`, or `useBusinessZone()` for a string. Pinning UTC
+avoids a hydration mismatch by being wrong for everyone.
+**Category**: dates · `app.saroh.in/components/shared/business-zone.tsx`
+
+## Team — a custom role was lost when the invitation was accepted (UX-004)
+
+**Problem**: Someone invited as "Front desk" joined as a Member: no New
+booking, no order changes, and Roles said "Front desk · 0 people". The
+invitation row read `role=front-desk ACCEPTED`; the membership `MEMBER`.
+**Root cause**: `accept` stored `toRole(invitation.role)`, the helper that
+narrows a stored key to the four built-ins for display. Every unit test
+mocked Prisma and checked a Reviewer invite, so nothing ran invite → accept →
+resolve with a role the business made.
+**Fix**: Accept stores the invited key when that role still exists in the
+business (MEMBER when it was removed since); migration
+`20261029141100_invited_custom_role` puts back the memberships the old accept
+dropped, only where nobody changed the role since.
+`invite-custom-role.db.spec.ts` runs the whole path and then asks the booking
+and order services what the role may do.
+**Category**: roles · rule in `docs/patterns/backend-auth-and-access.md`
+(invitations). `toRole` is for the response's `role` field only — never for
+what is written.
+
+## Payments — fake provider keys show CONNECTED; Pay then 500s and nobody is told (UX-012)
+
+**Problem**: An audit connected made-up Razorpay and Resend keys and both
+came back 201 CONNECTED. A customer pressing Pay got "can't take payment
+online right now", the API logged an unhandled 500
+(`Razorpay order creation failed (HTTP 401)`), and the business saw a green
+badge and heard nothing.
+**Root cause**: Connecting only sealed the keys; nothing asked the provider.
+At checkout the adapter's plain `Error` reached the global filter as a 500,
+and no code read a 401 as "these keys stopped working".
+**Fix**: An authenticated read on connect refuses keys with a field error;
+a 401/403 on a live call throws `ProviderKeysRefusedError`, which marks the
+connection `attention: KEYS_REFUSED` and queues the team's alert once; a
+failed provider order is a deliberate 503 in the customer's words. Tests in
+`common/providers/provider-key-checks.spec.ts`, `payments.service.spec.ts`
+and `message-send.handler.spec.ts`.
+**Category**: integrations · rule in `docs/patterns/backend-integrations.md` ("Keys are checked before they are kept, and watched after")
+
+## Renderer — an unknown page on a merchant's site answered 200 (UX-071)
+
+**Problem**: `/news/anything` on a live site showed the not-found page, but the
+response was `200` — a soft 404 that search engines and uptime checks read as
+a real page.
+**Root cause**: `apps/saroh.app/app/[domain]/loading.tsx` wrapped every page of
+a site in a Suspense boundary, so the response started streaming (status and
+headers sent) before the page ran `notFound()`. Next can't change the status
+after that; it only adds a `noindex` tag. The middleware already worked around
+it for `/account`.
+**Fix**: The segment loading state went. A site's pages render fully before
+the first byte, so `notFound()` (unknown page, post or product) answers 404.
+`e2e/tests/site-not-found.spec.ts` pins it. Don't put a `loading.tsx`, or a
+`<Suspense>` around `children`, above a page that can 404.
+**Category**: renderer · Next streaming
+
+### Two migrations with one timestamp
+
+**Symptom**: on 7 Oct two parallel units in one batch each added a `20261029153000_*` migration. An older pair (`20261024100000_*`) was already on development unnoticed.
+**Cause**: unit agents pick timestamps on their own, and nothing compared them. Prisma replays folders in name order, so two folders with one timestamp run in an order nobody chose.
+**Fix**: renamed the unapplied one (`20261029160000_billing_first_month`). `check:migration-ids` (prepush and CI) fails on any shared timestamp. The applied 24 Oct pair is allowlisted, because a migration that has run can't be renamed.
+**Rule**: before merging parallel units, the orchestrator runs `check:migration-ids`. A clash is fixed by renaming the migration that hasn't reached any database.
+**Category**: database · `scripts/check-migration-ids.mjs`
+
+## Notifications — the audit saw no booking confirmation, order notice or review alert (UX-041–043)
+
+**Problem**: The 7 Oct audit found no booking confirmation in any log, no
+"order placed" message in the customer's thread, no email to the owner for
+a web order, nothing for review events or a plan change, and "You've
+reached your 1 websites on Free" on day one.
+**Root cause**: Several. Booking notices did work: every `booking.notify`
+wrote its thread message (the audit database had 24); nothing was emailed
+because the business had no provider and `SAROH_BUSINESS_EMAIL` is off by
+default, so there was no log line to find. "Order placed" was never a
+notice kind. Team alert email went only through the business's own
+provider with New order off by default, so a Free business (which can't
+connect one, DEC-091) could never hear of a web order. Review writes and
+plan overrides queued nothing. A total cap of one was crossed by setup, and
+limit notices were never taken back when the count fell.
+**Fix**: `ORDER_PLACED` through the one `emailRoute`; Saroh's own mail
+(after commit) for a web order to owners and admins and for reviewers;
+`team.alert` `review`; `plan.change.notice`; `quietAtOne` and
+`limit-notice-clear.ts`; `countedWhat` for "1 website". Tests beside each.
+**Lesson**: when checking a notice by hand, read `CustomerNotice` and the
+thread before the mail log: a missing email is often the route saying no.
+**Category**: jobs · rules in `docs/patterns/backend-jobs.md` (Customer
+notices, Team alerts, Plan limit notices, Plan change notices)
+
 ## Images — one Help screen never loaded in CI, and the retry hung on the same one
 
 **Symptom**: `help.spec.ts` "the article draws its five real screens" failed
@@ -3051,6 +3212,44 @@ trace showing one `/_next/image` request with no response points at the
 optimizer, not at the page.
 **Category**: marketing · `apps/saroh.in/components/v2/help/help-step.tsx`
 
+## Permissions — the permission suite's fake API stopped giving a Member any Orders (DEC-098)
+
+**Symptom**: on batch-2026-10-07-3, `permissions.spec.ts` "a business with
+no orders yet is empty" and "a failed Orders read says so" showed Orders'
+locked card ("Your role … doesn't include orders"). Sell was also missing
+from the Member's rail.
+**Root cause**: DEC-098 made the app decide money and orders by the role's
+resolved permissions only (`permits()`). A response without `actions` now
+permits nothing. The real API always sends `actions`, but the fake API
+(`e2e/fixtures/permissions-api.mjs`) sent only `role: "MEMBER"` for its
+default scenarios, which the app's old role-name fallback used to fill in.
+**Fix**: the fixture sends a built-in Member's permissions (the policy's
+read-only floor plus `order:stage`) for any scenario without its own role.
+**Rule**: when the app changes which field of an API response it decides
+on, update the permission suite's fake API to send what the real API does.
+The fake API mirrors the API's answers, not the app's fallbacks.
+**Category**: e2e · `e2e/fixtures/permissions-api.mjs`
+
+## Billing — a catalogue version move read as a downgrade to Free (N1)
+
+**Symptom**: after a pricing publish with policy `move`, Settings › Plan and
+billing told every business "Your plan changes to Free on 14 Oct". That
+included businesses already on Free, and ones on a plan override directly
+under "Pro free until 31 Dec 2027".
+**Root cause**: the plan view's pending-move note named the move's target
+plan and never compared it with the plan the business moves from. A move
+publish puts every subscription on the same plan of the new version, so a
+Free business's move is Free to Free. An override business's subscription
+is on Free underneath, so its move read "changes to Free" beside the
+override.
+**Fix**: the access read's `pendingMove` carries `fromPlanId`. The plan
+view says nothing when only the version changes, lets a live plan override
+speak until it ends (its note names where the business lands), and keeps
+the authorise prompt, worded for a new price on the same plan.
+**Rule**: a version move isn't a plan change. Before saying "your plan
+changes", compare the target with the plan the business moves from, and
+let a live plan override speak first.
+**Category**: billing · `apps/app.saroh.in/lib/saroh-billing/plan-view.ts`
 ## Dependencies — a catalog bump that changed nothing
 
 **Symptom**: the `next16` catalog in `pnpm-workspace.yaml` moved from

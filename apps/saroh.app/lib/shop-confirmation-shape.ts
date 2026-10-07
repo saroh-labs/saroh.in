@@ -40,7 +40,13 @@ function fulfilmentOf(v: unknown): OrderConfirmationData["fulfilment"] | null {
         if (!isRecord(v.pickup) || !isString(v.pickup.name)) return null;
         const address = orNull(v.pickup.address);
         if (address === undefined) return null;
-        pickup = { name: v.pickup.name, address };
+        // When the place is open (UX-025); absent from an older API.
+        const hours = isString(v.pickup.hours) ? v.pickup.hours : null;
+        pickup = {
+            name: v.pickup.name,
+            address,
+            ...(hours ? { hours } : {}),
+        };
     }
     let deliverTo: OrderConfirmationData["fulfilment"]["deliverTo"] = null;
     if (v.deliverTo !== null) {
@@ -88,6 +94,12 @@ export function confirmationOf(body: unknown): OrderConfirmationData | null {
         subtotal: body.subtotal,
         delivery,
         discount,
+        // The code that took it off (DEC-104); absent from an older API.
+        discountCode:
+            isString(body.discountCode) &&
+            /^[A-Z0-9_-]{1,32}$/.test(body.discountCode)
+                ? body.discountCode
+                : null,
         total: body.total,
         fulfilment,
         refunded: body.refunded,

@@ -212,10 +212,12 @@ describe("OrdersService.create — organization stamping (#173)", () => {
             USER,
             DTO,
         );
+        // No payment taken with it: not money (DEC-106).
         expect(stores.orderWriteOrganization).toHaveBeenCalledWith(
             STORE,
             USER,
             "order:create",
+            { money: false },
         );
     });
 });

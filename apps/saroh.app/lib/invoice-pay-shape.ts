@@ -84,6 +84,30 @@ export interface PayInvoice {
      * "pay them the way they've asked" line stands.
      */
     payInstructions?: PayInstructions | null;
+    /**
+     * How to reach the business (UX-007), sent when it set no How to pay
+     * us: the page says "Contact them to pay" with these. Null or absent:
+     * nothing to say beyond the generic line.
+     */
+    businessContact?: PayContact | null;
+}
+
+/** The business's phone and email, as the pay page may show them. */
+export interface PayContact {
+    phone: string | null;
+    email: string | null;
+}
+
+/** The business's contact from the API, checked; anything strange is none. */
+export function payContactOf(v: unknown): PayContact | null {
+    if (!isRecord(v)) return null;
+    const phone =
+        isString(v.phone) && /^\+[1-9]\d{6,14}$/.test(v.phone) ? v.phone : null;
+    const email =
+        isString(v.email) && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v.email)
+            ? v.email
+            : null;
+    return phone || email ? { phone, email } : null;
 }
 
 /** `payOnline` from the API, checked: only a real `false` turns Pay off. */

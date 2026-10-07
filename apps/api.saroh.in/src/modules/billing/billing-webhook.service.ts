@@ -20,6 +20,7 @@ import {
     rollAddonChargesInTx,
 } from "./addon-charges";
 import { enqueueBillingEmail } from "./billing-email.job";
+import { isOneTime } from "./billing-term";
 import { periodEnd, periodStart } from "./checkout-quote";
 import { redeemCouponInTx, trialNoticeAt } from "./offers";
 import { applyDueMoveInTx } from "./plan-moves";
@@ -34,6 +35,7 @@ import type {
 import { BILLING_PROVIDER_FACTORY } from "./providers/billing-provider.port";
 import { SarohInvoicesService } from "./saroh-invoices.service";
 import { isLegalSubscriptionTransition } from "./subscription-state";
+import { endTermAtInTx } from "./term-end";
 
 type Tx = Prisma.TransactionClient;
 
@@ -220,26 +222,58 @@ export class BillingWebhookService {
             return outcome;
         });
 
-        if (outcome.completed) {
-            const c = outcome.completed;
-            await this.audit?.record({
-                action: AuditAction.PlanChange,
-                actorUserId: c.actorUserId ?? "billing-provider",
-                organizationId: c.organizationId,
-                targetType: "subscription",
-                targetId: c.subscriptionId,
-                outcome: AuditOutcome.Success,
-                metadata: { from: c.from, to: c.to, at: c.at },
-            });
-        }
+        await this.recordCompleted(outcome.completed);
         return outcome.result;
+    }
+
+    /**
+     * What the provider says, asked directly when the business comes back
+     * from paying (DEC-093): reconciled by the same rule as the webhook,
+     * without waiting for it. Idempotent with it either way round — the
+     * checkout is re-read under its subscription's lock, so whichever comes
+     * second finds it done and changes nothing; the charge's invoice is
+     * keyed once per charge. Nothing goes in the webhook inbox: this is not
+     * a delivery, and the real one is still applied (as a repeat) when it
+     * lands.
+     */
+    async reconcileCheckout(
+        checkoutId: string,
+        event: ParsedBillingEvent,
+        now: Date = new Date(),
+    ): Promise<BillingWebhookResult> {
+        const outcome = await prisma.$transaction(async (tx) => {
+            const checkout = await tx.billingCheckout.findUnique({
+                where: { id: checkoutId },
+            });
+            if (!checkout) {
+                return {
+                    result: { status: "ignored", changed: false },
+                } satisfies Outcome;
+            }
+            return this.onCheckout(tx, checkout, event, now);
+        });
+        await this.recordCompleted(outcome.completed);
+        return outcome.result;
+    }
+
+    private async recordCompleted(c: Completed | undefined): Promise<void> {
+        if (!c) return;
+        await this.audit?.record({
+            action: AuditAction.PlanChange,
+            actorUserId: c.actorUserId ?? "billing-provider",
+            organizationId: c.organizationId,
+            targetType: "subscription",
+            targetId: c.subscriptionId,
+            outcome: AuditOutcome.Success,
+            metadata: { from: c.from, to: c.to, at: c.at },
+        });
     }
 
     // ── A checkout's provider subscription ──────────────────────────────
 
     private async onCheckout(
         tx: Tx,
-        checkout: BillingCheckout,
+        seen: BillingCheckout,
         event: ParsedBillingEvent,
         now: Date,
     ): Promise<Outcome> {
@@ -247,7 +281,18 @@ export class BillingWebhookService {
         const ignored: Outcome = {
             result: { status: "ignored", changed: false },
         };
-        if (checkout.status !== "OPEN" && checkout.status !== "SCHEDULED") {
+        // The webhook and the business's return (DEC-093) may both reach
+        // one checkout: the subscription's lock first (the order every
+        // billing write takes), then the checkout as it is now.
+        await tx.$queryRaw`SELECT "id" FROM "Subscription" WHERE "organizationId" = ${seen.organizationId} FOR UPDATE`;
+        await tx.$queryRaw`SELECT "id" FROM "BillingCheckout" WHERE "id" = ${seen.id} FOR UPDATE`;
+        const checkout = await tx.billingCheckout.findUnique({
+            where: { id: seen.id },
+        });
+        if (
+            !checkout ||
+            (checkout.status !== "OPEN" && checkout.status !== "SCHEDULED")
+        ) {
             return ignored;
         }
 
@@ -339,12 +384,13 @@ export class BillingWebhookService {
                 provider: true,
                 providerSubscriptionId: true,
                 currentPeriodEnd: true,
-                plan: { select: { name: true } },
+                billingCycle: true,
+                plan: { select: { name: true, key: true } },
             },
         });
         const plan = await tx.plan.findUniqueOrThrow({
             where: { id: checkout.planId },
-            select: { name: true },
+            select: { name: true, key: true },
         });
         const cycle = checkout.cycle === "year" ? "year" : "month";
 
@@ -383,6 +429,11 @@ export class BillingWebhookService {
         if (checkout.kind === "SCHEDULED") {
             const from = checkout.startAt ?? now;
             if (!sub) return { result: { status: "ignored", changed: false } };
+            // The same plan again at its term's end (DEC-093's one-tap
+            // renewal): the term running now finishes on its own — its last
+            // charges are still owed — so nothing is told to stop.
+            const renewal =
+                sub.plan.key === plan.key && sub.billingCycle === cycle;
             await tx.billingCheckout.update({
                 where: { id: checkout.id },
                 data: { status: "SCHEDULED" },
@@ -392,12 +443,23 @@ export class BillingWebhookService {
                 data: {
                     pendingPlanId: checkout.planId,
                     pendingFrom: from,
-                    cancelAtPeriodEnd: Boolean(oldProvider),
+                    cancelAtPeriodEnd: !renewal && Boolean(oldProvider),
                 },
             });
+            // A year paid once is paid now (DEC-093): invoiced with the
+            // payment, for the year it starts on the date.
+            if (isOneTime(checkout)) {
+                await this.invoices?.invoiceCheckoutChargeInTx(tx, {
+                    checkout,
+                    event,
+                    now,
+                    source: "SCHEDULED",
+                    periodEnd: periodEnd(from, cycle),
+                });
+            }
             // The one it replaces runs to the end of the period paid; the
             // add-ons owed then ride on this one's first charge (U16).
-            if (oldProvider) {
+            if (oldProvider && !renewal) {
                 await enqueueProviderCancel(tx, {
                     organizationId: org,
                     ...oldProvider,
@@ -480,8 +542,15 @@ export class BillingWebhookService {
             });
         }
         if (trial) {
-            // Nothing charged yet: no invoice and no redemption until the
-            // trial's end. The business hears before then (U17's mail).
+            // No plan charge yet: no plan invoice and no redemption until
+            // the trial's end. A nominal first month (DEC-093) was taken
+            // with the authorisation, and has its own invoice. The business
+            // hears before the trial ends (U17's mail).
+            await this.invoices?.invoiceFirstMonthInTx(tx, {
+                checkout,
+                event,
+                now,
+            });
             if (currentPeriodEnd) {
                 await enqueueBillingEmail(
                     tx,
@@ -554,7 +623,9 @@ export class BillingWebhookService {
                 provider: true,
                 providerSubscriptionId: true,
                 providerEventAt: true,
+                currentPeriodEnd: true,
                 pendingFrom: true,
+                plan: { select: { version: true } },
             },
         });
 
@@ -571,6 +642,31 @@ export class BillingWebhookService {
         const phase = event.phase ?? "other";
         const current = sub.status as SubscriptionStatus;
         const stamp = event.eventAt ? { providerEventAt: event.eventAt } : {};
+
+        // Completed (DEC-093): its 12 charges are done, and the last one
+        // paid for a period still running. The plan stays until that period
+        // ends: a renewal or a move already waiting takes over on its date;
+        // with neither, it moves to Free then.
+        if (phase === "completed" && current !== "CANCELLED") {
+            const endsAt = event.currentPeriodEnd ?? sub.currentPeriodEnd;
+            if (sub.pendingFrom && sub.pendingFrom > now) {
+                await tx.subscription.update({
+                    where: { id: sub.id },
+                    data: { ...stamp },
+                });
+                return { result: { status: "processed", changed: false } };
+            }
+            if (!sub.pendingFrom && endsAt && endsAt > now) {
+                const set = await endTermAtInTx(tx, sub, endsAt);
+                if (set) {
+                    await tx.subscription.update({
+                        where: { id: sub.id },
+                        data: { ...stamp },
+                    });
+                    return { result: { status: "processed", changed: true } };
+                }
+            }
+        }
 
         // Ending: a move to Free, or to a plan it authorised, takes over
         // from the subscription that ended with its period.

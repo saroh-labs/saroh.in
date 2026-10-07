@@ -10,12 +10,12 @@ import {
     draftVisits,
     fromMinor,
     glance,
+    hasBookableHours,
     needsMeetingLink,
     savedMessage,
     serviceInput,
     serviceProblems,
     serviceUpdate,
-    showKind,
     staffFor,
     staffNote,
     stateLine,
@@ -328,7 +328,20 @@ describe("the words around the editor", () => {
                 kind: "one",
                 comingUp: 0,
             }),
-        ).toBe("Check-up added. It's bookable now.");
+        ).toBe(
+            "Check-up added. Give it hours under More settings so customers can book it.",
+        );
+        expect(
+            savedMessage({
+                isNew: true,
+                name: "Check-up",
+                kind: "one",
+                comingUp: 0,
+                hasPerson: true,
+            }),
+        ).toBe(
+            "Check-up added. Customers can book it in the free time of who takes it.",
+        );
         expect(
             savedMessage({
                 isNew: true,
@@ -336,7 +349,9 @@ describe("the words around the editor", () => {
                 kind: "class",
                 comingUp: 0,
             }),
-        ).toBe("Yoga added. Set its weekly times under More settings.");
+        ).toBe(
+            "Yoga added. Set its weekly times under More settings so customers can book it.",
+        );
         expect(
             savedMessage({ isNew: false, name: "x", kind: "one", comingUp: 2 }),
         ).toBe(
@@ -372,6 +387,14 @@ describe("the words around the editor", () => {
         expect(bookingPageNote(true, true)).toBe(
             "Customers can book it themselves.",
         );
+        // No hours and nobody to take it: off the page until it has (UX-024).
+        expect(bookingPageNote(true, true, false)).toBe(
+            "It goes on the booking page once it has weekly hours or someone to take it. Staff can book it from the calendar meanwhile.",
+        );
+        expect(hasBookableHours("one", 0, 0)).toBe(false);
+        expect(hasBookableHours("one", 0, 1)).toBe(true);
+        expect(hasBookableHours("class", 0, 1)).toBe(false);
+        expect(hasBookableHours("class", 2, 0)).toBe(true);
         const people = [
             { id: "a", name: "Asha" },
             { id: "b", name: "Vikram" },
@@ -416,17 +439,6 @@ describe("glance", () => {
             "Price",
             "—",
         ]);
-    });
-});
-
-describe("showKind", () => {
-    it("shows Kind for a business with classes or no services, and a class being edited", () => {
-        const one = { id: "a", capacity: 1 };
-        const cls = { id: "b", capacity: 10 };
-        expect(showKind([], null)).toBe(true);
-        expect(showKind([one, cls], null)).toBe(true);
-        expect(showKind([one], null)).toBe(false);
-        expect(showKind([one], { capacity: 6 })).toBe(true);
     });
 });
 

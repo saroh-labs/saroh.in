@@ -12,10 +12,12 @@ import { NORTHWIND_ORG, urls } from "../playwright.config";
  * see (DEC-057). Read-only: it asks, then answers "Keep it on".
  */
 
-/** The rail's names for the two modules the API calls otherwise. */
+/** The rail's names for the modules the API calls otherwise. */
 const RAIL: Partial<Record<string, string>> = {
     CRM: "Contacts",
     COMMERCE: "Sell",
+    // Bookings is Bookings on screen (UX-078).
+    APPOINTMENTS: "Bookings",
 };
 
 interface ModuleView {

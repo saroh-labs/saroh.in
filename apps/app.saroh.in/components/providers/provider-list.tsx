@@ -68,7 +68,7 @@ export function ProviderList({
                         ))
                     ) : (
                         <p className="text-pretty px-4 py-[13px] text-[13px] leading-[1.45] text-muted-foreground min-[760px]:px-[18px]">
-                            {offersPayments
+                            {offersPayments && !view.paymentsLocked
                                 ? "Nothing connected yet — connect a payment provider to take payments online."
                                 : "Nothing connected yet."}
                         </p>

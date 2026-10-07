@@ -13,6 +13,7 @@ import { resolveCapabilities } from "../organizations/organization-policy";
 import { cleanBusinessName } from "../site-accounts/sender-name";
 import type { AlertEvent } from "./alert-preferences";
 import { alertOn, mayHearAbout } from "./alert-preferences";
+import { wordReview } from "./review-alerts";
 import type { TeamAlertPayload, WordedAlert } from "./team-alerts";
 import { TEAM_ALERT_TYPE } from "./team-alerts";
 import { putOffUntilDue, wordUncollected } from "./uncollected-alert";
@@ -26,6 +27,7 @@ export const PAYMENT_FAILED_NOTIFICATION_TYPE = "payment.failed";
 export const TEAM_JOINED_NOTIFICATION_TYPE = "team.joined";
 export const SITE_LIVE_NOTIFICATION_TYPE = "site.live";
 export const SITE_NOT_LIVE_NOTIFICATION_TYPE = "site.not_live";
+export const PROVIDER_ATTENTION_NOTIFICATION_TYPE = "provider.attention";
 
 type Tx = Prisma.TransactionClient;
 
@@ -37,7 +39,7 @@ const ROW_LABEL: Record<AlertEvent, string> = {
     booking: "New booking",
     failed: "Payment failed",
     team: "Someone joins the team",
-    site: "Website goes live",
+    site: "Your website",
 };
 
 const BUILT_IN_LABEL: Partial<Record<string, string>> = {
@@ -88,8 +90,12 @@ export interface AlertEmail {
  *     business's email provider. To each person on the team whose role
  *     reads it and who has email on for it — by default, a failed payment
  *     and a scheduled go-live. Whoever scheduled a go-live is emailed
- *     whatever they chose. Handed to Saroh's sender once the transaction
- *     has committed, so a rolled-back run sends nothing; at most once.
+ *     whatever they chose. Two alerts widen who is emailed: a new
+ *     website order reaches the owners and admins unless they turned the
+ *     New order email off, as an enquiry does (UX-042); a review asked for,
+ *     or a new test release, reaches the site's reviewers, who have no
+ *     bell (UX-043). Handed to Saroh's sender once the transaction has
+ *     committed, so a rolled-back run sends nothing; at most once.
  *
  * Nothing goes by WhatsApp or SMS: Saroh keeps no number for a team member.
  */
@@ -155,7 +161,7 @@ export async function tellTeam(
     });
     if (claimed.count === 0) return { told: false, emails: [] };
 
-    if (!alert.notificationId) {
+    if (!alert.notificationId && !alert.noBell) {
         const notification = await tx.notification.create({
             data: {
                 organizationId,
@@ -186,6 +192,9 @@ async function whoToEmail(
     organizationId: string,
     alert: WordedAlert,
 ): Promise<AlertEmail[]> {
+    if (alert.emailReviewersOf) {
+        return reviewersToEmail(tx, organizationId, alert);
+    }
     const [members, roles, choices, org] = await Promise.all([
         tx.membership.findMany({
             where: { organizationId },
@@ -226,11 +235,17 @@ async function whoToEmail(
         if (!mayHearAbout(alert.event, (a) => actions.has(a), m.role)) {
             return false;
         }
-        return alertOn(
-            choices.filter((c) => c.userId === m.userId),
-            alert.event,
-            "email",
-        );
+        const own = choices.filter((c) => c.userId === m.userId);
+        // A website order: an owner or admin hears of the sale as of an
+        // enquiry, on unless they turned this row's email off (UX-042).
+        if (
+            alert.ownersAdminsByDefault &&
+            (m.role === "OWNER" || m.role === "ADMIN") &&
+            own.length === 0
+        ) {
+            return true;
+        }
+        return alertOn(own, alert.event, "email");
     });
     if (recipients.length === 0) return [];
 
@@ -243,11 +258,59 @@ async function whoToEmail(
 }
 
 /**
+ * The reviewers of the alert's site, still on the team (UX-043): a review
+ * asked of them, or a new test release to look over. They have no bell
+ * and no alert choices, so being a reviewer is the choice.
+ */
+async function reviewersToEmail(
+    tx: Tx,
+    organizationId: string,
+    alert: WordedAlert,
+): Promise<AlertEmail[]> {
+    const [grants, org] = await Promise.all([
+        tx.siteReviewer.findMany({
+            where: { organizationId, siteId: alert.emailReviewersOf ?? "" },
+            select: { userId: true, user: { select: { email: true } } },
+            orderBy: { userId: "asc" },
+        }),
+        tx.organization.findUnique({
+            where: { id: organizationId },
+            select: { name: true },
+        }),
+    ]);
+    const onTeam = new Set(
+        (
+            await tx.membership.findMany({
+                where: {
+                    organizationId,
+                    userId: { in: grants.map((g) => g.userId) },
+                },
+                select: { userId: true },
+            })
+        ).map((m) => m.userId),
+    );
+    const recipients = grants.filter(
+        (g) =>
+            g.user.email.trim() &&
+            g.userId !== alert.skipUserId &&
+            onTeam.has(g.userId),
+    );
+    if (recipients.length === 0) return [];
+    const mail = renderAlertEmail(alert, cleanName(org?.name, "Your business"));
+    return recipients.map((g) => ({
+        userId: g.userId,
+        to: g.user.email.trim(),
+        mail,
+    }));
+}
+
+/**
  * The email: the alert's email words (fixed, with the business's cleaned
  * names), a link, and why they got it. `business` is already cleaned.
  */
 export function renderAlertEmail(
-    alert: Pick<WordedAlert, "event" | "mail" | "path">,
+    alert: Pick<WordedAlert, "event" | "mail" | "path"> &
+        Partial<Pick<WordedAlert, "cta" | "emailReviewersOf">>,
     business: string,
 ): TeamAlertMail {
     return {
@@ -255,7 +318,10 @@ export function renderAlertEmail(
         heading: alert.mail.heading,
         body: alert.mail.body,
         url: alert.path ? `${appBase()}${alert.path}` : null,
-        footer: `You get this because email is on for “${ROW_LABEL[alert.event]}” in your alerts at ${business}. You can change it in Saroh, in Settings under Your profile.`,
+        ...(alert.cta ? { cta: alert.cta } : {}),
+        footer: alert.emailReviewersOf
+            ? `You get this because you review the website of ${business} in Saroh.`
+            : `You get this because email is on for “${ROW_LABEL[alert.event]}” in your alerts at ${business}. You can change it in Saroh, in Settings under Your profile.`,
     };
 }
 
@@ -279,6 +345,10 @@ export async function wordAlert(
             return wordSite(tx, organizationId, payload);
         case "uncollected":
             return wordUncollected(tx, organizationId, payload, now);
+        case "provider":
+            return wordProvider(tx, organizationId, payload);
+        case "review":
+            return wordReview(tx, organizationId, payload);
     }
 }
 
@@ -325,6 +395,12 @@ async function wordOrder(
         path: `/commerce/orders/${order.id}`,
         skipUserId: p.actorUserId ?? null,
         orderId: order.id,
+        // A website order comes in while nobody is watching: the owners and
+        // admins are emailed unless they turned it off, as of an enquiry
+        // (UX-042). One taken at the counter has someone there already.
+        ...(order.placedOnline
+            ? { ownersAdminsByDefault: true, cta: "Open the order" }
+            : {}),
     };
 }
 
@@ -504,6 +580,66 @@ async function wordSite(
     };
 }
 
+/**
+ * A provider that refused the business's keys (UX-012), told while it
+ * still needs attention: keys entered again since, or a disconnect, and
+ * there is nothing to say. Names the provider, never a key.
+ */
+async function wordProvider(
+    tx: Tx,
+    organizationId: string,
+    p: Extract<TeamAlertPayload, { event: "provider" }>,
+): Promise<WordedAlert | null> {
+    const where = { id: p.providerId, organizationId };
+    const select = {
+        provider: true,
+        status: true,
+        attentionAt: true,
+    } as const;
+    const row =
+        p.channel === "PAYMENTS"
+            ? await tx.merchantPaymentProvider.findFirst({ where, select })
+            : await tx.communicationProvider.findFirst({ where, select });
+    if (row?.status !== "CONNECTED" || !row.attentionAt) return null;
+    if (row.attentionAt.toISOString() !== p.since) return null;
+    const name = PROVIDER_NAMES[row.provider] ?? row.provider;
+    const base = {
+        event: "failed" as const,
+        eventKey: `team:provider:${p.providerId}:${p.since}`,
+        notificationId: null,
+        type: PROVIDER_ATTENTION_NOTIFICATION_TYPE,
+        path: "/settings/providers",
+        skipUserId: null,
+    };
+    // Saroh sends the email, not the provider whose keys were refused
+    // (DEC-011 amended), so an email provider's alert is emailed too.
+    if (p.channel === "PAYMENTS") {
+        const body = `Customers can't pay online until you connect ${name} again with keys that work, in Settings › Providers.`;
+        return {
+            ...base,
+            title: `${name} refused your keys`,
+            body,
+            mail: { heading: `${name} refused your keys`, body },
+        };
+    }
+    const body = `Emails to your customers aren't going out. Connect ${name} again with a key that works, in Settings › Providers.`;
+    return {
+        ...base,
+        title: `${name} refused your email keys`,
+        body,
+        mail: { heading: `${name} refused your email keys`, body },
+    };
+}
+
+/** How a provider is named in an alert. */
+const PROVIDER_NAMES: Partial<Record<string, string>> = {
+    RAZORPAY: "Razorpay",
+    CASHFREE: "Cashfree",
+    RESEND: "Resend",
+    SENDGRID: "SendGrid",
+    SMTP: "SMTP relay",
+};
+
 /** A booking's email words, by the notice's type: fixed, naming nobody. */
 const NEW_BOOKING_MAIL: WordedAlert["mail"] = {
     heading: "New booking",
@@ -540,6 +676,18 @@ function payloadOf(value: unknown): TeamAlertPayload | null {
             return str("notificationId") ? (p as TeamAlertPayload) : null;
         case "uncollected":
             return str("orderId") ? (p as TeamAlertPayload) : null;
+        case "provider":
+            return str("providerId") &&
+                str("since") &&
+                (p.channel === "PAYMENTS" || p.channel === "EMAIL")
+                ? (p as TeamAlertPayload)
+                : null;
+        case "review":
+            return (p.about === "approval" && str("approvalId")) ||
+                (p.about === "note" && str("commentId")) ||
+                (p.about === "release" && str("testReleaseId"))
+                ? (p as TeamAlertPayload)
+                : null;
         case "site":
             return str("testReleaseId") &&
                 str("goLiveAt") &&

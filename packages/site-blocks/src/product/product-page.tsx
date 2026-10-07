@@ -3,7 +3,7 @@
 import type { ReactNode } from "react";
 import { createContext, useContext, useState } from "react";
 
-import { siteMoney } from "../lib/money";
+import { formatAmount } from "../lib/money";
 import { cn } from "../lib/utils";
 
 /**
@@ -105,14 +105,9 @@ export interface ProductPageData {
     reviews: ProductPageReview[];
 }
 
-export function formatAmount(
-    amount: string,
-    currency: string,
-    locale = "en-IN",
-): string {
-    // "₹2,499", "₹24.50" (DEC-073 #11): never "₹24.5".
-    return siteMoney(Number(amount), currency, locale) ?? amount;
-}
+// Lives in `lib/money` (no directive) so a server page can call it too: an
+// export of this "use client" module is only a client reference there.
+export { formatAmount };
 
 /** Whole percent off, rounded down, or null when nothing is off. */
 export function percentOff(price: string, mrp: string | null): number | null {
@@ -146,6 +141,11 @@ export interface ProductSelection {
     price: string;
     /** Nothing of it can be sold now: the action is off. */
     soldOut: boolean;
+    /**
+     * How many can be sold, when the page says so ("Only 2 left"); null
+     * otherwise. The bag never offers more than this (UX-058).
+     */
+    left?: number | null;
 }
 
 const SelectionContext = createContext<ProductSelection | null>(null);
@@ -549,6 +549,10 @@ export default function ProductPage({
                                 name: product.name,
                                 price,
                                 soldOut,
+                                left:
+                                    stock?.word === "LOW"
+                                        ? (stock.left ?? null)
+                                        : null,
                             }}
                         >
                             <div className="mt-5">{action}</div>

@@ -6,6 +6,8 @@ import { PostCategoriesManager } from "@/components/sites/post-categories-manage
 import { listPostCategories } from "@/lib/content/service";
 import { requireSession } from "@/lib/session";
 import { getSite } from "@/lib/sites/service";
+/** The tab's title (UX-081): without one it read the bare "Saroh". */
+export const metadata = { title: "Categories · Website" };
 
 export default async function PostCategoriesPage({
     params,

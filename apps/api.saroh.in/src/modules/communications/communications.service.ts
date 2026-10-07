@@ -1,8 +1,10 @@
 import {
     BadRequestException,
     ConflictException,
+    Inject,
     Injectable,
     NotFoundException,
+    Optional,
 } from "@nestjs/common";
 import type {
     CommunicationProvider,
@@ -13,6 +15,11 @@ import type {
 } from "@saroh/database";
 import { prisma } from "@saroh/database";
 
+import type { ProviderAttention } from "../../common/providers/provider-attention";
+import {
+    attentionOf,
+    NO_ATTENTION,
+} from "../../common/providers/provider-attention";
 import type { OrganizationContext } from "../../common/types/organization-context";
 import { planMeter } from "../billing/metering.service";
 import { isReservedContactEmail } from "../contacts/contact-email";
@@ -32,7 +39,13 @@ import {
     INVOICE_PDF_ATTACHMENT,
     MESSAGE_SEND_TYPE,
 } from "./message-send.handler";
-import { isCommsChannel, isSupportedComms } from "./providers/provider.port";
+import { assertCommsKeysAccepted } from "./provider-keys";
+import type { CommsProviderFactory } from "./providers/provider.port";
+import {
+    COMMS_PROVIDER_FACTORY,
+    isCommsChannel,
+    isSupportedComms,
+} from "./providers/provider.port";
 import type { NotEmailed } from "./saroh-delivery";
 import { SAROH_REPRESENTATIVE_NOTICE } from "./saroh-delivery";
 import type { SarohEmailState } from "./saroh-email-state";
@@ -199,6 +212,12 @@ export interface RedactedCommsProvider {
     provider: string;
     status: string;
     fromAddress: string | null;
+    /**
+     * Null while it works; else the provider refused these keys on a live
+     * send (UX-012) — `{ reason: "KEYS_REFUSED", since }` — until they are
+     * entered again.
+     */
+    attention: ProviderAttention | null;
     createdAt: Date;
     updatedAt: Date;
 }
@@ -218,6 +237,7 @@ function redact(row: CommunicationProvider): RedactedCommsProvider {
         provider: row.provider,
         status: row.status,
         fromAddress: row.fromAddress ?? null,
+        attention: attentionOf(row),
         createdAt: row.createdAt,
         updatedAt: row.updatedAt,
     };
@@ -242,6 +262,14 @@ function redact(row: CommunicationProvider): RedactedCommsProvider {
  */
 @Injectable()
 export class CommunicationsService {
+    constructor(
+        // The adapters, for the connect-time key check (UX-012). Absent
+        // where a test builds the service by hand: nothing is checked then.
+        @Optional()
+        @Inject(COMMS_PROVIDER_FACTORY)
+        private readonly factory?: CommsProviderFactory,
+    ) {}
+
     // ---- Providers ---------------------------------------------------------
 
     /**
@@ -270,6 +298,16 @@ export class CommunicationsService {
         }
 
         const credentials = this.normalizeCredentials(input.credentials);
+
+        // The key must work before it is kept (UX-012); Resend's sending
+        // domain must be verified too. 400 when the provider refuses.
+        if (this.factory) {
+            await assertCommsKeysAccepted(this.factory.get(channel, provider), {
+                provider,
+                credentials,
+                fromAddress: input.fromAddress ?? null,
+            });
+        }
 
         // Seal the whole credential map as one blob. Plaintext is NEVER
         // persisted or logged.
@@ -305,6 +343,7 @@ export class CommunicationsService {
                         encryptedCredentials: sealed.ciphertext,
                         credentialsIv: sealed.iv,
                         credentialsAuthTag: sealed.authTag,
+                        ...NO_ATTENTION,
                     },
                 }),
             {

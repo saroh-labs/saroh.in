@@ -1,3 +1,4 @@
+import { permits } from "@/lib/organizations/permits";
 import type { resolveActiveOrganization } from "@/lib/organizations/service";
 
 type Org = Awaited<ReturnType<typeof resolveActiveOrganization>>;
@@ -13,16 +14,14 @@ type Org = Awaited<ReturnType<typeof resolveActiveOrganization>>;
  * The API sends each person's resolved powers, so `pack:write` arrives with
  * `pack:sell` and `pack:read`. An API from before E26 doesn't know
  * `pack:sell` and asked `pack:write` to sell, so selling still accepts it.
- * Without resolved powers, the built-in roles: an owner or admin holds all
- * three, and a Member none until F18.
+ * Only the role's permissions decide, never its name (DEC-098): a pack's
+ * prices are money.
  */
 function holds(organization: Org, ...actions: string[]): boolean {
-    return organization?.actions
-        ? actions.some((a) => organization.actions?.includes(a))
-        : organization?.role === "OWNER" || organization?.role === "ADMIN";
+    return actions.some((a) => permits(organization, a));
 }
 
-/** The same answer the API gives: `pack:read`, or an owner or admin. */
+/** The same answer the API gives: `pack:read`. */
 export function canReadPacks(organization: Org): boolean {
     return holds(organization, "pack:read");
 }

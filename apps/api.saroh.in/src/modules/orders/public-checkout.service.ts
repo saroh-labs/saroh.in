@@ -12,6 +12,7 @@ import { prisma, runInOrgContext } from "@saroh/database";
 
 import { toMoneyString } from "../../common/money";
 import { FixedWindowRateLimiter } from "../bookings/rate-limiter";
+import { DiscountsService } from "../discounts/discounts.service";
 import { assertOrganizationOpen } from "../organizations/organization-lifecycle.gate";
 import type { CreateIntentResult } from "../payments/payments.service";
 import { PaymentsService } from "../payments/payments.service";
@@ -27,7 +28,8 @@ import {
     ORDER_CLOSED_WHILE_PAYING,
     SOLD_OUT_REFUNDING,
 } from "../stock/stock-words";
-import type { ShopScope } from "./checkout-bag";
+import type { PickupPlace } from "../stores/pickup-place";
+import type { BagCode, ShopScope } from "./checkout-bag";
 import { priceBag, shopSettings } from "./checkout-bag";
 import type { SiteAccount } from "./checkout-order";
 import { createCheckoutOrder } from "./checkout-order";
@@ -100,12 +102,19 @@ export interface CheckoutOptions {
     ways: CheckoutWay[];
     /** How it can be paid: online, on handover, both, or neither (can't). */
     payments: { online: boolean; onHandover: boolean };
+    /**
+     * Where a pick-up is collected (UX-025): the storefront's address and
+     * hours, the business's public details. Null when Pick-up isn't offered.
+     */
+    pickup: PickupPlace | null;
 }
 
 /** The bag priced now, and how an order leaving the chosen way is paid. */
 export interface PricedBag extends CheckoutQuote {
     /** Empty until a way is chosen, or when the shop can't take orders. */
     payments: CheckoutPayOption[];
+    /** Where a pick-up is collected (UX-025); null when Pick-up isn't offered. */
+    pickup: PickupPlace | null;
 }
 
 /**
@@ -172,6 +181,10 @@ export class PublicCheckoutService {
             STARTS_PER_WINDOW,
             START_WINDOW_MS,
         ),
+        // The counter's discount evaluation (DEC-104); stateless, so a test
+        // that builds this service by hand gets the real one.
+        @Optional()
+        private readonly discounts: DiscountsService = new DiscountsService(),
     ) {}
 
     /** Whether this site can take an online order now, and how it leaves. */
@@ -188,21 +201,28 @@ export class PublicCheckoutService {
                 scope.storefront.id,
             );
             const pays = paysOf(ready);
+            const ways = ready.ok
+                ? payableWays(pays, settings.ways).map((type) => {
+                      const fee = feeCents(type, settings.fees);
+                      return {
+                          type,
+                          label: FULFILMENT_RULES[type].label,
+                          fee: fee > 0 ? fromCents(fee) : null,
+                      };
+                  })
+                : [];
             return {
-                canOrder: ready.ok,
+                // No way an order can leave (Pick-up from a place with no
+                // address, UX-025): the product page asks about ordering
+                // rather than filling a bag that can't be checked out.
+                canOrder: ready.ok && ways.length > 0,
                 storefront: { name: scope.storefront.name },
                 currency: settings.currency,
-                ways: ready.ok
-                    ? payableWays(pays, settings.ways).map((type) => {
-                          const fee = feeCents(type, settings.fees);
-                          return {
-                              type,
-                              label: FULFILMENT_RULES[type].label,
-                              fee: fee > 0 ? fromCents(fee) : null,
-                          };
-                      })
-                    : [],
+                ways,
                 payments: pays,
+                pickup: ways.some((w) => w.type === "PICKUP")
+                    ? settings.pickup
+                    : null,
             };
         });
     }
@@ -226,14 +246,18 @@ export class PublicCheckoutService {
             // always has (a test release's bag, DEC-071); only the ways
             // to pay are empty.
             const canPay = pays.online || pays.onHandover;
-            const { quote } = await priceBag(
+            const { quote, settings } = await priceBag(
                 scope,
                 bagOf(dto.lines),
                 dto.fulfilment ?? null,
                 canPay ? pays : undefined,
+                this.codeOf(scope, dto.discountCode),
             );
             return {
                 ...quote,
+                pickup: quote.ways.some((w) => w.type === "PICKUP")
+                    ? settings.pickup
+                    : null,
                 payments: quote.fulfilment
                     ? payOptionsFor(pays, quote.fulfilment)
                     : [],
@@ -302,11 +326,12 @@ export class PublicCheckoutService {
             }
 
             const payBy: CheckoutPayment = dto.payment ?? "ONLINE";
-            const { quote, lines, settings } = await priceBag(
+            const { quote, lines, settings, applied } = await priceBag(
                 scope,
                 bagOf(dto.lines),
                 dto.fulfilment,
                 ready,
+                this.codeOf(scope, dto.discountCode),
             );
             if (!quote.ready || quote.fulfilment !== dto.fulfilment) {
                 throw new ConflictException({
@@ -325,6 +350,28 @@ export class PublicCheckoutService {
                     details: { reason: "bag-changed" },
                 });
             }
+            // A code that no longer applies (it ended, or its last use went
+            // at the counter meanwhile) is a changed bag: priced again, the
+            // bag says why — never a full-price order the customer didn't
+            // agree to.
+            if (dto.discountCode && !applied) {
+                throw new ConflictException({
+                    message:
+                        quote.discount && !quote.discount.applied
+                            ? quote.discount.message
+                            : "Your code no longer applies. Check your bag, then place your order.",
+                    details: { reason: "bag-changed", field: "discountCode" },
+                });
+            }
+            // Nothing left to pay online: a provider can't take a payment
+            // of nothing, so the order is placed to be settled at the handover.
+            if (payBy === "ONLINE" && applied && Number(quote.total) <= 0) {
+                throw new ConflictException({
+                    message:
+                        "Your code covers the whole order, so there's nothing to pay online. Choose to pay when it reaches you.",
+                    details: { reason: "bag-changed", field: "discountCode" },
+                });
+            }
             // A product that lists how it may leave refuses any other (B12).
             assertItemsAllow(lines, type);
             if (shipsToAddress(type) && !dto.address) {
@@ -341,6 +388,7 @@ export class PublicCheckoutService {
                 currency: settings.currency,
                 dto,
                 payOnHandover: payBy === "ON_HANDOVER",
+                discount: applied,
             });
             return payBy === "ON_HANDOVER"
                 ? this.placed(orderId)
@@ -436,6 +484,19 @@ export class PublicCheckoutService {
     }
 
     // -----------------------------------------------------------------------
+
+    /** A typed code, bound to the counter's evaluation for this business. */
+    private codeOf(
+        scope: ShopScope,
+        code: string | null | undefined,
+    ): BagCode | null {
+        if (!code) return null;
+        return {
+            code,
+            check: (order) =>
+                this.discounts.checkForOrder(scope.organizationId, code, order),
+        };
+    }
 
     private read(siteId: string, callerHash: string | undefined): void {
         // A caller the platform gives no address for shares one bucket per

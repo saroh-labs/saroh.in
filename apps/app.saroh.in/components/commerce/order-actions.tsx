@@ -86,7 +86,14 @@ export function OrderActions({
             storeId,
             orderId,
             p.kind === "payment"
-                ? { paymentStatus: p.to, ...(how ? { paidHow: how } : {}) }
+                ? {
+                      paymentStatus: p.to,
+                      ...(how
+                          ? p.to === "REFUNDED"
+                              ? { refundedHow: how }
+                              : { paidHow: how }
+                          : {}),
+                  }
                 : { status: "CANCELLED" },
         );
         if (!res.ok) {
@@ -102,8 +109,12 @@ export function OrderActions({
     }
 
     // Marking it paid asks how (#834), and is not destructive.
+    // Recording it refunded asks how it went back, the same way (UX-061).
     const recordingPaid =
-        pending?.kind === "payment" && pending.to === "PAID" ? pending : null;
+        pending?.kind === "payment" &&
+        (pending.to === "PAID" || pending.to === "REFUNDED")
+            ? pending
+            : null;
     const confirm = pending && !recordingPaid ? confirmCopy(pending) : null;
 
     return (
@@ -149,6 +160,7 @@ export function OrderActions({
                         if (!open) setPending(null);
                     }}
                     initial={recordingPaid.how}
+                    refund={recordingPaid.to === "REFUNDED"}
                     onRecord={(how) => {
                         setPending(null);
                         void commit(recordingPaid, how);

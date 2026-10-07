@@ -7,7 +7,7 @@ const props = {
     title: "You've reached your 5 GB of things on Plan A",
     pct: "100%",
     body: "Nothing is blocked.",
-    cta: "Add more",
+    cta: "See your plan",
     href: "/settings/billing",
 };
 

@@ -60,6 +60,26 @@ a note saying so.
   first** (DEC-036): a disconnected one stays listed as theirs, only what the
   API can connect is offered, and a row shows only what the API sends as
   public (a checkout's public key, a sending address), never a credential.
+- **Current** (UX-012) — **Keys are checked before they are kept, and
+  watched after.** Connecting a provider asks it one cheap authenticated
+  read with the typed keys (`verifyCredentials` on the port: Razorpay
+  `GET /payments?count=1`, Cashfree an order look-up that should 404,
+  Resend `GET /domains`, whose list must hold the sending address's domain
+  as verified; a sending-only Resend key is accepted on its
+  `restricted_api_key` answer). A refusal is a 400 under the field
+  (`keySecret`, `apiKey` or `fromAddress`); no answer is a deliberate 503
+  (`provider-unreachable`) — nothing is stored either way. Relays (SMTP,
+  SendGrid, a Resend `baseUrl`) aren't checked. Later, an adapter that gets
+  a 401 or 403 on a live call throws `ProviderKeysRefusedError`
+  (`common/providers/provider-attention.ts`); the caller marks the row
+  (`attentionReason` `KEYS_REFUSED`, `attentionAt`), which the redacted
+  view sends as `attention: { reason, since } | null` and provider health
+  reads as FAILED, and queues the team's `provider` alert on the same
+  transaction, only when the row wasn't flagged already. Entering keys
+  again clears it. A provider order that fails at checkout is a deliberate
+  503 in the customer's words (`provider-keys-refused` or
+  `provider-unavailable`), never an unhandled 500
+  (`payments/provider-keys.ts`).
 - **Current** — **Credentials are encrypted at rest** (AES-256-GCM,
   `payments/crypto.ts`) and never returned; reads are redacted views.
 - **Current** — **Adapters sanitise errors:** never surface an auth header, a
@@ -298,6 +318,30 @@ assumptions made are listed in `docs/architecture/PRICING_ROLLOUT.md` →
 "Razorpay test-mode spike". The webhook inbox applies an event in the same
 transaction as its row and ignores one older than the last applied
 (`Subscription.providerEventAt`).
+
+**DEC-093 adds** (`checkout.service.ts`, `checkout-confirm.service.ts`):
+
+- **Terms.** A monthly subscription is made with `totalCount` 12 (the
+  adapter's open-ended 120 is only a fallback). A yearly plan is a one-time
+  Razorpay **order** (`orders` capability, `POST /orders`), stored where a
+  subscription id would be, with `providerPlanId` `"one-time"`; its
+  `order.paid` webhook reads as the charge. **Saroh's Razorpay webhook must
+  subscribe to `order.paid`** as well as the `subscription.*` events. An
+  order has nothing to cancel: the adapter asks Razorpay nothing for one.
+- **Razorpay's own window, not its hosted page.** The checkout answers a
+  `handoff` (the key id — public — the subscription or order id, and the
+  owner's email, business name and phone pre-filled); the app opens
+  Checkout over the page (`razorpay-window.ts`). The hosted page link stays
+  as the fallback when the window can't open.
+- **Back from paying, ask the provider.** `POST …/billing/checkout/confirm`
+  reads the OPEN checkout's subscription or order (`statuses` capability:
+  `GET /subscriptions/:id`, `GET /orders/:id` and its payments) and
+  reconciles it by the webhook's own rule
+  (`BillingWebhookService.reconcileCheckout`), under the subscription's and
+  the checkout's row locks — so the plan moves without the webhook, and
+  whichever of the two lands second changes nothing (the invoice is keyed
+  once per charge). Rate-limited per business; an unanswered call is
+  "still waiting", never a reason to pay again.
 
 ## Media storage — **Current**
 

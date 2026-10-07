@@ -7,6 +7,7 @@ import { businessTimezone } from "../bookings/staff-availability";
 import { paperDay } from "../invoices/invoice-paper-view";
 import { enqueueBillingEmail } from "./billing-email.job";
 import { planEndingNotice } from "./billing-emails";
+import { isOneTime } from "./billing-term";
 import { CatalogueAccessService } from "./catalogue-access.service";
 import {
     PLAN_ENDING_NOTICE_KIND,
@@ -17,6 +18,7 @@ import {
 } from "./plan-ending";
 import { applyDueMoveInTx } from "./plan-moves";
 import { enqueueProviderCancel } from "./provider-cancel.job";
+import { endTermAtInTx } from "./term-end";
 
 /**
  * Saroh billing's hourly sweep (pricing catalogue U15), a self-rescheduling
@@ -29,6 +31,10 @@ import { enqueueProviderCancel } from "./provider-cancel.job";
  *    plans, which bill nothing, and any webhook that never came.
  * 2. **Lapsed checkouts.** An OPEN checkout past `expiresAt` was never
  *    authorised: CANCELLED, and its provider subscription cancelled.
+ * 0. **Years that ended** (DEC-093), first: a yearly plan is one payment,
+ *    so no provider event marks the end of its year. One that ended with
+ *    nothing renewed is put on course for Free from its end
+ *    (`term-end.ts`), and step 1 applies it.
  * 3. **Plans that end** (#805). A plan override with an end date that moves
  *    the business to a cheaper plan is told 30, 7 and 1 days ahead
  *    (`plan-ending.ts`): an inbox notice and an email to its billing
@@ -86,6 +92,7 @@ export class MovesApplyHandler {
             lapsed: 0,
             reminded: 0,
         };
+        await this.endPaidYears(now);
         const tried = new Set<string>();
         for (;;) {
             const due = await prisma.subscription.findMany({
@@ -118,6 +125,73 @@ export class MovesApplyHandler {
         out.lapsed = await this.lapseCheckouts(now);
         out.reminded = await this.remindEndingPlans(now);
         return out;
+    }
+
+    /**
+     * Yearly plans paid once whose year is over with nothing waiting: on
+     * course for Free from the year's end. An autopay subscription is left
+     * to its provider's events (a late `charged` must never read as an
+     * end). Returns how many were set.
+     */
+    async endPaidYears(now: Date): Promise<number> {
+        const ended = await prisma.subscription.findMany({
+            where: {
+                status: { not: "CANCELLED" },
+                provider: { not: null },
+                providerSubscriptionId: { not: null },
+                pendingFrom: null,
+                currentPeriodEnd: { lte: now },
+            },
+            select: {
+                id: true,
+                provider: true,
+                providerSubscriptionId: true,
+            },
+            take: BATCH,
+        });
+        let set = 0;
+        for (const s of ended) {
+            if (!s.provider || !s.providerSubscriptionId) continue;
+            const checkout = await prisma.billingCheckout.findUnique({
+                where: {
+                    provider_providerSubscriptionId: {
+                        provider: s.provider,
+                        providerSubscriptionId: s.providerSubscriptionId,
+                    },
+                },
+                select: { providerPlanId: true },
+            });
+            if (!checkout || !isOneTime(checkout)) continue;
+            try {
+                const done = await prisma.$transaction(async (tx) => {
+                    await tx.$queryRaw`SELECT "id" FROM "Subscription" WHERE "id" = ${s.id} FOR UPDATE`;
+                    const sub = await tx.subscription.findUnique({
+                        where: { id: s.id },
+                        select: {
+                            id: true,
+                            pendingFrom: true,
+                            currentPeriodEnd: true,
+                            providerSubscriptionId: true,
+                            plan: { select: { version: true } },
+                        },
+                    });
+                    if (
+                        !sub?.currentPeriodEnd ||
+                        sub.currentPeriodEnd > now ||
+                        sub.providerSubscriptionId !== s.providerSubscriptionId
+                    ) {
+                        return false;
+                    }
+                    return endTermAtInTx(tx, sub, sub.currentPeriodEnd);
+                });
+                if (done) set += 1;
+            } catch (error) {
+                this.logger.error(
+                    `billing_year_end_failed subscription=${s.id}: ${String(error)}`,
+                );
+            }
+        }
+        return set;
     }
 
     /**

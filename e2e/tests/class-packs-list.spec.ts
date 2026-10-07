@@ -15,6 +15,10 @@ import { urls } from "../playwright.config";
  *
  * It leaves the live pack archived (a sold pack can't be deleted; its sale
  * stays, as the holder's would) and deletes the draft.
+ *
+ * Class packs aren't offered on any plan for now (DEC-099): the module is
+ * hidden and its data kept, so what runs today is that its pages are no
+ * page; the list's flow waits, skipped, for packs to be offered again.
  */
 
 const ORG = "seed_org";
@@ -39,7 +43,63 @@ async function aService(request: APIRequestContext): Promise<string> {
     return services[0].id;
 }
 
+test.describe("class packs aren't offered (DEC-099)", () => {
+    test("Northwind's packs are kept, but Class packs is no page and not in the rail", async ({
+        page,
+    }) => {
+        await signIn(page);
+        const request = page.request;
+        const serviceId = await aService(request);
+        // Kept data: a pack made through the API, as one sold before.
+        const drafted = await request.post(orgApi("/class-packs/drafts"), {
+            headers,
+            data: {
+                name: `E2E draft ${ownStamp(test.info())}`,
+                credits: 3,
+                validityDays: 14,
+                price: "600",
+                currency: "INR",
+                serviceIds: [serviceId],
+            },
+        });
+        const draft = drafted.ok()
+            ? ((await drafted.json()) as { id: string; revision: number })
+            : null;
+        try {
+            await page.goto("/");
+            await expect(
+                page.getByRole("link", { name: "Class packs" }),
+            ).toHaveCount(0);
+            for (const path of [
+                "/class-packs",
+                ...(draft ? [`/class-packs/${draft.id}`] : []),
+            ]) {
+                await page.goto(path);
+                await expect(
+                    page.getByRole("heading", { name: "Page not found" }),
+                ).toBeVisible();
+                await expect(page.getByText("is turned off")).toHaveCount(0);
+            }
+        } finally {
+            if (draft) {
+                await request.delete(
+                    orgApi(
+                        `/class-packs/${draft.id}?revision=${draft.revision}`,
+                    ),
+                    { headers },
+                );
+            }
+        }
+    });
+});
+
 test.describe("class packs list", () => {
+    // The screen is kept for when packs are offered again; until then it is
+    // no page (DEC-099), so its flow can't run.
+    test.skip(
+        true,
+        "Class packs aren't offered on any plan for now (DEC-099).",
+    );
     test.beforeEach(async ({ page }) => {
         await signIn(page);
     });

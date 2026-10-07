@@ -1,5 +1,6 @@
 import { z } from "zod";
 
+import { SAROH_CONTACT_EMAIL } from "./contact";
 /**
  * The Integrations pages (Resources plan U3): what connects today, what is
  * planned, and the typed frontmatter every provider page's MDX
@@ -58,7 +59,7 @@ export const integrationsIndex = {
     plannedTitle: "Planned · not available yet",
     plannedIntro:
         "These aren't built yet. Times are rough and can move. Each one gets a changelog entry when it ships.",
-    askEmail: "hello@saroh.in",
+    askEmail: SAROH_CONTACT_EMAIL,
     seo: {
         title: "Integrations: Razorpay, Cashfree and your own email · Saroh",
         socialTitle: "Integrations",

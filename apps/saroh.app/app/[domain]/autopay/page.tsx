@@ -23,11 +23,24 @@ import { readAutopay } from "./actions";
  * `?plan=<ref>` after My plan and `?join=<ref>` after the Prices page, read
  * with the customer's session.
  */
-export const metadata: Metadata = {
-    title: "Autopay",
-    robots: { index: false, follow: false },
-    referrer: "no-referrer",
-};
+export async function generateMetadata({
+    searchParams,
+}: {
+    searchParams: Promise<{
+        pay?: string | string[];
+        plan?: string | string[];
+        join?: string | string[];
+    }>;
+}): Promise<Metadata> {
+    // A visit with nothing to read is a 404 below, and its tab says so
+    // rather than "Autopay" (UX-090).
+    const read = autopayReadOf(await searchParams);
+    return {
+        title: read ? "Autopay" : "Page not found",
+        robots: { index: false, follow: false },
+        referrer: "no-referrer",
+    };
+}
 
 export default async function AutopayPage({
     params,

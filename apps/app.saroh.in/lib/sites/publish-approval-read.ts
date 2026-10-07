@@ -1,6 +1,8 @@
 import type { ApiResult } from "@/lib/api/failure";
 import { toFailure } from "@/lib/api/failure";
 import { apiFetch, orgBase } from "@/lib/api/http";
+import { rowIncluded } from "@/lib/billing/access";
+import { billingAccessOrNull } from "@/lib/saroh-billing/service";
 
 import type {
     PublishApproval,
@@ -36,6 +38,9 @@ async function testReleasesOn(siteId: string): Promise<boolean> {
 export async function readPublishApproval(
     site: PublishApprovalFields & { id: string },
 ): Promise<PublishApproval | null> {
+    // Pro's alone (DEC-103): on a plan without the approval row, nothing.
+    const inPlan = rowIncluded(await billingAccessOrNull(), "review");
+    if (!inPlan) return null;
     // A setting already on is shown whatever the flag says, so the release
     // list is asked only when it would change the answer.
     if (site.publishNeedsApproval === true) {

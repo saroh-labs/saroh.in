@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import type { ReleaseAbilities, TestRelease } from "./test-releases";
 import {
+    changesAskedLine,
     goLiveGate,
     linkLine,
     LIVE_OUTSIDE_RELEASE,
@@ -258,6 +259,20 @@ describe("review standing", () => {
             }).text,
         ).toBe("Ravi asked for changes");
     });
+
+    it("no longer reads In review once going live closed it (DEC-101)", () => {
+        expect(
+            standingCopy({
+                outstanding: false,
+                route: "DIRECT",
+                approved: false,
+                latest: { outcome: "BYPASSED", at: "", by: "Asha" },
+            }),
+        ).toEqual({
+            text: "Asha put it live without approval",
+            approved: false,
+        });
+    });
 });
 
 describe("links, going live and what stays live", () => {
@@ -307,5 +322,36 @@ describe("links, going live and what stays live", () => {
     it("lists what stays live in the bar's own words (R6)", () => {
         expect(LIVE_OUTSIDE_RELEASE).toContain("Products, prices and stock");
         expect(LIVE_OUTSIDE_RELEASE).toContain("Opening hours");
+    });
+});
+
+describe("changesAskedLine (UX-068)", () => {
+    const standing = (latest: TestRelease["standing"]["latest"]) => ({
+        ...release().standing,
+        latest,
+    });
+
+    it("says who asked for what before going live", () => {
+        expect(
+            changesAskedLine(
+                standing({
+                    outcome: "CHANGES_REQUESTED",
+                    at: "",
+                    by: "Rina",
+                    reason: "Hours are wrong",
+                }),
+            ),
+        ).toBe(
+            "Rina asked for changes on this release: “Hours are wrong”. Going live now is recorded as without approval.",
+        );
+    });
+
+    it("says nothing for an approval or no review", () => {
+        expect(changesAskedLine(standing(null))).toBeNull();
+        expect(
+            changesAskedLine(
+                standing({ outcome: "APPROVED", at: "", by: "Rina" }),
+            ),
+        ).toBeNull();
     });
 });

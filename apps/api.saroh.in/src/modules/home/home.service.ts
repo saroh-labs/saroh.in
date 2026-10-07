@@ -1,6 +1,7 @@
 import { Injectable, Logger, Optional } from "@nestjs/common";
 import { prisma } from "@saroh/database";
 
+import { planConnectsOwnAccounts } from "../billing/online-payments-plan";
 import { ModuleAvailabilityService } from "../capabilities/module-availability.service";
 import { CAPTURED_NEEDS_REFUND } from "../invoices/invoice-state";
 import { accountAreaOn } from "../site-accounts/account-area";
@@ -112,6 +113,10 @@ const SEVERITY_RANK: Record<HomeSeverity, number> = {
  * capped ({@link EVIDENCE_LIMIT}) and always ordered oldest-first: the thing
  * that has waited longest is the thing most likely to be a problem.
  */
+
+/** Communications on with nothing to send through (readiness registry). */
+const COMMUNICATIONS_NO_PROVIDER = "COMMUNICATIONS_NO_PROVIDER";
+
 @Injectable()
 export class HomeService {
     private readonly logger = new Logger(HomeService.name);
@@ -189,6 +194,19 @@ export class HomeService {
         // pipeline" or "Connect a provider" on a Member's Home is a row they
         // can't act on, and the design's staff Home draws none.
         const offersSetup = !staffView || holds(input, "module:manage");
+        // "Connect a provider to send messages" only where the plan lets the
+        // business connect its own (`integrations`, DEC-091): on a plan
+        // without it, Saroh sends its booking emails (DEC-086) and Home
+        // never pushes it at a lock (UX-006). Asked only when it would show.
+        const ownAccounts =
+            offersSetup &&
+            views.some(
+                (v) =>
+                    v.readiness === "SETUP_REQUIRED" &&
+                    v.blockers[0]?.code === COMMUNICATIONS_NO_PROVIDER,
+            )
+                ? await planConnectsOwnAccounts(input.organizationId)
+                : true;
         for (const view of offersSetup ? views : []) {
             if (view.readiness === "ATTENTION_REQUIRED") {
                 // SETUP/ATTENTION readiness always carries at least one blocker.
@@ -202,6 +220,8 @@ export class HomeService {
                 });
             } else if (view.readiness === "SETUP_REQUIRED") {
                 const blocker = view.blockers[0];
+                if (blocker.code === COMMUNICATIONS_NO_PROVIDER && !ownAccounts)
+                    continue;
                 actions.push({
                     code: `${view.key}_SETUP`,
                     title: blocker.message ?? `Finish setting up ${view.label}`,

@@ -14,8 +14,10 @@ const tx = {
     order: { count: jest.fn() },
     booking: { count: jest.fn() },
     post: { count: jest.fn() },
-    membership: { count: jest.fn() },
-    organizationInvitation: { count: jest.fn() },
+    membership: { findMany: jest.fn() },
+    staffMember: { count: jest.fn() },
+    organizationInvitation: { findMany: jest.fn() },
+    organizationRole: { findMany: jest.fn() },
     merchantPaymentProvider: { count: jest.fn() },
     communicationProvider: { count: jest.fn() },
     businessProfile: { findUnique: jest.fn() },
@@ -61,6 +63,7 @@ import {
     meteredModules,
     monthFirstDay,
     monthWindow,
+    quietAtOne,
     windowKey,
 } from "./metering";
 import {
@@ -175,7 +178,7 @@ describe("what each count asks", () => {
         });
     });
 
-    it("counts this month's confirmed bookings, a course's left out", async () => {
+    it("counts this month's confirmed online bookings, a course's and the team's left out", async () => {
         tx.booking.count.mockResolvedValue(2);
         await countUsage(tx as never, "org", "bookingsPerMonth", now);
         expect(tx.booking.count).toHaveBeenCalledWith({
@@ -184,6 +187,7 @@ describe("what each count asks", () => {
                 createdAt: { gte: start },
                 status: "CONFIRMED",
                 courseEnrollmentId: null,
+                bookedOnline: true,
             },
         });
     });
@@ -206,29 +210,104 @@ describe("what each count asks", () => {
         });
     });
 
+    /** People as `SEAT_MEMBER_SELECT` reads them. */
+    const person = (
+        role: string,
+        extraActions: string[] = [],
+        staff = false,
+    ) => ({
+        role,
+        extraActions,
+        staffMember: staff ? { status: "ACTIVE" } : null,
+    });
+    const team = (
+        members: ReturnType<typeof person>[],
+        invites: string[] = [],
+        roles: { key: string; actions: string[] }[] = [],
+        loginless = 0,
+    ) => {
+        tx.membership.findMany.mockResolvedValue(members);
+        tx.staffMember.count.mockResolvedValue(loginless);
+        tx.organizationInvitation.findMany.mockResolvedValue(
+            invites.map((role) => ({ role })),
+        );
+        tx.organizationRole.findMany.mockResolvedValue(roles);
+    };
+
     it("adds open invitations to the people in the business", async () => {
-        tx.membership.count.mockResolvedValue(2);
-        tx.organizationInvitation.count.mockResolvedValue(1);
+        team([person("OWNER"), person("MEMBER")], ["ADMIN"]);
         expect(await countUsage(tx as never, "org", "teamMembers", now)).toBe(
             3,
         );
-    });
-
-    it("leaves Reviewers out of the team, people and invitations both", async () => {
-        tx.membership.count.mockResolvedValue(0);
-        tx.organizationInvitation.count.mockResolvedValue(0);
-        await countUsage(tx as never, "org", "teamMembers", now);
-        expect(tx.membership.count).toHaveBeenCalledWith({
-            where: { organizationId: "org", role: { not: "REVIEWER" } },
-        });
-        expect(tx.organizationInvitation.count).toHaveBeenCalledWith({
+        expect(tx.organizationInvitation.findMany).toHaveBeenCalledWith({
             where: {
                 organizationId: "org",
                 status: "PENDING",
                 expiresAt: { gt: now },
-                role: { not: "REVIEWER" },
+            },
+            select: { role: true },
+        });
+    });
+
+    // DEC-105: classified by permissions, never by the role's name.
+    it("counts a seat for anyone who can change something, view-only people apart", async () => {
+        const roles = [
+            { key: "looker", actions: ["order:read", "contact:read"] },
+            { key: "front-desk", actions: ["booking:write"] },
+        ];
+        team(
+            [
+                person("OWNER"),
+                person("REVIEWER"),
+                person("looker"),
+                person("front-desk"),
+            ],
+            ["looker", "REVIEWER", "front-desk"],
+            roles,
+        );
+        // Owner and the booking role (a person and an invite).
+        expect(await countUsage(tx as never, "org", "teamMembers", now)).toBe(
+            3,
+        );
+        // Reviewer and the view-only role, people and invites both.
+        expect(await countUsage(tx as never, "org", "reviewers", now)).toBe(4);
+    });
+
+    it("gives a seat to a view-only person who takes bookings or holds a write extra", async () => {
+        const roles = [{ key: "looker", actions: ["booking:read"] }];
+        team(
+            [
+                person("looker", [], true),
+                person("looker", ["booking:write"]),
+                person("looker"),
+            ],
+            [],
+            roles,
+        );
+        expect(await countUsage(tx as never, "org", "teamMembers", now)).toBe(
+            2,
+        );
+        expect(await countUsage(tx as never, "org", "reviewers", now)).toBe(1);
+    });
+
+    // UX-053: someone on the diary with no login takes bookings, so uses a
+    // seat; one who is a team member counts once, through their membership.
+    it("gives a seat to each bookable person with no login, and never twice", async () => {
+        team([person("OWNER"), person("REVIEWER", [], true)], [], [], 2);
+        expect(await countUsage(tx as never, "org", "teamMembers", now)).toBe(
+            4,
+        );
+        expect(tx.staffMember.count).toHaveBeenCalledWith({
+            where: {
+                organizationId: "org",
+                status: "ACTIVE",
+                membershipId: null,
             },
         });
+        // Never view-only.
+        tx.staffMember.count.mockClear();
+        expect(await countUsage(tx as never, "org", "reviewers", now)).toBe(0);
+        expect(tx.staffMember.count).not.toHaveBeenCalled();
     });
 
     it("counts only live locations customers visit", async () => {
@@ -345,6 +424,29 @@ describe("crossing a notice's line", () => {
         expect(crossesNotice({ limit: 5, used: 1, adding: 3 })).toBe(true);
     });
 
+    it("a total of one, filled by setting the business up, crosses only past it (UX-041)", () => {
+        // The business's one website, made at sign-up: no notice, no job.
+        expect(
+            crossesNotice({ key: "sites", limit: 1, used: 0, adding: 1 }),
+        ).toBe(false);
+        // Past it (a soft cap) is still told.
+        expect(
+            crossesNotice({ key: "storageGb", limit: 1, used: 0.5, adding: 1 }),
+        ).toBe(true);
+        // A monthly one still warns: this month's one booking is news.
+        expect(
+            crossesNotice({
+                key: "bookingsPerMonth",
+                limit: 1,
+                used: 0,
+                adding: 1,
+            }),
+        ).toBe(true);
+        expect(quietAtOne("teamMembers", 1)).toBe(true);
+        expect(quietAtOne("teamMembers", 2)).toBe(false);
+        expect(quietAtOne("bookingsPerMonth", 1)).toBe(false);
+    });
+
     it("words each level as the design does", () => {
         const row = { plan: "Plan A", upgradeTo: "Plan B" };
         expect(limitLevel(3, 5)).toBeNull();
@@ -355,6 +457,13 @@ describe("crossing a notice's line", () => {
             title: "You've used 4 of 5 products on Plan A",
             body: "You'll be stopped at 5. Plan B gives you more.",
         });
+        // One is one thing, never "1 websites" (UX-041).
+        expect(limitNoticeWords(row, "sites", 1, 2, "over").title).toBe(
+            "You're past your 1 website on Plan A",
+        );
+        expect(limitNoticeWords(row, "teamMembers", 2, 2, "full").title).toBe(
+            "You've reached your 2 team members on Plan A",
+        );
         expect(limitNoticeWords(row, "ordersPerMonth", 2, 3, "over")).toEqual({
             title: "You're past your 2 orders a month on Plan A",
             body: "Your site kept taking orders, so no customer was turned away. Plan B raises the limit.",
@@ -628,6 +737,23 @@ describe("MeteringService", () => {
         ).resolves.toBeUndefined();
     });
 
+    // DEC-103: a setting the plan leaves off stops applying.
+    it("says whether a switch row applies, failing safe to included", async () => {
+        await expect(
+            meterFor("free").meter.isIncluded("org", "roles"),
+        ).resolves.toBe(false);
+        await expect(
+            meterFor("pro").meter.isIncluded("org", "roles"),
+        ).resolves.toBe(true);
+        // Nothing enforced, or off the catalogue: it applies.
+        await expect(
+            meterFor("free", false).meter.isIncluded("org", "roles"),
+        ).resolves.toBe(true);
+        await expect(
+            meterFor(null).meter.isIncluded("org", "roles"),
+        ).resolves.toBe(true);
+    });
+
     it("checks nothing for a row with no cap", async () => {
         const { meter } = meterFor("pro");
         expect(await meter.roomInTx(tx as never, "org", "products")).toBeNull();
@@ -649,8 +775,13 @@ describe("MeteringService", () => {
 
     it("checks on the write's own transaction with it on", async () => {
         const { meter } = meterFor("free");
-        tx.membership.count.mockResolvedValue(2);
-        tx.organizationInvitation.count.mockResolvedValue(0);
+        tx.membership.findMany.mockResolvedValue([
+            { role: "OWNER", extraActions: [], staffMember: null },
+            { role: "MEMBER", extraActions: [], staffMember: null },
+        ]);
+        tx.staffMember.count.mockResolvedValue(0);
+        tx.organizationInvitation.findMany.mockResolvedValue([]);
+        tx.organizationRole.findMany.mockResolvedValue([]);
         const write = jest.fn(() => Promise.resolve("done"));
         await expect(meter.withRoom("org", "members", write)).rejects.toThrow(
             ForbiddenException,

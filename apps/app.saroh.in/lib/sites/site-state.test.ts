@@ -23,6 +23,19 @@ describe("siteState", () => {
         ).toBe("Live · domain pending");
     });
 
+    it("says nothing about the domain to someone who can't act on it (UX-081)", () => {
+        expect(
+            siteState(
+                {
+                    ...base,
+                    currentPublicationId: "p",
+                    pendingDomain: "shop.example.com",
+                },
+                { domainState: false },
+            ).label,
+        ).not.toContain("domain");
+    });
+
     it("counts what is waiting to go out", () => {
         expect(
             siteState({

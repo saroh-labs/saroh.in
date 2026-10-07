@@ -2,10 +2,12 @@ import { Inject, Injectable, Logger, Optional } from "@nestjs/common";
 import type { Job, Message } from "@saroh/database";
 import { prisma } from "@saroh/database";
 
+import { isKeysRefused } from "../../common/providers/provider-attention";
 import { IssuedInvoicePdf } from "../invoices/issued-invoice-pdf";
 import type { EncryptedSecret } from "../payments/crypto";
 import { decryptSecret } from "../payments/crypto";
 import { stampConfirmedEmail } from "./confirmation-stamp";
+import { flagCommsProvider } from "./provider-keys";
 import type {
     CommsAttachment,
     CommsCredentials,
@@ -262,11 +264,29 @@ export class MessageSendHandler {
             // the failure, then re-throw so the worker retries with backoff.
             const reason = err instanceof Error ? err.message : "send failed";
             await this.recordFailure(delivery.id, message.id, reason);
+            // The provider refused the keys: the connection needs attention
+            // and the team hears of it once (UX-012).
+            if (isKeysRefused(err)) await this.flag(providerRow);
             throw err;
         }
 
         await this.stamp(message);
     };
+
+    /** Mark the connection as needing attention; a failure here is only logged. */
+    private async flag(
+        row: Parameters<typeof flagCommsProvider>[0],
+    ): Promise<void> {
+        try {
+            await flagCommsProvider(row);
+        } catch (err) {
+            this.logger.warn(
+                `message.send: could not mark provider ${row.id} as needing attention (${
+                    err instanceof Error ? err.message : "unknown"
+                })`,
+            );
+        }
+    }
 
     /**
      * The email went: a confirmation proves the address (A14). The send is

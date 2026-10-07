@@ -35,6 +35,10 @@ if (missing.length > 0) {
 
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+    // Development logs every server action's arguments by default, and some
+    // carry secrets: provider keys, sign-in codes (UX-005, 7 Oct). Production
+    // never logs them; this keeps local logs clean too.
+    logging: { serverFunctions: false },
     transpilePackages: ["@saroh/auth", "@saroh/ui", "@saroh/site-blocks"],
     // No Prisma externalization here: this app has no @prisma/* dependency and
     // imports no database code — every read and write goes to api.saroh.in over

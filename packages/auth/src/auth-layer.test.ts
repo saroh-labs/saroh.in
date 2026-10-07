@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
     getTrustedOrigins,
+    isJoinDestination,
     isTrustedOrigin,
     requestOrigin,
     safeDestination,
@@ -136,6 +137,39 @@ describe("createAuthMiddleware", () => {
         const location = res.headers.get("location") ?? "";
         expect(location).toContain("accounts.saroh.in/login");
         expect(location).toContain("redirect=");
+    });
+
+    it("sends a signed-out visitor to a path's own first page when it has one (UX-029)", () => {
+        vi.mocked(getSessionCookie).mockReturnValue(null);
+        const invite = createAuthMiddleware({
+            loginUrl: "https://accounts.saroh.in/login",
+            signedOutUrl: (path) => {
+                const token = /^\/join\/([^/]+)$/.exec(path)?.[1];
+                return token
+                    ? `https://accounts.saroh.in/invite/${token}`
+                    : null;
+            },
+        });
+        const joined = invite(
+            fakeRequest({ href: "https://app.saroh.in/join/abc123" }),
+        );
+        expect(joined.headers.get("location")).toBe(
+            "https://accounts.saroh.in/invite/abc123",
+        );
+        // Every other path still goes to log in, with its way back.
+        const other = invite(
+            fakeRequest({ href: "https://app.saroh.in/sites" }),
+        );
+        expect(other.headers.get("location")).toContain(
+            "accounts.saroh.in/login",
+        );
+        // A session goes straight on to accept.
+        vi.mocked(getSessionCookie).mockReturnValue("session");
+        expect(
+            invite(
+                fakeRequest({ href: "https://app.saroh.in/join/abc123" }),
+            ).headers.get("location"),
+        ).toBeNull();
     });
 
     it("builds the back-link from the forwarded host behind a proxy", () => {
@@ -426,5 +460,25 @@ describe("sessionCookiePrefix", () => {
         expect(sessionCookiePrefix()).toBe("saroh-dev");
         process.env.AUTH_COOKIE_PREFIX = "";
         expect(sessionCookiePrefix()).toBe("better-auth");
+    });
+});
+
+describe("isJoinDestination — an invitee's sign-in (UX-029)", () => {
+    it("knows the workspace's invitation link, absolute or a path", () => {
+        expect(isJoinDestination("https://app.saroh.in/join/abc123")).toBe(
+            true,
+        );
+        expect(isJoinDestination("/join/abc123")).toBe(true);
+    });
+
+    it("is false for anything else", () => {
+        expect(isJoinDestination(null)).toBe(false);
+        expect(isJoinDestination("")).toBe(false);
+        expect(isJoinDestination("/apps")).toBe(false);
+        expect(isJoinDestination("https://app.saroh.in/join")).toBe(false);
+        expect(isJoinDestination("https://app.saroh.in/join/a/b")).toBe(false);
+        expect(
+            isJoinDestination("https://app.saroh.in/onboarding?invite=x"),
+        ).toBe(false);
     });
 });

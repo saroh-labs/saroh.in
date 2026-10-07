@@ -143,3 +143,38 @@ describe("viewerHolds", () => {
         );
     });
 });
+
+describe("RolesTab where the plan leaves roles of your own off (UX-030)", () => {
+    const lock = {
+        line: "Roles of your own come with Plan B.",
+        cta: "See Plan B",
+        href: "/settings/billing?plan=b#change-plan",
+    };
+    const renderLocked = (rolesLock: typeof lock | null) =>
+        renderToString(
+            createElement(RolesTab, {
+                roles: [invented("clerk", "Clerk", [])],
+                catalogue: CATALOGUE,
+                canEdit: true,
+                myActions: null,
+                organizationName: "Rye Bakery",
+                builtInBlurb: {},
+                builtInPlain: {},
+                rolesLock,
+            }),
+        );
+
+    it("puts the way up where New role was, rather than a refused dialog", () => {
+        const html = renderLocked(lock);
+        expect(html).toContain("Roles of your own come with Plan B.");
+        expect(html).toContain('href="/settings/billing?plan=b#change-plan"');
+        expect(html).toContain("See Plan B");
+        expect(html).not.toContain("New role");
+    });
+
+    it("offers New role when the plan has them", () => {
+        const html = renderLocked(null);
+        expect(html).toContain("New role");
+        expect(html).not.toContain("Roles of your own come with");
+    });
+});

@@ -119,6 +119,12 @@ export function OrdersScreen({
          * it doesn't, "Send a payment link" isn't offered. Absent: yes.
          */
         online?: boolean;
+        /**
+         * Why the counter can't take a new order now (UX-036): the plan's
+         * monthly orders are used up. The button stays, disabled, with the
+         * reason beside it — before anyone fills the sheet in.
+         */
+        blocked?: string | null;
     } | null;
 }) {
     const router = useRouter();
@@ -132,7 +138,10 @@ export function OrdersScreen({
     // The row whose quick view is open (B5).
     const [peekId, setPeekId] = useState<string | null>(null);
     const [newOpen, setNewOpen] = useState(
-        newOrder?.openOnArrival === true && stores.length > 0 && !kitchen,
+        newOrder?.openOnArrival === true &&
+            !newOrder.blocked &&
+            stores.length > 0 &&
+            !kitchen,
     );
     const peek = rows.find((r) => r.id === peekId) ?? null;
     // Bulk moves (B6): whoever moves kitchen steps; the API decides again.
@@ -169,14 +178,30 @@ export function OrdersScreen({
                     stores.length > 0 && !kitchen ? (
                         <>
                             {newOrder ? (
-                                <Button
-                                    type="button"
-                                    onClick={() => setNewOpen(true)}
-                                    className="cursor-pointer active:scale-[0.98]"
-                                >
-                                    <Plus className="mr-1.5 size-4" />
-                                    New order
-                                </Button>
+                                <>
+                                    {newOrder.blocked ? (
+                                        <span
+                                            id="new-order-blocked"
+                                            className="max-w-[260px] text-pretty text-[12px] leading-snug text-muted-foreground"
+                                        >
+                                            {newOrder.blocked}
+                                        </span>
+                                    ) : null}
+                                    <Button
+                                        type="button"
+                                        onClick={() => setNewOpen(true)}
+                                        disabled={!!newOrder.blocked}
+                                        aria-describedby={
+                                            newOrder.blocked
+                                                ? "new-order-blocked"
+                                                : undefined
+                                        }
+                                        className="cursor-pointer active:scale-[0.98]"
+                                    >
+                                        <Plus className="mr-1.5 size-4" />
+                                        New order
+                                    </Button>
+                                </>
                             ) : null}
                             {/* A file of every order leaves Saroh: its own
                                 power (`order:export`, B16). */}

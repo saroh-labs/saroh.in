@@ -1,3 +1,5 @@
+import { SAROH_CONTACT_EMAIL } from "./contact";
+
 /**
  * The waitlist page's content (Waitlist design, plan U30): the kinds of
  * business it asks about, the opening date and the launch offer.
@@ -109,7 +111,7 @@ export const WAITLIST_MONEY = {
 } as const;
 
 /** Where someone writes to be taken off the list (KTD-17). */
-export const WAITLIST_CONTACT = "hello@saroh.in";
+export const WAITLIST_CONTACT = SAROH_CONTACT_EMAIL;
 
 /** The footer's meaning of the name, and where Saroh is. */
 export const WAITLIST_FOOTER = {

@@ -21,7 +21,7 @@ describe("limitNotice", () => {
             pct: "80%",
             title: "You've used 80 of 100 things on Plan A",
             body: "You'll be stopped at 100. Plan B gives you more.",
-            cta: "Upgrade or add more",
+            cta: "See plans",
             why: "",
         });
     });
@@ -39,12 +39,24 @@ describe("limitNotice", () => {
             left: 0,
             pct: "100%",
             title: "You've reached your 100 things on Plan A",
-            body: "New things are paused. Plan B raises the limit, or add more with an add-on.",
+            body: "New things are paused. Plan B raises the limit.",
             why: "You've reached your things limit on Plan A",
         });
         expect(limitNotice(access, 140, "things", "")).toMatchObject({
             full: true,
             pct: "100%",
+        });
+    });
+
+    it("never says a plan with no cap 'raises the limit' (UX-083)", () => {
+        const none = { ...access, upgradeUncapped: true };
+        expect(
+            limitNotice(none, 100, "things", "New things are paused."),
+        ).toMatchObject({
+            body: "New things are paused. Plan B has no limit.",
+        });
+        expect(limitNotice(none, 85, "things", "")).toMatchObject({
+            body: "You'll be stopped at 100. Plan B has no limit.",
         });
     });
 
@@ -67,7 +79,7 @@ describe("limitNotice", () => {
             full: true,
             soft: true,
             title: "You've reached your 100 GB of things on Plan A",
-            body: "Nothing is blocked: things keep working. Plan B raises the limit, or add more with an add-on.",
+            body: "Nothing is blocked: things keep working. Plan B raises the limit.",
             why: "",
         });
         expect(full.on && full.body).not.toMatch(/stopped|paused|can't/);
@@ -76,13 +88,16 @@ describe("limitNotice", () => {
         });
     });
 
-    it("offers only an add-on on the top plan, and nothing without a cap", () => {
+    it("offers no add-on on the top plan (UX-080), and nothing without a cap", () => {
         expect(
             limitNotice({ ...access, upgradeTo: "" }, 90, "things", ""),
         ).toMatchObject({
-            body: "You'll be stopped at 100. An add-on gives you more.",
-            cta: "Add more",
+            body: "You'll be stopped at 100.",
+            cta: "See your plan",
         });
+        expect(
+            limitNotice({ ...access, upgradeTo: "" }, 100, "things", "Paused."),
+        ).toMatchObject({ body: "Paused. Talk to us if you need more." });
         expect(
             limitNotice({ ...access, limit: null }, 1_000, "things", ""),
         ).toEqual({ on: false, full: false });

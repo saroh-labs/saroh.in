@@ -8,7 +8,7 @@ import { FeatureFlagService } from "../feature-flags/feature-flags.service";
 import { FlagKey } from "../feature-flags/flags";
 import { CatalogueAccessService } from "./catalogue-access.service";
 import type { MeteredLimitKey } from "./metering";
-import { countUsage, meteredKeyOf } from "./metering";
+import { countUsage, meteredKeyOf, quietAtOne } from "./metering";
 import { moduleLocked, planLimitReached } from "./plan-limit-errors";
 
 /** The job that tells a business it is near or at a limit. */
@@ -156,6 +156,22 @@ export class MeteringService {
     ): Promise<void> {
         const row = await this.enforcedRow(organizationId, moduleId, now);
         if (row && row.state !== "on") throw moduleLocked(row);
+    }
+
+    /**
+     * Whether a switch row applies to this business now: the
+     * {@link assertIncluded} answer, as a boolean, for a setting that stops
+     * applying under a plan without it ("Publishing needs approval",
+     * DEC-103). Fail safe as `assertIncluded` is: nothing enforced, or a
+     * plan that can't be read, reads as included.
+     */
+    async isIncluded(
+        organizationId: string,
+        moduleId: string,
+        now: Date = new Date(),
+    ): Promise<boolean> {
+        const row = await this.enforcedRow(organizationId, moduleId, now);
+        return !row || row.state === "on";
     }
 
     /**
@@ -333,13 +349,18 @@ export function rowGate(
 
 /**
  * Whether a write takes a business over a notice's line: to 80% of its cap,
- * to the cap, or (a soft cap) past it for the first time.
+ * to the cap, or (a soft cap) past it for the first time. A total cap of
+ * one has only the last line (`quietAtOne`).
  */
 export function crossesNotice(
-    room: Pick<PlanRoom, "limit" | "used" | "adding">,
+    room: Pick<PlanRoom, "limit" | "used" | "adding"> &
+        Partial<Pick<PlanRoom, "key">>,
 ): boolean {
     const { limit, used } = room;
     const after = used + room.adding;
+    // A total of one is reached by setting the business up (its one
+    // website): no notice, so no job (UX-041, `quietAtOne`). Past it is.
+    if (quietAtOne(room.key, limit)) return used <= limit && after > limit;
     const warnAt = Math.ceil(LIMIT_WARN_AT * limit);
     return (
         (used < warnAt && after >= warnAt) ||

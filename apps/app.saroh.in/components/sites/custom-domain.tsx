@@ -6,6 +6,7 @@ import { Input } from "@saroh/ui/input";
 import { showError, showInfo, showSuccess } from "@saroh/ui/toast";
 import { useEffect, useState } from "react";
 
+import { useBusinessZone } from "@/components/shared/business-zone";
 import { env } from "@/env";
 import {
     claimDomain,
@@ -13,6 +14,7 @@ import {
     removeDomain,
     verifyDomain,
 } from "@/lib/domains/actions";
+import { bareHostname } from "@/lib/domains/hostname";
 import type { DomainCheckFailure, SiteDomain } from "@/lib/domains/service";
 import { exactDate, shortDate } from "@/lib/sites/format-date";
 
@@ -102,11 +104,11 @@ function CopyField({ label, value }: { label: string; value: string }) {
 }
 
 /** What the last check means for the merchant, and what to do next. */
-function lastCheckLine(domain: SiteDomain): string {
+function lastCheckLine(domain: SiteDomain, zone: string): string {
     if (!domain.lastCheckedAt) {
         return "Not checked yet. Add the record, then check.";
     }
-    const when = shortDate(domain.lastCheckedAt);
+    const when = shortDate(domain.lastCheckedAt, zone);
     switch (checkFailure(domain.lastCheckResult)) {
         case "WRONG_VALUE":
             return `Checked ${when}: a record exists, but its value does not match. Copy the value again, exactly, and replace what is there.`;
@@ -124,6 +126,7 @@ function Block({ children }: { children: React.ReactNode }) {
 }
 
 export function CustomDomain({ siteId }: { siteId: string }) {
+    const zone = useBusinessZone();
     const [domains, setDomains] = useState<SiteDomain[] | null>(null);
     const [loadError, setLoadError] = useState<string | null>(null);
     const [hostname, setHostname] = useState("");
@@ -151,7 +154,8 @@ export function CustomDomain({ siteId }: { siteId: string }) {
     }, [siteId]);
 
     async function add() {
-        const value = hostname.trim().toLowerCase();
+        // A pasted https://…/ address is taken down to its domain (UX-066).
+        const value = bareHostname(hostname);
         if (!value) return;
         setBusy("add");
         setFormError(null);
@@ -159,8 +163,8 @@ export function CustomDomain({ siteId }: { siteId: string }) {
         setBusy(null);
         if (!res.ok) {
             // The api's own words: a taken hostname (409), a plan without
-            // custom domains (403), a malformed name (400). Each says what to
-            // do; none is worth rewriting into something vaguer.
+            // custom domains (403), a malformed name (400, plain since
+            // UX-066). Each says what to do.
             setFormError(res.error);
             return;
         }
@@ -189,7 +193,7 @@ export function CustomDomain({ siteId }: { siteId: string }) {
         } else {
             showInfo(
                 "Not verified yet.",
-                lastCheckLine({ ...domain, ...res.data.domain }),
+                lastCheckLine({ ...domain, ...res.data.domain }, zone),
             );
         }
     }
@@ -241,7 +245,7 @@ export function CustomDomain({ siteId }: { siteId: string }) {
                                         className="bg-success text-success-foreground"
                                         title={
                                             domain.verifiedAt
-                                                ? `Verified ${exactDate(domain.verifiedAt)}`
+                                                ? `Verified ${exactDate(domain.verifiedAt, zone)}`
                                                 : undefined
                                         }
                                     >
@@ -299,9 +303,14 @@ export function CustomDomain({ siteId }: { siteId: string }) {
                             </div>
                         ) : (
                             <div className="space-y-2">
+                                {/* Both records at once (UX-072): one trip
+                                    to the registrar, not one per check. */}
                                 <p className="text-sm text-muted-foreground">
-                                    Add this record at your registrar to prove
-                                    you own the domain. Copy each part exactly.
+                                    Add these two records at your registrar.
+                                    Copy each part exactly.
+                                </p>
+                                <p className="text-xs font-medium">
+                                    1. Proves you own the domain
                                 </p>
                                 <CopyField
                                     label="Type"
@@ -315,15 +324,28 @@ export function CustomDomain({ siteId }: { siteId: string }) {
                                     label="Value"
                                     value={domain.dnsRecord.value}
                                 />
+                                <p className="pt-1 text-xs font-medium">
+                                    2. Sends visitors to your site once
+                                    it&apos;s verified
+                                </p>
+                                <CopyField label="Type" value="CNAME" />
+                                <CopyField
+                                    label="Name"
+                                    value={domain.hostname}
+                                />
+                                <CopyField label="Value" value={CNAME_TARGET} />
                                 <p
                                     className="text-xs text-muted-foreground"
                                     title={
                                         domain.lastCheckedAt
-                                            ? exactDate(domain.lastCheckedAt)
+                                            ? exactDate(
+                                                  domain.lastCheckedAt,
+                                                  zone,
+                                              )
                                             : undefined
                                     }
                                 >
-                                    {lastCheckLine(domain)}
+                                    {lastCheckLine(domain, zone)}
                                 </p>
                             </div>
                         )}
@@ -393,7 +415,7 @@ export function CustomDomain({ siteId }: { siteId: string }) {
                         ) : (
                             <p className="text-xs text-muted-foreground">
                                 {domains.length === 0
-                                    ? "A domain you already own, without https://."
+                                    ? "A domain you already own, like www.yourshop.in."
                                     : "Add another domain for this site."}
                             </p>
                         )}

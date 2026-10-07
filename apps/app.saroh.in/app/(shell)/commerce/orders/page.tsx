@@ -5,7 +5,7 @@ import { LateRuleNotice } from "@/components/commerce/orders/late-rule-notice";
 import { OrdersScreen } from "@/components/commerce/orders/orders-screen";
 import { OrdersLocked } from "@/components/commerce/orders/orders-states";
 import { PageContainer } from "@/components/shared/page-container";
-import { takesOnlinePayment } from "@/lib/billing/access";
+import { createBlock, takesOnlinePayment } from "@/lib/billing/access";
 import { hasPaymentProvider } from "@/lib/invoices/tax";
 import {
     orderPowers,
@@ -22,6 +22,7 @@ import {
     ordersHref,
     readOrdersQuery,
 } from "@/lib/orders/list-query";
+import { permitsFor } from "@/lib/organizations/permits";
 import { resolveActiveOrganization } from "@/lib/organizations/service";
 import { listCataloguePage } from "@/lib/products/service";
 import { billingAccessOrNull } from "@/lib/saroh-billing/service";
@@ -76,17 +77,15 @@ export default async function OrdersPage({
     // What a row's menu and quick view may offer (B5), as Order Detail
     // asks it. A pay link needs a provider that opens the checkout window
     // (DEC-054), asked only of someone who may make one.
-    const may = (action: string) =>
-        organization?.actions
-            ? organization.actions.includes(action)
-            : organization?.role === "OWNER" || organization?.role === "ADMIN";
+    const may = permitsFor(organization);
     // What this person may do to orders, each the power its endpoint asks
     // (B16): what they can't do isn't drawn.
     const powers = orderPowers(organization);
     // On a plan without online payments no pay link is offered at all —
     // not on a row, not in New order (R33); "Paid in cash" and the counter
     // ways stay. The API refuses one anyway.
-    const online = takesOnlinePayment(await billingAccessOrNull());
+    const billing = await billingAccessOrNull();
+    const online = takesOnlinePayment(billing);
     const linkable = powers.payLink && online;
     const payOnline =
         linkable && access.money
@@ -159,6 +158,9 @@ export default async function OrdersPage({
                               openOnArrival: params.new === "1",
                               canSearch: may("contact:read"),
                               online,
+                              // The month's orders used up: said before the
+                              // sheet is filled, not after (UX-036).
+                              blocked: createBlock(billing, "orders"),
                           }
                         : null
                 }

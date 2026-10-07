@@ -1,4 +1,8 @@
-import type { TemplateContext, TemplateManifest } from "../manifest";
+import type {
+    TemplateContext,
+    TemplateManifest,
+    TemplatePage,
+} from "../manifest";
 import { escapeHtml } from "./html";
 
 /**
@@ -13,11 +17,16 @@ import { escapeHtml } from "./html";
  *   which no app serves, so every site built from it opened with broken
  *   images, and with no contact email sends "Get in touch" to a `/contact`
  *   page it never makes. Kept as shipped, for the sites built from it.
- * - v2 ({@link starterTemplate}, DEC-070) reads for a business, a person
+ * - v2 ({@link starterTemplateV2}, DEC-070) reads for a business, a person
  *   working for themselves or someone showing their work, and carries no
  *   image at all: both heroes are the centred look, and v1's gallery gives way
  *   to words and a call to action. A photo is the merchant's to add. Every
  *   link it makes goes somewhere: an email, or its own About page.
+ * - v3 ({@link starterTemplate}, UX-070, #353) starts with a real menu (Home,
+ *   About), so Settings › Menu, the pre-publish check and the live header
+ *   agree. With nothing said about the business, the hero prompts the owner
+ *   ("Say what you do and where, in one line.") rather than speaking for
+ *   them, and without an email there is one About button, not two.
  *
  * All copy is derived from the business profile via content builders, so an
  * org that has only supplied its name still gets a complete, contract-valid
@@ -163,7 +172,8 @@ function reachOut(ctx: TemplateContext): { label: string; href: string } {
         : { label: `About ${ctx.organizationName}`, href: "/about" };
 }
 
-export const starterTemplate: TemplateManifest = {
+/** `starter@2`, as it shipped (DEC-070). New sites start from v3. */
+export const starterTemplateV2: TemplateManifest = {
     id: STARTER_TEMPLATE_ID,
     version: 2,
     name: "Starter",
@@ -258,5 +268,48 @@ export const starterTemplate: TemplateManifest = {
                 },
             ],
         },
+    ],
+};
+
+// ---------------------------------------------------------------------------
+// v3 (UX-070, #353): a real menu, a prompting hero, one About button.
+// ---------------------------------------------------------------------------
+
+/** The hero's line when the owner hasn't said what they do (UX-070). */
+export const HERO_PROMPT = "Say what you do and where, in one line.";
+
+const [v2Home, v2About] = starterTemplateV2.pages as [
+    TemplatePage,
+    TemplatePage,
+];
+
+export const starterTemplate: TemplateManifest = {
+    ...starterTemplateV2,
+    version: 3,
+    pages: [
+        {
+            ...v2Home,
+            inMenu: true,
+            sections: [
+                {
+                    type: "hero",
+                    contractVersion: 1,
+                    content: (ctx: TemplateContext) => ({
+                        variant: "centered",
+                        heading: ctx.organizationName,
+                        subheading: ownWords(ctx) ?? HERO_PROMPT,
+                        cta: { ...reachOut(ctx), style: "primary" },
+                    }),
+                },
+                ...v2Home.sections.slice(1, 3),
+                {
+                    // Only with an email: without one the hero's button is
+                    // already "About ‹name›", and two of it read as a slip.
+                    ...v2Home.sections[3],
+                    when: (ctx: TemplateContext) => Boolean(ctx.contactEmail),
+                },
+            ],
+        },
+        { ...v2About, inMenu: true },
     ],
 };

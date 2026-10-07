@@ -82,7 +82,8 @@ what the API allows.
   included — Order Detail sends money to `order:read` or `payment:read`).
   So a role saved before the split keeps what it could do; no backfill. On
   the store-scoped writes `store:write` no longer takes orders; a storefront
-  role that writes to its storefront still does (DEC-048).
+  role that writes to its storefront still does (DEC-048), but never its
+  money (DEC-106, below).
   `order-permissions.db.spec.ts` pins the matrix one row per endpoint; a new
   order endpoint adds its row there.
 - **Current** (C13, DEC-039) — **Each customer endpoint asks its own power.**
@@ -117,6 +118,30 @@ what the API allows.
   "Your role can't …" (`bookings/booking-access.ts`).
   `booking-permissions.db.spec.ts` pins one row per endpoint; a new booking,
   service or pack endpoint adds its row there.
+- **Current** (DEC-098, 2026-10-07) — **Money follows permissions, never
+  role names.** Seeing amounts, taking a desk payment, marking an invoice
+  paid, recording an order's payment and refunding are asked of the role's
+  permissions only — `allows(ctx, …)` in the API, `permits(org, …)`
+  (`lib/organizations/permits.ts`) in the app, which permits nothing when
+  no permissions came back. Built-in roles keep their default permissions.
+  A role that may take desk payment (`booking:write` + `invoice:write`,
+  `mayTakeDeskPayment`) sees the diary's figures; anyone else gets
+  `toTake: true|false` in place of `take`, and the app shows Take payment
+  (and Mark paid, Paid in cash) **disabled with why**, never hidden.
+  Guarded by `organizations/money-by-permission.spec.ts` (API) and
+  `lib/organizations/money-by-permission.test.ts` (app).
+- **Current** (DEC-106, 2026-10-07) — **Storefront roles follow permissions
+  for money too.** A storefront Admin, Manager or Editor still takes and
+  changes its storefront's orders (DEC-048), but recording or taking a
+  payment, refunding or cancelling, and reading the store-scoped lists that
+  send amounts are asked of the business role's permissions only —
+  `StoresService.moneyAllows`, and `orderWriteOrganization(…, { money })`,
+  which leaves before the storefront-role fallback (`order:refund` always
+  does). With ORG_AUTHORIZATION off the storefront's owner keeps it; on the
+  organization path a `StoreOwner` row is no shortcut. Refused in Order
+  Detail's words ("Your role can't record payments — …"). A storefront role
+  that should take payments needs a business role carrying `order:edit`.
+  Guarded by the same two scans.
 - **Adopted** — **No money figures without a money read** (ADR-008). Stats,
   takings, fees and payouts go only to a role that may read that money
   (`payment:read`, `invoice:read`, `subscription:read`); the API omits them,
@@ -132,6 +157,9 @@ what the API allows.
   routes are `member:read` / `member:invite` / `member:role:update` /
   `member:remove`, plus `POST /organization-invitations/:token/accept`, which
   runs on the session alone because the caller is not a member yet.
+  Accepting stores the role as invited — a built-in, or a role the business
+  made while it still exists (else MEMBER) — never the built-in it maps to
+  (UX-004, `invite-custom-role.db.spec.ts`).
 - **Current** (F19) — **Granting is bounded by reach.** Nobody gives a role a
   permission they don't hold, or changes, renames or removes a role that can
   already do more than they can — their own role included. Members (who can
@@ -159,7 +187,19 @@ what the API allows.
   or removing someone also counts their extras; moving someone to Reviewer
   drops their non-review extras. Each change writes
   `membership.extras.update` (given and taken, keys and labels), which
-  Settings › Activity reads as "gave Ravi Refund orders".
+  Settings › Activity reads as "gave Ravi Refund orders". Giving an extra
+  asks the plan's `roles` row ("Custom roles", UX-030; Pro only, DEC-099) —
+  taking one away never does. So does giving an invented role a permission
+  it didn't have; taking one away or renaming never asks.
+- **Current** (DEC-105) — **Seats follow permissions, never role names.**
+  `billing/seats.ts` decides who uses a team seat: anyone whose role and
+  extras hold a permission outside `VIEW_ONLY_ACTIONS` (every `…:read`,
+  `customer:sensitive`, `order:export`, `site:comment`, `site:approve`), or
+  who takes bookings (an ACTIVE `StaffMember`). Everyone else is view-only
+  and counts toward the `reviewers` row ("View-only people"). Metering,
+  inviting, changing a role, giving an extra and re-permissioning a role all
+  classify through it, and the member, invitation and role views carry
+  `usesSeat` so Team never guesses from a key.
 - **Current** (F16, DEC-048) — **A storefront's people are on the team.**
   Accepting a storefront invite (`members/members.service.ts`) also makes a
   `Membership` in the store's business, in the same transaction, in the
@@ -243,7 +283,10 @@ orgId)` (`organizations/organization-kind.ts`).
   design's notice) or `MODULE_LOCKED`; the booking page gets 409
   `BOOKINGS_PAUSED`, which names no plan. What each limit counts is
   `billing/metering.ts`, the one place: orders and bookings that stand
-  (never an unpaid online checkout or a pay-now hold), in the business's
+  (never an unpaid online checkout or a pay-now hold; bookings only those
+  customers made on the site, `Booking.bookedOnline` — the team's own are
+  never capped, and the booking page reads `paused` before its form,
+  DEC-095), in the business's
   month in its zone (many businesses at once: `billing/metering-across.ts`,
   the same rules). The site's checkout is never refused (a soft cap,
   OQ-8); a payment once captured never is (OQ-7). A catalogue cell marked

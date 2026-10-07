@@ -85,22 +85,19 @@ const input: CatalogInput = {
                     "On your own domain",
                     "Your website on your own domain",
                 ),
-                pro: C(
-                    "On your own domains",
-                    "Your websites on your own domains",
-                ),
+                pro: C("On your own domain", "Your website on your own domain"),
             },
         },
         {
             id: "sites",
             name: "Websites",
             group: "site",
-            pricing: "show",
+            pricing: "hidden",
             what: "How many websites the business can run.",
             cells: {
                 free: C("1", "", 1),
                 grow: C("1", "", 1),
-                pro: C("Up to 30", "Up to 30 websites", 30),
+                pro: C("1", "", 1),
             },
         },
         {
@@ -131,9 +128,13 @@ const input: CatalogInput = {
             id: "review",
             name: "Required approval before changes go live",
             group: "site",
-            pricing: "hidden",
+            pricing: "show",
             what: "Changes to the site wait for a teammate's approval before they go live.",
-            cells: { free: X("hidden"), grow: X("hidden"), pro: X("hidden") },
+            cells: {
+                free: X("locked"),
+                grow: X("locked"),
+                pro: C("Included", "Approval before changes go live"),
+            },
         },
         {
             id: "blog",
@@ -190,7 +191,7 @@ const input: CatalogInput = {
             cells: {
                 free: C(
                     "Up to 8 a month",
-                    "Up to 8 bookings a month",
+                    "Up to 8 online bookings a month",
                     8,
                     "month",
                 ),
@@ -252,7 +253,7 @@ const input: CatalogInput = {
             name: "Team members",
             group: "team",
             pricing: "show",
-            what: "People who sign in to your dashboard. Everyone on your calendar is one. Reviewers are free.",
+            what: "People who can change things, and everyone who takes bookings, with a login or without. View-only people use no seat.",
             cells: {
                 free: C("2", "2 team members", 2),
                 grow: C("4", "4 team members", 4),
@@ -261,10 +262,10 @@ const input: CatalogInput = {
         },
         {
             id: "reviewers",
-            name: "Reviewers",
+            name: "View-only people",
             group: "team",
             pricing: "show",
-            what: "People who only approve your website's pages. They use no team seat.",
+            what: "People who can only look and approve, never change anything. They use no team seat.",
             cells: {
                 free: C("1", "", 1),
                 grow: C("3", "", 3),
@@ -279,7 +280,7 @@ const input: CatalogInput = {
             what: "Roles you define, beyond Owner, Admin, Member and Reviewer.",
             cells: {
                 free: X("hidden"),
-                grow: C("Included", "Custom roles"),
+                grow: X("locked"),
                 pro: C("Included", "Custom roles"),
             },
         },

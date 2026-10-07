@@ -136,6 +136,8 @@ const bar: TopBarActionProps = {
     asking: false,
     inReview: false,
     askForReview: () => undefined,
+    withdrawReview: () => undefined,
+    onSharePreview: () => undefined,
     publishing: false,
     publishDisabled: false,
     publishHint: undefined,
@@ -172,5 +174,31 @@ describe("TopBarActions with test releases", () => {
             <TopBarActions {...bar} needsApproval canOverride />,
         );
         expect(disabled(owner, "Needs approval")).toBe(false);
+    });
+});
+
+describe("TopBarActions (UX-081, UX-035, UX-068)", () => {
+    it("marks things worth a look with a dot, not a count that reads as changes", () => {
+        const html = renderToStaticMarkup(
+            <TopBarActions {...bar} flagCount={3} />,
+        );
+        expect(html).toContain("data-flag-dot");
+        expect(html).not.toMatch(/>3</);
+    });
+
+    it("folds Preview, Feedback and Test release into More when narrow", () => {
+        const html = renderToStaticMarkup(
+            <TopBarActions
+                {...bar}
+                compact
+                onFeedback={() => undefined}
+                testRelease={{ onOpenList: () => undefined, count: 0 }}
+            />,
+        );
+        expect(html).toContain("More: preview, feedback and test releases");
+        expect(html).not.toContain(">Preview<");
+        expect(html).not.toContain("Test release");
+        expect(html).toContain("Publish");
+        expect(html).toContain("Share");
     });
 });

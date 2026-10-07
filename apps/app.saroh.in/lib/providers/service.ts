@@ -9,6 +9,16 @@ import { apiFetch, destroy, getJson, mutate, orgBase } from "@/lib/api/http";
 
 export type PaymentProviderName = "RAZORPAY" | "CASHFREE";
 
+/**
+ * Why a connection that is still CONNECTED needs a person (UX-012): its
+ * provider refused the keys on a live call, `since` then. Entering the keys
+ * again clears it. Null while it works; absent from an older API.
+ */
+export interface ProviderAttention {
+    reason: "KEYS_REFUSED";
+    since: string;
+}
+
 export interface ConnectedPaymentProvider {
     id: string;
     provider: PaymentProviderName;
@@ -20,6 +30,7 @@ export interface ConnectedPaymentProvider {
      * older than that rule: read as not missing.
      */
     webhookSecretMissing?: boolean;
+    attention?: ProviderAttention | null;
     updatedAt: string;
 }
 
@@ -52,6 +63,7 @@ export interface ConnectedCommsProvider {
     provider: string;
     status: string;
     fromAddress: string | null;
+    attention?: ProviderAttention | null;
     updatedAt: string;
 }
 

@@ -62,7 +62,13 @@ export interface TestReleaseStanding {
      * someone else, and nothing asked since (`releaseApproved`).
      */
     approved: boolean;
-    latest: { outcome: string; at: Date; by: string | null } | null;
+    latest: {
+        outcome: string;
+        at: Date;
+        by: string | null;
+        /** What a change request asked for (UX-043). */
+        reason: string | null;
+    } | null;
 }
 
 export interface TestReleaseView {
@@ -245,6 +251,7 @@ export function toReleaseView(
                       outcome: latest.outcome,
                       at: latest.createdAt,
                       by: nameOf(names, latest.byUserId).name,
+                      reason: latest.reason ?? null,
                   }
                 : null,
         },

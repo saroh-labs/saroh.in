@@ -22,6 +22,20 @@ vi.mock("@/components/sites/media-picker", () => ({
 }));
 vi.mock("@saroh/ui/toast", () => ({ showUndo: vi.fn() }));
 
+/**
+ * The panel opens the address as a picture before adding it (UX-082):
+ * a stand-in Image that loads, or fails for an address with "broken" in it.
+ */
+class FakeImage {
+    onload: (() => void) | null = null;
+    onerror: (() => void) | null = null;
+    set src(value: string) {
+        if (value.includes("broken")) this.onerror?.();
+        else this.onload?.();
+    }
+}
+vi.stubGlobal("Image", FakeImage);
+
 let root: Root;
 let host: HTMLDivElement;
 const onAdd = vi.fn();
@@ -119,6 +133,23 @@ describe("AddressPanel", () => {
 
         act(() => addButton().click());
         expect(onAdd).not.toHaveBeenCalled();
+    });
+
+    it("says so when the address doesn't open as a picture, and can add it anyway", () => {
+        type("https://cdn.example.com/broken.jpg");
+        act(() => addButton().click());
+        expect(onAdd).not.toHaveBeenCalled();
+        expect(hint()).toBe(
+            "That address didn't open as a picture. Check it, or upload the photo instead.",
+        );
+        const anyway = Array.from(host.querySelectorAll("button")).find(
+            (b) => b.textContent.trim() === "Add it anyway",
+        );
+        act(() => anyway?.click());
+        expect(onAdd).toHaveBeenCalledWith(
+            "https://cdn.example.com/broken.jpg",
+            "",
+        );
     });
 
     it("says nothing is wrong before anything is typed", () => {

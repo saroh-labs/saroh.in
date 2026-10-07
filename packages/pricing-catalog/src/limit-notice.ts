@@ -1,5 +1,6 @@
 import type { ModuleAccess } from "./access";
 import type { LimitAction } from "./limit-words";
+import { countedWhat } from "./limit-words";
 import { formatCount } from "./price";
 
 /** A notice shows from this share of the limit. */
@@ -62,7 +63,7 @@ export interface LimitNoticeOptions {
  */
 export function limitNotice(
     access: Pick<ModuleAccess, "inc" | "limit" | "plan" | "upgradeTo"> &
-        Partial<Pick<ModuleAccess, "soft">>,
+        Partial<Pick<ModuleAccess, "soft" | "upgradeUncapped">>,
     count: number,
     what: string,
     pausedText: string,
@@ -90,7 +91,13 @@ export function limitNotice(
         : soft
           ? `Nothing stops at ${formatCount(L)}; we'll let you know when you reach it.`
           : `You'll be stopped at ${formatCount(L)}.`;
-    const higher = full ? "raises the limit" : "gives you more";
+    // A higher plan with no cap says so (UX-083: never "raises the limit").
+    const uncapped = access.upgradeUncapped === true;
+    const higher = uncapped
+        ? "has no limit"
+        : full
+          ? "raises the limit"
+          : "gives you more";
     // A limit's own way out comes first, a higher plan second, no add-on;
     // closed, the higher plan leads and says what it opens.
     const more = action
@@ -102,29 +109,29 @@ export function limitNotice(
                     ? ` ${action.closed.sentence}`
                     : "")
               : ""
-        : full
-          ? up
-              ? ` ${up} raises the limit, or add more with an add-on.`
-              : " Add more with an add-on."
-          : up
-            ? ` ${up} gives you more.`
-            : " An add-on gives you more.";
+        : up
+          ? ` ${up} ${higher}.`
+          : // Add-ons aren't bought in the app at launch (UX-080): the
+            // top plan's way to more is asking Saroh.
+            full
+            ? " Talk to us if you need more."
+            : "";
     return {
         on: true,
         full,
         left: Math.max(0, L - n),
         pct: `${Math.min(100, Math.round((n / L) * 100))}%`,
         title: full
-            ? `You've reached your ${formatCount(L)} ${what} on ${access.plan}`
-            : `You've used ${used} of ${formatCount(L)} ${what} on ${access.plan}`,
+            ? `You've reached your ${formatCount(L)} ${countedWhat(what, L)} on ${access.plan}`
+            : `You've used ${used} of ${formatCount(L)} ${countedWhat(what, L)} on ${access.plan}`,
         body: first + more,
         cta: action
             ? open
                 ? action.label
                 : action.closed.label
             : up
-              ? "Upgrade or add more"
-              : "Add more",
+              ? "See plans"
+              : "See your plan",
         ...(action && open ? { href: action.href } : {}),
         why:
             full && !soft

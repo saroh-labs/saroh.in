@@ -18,8 +18,14 @@ import { isBillOfSupply } from "../invoices/invoice-title";
 import { payLinkUrlFor } from "../invoices/pay-link-url";
 import { invoicePayOnline, NOT_PAID_ONLINE } from "../invoices/pay-online";
 import { hashPayToken } from "../invoices/pay-token";
-import type { PayInstructionsView } from "../organizations/business-pay-instructions";
-import { businessPayInstructionsOf } from "../organizations/business-pay-instructions";
+import type {
+    BusinessContactView,
+    PayInstructionsView,
+} from "../organizations/business-pay-instructions";
+import {
+    businessContactOf,
+    businessPayInstructionsOf,
+} from "../organizations/business-pay-instructions";
 import { assertOrganizationOpen } from "../organizations/organization-lifecycle.gate";
 import { siteOriginOf } from "../sites/site-origin";
 import { parseSiteStyle, siteStyleVariables } from "../sites/site-style";
@@ -112,6 +118,12 @@ export interface PublicInvoiceView {
      * business billed. Null when the business set none; absent otherwise.
      */
     payInstructions?: PayInstructionsView | null;
+    /**
+     * The business's phone and email (UX-007), on the same read when it set
+     * no How to pay us: the page says "Contact them to pay" with a way to
+     * reach them. Null when neither is set; absent otherwise.
+     */
+    businessContact?: BusinessContactView | null;
 }
 
 /** What the pay page may say about autopay (D12). */
@@ -311,6 +323,11 @@ export class PublicInvoicesService {
                     ? businessPayInstructionsOf(found.organizationId)
                     : undefined,
             ]);
+            // No way to pay set: a way to reach the business instead (UX-007).
+            const businessContact =
+                payInstructions === null
+                    ? await businessContactOf(found.organizationId)
+                    : undefined;
             const view: PublicInvoiceView = autopay
                 ? { ...paper, payOnline, autopay }
                 : { ...paper, payOnline };
@@ -324,6 +341,7 @@ export class PublicInvoicesService {
                 ...view,
                 payUrl: await payLinkUrlFor(found.organizationId, token),
                 ...(payInstructions !== undefined ? { payInstructions } : {}),
+                ...(businessContact !== undefined ? { businessContact } : {}),
                 ...(charging
                     ? { autopayCharging: { at: charging.at.toISOString() } }
                     : {}),

@@ -8,6 +8,7 @@ import {
 } from "@nestjs/common";
 import { Prisma, prisma } from "@saroh/database";
 
+import { enquirySubmittedEvent } from "../analytics/enquiry-event";
 import type { FieldType, FormField } from "../forms/dto";
 import { assertOrganizationOpen } from "../organizations/organization-lifecycle.gate";
 import { fieldsFromSnapshot } from "./live-form-fields";
@@ -221,6 +222,17 @@ export class EnquiryService {
                     },
                 });
 
+                // Insights' Enquiries figure (UX-032), committed with the lead.
+                await tx.analyticsEvent.create({
+                    data: enquirySubmittedEvent({
+                        organizationId,
+                        siteId: form.siteId ?? null,
+                        formId,
+                        leadId: lead.id,
+                        submissionId: submission.id,
+                    }),
+                });
+
                 return {
                     submissionId: submission.id,
                     leadId: lead.id,
@@ -319,9 +331,12 @@ export class EnquiryService {
 
         for (const field of fields) {
             if (field.required && str(field.name) === undefined) {
-                throw new BadRequestException(
-                    `Field "${field.name}" is required`,
-                );
+                // `details` names the field and why (UX-066), so the site
+                // can say which box needs filling in, in words.
+                throw new BadRequestException({
+                    message: `Field "${field.name}" is required`,
+                    details: { field: field.name, reason: "required" },
+                });
             }
         }
 
@@ -335,9 +350,10 @@ export class EnquiryService {
         }
         const email = (str(emailField.name) ?? "").toLowerCase();
         if (!isEmailShaped(email)) {
-            throw new BadRequestException(
-                `Field "${emailField.name}" must be a valid email`,
-            );
+            throw new BadRequestException({
+                message: `Field "${emailField.name}" must be a valid email`,
+                details: { field: emailField.name, reason: "invalid_email" },
+            });
         }
 
         return {

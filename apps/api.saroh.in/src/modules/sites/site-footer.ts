@@ -19,6 +19,12 @@ import { BadRequestException } from "@nestjs/common";
  * collected for one thing into something else without ever asking. So the
  * footer is written by the merchant, or it does not exist.
  *
+ * The one exception is decided, not derived: the contact email, which
+ * Settings › Business asks for as "where customers can reach the business"
+ * and says the site shows (DEC-101). The renderer reads it live beside the
+ * phone and place (`public-footer.service.ts`); it is never written into
+ * this footer, and the legal name and tax id stay unpublished.
+ *
  * WHY THE richText SHAPE. `{ format, value }` is what a richText section
  * already carries, so this reuses the authoring model, the publish-time
  * sanitizer and — when the rich text editor lands (#208) — the editor itself.

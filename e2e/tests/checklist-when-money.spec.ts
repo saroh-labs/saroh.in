@@ -61,7 +61,7 @@ function api(page: Page, org: string) {
 const settingsCard = (page: Page) =>
     page
         .getByRole("region", {
-            name: /Ready to take payments|Get your site live|Finish setting up/,
+            name: /Get ready to take money|Get your site live|Finish setting up/,
         })
         .filter({ visible: true });
 
@@ -101,12 +101,17 @@ test("the address, type and logo wait for a first invoice", async ({
     await page.goto("/settings/organization");
     const card = settingsCard(page);
     await expect(card).toBeVisible();
-    await expect(card).toHaveAccessibleName("Ready to take payments");
+    // Home's title and steps (UX-019).
+    await expect(card).toHaveAccessibleName("Get ready to take money");
     // Her kind's words: "your address", not "your registered address".
     await expect(card).toContainText("Add your address");
     await expect(card).not.toContainText("registered address");
-    await expect(card).toContainText("Choose your business type");
-    await expect(card).toContainText("Add your logo");
+    // The type and the logo are suggested apart, never counted (UX-019).
+    const extras = page
+        .getByRole("region", { name: "Make it yours" })
+        .filter({ visible: true });
+    await expect(extras).toContainText("Choose your business type");
+    await expect(extras).toContainText("Add your logo");
     const add = card.getByRole("link", { name: "Add address" });
     await expect(add).toHaveAttribute(
         "href",

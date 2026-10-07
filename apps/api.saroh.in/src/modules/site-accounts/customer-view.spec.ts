@@ -4,6 +4,7 @@ import {
     accountView,
     bookingView,
     messageView,
+    notesKindOf,
     noteView,
     orderDetailView,
     orderView,
@@ -82,13 +83,14 @@ describe("the account's allow-list", () => {
             businessName: "Kavi Dental",
             tabs: [
                 { key: "home", label: "Home" },
-                { key: "bookings", label: "Appointments" },
+                { key: "bookings", label: "Bookings" },
                 { key: "messages", label: "Messages" },
                 { key: "me", label: "Me" },
             ],
             offers: { appointments: true, orders: false, plans: false },
             bookingsLabel: "Appointments",
             healthNotes: false,
+            notesKind: "general",
             unreadMessages: 2,
         });
         expect(leaks(view)).toEqual([]);
@@ -251,6 +253,39 @@ describe("the account's allow-list", () => {
                 },
             ]);
             expect(leaks(view)).toEqual([]);
+        });
+
+        it("a pick-up says where to collect it, from a place customers visit (UX-025)", () => {
+            const view = orderDetailView({
+                ...order,
+                store: {
+                    settings: {
+                        kind: "SHOP",
+                        address: "12 Hill Road",
+                        openingHours: null,
+                        pausedAt: "secret",
+                    },
+                },
+            } as never);
+            expect(view.collectFrom).toEqual({
+                address: "12 Hill Road",
+                hours: null,
+            });
+            expect(view.steps[2].line).toBe(
+                "Now · Collect from 12 Hill Road — show #1019",
+            );
+            expect(leaks(view)).toEqual([]);
+            // A "No counter" place has no door: no address is given.
+            const online = orderDetailView({
+                ...order,
+                store: {
+                    settings: { kind: "ONLINE", address: "12 Hill Road" },
+                },
+            } as never);
+            expect(online.collectFrom).toBeNull();
+            expect(online.steps[2].line).toBe(
+                "Now · At the counter — show #1019",
+            );
         });
 
         it("a shipment shows the courier and tracking number once recorded", () => {
@@ -775,5 +810,17 @@ describe("the account's allow-list", () => {
         } as never);
         expect(saroh.from).toBe("business");
         expect(Object.keys(saroh)).toEqual(["ref", "from", "text", "sentAt"]);
+    });
+});
+
+describe("the notes card's words follow what the business is (UX-040)", () => {
+    it("asks about health for a practice, food for a kitchen, else in general words", () => {
+        expect(notesKindOf("clinic")).toBe("health");
+        expect(notesKindOf("dietician")).toBe("health");
+        expect(notesKindOf("bakery")).toBe("food");
+        expect(notesKindOf("ceramics")).toBe("general");
+        // Unknown (a site from before templates were recorded): never health.
+        expect(notesKindOf(null)).toBe("general");
+        expect(notesKindOf("not-a-template")).toBe("general");
     });
 });

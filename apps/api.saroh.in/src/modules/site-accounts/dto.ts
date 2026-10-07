@@ -124,6 +124,18 @@ export class AccountBookDto {
     @IsString()
     @MaxLength(MAX_INTAKE_NOTE, { message: INTAKE_NOTE_MESSAGE })
     intakeNote?: string;
+
+    /**
+     * A phone to reach them on (UX-049), optional: kept on the booking, and
+     * given to their record only when it has none.
+     */
+    @IsOptional()
+    @Transform(trim)
+    @IsString()
+    @Matches(/^\+?[\d\s()-]{6,24}$/, {
+        message: "Check the phone number.",
+    })
+    bookerPhone?: string;
 }
 
 /** The credit read (A10): what a customer could pay a class with, and when. */

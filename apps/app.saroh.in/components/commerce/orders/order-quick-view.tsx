@@ -6,8 +6,8 @@ import { ChevronRight } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 
+import { BusinessDate } from "@/components/shared/business-zone";
 import { QuickLook } from "@/components/shared/quick-look";
-import { ViewerDate } from "@/components/shared/viewer-date";
 import { customerHref } from "@/lib/customers/links";
 import { formatMoneyMajor } from "@/lib/format/money";
 import { attentionLines } from "@/lib/orders/attention";
@@ -15,6 +15,7 @@ import type { OrderRow } from "@/lib/orders/business-service";
 import { goesToAddress } from "@/lib/orders/lifecycle";
 import { loadOrderQuickView } from "@/lib/orders/list-actions";
 import { rowCustomer } from "@/lib/orders/list-row";
+import { kitchenPayment } from "@/lib/orders/pay-on-handover";
 import type { OrderRead } from "@/lib/orders/read";
 import type { OrderAbilities } from "@/lib/orders/row-menu";
 import {
@@ -142,7 +143,7 @@ export function OrderQuickView({
             titleClassName="font-display text-[20px] font-semibold tracking-[-0.02em]"
             subtitle={
                 <>
-                    <ViewerDate iso={row.placedAt} variant="moment" /> ·{" "}
+                    <BusinessDate iso={row.placedAt} variant="moment" /> ·{" "}
                     {row.store.name} · {row.fulfilmentLabel}
                 </>
             }
@@ -241,7 +242,9 @@ export function QuickViewBody({ order }: { order: OrderRead }) {
     const currency = money?.currency ?? "INR";
     const format = (a: string | number) =>
         formatMoneyMajor(a, currency) ?? String(a);
-    const payment = quickPayment(order, format);
+    // Without the money read, whether it is paid — never a figure (UX-010).
+    const payment =
+        quickPayment(order, format) ?? kitchenPayment(order)?.label ?? null;
     const appointment =
         order.fulfilmentType === "APPOINTMENT_IN_PERSON" ||
         order.fulfilmentType === "APPOINTMENT_ONLINE";
@@ -355,6 +358,19 @@ export function QuickViewBody({ order }: { order: OrderRead }) {
                             {Number(money.shipping) > 0
                                 ? format(money.shipping)
                                 : "Free"}
+                        </span>
+                    </div>
+                ) : null}
+                {money && Number(money.discount) > 0 ? (
+                    // The discount, so the lines add up to the total (UX-061).
+                    <div className="flex gap-2.5 border-t border-border/70 px-[13px] py-[9px] text-[12.5px] text-muted-foreground">
+                        <span className="flex-1">
+                            {money.discountCode
+                                ? `Discount · ${money.discountCode.code}`
+                                : "Discount"}
+                        </span>
+                        <span className="tabular-nums">
+                            −{format(money.discount)}
                         </span>
                     </div>
                 ) : null}

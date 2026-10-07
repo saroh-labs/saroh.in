@@ -6,6 +6,7 @@ import {
     cancelPlan,
     canReadOrders,
     canRefundPayments,
+    canTakeDeskPayments,
     deadlineText,
     paidLine,
     refundLine,
@@ -344,11 +345,11 @@ describe("a visit of a treatment (E9, DEC-050)", () => {
 });
 
 describe("canReadOrders", () => {
-    it("reads order:read, or an owner or admin without custom roles", () => {
+    it("reads order:read, never the role's name (DEC-098)", () => {
         type Org = Parameters<typeof canReadOrders>[0];
         const org = (over: Record<string, unknown>) =>
             ({ id: "o", name: "Kavi", ...over }) as unknown as Org;
-        expect(canReadOrders(org({ role: "OWNER" }))).toBe(true);
+        expect(canReadOrders(org({ role: "OWNER" }))).toBe(false);
         expect(canReadOrders(org({ role: "MEMBER" }))).toBe(false);
         expect(
             canReadOrders(org({ role: "MEMBER", actions: ["order:read"] })),
@@ -358,11 +359,11 @@ describe("canReadOrders", () => {
 });
 
 describe("canRefundPayments", () => {
-    it("reads payment:manage, or an owner or admin without custom roles", () => {
+    it("reads payment:manage, never the role's name (DEC-098)", () => {
         type Org = Parameters<typeof canRefundPayments>[0];
         const org = (over: Record<string, unknown>) =>
             ({ id: "o", name: "Kavi", ...over }) as unknown as Org;
-        expect(canRefundPayments(org({ role: "OWNER" }))).toBe(true);
+        expect(canRefundPayments(org({ role: "OWNER" }))).toBe(false);
         expect(canRefundPayments(org({ role: "MEMBER" }))).toBe(false);
         expect(
             canRefundPayments(
@@ -375,5 +376,52 @@ describe("canRefundPayments", () => {
             ),
         ).toBe(false);
         expect(canRefundPayments(null)).toBe(false);
+    });
+});
+
+describe("canTakeDeskPayments — Take payment follows the role's permissions (DEC-098)", () => {
+    type Org = Parameters<typeof canTakeDeskPayments>[0];
+    const org = (over: Record<string, unknown>) =>
+        ({ id: "o", name: "Kavi", ...over }) as unknown as Org;
+
+    it("a role the business made with booking:write and invoice:write takes payment", () => {
+        expect(
+            canTakeDeskPayments(
+                org({
+                    role: "MEMBER",
+                    roleKey: "front-desk",
+                    actions: ["booking:write", "invoice:write"],
+                }),
+            ),
+        ).toBe(true);
+    });
+
+    it("a Member with the default permissions can't, and nor can half the pair", () => {
+        expect(
+            canTakeDeskPayments(
+                org({
+                    role: "MEMBER",
+                    actions: ["booking:read", "order:stage"],
+                }),
+            ),
+        ).toBe(false);
+        expect(
+            canTakeDeskPayments(
+                org({ role: "MEMBER", actions: ["booking:write"] }),
+            ),
+        ).toBe(false);
+    });
+
+    it("an Owner is asked its permissions too, never its name", () => {
+        expect(canTakeDeskPayments(org({ role: "OWNER" }))).toBe(false);
+        expect(
+            canTakeDeskPayments(
+                org({
+                    role: "OWNER",
+                    actions: ["booking:write", "invoice:write"],
+                }),
+            ),
+        ).toBe(true);
+        expect(canTakeDeskPayments(null)).toBe(false);
     });
 });

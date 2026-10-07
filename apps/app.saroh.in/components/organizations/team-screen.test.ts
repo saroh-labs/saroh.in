@@ -160,3 +160,97 @@ describe("TeamScreen: who may change what", () => {
         );
     });
 });
+
+describe("TeamScreen at the plan's team limit (UX-028)", () => {
+    const people = [
+        member({ userId: "u1", name: "Asha", role: "OWNER", isSelf: true }),
+    ];
+    const invite = {
+        id: "inv_1",
+        email: "meera@example.com",
+        role: "MEMBER" as const,
+        roleKey: "MEMBER",
+        siteIds: [],
+        status: "PENDING",
+        expiresAt: "2026-10-14T00:00:00.000Z",
+        createdAt: "2026-10-07T00:00:00.000Z",
+    };
+    const renderAt = (teamLimit: {
+        full: boolean;
+        why: string;
+        reviewersFull?: boolean;
+    }) =>
+        renderToString(
+            createElement(TeamScreen, {
+                organizationName: "Rye Bakery",
+                members: people,
+                invitations: [invite] as never,
+                sites: [],
+                canManage: true,
+                canEditRoles: true,
+                roles: [],
+                catalogue: null,
+                myActions: null,
+                teamLimit,
+            }),
+        );
+
+    it("says what the cap counts, owner and waiting invites included", () => {
+        const html = renderAt({ full: true, why: "Team is full" });
+        expect(html).toContain("Just you · 1 invite waiting");
+    });
+
+    it("still invites someone view-only while seats are full", () => {
+        expect(renderAt({ full: true, why: "Team is full" })).toContain(
+            "Invite someone view-only",
+        );
+        expect(
+            renderAt({ full: true, why: "Team is full", reviewersFull: true }),
+        ).toContain("Team is full");
+        expect(renderAt({ full: false, why: "" })).toContain("Invite someone");
+    });
+});
+
+// DEC-105: the line counts seats by what each person can do, as the API
+// says, and view-only people apart.
+describe("TeamScreen seats and view-only people (DEC-105)", () => {
+    it("counts a view-only custom role apart from the seats", () => {
+        const html = renderToString(
+            createElement(TeamScreen, {
+                organizationName: "Rye Bakery",
+                members: [
+                    member({
+                        userId: "u1",
+                        name: "Asha",
+                        role: "OWNER",
+                        isSelf: true,
+                        usesSeat: true,
+                    }),
+                    member({
+                        userId: "u2",
+                        name: "Kiran",
+                        roleKey: "looker",
+                        usesSeat: false,
+                    }),
+                    member({
+                        userId: "u3",
+                        name: "Dev",
+                        roleKey: "front-desk",
+                        usesSeat: true,
+                    }),
+                ],
+                invitations: [],
+                sites: [],
+                canManage: true,
+                canEditRoles: true,
+                roles: [],
+                catalogue: null,
+                myActions: null,
+                teamLimit: { full: false, why: "" },
+            }),
+        );
+        expect(html).toContain(
+            "2 people including you · 1 view-only person, no seat",
+        );
+    });
+});

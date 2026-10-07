@@ -8,6 +8,7 @@
  * IN for the single provider call and never retained by the port.
  */
 
+import type { CredentialCheck } from "../../../common/providers/provider-attention";
 import type { FlagKey } from "../../feature-flags/flags";
 
 /** The closed set of providers this app can connect. */
@@ -24,6 +25,8 @@ export function isSupportedProvider(value: string): value is SupportedProvider {
  * in-memory at the moment of a provider call. `keyId` is the public
  * identifier; `keySecret` is the secret that is NEVER logged or returned.
  */
+export type { CredentialCheck } from "../../../common/providers/provider-attention";
+
 export interface ProviderCredentials {
     keyId: string;
     keySecret: string;
@@ -428,6 +431,20 @@ export interface MerchantProvider {
     readonly name: string;
     /** Autopay mandates, when this provider's adapter has them. */
     readonly mandates?: MandateCapability;
+    /**
+     * Check a business's keys with one cheap authenticated read before they
+     * are stored (UX-012): Razorpay `GET /payments?count=1`, Cashfree an
+     * order look-up. Never throws; never logs a credential. An adapter
+     * without it is not checked.
+     */
+    verifyCredentials?(
+        credentials: ProviderCredentials,
+    ): Promise<CredentialCheck>;
+    /**
+     * Make the provider's order for a payment. A 401 or 403 throws
+     * `ProviderKeysRefusedError` (`common/providers/provider-attention.ts`),
+     * so the caller can mark the connection as needing attention.
+     */
     createOrderIntent(
         input: CreateOrderIntentInput,
     ): Promise<CreateOrderIntentResult>;

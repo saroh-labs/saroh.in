@@ -288,7 +288,10 @@ export interface BillingAccessView {
         nextPlanName: string;
     } | null;
     pendingMove: {
+        /** The plan it moves to, on `version`. */
         planId: string;
+        /** The plan it moves from; `planId` again when only the version changes. */
+        fromPlanId: string;
         version: number;
         from: string;
         /**
@@ -335,6 +338,7 @@ export function moduleAccessViews(
                       planId: a.upgradePlanId,
                       name: a.upgradeTo,
                       pricePaise: a.upgradePricePaise,
+                      uncapped: a.upgradeUncapped,
                   }
                 : null,
         };

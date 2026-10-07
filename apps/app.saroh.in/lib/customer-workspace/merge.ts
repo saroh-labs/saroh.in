@@ -279,6 +279,33 @@ export function duplicateLine(d: {
     return `${who} has the same ${on}.${signs}`;
 }
 
+/**
+ * The duplicates a contact page shows as a prompt (DEC-097). A same-email
+ * record (compared without case) is "This may be the same person", for
+ * whoever can edit contacts; a phone-only pair keeps C2's quieter "Looks
+ * like the same person". `emailOnly` is the Contacts page, which offers
+ * only the email prompt. Nothing here merges: staff choose to.
+ */
+export function shownDuplicates<
+    T extends { matchedOn: readonly ("email" | "phone")[] },
+>(
+    duplicates: readonly T[],
+    { canEdit, emailOnly = false }: { canEdit: boolean; emailOnly?: boolean },
+): T[] {
+    return duplicates.filter((d) =>
+        d.matchedOn.includes("email") ? canEdit : !emailOnly,
+    );
+}
+
+/** The prompt's lead-in for a suggested duplicate (DEC-097, C2). */
+export function duplicateHeading(d: {
+    matchedOn: readonly ("email" | "phone")[];
+}): string {
+    return d.matchedOn.includes("email")
+        ? "This may be the same person:"
+        : "Looks like the same person:";
+}
+
 /** A suggested duplicate (C2) as the record to merge with. */
 export function suggestedTarget(d: {
     contactId: string;

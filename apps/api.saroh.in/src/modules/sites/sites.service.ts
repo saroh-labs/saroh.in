@@ -54,6 +54,7 @@ import { assertGridRefsOwned, productGridFlags } from "./product-grid-checks";
 import type { Renderability } from "./publication-renderability";
 import { checkRenderability } from "./publication-renderability";
 import {
+    approvalApplies,
     assertOverrideAllowed,
     isOwner,
     setPublishNeedsApproval,
@@ -63,6 +64,7 @@ import {
     isOnFrozenPage,
     releaseUnderReview,
 } from "./release-under-review";
+import { queueReviewAlert } from "./review-alert-queue";
 import type { ReviewRoute } from "./review-route";
 import { draftFingerprint } from "./review-route";
 import { sanitizeRichHtml, sanitizeSectionContent } from "./sanitize";
@@ -181,7 +183,13 @@ export interface ReviewState {
      * The latest event of any kind — a reviewer's verdict, or a BYPASSED row
      * publish wrote (#199). What the badge shows.
      */
-    latestApproval: { outcome: string; at: Date; by: string } | null;
+    latestApproval: {
+        outcome: string;
+        at: Date;
+        by: string;
+        /** What a change request asked for (UX-043); null otherwise. */
+        reason: string | null;
+    } | null;
     /**
      * True while a reviewer's most recent VERDICT is CHANGES_REQUESTED and no
      * approval has followed it (#199). Publishing then still succeeds, and is
@@ -189,6 +197,12 @@ export interface ReviewState {
      * it is unreviewed, which is the normal state and must not nag.
      */
     outstanding: boolean;
+    /**
+     * The open request is the caller's own (UX-068): the workspace hides
+     * Approve and Ask for changes from them — approving your own request is
+     * not a second pair of eyes, and would not settle it anyway.
+     */
+    askedByYou: boolean;
 }
 
 /** A page as returned by the page endpoints and by getSite. */
@@ -939,6 +953,12 @@ export class SitesService {
             : null;
         return {
             ...rest,
+            // As it applies now (DEC-103): switched on under a plan without
+            // the approval row, it reads as off, as publishing treats it.
+            publishNeedsApproval: await approvalApplies(
+                ctx.organizationId,
+                rest.publishNeedsApproval,
+            ),
             canEdit: allows(ctx, "section:write"),
             // Only an owner goes live past "Publishing needs approval", and
             // only an owner changes it (DEC-071, KTD-11).
@@ -1099,7 +1119,13 @@ export class SitesService {
                 postsPrefix: true,
             },
         });
-        return site;
+        return {
+            ...site,
+            publishNeedsApproval: await approvalApplies(
+                ctx.organizationId,
+                site.publishNeedsApproval,
+            ),
+        };
     }
 
     /**
@@ -2418,21 +2444,32 @@ export class SitesService {
             }
         }
 
-        const comment = await prisma.siteComment.create({
-            data: {
-                siteId,
-                pageId: dto.pageId,
-                // Where the note was, for when the page itself is gone (#277).
-                pageTitle: page?.title ?? null,
-                organizationId: ctx.organizationId,
-                sectionKey: dto.sectionKey,
-                authorUserId: ctx.userId,
-                body: dto.body,
-                ...(release ? { testReleaseId: release.id } : {}),
-            },
-            select: { id: true },
+        return prisma.$transaction(async (tx) => {
+            const comment = await tx.siteComment.create({
+                data: {
+                    siteId,
+                    pageId: dto.pageId,
+                    // Where the note was, for when the page itself is gone (#277).
+                    pageTitle: page?.title ?? null,
+                    organizationId: ctx.organizationId,
+                    sectionKey: dto.sectionKey,
+                    authorUserId: ctx.userId,
+                    body: dto.body,
+                    ...(release ? { testReleaseId: release.id } : {}),
+                },
+                select: { id: true },
+            });
+            // A reviewer's note tells the people who publish (UX-043); one
+            // by them is the team talking to itself.
+            if (!allows(ctx, "site:publish")) {
+                await queueReviewAlert(tx, ctx.organizationId, {
+                    event: "review",
+                    about: "note",
+                    commentId: comment.id,
+                });
+            }
+            return comment;
         });
-        return comment;
     }
 
     /**
@@ -2499,34 +2536,54 @@ export class SitesService {
                 dto.testReleaseId,
                 { open: true },
             );
-            return prisma.siteApproval.create({
-                data: {
-                    siteId,
-                    organizationId: ctx.organizationId,
-                    byUserId: ctx.userId,
-                    outcome: dto.outcome,
-                    draftFingerprint: release.fingerprint,
-                    testReleaseId: release.id,
-                },
-                select: { id: true },
-            });
-        }
-
-        return prisma.siteApproval.create({
-            data: {
+            return this.approvalWithAlert(ctx, {
                 siteId,
                 organizationId: ctx.organizationId,
                 byUserId: ctx.userId,
                 outcome: dto.outcome,
-                // An approval names the draft it approved (#278), so later
-                // edits do not inherit it. A change request does not: it is
-                // about the work as a whole and stands until it is answered.
-                draftFingerprint:
-                    dto.outcome === "APPROVED"
-                        ? await this.currentDraftFingerprint(ctx, siteId)
-                        : null,
-            },
-            select: { id: true },
+                reason: reasonOf(dto),
+                draftFingerprint: release.fingerprint,
+                testReleaseId: release.id,
+            });
+        }
+
+        return this.approvalWithAlert(ctx, {
+            siteId,
+            organizationId: ctx.organizationId,
+            byUserId: ctx.userId,
+            outcome: dto.outcome,
+            reason: reasonOf(dto),
+            // An approval names the draft it approved (#278), so later
+            // edits do not inherit it. A change request does not: it is
+            // about the work as a whole and stands until it is answered.
+            draftFingerprint:
+                dto.outcome === "APPROVED"
+                    ? await this.currentDraftFingerprint(ctx, siteId)
+                    : null,
+        });
+    }
+
+    /**
+     * Write a review row and, on its transaction, tell the other side
+     * (UX-043): a request goes to the site's reviewers, a verdict to the
+     * people who publish (`notifications/review-alerts.ts`).
+     */
+    private approvalWithAlert(
+        ctx: OrganizationContext,
+        data: Prisma.SiteApprovalUncheckedCreateInput,
+    ): Promise<{ id: string }> {
+        return prisma.$transaction(async (tx) => {
+            const approval = await tx.siteApproval.create({
+                data,
+                select: { id: true },
+            });
+            await queueReviewAlert(
+                tx,
+                ctx.organizationId,
+                { event: "review", about: "approval", approvalId: approval.id },
+                data.outcome === "REQUESTED" ? data.siteId : undefined,
+            );
+            return approval;
         });
     }
 
@@ -2553,31 +2610,32 @@ export class SitesService {
               })
             : null;
 
-        const [latest, standing, openNotes] = await Promise.all([
+        // A release's verdicts (by fingerprint, as the standing reads them)
+        // and its go-live's own record; or the draft's.
+        const scope = release
+            ? {
+                  OR: [
+                      {
+                          testReleaseId: { not: null },
+                          draftFingerprint: release.fingerprint,
+                      },
+                      { testReleaseId: release.id },
+                  ],
+              }
+            : { testReleaseId: null };
+        const [latest, standing, openNotes, newestAsk] = await Promise.all([
             prisma.siteApproval.findFirst({
                 where: {
                     siteId,
                     organizationId: ctx.organizationId,
-                    ...(release
-                        ? {
-                              // Its verdicts (by fingerprint, as the
-                              // standing reads them), and its go-live's
-                              // own record.
-                              OR: [
-                                  {
-                                      testReleaseId: { not: null },
-                                      draftFingerprint: release.fingerprint,
-                                  },
-                                  { testReleaseId: release.id },
-                              ],
-                          }
-                        : { testReleaseId: null }),
+                    ...scope,
                 },
                 // Two reviews can share a millisecond; the id (a cuid, which grows)
                 // keeps "newest" deterministic.
                 orderBy: [{ createdAt: "desc" }, { id: "desc" }],
                 select: {
                     outcome: true,
+                    reason: true,
                     createdAt: true,
                     by: { select: { name: true, email: true } },
                 },
@@ -2611,7 +2669,19 @@ export class SitesService {
                     testReleaseId: release?.id ?? null,
                 },
             }),
+            prisma.siteApproval.findFirst({
+                where: {
+                    siteId,
+                    organizationId: ctx.organizationId,
+                    outcome: "REQUESTED",
+                    ...scope,
+                },
+                orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+                select: { byUserId: true },
+            }),
         ]);
+        const pending =
+            standing.outstanding && latest?.outcome !== "CHANGES_REQUESTED";
 
         return {
             testRelease: release
@@ -2619,10 +2689,10 @@ export class SitesService {
                 : null,
             openNotes,
             outstanding: standing.outstanding,
-            // "In review" is the state a REQUESTED row creates and only a
-            // verdict clears (#278).
-            pending:
-                standing.outstanding && latest?.outcome !== "CHANGES_REQUESTED",
+            // "In review" is the state a REQUESTED row creates and a
+            // verdict, a withdrawal or going live clears (#278, UX-068).
+            pending,
+            askedByYou: pending && newestAsk?.byUserId === ctx.userId,
             approvalIsStale: standing.approvalIsStale,
             latestApproval:
                 latest === null
@@ -2631,6 +2701,7 @@ export class SitesService {
                           outcome: latest.outcome,
                           at: latest.createdAt,
                           by: latest.by.name ?? latest.by.email,
+                          reason: latest.reason ?? null,
                       },
         };
     }
@@ -2665,31 +2736,58 @@ export class SitesService {
                 testReleaseId,
                 { open: true },
             );
-            return prisma.siteApproval.create({
-                data: {
-                    siteId,
-                    organizationId: ctx.organizationId,
-                    byUserId: ctx.userId,
-                    outcome: "REQUESTED",
-                    draftFingerprint: release.fingerprint,
-                    testReleaseId: release.id,
-                },
-                select: { id: true },
+            return this.approvalWithAlert(ctx, {
+                siteId,
+                organizationId: ctx.organizationId,
+                byUserId: ctx.userId,
+                outcome: "REQUESTED",
+                draftFingerprint: release.fingerprint,
+                testReleaseId: release.id,
             });
         }
 
+        return this.approvalWithAlert(ctx, {
+            siteId,
+            organizationId: ctx.organizationId,
+            byUserId: ctx.userId,
+            outcome: "REQUESTED",
+            // Which draft is being put up for review, so "approved" can
+            // later be checked against the same work.
+            draftFingerprint: await this.currentDraftFingerprint(ctx, siteId),
+        });
+    }
+
+    /**
+     * Take back the draft's open review request (UX-068): `site:update`,
+     * like asking. Refused with 409 when nothing is open. Writes WITHDRAWN,
+     * which closes the request (`CLOSING_OUTCOMES`); asking again opens a
+     * new one.
+     */
+    async withdrawReview(
+        ctx: OrganizationContext,
+        siteId: string,
+    ): Promise<{ id: string }> {
+        authorize(ctx, "site:update");
+        await assertSiteInOrg(ctx, siteId);
+        const standing = await this.reviewStandingFor(
+            prisma,
+            siteId,
+            ctx.organizationId,
+            await this.currentDraftFingerprint(ctx, siteId),
+            ctx.userId,
+        );
+        if (!standing.outstanding) {
+            throw new ConflictException({
+                code: "NO_OPEN_REVIEW",
+                message: "There's no open review request to withdraw.",
+            });
+        }
         return prisma.siteApproval.create({
             data: {
                 siteId,
                 organizationId: ctx.organizationId,
                 byUserId: ctx.userId,
-                outcome: "REQUESTED",
-                // Which draft is being put up for review, so "approved" can
-                // later be checked against the same work.
-                draftFingerprint: await this.currentDraftFingerprint(
-                    ctx,
-                    siteId,
-                ),
+                outcome: "WITHDRAWN",
             },
             select: { id: true },
         });
@@ -3129,4 +3227,9 @@ function sectionLabel(content: unknown): string | null {
         }
     }
     return null;
+}
+
+/** A change request's reason (UX-043); nothing on an approval. */
+function reasonOf(dto: CreateApprovalDto): string | null {
+    return dto.outcome === "CHANGES_REQUESTED" ? (dto.reason ?? null) : null;
 }

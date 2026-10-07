@@ -20,10 +20,11 @@ import {
 } from "@/lib/calendar/service";
 import { clampWeekDay, isDay, weekHref } from "@/lib/calendar/week";
 import { orderPowers } from "@/lib/orders/access";
+import { permitsFor } from "@/lib/organizations/permits";
 import { resolveActiveOrganization } from "@/lib/organizations/service";
 import { requireSession } from "@/lib/session";
 
-export const metadata = { title: "Calendar" };
+export const metadata = { title: "Overview" };
 
 const MONTH = /^\d{4}-(0[1-9]|1[0-2])$/;
 
@@ -68,10 +69,7 @@ export default async function CalendarPage({
     );
     if (calendarLocked(organization?.actions)) return <CalendarLocked />;
 
-    const may = (action: string) =>
-        organization?.actions
-            ? organization.actions.includes(action)
-            : organization?.role === "OWNER" || organization?.role === "ADMIN";
+    const may = permitsFor(organization);
     const can: Can = {
         // New order: `order:create` (B16).
         order: orderPowers(organization).create,

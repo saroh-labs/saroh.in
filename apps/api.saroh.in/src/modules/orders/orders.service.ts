@@ -14,6 +14,7 @@ import { planMeter } from "../billing/metering.service";
 import { assertPlanTakesOnlinePayment } from "../billing/online-payments-plan";
 import type { AppliedDiscount } from "../discounts/discounts.service";
 import { DiscountsService } from "../discounts/discounts.service";
+import { recordRedemptionInTx } from "../discounts/redemption";
 import { assertBusinessDetails } from "../invoices/business-details";
 import { formatMoney } from "../invoices/invoice-send.service";
 import { gstInsideOrder } from "../invoices/order-invoice";
@@ -38,11 +39,18 @@ import {
     storedValueFor,
     typeOf,
 } from "./fulfilment";
-import { markedPaidNote, recordPaidByHandInTx } from "./hand-payments";
 import {
+    heldCents,
+    markedPaidNote,
+    recordPaidByHandInTx,
+    refundedByHandNote,
+} from "./hand-payments";
+import {
+    assertHandedOver,
     assertOneParty,
     assertStorefrontOffers,
     cashReceivedCents,
+    handOverAtCounterInTx,
     isCounterPayment,
     newOrderLines,
     orderPartyInTx,
@@ -65,6 +73,7 @@ import { stageForStatus } from "./order-stage";
 import { assertPaymentTransition, assertStatusTransition } from "./order-state";
 import { assertNotPayingOnlineInTx } from "./payment-in-flight";
 import { serializeOrderDetail, serializeOrderSummary } from "./serialize";
+import { orderMoneyIntents } from "./treatment-ledger";
 
 const CUSTOMER_SELECT = {
     select: { email: true, firstName: true, lastName: true },
@@ -75,6 +84,18 @@ const ORDER_WRITE_REFUSAL = {
     "order:create": "Your role can't take new orders.",
     "order:edit": "Your role can't change orders.",
     "order:refund": "Your role can't refund or cancel orders.",
+} as const;
+
+/**
+ * The same, to someone who may take or change this storefront's orders but
+ * not record their money — a storefront role without the payment permission
+ * (DEC-106). In the words Order Detail shows beside a disabled Mark paid.
+ */
+const MONEY_WRITE_REFUSAL = {
+    "order:create":
+        "Your role can't take payments — leave it to pay later, or ask the owner or an admin.",
+    "order:edit":
+        "Your role can't record payments — ask the owner or an admin to mark it paid.",
 } as const;
 
 /**
@@ -173,10 +194,13 @@ export class OrdersService {
     }
 
     async create(storeId: string, userId: string, dto: CreateOrderDto) {
+        // Taking the money with it — at the counter or by a pay link — is
+        // the permissions' alone, never a storefront role's (DEC-106).
         const organizationId = await this.requireOrderWrite(
             storeId,
             userId,
             "order:create",
+            dto.payment !== undefined && dto.payment.kind !== "LATER",
         );
         // Who it is for, and how it is paid (B13): checked before anything
         // is priced, so a request that can't be served costs nothing.
@@ -293,6 +317,13 @@ export class OrdersService {
             });
         }
 
+        // Handed over now (UX-059): paid at the counter, picked up there.
+        assertHandedOver({
+            handedOver: dto.handedOver,
+            payment: dto.payment ?? null,
+            fulfilment: type,
+        });
+
         // Paid at the counter (B13): cash short of the total is refused.
         const counter =
             dto.payment && isCounterPayment(dto.payment.kind)
@@ -398,7 +429,7 @@ export class OrdersService {
                             "RESERVED",
                         );
                         if (applied) {
-                            await this.recordRedemption(
+                            await recordRedemptionInTx(
                                 tx,
                                 applied,
                                 order.id,
@@ -418,6 +449,13 @@ export class OrdersService {
                                 receivedCents: counter.receivedCents,
                                 at: new Date(),
                             });
+                            if (dto.handedOver) {
+                                await handOverAtCounterInTx(tx, {
+                                    orderId: order.id,
+                                    organizationId,
+                                    userId,
+                                });
+                            }
                         }
                         const payLink =
                             dto.payment?.kind === "LINK" && organizationId
@@ -514,11 +552,18 @@ export class OrdersService {
             (dto.status !== undefined && dto.status !== "CANCELLED") ||
             (dto.paymentStatus !== undefined &&
                 dto.paymentStatus !== "REFUNDED");
+        // Recording a payment is money: asked of the permissions only, never
+        // a storefront role (DEC-106); `order:refund` always is.
         if (refunds) {
-            await this.requireOrderWrite(storeId, userId, "order:refund");
+            await this.requireOrderWrite(storeId, userId, "order:refund", true);
         }
         if (edits || !refunds) {
-            await this.requireOrderWrite(storeId, userId, "order:edit");
+            await this.requireOrderWrite(
+                storeId,
+                userId,
+                "order:edit",
+                dto.paymentStatus !== undefined,
+            );
         }
         const nextStatus = dto.status;
         const nextPayment = dto.paymentStatus;
@@ -627,7 +672,44 @@ export class OrdersService {
                 }
             }
             if (paymentChanging && nextPayment === "REFUNDED") {
+                // What it held, read before the credit note: the step on the
+                // timeline says how much went back, and how (UX-061).
+                const [held, paid] = await Promise.all([
+                    tx.order.findUniqueOrThrow({
+                        where: { id: orderId },
+                        select: { total: true, paidByHand: true },
+                    }),
+                    tx.paymentIntent.findMany({
+                        where: {
+                            ...orderMoneyIntents(orderId),
+                            status: "SUCCEEDED",
+                        },
+                        select: {
+                            amountCents: true,
+                            refunds: {
+                                where: { status: { not: "FAILED" } },
+                                select: { amountCents: true },
+                            },
+                        },
+                    }),
+                ]);
                 await creditRestOfOrder(tx, orderId, "Refunded", userId);
+                if (order.organizationId) {
+                    await tx.orderEvent.create({
+                        data: {
+                            organizationId: order.organizationId,
+                            orderId,
+                            kind: "REFUND",
+                            actorUserId: userId,
+                            note: refundedByHandNote(dto.refundedHow),
+                            amountCents: heldCents({
+                                ...held,
+                                paymentStatus: order.paymentStatus,
+                                paymentIntents: paid,
+                            }),
+                        },
+                    });
+                }
             }
             // Cancelled, refunded or paid at the counter: its pay link stops
             // working (B11, DEC-067), so nobody can pay twice. The page says
@@ -665,51 +747,6 @@ export class OrdersService {
      * here rather than looking it up at each call site makes the stamp hard to
      * forget: the guard you must call already hands you the value.
      */
-    /**
-     * The redemption, inside the order's own transaction: a failed order
-     * leaves none behind, and the unique order id keeps a retried create
-     * from counting twice. It snapshots the rule it applied, so re-rating
-     * the code later cannot rewrite this order's history.
-     */
-    private async recordRedemption(
-        tx: Prisma.TransactionClient,
-        applied: AppliedDiscount,
-        orderId: string,
-        organizationId: string | null,
-        currency: string,
-    ): Promise<void> {
-        if (!organizationId) {
-            // redeemForOrder already refused this; the type needs saying so.
-            throw new BadRequestException("A code needs a business");
-        }
-        if (applied.usageLimit !== null) {
-            // Re-counted INSIDE the serializable transaction, so two orders
-            // racing for the last use cannot both see room for it.
-            const used = await tx.discountRedemption.count({
-                where: { discountId: applied.discountId },
-            });
-            if (used >= applied.usageLimit) {
-                throw new ConflictException({
-                    message: `${applied.code} has been used as many times as it allows.`,
-                    details: { field: "discountCode" },
-                });
-            }
-        }
-        await tx.discountRedemption.create({
-            data: {
-                organizationId,
-                discountId: applied.discountId,
-                orderId,
-                amount: fromCents(applied.amountCents),
-                currency,
-                code: applied.code,
-                kind: applied.kind,
-                percentBps: applied.percentBps,
-                ruleAmount: applied.ruleAmount,
-            },
-        });
-    }
-
     /**
      * What New order v2 asks beyond writing to the storefront (B13): a
      * picked person is read by their email, which takes `contact:read` (as
@@ -765,21 +802,37 @@ export class OrdersService {
      * caller may take `action` on this storefront's orders (see
      * `StoresService.orderWriteOrganization`). A storefront they can't reach
      * stays a 404, so nothing says it exists; one they can reach, without
-     * the power, is a 403 in words.
+     * the power, is a 403 in words. `money` (a payment recorded or taken)
+     * is asked of the permissions only (DEC-106).
      */
     private async requireOrderWrite(
         storeId: string,
         userId: string,
         action: "order:create" | "order:edit" | "order:refund",
+        money = false,
     ): Promise<string | null> {
         const writable = await this.stores.orderWriteOrganization(
             storeId,
             userId,
             action,
+            { money },
         );
         if (writable !== null) return writable.organizationId;
         await this.stores.getForUser(storeId, userId);
-        throw new ForbiddenException(ORDER_WRITE_REFUSAL[action]);
+        // Someone who may take or change the order, but not its money, is
+        // told it is the payment they can't record (FB-1).
+        const takesOrders =
+            money &&
+            (await this.stores.orderWriteOrganization(
+                storeId,
+                userId,
+                action,
+            )) !== null;
+        throw new ForbiddenException(
+            takesOrders && action !== "order:refund"
+                ? MONEY_WRITE_REFUSAL[action]
+                : ORDER_WRITE_REFUSAL[action],
+        );
     }
 
     private isUniqueOrderNumber(err: unknown): boolean {

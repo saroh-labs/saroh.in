@@ -187,6 +187,22 @@ describe("Track", () => {
         });
     });
 
+    it("a pick-up says where to collect it, and when it's open (UX-025)", () => {
+        draw({
+            ok: true,
+            order: {
+                ...DETAIL,
+                collectFrom: {
+                    address: "12 Hill Road, Bandra",
+                    hours: "Mon–Sat 10:00–19:00, Sun closed",
+                },
+            },
+        });
+        const sheet = screen.getByRole("dialog", { name: "Order #1019" });
+        expect(sheet).toHaveTextContent("Collect from 12 Hill Road, Bandra");
+        expect(sheet).toHaveTextContent("Open Mon–Sat 10:00–19:00, Sun closed");
+    });
+
     it("a shipment links to the courier's tracking; a receipt opens its paper", () => {
         draw({
             ok: true,

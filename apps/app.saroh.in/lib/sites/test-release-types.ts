@@ -37,7 +37,13 @@ export interface TestReleaseStanding {
     route: string;
     /** Approved by someone other than this person, and nothing asked since. */
     approved: boolean;
-    latest: { outcome: string; at: string; by: string | null } | null;
+    latest: {
+        outcome: string;
+        at: string;
+        by: string | null;
+        /** What a change request asked for (UX-043). */
+        reason?: string | null;
+    } | null;
 }
 
 export interface TestRelease {

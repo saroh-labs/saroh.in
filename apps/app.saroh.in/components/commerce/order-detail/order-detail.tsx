@@ -6,6 +6,7 @@ import { useState } from "react";
 
 import type { OrderMenuPending } from "@/components/commerce/order-actions";
 import { OrderActions } from "@/components/commerce/order-actions";
+import { useBusinessZone } from "@/components/shared/business-zone";
 import { formatMoneyMajor } from "@/lib/format/money";
 import { useClock } from "@/lib/hooks/use-clock";
 import { readyNoticeText } from "@/lib/messages/notice-reach";
@@ -44,6 +45,7 @@ import { CustomerCard } from "./customer-card";
 import { EditPanel } from "./edit-panel";
 import { HoldCard } from "./hold-card";
 import { AllergyBanner, OrderItems } from "./items";
+import { KitchenPaymentCard } from "./kitchen-payment-card";
 import { MoneyCard } from "./money-card";
 import { OrderCrumbs, OrderHeading } from "./order-header";
 import type { PillTone } from "./parts";
@@ -153,7 +155,9 @@ export function OrderDetail({
     const appointment = isAppointment(order);
     const visits = appointment ? order.visits : undefined;
     const now = new Date(clock ?? Date.parse(order.updatedAt));
-    const zone = visits?.service.timezone ?? "UTC";
+    // The service's zone, else the business's (UX-008), never UTC.
+    const businessZone = useBusinessZone();
+    const zone = visits?.service.timezone ?? businessZone;
     const standing = appointment
         ? (({ label, tone }) => ({ label, tone: VISITS_TONE[tone] }))(
               visitsStanding(
@@ -294,6 +298,15 @@ export function OrderDetail({
             {!open && !hold ? (
                 <span className="text-[13px] font-semibold text-success-subtle-foreground">
                     Nothing left to do
+                </span>
+            ) : null}
+            {handover && can.stage && !next && open && !hold ? (
+                // Ready, and paid at the handover: Collected waits for the
+                // payment (the API refuses it before then, UX-010).
+                <span className="text-[13px] font-semibold text-muted-foreground">
+                    {handover === "collection"
+                        ? "Mark collected once it's paid"
+                        : "Mark delivered once it's paid"}
                 </span>
             ) : null}
         </OrderHeading>
@@ -600,7 +613,12 @@ export function OrderDetail({
                                     ) : null
                                 }
                             />
-                        ) : null}
+                        ) : (
+                            <KitchenPaymentCard
+                                order={order}
+                                canRecord={can.edit}
+                            />
+                        )}
                         {aside}
                     </div>
                 </div>

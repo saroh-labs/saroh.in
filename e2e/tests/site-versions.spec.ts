@@ -174,6 +174,11 @@ test.describe("publishing past a change request", { tag: "@serial" }, () => {
         const reviewer = await asReviewer(browser);
         await reviewer.goto(`${urls.APP_URL}/sites/${id}/review`);
         await reviewer.getByRole("button", { name: "Ask for changes" }).click();
+        // A change request says what (UX-043).
+        await reviewer
+            .getByLabel("What needs changing?")
+            .fill("The hero heading is last season's.");
+        await reviewer.getByRole("button", { name: "Ask for changes" }).click();
         await expect(
             reviewer.getByText(/asked for changes/i).first(),
         ).toBeVisible();
@@ -213,6 +218,11 @@ test.describe("taking a version back", { tag: "@serial" }, () => {
 
         const reviewer = await asReviewer(browser);
         await reviewer.goto(`${urls.APP_URL}/sites/${id}/review`);
+        await reviewer.getByRole("button", { name: "Ask for changes" }).click();
+        // A change request says what (UX-043).
+        await reviewer
+            .getByLabel("What needs changing?")
+            .fill("The hero heading is last season's.");
         await reviewer.getByRole("button", { name: "Ask for changes" }).click();
         await expect(
             reviewer.getByText(/asked for changes/i).first(),

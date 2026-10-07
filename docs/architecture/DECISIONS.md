@@ -1099,3 +1099,112 @@ Unless an entry says otherwise, its status is **Proposed — requires audit revi
 - Context: on a plan without online payments, the "Ready to take payments" checklist (Settings › Business) and Home's "Get ready to take money" counted "Take payment online" as a step left (#835). Nothing in setup could finish it, so a Free business could never reach all done.
 - Decision: that step is not counted. Both checklists show it beside the steps, outside the count and the bar, as "Comes with ‹plan›" when the catalogue's `payments` row names the plan that has it, otherwise "Comes with a paid plan", with See plans to `/settings/billing#change-plan`. Payments' other steps (connect, finish connecting, reconnect) still count on a plan that takes payment online.
 - Consequences: `readyChecklist` returns the plan's asides as `outside`, apart from `done` and `total`; `loadReadyChecklist` and `loadSettingsChecklist` read billing access only on such a plan, best-effort. Once every counted step is done the checklists hide, aside included; the plan page and the Payment panel still say it.
+
+## DEC-093 A paid plan starts with a nominal first month on autopay, for a 12-month term
+
+**Status: Accepted — 2026-10-07** · user · from the UX audit (UX-003, D1/D2)
+
+- Context: the plan checkout's quote said "30-day free trial, nothing charged today", while Razorpay took a small mandate check. Monthly subscriptions were created as open-ended mandates running for years, and the yearly plan as a yearly autopay. None of it matched the pricing decided on 5 Oct.
+- Decision: after launch, a new paid plan starts with a nominal first month and autopay. The checkout names the mandate check honestly, and says if it is refunded. A monthly plan runs for 12 charges and then renews with one tap. A yearly plan is a single payment for the year. The launch offer comes from the catalogue, never fixed text.
+- Consequences: the subscription is created with a 12-charge limit and the yearly plan as a one-time order. The checkout and Plan and billing describe exactly what is charged today and later. Returning from Razorpay checks the payment, without waiting for the webhook. Builds #803.
+
+## DEC-094 One website per business at launch, on every plan
+
+**Status: Accepted — 2026-10-07** · user · from the UX audit (D3)
+
+- Context: the catalogue sold Pro with more than one website, but the app allows one per business.
+- Decision: one website on every plan for launch. The Websites row is hidden from the pricing page, and the Website row says "your own domain". More websites per business is future work.
+- Consequences: the catalogue on each instance needs a new version with the row changed before the pricing page is live.
+
+## DEC-095 Free's monthly booking cap counts only bookings customers make online
+
+**Status: Accepted — 2026-10-07** · user · from the UX audit (D5)
+
+- Context: Free's monthly bookings cap also refused bookings the owner made at the desk, and customers learned bookings were paused only after filling in the whole form.
+- Decision: the cap counts bookings customers make on the business's site. Bookings staff make in the workspace are never capped. Past the cap, the booking page says up front that online booking is paused, before the form.
+- Consequences: metering filters by where a booking came from. The booking page reads the cap state before showing the form.
+
+## DEC-096 Opening hours limit in-person booking times for every business
+
+**Status: Accepted — 2026-10-07** · user · amends DEC-087 · from the UX audit (UX-009, D8)
+
+- Context: DEC-087 cut booking times only to walk-in (SHOP) storefronts' hours. Settings › Hours saves to the business's hours shown in the site header, so a business with no walk-in location offered times outside the hours its own site displays.
+- Decision: the hours set in Settings › Hours limit in-person booking times for every business, whatever its storefronts. Online-only sessions are not cut, as in DEC-087.
+- Consequences: one source of opening hours for the header, the booking page and the slot engine. Bookings already made are never moved.
+
+## DEC-097 Possible duplicate contacts are offered to staff to merge, never merged automatically
+
+**Status: Accepted — 2026-10-07** · user · keeps DEC-049 · from the UX audit (UX-013)
+
+- Context: a customer signing in on a merchant site gets a separate contact unless the existing contact's email was already verified (DEC-049). The audit saw duplicates as a bug.
+- Decision: DEC-049 stands, for safety: a shared or mistyped inbox must not open someone else's history. Staff see "This may be the same person" with a merge action on both contacts, and merging is their choice (ADR-011: nothing merges silently).
+- Consequences: a merge prompt on the contact pages, backed by an email match. Merging keeps both histories.
+
+## DEC-098 Counter money follows permissions, never role names
+
+**Status: Accepted — 2026-10-07** · user · from the UX audit (D7)
+
+- Context: seeing amounts and recording payments at the counter was decided partly by role name (Owner, Admin, Member).
+- Decision: what a person can see and do with money is decided only by the permissions their role carries, as set by the owner or an admin. No screen or endpoint checks a role name for money.
+- Consequences: every role-name check for money is replaced by its permission (ADR-008). Built-in roles keep their default permissions.
+
+## DEC-099 Custom roles are a Pro feature; class packs aren't offered yet
+
+**Status: Accepted — 2026-10-07** · user · from the UX audit
+
+- Decision:
+    - Custom roles are included on Pro only. Free and Grow can't create them or give a role permissions beyond the built-in ones (taking permissions away is never blocked).
+    - Class packs aren't offered on any plan for now. The module is hidden like Automations (DEC-068), and existing data is kept.
+- Consequences: the catalogue's Custom roles row is off on Free and Grow, and the class packs module joins the not-offered list.
+
+## DEC-100 The 12-month term ends with a request to pay; paying resubscribes
+
+**Status: Accepted — 2026-10-07** · user · clarifies DEC-093
+
+- Decision: a monthly plan's 12 charges, or a yearly plan's year, run to the end of the term. Before the end the owner is asked to pay for the next term, and paying resubscribes them for another term. The first month is priced before GST, like every Saroh price.
+- Consequences: the renew prompt opens in the term's last 30 days. A business that doesn't pay moves to Free at the term's end, with the move-down rules (#800/#801).
+
+## DEC-101 A release going live closes its review; footers carry a contact email
+
+**Status: Accepted — 2026-10-07** · user
+
+- Decision:
+    - When a site change or test release goes live, any open review request for it is closed.
+    - Saroh's own sites show contact@saroh.in as the contact address.
+    - A merchant's site footer shows the business's own contact email when the business has added one.
+
+## DEC-102 The Saroh credit on merchant sites: Free only
+
+**Status: Accepted — 2026-10-07** · user · from the UX audit (D4)
+
+- Decision: Free sites show "Made with Saroh" in the footer, linking with the business's referral code. Paid plans show no Saroh credit.
+- Consequences: the renderer reads the plan to choose the footer credit, replacing the "Runs on Saroh" line every site shows today.
+
+## DEC-103 Publishing needs approval is a Pro feature
+
+**Status: Accepted — 2026-10-07** · user · from the UX audit (D9)
+
+- Decision: the "Publishing needs approval" website setting is included on Pro only. A teammate's site edits wait for an owner's or admin's approval before going live. The setting is hidden on Free and Grow, not upsold from a switch that does nothing.
+- Consequences: the catalogue's approval row is included on Pro. An approval already switched on, on a plan without it, stops applying, and publishing goes through as normal.
+
+## DEC-104 Customers can use discount codes at a merchant site's checkout
+
+**Status: Accepted — 2026-10-07** · user · from the UX audit (D12)
+
+- Decision: on every plan that sells on its website, the site's bag and checkout accept the merchant's discount codes from Sell › Discounts, with the same rules as at the counter.
+- Consequences: the checkout quote validates and applies a code, and orders record the code used.
+
+## DEC-105 Team seats count people who can change things; view-only people have their own limit
+
+**Status: Accepted — 2026-10-07** · user · from the UX audit (D6)
+
+- Decision: anyone whose role carries a write permission (books, sells, edits), including bookable staff, uses a team seat. People whose role carries only view permissions don't use a seat. They count toward a separate per-plan limit, the one Reviewers use today, which can change by policy.
+- Consequences: metering classifies a member by their role's permissions, not its name. The catalogue's Reviewers row becomes the view-only people limit.
+
+## DEC-106 Storefront roles follow permissions for money too
+
+**Status: Accepted — 2026-10-07** · user · amends DEC-048 · extends DEC-098
+
+- Context: DEC-048 let a storefront's Admin, Manager or Editor take and change that storefront's orders, recording payment included, because of their storefront role name.
+- Decision: on a storefront too, seeing amounts and recording or taking payment depend only on the permissions the person's roles carry. No storefront role name grants money.
+- Consequences: the storefront role checks in the stores service give way to permissions. A storefront role that should take payments needs a role carrying the payment permission.

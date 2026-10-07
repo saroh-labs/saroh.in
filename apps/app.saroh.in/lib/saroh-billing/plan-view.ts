@@ -1,9 +1,11 @@
 import type { Catalog } from "@saroh/pricing-catalog";
 import {
+    cardLines,
     catalogPlanIdForKey,
     formatInr,
     offeredPlans,
     planPricePaise,
+    trialFirstPaise,
 } from "@saroh/pricing-catalog";
 
 import type { BillingAccessView } from "@/lib/billing/access";
@@ -62,7 +64,10 @@ export interface AddonsView {
 }
 
 export type ChangeKind =
-    "NONE" | "TO_FREE" | "NEW" | "UPGRADE" | "SCHEDULED" | "TRIAL";
+    "NONE" | "TO_FREE" | "NEW" | "UPGRADE" | "SCHEDULED" | "TRIAL" | "RENEW";
+
+/** Monthly autopay, or yearly's one payment (DEC-093). */
+export type PaymentKind = "AUTOPAY" | "ONE_TIME";
 
 /** `GET …/billing/change-plan`: what a change would be, and cost. */
 export interface ChangeQuote {
@@ -82,6 +87,32 @@ export interface ChangeQuote {
     firstChargePaise: number;
     firstChargeGstPaise: number;
     firstChargeTotalPaise: number;
+    /** How it's paid, and for how many charges (DEC-093). */
+    payment: PaymentKind;
+    termCharges: number;
+    /** Exactly what is taken today, GST included. */
+    payNowTotalPaise: number;
+    /** What setting up autopay takes now: a real charge, a refunded check, or none. */
+    mandateCheck: "PAID" | "REFUNDED" | "NONE";
+}
+
+/**
+ * What opens Razorpay's own checkout window over the page (DEC-093): its
+ * public key, the subscription or order, and the owner's details
+ * pre-filled. Never a secret.
+ */
+export interface CheckoutHandoff {
+    provider: string;
+    keyId: string;
+    subscriptionId: string | null;
+    orderId: string | null;
+    amountPaise: number | null;
+    currency: string;
+    prefill: {
+        name: string | null;
+        email: string | null;
+        contact: string | null;
+    };
 }
 
 export interface CheckoutView {
@@ -94,20 +125,37 @@ export interface CheckoutView {
     startAt: string | null;
     expiresAt: string;
     createdAt: string;
+    payment?: PaymentKind;
+}
+
+/** The 12-month term of the plan it's on (DEC-093, #803). */
+export interface TermView {
+    endsAt: string;
+    payment: PaymentKind;
+    renewOpen: boolean;
 }
 
 export interface CheckoutsView {
-    open: CheckoutView | null;
+    open: (CheckoutView & { handoff?: CheckoutHandoff | null }) | null;
     scheduled: CheckoutView | null;
+    term?: TermView | null;
 }
 
 /** `POST …/billing/change-plan`. */
 export type ChangeResult =
     | { kind: "TO_FREE"; effectiveAt: string }
     | {
-          kind: "NEW" | "UPGRADE" | "SCHEDULED" | "TRIAL";
+          kind: "NEW" | "UPGRADE" | "SCHEDULED" | "TRIAL" | "RENEW";
           authorisationUrl: string | null;
+          handoff: CheckoutHandoff | null;
       };
+
+/** `POST …/billing/checkout/confirm`: where a checkout stands. */
+export interface ConfirmResult {
+    state: "completed" | "scheduled" | "waiting" | "failed" | "none";
+    plan: { id: string; name: string } | null;
+    startAt: string | null;
+}
 
 const per = (cycle: Cycle) => (cycle === "year" ? "a year" : "a month");
 
@@ -162,6 +210,18 @@ export interface YourPlanView {
     next: NextCharge;
     method: string | null;
     notes: PlanNote[];
+    /**
+     * A checkout waiting for its payment (DEC-093): confirmed with Razorpay
+     * on the page, never started again — that would be a second mandate.
+     */
+    pending: PendingCheckout | null;
+}
+
+export interface PendingCheckout {
+    planName: string;
+    expiresAt: string;
+    /** Reopens the same payment window; null when there's none to open. */
+    handoff: CheckoutHandoff | null;
 }
 
 const PROVIDER_NAMES: Record<string, string> = {
@@ -190,6 +250,7 @@ export function yourPlan(input: {
     addonsHeld: boolean;
 }): YourPlanView {
     const { access, subscription: sub, catalog } = input;
+    const term = input.checkouts?.term ?? null;
     const planId = access.plan?.id ?? "";
     const name = access.plan?.name ?? "Free";
     const cycle = billedCycle(sub);
@@ -220,8 +281,17 @@ export function yourPlan(input: {
     const notes: PlanNote[] = [];
     let next: NextCharge = { kind: "text", text: "Nothing to pay" };
 
+    const move = access.pendingMove;
+    // Only the version changes (Free v1 to Free v2): not a plan change, so
+    // nothing says one (N1).
+    const samePlan = move !== null && move.planId === move.fromPlanId;
+
     if (given) {
-        const then = planName(catalog, billedId ?? "free");
+        // Where it lands when the plan given ends: a pending move's plan.
+        const then = planName(
+            catalog,
+            move && !samePlan ? move.planId : (billedId ?? "free"),
+        );
         notes.push(
             override.expiresAt
                 ? {
@@ -254,6 +324,9 @@ export function yourPlan(input: {
         });
     } else if (sub?.cancelAtPeriodEnd && sub.currentPeriodEnd) {
         next = { kind: "ends", iso: sub.currentPeriodEnd };
+    } else if (!given && paise > 0 && term?.payment === "ONE_TIME") {
+        // A year paid once: nothing more is charged (DEC-093).
+        next = { kind: "paidTo", iso: term.endsAt };
     } else if (!given && paise > 0 && sub?.currentPeriodEnd) {
         next = {
             kind: "charge",
@@ -263,26 +336,37 @@ export function yourPlan(input: {
         if (sub.status === "TRIALING") {
             notes.push({
                 tone: "info",
-                lead: "On a free trial — nothing is charged until ",
+                lead: "Your first month runs to ",
                 iso: sub.currentPeriodEnd,
-                tail: ". If that charge doesn't go through, you're back on Free.",
+                tail: ", when the first full charge is taken. If it doesn't go through, you're back on Free.",
                 action: null,
             });
         }
     }
 
-    const move = access.pendingMove;
-    if (move) {
+    // A plan given for a while wins until it ends: the move happens under
+    // it, and the note above already says where it lands (N1).
+    const underOverride =
+        given &&
+        (override.expiresAt === null ||
+            (move !== null && override.expiresAt > move.from));
+    if (move?.waiting === "authorise") {
+        // Due, and waiting on the business: the one move that needs a tap.
         const to = planName(catalog, move.planId);
-        if (move.waiting === "authorise") {
-            notes.push({
-                tone: "attention",
-                lead: `Your plan was due to move to ${to} on `,
-                iso: move.from,
-                tail: `. Authorise the new amount to move; until then you stay on ${name}.`,
-                action: { label: "Authorise", planId: move.planId, cycle },
-            });
-        } else if (move.waiting === "held") {
+        notes.push({
+            tone: "attention",
+            lead: samePlan
+                ? `${to}'s new price was due to start on `
+                : `Your plan was due to move to ${to} on `,
+            iso: move.from,
+            tail: samePlan
+                ? ". Authorise the new amount to keep it; until then nothing changes."
+                : `. Authorise the new amount to move; until then you stay on ${name}.`,
+            action: { label: "Authorise", planId: move.planId, cycle },
+        });
+    } else if (move && !samePlan && !underOverride) {
+        const to = planName(catalog, move.planId);
+        if (move.waiting === "held") {
             notes.push({
                 tone: "info",
                 lead: `Your plan moves to ${to} from `,
@@ -299,31 +383,58 @@ export function yourPlan(input: {
                 action: null,
             });
         }
-    } else if (input.checkouts?.scheduled) {
-        const s = input.checkouts.scheduled;
-        notes.push({
-            tone: "info",
-            lead: `${s.plan.name} starts on `,
-            iso: s.startAt,
-            tail: ", as you authorised. Everything stays until then.",
-            action: null,
-        });
+    }
+    const scheduled = input.checkouts?.scheduled ?? null;
+    // The same plan scheduled is its renewal (DEC-093).
+    const renewed = scheduled !== null && scheduled.plan.id === planId;
+    if (scheduled && (!move || samePlan || renewed)) {
+        notes.push(
+            renewed
+                ? {
+                      tone: "info",
+                      lead: `Your next 12 months of ${name} start on `,
+                      iso: scheduled.startAt,
+                      tail: ", as you authorised.",
+                      action: null,
+                  }
+                : {
+                      tone: "info",
+                      lead: `${scheduled.plan.name} starts on `,
+                      iso: scheduled.startAt,
+                      tail: ", as you authorised. Everything stays until then.",
+                      action: null,
+                  },
+        );
+    }
+
+    // The term (DEC-093, #803): when it ends, and the one-tap renewal in its
+    // last days. Left alone, the plan runs to the end and then it's Free.
+    if (term && !given && !renewed) {
+        const year = term.payment === "ONE_TIME";
+        notes.push(
+            term.renewOpen
+                ? {
+                      tone: "attention",
+                      lead: year
+                          ? "The year you paid for ends on "
+                          : `Your 12 months of ${name} end on `,
+                      iso: term.endsAt,
+                      tail: `. Pay for the next term to keep ${name} from that day, at today's price; otherwise you move to Free then.`,
+                      action: { label: "Renew", planId, cycle },
+                  }
+                : {
+                      tone: "info",
+                      lead: year
+                          ? "Paid for the year, to "
+                          : "Your 12 monthly charges run to ",
+                      iso: term.endsAt,
+                      tail: ". In its last 30 days we ask you to pay for the next term, and paying starts it.",
+                      action: null,
+                  },
+        );
     }
 
     const open = input.checkouts?.open;
-    if (open) {
-        notes.push({
-            tone: "attention",
-            lead: `Your move to ${open.plan.name} is waiting for you to authorise the payment. The payment page's link works once; start again for a new one. It lapses on `,
-            iso: open.expiresAt,
-            tail: ".",
-            action: {
-                label: "Start again",
-                planId: open.plan.id,
-                cycle: open.cycle === "year" ? "year" : "month",
-            },
-        });
-    }
 
     return {
         name,
@@ -335,6 +446,13 @@ export function yourPlan(input: {
             ? `Through ${PROVIDER_NAMES[sub.provider] ?? sub.provider}`
             : null,
         notes,
+        pending: open
+            ? {
+                  planName: open.plan.name,
+                  expiresAt: open.expiresAt,
+                  handoff: open.handoff ?? null,
+              }
+            : null,
     };
 }
 
@@ -342,180 +460,117 @@ export function yourPlan(input: {
 export interface PickerRow {
     planId: string;
     name: string;
+    /** "₹111 a month + GST", or "₹0". */
     price: string;
     what: string;
     current: boolean;
-    /** "Start 14-day trial", "Upgrade", "Switch", "Bill yearly"; null when current. */
+    /** "Start 14-day trial", "Upgrade", "Switch", "Bill yearly", "Keep Plan B"; null when there's nothing to do. */
     cta: string | null;
+    /** The catalogue card's lead ("Everything in Plan A, plus:") and its first lines. */
+    lead: string;
+    lines: string[];
+    /** Where the business stands with it under a plan given for a while. */
+    note: { lead: string; iso: string | null } | null;
 }
+
+/** How many of a plan card's lines the picker shows. */
+export const PICKER_LINES = 4;
 
 /**
  * The plan picker for one cycle: the offered plans in catalogue order, the
  * one billed marked current, each other one an upgrade (later in the list),
  * a switch (earlier), or its trial — only where this business would get one
- * (`trials`: plan ids the API quoted as a TRIAL).
+ * (`trials`: plan ids the API quoted as a TRIAL). Each says what it unlocks,
+ * from the catalogue's own card lines (UX-045).
+ *
+ * Under a plan given for a while (a launch offer, UX-044), that plan is the
+ * one it's on — "You're on this until …", no trial on it — and the plan it's
+ * billed for is what comes "After …".
  */
 export function pickerRows(input: {
     catalog: Catalog;
     subscription: SarohSubscription | null;
     cycle: Cycle;
     trials: ReadonlySet<string>;
+    /** A plan given for a while, and until when (null: until changed). */
+    given?: { planId: string; until: string | null } | null;
 }): PickerRow[] {
     const { catalog, cycle } = input;
     const plans = offeredPlans(catalog);
     const billedId = billedPlanId(catalog, input.subscription);
-    const billedAt = plans.findIndex((p) => p.id === billedId);
+    const givenId =
+        input.given && input.given.planId !== billedId
+            ? input.given.planId
+            : null;
+    const onId = givenId ?? billedId;
+    const onAt = plans.findIndex((p) => p.id === onId);
     const onCycle = billedCycle(input.subscription);
     return plans.map((p, i) => {
-        const up = i > billedAt;
+        const up = i > onAt;
+        const held = p.id === givenId;
+        // Monthly only: yearly is one payment and has no trial (DEC-093).
         const trialDays =
-            up && p.trial?.on && p.pricePaise > 0 && input.trials.has(p.id)
+            up &&
+            !held &&
+            cycle === "month" &&
+            p.trial?.on &&
+            p.pricePaise > 0 &&
+            input.trials.has(p.id)
                 ? p.trial.days
                 : null;
+        // A first month that costs something isn't a free trial.
+        const firstPaise = trialDays ? trialFirstPaise(p) : 0;
         const free = p.pricePaise === 0;
         const samePlan = p.id === billedId;
-        const current = samePlan && (free || cycle === onCycle);
+        const current =
+            held || (samePlan && !givenId && (free || cycle === onCycle));
+        const card = cardLines(catalog, p.id);
+        const note = held
+            ? {
+                  lead: input.given?.until
+                      ? "You're on this until "
+                      : "You're on this for now",
+                  iso: input.given?.until ?? null,
+              }
+            : givenId && samePlan
+              ? input.given?.until
+                  ? { lead: "After ", iso: input.given.until }
+                  : null
+              : null;
         return {
             planId: p.id,
             name: p.name,
             price: free
                 ? "₹0"
-                : priceWords(planPricePaise(catalog, p, cycle), cycle),
+                : `${priceWords(planPricePaise(catalog, p, cycle), cycle)} + GST`,
             what:
-                p.tagline + (trialDays ? ` · ${trialDays}-day free trial` : ""),
+                p.tagline +
+                (firstPaise > 0
+                    ? ` · first month ${formatInr(firstPaise)} + GST`
+                    : trialDays
+                      ? ` · ${trialDays}-day free trial`
+                      : ""),
             current,
-            cta: current
-                ? null
-                : trialDays
-                  ? `Start ${trialDays}-day trial`
-                  : samePlan
-                    ? cycle === "year"
-                        ? "Bill yearly"
-                        : "Bill monthly"
-                    : up
-                      ? "Upgrade"
-                      : "Switch",
+            cta: held
+                ? `Keep ${p.name}`
+                : current || (givenId && samePlan)
+                  ? null
+                  : firstPaise > 0
+                    ? "Start with the first month"
+                    : trialDays
+                      ? `Start ${trialDays}-day trial`
+                      : samePlan
+                        ? cycle === "year"
+                            ? "Bill yearly"
+                            : "Bill monthly"
+                        : up
+                          ? "Upgrade"
+                          : "Switch",
+            lead: card.lead,
+            lines: card.lines.slice(0, PICKER_LINES).map((l) => l.t),
+            note,
         };
     });
-}
-
-/** A line of a quote: what, and how much or when. */
-export interface QuoteLine {
-    label: string;
-    value: string;
-    iso?: string | null;
-}
-
-export interface QuoteSummary {
-    title: string;
-    lead: string;
-    lines: QuoteLine[];
-    /** The confirm button; null when there is nothing to do. */
-    confirm: string | null;
-    /** Whether it goes on to the payment page. */
-    toPayment: boolean;
-}
-
-/** A change's quote in words: what happens, when, and every amount the API sent. */
-export function quoteSummary(q: ChangeQuote): QuoteSummary {
-    const plan = q.plan.name;
-    const recurring: QuoteLine = {
-        label: `${plan}, ${q.cycle === "year" ? "yearly" : "monthly"}`,
-        value: `${formatInr(q.pricePaise)} + ${formatInr(q.gstPaise)} GST = ${formatInr(q.totalPaise)} ${per(q.cycle)}`,
-    };
-    const coupon: QuoteLine[] = q.coupon
-        ? [
-              {
-                  label: `Coupon ${q.coupon.code}`,
-                  value: `${formatInr(q.coupon.discountPaise)} off ${
-                      q.cycle === "year"
-                          ? "the first yearly charge"
-                          : q.coupon.charges === 1
-                            ? "the first month"
-                            : `each of the first ${q.coupon.charges} months`
-                  }`,
-              },
-              {
-                  label: "First charge",
-                  value: `${formatInr(q.firstChargePaise)} + ${formatInr(q.firstChargeGstPaise)} GST = ${formatInr(q.firstChargeTotalPaise)}`,
-              },
-          ]
-        : [];
-
-    switch (q.kind) {
-        case "NONE":
-            return {
-                title: `You're on ${plan} already`,
-                lead: "Nothing changes.",
-                lines: [],
-                confirm: null,
-                toPayment: false,
-            };
-        case "TO_FREE":
-            return {
-                title: `Move to ${plan}`,
-                lead: "Everything stays until then. Anything over Free's limits stays readable; you can't add more.",
-                lines: [
-                    {
-                        label: "From",
-                        value: q.effectiveAt ? "" : "Today",
-                        iso: q.effectiveAt,
-                    },
-                ],
-                confirm: `Move to ${plan}`,
-                toPayment: false,
-            };
-        case "TRIAL":
-            return {
-                title: `Start your ${plan} trial`,
-                lead: "Nothing is charged today. Set up UPI Autopay or a card on the payment page; the first charge is taken when the trial ends. If it doesn't go through, you're back on Free.",
-                lines: [
-                    {
-                        label: "Trial ends",
-                        value: "",
-                        iso: q.trialEndsAt,
-                    },
-                    recurring,
-                    ...coupon,
-                ],
-                confirm: "Continue to payment",
-                toPayment: true,
-            };
-        case "UPGRADE":
-            return {
-                title: `Upgrade to ${plan}`,
-                lead: `You're on ${plan} from today, once you authorise it.`,
-                lines: [
-                    {
-                        label: "Today, for the rest of this period",
-                        value: `${formatInr(q.chargeNowPaise)} + ${formatInr(q.chargeNowGstPaise)} GST = ${formatInr(q.chargeNowTotalPaise)}`,
-                    },
-                    recurring,
-                    { label: "Then from", value: "", iso: q.startAt },
-                ],
-                confirm: "Continue to payment",
-                toPayment: true,
-            };
-        case "SCHEDULED":
-            return {
-                title: `Move to ${plan}`,
-                lead: "Authorise it now; nothing is charged until it starts, and everything stays until then.",
-                lines: [
-                    { label: "Starts", value: "", iso: q.startAt },
-                    recurring,
-                ],
-                confirm: "Continue to payment",
-                toPayment: true,
-            };
-        default:
-            return {
-                title: `Start ${plan}`,
-                lead: "You're on it once the first charge goes through on the payment page.",
-                lines: [recurring, ...coupon],
-                confirm: "Continue to payment",
-                toPayment: true,
-            };
-    }
 }
 
 /** An add-on row: what one adds, and what is held. */
@@ -535,7 +590,8 @@ const UNIT: Record<string, [string, string]> = {
     members: ["team member", "team members"],
     products: ["product", "products"],
     orders: ["order a month", "orders a month"],
-    bookings: ["booking a month", "bookings a month"],
+    // Online ones only (DEC-095): the team's own bookings are never capped.
+    bookings: ["online booking a month", "online bookings a month"],
     integrations: ["connection", "connections"],
     blog: ["blog post", "blog posts"],
 };

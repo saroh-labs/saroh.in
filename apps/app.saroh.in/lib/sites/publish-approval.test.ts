@@ -33,6 +33,24 @@ describe("publishApprovalOf", () => {
         ).toEqual({ on: false, canChange: false });
     });
 
+    // DEC-103: Pro's alone. Hidden, never upsold, on a plan without it.
+    it("hides the setting on a plan without the approval row, even switched on", () => {
+        expect(
+            publishApprovalOf(
+                { publishNeedsApproval: true, canOverride: true },
+                true,
+                false,
+            ),
+        ).toBe(null);
+        expect(
+            publishApprovalOf(
+                { publishNeedsApproval: false, canOverride: true },
+                true,
+                true,
+            ),
+        ).toEqual({ on: false, canChange: true });
+    });
+
     it("says who can change it", () => {
         expect(publishApprovalLine(true)).toBe(
             "On · only the owner can change this",
