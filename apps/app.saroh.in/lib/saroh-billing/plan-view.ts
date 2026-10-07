@@ -350,7 +350,7 @@ export function yourPlan(input: {
         given &&
         (override.expiresAt === null ||
             (move !== null && override.expiresAt > move.from));
-    if (move && move.waiting === "authorise") {
+    if (move?.waiting === "authorise") {
         // Due, and waiting on the business: the one move that needs a tap.
         const to = planName(catalog, move.planId);
         notes.push({

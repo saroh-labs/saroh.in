@@ -64,16 +64,19 @@ export type NotesKind = "health" | "food" | "general";
  * was recorded, asks in general words: never health on a bakery or a
  * boutique (UX-040).
  */
-const NOTES_BY_TEMPLATE: Readonly<Record<string, NotesKind>> = {
-    clinic: "health",
-    dietician: "health",
-    gym: "health",
-    bakery: "food",
-};
+const NOTES_BY_TEMPLATE: ReadonlyMap<string, NotesKind> = new Map<
+    string,
+    NotesKind
+>([
+    ["clinic", "health"],
+    ["dietician", "health"],
+    ["gym", "health"],
+    ["bakery", "food"],
+]);
 
 /** The notes' kind for a business whose website was made from `templateId`. */
 export function notesKindOf(templateId: string | null | undefined): NotesKind {
-    return (templateId && NOTES_BY_TEMPLATE[templateId]) || "general";
+    return (templateId ? NOTES_BY_TEMPLATE.get(templateId) : null) ?? "general";
 }
 
 export interface AccountBooking {
