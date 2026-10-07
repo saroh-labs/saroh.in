@@ -16,7 +16,7 @@ import { prisma } from "@saroh/database";
 import type { OrganizationContext } from "../../common/types/organization-context";
 import { planMeter } from "../billing/metering.service";
 import { isReservedContactEmail } from "../contacts/contact-email";
-import { authorize } from "../organizations/organization-policy";
+import { allows, authorize } from "../organizations/organization-policy";
 import { encryptSecret } from "../payments/crypto";
 import type {
     NoticeChannels,
@@ -25,6 +25,8 @@ import type {
 import { contactReach, noticeChannels } from "../site-accounts/notice-reach";
 import type { NoticeVars } from "../site-accounts/notify-templates";
 import { renderNotice } from "../site-accounts/notify-templates";
+import type { EmailSetup } from "./email-setup";
+import { readEmailSetup } from "./email-setup";
 import type { MessageSendPayload } from "./message-send.handler";
 import {
     INVOICE_PDF_ATTACHMENT,
@@ -341,6 +343,20 @@ export class CommunicationsService {
      * rule as the send (`saroh-email-state.ts`); a failed lookup reads as
      * UNREAD, never as off or a zero.
      */
+    /**
+     * Whether the business has its own email provider, and if not whether
+     * its plan lets it connect one (DEC-011, amended 2026-10-07; DEC-091):
+     * what the workspace's "connect your email" prompt is drawn from. For
+     * whoever can act on it — `comms:manage` to connect, `billing:read` for
+     * the plans — and nobody else.
+     */
+    async emailSetup(ctx: OrganizationContext): Promise<EmailSetup> {
+        if (!allows(ctx, "comms:manage") && !allows(ctx, "billing:read")) {
+            authorize(ctx, "comms:manage");
+        }
+        return readEmailSetup(prisma, ctx.organizationId);
+    }
+
     async sarohEmail(ctx: OrganizationContext): Promise<SarohEmailState> {
         authorize(ctx, "comms:manage");
         return sarohEmailState(prisma, ctx.organizationId);

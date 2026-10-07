@@ -342,9 +342,13 @@ organizations/:org/customers`: everyone who has paid (an order through a
   business's names cleaned; built, #849), a site's customer sign-in codes and the email-changed notice
   with Saroh's built-in customer accounts (ADR-011), and a template test
   sent to the signed-in user's own verified address. A business that brings
-  its own login system sends its own codes (not built). The workspace is to
-  ask owners and admins to connect their email provider (decided, not yet
-  built). Consent gates every send.
+  its own login system sends its own codes (not built). With no email
+  provider, owners and admins who can act are asked to connect one — "Your
+  customers get no emails from you", and what they miss — on Home's Needs
+  you and Settings › Providers, with Connect (`comms:manage`), or on a plan
+  that can't connect one, "comes with a paid plan" and See plans
+  (`billing:read`); it goes once one is connected, and the same note says
+  why an invoice or a review invitation can't be emailed (built, #850). Consent gates every send.
 - **Adopted** — A simple WhatsApp deep link with a prefilled message is
   acceptable before any provider integration (§16). None exists yet.
 - **Adopted** (2026-09-26, ADR-011) — A message about a customer's own order,

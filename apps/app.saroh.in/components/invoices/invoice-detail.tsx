@@ -9,6 +9,7 @@ import type { ReactNode } from "react";
 import { useState } from "react";
 
 import { reportFailure } from "@/components/billing/plan-refusal";
+import { EmailNoteText } from "@/components/communications/email-note";
 import type { InvoiceRef } from "@/components/invoices/invoice-actions";
 import {
     CancelInvoiceDialog,
@@ -24,6 +25,8 @@ import { useBusinessDetailsStep } from "@/components/organizations/use-business-
 import { ConfirmDialog } from "@/components/shared/confirm-dialog";
 import { ReadOnlyNote } from "@/components/shared/read-only-note";
 import { ViewerDate } from "@/components/shared/viewer-date";
+import type { EmailNote } from "@/lib/communications/email-setup";
+import { INVOICE_EMAIL_WORDS } from "@/lib/communications/email-setup";
 import { createPayLink, createViewLink } from "@/lib/invoices/actions";
 import type { DetailActionId } from "@/lib/invoices/detail-actions";
 import { detailActions, owedHere } from "@/lib/invoices/detail-actions";
@@ -99,6 +102,7 @@ export function InvoiceDetail({
     connected,
     after,
     paymentsOn = true,
+    emailNote = null,
 }: {
     invoice: InvoiceRef & { kind: string };
     pill: { label: string; variant: PillVariant };
@@ -135,6 +139,11 @@ export function InvoiceDetail({
      * make the link take payment, so it isn't suggested.
      */
     paymentsOn?: boolean;
+    /**
+     * Why it can't be emailed when the business has no email provider of
+     * its own, with the way to fix it for this person (`emailRefusalNote`).
+     */
+    emailNote?: EmailNote | null;
 }) {
     const [open, setOpen] = useState<Dialog | null>(null);
     // A pay link waits for the registered address (DEC-068): asked here.
@@ -400,15 +409,18 @@ export function InvoiceDetail({
                         {owed &&
                         canWrite &&
                         send?.reason === "NO_EMAIL_PROVIDER" ? (
+                            // No email of its own (DEC-011): why, and the
+                            // way to fix it for who may — the note every
+                            // refused send shows.
                             <p className="mt-2 text-[12.5px] leading-[1.5] text-muted-foreground">
-                                To send invoices by email, connect your email
-                                provider.{" "}
-                                <Link
-                                    href="/settings/providers"
-                                    className="font-medium text-foreground underline underline-offset-4 hover:decoration-2 active:text-muted-foreground"
-                                >
-                                    Providers
-                                </Link>
+                                <EmailNoteText
+                                    note={
+                                        emailNote ?? {
+                                            text: INVOICE_EMAIL_WORDS.connect,
+                                            action: null,
+                                        }
+                                    }
+                                />
                             </p>
                         ) : null}
                     </section>

@@ -1,3 +1,6 @@
+import type { EmailNote } from "@/lib/communications/email-setup";
+import { emailRefusalNote } from "@/lib/communications/email-setup";
+
 import type {
     InvitationState,
     ProductRating,
@@ -62,34 +65,20 @@ export const NO_PROVIDER_NOTE =
 export const NO_PROVIDER_PLAN_NOTE =
     "Review invitations go from your own email, and connecting your own email needs a paid plan.";
 
-export interface ReviewEmailNote {
-    text: string;
-    /** The way to fix it, when this person may take it. */
-    action: { href: string; label: string } | null;
-}
+export type ReviewEmailNote = EmailNote;
 
 /**
  * What to lead with when invitations can't go (D11): connect the business's
  * own email, or, where the plan can't (Free, DEC-091), see the plans. Null
- * when they can go, or when it couldn't be read.
+ * when they can go, or when it couldn't be read. The same note as every
+ * refused send (`emailRefusalNote`), in review invitations' words.
  */
 export function reviewEmailNote(
     setup: ReviewEmailSetup | null | undefined,
     may: { connect: boolean; plans: boolean },
 ): ReviewEmailNote | null {
-    if (!setup || setup.connected) return null;
-    if (setup.canConnect === false) {
-        return {
-            text: NO_PROVIDER_PLAN_NOTE,
-            action: may.plans
-                ? { href: "/settings/billing#change-plan", label: "See plans" }
-                : null,
-        };
-    }
-    return {
-        text: NO_PROVIDER_NOTE,
-        action: may.connect
-            ? { href: "/settings/providers", label: "Connect one" }
-            : null,
-    };
+    return emailRefusalNote(setup, may, {
+        connect: NO_PROVIDER_NOTE,
+        plans: NO_PROVIDER_PLAN_NOTE,
+    });
 }

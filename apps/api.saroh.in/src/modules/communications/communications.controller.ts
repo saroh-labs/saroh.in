@@ -66,6 +66,16 @@ export class CommunicationsController {
         return this.comms.sarohEmail(ctx);
     }
 
+    /**
+     * Whether the business has its own email provider, and if not whether
+     * its plan lets it connect one (DEC-091): the workspace's prompt to
+     * connect one. Not module-gated: it says what is true either way.
+     */
+    @Get("comms-providers/email-setup")
+    emailSetup(@OrgContext() ctx: OrganizationContext) {
+        return this.comms.emailSetup(ctx);
+    }
+
     @Delete("comms-providers/:channel")
     @RequireModule("COMMUNICATIONS")
     disconnect(
