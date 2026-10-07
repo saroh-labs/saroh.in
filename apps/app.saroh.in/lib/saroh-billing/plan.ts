@@ -90,6 +90,8 @@ export type NextCharge =
     | { kind: "charge"; iso: string; amount: string }
     /** "Ends 4 Oct 2026". */
     | { kind: "ends"; iso: string }
+    /** "Paid to 4 Oct 2026": a year paid once (DEC-093). */
+    | { kind: "paidTo"; iso: string }
     | { kind: "text"; text: string };
 
 export interface PlanSummary {

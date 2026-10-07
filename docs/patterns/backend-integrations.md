@@ -319,6 +319,30 @@ assumptions made are listed in `docs/architecture/PRICING_ROLLOUT.md` →
 transaction as its row and ignores one older than the last applied
 (`Subscription.providerEventAt`).
 
+**DEC-093 adds** (`checkout.service.ts`, `checkout-confirm.service.ts`):
+
+- **Terms.** A monthly subscription is made with `totalCount` 12 (the
+  adapter's open-ended 120 is only a fallback). A yearly plan is a one-time
+  Razorpay **order** (`orders` capability, `POST /orders`), stored where a
+  subscription id would be, with `providerPlanId` `"one-time"`; its
+  `order.paid` webhook reads as the charge. **Saroh's Razorpay webhook must
+  subscribe to `order.paid`** as well as the `subscription.*` events. An
+  order has nothing to cancel: the adapter asks Razorpay nothing for one.
+- **Razorpay's own window, not its hosted page.** The checkout answers a
+  `handoff` (the key id — public — the subscription or order id, and the
+  owner's email, business name and phone pre-filled); the app opens
+  Checkout over the page (`razorpay-window.ts`). The hosted page link stays
+  as the fallback when the window can't open.
+- **Back from paying, ask the provider.** `POST …/billing/checkout/confirm`
+  reads the OPEN checkout's subscription or order (`statuses` capability:
+  `GET /subscriptions/:id`, `GET /orders/:id` and its payments) and
+  reconciles it by the webhook's own rule
+  (`BillingWebhookService.reconcileCheckout`), under the subscription's and
+  the checkout's row locks — so the plan moves without the webhook, and
+  whichever of the two lands second changes nothing (the invoice is keyed
+  once per charge). Rate-limited per business; an unanswered call is
+  "still waiting", never a reason to pay again.
+
 ## Media storage — **Current**
 
 One R2 bucket per environment in the Saroh labs Cloudflare account:

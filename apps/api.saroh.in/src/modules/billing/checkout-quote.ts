@@ -26,15 +26,48 @@ import {
  *   plan from the date (the period's end, or the move's).
  * - `TRIAL` (U16): a paid plan with a free trial, where `NEW` would be and
  *   the business may still have one, or another paid plan while a trial
- *   runs (the same end). A checkout; on the plan once authorised, nothing
- *   charged until `startAt`, the trial's end.
+ *   runs (the same end). A checkout; on the plan once authorised, its first
+ *   charge at `startAt`, the trial's end. With the catalogue's nominal first
+ *   month (DEC-093) that month's charge is taken at authorisation.
+ * - `RENEW` (DEC-093, #803): the plan it's on, again, once its 12-month
+ *   term is about to end (`RENEW_WINDOW_DAYS`). A checkout authorised now
+ *   for a new term starting when this one ends, at the live price.
+ *
+ * How it's paid (DEC-093): monthly on autopay for `TERM_CHARGES` charges,
+ * then a one-tap renewal; yearly as one payment for the year, taken when
+ * the business pays, with no autopay at all. So a yearly plan never has a
+ * trial, and the set-up check autopay needs (`mandateCheck`) is named for
+ * what it is: a charge that pays for something, or a small amount the
+ * provider takes and refunds.
  *
  * A coupon (U16) applies to a checkout that starts a plan (`NEW`, `TRIAL`):
  * off each of the first months on monthly, or that many months' worth once
  * off the first yearly charge, never more than the charge.
  */
 export type ChangeKind =
-    "NONE" | "TO_FREE" | "NEW" | "UPGRADE" | "SCHEDULED" | "TRIAL";
+    "NONE" | "TO_FREE" | "NEW" | "UPGRADE" | "SCHEDULED" | "TRIAL" | "RENEW";
+
+/** How many monthly charges one autopay term runs for (DEC-093, R15). */
+export const TERM_CHARGES = 12;
+
+/** How long before a term ends its one-tap renewal opens. */
+export const RENEW_WINDOW_DAYS = 30;
+
+/**
+ * How a change is paid: monthly on autopay, yearly as one payment
+ * (DEC-093). Nothing to pay (NONE, TO_FREE) reads as autopay and is never
+ * shown.
+ */
+export type PaymentKind = "AUTOPAY" | "ONE_TIME";
+
+/**
+ * What setting up autopay takes now: `PAID` — the payment taken is a real
+ * charge (a first month, a first charge, an upgrade's difference) and is
+ * kept; `REFUNDED` — nothing is owed now, so the provider takes a small
+ * amount to check the mandate and refunds it; `NONE` — no autopay (a
+ * one-time payment, or nothing to pay).
+ */
+export type MandateCheck = "PAID" | "REFUNDED" | "NONE";
 
 /** The kinds a coupon can be used on. */
 export const COUPON_KINDS: readonly ChangeKind[] = ["NEW", "TRIAL"];
@@ -99,6 +132,17 @@ export interface ChangeQuote {
      * charges is exactly what Saroh's invoice says.
      */
     discountTotalPaise: number;
+    /** Monthly autopay, or yearly's one payment (DEC-093). */
+    payment: PaymentKind;
+    /** Charges the change commits to: 12 monthly, 1 yearly; 0 for none. */
+    termCharges: number;
+    /**
+     * Exactly what the business pays when it authorises, GST included: a
+     * first charge, a first month, an upgrade's difference, a year paid
+     * ahead — or zero.
+     */
+    payNowTotalPaise: number;
+    mandateCheck: MandateCheck;
 }
 
 const YEAR_MONTHS = 12;
@@ -175,19 +219,7 @@ export function couponDiscount(
 }
 
 /** What changing to `target` would be, and cost. */
-export function quoteChange(input: {
-    subscription: QuoteSubscription | null;
-    target: QuotePlanRow;
-    now: Date;
-    /**
-     * The target plan's free trial, in days, when the business may still
-     * have one (the service decides: the plan offers one and it never had
-     * one). Null: no trial.
-     */
-    trialDays?: number | null;
-    /** A coupon to apply, already checked as usable (the service's job). */
-    coupon?: QuoteCoupon | null;
-}): ChangeQuote {
+export function quoteChange(input: QuoteInput): ChangeQuote {
     const base = baseQuote(input);
     const cycle: BillingCycle =
         input.target.interval === "year" ? "year" : "month";
@@ -197,14 +229,61 @@ export function quoteChange(input: {
             ? couponDiscount(input.coupon, price, cycle)
             : { discountPaise: 0, discountCharges: 0 };
     const first = price - off.discountPaise;
+    const firstTotal = withGstPaise(first);
+    const nothing = base.kind === "NONE" || base.kind === "TO_FREE";
+    const payment: PaymentKind =
+        cycle === "year" && !nothing ? "ONE_TIME" : "AUTOPAY";
+    const payNowTotalPaise = nothing
+        ? 0
+        : payment === "ONE_TIME"
+          ? base.kind === "UPGRADE"
+              ? base.chargeNowTotalPaise
+              : firstTotal
+          : base.kind === "NEW"
+            ? firstTotal
+            : base.chargeNowTotalPaise;
     return {
         ...base,
         ...off,
         firstChargePaise: first,
         firstChargeGstPaise: gstPaise(first),
-        firstChargeTotalPaise: withGstPaise(first),
-        discountTotalPaise: withGstPaise(price) - withGstPaise(first),
+        firstChargeTotalPaise: firstTotal,
+        discountTotalPaise: withGstPaise(price) - firstTotal,
+        payment,
+        termCharges: nothing ? 0 : payment === "ONE_TIME" ? 1 : TERM_CHARGES,
+        payNowTotalPaise,
+        mandateCheck:
+            nothing || payment === "ONE_TIME"
+                ? "NONE"
+                : payNowTotalPaise > 0
+                  ? "PAID"
+                  : "REFUNDED",
     };
+}
+
+export interface QuoteInput {
+    subscription: QuoteSubscription | null;
+    target: QuotePlanRow;
+    now: Date;
+    /**
+     * The target plan's free trial, in days, when the business may still
+     * have one (the service decides: the plan offers one and it never had
+     * one). Null: no trial. Never on yearly, which has no autopay to take
+     * the first charge later (DEC-093).
+     */
+    trialDays?: number | null;
+    /**
+     * What the trial's days cost, before GST (DEC-093's nominal first
+     * month, from the catalogue): taken at authorisation. Zero: free.
+     */
+    trialFirstPaise?: number;
+    /**
+     * When the 12-month term of the plan it's on ends (`billing-term.ts`),
+     * when it has one: the same plan is then a renewal from that date.
+     */
+    termEndsAt?: Date | null;
+    /** A coupon to apply, already checked as usable (the service's job). */
+    coupon?: QuoteCoupon | null;
 }
 
 type BaseQuote = Omit<
@@ -215,16 +294,21 @@ type BaseQuote = Omit<
     | "firstChargeGstPaise"
     | "firstChargeTotalPaise"
     | "discountTotalPaise"
+    | "payment"
+    | "termCharges"
+    | "payNowTotalPaise"
+    | "mandateCheck"
 >;
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
-function baseQuote(input: {
-    subscription: QuoteSubscription | null;
-    target: QuotePlanRow;
-    now: Date;
-    trialDays?: number | null;
-}): BaseQuote {
+/** The term ends soon enough that the same plan is its renewal. */
+export function renewOpen(termEndsAt: Date | null | undefined, now: Date) {
+    if (!termEndsAt || termEndsAt.getTime() <= now.getTime()) return false;
+    return termEndsAt.getTime() - now.getTime() <= RENEW_WINDOW_DAYS * DAY_MS;
+}
+
+function baseQuote(input: QuoteInput): BaseQuote {
     const { subscription: sub, target, now } = input;
     const cycle: BillingCycle = target.interval === "year" ? "year" : "month";
     const price = target.priceCents;
@@ -239,6 +323,24 @@ function baseQuote(input: {
     };
     const live = sub && sub.status !== "CANCELLED" ? sub : null;
 
+    // The plan it's on, on the same cycle, at its term's end: a renewal
+    // from that date at today's price (the live row), else nothing to do.
+    if (
+        live &&
+        price > 0 &&
+        live.plan.key === target.key &&
+        live.plan.interval === target.interval &&
+        billedByProvider(live) &&
+        input.termEndsAt &&
+        renewOpen(input.termEndsAt, now)
+    ) {
+        return {
+            ...base,
+            kind: "RENEW",
+            startAt: input.termEndsAt,
+            effectiveAt: input.termEndsAt,
+        };
+    }
     if (live?.plan.id === target.id) {
         return { ...base, kind: "NONE", startAt: null, effectiveAt: null };
     }
@@ -260,12 +362,20 @@ function baseQuote(input: {
 
     const onCatalogue = live?.plan.key.startsWith(CATALOG_PLAN_KEY_PREFIX);
     if (!live || !billedByProvider(live) || !onCatalogue || !periodEndAt) {
-        const days = input.trialDays ?? 0;
+        const days = cycle === "month" ? (input.trialDays ?? 0) : 0;
         if (days > 0) {
             const ends = new Date(now.getTime() + days * DAY_MS);
+            // The nominal first month (DEC-093), taken as it's authorised.
+            const first = Math.max(
+                0,
+                Math.min(input.trialFirstPaise ?? 0, price),
+            );
             return {
                 ...base,
                 kind: "TRIAL",
+                chargeNowPaise: first,
+                chargeNowGstPaise: gstPaise(first),
+                chargeNowTotalPaise: withGstPaise(first),
                 startAt: ends,
                 effectiveAt: null,
                 trialEndsAt: ends,
@@ -274,7 +384,12 @@ function baseQuote(input: {
         return { ...base, kind: "NEW", startAt: null, effectiveAt: null };
     }
 
-    // Another plan while a trial runs: still a trial, to the same end.
+    // Yearly while a trial runs: one payment, so the year starts now.
+    if (trialing && cycle === "year") {
+        return { ...base, kind: "NEW", startAt: null, effectiveAt: null };
+    }
+    // Another plan while a trial runs: still a trial, to the same end. Its
+    // first month was paid with the first checkout; nothing more now.
     if (trialing) {
         return {
             ...base,

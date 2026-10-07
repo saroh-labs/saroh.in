@@ -209,6 +209,56 @@ export class SarohInvoicesService {
     }
 
     /**
+     * A plan's nominal first month (DEC-093), taken as the mandate was
+     * authorised: one line for the days to the trial's end, once per
+     * checkout (`first-month:<checkout>`). Written as a new plan's first
+     * invoice; the first full charge, at the trial's end, is still read as
+     * the plan's first (`invoiceRenewalInTx` leaves this one out).
+     */
+    async invoiceFirstMonthInTx(
+        tx: Tx,
+        input: {
+            checkout: BillingCheckout;
+            event: ParsedBillingEvent;
+            now: Date;
+        },
+    ): Promise<string | null> {
+        const { checkout, event, now } = input;
+        if (checkout.kind !== "TRIAL" || checkout.chargeNowPaise <= 0) {
+            return null;
+        }
+        const plan = await tx.plan.findUnique({
+            where: { id: checkout.planId },
+            select: { name: true },
+        });
+        const planName = plan?.name ?? "Plan";
+        return this.recordInTx(tx, {
+            organizationId: checkout.organizationId,
+            source: "NEW",
+            chargeKey: `${FIRST_MONTH_KEY}${checkout.id}`,
+            provider: checkout.provider,
+            providerSubscriptionId: checkout.providerSubscriptionId,
+            providerEventId: event.providerEventId,
+            providerPaymentId: event.providerPaymentId ?? null,
+            checkoutId: checkout.id,
+            planId: checkout.planId,
+            planName,
+            cycle: "month",
+            periodStart: now,
+            periodEnd: checkout.startAt,
+            lines: [
+                {
+                    description: `${planName}: first month`,
+                    sac: this.sellerNow().sac,
+                    unitPaise: checkout.chargeNowPaise,
+                },
+            ],
+            billTo: billToOf(checkout),
+            issuedAt: now,
+        });
+    }
+
+    /**
      * A charge on the subscription's own provider subscription — a renewal,
      * or the first charge of a scheduled change the sweep applied first —
      * on the plan it was billed on before the webhook moved anything, for
@@ -258,13 +308,15 @@ export class SarohInvoicesService {
             },
         });
         // Charges of this provider subscription already invoiced, an
-        // upgrade's difference aside: this one is the next.
+        // upgrade's difference and a nominal first month aside: this one is
+        // the next.
         const before = await tx.sarohInvoice.count({
             where: {
                 organizationId: input.organizationId,
                 provider: sub.provider,
                 providerSubscriptionId: sub.providerSubscriptionId,
                 source: { not: "UPGRADE" },
+                NOT: { chargeKey: { startsWith: FIRST_MONTH_KEY } },
             },
         });
         // A scheduled change's first charge, when the sweep moved it first;
@@ -553,6 +605,9 @@ function buyerName(
     }
     return "Your business";
 }
+
+/** The charge key of a nominal first month (DEC-093), before its checkout. */
+const FIRST_MONTH_KEY = "first-month:";
 
 function periodKey(
     provider: string,

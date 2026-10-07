@@ -5,13 +5,17 @@ import type {
     BillingProvider,
     BillingProviderFactory,
     CancelSubscriptionOptions,
+    CheckoutStatus,
+    CreateOrderInput,
     CreateProviderPlanInput,
     CreateSubscriptionInput,
     CreateSubscriptionResult,
     NextChargeItem,
     ParsedBillingEvent,
     ProviderChargeCapability,
+    ProviderOrderCapability,
     ProviderPlanCapability,
+    ProviderStatusCapability,
     SubscriptionStatus,
     WebhookHeaders,
 } from "./billing-provider.port";
@@ -103,6 +107,44 @@ export class FakeProviderCharges implements ProviderChargeCapability {
     }
 }
 
+/** The fake's one-time payments (DEC-093): each order recorded. */
+export class FakeProviderOrders implements ProviderOrderCapability {
+    readonly created: CreateOrderInput[] = [];
+
+    createOrder(input: CreateOrderInput): Promise<{ providerOrderId: string }> {
+        this.created.push(input);
+        return Promise.resolve({
+            providerOrderId: `fake_order_${input.reference}`,
+        });
+    }
+}
+
+/**
+ * What the fake says a checkout stands at when asked (DEC-093): set per
+ * reference by a test, else still waiting. Every question is recorded.
+ */
+export class FakeProviderStatuses implements ProviderStatusCapability {
+    readonly asked: { ref: string; oneTime: boolean }[] = [];
+    private readonly byRef = new Map<string, CheckoutStatus>();
+    failNext: BillingProviderError | null = null;
+
+    set(ref: string, status: CheckoutStatus): void {
+        this.byRef.set(ref, status);
+    }
+
+    checkoutStatus(ref: string, oneTime: boolean): Promise<CheckoutStatus> {
+        this.asked.push({ ref, oneTime });
+        if (this.failNext) {
+            const error = this.failNext;
+            this.failNext = null;
+            return Promise.reject(error);
+        }
+        return Promise.resolve(
+            this.byRef.get(ref) ?? { phase: "other", status: "IGNORED" },
+        );
+    }
+}
+
 /**
  * Deterministic, network-free billing provider for tests/dev (S7-005).
  *
@@ -121,6 +163,10 @@ export class FakeBillingProvider implements BillingProvider {
     readonly cancelOptions: (CancelSubscriptionOptions | undefined)[] = [];
     readonly plans = new FakeProviderPlans();
     readonly charges = new FakeProviderCharges();
+    readonly orders = new FakeProviderOrders();
+    readonly statuses = new FakeProviderStatuses();
+    /** The public key Checkout would open with; null: no window. */
+    publicKeyValue: string | null = null;
     /** The next `createSubscription` fails with this, once. */
     failNextCreate: BillingProviderError | null = null;
 
@@ -165,6 +211,10 @@ export class FakeBillingProvider implements BillingProvider {
                 ? { authorisationUrl: `https://pay.fake.test/${id}` }
                 : {}),
         });
+    }
+
+    publicKey(): string | null {
+        return this.publicKeyValue;
     }
 
     cancelSubscription(

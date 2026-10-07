@@ -6,13 +6,17 @@ import type {
     BillingEventPhase,
     BillingProvider,
     CancelSubscriptionOptions,
+    CheckoutStatus,
+    CreateOrderInput,
     CreateProviderPlanInput,
     CreateSubscriptionInput,
     CreateSubscriptionResult,
     NextChargeItem,
     ParsedBillingEvent,
     ProviderChargeCapability,
+    ProviderOrderCapability,
     ProviderPlanCapability,
+    ProviderStatusCapability,
     SubscriptionStatus,
     WebhookHeaders,
 } from "./billing-provider.port";
@@ -21,6 +25,7 @@ import {
     RAZORPAY_KEY_ID,
     RAZORPAY_KEY_SECRET,
     RAZORPAY_WEBHOOK_SECRET,
+    readPlatformSecret,
     requirePlatformSecret,
 } from "./platform-secrets";
 
@@ -28,12 +33,15 @@ import {
 const CALL_TIMEOUT_MS = 15_000;
 
 /**
- * How many charges a subscription is made for. Razorpay asks for a count
- * (`total_count`); Saroh's plans run until cancelled, so it is the most a
- * cycle sensibly needs: ten years either way. Not a plan term — the business
- * can cancel at any time. Unverified against test mode (U15, OQ-6).
+ * How many charges a subscription is made for when the caller names none.
+ * Razorpay asks for a count (`total_count`). The checkout names its term
+ * (DEC-093: 12 monthly charges); this open-ended fallback is what U15 made
+ * before there was a term. Confirmed accepted in test mode (OQ-6).
  */
 const TOTAL_COUNT: Record<string, number> = { month: 120, year: 10 };
+
+/** Razorpay's order ids; an order is a one-time payment, never cancelled. */
+const ORDER_PREFIX = "order_";
 
 /** How many pages of plans `findPlan` reads before giving up. */
 const FIND_PLAN_PAGES = 5;
@@ -78,6 +86,20 @@ export class RazorpayBillingProvider implements BillingProvider {
         addToNextCharge: (item) => this.addToNextCharge(item),
     };
 
+    readonly orders: ProviderOrderCapability = {
+        createOrder: (input) => this.createOrder(input),
+    };
+
+    readonly statuses: ProviderStatusCapability = {
+        checkoutStatus: (ref, oneTime) =>
+            oneTime ? this.orderStatus(ref) : this.subscriptionStatus(ref),
+    };
+
+    /** The key id Checkout opens with: public by design, never the secret. */
+    publicKey(): string | null {
+        return readPlatformSecret(RAZORPAY_KEY_ID) ?? null;
+    }
+
     async createSubscription(
         input: CreateSubscriptionInput,
     ): Promise<CreateSubscriptionResult> {
@@ -99,8 +121,9 @@ export class RazorpayBillingProvider implements BillingProvider {
                 "Razorpay subscription creation refused: the coupon has no Razorpay offer",
             );
         }
+        const openEnded = TOTAL_COUNT[input.interval] ?? TOTAL_COUNT.month;
         const body: Record<string, unknown> = {
-            total_count: TOTAL_COUNT[input.interval] ?? TOTAL_COUNT.month,
+            total_count: input.totalCount ?? openEnded,
             quantity: 1,
             customer_notify: 1,
             notes: {
@@ -159,6 +182,9 @@ export class RazorpayBillingProvider implements BillingProvider {
         providerSubscriptionId: string,
         options: CancelSubscriptionOptions = {},
     ): Promise<void> {
+        // A one-time payment has nothing to cancel: paid, it's done; unpaid,
+        // Razorpay lets the order lapse on its own (DEC-093).
+        if (providerSubscriptionId.startsWith(ORDER_PREFIX)) return;
         await this.call(
             "subscription cancel",
             "POST",
@@ -200,12 +226,17 @@ export class RazorpayBillingProvider implements BillingProvider {
                     };
                 };
                 payment?: { entity?: { id?: string } };
+                order?: { entity?: { id?: string } };
             };
         };
 
         const type = body.event ?? "unknown";
         const entity = body.payload?.subscription?.entity;
-        const providerSubscriptionId = entity?.id;
+        // A yearly plan's one payment (DEC-093): the order stands where a
+        // subscription would, and its `order.paid` is the charge.
+        const order =
+            type === "order.paid" ? body.payload?.order?.entity : undefined;
+        const providerSubscriptionId = entity?.id ?? order?.id;
 
         return {
             type,
@@ -225,6 +256,104 @@ export class RazorpayBillingProvider implements BillingProvider {
             ...(body.payload?.payment?.entity?.id
                 ? { providerPaymentId: body.payload.payment.entity.id }
                 : {}),
+        };
+    }
+
+    // ── One-time payments and asking how a checkout stands (DEC-093) ────
+
+    /** A yearly plan's one payment: an order Checkout pays. */
+    private async createOrder(
+        input: CreateOrderInput,
+    ): Promise<{ providerOrderId: string }> {
+        const res = await this.call("order creation", "POST", "/orders", {
+            amount: input.amountPaise,
+            currency: input.currency,
+            receipt: input.reference.slice(0, 40),
+            notes: {
+                sarohPlanKey: input.planKey,
+                organizationId: input.organizationId,
+                [REFERENCE_NOTE]: input.reference,
+            },
+        });
+        const json = (await res.json()) as { id?: string };
+        if (!json.id) {
+            throw new BillingProviderError(
+                "UNKNOWN",
+                "Razorpay order creation failed: missing order id",
+            );
+        }
+        return { providerOrderId: json.id };
+    }
+
+    /**
+     * A subscription as Razorpay holds it now, read as the event its
+     * webhook would send: authorised but not yet charged (a start date
+     * ahead), charged, or ended. `created` is still waiting.
+     */
+    private async subscriptionStatus(id: string): Promise<CheckoutStatus> {
+        const res = await this.call(
+            "subscription lookup",
+            "GET",
+            `/subscriptions/${encodeURIComponent(id)}`,
+        );
+        const json = (await res.json()) as {
+            status?: string;
+            current_end?: number | null;
+            paid_count?: number;
+        };
+        const end = unixDate(json.current_end);
+        switch (json.status) {
+            case "authenticated":
+                return { phase: "authenticated", status: "IGNORED" };
+            case "active":
+                return {
+                    phase: (json.paid_count ?? 0) > 0 ? "charged" : "activated",
+                    status: "ACTIVE",
+                    currentPeriodEnd: end,
+                };
+            case "pending":
+                return { phase: "pending", status: "PAST_DUE" };
+            case "halted":
+                return { phase: "halted", status: "PAST_DUE" };
+            case "cancelled":
+            case "expired":
+                return { phase: "cancelled", status: "CANCELLED" };
+            case "completed":
+                return {
+                    phase: "completed",
+                    status: "CANCELLED",
+                    currentPeriodEnd: end,
+                };
+            default:
+                return { phase: "other", status: "IGNORED" };
+        }
+    }
+
+    /** An order: paid, or still waiting (`created`, `attempted`). */
+    private async orderStatus(id: string): Promise<CheckoutStatus> {
+        const res = await this.call(
+            "order lookup",
+            "GET",
+            `/orders/${encodeURIComponent(id)}`,
+        );
+        const json = (await res.json()) as { status?: string };
+        if (json.status !== "paid")
+            return { phase: "other", status: "IGNORED" };
+        const paid = await this.call(
+            "order payments lookup",
+            "GET",
+            `/orders/${encodeURIComponent(id)}/payments`,
+        );
+        const list = (await paid.json()) as {
+            items?: { id?: string; status?: string }[];
+        };
+        const payment = (list.items ?? []).find(
+            (p) => p.status === "captured" && p.id,
+        );
+        return {
+            phase: "charged",
+            status: "ACTIVE",
+            providerPaymentId: payment?.id ?? null,
         };
     }
 
@@ -383,6 +512,7 @@ function unixDate(seconds: number | null | undefined): Date | null {
 /** Map a Razorpay subscription event type → the target subscription status. */
 function outcomeFor(type: string): SubscriptionStatus | "IGNORED" {
     switch (type) {
+        case "order.paid":
         case "subscription.activated":
         case "subscription.charged":
         case "subscription.resumed":
@@ -408,6 +538,7 @@ function phaseFor(type: string): BillingEventPhase {
         case "subscription.resumed":
             return "activated";
         case "subscription.charged":
+        case "order.paid":
             return "charged";
         case "subscription.pending":
             return "pending";

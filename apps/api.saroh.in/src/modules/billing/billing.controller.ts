@@ -22,6 +22,8 @@ import type { AddonsView } from "./addons.service";
 import { AddonsService } from "./addons.service";
 import type { BillingAccessView } from "./catalogue-access";
 import { CatalogueAccessService } from "./catalogue-access.service";
+import type { ConfirmView } from "./checkout-confirm.service";
+import { CheckoutConfirmService } from "./checkout-confirm.service";
 import type {
     ChangePlanQuoteView,
     ChangePlanResult,
@@ -81,6 +83,7 @@ export class BillingController {
         private readonly checkouts: CheckoutService,
         private readonly invoices: SarohInvoicesService,
         private readonly addons: AddonsService,
+        private readonly confirmer: CheckoutConfirmService,
     ) {}
 
     /** Saroh's invoices to the business for its plan, newest first (U17). */
@@ -165,6 +168,18 @@ export class BillingController {
         @OrgContext() ctx: OrganizationContext,
     ): Promise<CheckoutsView> {
         return this.checkouts.current(ctx);
+    }
+
+    /**
+     * Back from paying (DEC-093): the checkout waiting is looked up at the
+     * provider and the plan moves if it's paid, without waiting for the
+     * webhook. Safe to call again and again. `billing:manage`.
+     */
+    @Post("checkout/confirm")
+    confirmCheckout(
+        @OrgContext() ctx: OrganizationContext,
+    ): Promise<ConfirmView> {
+        return this.confirmer.confirm(ctx);
     }
 
     /** What the business's plan gives it, row by row (plans catalogue U12). */

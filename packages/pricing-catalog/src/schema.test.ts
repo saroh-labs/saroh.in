@@ -1,7 +1,12 @@
 import { describe, expect, it } from "vitest";
 
 import { edit, fixture, fixtureInput } from "./catalog.fixture";
-import { catalogSchema, cellOf, validateCatalog } from "./schema";
+import {
+    catalogSchema,
+    cellOf,
+    trialFirstPaise,
+    validateCatalog,
+} from "./schema";
 
 const errorsOf = (input: unknown) => {
     const r = validateCatalog(input);
@@ -48,6 +53,28 @@ describe("the catalogue schema", () => {
         expect(errorsOf(input).length).toBeGreaterThan(0);
         input.plans[1].trial = { on: true, days: 60 };
         expect(errorsOf(input)).toEqual([]);
+    });
+
+    it("keeps a paid first month within the plan's monthly price", () => {
+        const input = fixtureInput();
+        const price = input.plans[1].pricePaise;
+        input.plans[1].trial = { on: true, days: 30, firstPaise: price + 1 };
+        expect(errorsOf(input).join()).toMatch(
+            /first month can't cost more than a month/,
+        );
+        input.plans[1].trial = { on: true, days: 30, firstPaise: 7 };
+        expect(errorsOf(input)).toEqual([]);
+    });
+
+    it("reads a plan's first-month charge only while its offer is on", () => {
+        expect(
+            trialFirstPaise({ trial: { on: true, days: 30, firstPaise: 7 } }),
+        ).toBe(7);
+        expect(
+            trialFirstPaise({ trial: { on: false, days: 30, firstPaise: 7 } }),
+        ).toBe(0);
+        expect(trialFirstPaise({ trial: { on: true, days: 30 } })).toBe(0);
+        expect(trialFirstPaise({})).toBe(0);
     });
 
     it("rejects yearly billing that pays for no months, or more than 12", () => {

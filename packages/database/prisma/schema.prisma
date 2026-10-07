@@ -6861,10 +6861,13 @@ model BillingCheckout {
   plan   Plan   @relation(fields: [planId], references: [id])
   cycle  String // "month" | "year"
   // NEW | UPGRADE | SCHEDULED | TRIAL (U16: on the plan once authorised, its
-  // first charge at `startAt`, the trial's end)
+  // first charge at `startAt`, the trial's end). A renewal of the plan it's
+  // on (DEC-093) is a SCHEDULED one for the same plan.
   kind   String
   status String @default("OPEN") // OPEN | SCHEDULED | COMPLETED | CANCELLED
 
+  // The provider's subscription; for a yearly plan paid once (DEC-093), its
+  // order, with `providerPlanId` "one-time".
   provider               String
   providerSubscriptionId String
   providerPlanId         String
@@ -6872,8 +6875,9 @@ model BillingCheckout {
 
   // The plan's recurring price before GST, in paise, as it was quoted.
   pricePaise        Int
-  // An UPGRADE's difference for the rest of the period, charged at
-  // authorisation; zero otherwise.
+  // Charged at authorisation, before GST: an UPGRADE's difference for the
+  // rest of the period, or a TRIAL's nominal first month (DEC-093); zero
+  // otherwise.
   chargeNowPaise    Int @default(0)
   chargeNowGstPaise Int @default(0)
 
