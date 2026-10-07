@@ -31,24 +31,26 @@
     // universal certificate covers it). The zone's own hosts (api, app,
     // admin, accounts, www, media) have "no Worker" routes, so the wildcard
     // never reaches them; the apex stays the dev marketing site.
-    "routes": [
-        { "pattern": "*.saroh.io/*", "zone_name": "saroh.io" },
-    ],
+    "routes": [{ "pattern": "*.saroh.io/*", "zone_name": "saroh.io" }],
     // Public values; SITE_RELAY_SECRET is a Worker secret.
     "vars": {
         "API_URL": "https://api.saroh.io",
     },
     "env": {
         // Production (`wrangler deploy --env production`, from main):
-        // `saroh-sites` for saroh.app against api.saroh.in. No routes yet, so
-        // a deploy takes no traffic; saroh.app stays on Vercel (through
-        // Cloudflare's proxy) until the cutover adds `saroh.app/*` and
-        // `*.saroh.app/*` here. Bindings and vars are not inherited, so each
-        // is repeated.
+        // `saroh-sites` serves saroh.app and every <address>.saroh.app against
+        // api.saroh.in (cut over 2026-10-07). A deploy replaces the Worker's
+        // routes with these, so they live here, not only in the dashboard;
+        // deploy-sites.yml then sets them to fail open, so a failing Worker
+        // falls through to the origin (Vercel) instead of an error page.
+        // Bindings and vars are not inherited, so each is repeated.
         "production": {
             "name": "saroh-sites",
             "workers_dev": true,
-            "routes": [],
+            "routes": [
+                { "pattern": "saroh.app/*", "zone_name": "saroh.app" },
+                { "pattern": "*.saroh.app/*", "zone_name": "saroh.app" },
+            ],
             "services": [
                 {
                     "binding": "WORKER_SELF_REFERENCE",
