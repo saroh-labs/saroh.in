@@ -15,7 +15,9 @@ import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 
 import { ViewerDate } from "@/components/shared/viewer-date";
+import { ReviewEmailNoteText } from "@/components/stores/review-email-note";
 import { inviteReviews } from "@/lib/product-reviews/actions";
+import type { ReviewEmailNote } from "@/lib/product-reviews/describe";
 import type {
     InvitableOrder,
     InviteResult,
@@ -28,16 +30,20 @@ const BATCH = 50;
  * "Invite reviews": paid, shipped orders from the last 90 days nobody has been
  * asked about — the newest 50 ticked, since that is what one send takes. What
  * was skipped, and why, is listed after sending rather than folded into a
- * count.
+ * count. With no email provider of the business's own (D11) nothing can be
+ * sent, so it leads with that and the way to fix it, and lists no orders.
  */
 export function InviteReviewsSheet({
     open,
     onOpenChange,
     orders,
+    emailNote,
 }: {
     open: boolean;
     onOpenChange: (open: boolean) => void;
     orders: InvitableOrder[];
+    /** Why invitations can't go; null when they can. */
+    emailNote: ReviewEmailNote | null;
 }) {
     const router = useRouter();
     const [picked, setPicked] = useState<Set<string>>(
@@ -63,13 +69,13 @@ export function InviteReviewsSheet({
                 showError(res.error);
                 return;
             }
-            const sent = res.data.filter((r) => r.status === "sent").length;
+            const sent = res.data.filter((r) => r.status === "queued").length;
             const skipped = res.data.length - sent;
             if (sent > 0) {
                 showSuccess(
                     sent === 1
-                        ? "Review invitation sent"
-                        : `${sent} review invitations sent`,
+                        ? "Review invitation sending"
+                        : `${sent} review invitations sending`,
                 );
             } else {
                 showWarning("No invitations were sent");
@@ -104,7 +110,13 @@ export function InviteReviewsSheet({
                     </SheetDescription>
                 </SheetHeader>
 
-                {results ? (
+                {emailNote ? (
+                    <div className="mt-5 flex-1">
+                        <p className="text-[13px] leading-[1.5] text-muted-foreground">
+                            <ReviewEmailNoteText note={emailNote} />
+                        </p>
+                    </div>
+                ) : results ? (
                     <div className="mt-5 flex-1 space-y-3 overflow-y-auto">
                         <p className="text-[13px] font-medium">Not sent</p>
                         <ul className="space-y-2">
@@ -178,7 +190,7 @@ export function InviteReviewsSheet({
                 )}
 
                 <SheetFooter className="mt-4">
-                    {results ? (
+                    {results || emailNote ? (
                         <Button onClick={() => onOpenChange(false)}>
                             Done
                         </Button>

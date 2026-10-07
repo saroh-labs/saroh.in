@@ -5,7 +5,7 @@ import {
     NotFoundException,
     Optional,
 } from "@nestjs/common";
-import type { ProductReview } from "@saroh/database";
+import type { Prisma, ProductReview } from "@saroh/database";
 import { prisma } from "@saroh/database";
 
 import type { OrganizationContext } from "../../common/types/organization-context";
@@ -14,7 +14,9 @@ import {
     AuditOutcome,
     AuditService,
 } from "../audit/audit.service";
+import { planMeter } from "../billing/metering.service";
 import { CommunicationsService } from "../communications/communications.service";
+import { CANCELLED_DELIVERY } from "../communications/message-send.handler";
 import { renderReviewInvitation } from "../communications/transactional";
 import { contactEmailForDisplay } from "../contacts/contact-email";
 import { FixedWindowRateLimiter } from "../enquiry/rate-limiter";
@@ -71,10 +73,28 @@ export interface InvitableOrder {
     itemCount: number;
 }
 
+/**
+ * Whether the business can send review invitations (D11): only through its
+ * own connected email provider. `canConnect` says, when it has none,
+ * whether its plan lets it connect one (the connect's own check,
+ * `MeteringService.hasRoom` on `integrations`, DEC-091); null when it has
+ * one, or when the plan couldn't be read.
+ */
+export interface ReviewEmailSetup {
+    connected: boolean;
+    canConnect: boolean | null;
+}
+
+/** What a delivery of the invitation's latest message says about it. */
+const ACCEPTED_DELIVERY = ["SENT", "DELIVERED"];
+/** Undelivered sends a resend withdraws: still queued, or failed and retrying. */
+const WITHDRAWABLE_DELIVERY = ["QUEUED", "FAILED"];
+
 export type InviteSkip =
     | IneligibleReason
     | "not-found"
     | "completed"
+    | "sending"
     | "send-limit"
     | "unsubscribed"
     | "no-email-provider"
@@ -84,10 +104,10 @@ export type InviteResult =
     | {
           orderId: string;
           /**
-           * Queued through the business's own email provider; the send job
-           * hands it over (and retries) from there.
+           * Queued through the business's own email provider; it shows as
+           * sent, and counts as a send, once the provider accepts it.
            */
-          status: "sent";
+          status: "queued";
           /** No contact linked or matched, so consent could not be checked. */
           note?: "consent-not-checked";
       }
@@ -99,29 +119,59 @@ export type InviteResult =
       };
 
 export interface InvitationState {
-    state: "none" | "sent" | "completed" | "expired";
+    /**
+     * sending: queued, the provider hasn't taken it yet. failed: the latest
+     * send didn't go (it used none of the three). sent: the provider
+     * accepted it.
+     */
+    state: "none" | "sending" | "failed" | "sent" | "completed" | "expired";
+    /** When the latest send was queued. */
     sentAt: string | null;
+    /** Sends the provider accepted (and, before D11, Saroh's sends). */
     sendCount: number;
     reviewed: number;
     lines: number;
     /** Null when the order can be invited (or re-sent); else why not. */
     blocked: { reason: InviteSkip; message: string } | null;
+    /** Whether invitations can go at all, for the section to lead with. */
+    email: ReviewEmailSetup;
 }
+
+export const NO_PROVIDER_MESSAGE =
+    "Review invitations go from your own email. Connect an email provider in Settings › Providers to send them.";
+export const NO_PROVIDER_PLAN_MESSAGE =
+    "Review invitations go from your own email, and connecting your own email needs a paid plan.";
 
 const SKIP_MESSAGE: Record<Exclude<InviteSkip, IneligibleReason>, string> = {
     "not-found": "This order was not found.",
     completed: "Every item on this order has been reviewed.",
+    sending:
+        "The invitation is still being sent. It shows as sent once your email provider accepts it.",
     "send-limit": "This order has already been asked three times.",
     unsubscribed: "This customer has unsubscribed from email.",
-    "no-email-provider":
-        "Review invitations go from your own email. Connect an email provider in Settings › Providers to send them.",
+    "no-email-provider": NO_PROVIDER_MESSAGE,
     "daily-limit": "Today's invitations are used up. Try again tomorrow.",
 };
 
-const skipMessage = (reason: InviteSkip): string =>
-    reason in INELIGIBLE_MESSAGE
-        ? INELIGIBLE_MESSAGE[reason as IneligibleReason]
-        : SKIP_MESSAGE[reason as Exclude<InviteSkip, IneligibleReason>];
+/**
+ * The words for "no email provider", by whether the plan lets the business
+ * connect one. The app shows the same words, with the way to fix it.
+ */
+export function noProviderMessage(canConnect: boolean | null): string {
+    return canConnect === false
+        ? NO_PROVIDER_PLAN_MESSAGE
+        : NO_PROVIDER_MESSAGE;
+}
+
+const skipMessage = (
+    reason: InviteSkip,
+    canConnect: boolean | null = null,
+): string =>
+    reason === "no-email-provider"
+        ? noProviderMessage(canConnect)
+        : reason in INELIGIBLE_MESSAGE
+          ? INELIGIBLE_MESSAGE[reason as IneligibleReason]
+          : SKIP_MESSAGE[reason as Exclude<InviteSkip, IneligibleReason>];
 
 function toView(r: ProductReview): ReviewView {
     return {
@@ -164,6 +214,24 @@ export class ProductReviewsService {
             DAY_MS,
         ),
     ) {}
+
+    /**
+     * Whether the plan has room for the business's own email (DEC-091):
+     * the connect's own check. A property so a test can stand in for it.
+     */
+    ownEmailRoom = (organizationId: string): Promise<boolean> =>
+        planMeter.hasRoom(organizationId, "integrations");
+
+    /** Whether invitations can go, and if not, whether the plan can fix it. */
+    async emailSetup(organizationId: string): Promise<ReviewEmailSetup> {
+        if (await this.comms.emailConnected(prisma, organizationId)) {
+            return { connected: true, canConnect: null };
+        }
+        const canConnect = await this.ownEmailRoom(organizationId).catch(
+            () => null,
+        );
+        return { connected: false, canConnect };
+    }
 
     async list(
         organizationId: string,
@@ -218,14 +286,40 @@ export class ProductReviewsService {
         );
     }
 
-    /** Paid, shipped orders from the last 90 days nobody has been asked about. */
+    /**
+     * Paid, shipped orders from the last 90 days nobody has been asked about:
+     * no invitation, or one whose every send failed (none accepted, none
+     * still on its way) and that Saroh's sender never sent.
+     */
     async invitableOrders(organizationId: string): Promise<InvitableOrder[]> {
         const orders = await prisma.order.findMany({
             where: {
                 organizationId,
                 paymentStatus: "PAID",
                 status: { in: ["SHIPPED", "DELIVERED"] },
-                reviewInvitation: null,
+                OR: [
+                    { reviewInvitation: null },
+                    {
+                        reviewInvitation: {
+                            completedAt: null,
+                            sendCount: 0,
+                            messages: {
+                                none: {
+                                    deliveries: {
+                                        some: {
+                                            status: {
+                                                in: [
+                                                    ...ACCEPTED_DELIVERY,
+                                                    "QUEUED",
+                                                ],
+                                            },
+                                        },
+                                    },
+                                },
+                            },
+                        },
+                    },
+                ],
                 createdAt: {
                     gte: new Date(Date.now() - INVITABLE_WINDOW_DAYS * DAY_MS),
                 },
@@ -282,34 +376,44 @@ export class ProductReviewsService {
         const inv = order.reviewInvitation;
         const reviewed = inv?._count.reviews ?? 0;
         const lines = order._count.items;
+        const send = inv ? sendStatus(inv) : "sent";
         const state: InvitationState["state"] = !inv
             ? "none"
             : inv.completedAt
               ? "completed"
-              : inv.expiresAt < new Date()
-                ? "expired"
-                : "sent";
+              : send !== "sent"
+                ? send
+                : inv.expiresAt < new Date()
+                  ? "expired"
+                  : "sent";
+        const email = await this.emailSetup(organizationId);
         const reason =
             this.blockedReason(order) ??
-            ((await this.comms.emailConnected(prisma, organizationId))
-                ? null
-                : "no-email-provider");
+            (email.connected ? null : "no-email-provider");
         return {
             state,
             sentAt: inv?.lastSentAt.toISOString() ?? null,
-            sendCount: inv?.sendCount ?? 0,
+            sendCount: inv ? sendsUsed(inv) : 0,
             reviewed,
             lines,
-            blocked: reason ? { reason, message: skipMessage(reason) } : null,
+            blocked: reason
+                ? { reason, message: skipMessage(reason, email.canConnect) }
+                : null,
+            email,
         };
     }
 
     /**
      * Ask the customers of these orders for reviews. Per order: eligible, not
-     * finished, under the send limit, the business's email provider
-     * connected, not unsubscribed — then the email is queued through that
-     * provider and the invitation written in the same transaction (a resend
-     * rotates the token in place, so the old link stops working).
+     * finished, not still being sent, under the send limit, the business's
+     * email provider connected, not unsubscribed — then the email is queued
+     * through that provider and the invitation written in the same
+     * transaction.
+     *
+     * One order has one live link: a resend rotates the token in place, so
+     * the old link stops working, and withdraws the earlier sends that
+     * haven't gone (a failed one may still be retrying) so none goes out
+     * with a dead link. A send still queued blocks a resend ("sending").
      */
     async invite(
         ctx: OrganizationContext,
@@ -336,13 +440,22 @@ export class ProductReviewsService {
         if (!order) return skip("not-found");
         const blocked = this.blockedReason(order);
         if (blocked) return skip(blocked);
+        const noProvider = async (): Promise<InviteResult> => {
+            const { canConnect } = await this.emailSetup(ctx.organizationId);
+            return {
+                orderId,
+                status: "skipped",
+                reason: "no-email-provider",
+                message: noProviderMessage(canConnect),
+            };
+        };
 
         // A walk-in (B13) has no customer and no email: never invited.
         const email =
             contactEmailForDisplay(order.customer?.email)?.trim() ?? "";
         if (!email || !order.customerId) return skip("no-email");
         if (!(await this.comms.emailConnected(prisma, ctx.organizationId))) {
-            return skip("no-email-provider");
+            return noProvider();
         }
         const consent = await this.consentFor(
             ctx.organizationId,
@@ -379,13 +492,13 @@ export class ProductReviewsService {
 
                 // Written once the email is QUEUED, in the same transaction
                 // (it used to be written only once Saroh's sender said it had
-                // left). The business's provider sends it from the job, which
-                // retries; the token in the job is the one hashed here.
+                // left). It shows as sent, and counts as a send, only once
+                // the provider accepts it (its Message's delivery).
                 const expiresAt = new Date(
                     Date.now() + REVIEW_LINK_DAYS * DAY_MS,
                 );
                 const now = new Date();
-                await tx.reviewInvitation.upsert({
+                const inv = await tx.reviewInvitation.upsert({
                     where: { orderId },
                     create: {
                         organizationId: ctx.organizationId,
@@ -394,6 +507,9 @@ export class ProductReviewsService {
                         toAddress: queued.toAddress,
                         expiresAt,
                         lastSentAt: now,
+                        // Saroh's sends only; provider sends are counted
+                        // from their deliveries.
+                        sendCount: 0,
                         createdByUserId: ctx.userId,
                     },
                     update: {
@@ -401,8 +517,32 @@ export class ProductReviewsService {
                         toAddress: queued.toAddress,
                         expiresAt,
                         lastSentAt: now,
-                        sendCount: { increment: 1 },
                     },
+                    select: { id: true },
+                });
+                // The earlier link is dead now: withdraw its sends that
+                // haven't gone, so the job never sends them.
+                await tx.delivery.updateMany({
+                    where: {
+                        message: { reviewInvitationId: inv.id },
+                        status: { in: WITHDRAWABLE_DELIVERY },
+                    },
+                    data: { status: CANCELLED_DELIVERY },
+                });
+                await tx.message.updateMany({
+                    where: {
+                        reviewInvitationId: inv.id,
+                        status: { in: WITHDRAWABLE_DELIVERY },
+                        // Never one its provider already took.
+                        deliveries: {
+                            none: { status: { in: ACCEPTED_DELIVERY } },
+                        },
+                    },
+                    data: { status: CANCELLED_DELIVERY },
+                });
+                await tx.message.update({
+                    where: { id: queued.id },
+                    data: { reviewInvitationId: inv.id },
                 });
                 return "queued" as const;
             })
@@ -414,11 +554,9 @@ export class ProductReviewsService {
             });
         if (outcome === "unsubscribed") return skip("unsubscribed");
         if (outcome === "conflict") {
-            return skip(
-                (await this.comms.emailConnected(prisma, ctx.organizationId))
-                    ? "no-email"
-                    : "no-email-provider",
-            );
+            return (await this.comms.emailConnected(prisma, ctx.organizationId))
+                ? skip("no-email")
+                : noProvider();
         }
 
         await this.audit?.record({
@@ -430,8 +568,8 @@ export class ProductReviewsService {
             outcome: AuditOutcome.Success,
         });
         return consent === "unknown"
-            ? { orderId, status: "sent", note: "consent-not-checked" }
-            : { orderId, status: "sent" };
+            ? { orderId, status: "queued", note: "consent-not-checked" }
+            : { orderId, status: "queued" };
     }
 
     async reply(
@@ -542,15 +680,7 @@ export class ProductReviewsService {
                 store: { select: { name: true } },
                 customer: { select: { email: true } },
                 _count: { select: { items: { where: PRODUCT_LINES } } },
-                reviewInvitation: {
-                    select: {
-                        completedAt: true,
-                        expiresAt: true,
-                        lastSentAt: true,
-                        sendCount: true,
-                        _count: { select: { reviews: true } },
-                    },
-                },
+                reviewInvitation: { select: INVITATION_SELECT },
             },
         });
     }
@@ -569,9 +699,9 @@ export class ProductReviewsService {
         });
         if (ineligible) return ineligible;
         if (order.reviewInvitation?.completedAt) return "completed";
-        if ((order.reviewInvitation?.sendCount ?? 0) >= MAX_REVIEW_SENDS) {
-            return "send-limit";
-        }
+        const inv = order.reviewInvitation;
+        if (inv && sendStatus(inv) === "sending") return "sending";
+        if (inv && sendsUsed(inv) >= MAX_REVIEW_SENDS) return "send-limit";
         return null;
     }
 
@@ -617,6 +747,70 @@ export class ProductReviewsService {
         });
         return revoked ? "revoked" : "ok";
     }
+}
+
+/**
+ * What an order's invitation is read with: its latest message's latest
+ * delivery, and how many of its messages the provider accepted.
+ */
+const INVITATION_SELECT = {
+    completedAt: true,
+    expiresAt: true,
+    lastSentAt: true,
+    sendCount: true,
+    messages: {
+        orderBy: { createdAt: "desc" },
+        take: 1,
+        select: {
+            status: true,
+            deliveries: {
+                orderBy: { createdAt: "desc" },
+                take: 1,
+                select: { status: true },
+            },
+        },
+    },
+    _count: {
+        select: {
+            reviews: true,
+            messages: {
+                where: {
+                    deliveries: { some: { status: { in: ACCEPTED_DELIVERY } } },
+                },
+            },
+        },
+    },
+} as const satisfies Prisma.ReviewInvitationSelect;
+
+type InvitationRow = Prisma.ReviewInvitationGetPayload<{
+    select: typeof INVITATION_SELECT;
+}>;
+
+/**
+ * Where the latest send stands: its message's latest delivery. Accepted
+ * (SENT, DELIVERED): sent. Still QUEUED: sending. Anything else (failed,
+ * bounced): failed. No message at all is an invitation Saroh's sender sent
+ * before D11, recorded only once it had left: sent.
+ */
+export function sendStatus(
+    inv: Pick<InvitationRow, "messages">,
+): "sending" | "sent" | "failed" {
+    if (inv.messages.length === 0) return "sent";
+    const latest = inv.messages[0];
+    const status =
+        latest.deliveries.length > 0
+            ? latest.deliveries[0].status
+            : latest.status;
+    if (ACCEPTED_DELIVERY.includes(status)) return "sent";
+    if (status === "QUEUED") return "sending";
+    return "failed";
+}
+
+/** Sends used of the three: Saroh's (before D11) and the provider's accepted. */
+export function sendsUsed(
+    inv: Pick<InvitationRow, "sendCount" | "_count">,
+): number {
+    return inv.sendCount + inv._count.messages;
 }
 
 /** A 429 for the public path, shared so both services say it the same way. */

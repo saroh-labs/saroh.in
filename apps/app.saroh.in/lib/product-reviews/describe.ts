@@ -1,4 +1,8 @@
-import type { InvitationState, ProductRating } from "./service";
+import type {
+    InvitationState,
+    ProductRating,
+    ReviewEmailSetup,
+} from "./service";
 
 /**
  * One catalogue row's rating. A row can be one product sold in several
@@ -38,6 +42,10 @@ export function invitationSentence(s: InvitationState): string {
             return `Every item has been reviewed (${s.lines} of ${s.lines}).`;
         case "expired":
             return `The invitation expired with ${s.reviewed} of ${s.lines} reviewed.`;
+        case "sending":
+            return "Invitation sending — it shows as sent once your email provider accepts it.";
+        case "failed":
+            return "The last invitation couldn't be sent, so it didn't use one of the three. You can send it again.";
         case "sent":
             return `Invitation sent — ${s.reviewed} of ${s.lines} reviewed so far.`;
     }
@@ -46,4 +54,42 @@ export function invitationSentence(s: InvitationState): string {
 /** "★★★★☆" — the stars as text, with the number beside it for screen readers. */
 export function stars(rating: number): string {
     return "★".repeat(rating) + "☆".repeat(Math.max(0, 5 - rating));
+}
+
+/** The API's words for "no email provider" (`product-reviews.service.ts`). */
+export const NO_PROVIDER_NOTE =
+    "Review invitations go from your own email. Connect an email provider in Settings › Providers to send them.";
+export const NO_PROVIDER_PLAN_NOTE =
+    "Review invitations go from your own email, and connecting your own email needs a paid plan.";
+
+export interface ReviewEmailNote {
+    text: string;
+    /** The way to fix it, when this person may take it. */
+    action: { href: string; label: string } | null;
+}
+
+/**
+ * What to lead with when invitations can't go (D11): connect the business's
+ * own email, or, where the plan can't (Free, DEC-091), see the plans. Null
+ * when they can go, or when it couldn't be read.
+ */
+export function reviewEmailNote(
+    setup: ReviewEmailSetup | null | undefined,
+    may: { connect: boolean; plans: boolean },
+): ReviewEmailNote | null {
+    if (!setup || setup.connected) return null;
+    if (setup.canConnect === false) {
+        return {
+            text: NO_PROVIDER_PLAN_NOTE,
+            action: may.plans
+                ? { href: "/settings/billing#change-plan", label: "See plans" }
+                : null,
+        };
+    }
+    return {
+        text: NO_PROVIDER_NOTE,
+        action: may.connect
+            ? { href: "/settings/providers", label: "Connect one" }
+            : null,
+    };
 }

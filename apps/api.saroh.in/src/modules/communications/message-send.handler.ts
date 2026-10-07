@@ -63,6 +63,13 @@ export const MAX_ATTACHMENT_BYTES = 5 * 1024 * 1024;
 const SENT_STATES = new Set(["SENT", "DELIVERED"]);
 
 /**
+ * A delivery withdrawn before its provider accepted it: a review invitation
+ * resent while an earlier send was queued or retrying (its token rotated, so
+ * the earlier link no longer works). The job skips it.
+ */
+export const CANCELLED_DELIVERY = "CANCELLED";
+
+/**
  * A Saroh delivery's own terminal states (DEC-086): STOPPED never goes, and
  * UNKNOWN may already have gone, so a re-run must not send either.
  */
@@ -128,6 +135,14 @@ export class MessageSendHandler {
         if (SENT_STATES.has(delivery.status)) {
             this.logger.log(
                 `message.send: delivery ${deliveryId} already ${delivery.status}; skipping.`,
+            );
+            return;
+        }
+        // Withdrawn before it went (a review invitation resent: its old
+        // link no longer works), so it never goes.
+        if (delivery.status === CANCELLED_DELIVERY) {
+            this.logger.log(
+                `message.send: delivery ${deliveryId} was cancelled; skipping.`,
             );
             return;
         }

@@ -64,6 +64,16 @@ export class ProductReviewsController {
         return this.reviews.invitableOrders(ctx.organizationId);
     }
 
+    /**
+     * Whether invitations can go (D11): the business's own email provider,
+     * and when it has none, whether its plan lets it connect one.
+     */
+    @Get("email-setup")
+    emailSetup(@OrgContext() ctx: OrganizationContext) {
+        authorize(ctx, "product-review:write");
+        return this.reviews.emailSetup(ctx.organizationId);
+    }
+
     @Get("orders/:orderId")
     invitationState(
         @OrgContext() ctx: OrganizationContext,

@@ -143,7 +143,7 @@ describe("Review invitations through the business's provider (D11, DB)", () => {
         await connectEmail(b.ctx.organizationId);
 
         const [result] = await reviews().invite(b.ctx, [b.orderId]);
-        expect(result).toMatchObject({ status: "sent" });
+        expect(result).toMatchObject({ status: "queued" });
 
         const message = await prisma.message.findFirstOrThrow({
             where: { organizationId: b.ctx.organizationId },
@@ -181,6 +181,93 @@ describe("Review invitations through the business's provider (D11, DB)", () => {
         });
         expect(invitation.tokenHash).toBe(hashReviewToken(token));
         expect(invitation.toAddress).toBe("ananya@example.in");
-        expect(invitation.sendCount).toBe(1);
+        // Queued is not sent: no send counted until the provider takes it.
+        expect(invitation.sendCount).toBe(0);
+        const queued = await reviews().invitationState(
+            b.ctx.organizationId,
+            b.orderId,
+        );
+        expect(queued).toMatchObject({
+            state: "sending",
+            sendCount: 0,
+            blocked: { reason: "sending" },
+        });
+    });
+
+    it("counts a send only once the provider accepts it; a failed one leaves it open, and a resend withdraws it", async () => {
+        const b = await business();
+        await connectEmail(b.ctx.organizationId);
+        const service = reviews();
+        await service.invite(b.ctx, [b.orderId]);
+
+        // The provider took it.
+        await prisma.delivery.updateMany({
+            where: { organizationId: b.ctx.organizationId },
+            data: { status: "SENT" },
+        });
+        expect(
+            await service.invitationState(b.ctx.organizationId, b.orderId),
+        ).toMatchObject({ state: "sent", sendCount: 1, blocked: null });
+
+        // A resend fails (and may still be retrying).
+        const [again] = await service.invite(b.ctx, [b.orderId]);
+        expect(again).toMatchObject({ status: "queued" });
+        const second = await prisma.message.findFirstOrThrow({
+            where: { organizationId: b.ctx.organizationId },
+            orderBy: { createdAt: "desc" },
+            select: { id: true },
+        });
+        await prisma.delivery.updateMany({
+            where: { messageId: second.id },
+            data: { status: "FAILED" },
+        });
+        expect(
+            await service.invitationState(b.ctx.organizationId, b.orderId),
+        ).toMatchObject({ state: "failed", sendCount: 1, blocked: null });
+
+        // Sending again withdraws the failed one: it can't go out later
+        // with the link this send just replaced.
+        await service.invite(b.ctx, [b.orderId]);
+        const failed = await prisma.delivery.findFirstOrThrow({
+            where: { messageId: second.id },
+        });
+        expect(failed.status).toBe("CANCELLED");
+        const all = await prisma.message.findMany({
+            where: { organizationId: b.ctx.organizationId },
+            orderBy: { createdAt: "asc" },
+            select: { status: true, reviewInvitationId: true },
+        });
+        expect(all.map((m) => m.status)).toEqual([
+            "QUEUED",
+            "CANCELLED",
+            "QUEUED",
+        ]);
+        expect(new Set(all.map((m) => m.reviewInvitationId)).size).toBe(1);
+        // The first, which the provider accepted, was left alone.
+        expect(
+            await prisma.delivery.count({
+                where: {
+                    organizationId: b.ctx.organizationId,
+                    status: "SENT",
+                },
+            }),
+        ).toBe(1);
+    });
+
+    it("on a plan that can't connect email, the order page says it needs a paid plan", async () => {
+        const b = await business();
+        const service = reviews();
+        service.ownEmailRoom = () => Promise.resolve(false);
+        expect(await service.emailSetup(b.ctx.organizationId)).toEqual({
+            connected: false,
+            canConnect: false,
+        });
+        const state = await service.invitationState(
+            b.ctx.organizationId,
+            b.orderId,
+        );
+        expect(state.blocked?.message).toBe(
+            "Review invitations go from your own email, and connecting your own email needs a paid plan.",
+        );
     });
 });
