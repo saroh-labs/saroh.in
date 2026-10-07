@@ -281,8 +281,17 @@ export function yourPlan(input: {
     const notes: PlanNote[] = [];
     let next: NextCharge = { kind: "text", text: "Nothing to pay" };
 
+    const move = access.pendingMove;
+    // Only the version changes (Free v1 to Free v2): not a plan change, so
+    // nothing says one (N1).
+    const samePlan = move !== null && move.planId === move.fromPlanId;
+
     if (given) {
-        const then = planName(catalog, billedId ?? "free");
+        // Where it lands when the plan given ends: a pending move's plan.
+        const then = planName(
+            catalog,
+            move && !samePlan ? move.planId : (billedId ?? "free"),
+        );
         notes.push(
             override.expiresAt
                 ? {
@@ -335,18 +344,29 @@ export function yourPlan(input: {
         }
     }
 
-    const move = access.pendingMove;
-    if (move) {
+    // A plan given for a while wins until it ends: the move happens under
+    // it, and the note above already says where it lands (N1).
+    const underOverride =
+        given &&
+        (override.expiresAt === null ||
+            (move !== null && override.expiresAt > move.from));
+    if (move && move.waiting === "authorise") {
+        // Due, and waiting on the business: the one move that needs a tap.
         const to = planName(catalog, move.planId);
-        if (move.waiting === "authorise") {
-            notes.push({
-                tone: "attention",
-                lead: `Your plan was due to move to ${to} on `,
-                iso: move.from,
-                tail: `. Authorise the new amount to move; until then you stay on ${name}.`,
-                action: { label: "Authorise", planId: move.planId, cycle },
-            });
-        } else if (move.waiting === "held") {
+        notes.push({
+            tone: "attention",
+            lead: samePlan
+                ? `${to}'s new price was due to start on `
+                : `Your plan was due to move to ${to} on `,
+            iso: move.from,
+            tail: samePlan
+                ? ". Authorise the new amount to keep it; until then nothing changes."
+                : `. Authorise the new amount to move; until then you stay on ${name}.`,
+            action: { label: "Authorise", planId: move.planId, cycle },
+        });
+    } else if (move && !samePlan && !underOverride) {
+        const to = planName(catalog, move.planId);
+        if (move.waiting === "held") {
             notes.push({
                 tone: "info",
                 lead: `Your plan moves to ${to} from `,
@@ -367,7 +387,7 @@ export function yourPlan(input: {
     const scheduled = input.checkouts?.scheduled ?? null;
     // The same plan scheduled is its renewal (DEC-093).
     const renewed = scheduled !== null && scheduled.plan.id === planId;
-    if (scheduled && (!move || renewed)) {
+    if (scheduled && (!move || samePlan || renewed)) {
         notes.push(
             renewed
                 ? {

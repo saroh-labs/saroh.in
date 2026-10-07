@@ -159,6 +159,7 @@ describe("yourPlan", () => {
                 plan: { id: "b", name: "Plan B" },
                 pendingMove: {
                     planId: "a",
+                    fromPlanId: "b",
                     version: 3,
                     from: "2026-11-01T00:00:00.000Z",
                     waiting: null,
@@ -177,6 +178,7 @@ describe("yourPlan", () => {
                 plan: { id: "b", name: "Plan B" },
                 pendingMove: {
                     planId: "c",
+                    fromPlanId: "b",
                     version: 4,
                     from: "2026-11-01T00:00:00.000Z",
                     waiting: "authorise",
@@ -208,6 +210,169 @@ describe("yourPlan", () => {
             expiresAt: "2026-10-05T00:00:00.000Z",
             handoff: null,
         });
+    });
+
+    it("says nothing when a new version keeps the same plan (N1)", () => {
+        // Free v1 to Free v2: a version move, not a plan change.
+        const v = yourPlan({
+            access: access({
+                plan: { id: "a", name: "Plan A" },
+                pendingMove: {
+                    planId: "a",
+                    fromPlanId: "a",
+                    version: 4,
+                    from: "2026-11-01T00:00:00.000Z",
+                    waiting: null,
+                },
+            }),
+            subscription: sub({
+                provider: null,
+                plan: { ...sub().plan, key: "catalog.a", priceCents: 0 },
+            }),
+            catalog: CATALOG,
+            liveVersion: 4,
+            checkouts: null,
+            addonsHeld: false,
+        });
+        expect(v.notes).toEqual([]);
+
+        // Plan B v3 to Plan B v4, held at the provider: still nothing.
+        const held = yourPlan({
+            access: access({
+                plan: { id: "b", name: "Plan B" },
+                pricePaise: 11_100,
+                pendingMove: {
+                    planId: "b",
+                    fromPlanId: "b",
+                    version: 4,
+                    from: "2026-11-01T00:00:00.000Z",
+                    waiting: "held",
+                },
+            }),
+            subscription: sub(),
+            catalog: CATALOG,
+            liveVersion: 4,
+            checkouts: null,
+            addonsHeld: false,
+        });
+        expect(held.notes).toEqual([]);
+
+        // A new price on the same plan, due and waiting: asks to authorise,
+        // without calling it a move to another plan.
+        const authorise = yourPlan({
+            access: access({
+                plan: { id: "b", name: "Plan B" },
+                pricePaise: 11_100,
+                pendingMove: {
+                    planId: "b",
+                    fromPlanId: "b",
+                    version: 4,
+                    from: "2026-11-01T00:00:00.000Z",
+                    waiting: "authorise",
+                },
+            }),
+            subscription: sub(),
+            catalog: CATALOG,
+            liveVersion: 4,
+            checkouts: null,
+            addonsHeld: false,
+        });
+        expect(authorise.notes).toHaveLength(1);
+        expect(authorise.notes[0]).toMatchObject({
+            lead: "Plan B's new price was due to start on ",
+            action: { label: "Authorise", planId: "b" },
+        });
+    });
+
+    it("never contradicts a plan given for a while: it wins until it ends (N1)", () => {
+        const base = {
+            subscription: sub({
+                provider: null,
+                plan: { ...sub().plan, key: "catalog.a", priceCents: 0 },
+            }),
+            catalog: CATALOG,
+            liveVersion: 4,
+            checkouts: null,
+            addonsHeld: false,
+        };
+        const given = {
+            plan: { id: "c", name: "Plan C" },
+            planOverride: {
+                planKey: "c",
+                expiresAt: "2027-12-31T00:00:00.000Z",
+            },
+        };
+        // On Plan A underneath, which only changes version.
+        const same = yourPlan({
+            ...base,
+            access: access({
+                ...given,
+                pendingMove: {
+                    planId: "a",
+                    fromPlanId: "a",
+                    version: 4,
+                    from: "2026-10-14T00:00:00.000Z",
+                    waiting: null,
+                },
+            }),
+        });
+        expect(same.notes).toHaveLength(1);
+        expect(same.notes[0]).toMatchObject({
+            lead: "Plan C is yours, free, until ",
+            tail: ". Then you're on Plan A unless you choose a plan below.",
+        });
+
+        // Underneath moving to another plan before the override ends: the
+        // override's note says where it lands; no "changes to" beside it.
+        const other = yourPlan({
+            ...base,
+            subscription: sub({ provider: null }),
+            access: access({
+                ...given,
+                pendingMove: {
+                    planId: "a",
+                    fromPlanId: "b",
+                    version: 4,
+                    from: "2026-10-14T00:00:00.000Z",
+                    waiting: null,
+                },
+            }),
+        });
+        expect(other.notes.map((n) => n.lead)).toEqual([
+            "Plan C is yours, free, until ",
+        ]);
+        expect(other.notes[0]?.tail).toBe(
+            ". Then you're on Plan A unless you choose a plan below.",
+        );
+    });
+
+    it("names the real target plan when the plan does change (N1)", () => {
+        const v = yourPlan({
+            access: access({
+                plan: { id: "c", name: "Plan C" },
+                pricePaise: 22_200,
+                pendingMove: {
+                    planId: "b",
+                    fromPlanId: "c",
+                    version: 4,
+                    from: "2026-10-14T00:00:00.000Z",
+                    waiting: null,
+                },
+            }),
+            subscription: sub({
+                plan: { ...sub().plan, key: "catalog.c", priceCents: 22_200 },
+            }),
+            catalog: CATALOG,
+            liveVersion: 4,
+            checkouts: null,
+            addonsHeld: false,
+        });
+        expect(v.notes).toEqual([
+            expect.objectContaining({
+                lead: "Your plan changes to Plan B on ",
+                iso: "2026-10-14T00:00:00.000Z",
+            }),
+        ]);
     });
 
     it("says the 12-month term, and offers the one-tap renewal in its last days", () => {

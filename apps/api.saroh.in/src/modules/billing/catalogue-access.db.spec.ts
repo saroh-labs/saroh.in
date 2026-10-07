@@ -361,6 +361,8 @@ describe("access from the catalogue (DB, U12)", () => {
             planOverride: null,
             pendingMove: {
                 planId: "free",
+                // Free to Free on a new version: no plan change (N1).
+                fromPlanId: "free",
                 version: V2,
                 from: from.toISOString(),
             },

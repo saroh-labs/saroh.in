@@ -59,7 +59,10 @@ export interface BillingAccessView {
     /** A plan it is on for a while (a launch offer, or grandfathering). */
     planOverride: { planKey: string; expiresAt: string | null } | null;
     pendingMove: {
+        /** The plan it moves to, on `version`. */
         planId: string;
+        /** The plan it moves from; `planId` again when only the version changes. */
+        fromPlanId: string;
         version: number;
         from: string;
         waiting: "held" | "authorise" | null;

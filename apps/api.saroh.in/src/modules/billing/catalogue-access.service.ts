@@ -78,7 +78,14 @@ export interface LivePlanOverride {
  * (U15, `plan-moves.ts`).
  */
 export interface PendingMove {
+    /** The plan it moves to, on the new version. */
     planId: string;
+    /**
+     * The plan it moves from (its subscription's, before any plan
+     * override). The same as `planId` when only the version changes: a
+     * Free business stays on Free, so no screen calls it a plan change.
+     */
+    fromPlanId: string;
     version: number;
     from: Date;
     waiting: "held" | "authorise" | null;
@@ -387,6 +394,7 @@ export class CatalogueAccessService {
                           planId:
                               catalogPlanIdForKey(live.pendingPlan.key) ??
                               live.pendingPlan.key,
+                          fromPlanId: planId,
                           version: live.pendingPlan.version,
                           from: live.pendingFrom,
                           waiting:
@@ -459,6 +467,7 @@ export class CatalogueAccessService {
             pendingMove: a.pendingMove
                 ? {
                       planId: a.pendingMove.planId,
+                      fromPlanId: a.pendingMove.fromPlanId,
                       version: a.pendingMove.version,
                       from: a.pendingMove.from.toISOString(),
                       waiting: a.pendingMove.waiting,
