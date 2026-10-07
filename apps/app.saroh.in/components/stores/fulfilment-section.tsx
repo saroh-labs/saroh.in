@@ -270,10 +270,9 @@ function LateAfterRow({
 }
 
 function helpFor(type: StorefrontFulfilmentType): string {
+    // No business type's figure is suggested (UX-082): a counter sets its own.
     const start = `Starts at ${lateAfterWords(DEFAULT_LATE_AFTER[type])}.`;
-    return type === "PICKUP"
-        ? `${start} A café counter often uses 20 minutes.`
-        : start;
+    return type === "PICKUP" ? `${start} Set what suits your counter.` : start;
 }
 
 const capitalise = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
