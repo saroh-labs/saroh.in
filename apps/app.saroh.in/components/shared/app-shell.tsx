@@ -1,6 +1,7 @@
 import { getServerSession } from "@saroh/auth/next";
 import { cookies, headers } from "next/headers";
 
+import { PlanEndingBanner } from "@/components/billing/plan-ending-banner";
 import { PlanRefusalHost } from "@/components/billing/plan-refusal";
 import { AppHeader } from "@/components/shared/app-header";
 import { AppSidebar } from "@/components/shared/app-sidebar";
@@ -239,6 +240,8 @@ export async function AppShell({ children }: { children: React.ReactNode }) {
                         tabIndex={-1}
                         className="flex flex-1 flex-col pb-[var(--tab-bar-inset)] outline-none"
                     >
+                        {/* A plan that ends within 30 days (#805). */}
+                        <PlanEndingBanner ending={billing?.planEnding} />
                         {children}
                     </div>
                 </div>
