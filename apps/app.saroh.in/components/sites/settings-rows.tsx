@@ -7,15 +7,28 @@ import { Card, CardContent } from "@saroh/ui/card";
  * (`sells-from-row.tsx`, G11).
  */
 
+/**
+ * When a section's changes reach the live site (UX-081): some apply as they
+ * are saved (an address, a domain), others wait in the draft for a publish.
+ * One screen mixing the two without saying which read as broken either way.
+ */
+export const SAVES_WORDS = {
+    now: "Live as soon as it's saved",
+    publish: "Goes live with your next publish",
+} as const;
+
 export function Section({
     title,
     description,
     badge,
+    saves,
     children,
 }: {
     title: string;
     description: string;
     badge?: React.ReactNode;
+    /** When a change here reaches the live site; absent says nothing. */
+    saves?: keyof typeof SAVES_WORDS;
     children: React.ReactNode;
 }) {
     return (
@@ -24,6 +37,14 @@ export function Section({
                 <div className="flex items-center gap-2">
                     <h2 className="text-sm font-semibold">{title}</h2>
                     {badge}
+                    {saves ? (
+                        <span
+                            data-saves={saves}
+                            className="text-xs text-muted-foreground"
+                        >
+                            · {SAVES_WORDS[saves]}
+                        </span>
+                    ) : null}
                 </div>
                 <p className="text-sm text-muted-foreground">{description}</p>
             </div>

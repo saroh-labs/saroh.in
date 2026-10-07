@@ -14,14 +14,22 @@ export type SiteStateTone = "live" | "draft" | "attention";
  * "Never published" outranks everything: that site does not exist to the
  * public, which no other state is as consequential as.
  */
-export function siteState(site: SiteSummary): {
+export function siteState(
+    site: SiteSummary,
+    /**
+     * Whether this person can act on the site's domain (UX-081). A reviewer
+     * or member who can't was shown "domain pending" in a warning colour
+     * about a record only an owner or admin can add; they read "Live".
+     */
+    { domainState = true }: { domainState?: boolean } = {},
+): {
     label: string;
     tone: SiteStateTone;
 } {
     if (!site.currentPublicationId) {
         return { label: "Never published", tone: "draft" };
     }
-    if (site.pendingDomain) {
+    if (site.pendingDomain && domainState) {
         // Published, but the domain they think they connected routes nowhere.
         return { label: "Live · domain pending", tone: "attention" };
     }

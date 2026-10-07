@@ -72,7 +72,7 @@ export default async function WebsiteTabsLayout({
     ).map((s) => ({
         id: s.id,
         name: s.name.trim() || "Untitled site",
-        state: siteState(s),
+        state: siteState(s, { domainState: site.can.edit }),
     }));
 
     return (
@@ -87,6 +87,8 @@ export default async function WebsiteTabsLayout({
                         // record: the detail does not carry a pending domain.
                         state: siteState(
                             sites.find((s) => s.id === site.id) ?? site,
+                            // Domain state only for whoever can fix it.
+                            { domainState: site.can.edit },
                         ),
                     }}
                     sites={summaries}

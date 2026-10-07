@@ -314,6 +314,7 @@ export function SiteSettings({
 
             <Section
                 title="Web address"
+                saves="now"
                 description="Your business's web address on Saroh. Your own domain, below, is added alongside it, and this one keeps working."
             >
                 <Row label="On Saroh">
@@ -323,6 +324,7 @@ export function SiteSettings({
 
             <Section
                 title="Your own domain"
+                saves="now"
                 description="Point a domain you own at this site. You prove you own it with one DNS record; nothing changes for visitors until it is verified."
             >
                 <CustomDomain siteId={site.id} />
@@ -340,6 +342,7 @@ export function SiteSettings({
 
             <Section
                 title="Writing"
+                saves="publish"
                 description="Where this site's posts live. Yours to name — a practice has updates, a studio has a journal."
             >
                 <Row
@@ -411,6 +414,7 @@ export function SiteSettings({
 
             <Section
                 title="Search"
+                saves="publish"
                 description="What people see before they click."
             >
                 <Row
@@ -563,6 +567,7 @@ export function SiteSettings({
 
             <Section
                 title="Social share image"
+                saves="publish"
                 description="Used when someone posts a link to your site."
             >
                 <Row
@@ -698,6 +703,7 @@ export function SiteSettings({
 
             <Section
                 title="Menu"
+                saves="publish"
                 description="The links at the top of every page. Pick the pages, put them in order, and rename an entry if the page title is too long for a menu."
             >
                 <Row
@@ -880,6 +886,7 @@ export function SiteSettings({
 
             <Section
                 title="Footer"
+                saves="publish"
                 description="The last thing on every page. Yours to write — an address, opening hours, a way to get in touch."
             >
                 <Row
@@ -983,10 +990,13 @@ export function SiteSettings({
                 </Row>
             </Section>
 
-            {/* Say what is true: none of this is public until it is published. */}
+            {/* Say what is true (UX-081): each section says when it goes
+                live, so this sums up rather than claiming all of it. */}
             <p className="text-sm text-muted-foreground">
-                These settings are part of your draft. They reach your live site
-                the next time you publish.
+                Your web address and domain change as soon as they&apos;re
+                saved. Writing, search, the share image, the menu and the footer
+                are part of your draft, and reach your live site the next time
+                you publish.
             </p>
         </div>
     );

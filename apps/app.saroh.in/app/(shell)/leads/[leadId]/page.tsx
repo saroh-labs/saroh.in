@@ -27,6 +27,9 @@ import { listCommsProviders } from "@/lib/providers/service";
 import { billingAccessOrNull } from "@/lib/saroh-billing/service";
 import { requireSession } from "@/lib/session";
 
+/** The tab's title (UX-081): without one it read the bare "Saroh". */
+export const metadata = { title: "Lead" };
+
 /**
  * Lead detail (S3-005 + S3-007): the lead's contact + current stage, a
  * move-stage control, a status control, a note composer + follow-up task form,

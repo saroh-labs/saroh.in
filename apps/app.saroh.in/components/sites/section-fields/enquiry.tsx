@@ -85,22 +85,16 @@ export function EnquiryFields({
                 {c.fields.map((field, i) => (
                     <div key={i} className="grid gap-2 rounded-md border p-2">
                         <div className="flex items-start gap-2">
-                            <Input
-                                value={field.name}
-                                onChange={(e) =>
-                                    patchField(i, {
-                                        name: e.target.value,
-                                    })
-                                }
-                                placeholder="Field name (email)"
-                                aria-label="Field name"
-                            />
+                            {/* The label is what the merchant names; the
+                                key follows it until they set one under
+                                Advanced (UX-081). */}
                             <Input
                                 value={field.label}
                                 onChange={(e) =>
-                                    patchField(i, {
-                                        label: e.target.value,
-                                    })
+                                    patchField(
+                                        i,
+                                        labelChange(field, e.target.value),
+                                    )
                                 }
                                 placeholder="Label (Email)"
                                 aria-label="Field label"
@@ -119,6 +113,29 @@ export function EnquiryFields({
                                 ✕
                             </Button>
                         </div>
+                        <details className="text-xs">
+                            <summary className="cursor-pointer text-muted-foreground">
+                                Advanced
+                            </summary>
+                            <div className="mt-2 grid gap-1">
+                                <Input
+                                    value={field.name}
+                                    onChange={(e) =>
+                                        patchField(i, {
+                                            name: e.target.value,
+                                        })
+                                    }
+                                    placeholder="Field key (email)"
+                                    aria-label="Field key"
+                                />
+                                <p className="text-muted-foreground">
+                                    How this answer is stored. Keep{" "}
+                                    <code>name</code>, <code>email</code>,{" "}
+                                    <code>phone</code> or <code>message</code>{" "}
+                                    so the lead shows it in the right place.
+                                </p>
+                            </div>
+                        </details>
                         <div className="flex items-center gap-3">
                             <div className="w-40">
                                 <Select
@@ -180,4 +197,37 @@ export function EnquiryFields({
             </div>
         </div>
     );
+}
+
+/** The keys the API reads a lead's details by: never renamed for a label. */
+const READ_KEYS: ReadonlySet<string> = new Set([
+    "name",
+    "email",
+    "phone",
+    "message",
+]);
+
+/** A label as a field key: lower-case words joined by underscores. */
+export function keyFromLabel(label: string): string {
+    return label
+        .trim()
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, "_")
+        .replace(/^_+|_+$/g, "")
+        .slice(0, 64);
+}
+
+/**
+ * A label edit (UX-081). The key follows the label while it is empty or
+ * still the key the old label would have made; a key set by hand, or one
+ * the API reads (`email` on an Email field), is left alone.
+ */
+export function labelChange(
+    field: Pick<EnquiryField, "name" | "label">,
+    label: string,
+): Partial<EnquiryField> {
+    const following =
+        !READ_KEYS.has(field.name) &&
+        (field.name === "" || field.name === keyFromLabel(field.label));
+    return following ? { label, name: keyFromLabel(label) } : { label };
 }

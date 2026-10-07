@@ -1,5 +1,12 @@
 import type { Section, SectionType } from "@/lib/sites/service";
 
+/** A new enquiry form's fields (UX-081). */
+export const ENQUIRY_DEFAULT_FIELDS = [
+    { name: "name", label: "Name", type: "text", required: true },
+    { name: "email", label: "Email", type: "email", required: true },
+    { name: "message", label: "Message", type: "textarea", required: false },
+] as const;
+
 /**
  * A new section carries its key from the moment it exists (#277).
  *
@@ -57,16 +64,11 @@ export function emptySection(type: SectionType): Section {
                     title: "Get in touch",
                     submitLabel: "Send",
                     successMessage: "Thanks — we'll be in touch soon.",
-                    // Seed with an email field: the contract + the backing Form
-                    // both require one, so the section is valid out of the box.
-                    fields: [
-                        {
-                            name: "email",
-                            label: "Email",
-                            type: "email",
-                            required: true,
-                        },
-                    ],
+                    // Name, email and a message (UX-081): what an enquiry
+                    // needs to be answered. The email is what the contract
+                    // and the backing Form require; `name` and `message` are
+                    // the keys the API reads a lead's name and its words by.
+                    fields: ENQUIRY_DEFAULT_FIELDS.map((f) => ({ ...f })),
                 },
             };
         case "features":

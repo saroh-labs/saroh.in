@@ -19,6 +19,9 @@ import {
 } from "@/lib/sites/share-links-read";
 import { readTestReleases } from "@/lib/sites/test-releases-api";
 
+/** The tab's title (UX-081): without one it read the bare "Saroh". */
+export const metadata = { title: "Editing · Website" };
+
 /**
  * Site editor host (S2-004). Resolves the site (notFound when missing / not
  * permitted), picks its home page (or the first page), loads that page's
