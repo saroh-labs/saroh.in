@@ -12,8 +12,10 @@
  *   `next.config.js`), so a page listed here before its route lands never
  *   links to a 404.
  *
- * Templates (`/templates`) is not listed: it is blocked until the industry
- * templates exist (plan U6). Add it here when it ships.
+ * Templates (`/templates`, plan U6) is listed now the industry templates
+ * exist: its gallery shows only templates a merchant can pick
+ * (`content/templates.ts`), and its detail pages follow it into the
+ * sitemap (`lib/site-pages.ts`).
  */
 
 /** A day, `YYYY-MM-DD`, read in India time. */
@@ -35,7 +37,7 @@ export interface ResourcePage {
     children?: readonly string[];
 }
 
-/** In the plan's order: Help, Integrations, Changelog, (Templates), Link preview tool. */
+/** In the plan's order: Help, Integrations, Changelog, Templates, Link preview tool. */
 export const RESOURCE_PAGES: readonly ResourcePage[] = [
     {
         id: "help",
@@ -63,6 +65,14 @@ export const RESOURCE_PAGES: readonly ResourcePage[] = [
         line: "What's new in Saroh, written for the people who use it.",
         href: "/changelog",
         publishOn: "2026-10-05",
+    },
+    {
+        id: "templates",
+        name: "Templates",
+        line: "Sites made for your kind of business, ready to start from.",
+        href: "/templates",
+        // With early access, as Help (industry templates plan U13).
+        publishOn: "2026-10-17",
     },
     {
         id: "link-preview",

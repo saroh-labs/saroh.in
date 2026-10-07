@@ -286,9 +286,12 @@ export function setupFor(key: string, draft: TurnOnDraft): object {
         } satisfies AppointmentsSetup;
     }
     if (key === "WEBSITE") {
+        const { templateId } = draft.WEBSITE;
         return {
             siteName: draft.WEBSITE.siteName.trim(),
             address: draft.WEBSITE.address.trim(),
+            // Only a choice made in the sheet; else the API picks the kind's.
+            ...(templateId ? { templateId } : {}),
         } satisfies WebsiteSetup;
     }
     return {};

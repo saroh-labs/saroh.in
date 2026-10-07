@@ -5,7 +5,8 @@
  *
  * G2  No Saroh design token may be drawn by a site block.
  * G6  No component outside packages/site-blocks may draw the --site-* layer.
- * G7  No Saroh typeface in a site block, and no font loaded into saroh.app.
+ * G7  No Saroh typeface in a site block, and no font loaded into saroh.app
+ *     outside its merchant font list (lib/site-fonts.ts).
  *
  * Both encode failures this repository has already had, which is the only
  * reason they are worth a script:
@@ -168,6 +169,10 @@ const SITE_LAYER_ALLOWED = new Set([
     "apps/saroh.app/app/[domain]/[slug]/not-found.tsx",
     "apps/saroh.app/app/[domain]/layout.tsx",
     "apps/saroh.app/app/preview/[token]/layout.tsx",
+    // The renderer's template renders (industry templates U14): the same
+    // ground a published site's layout gives its blocks, for a gallery
+    // template drawn for its sample business. Every block is PageSections'.
+    "apps/saroh.app/app/template-renders/[template]/[style]/[[...path]]/page.tsx",
     // The error and loading boundaries, same category as the 404 above: a
     // Saroh surface on a merchant's page, which should wear the merchant's
     // palette rather than ours. They draw no block — a heading, a line of
@@ -259,10 +264,15 @@ for (const root of SEARCH_ROOTS) {
  *     `tooling/tailwind-config`. Blocks use `font-site-heading` and
  *     `font-site-body`.
  * (b) `apps/saroh.app` serves merchant sites, so it loads no face from
- *     `packages/ui/fonts` and imports no `next/font` at all. When merchants
- *     choose fonts, they are served from the app's own site-font files.
+ *     `packages/ui/fonts`, and imports `next/font` in ONE file: the merchant
+ *     font list, `lib/site-fonts.ts` (industry templates, KTD-2). Those faces
+ *     are the `FONT_PAIRS` a merchant's style may name, reached only through
+ *     `--site-font-*`; a `next/font` call anywhere else would be a face on
+ *     every site whatever its merchant chose.
  */
-const SAROH_FONT_UTILITY_RE = /\bfont-(?:sans|display|mono)\b(?![\w-])/g;
+// Not preceded by a dash either: `--site-font-mono` is the merchant's own
+// mono role (industry templates), and `font-site-mono` its utility.
+const SAROH_FONT_UTILITY_RE = /(?<![\w-])font-(?:sans|display|mono)\b(?![\w-])/g;
 const SAROH_FONT_LOAD_RE =
     /packages\/ui\/fonts|from\s+["']next\/font(?:\/[\w-]+)?["']/g;
 
@@ -277,10 +287,12 @@ for await (const file of walk(BLOCKS)) {
     }
 }
 
+const SITE_FONT_LIST = "apps/saroh.app/lib/site-fonts.ts";
 for await (const file of walk(join(ROOT, "apps/saroh.app"))) {
     const rel = relative(ROOT, file);
     const source = code(await readFile(file, "utf8"));
     for (const match of source.matchAll(SAROH_FONT_LOAD_RE)) {
+        if (rel === SITE_FONT_LIST && match[0].startsWith("from")) continue;
         const line = source.slice(0, match.index).split("\n").length;
         failures.push(
             `G7  ${rel}:${line}  loads a font into saroh.app ("${match[0]}"). Merchant sites never load Saroh's faces; their text is the --site-font-* layer (H1).`,

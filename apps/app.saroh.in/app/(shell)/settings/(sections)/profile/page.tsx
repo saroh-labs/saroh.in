@@ -5,8 +5,6 @@ import {
 import { YourProfile } from "@/components/settings/your-profile";
 import { accountSettingsUrl } from "@/lib/accounts";
 import { getAlertPreferences } from "@/lib/notifications/service";
-import { connectLocksOf } from "@/lib/providers/connect-lock";
-import { billingAccessOrNull } from "@/lib/saroh-billing/service";
 import { requireSession } from "@/lib/session";
 
 /**
@@ -22,13 +20,6 @@ export const metadata = { title: "Your profile" };
 export default async function ProfilePage() {
     const { user } = await requireSession();
     const alerts = await getAlertPreferences();
-    // Only when email alerts can't go: whether the plan lets the business
-    // connect its own email decides what the line offers (DEC-091, UX-006).
-    // Best-effort; unread offers Providers as before.
-    const emailLock =
-        alerts.status === "ok" && !alerts.prefs.channels.email.available
-            ? connectLocksOf(await billingAccessOrNull()).messaging
-            : null;
 
     return (
         <SettingsPanel header={<SettingsPanelHeader title="Your profile" />}>
@@ -37,7 +28,6 @@ export default async function ProfilePage() {
                 email={user.email}
                 accountUrl={accountSettingsUrl}
                 alerts={alerts}
-                emailLock={emailLock}
             />
         </SettingsPanel>
     );

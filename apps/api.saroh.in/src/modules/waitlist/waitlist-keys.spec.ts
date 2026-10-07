@@ -5,6 +5,8 @@ import {
     newRefCode,
     normaliseEmail,
     REF_CODE_PATTERN,
+    WAITLIST_TEMPLATES,
+    waitlistTemplate,
 } from "./waitlist-keys";
 
 describe("normaliseEmail", () => {
@@ -77,5 +79,35 @@ describe("maskEmail", () => {
         expect(maskEmail("abcdefghijkl@example.test")).toBe(
             "a***@example.test",
         );
+    });
+});
+
+describe("waitlistTemplate (industry templates U13)", () => {
+    it("saves exactly the gallery's templates: those with kinds and a sample", () => {
+        // saroh.in's content test pins the same nine (`content/templates.test.ts`).
+        expect([...WAITLIST_TEMPLATES].sort()).toEqual([
+            "bakery",
+            "blogs",
+            "clinic",
+            "developer",
+            "dietician",
+            "gym",
+            "salon",
+            "store",
+            "studio",
+        ]);
+    });
+
+    it("keeps a known slug, trimmed and lower-cased", () => {
+        expect(waitlistTemplate("gym")).toBe("gym");
+        expect(waitlistTemplate(" Store ")).toBe("store");
+    });
+
+    it("drops anything else: a general template, an unbuilt one, free text", () => {
+        expect(waitlistTemplate("starter")).toBeNull();
+        expect(waitlistTemplate("no-such-template")).toBeNull();
+        expect(waitlistTemplate("<b>gym</b>")).toBeNull();
+        expect(waitlistTemplate("")).toBeNull();
+        expect(waitlistTemplate(undefined)).toBeNull();
     });
 });

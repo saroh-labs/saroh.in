@@ -59,8 +59,14 @@ pattern files refer back here.
   template: the starter (`starter@2`) for a business, Personal for Just me,
   Portfolio (with the Projects block) for A site for my work. The Turn on
   sheet's Website step says which ("Starts from the Portfolio template"),
-  and `/sites/new` starts its picker there; any registered template can be
-  chosen instead, Writing among them, and an explicit choice always wins.
+  or offers the few suggested for the business with it picked; and
+  `/sites/new` starts its picker there (industry templates U12: cards
+  suggested from the kind and the modules that are on, "All" a click away,
+  `?template=` to start on one, and the chosen template's colourway sent as
+  `styleId`). Any registered template can be chosen instead, and an
+  explicit choice always wins. A card whose sections need a module that is
+  off says so ("Its products show once Sell is on") and is never refused
+  (`lib/sites/template-picker.ts`).
   There is no blank site. The kind only picks the default
   (`sites/site-template.ts`, `KIND_TEMPLATE`), never which templates a
   business may use. No template assumes a business, speaks as "we", or
@@ -329,17 +335,29 @@ organizations/:org/customers`: everyone who has paid (an order through a
 ## Communications
 
 - **Current** — Real messages go through the Organization's own connected
-  provider (DEC-011), with one exception: while it has none, Saroh sends its
-  three booking notices (confirmed, moved, cancelled) from `notify.saroh.in`
-  when the shared rule allows. Each one counts against the plan's monthly
-  allowance, and when the allowance is used or can't be read, Saroh sends
-  nothing (DEC-086). Connecting its own email provider comes with Grow and
-  Pro, not Free: the catalogue's `integrations` row decides, so Settings
-  and the allowance's notices offer "Connect your email" only where the
-  plan has room for one, and "See plans" otherwise — never a connect the
-  API would refuse (DEC-086, amended 6 Oct). Otherwise Saroh-owned email is only for identity and
-  security mail, and for a template test sent to the signed-in user's own
-  verified address. Consent gates every send.
+  provider (DEC-011, reaffirmed 2026-10-07), review invitations included.
+  Saroh sends none of a business's messages to its customers: DEC-086
+  (Saroh sending booking notices) is reversed and its code stays off. With
+  no connected email provider, nothing is emailed, and the customer sees the
+  update in their account. Connecting its own email provider comes with Grow
+  and Pro, not Free (DEC-091), so a Free business's customers get no emails,
+  by design; Settings offers "Connect your email" only where the plan has
+  room for one, and "See plans" otherwise — never a connect the API would
+  refuse. Saroh's own email is for Saroh speaking to its own users (DEC-011,
+  amended 2026-10-07): sign-in and account mail, team invitations, Saroh's
+  billing, the waitlist, alerts to a business's own team (enquiries, and
+  the team alerts — new order, booking, failed payment, someone joining, a
+  go-live — for every business, provider or not, in fixed words with the
+  business's names cleaned; built, #849), a site's customer sign-in codes and the email-changed notice
+  with Saroh's built-in customer accounts (ADR-011), and a template test
+  sent to the signed-in user's own verified address. A business that brings
+  its own login system sends its own codes (not built). With no email
+  provider, owners and admins who can act are asked to connect one — "Your
+  customers get no emails from you", and what they miss — on Home's Needs
+  you and Settings › Providers, with Connect (`comms:manage`), or on a plan
+  that can't connect one, "comes with a paid plan" and See plans
+  (`billing:read`); it goes once one is connected, and the same note says
+  why an invoice or a review invitation can't be emailed (built, #850). Consent gates every send.
 - **Adopted** — A simple WhatsApp deep link with a prefilled message is
   acceptable before any provider integration (§16). None exists yet.
 - **Adopted** (2026-09-26, ADR-011) — A message about a customer's own order,

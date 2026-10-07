@@ -1,5 +1,6 @@
 import type { UpgradeTo } from "@/lib/billing/access";
 import { upgradeHref } from "@/lib/billing/access";
+import type { EmailSetup } from "@/lib/communications/email-setup";
 import { rolledOut } from "@/lib/modules/rollout";
 import type { ModuleView } from "@/lib/modules/schema";
 import { inIndia, yourAddress } from "@/lib/organizations/business-details";
@@ -76,14 +77,30 @@ export function emailAttention(
 }
 
 /**
+ * Whether the plan holds the business's own email back (DEC-091): none
+ * connected, and the connect's own check says no room for one
+ * (`GET …/comms-providers/email-setup`). Never asked to connect then — a
+ * connect the API would refuse — only told it comes with a paid plan.
+ */
+export function emailHeldByPlan(
+    attention: EmailAttention | null,
+    setup: EmailSetup | null | undefined,
+): boolean {
+    return (
+        attention === "not-connected" &&
+        setup?.connected === false &&
+        setup.canConnect === false
+    );
+}
+
+/**
  * The Providers tab's line in the settings tabs, when email needs a person.
- * "No email provider yet" only where the plan lets the business connect
- * its own (`ownEmail`, DEC-091): on Free, Saroh sends its booking emails
- * (DEC-086) and nothing needs anyone (UX-006).
+ * On a plan that can't connect one (DEC-091) it says a paid plan brings it,
+ * and only to who may see the plans (`billing:read`).
  */
 export function providersTabNote(
     attention: EmailAttention | null,
-    ownEmail = true,
+    plan: { setup?: EmailSetup | null; mayPlans?: boolean } = {},
 ) {
     if (attention === "disconnected") {
         return "Needs you: email is disconnected";
@@ -91,7 +108,10 @@ export function providersTabNote(
     if (attention === "refused") {
         return "Needs you: your email provider refused its keys";
     }
-    if (attention === "not-connected" && ownEmail) {
+    if (emailHeldByPlan(attention, plan.setup)) {
+        return plan.mayPlans ? "Your own email comes with a paid plan" : null;
+    }
+    if (attention === "not-connected") {
         return "Needs you: no email provider yet";
     }
     return null;
@@ -136,7 +156,7 @@ export interface ReadyStep extends ReadyItem {
  * (DEC-092): a business on a plan without it can still reach all done.
  */
 export interface ReadyAside {
-    key: "payments";
+    key: "payments" | "email";
     label: string;
     why: string;
     /** "Comes with ‹plan›", or "Comes with a paid plan". */

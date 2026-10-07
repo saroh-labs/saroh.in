@@ -3,9 +3,15 @@
 import { useCallback, useEffect, useState } from "react";
 
 import type { RenderedJournal } from "@saroh/block-contract";
+import { resolveVariant } from "@saroh/block-contract";
 
 import { DEFAULT_API_URL } from "../api-url";
 import { cn, trimTrailingSlashes } from "../lib/utils";
+import type { ArchiveYear } from "./journal-archive";
+import { JournalArchive, JournalArchiveByYear } from "./journal-archive";
+import { JournalLead } from "./journal-lead";
+import type { JournalFeed, JournalPost } from "./journal-posts";
+import { JOURNAL_DEFAULT_COUNT, journalCardPosts } from "./journal-posts";
 import { cardLink, listCard, listPhoto } from "./list-layout";
 
 /**
@@ -31,33 +37,16 @@ import { cardLink, listCard, listPhoto } from "./list-layout";
  * Drawn from `--site-*` only; gates G2 and G7 fail the build otherwise.
  */
 
-/** What the block needs of a post: less than the live or preview read has. */
-export interface JournalPost {
-    title: string;
-    slug: string;
-    excerpt?: string | null;
-    /** The post's body, already sanitized at publish; only read for text. */
-    content?: string | null;
-    image?: string | null;
-    author?: string | null;
-    /** Null for a post behind a preview token that has never gone live. */
-    publishedAt: string | null;
-    /** False only behind a preview token, for a post not published yet. */
-    live?: boolean;
-}
-
-/** The posts to show and where they live: `/blog` unless the merchant chose. */
-export interface JournalFeed {
-    posts: JournalPost[];
-    /** The posts index; each post is at `${basePath}/${slug}`. */
-    basePath: string;
-}
+// The post and feed shapes live beside the rule for which posts are listed,
+// so that module needs nothing from this one.
+export type { JournalFeed, JournalPost };
 
 /** What the section is called when the merchant left the title empty. */
 export const JOURNAL_TITLE = "Journal";
 
-/** How many posts the block shows when the count is not set. */
-export const JOURNAL_DEFAULT_COUNT = 3;
+// How many posts the block shows when the count is not set: kept beside
+// the rule for which posts it lists, a module the server can call.
+export { JOURNAL_DEFAULT_COUNT };
 
 /** A value with something in it, else null: an empty string says nothing. */
 function said(value: string | null | undefined): string | null {
@@ -176,6 +165,93 @@ export function postDay(iso: string): string | null {
     return `${date.getUTCDate()} ${MONTHS[date.getUTCMonth()]} ${date.getUTCFullYear()}`;
 }
 
+/** "2 Apr": a day without its year (template polish), in UTC as above. */
+export function postDayShort(iso: string): string | null {
+    const date = new Date(iso);
+    if (Number.isNaN(date.getTime())) return null;
+    return `${date.getUTCDate()} ${MONTHS[date.getUTCMonth()]}`;
+}
+
+/** A post's year, "2026", in UTC as its date is; null when it has none. */
+export function postYear(iso: string | null): string | null {
+    if (!iso) return null;
+    const date = new Date(iso);
+    return Number.isNaN(date.getTime()) ? null : String(date.getUTCFullYear());
+}
+
+/** Text with the common entities a sanitized body carries turned back. */
+function decoded(text: string): string {
+    return text
+        .replace(/&(#39|[a-z]+);/gi, (m, name: string) => {
+            return ENTITIES[name.toLowerCase()] ?? m;
+        })
+        .replace(/\s+/g, " ")
+        .trim();
+}
+
+/**
+ * The first few paragraphs of a post's body as plain text (template
+ * polish), for the lead look: each `<p>…</p>` in turn, its tags stripped,
+ * empty ones skipped. A scan with `indexOf`, not a regex over the body, so
+ * a body of many unclosed tags stays linear (CodeQL js/polynomial-redos).
+ */
+export function openingParagraphs(
+    html: string | null | undefined,
+    max = 3,
+): string[] {
+    const body = withoutScriptsAndStyles(html ?? "");
+    const lower = body.toLowerCase();
+    const out: string[] = [];
+    let at = 0;
+    while (out.length < max) {
+        let open = lower.indexOf("<p", at);
+        // `<pre>` and `<param>` are not paragraphs.
+        while (open !== -1 && /[a-z]/.test(lower[open + 2] ?? "")) {
+            open = lower.indexOf("<p", open + 2);
+        }
+        if (open === -1) break;
+        const start = lower.indexOf(">", open);
+        if (start === -1) break;
+        const close = lower.indexOf("</p>", start);
+        const end = close === -1 ? body.length : close;
+        const text = decoded(inlineText(body.slice(start + 1, end)));
+        if (text !== "") out.push(text);
+        if (close === -1) break;
+        at = close + 4;
+    }
+    return out;
+}
+
+/**
+ * A paragraph's text: inline tags removed without a gap, so "<b>two</b>."
+ * reads "two.", and a line break as a space. A scan, as `withoutTags`.
+ */
+function inlineText(html: string): string {
+    let out = "";
+    let at = 0;
+    for (;;) {
+        const open = html.indexOf("<", at);
+        if (open === -1) return out + html.slice(at);
+        const close = html.indexOf(">", open + 1);
+        if (close === -1) return out + html.slice(at);
+        const tag = html.slice(open + 1, open + 4).toLowerCase();
+        out += html.slice(at, open) + (tag.startsWith("br") ? " " : "");
+        at = close + 1;
+    }
+}
+
+/**
+ * "About 12 minutes" from a post's body, at 230 words a minute (template
+ * polish); null when there is no body to count, so nothing is claimed.
+ */
+export function readingTime(html: string | null | undefined): string | null {
+    const text = decoded(withoutTags(withoutScriptsAndStyles(html ?? "")));
+    if (text === "") return null;
+    const words = text.split(" ").length;
+    const minutes = Math.max(1, Math.round(words / 230));
+    return `About ${minutes} ${minutes === 1 ? "minute" : "minutes"}`;
+}
+
 /**
  * The small line over a post's title: who wrote it and when. A post behind a
  * preview token that hasn't gone out says so instead of a date.
@@ -234,6 +310,7 @@ export default function JournalSection({
     feed,
     siteId,
     apiUrl = DEFAULT_API_URL,
+    now,
 }: {
     content: RenderedJournal;
     /** The posts, read by the page that serves the site (live or preview). */
@@ -246,6 +323,8 @@ export default function JournalSection({
     siteId?: string | null;
     /** Base URL of the public API. See {@link DEFAULT_API_URL}. */
     apiUrl?: string;
+    /** The moment "this year" is read against (short dates). Tests pin it. */
+    now?: Date;
 }) {
     const reads = feed === undefined && typeof siteId === "string";
     const [state, setState] = useState<LoadState>({ kind: "loading" });
@@ -292,7 +371,14 @@ export default function JournalSection({
     const title = said(content.title) ?? JOURNAL_TITLE;
 
     if (feed) {
-        return <JournalCards content={content} title={title} feed={feed} />;
+        return (
+            <JournalCards
+                content={content}
+                title={title}
+                feed={feed}
+                now={now}
+            />
+        );
     }
     if (siteId === null) return null;
     if (siteId === undefined) {
@@ -338,7 +424,14 @@ export default function JournalSection({
             </JournalNote>
         );
     }
-    return <JournalCards content={content} title={title} feed={state.feed} />;
+    return (
+        <JournalCards
+            content={content}
+            title={title}
+            feed={state.feed}
+            now={now}
+        />
+    );
 }
 
 const focusRing =
@@ -361,7 +454,10 @@ function JournalFrame({
     return (
         <section className="mx-auto w-full max-w-screen-xl px-5 py-[var(--site-section-padding)] sm:px-[var(--site-page-margin)]">
             <div className="mb-3.5 flex items-baseline gap-3">
-                <h2 className="font-site-heading text-site-fg min-w-0 flex-1 text-[calc(1.625rem*var(--site-heading-scale))] font-semibold tracking-[-0.01em]">
+                <h2
+                    data-site-title=""
+                    className="font-site-heading text-site-fg min-w-0 flex-1 text-[calc(1.625rem*var(--site-heading-scale))] font-semibold tracking-[-0.01em]"
+                >
                     {title}
                 </h2>
                 {more ?? null}
@@ -401,13 +497,85 @@ function JournalCards({
     content,
     title,
     feed,
+    now,
 }: {
     content: RenderedJournal;
     title: string;
     feed: JournalFeed;
+    /** The moment "this year" is read against. Tests pin it. */
+    now?: Date;
 }) {
-    const posts = feed.posts.slice(0, content.count ?? JOURNAL_DEFAULT_COUNT);
+    const look = resolveVariant("journal", content);
+    // The lead look (template polish): the newest post, in depth.
+    if (look === "lead") {
+        return <LeadSection content={content} feed={feed} />;
+    }
+    // The archive look (U2): every post, dated, whatever the count says.
+    const archive = look === "archive";
+    const limit = archive ? content.archiveLimit : undefined;
+    const posts = journalCardPosts(content, feed);
     if (posts.length === 0) return null;
+    if (archive) {
+        const index = trimTrailingSlashes(feed.basePath);
+        const thisYear = String((now ?? new Date()).getUTCFullYear());
+        const byYear = content.groupByYear === true;
+        const rows = posts.map((post) => {
+            const live = post.live !== false && post.publishedAt !== null;
+            const iso = post.publishedAt ?? "";
+            // Under its year, or in this year when asked: no year in the date.
+            const short =
+                byYear ||
+                (content.shortDates === true && postYear(iso) === thisYear);
+            return {
+                key: post.slug,
+                href: `${index}/${encodeURIComponent(post.slug)}`,
+                title: post.title,
+                date: live
+                    ? short
+                        ? postDayShort(iso)
+                        : postDay(iso)
+                    : "Not published",
+                dateTime: live ? iso.slice(0, 10) : null,
+                excerpt:
+                    content.showExcerpts !== false ? postExcerpt(post) : null,
+                year: live ? postYear(iso) : null,
+            };
+        });
+        const total = feed.posts.length;
+        const more = limit ? (
+            <a href={index || "/"} className={cn(textButton, "shrink-0")}>
+                All {total} {total === 1 ? "entry" : "entries"}{" "}
+                <span aria-hidden="true">→</span>
+            </a>
+        ) : content.showTotal ? (
+            <span
+                data-journal-total=""
+                className="text-site-muted shrink-0 text-[14px]"
+            >
+                {total === 1 ? "One piece" : `${total} pieces in all`}
+            </span>
+        ) : undefined;
+        if (byYear) {
+            const years: ArchiveYear[] = [];
+            for (const row of rows) {
+                const year = row.year ?? "Not published";
+                const last: ArchiveYear | null =
+                    years.length > 0 ? years[years.length - 1] : null;
+                if (last?.year === year) last.rows.push(row);
+                else years.push({ year, rows: [row] });
+            }
+            return (
+                <JournalFrame title={title} more={more}>
+                    <JournalArchiveByYear years={years} />
+                </JournalFrame>
+            );
+        }
+        return (
+            <JournalFrame title={title} more={more}>
+                <JournalArchive rows={rows} />
+            </JournalFrame>
+        );
+    }
     const showImages = content.showImages !== false;
     const showExcerpts = content.showExcerpts !== false;
     const base = trimTrailingSlashes(feed.basePath);
@@ -522,5 +690,45 @@ function JournalCards({
                 })}
             </ul>
         </JournalFrame>
+    );
+}
+
+/**
+ * The lead look's section (template polish): the newest post, drawn by
+ * `JournalLead`. The section's own title shows only when the merchant set
+ * one; the post's title is otherwise the section's heading.
+ */
+function LeadSection({
+    content,
+    feed,
+}: {
+    content: RenderedJournal;
+    feed: JournalFeed;
+}) {
+    if (feed.posts.length === 0) return null;
+    const post = feed.posts[0];
+    const own = said(content.title);
+    const live = post.live !== false && post.publishedAt !== null;
+    const index = trimTrailingSlashes(feed.basePath);
+    const lead = (
+        <JournalLead
+            titled={own !== null}
+            post={{
+                href: `${index}/${encodeURIComponent(post.slug)}`,
+                title: post.title,
+                date: live ? postDay(post.publishedAt ?? "") : "Not published",
+                dateTime: live ? (post.publishedAt ?? "").slice(0, 10) : null,
+                dek: said(post.excerpt),
+                minutes: readingTime(post.content),
+                paragraphs: openingParagraphs(post.content),
+            }}
+        />
+    );
+    return own ? (
+        <JournalFrame title={own}>{lead}</JournalFrame>
+    ) : (
+        <section className="mx-auto w-full max-w-screen-xl px-5 py-[var(--site-section-padding)] sm:px-[var(--site-page-margin)]">
+            {lead}
+        </section>
     );
 }

@@ -5,6 +5,8 @@ import {
     takesOnlinePayment,
     upgradeHref,
 } from "@/lib/billing/access";
+import type { EmailSetup } from "@/lib/communications/email-setup";
+import { SEE_PLANS_HREF } from "@/lib/communications/email-setup";
 
 /**
  * What a provider row offers in place of Connect when the plan won't let
@@ -12,13 +14,16 @@ import {
  * plans, said before any key form opens, never after the keys are typed.
  *
  * - Payments: the plan takes no online payment (row `payments`), or has no
- *   room for one more of the business's own accounts (`integrations`).
- * - Email and WhatsApp: no room on `integrations`.
+ *   room for one more of the business's own accounts (`integrations`),
+ *   read from the plan the screen already has, the way the connect's own
+ *   check reads it (`ownAccountsRoom`, `takesOnlinePayment`).
+ * - Email and WhatsApp: the API's own answer, `GET …/comms-providers/
+ *   email-setup` (`canConnect: false`, `lib/communications/email-setup.ts`),
+ *   the same state the email prompt and Settings' nudges read — never a
+ *   second check of the plan. The plan only names what has it.
  *
- * Read from the plan the screen already has, the way the connect's own
- * check reads it (`ownAccountsRoom`, `takesOnlinePayment`): unread, legacy
- * or unenforced is no lock, failing open — the connect still refuses if it
- * must. Plan names are the catalogue's; no price.
+ * Unread, legacy or unenforced is no lock, failing open — the connect still
+ * refuses if it must. Plan names are the catalogue's; no price.
  */
 export interface ConnectLock {
     /** "Comes with Grow", or why there's no room on this plan. */
@@ -59,13 +64,37 @@ function lockFor(
     };
 }
 
-export function connectLocksOf(access: BillingAccessView | null): ConnectLocks {
-    if (!access) return NONE;
-    const room = ownAccountsRoom(access);
-    const messaging = room ? null : lockFor(access, "integrations");
+/**
+ * The business's own email (and WhatsApp) held back by the plan, as the
+ * email setup says (`canConnect: false`); named from the plan when it was
+ * read, else "a paid plan" and See plans, the prompt's own link.
+ */
+export function messagingLockOf(
+    setup: EmailSetup | null | undefined,
+    access: BillingAccessView | null = null,
+): ConnectLock | null {
+    if (setup?.connected !== false || setup.canConnect !== false) return null;
+    if (access) return lockFor(access, "integrations");
+    return {
+        comesWith: "Comes with a paid plan",
+        cta: "See plans",
+        href: SEE_PLANS_HREF,
+        upgrade: null,
+        full: false,
+    };
+}
+
+export function connectLocksOf(
+    access: BillingAccessView | null,
+    emailSetup: EmailSetup | null | undefined,
+): ConnectLocks {
+    const messaging = messagingLockOf(emailSetup, access);
+    if (!access) return { ...NONE, messaging };
     const payments = !takesOnlinePayment(access)
         ? lockFor(access, "payments")
-        : messaging;
+        : ownAccountsRoom(access)
+          ? null
+          : lockFor(access, "integrations");
     return { payments, messaging };
 }
 

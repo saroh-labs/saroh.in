@@ -10,7 +10,77 @@
  * without moving this would have let them drift apart again the same way.
  */
 
+import type { SiteFontPair } from "@saroh/block-contract";
+import { findFontPair, fontStack } from "@saroh/block-contract";
+
 import { SITE_FONT_STACK } from "./tailwind-preset";
+
+/**
+ * The faces an app has loaded, by Google Fonts family name ("Fraunces"), each
+ * mapped to the CSS family its loader registered — `next/font` hashes it, so
+ * the plain name would not find the file. `saroh.app` loads them
+ * (`lib/site-fonts.ts`), and the editor for its previews; anywhere without
+ * them a pair falls back to the plain family name and then to its stack.
+ */
+export type LoadedSiteFaces = Readonly<Record<string, string>>;
+
+/** The `--site-font-*` variables, and the role each one sets. */
+const FONT_ROLES: Partial<
+    Record<string, keyof Pick<SiteFontPair, "heading" | "body" | "mono">>
+> = {
+    "--site-font-heading": "heading",
+    "--site-font-body": "body",
+    // The optional third face (`font-site-mono`): absent for a pair without
+    // one, which then sets machine facts in its body face.
+    "--site-font-mono": "mono",
+};
+
+/**
+ * A loader's registered family, if it is one a stylesheet can safely carry:
+ * quoted or bare names, commas and spaces. It comes from the app's own build,
+ * never from a snapshot, but it is interpolated into a `<style>` element, so
+ * it is checked like everything else written there.
+ */
+function safeLoadedFamily(
+    faces: LoadedSiteFaces | undefined,
+    family: string | null,
+): string | undefined {
+    if (!faces || family === null) return undefined;
+    const loaded = faces[family];
+    return typeof loaded === "string" && /^[\w '",-]{1,200}$/.test(loaded)
+        ? loaded
+        : undefined;
+}
+
+/**
+ * The `font-family` stacks for a pair's key (KTD-2), or null for a key that is
+ * not in the list. The snapshot carries only the KEY; this is where it becomes
+ * CSS, from the curated list, so nothing a publication holds is ever written
+ * into a stylesheet as a font name.
+ */
+export function fontPairStacks(
+    key: unknown,
+    faces?: LoadedSiteFaces,
+): { heading: string; body: string; mono?: string } | null {
+    const pair = findFontPair(key);
+    if (!pair) return null;
+    return {
+        heading: fontStack(
+            pair.heading,
+            safeLoadedFamily(faces, pair.heading.family),
+        ),
+        body: fontStack(pair.body, safeLoadedFamily(faces, pair.body.family)),
+        // Only a pair that names a mono face has one.
+        ...(pair.mono
+            ? {
+                  mono: fontStack(
+                      pair.mono,
+                      safeLoadedFamily(faces, pair.mono.family),
+                  ),
+              }
+            : {}),
+    };
+}
 
 /**
  * Per-publication theme (#189).
@@ -32,8 +102,14 @@ import { SITE_FONT_STACK } from "./tailwind-preset";
 export function SiteTheme({
     variables,
     selector = ":root",
+    faces,
 }: {
     variables?: Record<string, string> | null;
+    /**
+     * The faces this app loaded ({@link LoadedSiteFaces}). The variables name
+     * a font pair by key; this is how the key finds the files.
+     */
+    faces?: LoadedSiteFaces;
     /**
      * What the variables are declared on. `:root` — the default, and what the
      * live renderer and the editor preview both want — themes the whole
@@ -50,8 +126,10 @@ export function SiteTheme({
      */
     selector?: string;
 }) {
-    const custom = cssVariables(variables);
+    const custom = cssVariables(variables, faces);
     const at = safeSelector(selector);
+    const labels = labelRule(at, variables?.[LABEL_STYLE_VARIABLE]);
+    const column = columnRule(at, variables?.[CONTENT_WIDTH_VARIABLE]);
 
     return (
         <style>{`
@@ -134,9 +212,174 @@ ${
                 }
             }`
         : `            ${at} {\n${custom}\n            }`
-}
+}${labels}${column}${sectionRules(at)}
         `}</style>
     );
+}
+
+/**
+ * The section-title style a template set (DEC-090), by WORD
+ * (`--site-label-style`, from `typeScaleVariables`). Like a font pair's key,
+ * the value is never written into CSS: it picks one of the fixed rules below.
+ */
+const LABEL_STYLE_VARIABLE = "--site-label-style";
+
+/**
+ * Section titles as an eyebrow: small, uppercase, wide-tracked, in the quiet
+ * text colour or the accent — both held to 4.5:1 on the page by the
+ * palette's rules. Blocks mark a section title `data-site-title`; the
+ * selector's two parts outrank the title's own size and colour utilities, so
+ * a site without a label style keeps the headings it has.
+ *
+ * A text block's own `h2`s and `h3`s join them when it asks
+ * (`headingStyle: "label"`, marked `data-site-headings` on its prose): the
+ * sanitized markup cannot carry the attribute itself.
+ */
+const LABEL_RULES: Record<string, string> = {
+    eyebrow: "hsl(var(--site-muted))",
+    eyebrowAccent: "hsl(var(--site-accent))",
+};
+
+function labelRule(at: string, style: string | undefined): string {
+    const colour = style ? LABEL_RULES[style] : undefined;
+    if (!colour) return "";
+    return `
+            ${at} :is([data-site-title], [data-site-headings="label"] :is(h2, h3)) {
+                font-size: 0.875rem;
+                line-height: 1.4;
+                font-weight: 500;
+                letter-spacing: 0.14em;
+                text-transform: uppercase;
+                color: ${colour};
+            }`;
+}
+
+/** A template's column width (DEC-090 type scale), in px. */
+const CONTENT_WIDTH_VARIABLE = "--site-content-width";
+
+/**
+ * One column for the whole page, when a template sets one.
+ *
+ * The header, the footer and a module page's title read the width through
+ * `max-w-site-content`. The blocks still name their own Tailwind widths
+ * (1280px, or a 768px reading column for text), so while the site has a
+ * column this rule sets each of those, inside a section, to it — a
+ * developer's single 820px column, a studio's 1320px frame. Without one the
+ * rule is not written, and every block keeps the width it has always had.
+ * Margins are inside the width, as they are inside `max-w-screen-xl`.
+ */
+function columnRule(at: string, width: string | undefined): string {
+    if (!width || !/^\d{3,4}px$/.test(width)) return "";
+    return `
+            ${at} [data-site-section] :is(.max-w-screen-md, .max-w-screen-lg, .max-w-screen-xl) {
+                max-width: var(${CONTENT_WIDTH_VARIABLE});
+            }`;
+}
+
+/**
+ * What a section's frame asks of the page (`section-frame.ts` in the
+ * contract), written for every site because each only matches a section
+ * that set it, and none has until a template or the merchant does.
+ *
+ * BANDS. A band recolours the section's own `--site-*` tokens, so every
+ * block inside it draws in the band's colours without knowing it is in one.
+ * The swap reads the page's colours through `--site-band-*` aliases
+ * declared at the theme's own scope: a property cannot read its own
+ * inherited value on the element that redefines it, but an alias, computed
+ * where the theme is, carries the page's value down. Each band keeps a
+ * pairing the palette already holds to 4.5:1 — ink on paper swapped, the
+ * accent's text on the accent — and every quieter text role (body, quiet,
+ * hairline) takes that same full-contrast colour, never a tint nobody
+ * checked. The accent inside an inverse band is the paper, so a button there
+ * is paper with ink words; inside an accent band, the accent's own text.
+ *
+ * Anchors leave room for the sticky header when a link jumps to them.
+ *
+ * STATUS. The "open now" dot's colours (`--site-status`, and
+ * `--site-status-inverse` over the ink) are optional palette roles, unset
+ * unless a template's colourway names them; the blocks fall back to the
+ * accent. An inverse band swaps the two, so the dot keeps the colour held
+ * to 3:1 on the ink; an accent band clears both, so the dot is the
+ * accent's text there, as every other mark in it is. An unset status stays
+ * unset through a band (`var()` of nothing is nothing), and the dot keeps
+ * the band's accent, as it always did.
+ *
+ * DEFINITION LISTS. A text block may carry `dl`/`dt`/`dd` (facts: "Clay /
+ * Stoneware"). The prose defaults would set them in the typography
+ * plugin's greys; this sets them in the merchant's colours, terms in the
+ * heading face. Scoped to sections, so a footer's own colours stay its own.
+ * A text block that asks for `factsStyle: "labels"` (marked
+ * `data-site-facts`) sets its terms as small uppercase labels in the quiet
+ * text colour — held to 4.5:1 on the page — and its values in the text
+ * colour, the facts list the ceramics design draws.
+ */
+function sectionRules(at: string): string {
+    return `
+            ${at} {
+                --site-band-paper: var(--site-bg);
+                --site-band-ink: var(--site-fg);
+                --site-band-card: var(--site-surface);
+                --site-band-accent: var(--site-accent);
+                --site-band-accent-fg: var(--site-accent-fg);
+                --site-band-status: var(--site-status);
+                --site-band-status-inverse: var(--site-status-inverse);
+            }
+            ${at} [data-site-band] {
+                background-color: hsl(var(--site-bg));
+                color: hsl(var(--site-body));
+            }
+            ${at} [data-site-band="surface"] {
+                --site-bg: var(--site-band-card);
+                --site-surface: var(--site-band-paper);
+            }
+            ${at} [data-site-band="inverse"] {
+                --site-bg: var(--site-band-ink);
+                --site-surface: var(--site-band-ink);
+                --site-fg: var(--site-band-paper);
+                --site-body: var(--site-band-paper);
+                --site-muted: var(--site-band-paper);
+                --site-border: var(--site-band-paper);
+                --site-accent: var(--site-band-paper);
+                --site-accent-fg: var(--site-band-ink);
+                --site-status: var(--site-band-status-inverse);
+                --site-status-inverse: var(--site-band-status);
+            }
+            ${at} [data-site-band="accent"] {
+                --site-bg: var(--site-band-accent);
+                --site-surface: var(--site-band-accent);
+                --site-fg: var(--site-band-accent-fg);
+                --site-body: var(--site-band-accent-fg);
+                --site-muted: var(--site-band-accent-fg);
+                --site-border: var(--site-band-accent-fg);
+                --site-accent: var(--site-band-accent-fg);
+                --site-accent-fg: var(--site-band-accent);
+                --site-status: initial;
+                --site-status-inverse: initial;
+            }
+            ${at} [data-site-section][id] {
+                scroll-margin-top: 4.5rem;
+            }
+            ${at} [data-site-section] .prose dt {
+                color: hsl(var(--site-fg));
+                font-family: var(--site-font-heading);
+            }
+            ${at} [data-site-section] .prose dd {
+                color: hsl(var(--site-fg) / 0.8);
+            }
+            ${at} [data-site-section] [data-site-facts="labels"] dt {
+                margin-top: 1.25em;
+                color: hsl(var(--site-muted));
+                font-family: var(--site-font-body);
+                font-size: 0.78rem;
+                font-weight: 500;
+                letter-spacing: 0.1em;
+                text-transform: uppercase;
+            }
+            ${at} [data-site-section] [data-site-facts="labels"] dd {
+                margin-top: 0.25em;
+                padding-inline-start: 0;
+                color: hsl(var(--site-fg));
+            }`;
 }
 
 /**
@@ -174,18 +417,35 @@ function safeSelector(selector: string): string {
  */
 function cssVariables(
     variables: Record<string, string> | null | undefined,
+    faces?: LoadedSiteFaces,
 ): string | null {
     if (!variables) return null;
     const safeName = /^--site-[a-z-]+$/;
-    // HSL triples ("18 45% 45%"), lengths ("38px") and bare scales ("1.05").
+    // HSL triples ("18 45% 45%"), lengths ("38px", "64ch") and bare scales
+    // ("1.05"). A template's exact colours (DEC-090) arrive as HSL triples
+    // too — the publisher converts its `#RRGGBB` — so no `#` is ever let in.
     const safeValue = /^[a-zA-Z0-9 .%]{1,64}$/;
 
     const declarations = Object.entries(variables)
+        // A word that chooses a rule, not a value (see `labelRule`).
+        .filter(([name]) => name !== LABEL_STYLE_VARIABLE)
+        .map(([name, value]): [string, unknown] => {
+            // The two font variables carry a pair's KEY (KTD-2), translated
+            // here from the curated list; an unknown key is dropped, leaving
+            // the system stack. The value itself is never written.
+            const role = FONT_ROLES[name];
+            if (role) {
+                return [name, fontPairStacks(value, faces)?.[role] ?? ""];
+            }
+            return [name, value];
+        })
         .filter(
-            ([name, value]) =>
-                safeName.test(name) &&
-                typeof value === "string" &&
-                safeValue.test(value),
+            (entry): entry is [string, string] =>
+                safeName.test(entry[0]) &&
+                typeof entry[1] === "string" &&
+                (FONT_ROLES[entry[0]]
+                    ? entry[1] !== ""
+                    : safeValue.test(entry[1])),
         )
         .map(([name, value]) => `                ${name}: ${value};`);
 
@@ -203,9 +463,11 @@ function cssVariables(
 export function SiteThemeScope({
     variables,
     name,
+    faces,
     children,
 }: {
     variables?: Record<string, string> | null;
+    faces?: LoadedSiteFaces;
     /** Distinguishes this scope from the others on the page. */
     name: string;
     children: React.ReactNode;
@@ -213,7 +475,11 @@ export function SiteThemeScope({
     const scope = `site-theme-${name.replace(/[^\w-]/g, "")}`;
     return (
         <div className={scope}>
-            <SiteTheme variables={variables} selector={`.${scope}`} />
+            <SiteTheme
+                variables={variables}
+                selector={`.${scope}`}
+                faces={faces}
+            />
             {children}
         </div>
     );

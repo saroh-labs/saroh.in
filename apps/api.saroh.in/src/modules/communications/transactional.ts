@@ -36,14 +36,6 @@ export const NOTICE_TEMPLATES = [
 export type NoticeTemplate = (typeof NOTICE_TEMPLATES)[number];
 
 /**
- * F14's alerts to the business's own team (a new order, a booking, a failed
- * payment, someone joining), worded by `notifications/team-alert.handler.ts`
- * and sent only to the people who chose email for them.
- */
-export const TEAM_TEMPLATES = ["TEAM_ALERT"] as const;
-export type TeamTemplate = (typeof TEAM_TEMPLATES)[number];
-
-/**
  * D14's autopay set-up link, sent when staff press "Send a set-up link" on
  * Subscription Detail: the provider's page to approve autopay on, as a
  * secret link like a pay link. And the note that staff cancelled their
@@ -56,11 +48,19 @@ export const AUTOPAY_TEMPLATES = [
 ] as const;
 export type AutopayTemplate = (typeof AUTOPAY_TEMPLATES)[number];
 
+/**
+ * The review invitation ("How was your order?", plan 2026-09-21-001): a
+ * link to review what an order bought, as a secret link like a pay link.
+ * Through the business's own provider only (DEC-011, MARKETING_CLAIMS D11).
+ */
+export const REVIEW_TEMPLATES = ["REVIEW_INVITATION"] as const;
+export type ReviewTemplate = (typeof REVIEW_TEMPLATES)[number];
+
 export const TRANSACTIONAL_TEMPLATES = [
     ...INVOICE_TEMPLATES,
     ...NOTICE_TEMPLATES,
-    ...TEAM_TEMPLATES,
     ...AUTOPAY_TEMPLATES,
+    ...REVIEW_TEMPLATES,
 ] as const;
 export type TransactionalTemplate = (typeof TRANSACTIONAL_TEMPLATES)[number];
 
@@ -244,6 +244,32 @@ export function renderAutopayCancelled(
         subject: `Autopay for ${vars.plan} is off`,
         body,
     };
+}
+
+/** What the review invitation says. */
+export interface ReviewInvitationVars {
+    /** The storefront the order was placed with. */
+    store: string;
+    /** How many days the link works for. */
+    days: number;
+}
+
+/**
+ * The review invitation (plan 2026-09-21-001), in the words Saroh's sender
+ * used before it moved to the business's provider. The review link is a
+ * secret link: the stored body holds {@link SECRET_LINK_SLOT}.
+ */
+export function renderReviewInvitation(
+    vars: ReviewInvitationVars,
+): RenderedMessage {
+    const store = escapeHtml(vars.store);
+    const body = [
+        `<p>How was your order?</p>`,
+        `<p>${store} would like to hear what you thought of what you bought. It takes a minute, and you can review each item. The link works for ${vars.days} days.</p>`,
+        `<p>Leave a review here:<br><a href="${SECRET_LINK_SLOT}">${SECRET_LINK_SLOT}</a></p>`,
+        `<p>${store}</p>`,
+    ].join("\n");
+    return { subject: `How was your order from ${vars.store}?`, body };
 }
 
 /** The stored body with the link put back, for the provider only. */

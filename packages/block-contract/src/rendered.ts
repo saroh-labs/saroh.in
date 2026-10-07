@@ -124,8 +124,12 @@ const renderedHero = z.object({
     subheading: z.string().optional(),
     cta: renderedCtaSchema.optional(),
     image: renderedImageSchema.optional(),
+    /** The photo it wants (KTD-5): a note to the owner, never drawn live. */
+    imageBrief: z.string().optional(),
     /** "On today" beside the headline (G18); read live, never stored. */
     onToday: z.boolean().optional(),
+    /** `false`: the heading is for screen readers only (the `none` look). */
+    titleVisible: z.boolean().optional(),
 });
 
 /**
@@ -141,7 +145,18 @@ const renderedRichText = z.object({
     value: z.string(),
     /** One photo beside the text (G7); absent side is the right. */
     image: renderedImageSchema.optional(),
-    imageSide: z.enum(["left", "right"]).optional(),
+    imageBrief: z.string().optional(),
+    // A side this build does not know draws as the right, as absent does.
+    imageSide: z.string().optional(),
+    /** A boxed line after the text, ruled in the accent (template polish). */
+    callout: z
+        .object({ label: z.string().optional(), text: z.string() })
+        .optional(),
+    partLabels: z.boolean().optional(),
+    // A style this build does not know draws as absent does.
+    headingStyle: z.string().optional(),
+    factsStyle: z.string().optional(),
+    label: z.string().optional(),
 });
 
 const renderedCta = renderedCtaSchema.extend({ variant, padding });
@@ -158,7 +173,16 @@ const renderedCta = renderedCtaSchema.extend({ variant, padding });
 const renderedGallery = z.object({
     variant,
     padding,
-    images: z.array(renderedImageSchema).min(1),
+    /**
+     * Empty only for a slot shipped as a brief (KTD-5), which the live site
+     * draws as nothing. Each image may carry a caption (U2).
+     */
+    images: z.array(
+        renderedImageSchema.extend({ caption: z.string().optional() }),
+    ),
+    imageBrief: z.string().optional(),
+    // Where captions sit (DEC-090); a value this build does not know is below.
+    captionPlacement: z.string().optional(),
 });
 
 const renderedEnquiryField = z.object({
@@ -206,9 +230,15 @@ const renderedFeatures = z.object({
             z.object({
                 title: z.string(),
                 body: z.string().optional(),
+                /** A figure the point stands on, the merchant's own words. */
+                value: z.string().optional(),
             }),
         )
         .min(1),
+    columns: z.number().int().optional(),
+    note: z.string().optional(),
+    // An intro style this build does not know draws as the plain intro.
+    introStyle: z.string().optional(),
 });
 
 /**
@@ -270,6 +300,10 @@ const renderedServicesList = z.object({
     layout: z.enum(["cards", "list"]).optional(),
     showDescriptions: z.boolean().optional(),
     buttonLabel: z.string().optional(),
+    modeLine: z.string().optional(),
+    followUpLine: z.string().optional(),
+    includesLabel: z.string().optional(),
+    includes: z.array(z.string()).optional(),
 });
 
 /**
@@ -298,6 +332,11 @@ const renderedJournal = z.object({
     showImages: z.boolean().optional(),
     layout: z.enum(["cards", "list"]).optional(),
     buttonLabel: z.string().optional(),
+    afterLead: z.boolean().optional(),
+    groupByYear: z.boolean().optional(),
+    showTotal: z.boolean().optional(),
+    archiveLimit: z.number().int().optional(),
+    shortDates: z.boolean().optional(),
 });
 
 /**
@@ -308,6 +347,7 @@ const renderedPlans = z.object({
     variant,
     padding,
     title: z.string().optional(),
+    intro: z.string().optional(),
     highlight: z.enum(["first", "none"]).optional(),
     buttonLabel: z.string().optional(),
     showDescriptions: z.boolean().optional(),
@@ -332,6 +372,12 @@ const renderedProductGrid = z.object({
     showPhotos: z.boolean().optional(),
     showDescriptions: z.boolean().optional(),
     buttonLabel: z.string().optional(),
+    showAvailability: z.boolean().optional(),
+    note: z.string().optional(),
+    // A card style this build does not know draws as the card.
+    cardStyle: z.string().optional(),
+    // A count this build does not draw falls back to filling the row.
+    columns: z.number().int().optional(),
 });
 
 /**
@@ -360,12 +406,83 @@ const renderedProjects = z.object({
         .array(
             z.object({
                 image: renderedImageSchema.optional(),
+                imageBrief: z.string().optional(),
+                caption: z.string().optional(),
                 title: z.string(),
                 summary: z.string().optional(),
                 link: z.string().optional(),
+                year: z.string().optional(),
+                role: z.string().optional(),
+                meta: z.string().optional(),
             }),
         )
         .min(1),
+    captionPlacement: z.string().optional(),
+    showCount: z.boolean().optional(),
+});
+
+/**
+ * `timetable`, `hours` and `person`, as published (industry templates U2).
+ * The first two are bound: nothing resolves at publish, the sessions and the
+ * week are read live. A person's button resolves like hero's.
+ */
+const renderedTimetable = z.object({
+    variant,
+    padding,
+    title: z.string().optional(),
+    intro: z.string().optional(),
+    serviceIds: z.array(z.string()).optional(),
+    showTrainer: z.boolean().optional(),
+    showPlacesLeft: z.boolean().optional(),
+    weekdaysOnly: z.boolean().optional(),
+    showCounts: z.boolean().optional(),
+});
+
+const renderedHours = z.object({
+    variant,
+    padding,
+    title: z.string().optional(),
+    storeId: z.string().optional(),
+    showClosed: z.boolean().optional(),
+    groupDays: z.boolean().optional(),
+    showAddress: z.boolean().optional(),
+});
+
+const renderedPerson = z.object({
+    variant,
+    padding,
+    image: renderedImageSchema.optional(),
+    imageBrief: z.string().optional(),
+    name: z.string(),
+    role: z.string().optional(),
+    // A line, or a row with where it came from (template polish).
+    credentials: z
+        .array(
+            z.union([
+                z.string(),
+                z.object({
+                    title: z.string(),
+                    detail: z.string().optional(),
+                }),
+            ]),
+        )
+        .optional(),
+    credentialsLabel: z.string().optional(),
+    bio: z.string().optional(),
+    cta: renderedCtaSchema.optional(),
+    asTitle: z.boolean().optional(),
+    title: z.string().optional(),
+    people: z
+        .array(
+            z.object({
+                image: renderedImageSchema.optional(),
+                imageBrief: z.string().optional(),
+                name: z.string(),
+                role: z.string().optional(),
+                bio: z.string().optional(),
+            }),
+        )
+        .optional(),
 });
 
 /**
@@ -400,6 +517,9 @@ export const RENDERED_SCHEMAS = {
     productGrid: renderedProductGrid,
     packs: renderedPacks,
     projects: renderedProjects,
+    timetable: renderedTimetable,
+    hours: renderedHours,
+    person: renderedPerson,
 } satisfies Record<SectionType, z.ZodTypeAny>;
 
 export type RenderedContent<T extends SectionType> = z.infer<
@@ -423,6 +543,9 @@ export type RenderedPlans = RenderedContent<"plans">;
 export type RenderedProductGrid = RenderedContent<"productGrid">;
 export type RenderedPacks = RenderedContent<"packs">;
 export type RenderedProjects = RenderedContent<"projects">;
+export type RenderedTimetable = RenderedContent<"timetable">;
+export type RenderedHours = RenderedContent<"hours">;
+export type RenderedPerson = RenderedContent<"person">;
 
 /**
  * Validate rendered content for a block type.

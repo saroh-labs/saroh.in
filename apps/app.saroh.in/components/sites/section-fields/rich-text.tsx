@@ -1,5 +1,6 @@
 "use client";
 
+import { Input } from "@saroh/ui/input";
 import {
     Select,
     SelectContent,
@@ -35,6 +36,7 @@ const RichTextEditor = dynamic(
 
 import type { RichTextContent } from "@/lib/sites/service";
 import { Field } from "./field";
+import { OptionSwitch } from "./option-switch";
 import type { SectionFieldsProps } from "./props";
 import { TextPhotoFields } from "./text-photo";
 
@@ -94,6 +96,7 @@ export function RichTextFields({
             </Field>
             <TextPhotoFields
                 value={{ image: c.image, imageSide: c.imageSide }}
+                brief={c.imageBrief}
                 onChange={(photo) => {
                     // Rebuilt rather than spread, so Remove leaves no
                     // empty `image` or stray side behind in the content.
@@ -101,6 +104,45 @@ export function RichTextFields({
                     onChange({ ...section, content: { ...rest, ...photo } });
                 }}
             />
+            <OptionSwitch
+                label="Small labels for sub-headings"
+                checked={c.partLabels === true}
+                onChange={(on) => patch({ partLabels: on ? true : undefined })}
+                note="Sets the text's smaller headings as small capitals, to name the parts of a longer piece."
+            />
+            <Field label="Box after the text">
+                <Textarea
+                    value={c.callout?.text ?? ""}
+                    onChange={(e) => {
+                        const text = e.target.value;
+                        patch({
+                            // Emptied, the box goes, label and all: the
+                            // contract asks a box for its words.
+                            callout: text.trim()
+                                ? { label: c.callout?.label, text }
+                                : undefined,
+                        });
+                    }}
+                    rows={2}
+                    placeholder="Optional. A result or the one thing to remember, set in a box."
+                />
+            </Field>
+            {c.callout?.text.trim() ? (
+                <Field label="Box label">
+                    <Input
+                        value={c.callout.label ?? ""}
+                        onChange={(e) =>
+                            patch({
+                                callout: {
+                                    text: c.callout?.text ?? "",
+                                    label: e.target.value || undefined,
+                                },
+                            })
+                        }
+                        placeholder="What changed"
+                    />
+                </Field>
+            ) : null}
         </div>
     );
 }

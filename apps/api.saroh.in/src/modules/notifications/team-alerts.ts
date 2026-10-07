@@ -6,8 +6,8 @@ import type { AlertEvent } from "./alert-preferences";
  * transaction, so a committed order, a failed payment or an accepted
  * invitation always has its alert (the transactional outbox). The
  * `team.alert` job (`team-alert.handler.ts`) re-reads what it is about,
- * puts it in the business's inbox (the bell) and emails the people who
- * chose email for it.
+ * puts it in the business's inbox (the bell) and emails, from Saroh, the
+ * people who chose email for it.
  *
  * Plain functions over the caller's transaction: no module has to import
  * the notifications module to raise one.
@@ -40,12 +40,10 @@ export const TEAM_ALERT_TYPE = "team.alert";
  * - `provider`: a connected payment or email provider refused the
  *   business's keys on a live call and was marked as needing attention
  *   (UX-012). Keyed to the connection and the instant it was flagged, so
- *   each refusal is told once; told on the Payment failed row. An email
- *   provider's goes to the bell only: its own email would go through the
- *   keys that were just refused.
+ *   each refusal is told once; told on the Payment failed row. Saroh
+ *   sends the email, so an email provider's refusal is emailed too.
  * - `review`: the website's review (UX-043). A review asked for, or a new
- *   test release, tells the site's reviewers by Saroh's own mail (they
- *   have no bell); a verdict, or a reviewer's first note of a round, tells
+ *   test release, emails the site's reviewers (they have no bell); a verdict, or a reviewer's first note of a round, tells
  *   the people who publish, on the Website row. Keyed to the approval, the
  *   release, or the reviewer's round.
  */
@@ -108,6 +106,13 @@ export interface WordedAlert {
     type: string;
     title: string;
     body: string;
+    /**
+     * What the email says (DEC-011, amended 2026-10-07): Saroh sends it in
+     * its own name, so fixed words and the business's own names, cleaned
+     * (`cleanName`), and never what a customer typed: no customer's name,
+     * no free text from a run. The bell keeps the full words above.
+     */
+    mail: { heading: string; body: string };
     /** Where it opens in the workspace, for the email. */
     path: string | null;
     /** Not emailed about their own doing. */
@@ -117,30 +122,20 @@ export interface WordedAlert {
      * scheduled a go-live hears how it went (DEC-071, T10).
      */
     alwaysUserId?: string | null;
-    /** The bell only, never an email (an email provider's own alert). */
-    bellOnly?: boolean;
     /** No inbox notice: it is for people with no bell (a site's reviewers). */
     noBell?: boolean;
     /**
-     * Saroh's own mail tells them instead of the business's provider, as an
-     * enquiry's notice does (`team-mail.ts`):
-     * - `OWNERS_ADMINS`: a new website order (UX-042), unless they turned
-     *   this row's email off;
-     * - `REVIEWERS`: the reviewers of `siteId` (UX-043).
+     * A new website order (UX-042): the owners and admins are emailed
+     * unless they turned this row's email off, as of an enquiry, whatever
+     * the row's default.
      */
-    sarohMail?: "OWNERS_ADMINS" | "REVIEWERS";
-    siteId?: string;
-    /** The email's button. */
+    ownersAdminsByDefault?: boolean;
+    /**
+     * Email this site's reviewers instead of the row's choices (UX-043): a
+     * review asked of them, or a new test release.
+     */
+    emailReviewersOf?: string;
+    /** The email's button; "Open it in Saroh" when not said. */
     cta?: string;
     orderId?: string;
-}
-
-/** One email Saroh's own mail sends to someone on the team, after commit. */
-export interface TeamMail {
-    to: string;
-    subject: string;
-    heading: string;
-    text: string;
-    url: string;
-    cta: string;
 }

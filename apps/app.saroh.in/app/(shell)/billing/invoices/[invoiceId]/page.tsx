@@ -10,6 +10,11 @@ import { PaymentsToRefund } from "@/components/invoices/pay-link";
 import { PaymentsLocked } from "@/components/invoices/payments-locked";
 import { PageContainer } from "@/components/shared/page-container";
 import { ViewerDate } from "@/components/shared/viewer-date";
+import {
+    emailRefusalNote,
+    INVOICE_EMAIL_WORDS,
+} from "@/lib/communications/email-setup";
+import { readEmailSetup } from "@/lib/communications/email-setup-service";
 import { formatMoneyMajor } from "@/lib/format/money";
 import { mayRead, paymentsLockedCopy } from "@/lib/invoices/access";
 import { paymentsModuleOn } from "@/lib/invoices/payments-on";
@@ -26,8 +31,6 @@ import {
 import { getInvoiceBusiness } from "@/lib/invoices/tax";
 import { invoiceZone } from "@/lib/invoices/zone";
 import { resolveActiveOrganization } from "@/lib/organizations/service";
-import { connectLocksOf } from "@/lib/providers/connect-lock";
-import { billingAccessOrNull } from "@/lib/saroh-billing/service";
 import { requireSession } from "@/lib/session";
 
 export const metadata = { title: "Invoice" };
@@ -68,9 +71,28 @@ export default async function InvoicePage({
         ? await listInvoicesFor(invoice.contact.id).catch(() => null)
         : [];
 
-    const canWrite = organization?.actions
-        ? organization.actions.includes("invoice:write")
-        : organization?.role === "OWNER" || organization?.role === "ADMIN";
+    const may = (action: string) =>
+        organization?.actions
+            ? organization.actions.includes(action)
+            : organization?.role === "OWNER" || organization?.role === "ADMIN";
+    const canWrite = may("invoice:write");
+    // It can't be emailed for want of the business's own email (DEC-011):
+    // why, and Connect or See plans (DEC-091) for whoever may.
+    const emailMay = {
+        connect: may("comms:manage"),
+        plans: may("billing:read"),
+    };
+    const emailNote =
+        canWrite && invoice.send?.reason === "NO_EMAIL_PROVIDER"
+            ? emailRefusalNote(
+                  (await readEmailSetup(emailMay)) ?? {
+                      connected: false,
+                      canConnect: null,
+                  },
+                  emailMay,
+                  INVOICE_EMAIL_WORDS,
+              )
+            : null;
     const businessName = organization?.name ?? "This business";
     const who = billedTo(invoice);
     const money = (a: string) => formatMoneyMajor(a, invoice.currency) ?? a;
@@ -79,13 +101,6 @@ export default async function InvoicePage({
     const zone = invoiceZone(business);
     // Whether its link takes payment: the API's word (DEC-070).
     const payOnline = paysOnline(invoice.send, invoice.online);
-    // Only when it can't be emailed for want of the business's own email:
-    // whether the plan lets it connect one picks the hint (DEC-091, UX-006).
-    // Best-effort; unread points at Providers as before.
-    const emailLock =
-        canWrite && invoice.send?.reason === "NO_EMAIL_PROVIDER"
-            ? connectLocksOf(await billingAccessOrNull()).messaging
-            : null;
     const again = payOnline ? "Send the pay link again" : "Send it again";
 
     return (
@@ -127,7 +142,6 @@ export default async function InvoicePage({
                         : null
                 }
                 editHref={`/billing/invoices/${encodeURIComponent(invoice.id)}/edit`}
-                emailLock={emailLock}
                 online={invoice.online ?? null}
                 send={invoice.send ?? null}
                 sent={invoice.sent ?? []}
@@ -168,6 +182,7 @@ export default async function InvoicePage({
                     </>
                 }
                 paymentsOn={paymentsOn}
+                emailNote={emailNote}
             />
         </PageContainer>
     );

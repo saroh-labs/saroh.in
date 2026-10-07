@@ -232,15 +232,19 @@ export class NotificationPreferencesService {
     private async channelStates(
         ctx: OrganizationContext,
     ): Promise<Record<AlertChannel, ChannelState>> {
-        const providers = await prisma.communicationProvider.findMany({
-            where: { organizationId: ctx.organizationId, status: "CONNECTED" },
+        // Only WhatsApp asks after a provider: email alerts come from Saroh
+        // (DEC-011, amended 2026-10-07), whatever the business connected.
+        const whatsapp = await prisma.communicationProvider.findMany({
+            where: {
+                organizationId: ctx.organizationId,
+                status: "CONNECTED",
+                channel: "WHATSAPP",
+            },
             select: { channel: true },
         });
-        const connected = new Set(providers.map((p) => p.channel));
         const input = {
             seesInbox: allows(ctx, "notification:read"),
-            emailConnected: connected.has("EMAIL"),
-            whatsappConnected: connected.has("WHATSAPP"),
+            whatsappConnected: whatsapp.some((p) => p.channel === "WHATSAPP"),
         };
         return Object.fromEntries(
             ALERT_CHANNELS.map((channel) => [
@@ -264,7 +268,7 @@ function unavailableMessage(channel: AlertChannel): string {
         case "bell":
             return "Your role doesn't see the bell in this business.";
         case "email":
-            return "Connect email in Providers to get alerts by email.";
+            return "Alerts can't be sent to you by email.";
         case "whatsapp":
             return "Alerts can't be sent to you on WhatsApp.";
     }

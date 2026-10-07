@@ -1,14 +1,18 @@
 "use client";
 
 import { zodResolver } from "@hookform/resolvers/zod";
-import { useState } from "react";
+import { useState, useSyncExternalStore } from "react";
 import { Controller, useForm } from "react-hook-form";
 
 import type { WaitlistContent } from "@/content/waitlist";
 import { NO_OFFER, WAITLIST_CONTACT, WAITLIST_KINDS } from "@/content/waitlist";
 import { track } from "@/lib/analytics";
 import { cn } from "@/lib/cn";
-import type { WaitlistResponse, WaitlistValues } from "@/lib/waitlist";
+import type {
+    WaitlistResponse,
+    WaitlistTemplate,
+    WaitlistValues,
+} from "@/lib/waitlist";
 import {
     EMPTY_WAITLIST,
     openingDay,
@@ -31,6 +35,9 @@ const INPUT = cn(
     RING,
 );
 
+/** The address doesn't change while the form is open: nothing to subscribe to. */
+const noSubscription = () => () => undefined;
+
 /** What a failed send tells the visitor; the form keeps what they typed. */
 const SEND_FAILED: Record<string, string> = {
     RATE_LIMITED: "Too many tries from here. Wait a minute, then try again.",
@@ -48,12 +55,38 @@ const SEND_FAILED: Record<string, string> = {
  * message under the button. GA hears `waitlist_join` with the kind, source,
  * plan and whether a referral link was used — never the email or name.
  *
- * The plan, source and referral come from the page's address (`?plan=`,
- * `?src=`, `?ref=`), read here as the join is sent, so the page itself
- * reads no query and stays static.
+ * The plan, source, referral and saved template come from the page's
+ * address (`?plan=`, `?src=`, `?ref=`, `?template=`), read here in the
+ * browser, so the page itself reads no query and stays static. A template
+ * is kept only when it is one of `templates` (the gallery's), and the form
+ * and its done state say it is saved.
  */
-export function WaitlistForm({ content }: { content: WaitlistContent }) {
+export function WaitlistForm({
+    content,
+    templates = [],
+}: {
+    content: WaitlistContent;
+    templates?: readonly WaitlistTemplate[];
+}) {
     const [joined, setJoined] = useState<WaitlistJoined | null>(null);
+    // The address is read after hydration: the served page is the same
+    // for every address ("" on the server).
+    const search = useSyncExternalStore(
+        noSubscription,
+        () => window.location.search,
+        () => "",
+    );
+    const slugs = templates.map((t) => t.slug);
+    const fromAddress = () =>
+        waitlistContext(
+            Object.fromEntries(new URLSearchParams(window.location.search)),
+            slugs,
+        );
+    const savedSlug = waitlistContext(
+        Object.fromEntries(new URLSearchParams(search)),
+        slugs,
+    ).template;
+    const saved = templates.find((t) => t.slug === savedSlug) ?? null;
     const form = useForm<WaitlistValues>({
         resolver: zodResolver(waitlistSchema),
         defaultValues: EMPTY_WAITLIST,
@@ -73,13 +106,7 @@ export function WaitlistForm({ content }: { content: WaitlistContent }) {
 
     const onSubmit = handleSubmit(async (values) => {
         const parsed = waitlistSchema.parse(values);
-        const {
-            plan,
-            src,
-            ref: referral,
-        } = waitlistContext(
-            Object.fromEntries(new URLSearchParams(window.location.search)),
-        );
+        const { plan, src, ref: referral, template } = fromAddress();
         let result: WaitlistResponse;
         try {
             const response = await fetch("/api/waitlist", {
@@ -93,6 +120,7 @@ export function WaitlistForm({ content }: { content: WaitlistContent }) {
                     plan,
                     src,
                     ref: referral,
+                    template,
                 }),
             });
             result = (await response.json()) as WaitlistResponse;
@@ -120,11 +148,13 @@ export function WaitlistForm({ content }: { content: WaitlistContent }) {
             src,
             plan,
             ref: referral !== undefined,
+            template,
         });
         setJoined({
             business: parsed.business,
             email: parsed.email,
             position: result.created ? result.position : undefined,
+            template: templates.find((t) => t.slug === template)?.name,
             outsideIndia: result.outsideIndia === true,
             link:
                 result.created && result.ref
@@ -173,6 +203,24 @@ export function WaitlistForm({ content }: { content: WaitlistContent }) {
                     {offer?.aside ? ` ${offer.aside}` : null} when we open.
                     {offer ? null : ` ${NO_OFFER.note}`}
                 </p>
+                {saved ? (
+                    <p
+                        data-testid="waitlist-template"
+                        className="m-0 mt-1 flex items-center gap-2 text-[14px] leading-[1.5] text-foreground"
+                    >
+                        <span
+                            aria-hidden
+                            className="size-2 shrink-0 rounded-full bg-brand-500"
+                        />
+                        <span>
+                            Saving the{" "}
+                            <strong className="font-semibold">
+                                {saved.name}
+                            </strong>{" "}
+                            template for your invite.
+                        </span>
+                    </p>
+                ) : null}
             </div>
 
             <label className="flex flex-col gap-1.5">
@@ -335,8 +383,9 @@ export function WaitlistForm({ content }: { content: WaitlistContent }) {
                     : " when we open"}{" "}
                 with your invite, and not again unless you reply.
                 {offer ? ` ${offer.terms}` : null} We keep your business name,
-                kind, email and city only for that invite and to plan the
-                launch; to be removed, write to{" "}
+                kind, email and city only for that invite and to plan the launch
+                {saved ? ", with the template you saved" : null}; to be removed,
+                write to{" "}
                 <a
                     href={`mailto:${WAITLIST_CONTACT}`}
                     className={cn(

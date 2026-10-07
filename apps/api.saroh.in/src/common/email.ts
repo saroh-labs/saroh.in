@@ -270,6 +270,61 @@ export function sendEnquiryNotificationEmail(
     return Promise.resolve();
 }
 
+/** What a team alert email says, worded by `notifications/team-alert.handler.ts`. */
+export interface TeamAlertMail {
+    subject: string;
+    heading: string;
+    body: string;
+    /** Where it opens in the workspace; none when there is nowhere to open. */
+    url: string | null;
+    /** The button's words; "Open it in Saroh" when not said. */
+    cta?: string;
+    /** Why they got it, and where to change it. */
+    footer: string;
+}
+
+/**
+ * A team alert (round-2 F14: a new order, a booking, a failed payment,
+ * someone joining, a scheduled go-live, a provider that refused its keys,
+ * a website review) to one person on a business's team. The only mail
+ * helper for the team's alerts: every one goes through
+ * `notifications/team-alert.handler.ts`.
+ * Saroh telling a business about its own business, so Saroh sends it, as
+ * the new-enquiry alert above, whether or not the business has an email
+ * provider (DEC-011, amended 2026-10-07).
+ *
+ * Sent in Saroh's own name, so the handler words it in fixed words and the
+ * business's cleaned names only (`site-accounts/sender-name.ts`), never
+ * text a customer typed; everything is escaped again here. Console
+ * fallback with no SMTP, like the other `send*` helpers.
+ */
+export function sendTeamAlertEmail(
+    to: string,
+    mail: TeamAlertMail,
+): Promise<void> {
+    if (!transporter) {
+        console.info(
+            `[Team alert] (no SMTP) ${to}: ${mail.subject}${mail.url ? ` -> ${mail.url}` : ""}`,
+        );
+        return Promise.resolve();
+    }
+    const button = mail.url
+        ? `<p><a href="${esc(mail.url)}" style="display:inline-block;padding:10px 16px;background:#111;color:#fff;text-decoration:none;border-radius:6px">${esc(mail.cta ?? "Open it in Saroh")}</a></p>`
+        : "";
+    void transporter.sendMail({
+        from: FROM,
+        to,
+        subject: mail.subject,
+        html: `<div style="font-family:sans-serif;max-width:480px;margin:0 auto">
+  <h2>${esc(mail.heading)}</h2>
+  <p>${esc(mail.body)}</p>
+  ${button}
+  <p style="color:#666;font-size:12px">${esc(mail.footer)}</p>
+</div>`,
+    });
+    return Promise.resolve();
+}
+
 /**
  * Tell an owner or admin a customer wrote from their account on the
  * business's site (UX-014). Sent by the `customer-message.notify` job, once
@@ -304,39 +359,6 @@ export function sendCustomerMessageNotificationEmail(
             threadUrl,
             "Read and reply",
         ),
-    });
-    return Promise.resolve();
-}
-
-/**
- * Tell someone on a business's team about something Saroh noticed for them
- * (UX-042: a new website order; UX-043: a site review asked of them).
- * Saroh's own mail to its own users, as an enquiry's notice is: console
- * fallback with no SMTP, never throws, and the job's once-only claim is the
- * record. Every value is escaped in the body; the subject is one line.
- */
-export function sendTeamNoticeEmail(
-    to: string,
-    mail: {
-        subject: string;
-        heading: string;
-        text: string;
-        url: string;
-        cta: string;
-    },
-): Promise<void> {
-    const subject = mail.subject.replace(/[\r\n]+/g, " ").trim();
-    if (!transporter) {
-        console.info(
-            `[Team notice] (no SMTP) ${to}: ${subject} -> ${mail.url}`,
-        );
-        return Promise.resolve();
-    }
-    void transporter.sendMail({
-        from: FROM,
-        to,
-        subject,
-        html: actionEmail(mail.heading, mail.text, mail.url, mail.cta),
     });
     return Promise.resolve();
 }
@@ -445,58 +467,13 @@ export function sendOrganizationInvitationEmail(
     return Promise.resolve();
 }
 
-/** Whether an email actually left — the one sender that has to know. */
+/** Whether an email actually left, for a sender that has to know. */
 export type EmailOutcome = "sent" | "not-configured" | "failed";
-
-/**
- * Ask a customer to review what they bought (product reviews, plan
- * 2026-09-21-001).
- *
- * Unlike the senders above it AWAITS the send and says how it went: an
- * invitation is only recorded once its email has left, so a failed send never
- * leaves the merchant believing a customer was asked. The link carries a
- * token that is stored only as a hash — so without SMTP it is printed ONLY in
- * development (an allowlist, per devops-environments-and-flags), never into a
- * production log.
- */
-export async function sendReviewInvitationEmail(
-    to: string,
-    reviewUrl: string,
-    storeName: string,
-): Promise<EmailOutcome> {
-    if (!transporter) {
-        // In development the console IS the delivery, as for every sender
-        // here; everywhere else no SMTP means nothing left.
-        if (env.NODE_ENV === "development") {
-            console.info(
-                `[Review invite] (no SMTP) ${to} -> ${storeName}: ${reviewUrl}`,
-            );
-            return "sent";
-        }
-        return "not-configured";
-    }
-    try {
-        await transporter.sendMail({
-            from: FROM,
-            to,
-            subject: `How was your order from ${storeName}?`,
-            html: actionEmail(
-                `How was your order?`,
-                `${storeName} would like to hear what you thought of what you bought. It takes a minute, and you can review each item. The link works for 30 days.`,
-                reviewUrl,
-                "Leave a review",
-            ),
-        });
-        return "sent";
-    } catch {
-        return "failed";
-    }
-}
 
 /**
  * The opening-day invite off the waitlist (marketing plan U31): "Your Saroh
  * invite", with a link that is the invitee's alone. Awaited and it says how
- * it went, like the review invitation: the batch records an invite as sent
+ * it went: the batch records an invite as sent
  * only once its email has left.
  *
  * With no SMTP it never leaves the process: where the fake transport is

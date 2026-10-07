@@ -195,6 +195,9 @@ export function SiteEditor({
         navigation,
         pages,
         footer: chrome.footer,
+        homeSections: pages.find((p) => p.id === pageId)?.isHome
+            ? sections
+            : undefined,
     });
 
     return (

@@ -1,3 +1,5 @@
+import { instantiateTemplate, listTemplates } from "@saroh/templates";
+
 import {
     ADDRESS_MISSING_MESSAGE,
     checkAddress,
@@ -980,5 +982,317 @@ describe("checkAddress (DEC-069, L5)", () => {
         ];
         expect(flags.length).toBeGreaterThan(0);
         expect(flags.some((f) => f.blocking)).toBe(false);
+    });
+});
+
+describe("the industry templates' blocks (U2)", () => {
+    it("asks no image of the No hero look, and names a brief when one is wanted", () => {
+        const none = checkPage(
+            page([
+                {
+                    type: "hero",
+                    content: { variant: "none", heading: "Writing" },
+                },
+            ]),
+            ["/"],
+        );
+        expect(types(none)).not.toContain("missingImage");
+
+        const briefed = checkPage(
+            page([
+                {
+                    type: "hero",
+                    content: {
+                        variant: "fullBleed",
+                        heading: "Bread, the slow way",
+                        imageBrief: "Loaves on the counter at dawn",
+                    },
+                },
+            ]),
+            ["/"],
+        );
+        const missing = briefed.find((f) => f.type === "missingImage");
+        expect(missing?.message).toMatch(/Loaves on the counter at dawn/);
+    });
+
+    it("asks for a person's photo description, and checks their button", () => {
+        const flags = checkPage(
+            page([
+                {
+                    type: "person",
+                    content: {
+                        name: "Anika",
+                        image: { src: "https://x/a.jpg", alt: "" },
+                        cta: {
+                            label: "Book",
+                            action: { kind: "url", href: "/nowhere" },
+                        },
+                    },
+                },
+            ]),
+            ["/"],
+        );
+        expect(flags.map((f) => [f.type, f.field])).toEqual(
+            expect.arrayContaining([
+                ["emptyRequiredField", "image"],
+                ["brokenLink", "cta"],
+            ]),
+        );
+    });
+});
+
+describe("a template's placeholder words (template polish)", () => {
+    const placeholders = (sections: { type: string; content: unknown }[]) =>
+        checkPage(page(sections), ["/"]).filter(
+            (f) => f.type === "placeholderText",
+        );
+
+    it("names a person, points, text and work still in a template's words", () => {
+        const flags = placeholders([
+            {
+                type: "person",
+                content: {
+                    name: "Iron & Oak",
+                    bio: "A placeholder. Say what they coach, how long they have done it.",
+                },
+            },
+            {
+                type: "person",
+                content: {
+                    name: "Dr Priya",
+                    credentials: [
+                        "Your degree — the subject, where you studied and the year",
+                    ],
+                },
+            },
+            {
+                type: "features",
+                content: {
+                    items: [
+                        {
+                            title: "Day rate",
+                            body: "Your day rate, what it is for, and any minimum.",
+                        },
+                    ],
+                },
+            },
+            {
+                type: "richText",
+                content: {
+                    value: "<h2>The studio</h2><p>Say how much work is taken on in a year.</p>",
+                },
+            },
+            {
+                type: "projects",
+                content: { items: [{ title: "Your lead project" }] },
+            },
+        ]);
+        expect(flags.map((f) => f.sectionIndex)).toEqual([0, 1, 2, 3, 4]);
+        expect(flags[0].message).toContain(
+            '("A placeholder. Say what they coach',
+        );
+        expect(flags[4].message).toContain('"Your lead project"');
+    });
+
+    it("finds it in a team member, a callout or a fact", () => {
+        const flags = placeholders([
+            {
+                type: "person",
+                content: {
+                    variant: "team",
+                    name: "Devika",
+                    people: [{ name: "Your second coach" }],
+                },
+            },
+            {
+                type: "richText",
+                content: {
+                    value: "<p>Our story.</p>",
+                    callout: { text: "Placeholders: replace this." },
+                },
+            },
+            {
+                type: "features",
+                content: {
+                    variant: "facts",
+                    items: [{ title: "In practice", value: "A placeholder" }],
+                },
+            },
+        ]);
+        expect(flags).toHaveLength(3);
+    });
+
+    it("leaves an owner's own words alone, and a photo brief, which is a note to them", () => {
+        const flags = placeholders([
+            {
+                type: "person",
+                content: {
+                    name: "Anika Rao",
+                    role: "Clinical dietician",
+                    bio: "Say hello at the desk when you arrive.\nYour first visit is free.",
+                    imageBrief: "Write two or three words about the light",
+                },
+            },
+            {
+                type: "features",
+                content: {
+                    items: [
+                        {
+                            title: "Your order, your way",
+                            body: "Write to us any time; we answer within a day.",
+                        },
+                    ],
+                },
+            },
+            {
+                type: "projects",
+                content: {
+                    items: [
+                        {
+                            title: "A shopfront in Bandra",
+                            imageBrief: "A placeholder for the photo",
+                        },
+                    ],
+                },
+            },
+        ]);
+        expect(flags).toEqual([]);
+    });
+
+    it("says it once for a text block that already says placeholder", () => {
+        const flags = placeholders([
+            {
+                type: "richText",
+                content: {
+                    value: "<p>This is a placeholder for your story.</p>",
+                },
+            },
+        ]);
+        expect(flags).toHaveLength(1);
+        expect(flags[0].field).toBe("value");
+    });
+
+    it("flags every industry template's person, features, text and projects laid down as placeholders", () => {
+        const ctx = {
+            organizationName: "Sample business",
+            modules: ["WEBSITE", "APPOINTMENTS", "COMMERCE", "POSTS"],
+            serviceIds: ["svc_1"],
+        };
+        let checked = 0;
+        for (const template of listTemplates()) {
+            const made = instantiateTemplate(template, ctx);
+            for (const p of made.pages) {
+                const flagged = new Set(
+                    checkPage(
+                        page(
+                            p.sections.map((s) => ({
+                                type: s.type,
+                                content: s.content,
+                            })),
+                            { path: p.path },
+                        ),
+                        made.pages.map((x) => x.path),
+                    )
+                        .filter((f) => f.type === "placeholderText")
+                        .map((f) => f.sectionIndex),
+                );
+                p.sections.forEach((s, i) => {
+                    const text = JSON.stringify(s.content);
+                    if (
+                        ["person", "features", "richText", "projects"].includes(
+                            s.type,
+                        ) &&
+                        /A placeholder|This is a placeholder/.test(text)
+                    ) {
+                        checked++;
+                        expect({
+                            template: template.id,
+                            path: p.path,
+                            index: i,
+                            flagged: flagged.has(i),
+                        }).toMatchObject({ flagged: true });
+                    }
+                });
+            }
+        }
+        // Not a vacuous pass: the templates do ship such sections.
+        expect(checked).toBeGreaterThan(5);
+    });
+});
+
+describe("the footer still in its template's words (round 2)", () => {
+    const LINE = "Your street and area — and the day you close";
+
+    it("flags a footer left exactly as the site's template wrote it", () => {
+        const flags = checkSite(
+            site({
+                footer: { format: "markdown", value: LINE },
+                templateFooterLine: LINE,
+            }),
+        );
+        const flag = flags.find((f) => f.field === "footer");
+        expect(flag).toMatchObject({
+            type: "placeholderText",
+            pageId: null,
+            sectionIndex: null,
+        });
+        expect(flag?.message).toMatch(/footer/i);
+    });
+
+    it("still knows it once the editor saved it back as a paragraph", () => {
+        for (const value of [
+            `<p>${LINE}</p>`,
+            "<p>Your street and area &mdash; and   the day you close</p>",
+        ]) {
+            expect(
+                checkSite(
+                    site({
+                        footer: { format: "html", value },
+                        templateFooterLine: LINE,
+                    }),
+                ).some((f) => f.field === "footer"),
+            ).toBe(true);
+        }
+    });
+
+    it("is quiet once the owner has written their own, or the site has no template line", () => {
+        for (const over of [
+            {
+                footer: {
+                    format: "markdown",
+                    value: "14 Hill Road · Closed Mondays",
+                },
+                templateFooterLine: LINE,
+            },
+            {
+                footer: { format: "markdown", value: `${LINE}s` },
+                templateFooterLine: LINE,
+            },
+            {
+                footer: { format: "markdown", value: LINE },
+                templateFooterLine: null,
+            },
+            { footer: { format: "markdown", value: LINE } },
+            { footer: null, templateFooterLine: LINE },
+        ] as Partial<FlagSiteInput>[]) {
+            expect(
+                checkSite(site(over)).some((f) => f.field === "footer"),
+            ).toBe(false);
+        }
+    });
+
+    it("finds every gallery template's own line, as a new site starts with it", () => {
+        for (const template of listTemplates()) {
+            const line = template.footer?.line;
+            if (!line) continue;
+            expect(
+                checkSite(
+                    site({
+                        footer: { format: "markdown", value: line },
+                        templateFooterLine: line,
+                    }),
+                ).some((f) => f.field === "footer"),
+            ).toBe(true);
+        }
     });
 });

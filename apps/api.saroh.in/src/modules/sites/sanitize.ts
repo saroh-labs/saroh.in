@@ -53,6 +53,11 @@ const OPTIONS: sanitizeHtml.IOptions = {
         "ul",
         "ol",
         "li",
+        // Definition lists, for a template's facts ("Clay / Stoneware",
+        // "Years / 2014 to now"): structure only, no attributes of their own.
+        "dl",
+        "dt",
+        "dd",
         "a",
         "b",
         "strong",

@@ -6,7 +6,6 @@ import {
 } from "@nestjs/common";
 import type { Prisma } from "@saroh/database";
 import { prisma } from "@saroh/database";
-import { starterTemplate } from "@saroh/templates";
 
 import { prismaErrorCode } from "../../common/prisma-errors";
 import type { OrganizationContext } from "../../common/types/organization-context";
@@ -20,6 +19,7 @@ import { assertOverrideAllowed, isOwner } from "./publish-approval";
 import { queueReviewAlert } from "./review-alert-queue";
 import { draftFingerprint } from "./review-route";
 import { assertSiteInOrg } from "./site-access";
+import { publicationTemplate } from "./site-template-record";
 import { SitesService } from "./sites.service";
 import { goLiveWithRelease } from "./test-release-go-live";
 import type {
@@ -114,6 +114,8 @@ export class TestReleasesService {
         const snapshot = this.freeze(draft, now);
         const fingerprint = draftFingerprint(snapshot);
         const token = mintTestReleaseToken();
+        // The site's own template (KTD-7), else the starter.
+        const stamp = publicationTemplate(draft);
 
         const releaseId = await prisma.$transaction(async (tx) => {
             // Organization, then Site, as every way of going live takes
@@ -137,8 +139,8 @@ export class TestReleasesService {
                     // Through `unknown`, as publish does: SiteStyle is a
                     // precise interface Prisma's JSON input does not accept.
                     snapshot: snapshot as unknown as Prisma.InputJsonValue,
-                    templateId: starterTemplate.id,
-                    templateVersion: starterTemplate.version,
+                    templateId: stamp.id,
+                    templateVersion: stamp.version,
                     publishedByUserId: ctx.userId,
                     publishedAt: now,
                 },

@@ -78,6 +78,53 @@ describe("SitesService.updateStyle", () => {
         expect(siteUpdate).not.toHaveBeenCalled();
     });
 
+    it("refuses exact colours that are not one of the template's colourways (DEC-090)", async () => {
+        // The site's row: no template recorded, no palette held.
+        siteFindFirst.mockResolvedValue({
+            id: "site_1",
+            currentPublicationId: null,
+            style: null,
+            templateId: null,
+            templateVersion: null,
+        });
+        await expect(
+            service.updateStyle(ctx(), "site_1", {
+                palette: {
+                    bg: "#FFFFFF",
+                    fg: "#111111",
+                    accent: "#1F3D2B",
+                    accentFg: "#FFFFFF",
+                },
+            }),
+        ).rejects.toMatchObject({
+            response: { details: { field: "palette" } },
+        });
+        expect(siteUpdate).not.toHaveBeenCalled();
+    });
+
+    it("keeps a palette the site already has when only spacing changes", async () => {
+        const palette = {
+            bg: "#FFFFFF",
+            fg: "#111111",
+            accent: "#1F3D2B",
+            accentFg: "#FFFFFF",
+        };
+        const held = { palette };
+        siteFindFirst.mockResolvedValue({
+            id: "site_1",
+            currentPublicationId: null,
+            style: held,
+            templateId: null,
+            templateVersion: null,
+        });
+        const res = await service.updateStyle(ctx(), "site_1", {
+            palette,
+            scalars: { pageMargin: 20 },
+        });
+        expect(res.style.palette?.accent).toBe("#1F3D2B");
+        expect(siteUpdate).toHaveBeenCalled();
+    });
+
     it("denies site:update to a MEMBER before touching the database", async () => {
         await expect(
             service.updateStyle(ctx({ role: "MEMBER" }), "site_1", {
@@ -105,6 +152,24 @@ describe("SitesService.updateFooter", () => {
         });
     });
 
+    it("keeps a template's left-hand row when only the line is sent", async () => {
+        siteFindFirst.mockResolvedValue({
+            id: "site_1",
+            currentPublicationId: null,
+            footer: { format: "markdown", value: "Old", layout: "left" },
+        });
+        const res = await service.updateFooter(ctx(), "site_1", {
+            format: "markdown",
+            value: "14 Hill Road",
+        });
+        expect(res.footer).toEqual({
+            format: "markdown",
+            value: "14 Hill Road",
+            layout: "left",
+        });
+        expect(siteUpdate.mock.calls[0][0].data.footer).toEqual(res.footer);
+    });
+
     it("clears the column when the box is emptied — there is no separate delete", async () => {
         const res = await service.updateFooter(ctx(), "site_1", {
             value: "   ",
@@ -114,6 +179,53 @@ describe("SitesService.updateFooter", () => {
         // A database NULL, not a JSON null — the two are different values in a
         // Json column, and clearing means the column holds nothing at all.
         expect(siteUpdate.mock.calls[0][0].data.footer).toBe(Prisma.DbNull);
+    });
+
+    it("refuses exact colours that are not one of the template's colourways (DEC-090)", async () => {
+        // The site's row: no template recorded, no palette held.
+        siteFindFirst.mockResolvedValue({
+            id: "site_1",
+            currentPublicationId: null,
+            style: null,
+            templateId: null,
+            templateVersion: null,
+        });
+        await expect(
+            service.updateStyle(ctx(), "site_1", {
+                palette: {
+                    bg: "#FFFFFF",
+                    fg: "#111111",
+                    accent: "#1F3D2B",
+                    accentFg: "#FFFFFF",
+                },
+            }),
+        ).rejects.toMatchObject({
+            response: { details: { field: "palette" } },
+        });
+        expect(siteUpdate).not.toHaveBeenCalled();
+    });
+
+    it("keeps a palette the site already has when only spacing changes", async () => {
+        const palette = {
+            bg: "#FFFFFF",
+            fg: "#111111",
+            accent: "#1F3D2B",
+            accentFg: "#FFFFFF",
+        };
+        const held = { palette };
+        siteFindFirst.mockResolvedValue({
+            id: "site_1",
+            currentPublicationId: null,
+            style: held,
+            templateId: null,
+            templateVersion: null,
+        });
+        const res = await service.updateStyle(ctx(), "site_1", {
+            palette,
+            scalars: { pageMargin: 20 },
+        });
+        expect(res.style.palette?.accent).toBe("#1F3D2B");
+        expect(siteUpdate).toHaveBeenCalled();
     });
 
     it("denies site:update to a MEMBER before touching the database", async () => {
@@ -153,6 +265,53 @@ describe("SitesService.updateNavigation", () => {
 
         expect(res.navigation).toBeNull();
         expect(siteUpdate.mock.calls[0][0].data.navigation).toBe(Prisma.DbNull);
+    });
+
+    it("refuses exact colours that are not one of the template's colourways (DEC-090)", async () => {
+        // The site's row: no template recorded, no palette held.
+        siteFindFirst.mockResolvedValue({
+            id: "site_1",
+            currentPublicationId: null,
+            style: null,
+            templateId: null,
+            templateVersion: null,
+        });
+        await expect(
+            service.updateStyle(ctx(), "site_1", {
+                palette: {
+                    bg: "#FFFFFF",
+                    fg: "#111111",
+                    accent: "#1F3D2B",
+                    accentFg: "#FFFFFF",
+                },
+            }),
+        ).rejects.toMatchObject({
+            response: { details: { field: "palette" } },
+        });
+        expect(siteUpdate).not.toHaveBeenCalled();
+    });
+
+    it("keeps a palette the site already has when only spacing changes", async () => {
+        const palette = {
+            bg: "#FFFFFF",
+            fg: "#111111",
+            accent: "#1F3D2B",
+            accentFg: "#FFFFFF",
+        };
+        const held = { palette };
+        siteFindFirst.mockResolvedValue({
+            id: "site_1",
+            currentPublicationId: null,
+            style: held,
+            templateId: null,
+            templateVersion: null,
+        });
+        const res = await service.updateStyle(ctx(), "site_1", {
+            palette,
+            scalars: { pageMargin: 20 },
+        });
+        expect(res.style.palette?.accent).toBe("#1F3D2B");
+        expect(siteUpdate).toHaveBeenCalled();
     });
 
     it("denies site:update to a MEMBER before touching the database", async () => {

@@ -2,7 +2,6 @@ import { Button } from "@saroh/ui/button";
 import { cn } from "@saroh/ui/lib/utils";
 
 import type { AlertPreferencesRead } from "@/lib/notifications/preferences";
-import type { ConnectLock } from "@/lib/providers/connect-lock";
 
 import { AlertsGrid } from "./alerts-grid";
 
@@ -23,15 +22,12 @@ export function YourProfile({
     email,
     accountUrl,
     alerts,
-    emailLock = null,
 }: {
     name: string;
     email: string;
     /** Your account on accounts.saroh.in. */
     accountUrl: string;
     alerts: AlertPreferencesRead;
-    /** The plan won't let the business connect its own email (UX-006). */
-    emailLock?: ConnectLock | null;
 }) {
     const rows: {
         label: string;
@@ -99,7 +95,7 @@ export function YourProfile({
                 </p>
             </section>
 
-            <AlertsGrid read={alerts} emailLock={emailLock} />
+            <AlertsGrid read={alerts} />
         </div>
     );
 }

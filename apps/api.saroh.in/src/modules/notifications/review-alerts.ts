@@ -1,6 +1,7 @@
 import type { Prisma } from "@saroh/database";
 
 import { resolveCapabilities } from "../organizations/organization-policy";
+import { cleanBusinessName } from "../site-accounts/sender-name";
 import type { TeamAlertPayload, WordedAlert } from "./team-alerts";
 
 /**
@@ -9,8 +10,8 @@ import type { TeamAlertPayload, WordedAlert } from "./team-alerts";
  * notified nobody: a reviewer found a test release only by its link, and
  * the owner saw a verdict only by opening the editor.
  *
- * - **To the reviewers** (Saroh's own mail: a reviewer has no bell): a
- *   review asked for, and a new test release to look at.
+ * - **To the reviewers** (email only: a reviewer has no bell): a review
+ *   asked for, and a new test release to look at.
  * - **To the people who publish** (the bell and the Website row's email,
  *   `site:publish`): a reviewer approved or asked for changes, or left the
  *   first note of a round. Later notes in the round land where the team is
@@ -52,6 +53,23 @@ function nameOf(user: { name: string | null; email: string }): string {
     // `||`, not `??`: an empty name falls through too.
     // eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing
     return user.name?.trim() || user.email;
+}
+
+/**
+ * A name as the email may carry it (`team-alert.handler.ts` `cleanName`,
+ * here so this module needn't import the handler back).
+ */
+function mailName(name: string | null | undefined, fallback: string) {
+    return cleanBusinessName(name ?? "", fallback);
+}
+
+/** The email's "Spring menu on Rye & Co" or "Rye & Co", cleaned. */
+function mailSubjectOf(
+    site: string,
+    release: { name: string } | null | undefined,
+): string {
+    const s = mailName(site, "your website");
+    return release ? `${mailName(release.name, "A test release")} on ${s}` : s;
 }
 
 /** A release still open to review: not discarded, not live. */
@@ -129,6 +147,8 @@ async function wordApproval(
     if (a.testRelease && !open(a.testRelease)) return null;
     const who = nameOf(a.by);
     const subject = subjectOf(a.site.name, a.testRelease);
+    const mailWho = mailName(a.by.name, "Someone on the team");
+    const mailSubject = mailSubjectOf(a.site.name, a.testRelease);
     const base = {
         event: "site" as const,
         eventKey: `team:review:${a.id}`,
@@ -142,12 +162,15 @@ async function wordApproval(
             type: "site.review.requested",
             title: `${who} asked you to review ${subject}`,
             body: "Open it to leave notes on what you see, then approve it or ask for changes.",
+            mail: {
+                heading: `${mailWho} asked you to review ${mailSubject}`,
+                body: "Open it to leave notes on what you see, then approve it or ask for changes.",
+            },
             path: a.testReleaseId
                 ? `/sites/${a.siteId}/releases/${a.testReleaseId}`
                 : `/sites/${a.siteId}/review`,
             noBell: true,
-            sarohMail: "REVIEWERS",
-            siteId: a.siteId,
+            emailReviewersOf: a.siteId,
             cta: "Open the review",
         };
     }
@@ -163,26 +186,33 @@ async function wordApproval(
         ? `/sites/${a.siteId}/releases`
         : `/sites/${a.siteId}/pages`;
     if (a.outcome === "APPROVED") {
+        const body =
+            notes > 0
+                ? `With ${noteWords} to look at before it goes live.`
+                : "No notes are left open.";
         return {
             ...base,
             type: SITE_REVIEW_APPROVED_NOTIFICATION_TYPE,
             title: `${who} approved ${subject}`,
-            body:
-                notes > 0
-                    ? `With ${noteWords} to look at before it goes live.`
-                    : "No notes are left open.",
+            body,
+            mail: { heading: `${mailWho} approved ${mailSubject}`, body },
             path,
             alwaysUserId: asker,
         };
     }
+    const body =
+        notes > 0
+            ? `Their ${noteWords} say what to change.`
+            : "Open the review to see what they asked for.";
     return {
         ...base,
         type: SITE_REVIEW_CHANGES_NOTIFICATION_TYPE,
         title: `${who} asked for changes to ${subject}`,
-        body:
-            notes > 0
-                ? `Their ${noteWords} say what to change.`
-                : "Open the review to see what they asked for.",
+        body,
+        mail: {
+            heading: `${mailWho} asked for changes to ${mailSubject}`,
+            body,
+        },
         path,
         alwaysUserId: asker,
     };
@@ -259,6 +289,11 @@ async function wordNote(
         type: SITE_REVIEW_NOTE_NOTIFICATION_TYPE,
         title: `${nameOf(c.author)} left a note on ${subjectOf(c.site.name, c.testRelease)}`,
         body: `${where}“${quote}”`,
+        // The note is free text: the bell quotes it, the email doesn't.
+        mail: {
+            heading: `${mailName(c.author.name, "A reviewer")} left a note on ${mailSubjectOf(c.site.name, c.testRelease)}`,
+            body: "Open the review in Saroh to read it.",
+        },
         path: c.testReleaseId
             ? `/sites/${c.siteId}/releases`
             : `/sites/${c.siteId}/pages`,
@@ -297,11 +332,14 @@ async function wordRelease(
         type: "site.release.new",
         title: `${who} made a test release of ${r.site.name}: ${r.name}`,
         body: "It isn't live. Open it to look it over and leave notes before it goes live.",
+        mail: {
+            heading: `${mailName(by?.name, "Someone on the team")} made a test release of ${mailName(r.site.name, "your website")}: ${mailName(r.name, "a test release")}`,
+            body: "It isn't live. Open it to look it over and leave notes before it goes live.",
+        },
         path: `/sites/${r.siteId}/releases/${r.id}`,
         skipUserId: r.createdByUserId,
         noBell: true,
-        sarohMail: "REVIEWERS",
-        siteId: r.siteId,
+        emailReviewersOf: r.siteId,
         cta: "Open the test release",
     };
 }

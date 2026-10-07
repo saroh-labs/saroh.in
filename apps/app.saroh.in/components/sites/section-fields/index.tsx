@@ -10,14 +10,17 @@ import { FaqFields } from "./faq";
 import { FeaturesFields } from "./features";
 import { GalleryFields } from "./gallery";
 import { HeroFields } from "./hero";
+import { HoursFields } from "./hours";
 import { JournalFields } from "./journal";
 import { PacksFields } from "./packs";
+import { PersonFields } from "./person";
 import { PlansFields } from "./plans";
 import { ProductGridFields } from "./product-grid";
 import { ProjectsFields } from "./projects";
 import { RichTextFields } from "./rich-text";
 import { ServicesListFields } from "./services-list";
 import { TestimonialsFields } from "./testimonials";
+import { TimetableFields } from "./timetable";
 import type { ServicesLoad } from "./types";
 import { VariantField } from "./variant-field";
 import { VisitUsFields } from "./visit-us";
@@ -207,6 +210,33 @@ function perTypeFields({
         case "projects":
             return (
                 <ProjectsFields
+                    section={section}
+                    pages={pages}
+                    services={services}
+                    onChange={onChange}
+                />
+            );
+        case "timetable":
+            return (
+                <TimetableFields
+                    section={section}
+                    pages={pages}
+                    services={services}
+                    onChange={onChange}
+                />
+            );
+        case "hours":
+            return (
+                <HoursFields
+                    section={section}
+                    pages={pages}
+                    services={services}
+                    onChange={onChange}
+                />
+            );
+        case "person":
+            return (
+                <PersonFields
                     section={section}
                     pages={pages}
                     services={services}

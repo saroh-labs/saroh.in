@@ -9,11 +9,13 @@ jest.mock("@saroh/database", () => ({
 jest.mock("../../env", () => ({
     env: { APP_URL: "https://app.saroh.localhost" },
 }));
+jest.mock("../../common/email", () => ({
+    sendTeamAlertEmail: jest.fn().mockResolvedValue(undefined),
+}));
 
 import type { Job, Prisma } from "@saroh/database";
 import { prisma } from "@saroh/database";
 
-import type { CommunicationsService } from "../communications/communications.service";
 import { alertEventOfType } from "./alert-preferences";
 import {
     TEAM_ALERT_TYPE,
@@ -62,8 +64,16 @@ function makeTx(order: Record<string, unknown> = {}) {
         job: { create: jest.fn().mockResolvedValue({}) },
         membership: {
             findMany: jest.fn().mockResolvedValue([
-                { userId: "u_owner", role: "OWNER" },
-                { userId: "u_kitchen", role: "MEMBER" },
+                {
+                    userId: "u_owner",
+                    role: "OWNER",
+                    user: { email: "owner@example.com" },
+                },
+                {
+                    userId: "u_kitchen",
+                    role: "MEMBER",
+                    user: { email: "kitchen@example.com" },
+                },
             ]),
         },
         organizationRole: { findMany: jest.fn().mockResolvedValue([]) },
@@ -99,12 +109,6 @@ function makeTx(order: Record<string, unknown> = {}) {
 type FakeTx = ReturnType<typeof makeTx>;
 const asTx = (tx: FakeTx) => tx as unknown as Prisma.TransactionClient;
 
-const queueTransactional = jest.fn().mockResolvedValue({ id: "msg_1" });
-const comms = {
-    emailConnected: jest.fn().mockResolvedValue(true),
-    queueTransactional,
-} as unknown as CommunicationsService;
-
 const payload = { event: "uncollected" as const, orderId: "ord_1" };
 
 beforeEach(() => jest.clearAllMocks());
@@ -132,12 +136,15 @@ describe("telling the team", () => {
         const tx = makeTx();
         const out = await tellTeam(
             asTx(tx),
-            comms,
             ORG,
             payload,
             at("2026-10-08T00:05"),
         );
-        expect(out).toEqual({ told: true, emailed: 2 });
+        expect(out.told).toBe(true);
+        expect(out.emails.map((e) => e.to)).toEqual([
+            "owner@example.com",
+            "kitchen@example.com",
+        ]);
         expect(tx.customerNotice.createMany.mock.calls[0][0].data).toEqual([
             {
                 organizationId: ORG,
@@ -158,10 +165,11 @@ describe("telling the team", () => {
         expect(alertEventOfType(ORDER_UNCOLLECTED_NOTIFICATION_TYPE)).toBe(
             "order",
         );
-        const email = queueTransactional.mock.calls[0][2] as {
-            rendered: { body: string };
-        };
-        expect(email.rendered.body).toContain("/commerce/orders/ord_1");
+        // Saroh's email names the order, not the customer who placed it.
+        expect(out.emails[0].mail.heading).toBe(
+            "Not collected: order ORD-1042",
+        );
+        expect(out.emails[0].mail.url).toContain("/commerce/orders/ord_1");
     });
 
     it("never tells them twice, however long it keeps waiting", async () => {
@@ -169,14 +177,12 @@ describe("telling the team", () => {
         tx.customerNotice.createMany.mockResolvedValue({ count: 0 });
         const out = await tellTeam(
             asTx(tx),
-            comms,
             ORG,
             payload,
             at("2026-10-12T09:00"),
         );
-        expect(out).toEqual({ told: false, emailed: 0 });
+        expect(out).toEqual({ told: false, emails: [] });
         expect(tx.notification.create).not.toHaveBeenCalled();
-        expect(queueTransactional).not.toHaveBeenCalled();
     });
 
     it.each([
@@ -190,7 +196,6 @@ describe("telling the team", () => {
         const tx = makeTx(over);
         const out = await tellTeam(
             asTx(tx),
-            comms,
             ORG,
             payload,
             at("2026-10-09T09:00"),
@@ -201,7 +206,7 @@ describe("telling the team", () => {
 
     it("never cancels the order, or touches it", async () => {
         const tx = makeTx();
-        await tellTeam(asTx(tx), comms, ORG, payload, at("2026-10-20T09:00"));
+        await tellTeam(asTx(tx), ORG, payload, at("2026-10-20T09:00"));
         expect(tx.order.update).not.toHaveBeenCalled();
         expect(tx.order.updateMany).not.toHaveBeenCalled();
     });
@@ -229,7 +234,7 @@ describe("the job", () => {
         );
         jest.useFakeTimers({ now: at("2026-10-08T00:30") });
 
-        await new TeamAlertHandler(comms).handle(job());
+        await new TeamAlertHandler().handle(job());
 
         expect(tx.customerNotice.createMany).not.toHaveBeenCalled();
         expect(tx.job.create).toHaveBeenCalledTimes(1);
@@ -246,7 +251,7 @@ describe("the job", () => {
         );
         jest.useFakeTimers({ now: at("2026-10-08T00:30") });
 
-        await new TeamAlertHandler(comms).handle(job());
+        await new TeamAlertHandler().handle(job());
 
         expect(tx.customerNotice.createMany).toHaveBeenCalledTimes(1);
         expect(tx.job.create).not.toHaveBeenCalled();
@@ -257,7 +262,7 @@ describe("the job", () => {
         (prisma.$transaction as jest.Mock).mockImplementation(
             (fn: (t: unknown) => unknown) => fn(tx),
         );
-        await new TeamAlertHandler(comms).handle(job());
+        await new TeamAlertHandler().handle(job());
         expect(tx.customerNotice.createMany).not.toHaveBeenCalled();
         expect(tx.job.create).not.toHaveBeenCalled();
     });

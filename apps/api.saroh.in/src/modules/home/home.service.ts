@@ -9,6 +9,7 @@ import { ThreadsService } from "../site-accounts/threads.service";
 import { StockChecksService } from "../stock/stock-checks.service";
 import { businessDetailsGap } from "./home-business-details";
 import { overdueFollowUps } from "./home-crm-sources";
+import { noEmailProvider } from "./home-email-setup";
 import { HomeInlineService } from "./home-inline";
 import { lastDayHeader, readLastDay } from "./home-last-day";
 import type {
@@ -313,6 +314,7 @@ export class HomeService {
             refundsFailed,
             detailsGap,
             uncollected,
+            noEmail,
         ] = await Promise.all([
             active.has("CRM") && canReadLeads
                 ? guard(
@@ -563,6 +565,21 @@ export class HomeService {
                       null,
                   )
                 : skip(null),
+            // No email provider of its own (DEC-011, amended 2026-10-07):
+            // its customers get no emails. To whoever can connect one, or,
+            // on a plan that can't (DEC-091), see the plans.
+            available.has("COMMUNICATIONS") &&
+            (holds(input, "comms:manage") || holds(input, "billing:read"))
+                ? guard(
+                      { moduleKey: "COMMUNICATIONS", label: "Email" },
+                      () =>
+                          noEmailProvider(this.db, input.organizationId, {
+                              connect: holds(input, "comms:manage"),
+                              plans: holds(input, "billing:read"),
+                          }),
+                      null,
+                  )
+                : skip(null),
         ]);
         const unavailable = slots.flat();
 
@@ -631,6 +648,16 @@ export class HomeService {
         if (short) actions.push(short);
         for (const waitingOnUs of [notes, messages, reviews]) {
             if (waitingOnUs) actions.push(waitingOnUs);
+        }
+        if (noEmail) {
+            // It says what the customers miss, and how to fix it, so
+            // readiness's "Connect a provider to send messages" would say
+            // the same thing twice.
+            const setup = actions.findIndex(
+                (a) => a.code === "COMMUNICATIONS_SETUP",
+            );
+            if (setup >= 0) actions.splice(setup, 1);
+            actions.push(noEmail);
         }
         if (notLive) {
             // It names the sites, so readiness's general "Publish your site

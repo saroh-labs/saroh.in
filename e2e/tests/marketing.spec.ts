@@ -83,6 +83,9 @@ const RESOURCE_PREFIXES = [
     "/privacy",
     "/terms",
     "/refunds",
+    // The gallery and each template's page (`lib/site-pages.ts`), listed
+    // with /templates once it is published (17 Oct, or RESOURCES_PREVIEW=1).
+    "/templates",
 ];
 
 /**

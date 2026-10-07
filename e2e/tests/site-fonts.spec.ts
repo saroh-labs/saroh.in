@@ -107,7 +107,7 @@ test.describe("merchant sites load no Saroh font", () => {
         expect(family).toContain("system-ui");
     });
 
-    test("the Style panel says the site's text is a plain system font", async ({
+    test("the Style panel offers the typefaces, the system font chosen", async ({
         page,
     }, testInfo) => {
         test.skip(
@@ -133,10 +133,15 @@ test.describe("merchant sites load no Saroh font", () => {
         if ((await brand.getAttribute("aria-selected")) !== "true") {
             await brand.click();
         }
+        // The pairing picker (industry templates, KTD-2). Read-only here: a
+        // seeded site has chosen no pair, so the system font is checked.
+        const typeface = page.getByRole("radiogroup", { name: "Typeface" });
+        await expect(typeface).toBeVisible();
         await expect(
-            page.getByText(
-                "Your site's text now uses a plain system font. Font choices aren't available yet.",
-            ),
+            typeface.getByRole("radio", { name: "Your visitor's system font" }),
+        ).toHaveAttribute("aria-checked", "true");
+        await expect(
+            typeface.getByRole("radio", { name: "Fraunces and Inter Tight" }),
         ).toBeVisible();
     });
 });

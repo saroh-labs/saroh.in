@@ -97,90 +97,22 @@ describe("alertGrid", () => {
         ]);
     });
 
-    it("with no email provider, email is off and fixed, with the way to connect one", () => {
-        const grid = alertGrid({
-            status: "ok",
-            prefs: prefs({
-                channels: {
-                    bell: { available: true },
-                    email: { available: false, reason: "NO_PROVIDER" },
-                    whatsapp: { available: false, reason: "NO_PROVIDER" },
-                },
-            }),
-        });
-        const email = grid.rows[0]?.cells.find((c) => c.channel === "email");
-        expect(email).toMatchObject({
-            on: false,
-            disabled: true,
-            label: "New order by Email, off — no provider connected",
-        });
-        expect(grid.notes).toEqual([
-            {
-                id: "email",
-                text: "Email alerts go out through your business's own email provider, and none is connected.",
-                link: {
-                    label: "Connect email in Providers",
-                    href: "/settings/providers",
-                },
-            },
-        ]);
-    });
-
-    it("Free: says the plan, links to it, and never sends to Providers (UX-006)", () => {
-        const noEmail = {
-            bell: { available: true as const },
-            email: {
-                available: false as const,
-                reason: "NO_PROVIDER" as const,
-            },
-            whatsapp: {
-                available: false as const,
-                reason: "NO_PROVIDER" as const,
-            },
-        };
-        const lock = {
-            upgrade: "Grow",
-            cta: "See Grow",
-            href: "/settings/billing?plan=grow#change-plan",
-        };
-        const grid = alertGrid(
-            { status: "ok", prefs: prefs({ channels: noEmail }) },
-            lock,
-        );
-        expect(grid.notes[0]).toEqual({
-            id: "email",
-            text: "Email alerts go out through your business's own email provider, which comes with Grow. Saroh still emails owners and admins about each new enquiry.",
-            link: {
-                label: "See Grow",
-                href: "/settings/billing?plan=grow#change-plan",
-            },
-        });
-        // Someone who can't change the plan: the words, no link.
-        const member = alertGrid(
-            {
-                status: "ok",
-                prefs: prefs({ channels: noEmail, canConnect: false }),
-            },
-            lock,
-        );
-        expect(member.notes[0]?.link).toBeUndefined();
-        expect(member.notes[0]?.text).toContain("comes with Grow");
-    });
-
-    it("tells someone who can't connect one who can, with no link", () => {
+    it("email needs no provider: Saroh sends it, and nothing says one is needed", () => {
         const grid = alertGrid({
             status: "ok",
             prefs: prefs({
                 canConnect: false,
                 channels: {
                     bell: { available: true },
-                    email: { available: false, reason: "NO_PROVIDER" },
+                    email: { available: true },
                     whatsapp: { available: false, reason: "NO_PROVIDER" },
                 },
             }),
         });
-        expect(grid.notes[0]?.link).toBeUndefined();
-        expect(grid.notes[0]?.text).toMatch(/Ask an owner/);
+        const email = grid.rows[0]?.cells.find((c) => c.channel === "email");
+        expect(email).toMatchObject({ disabled: false });
+        expect(grid.notes).toEqual([]);
+        expect(JSON.stringify(grid)).not.toMatch(/provider/i);
     });
 
     it("a WhatsApp cell appears once a provider is connected, and still can't be switched on", () => {

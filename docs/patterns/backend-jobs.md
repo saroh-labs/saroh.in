@@ -204,19 +204,25 @@ nobody was told. Round-2 A14 closed it (`bookings/booking-notify.handler.ts`).
   and queues `team.alert` with that notice's id for the email only.
 - **One notice, filtered per person.** The bell is one org-wide
   `Notification`; `NotificationsService` leaves out, per viewer, the types
-  of rows they turned the bell off for or can't read. Email goes through
-  the business's own provider (`queueTransactional`, recipient
-  `TEAM_MEMBER`) to each member whose role reads it and who has email on.
+  of rows they turned the bell off for or can't read. Email goes from
+  **Saroh** (`sendTeamAlertEmail`, `common/email.ts`), provider or not —
+  Saroh telling a business about its own business (DEC-011, amended
+  2026-10-07) — to each member whose role reads it and who has email on.
+  `tellTeam` returns the emails and the handler sends them after the
+  transaction commits (at most once). Saroh's email carries fixed words and
+  the business's names cleaned (`cleanName`), never a customer's name or a
+  run's free text; the bell keeps the full words.
 - **Once per event**, claimed as a `CustomerNotice` (`TEAM_TOLD`,
   `team:<event>:<id>`), and re-read first: an unpaid checkout, a payment
   that went through after all, or someone who left again is not announced.
-- **Saroh's own mail for two alerts** (`notifications/team-mail.ts`): a new
-  website order emails the owners and admins as an enquiry's notice does,
-  unless they turned the New order email off (UX-042); a review asked of a
-  site's reviewers, and a new test release, email its reviewers, who have
-  no bell (UX-043). `tellTeam` collects these and the handler sends them
-  only after the claim commits, so a rerun sends none. A counter order and
-  every other alert keep the provider path above.
+- **Two alerts widen who is emailed**, on the same path and the same
+  helper (there is no second team-mail helper): a new website order
+  (`ownersAdminsByDefault`) emails the owners and admins as an enquiry's
+  notice does, unless they turned the New order email off (UX-042); a
+  review asked of a site's reviewers, and a new test release
+  (`emailReviewersOf`), email its reviewers, who have no bell (UX-043). A
+  provider that refused its keys (UX-012) is emailed too, email providers
+  included: Saroh sends it, not the refused key.
 - **Review alerts** (`team.alert` `{ event: "review" }`,
   `notifications/review-alerts.ts`, UX-043), queued on the review write's
   transaction (`sites/review-alert-queue.ts`): a request or a new test

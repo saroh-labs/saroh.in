@@ -1,10 +1,12 @@
 "use client";
 
+import { fontPairStacks } from "@saroh/site-blocks";
 import { Button } from "@saroh/ui/button";
 import { cn } from "@saroh/ui/lib/utils";
 
+import { useSiteFaces } from "@/components/sites/site-faces";
 import type { SiteStyle, SiteStyleOptions } from "@/lib/sites/style";
-import { contrastOk } from "@/lib/sites/style";
+import { activeColourway, contrastOk, inColourway } from "@/lib/sites/style";
 
 /**
  * The Style panel (#189) — colour and spacing for a whole site.
@@ -13,6 +15,16 @@ import { contrastOk } from "@/lib/sites/style";
  * API serves. A colour picker would let a merchant produce something
  * unreadable, and "pick any hex" moves the design problem onto the person least
  * equipped to solve it. Five good choices is the feature.
+ *
+ * The typeface is a choice of pairs too (KTD-2): a heading face and a body
+ * face picked together, each option set in its own heading face so the
+ * merchant compares the type itself rather than its name.
+ *
+ * A site made from a template is offered that template's colourways first
+ * (DEC-090): named whole looks, some in exact colours of the template's own
+ * that no row holds. They are choices like the swatches, never a colour
+ * picker; choosing a swatch afterwards leaves the colourway for the
+ * merchant's own colours.
  *
  * Every change applies to the preview immediately — the values resolve into
  * `--site-*` custom properties on the preview subtree, so nothing round-trips
@@ -58,9 +70,16 @@ export function StylePanel({
               style.colours.text)
             : style.colours.text;
 
+    const colourways = options.colourways ?? [];
+    const current = activeColourway(style, colourways);
+    // A colourway's own palette replaces the rows' colours while it is on.
+    const paletteOn = style.palette !== undefined;
+
     function setColour(row: string, key: string) {
+        // A swatch leaves the template's palette for the merchant's colours.
+        const { palette: _palette, ...rest } = style;
         const next: SiteStyle = {
-            ...style,
+            ...rest,
             colours: { ...style.colours, [row]: key },
         };
 
@@ -87,6 +106,15 @@ export function StylePanel({
     function setScalar(key: string, value: number) {
         onChange({ ...style, scalars: { ...style.scalars, [key]: value } });
     }
+    const faces = useSiteFaces();
+    const fontPairs = options.fontPairs ?? [];
+    const activePair = style.fontPair ?? fontPairs[0]?.key;
+    function setFontPair(key: string) {
+        // The default pair is stored as no pair at all, as the API keeps it,
+        // so choosing it back leaves nothing to publish.
+        const { fontPair: _previous, ...rest } = style;
+        onChange(key === fontPairs[0]?.key ? rest : { ...rest, fontPair: key });
+    }
 
     return (
         /*
@@ -95,17 +123,110 @@ export function StylePanel({
          */
         <div className="flex min-h-0 flex-col">
             <div className="min-h-0 flex-1 space-y-5 overflow-y-auto p-3">
-                {/* H1: the site's text moved to a system font when Saroh's
-                    own faces stopped loading on merchant sites. Says so, and
-                    promises no date; the font-pairing picker replaces it. */}
-                <p className="text-xs text-muted-foreground">
-                    Your site&apos;s text now uses a plain system font. Font
-                    choices aren&apos;t available yet.
-                </p>
-                <section className="space-y-3">
+                {/* The pairing picker H1's note promised (DEC-046); an
+                    older API that serves no pairs shows no choice. */}
+                {fontPairs.length > 0 ? (
+                    <section className="space-y-3">
+                        <h3 className="text-[0.6875rem] font-semibold uppercase tracking-wider text-muted-foreground">
+                            Typeface
+                        </h3>
+                        <div
+                            role="radiogroup"
+                            aria-label="Typeface"
+                            className="space-y-1"
+                        >
+                            {fontPairs.map((pair) => {
+                                const active = activePair === pair.key;
+                                return (
+                                    <button
+                                        key={pair.key}
+                                        type="button"
+                                        role="radio"
+                                        aria-checked={active}
+                                        onClick={() => setFontPair(pair.key)}
+                                        className={cn(
+                                            "flex min-h-9 w-full items-center rounded border px-2.5 py-1.5 text-left text-sm",
+                                            "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1",
+                                            active
+                                                ? "border-foreground ring-1 ring-foreground"
+                                                : "border-border hover:bg-muted",
+                                        )}
+                                        style={{
+                                            fontFamily: fontPairStacks(
+                                                pair.key,
+                                                faces,
+                                            )?.heading,
+                                        }}
+                                    >
+                                        {pair.name}
+                                    </button>
+                                );
+                            })}
+                        </div>
+                    </section>
+                ) : null}
+                <section
+                    className={cn(
+                        "space-y-3",
+                        fontPairs.length > 0 && "border-t pt-4",
+                    )}
+                >
                     <h3 className="text-[0.6875rem] font-semibold uppercase tracking-wider text-muted-foreground">
                         Colour
                     </h3>
+                    {colourways.length > 0 ? (
+                        <div
+                            role="radiogroup"
+                            aria-label="Colourway"
+                            className="space-y-1"
+                        >
+                            {colourways.map((cw) => {
+                                const active = current?.id === cw.id;
+                                return (
+                                    <button
+                                        key={cw.id}
+                                        type="button"
+                                        role="radio"
+                                        aria-checked={active}
+                                        onClick={() =>
+                                            onChange(inColourway(style, cw))
+                                        }
+                                        className={cn(
+                                            "flex min-h-9 w-full items-center gap-2.5 rounded border px-2.5 py-1.5 text-left text-sm",
+                                            "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1",
+                                            active
+                                                ? "border-foreground ring-1 ring-foreground"
+                                                : "border-border hover:bg-muted",
+                                        )}
+                                    >
+                                        <span
+                                            aria-hidden="true"
+                                            className="flex shrink-0 overflow-hidden rounded-sm border"
+                                        >
+                                            {cw.chips.map((hsl, i) => (
+                                                <span
+                                                    key={i}
+                                                    className="h-5 w-3.5"
+                                                    style={{
+                                                        background: `hsl(${hsl})`,
+                                                    }}
+                                                />
+                                            ))}
+                                        </span>
+                                        {cw.name}
+                                    </button>
+                                );
+                            })}
+                        </div>
+                    ) : null}
+                    {paletteOn ? (
+                        <p className="text-xs text-muted-foreground">
+                            {current
+                                ? `The ${current.name} colourway uses your template's own colours.`
+                                : "These colours are your template's own."}{" "}
+                            Choose a colour below to use your own instead.
+                        </p>
+                    ) : null}
                     {options.rows.map((row) => (
                         <div key={row.key} className="space-y-1.5">
                             <span className="text-xs">{row.label}</span>
@@ -116,10 +237,11 @@ export function StylePanel({
                             >
                                 {row.swatches.map((swatch) => {
                                     const active =
-                                        row.key === "text"
+                                        !paletteOn &&
+                                        (row.key === "text"
                                             ? effectiveTextKey === swatch.key
                                             : style.colours[row.key] ===
-                                              swatch.key;
+                                              swatch.key);
                                     // Only the text row can be illegible against
                                     // a choice made elsewhere in this panel.
                                     const unreadable =
@@ -176,6 +298,10 @@ export function StylePanel({
                     </h3>
                     {options.scalars.map((scalar) => {
                         const value = style.scalars[scalar.key] ?? scalar.min;
+                        // A template may set a value under the merchant's
+                        // range (a 1px hairline gap, DEC-090): the slider
+                        // shows it truly rather than pinned to its floor.
+                        const min = Math.min(scalar.min, value);
                         return (
                             <div key={scalar.key} className="space-y-1">
                                 <div className="flex items-baseline justify-between">
@@ -194,7 +320,7 @@ export function StylePanel({
                                 <input
                                     id={`style-${scalar.key}`}
                                     type="range"
-                                    min={scalar.min}
+                                    min={min}
                                     max={scalar.max}
                                     step={scalar.step}
                                     value={value}

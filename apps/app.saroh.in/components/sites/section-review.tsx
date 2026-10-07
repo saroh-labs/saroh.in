@@ -8,6 +8,7 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 
 import { useBusinessZone } from "@/components/shared/business-zone";
+import { useSiteFaces } from "@/components/sites/site-faces";
 import { env } from "@/env";
 import { createComment } from "@/lib/sites/actions";
 import { shortDate } from "@/lib/sites/format-date";
@@ -76,6 +77,8 @@ export function SectionReview({
     /** The test release these sections are from; notes go to it. */
     testReleaseId?: string;
 }) {
+    // The merchant faces the editor loaded, for the site's typeface.
+    const faces = useSiteFaces();
     const [commenting, setCommenting] = useState(false);
     const [openFor, setOpenFor] = useState<string | null>(null);
 
@@ -120,7 +123,11 @@ export function SectionReview({
             ) : null}
 
             <div className="overflow-hidden rounded-lg border">
-                <SiteTheme variables={vars} selector={`.${SCOPE}`} />
+                <SiteTheme
+                    variables={vars}
+                    selector={`.${SCOPE}`}
+                    faces={faces}
+                />
                 <div
                     className={`${SCOPE} bg-[hsl(var(--site-bg))] text-[hsl(var(--site-fg))]`}
                 >

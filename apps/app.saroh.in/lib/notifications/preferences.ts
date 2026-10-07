@@ -1,5 +1,3 @@
-import type { ConnectLock } from "@/lib/providers/connect-lock";
-
 /**
  * Your alerts (Settings → Your profile, "What you hear about"): which things
  * Saroh tells YOU about, and where. Per person, per business: your team picks
@@ -16,8 +14,8 @@ import type { ConnectLock } from "@/lib/providers/connect-lock";
  * has on, and says what each channel can do for them here. Only channels
  * that can deliver are offered:
  * - the bell, to someone whose role sees the inbox;
- * - email, through the business's own connected provider — otherwise the
- *   column is off, with "Connect email in Providers";
+ * - email, which Saroh sends, so it needs no provider of the business's
+ *   (DEC-011, amended 2026-10-07);
  * - WhatsApp appears only once a WhatsApp provider is connected, and even
  *   then can't be switched on: Saroh keeps no WhatsApp number for a team
  *   member, and says so.
@@ -115,7 +113,7 @@ export interface AlertRow {
 
 /** A line under the heading saying why something can't be switched on. */
 export interface AlertNote {
-    id: "not-available" | "email" | "whatsapp" | "nothing";
+    id: "not-available" | "whatsapp" | "nothing";
     text: string;
     /** Where to fix it, when this person can. */
     link?: { label: string; href: string };
@@ -127,8 +125,6 @@ export interface AlertGrid {
     rows: AlertRow[];
     notes: AlertNote[];
 }
-
-const PROVIDERS_HREF = "/settings/providers";
 
 const alertOf = (key: AlertKey) =>
     ALERTS.find((a) => a.key === key) ?? ALERTS[0];
@@ -150,16 +146,7 @@ const UNAVAILABLE_WORDS: Record<ChannelUnavailable, string> = {
  * every switch is off and disabled, and says why rather than "off" — off
  * would be a claim about what this person hears.
  */
-export function alertGrid(
-    read: AlertPreferencesRead,
-    /**
-     * The plan won't let the business connect its own email (DEC-091,
-     * UX-006): the email line says the plan, with See plans, not "Connect
-     * email in Providers" — a dead end on such a plan. Null: no lock, or
-     * the plan unread.
-     */
-    emailLock: Pick<ConnectLock, "upgrade" | "cta" | "href"> | null = null,
-): AlertGrid {
+export function alertGrid(read: AlertPreferencesRead): AlertGrid {
     if (read.status !== "ok") {
         return {
             columns: [...ALERT_CHANNELS],
@@ -231,39 +218,6 @@ export function alertGrid(
             id: "nothing",
             text: "Nothing here reaches your role in this business yet.",
         });
-    }
-    if (rows.length > 0 && !prefs.channels.email.available) {
-        notes.push(
-            emailLock
-                ? {
-                      id: "email",
-                      // True of team alerts (they need the business's own
-                      // provider); Saroh's own enquiry email to owners and
-                      // admins is apart, and still goes (UX-006).
-                      text: `Email alerts go out through your business's own email provider, which comes with ${emailLock.upgrade ?? "a paid plan"}. Saroh still emails owners and admins about each new enquiry.`,
-                      ...(prefs.canConnect
-                          ? {
-                                link: {
-                                    label: emailLock.cta,
-                                    href: emailLock.href,
-                                },
-                            }
-                          : {}),
-                  }
-                : prefs.canConnect
-                  ? {
-                        id: "email",
-                        text: "Email alerts go out through your business's own email provider, and none is connected.",
-                        link: {
-                            label: "Connect email in Providers",
-                            href: PROVIDERS_HREF,
-                        },
-                    }
-                  : {
-                        id: "email",
-                        text: "Email alerts go out through the business's own email provider. Ask an owner to connect email in Providers.",
-                    },
-        );
     }
     if (rows.length > 0 && columns.includes("whatsapp")) {
         notes.push({

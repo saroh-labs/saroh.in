@@ -11,7 +11,6 @@ import {
     Query,
     UseGuards,
 } from "@nestjs/common";
-import { listTemplates } from "@saroh/templates";
 
 import { OrgContext } from "../../common/decorators/org-context.decorator";
 import { BetterAuthGuard } from "../../common/guards/better-auth.guard";
@@ -35,6 +34,8 @@ import {
 } from "./dto";
 import { SitePreviewLinksService } from "./site-preview-links.service";
 import { SitesService } from "./sites.service";
+import type { CatalogueTemplate } from "./template-catalogue";
+import { templateCatalogue } from "./template-catalogue";
 
 /**
  * Site endpoints for an Organization (S2-003), scoped to
@@ -71,13 +72,8 @@ export class SitesController {
      * before the `:siteId` route so "templates" is never captured as an id.
      */
     @Get("templates")
-    templates() {
-        return listTemplates().map((template) => ({
-            id: template.id,
-            version: template.version,
-            name: template.name,
-            description: template.description,
-        }));
+    templates(): CatalogueTemplate[] {
+        return templateCatalogue();
     }
 
     /**

@@ -249,6 +249,24 @@ describe("MessageSendHandler", () => {
         expect(messageUpdate).not.toHaveBeenCalled();
     });
 
+    it("never sends a delivery withdrawn by a resend (a review invitation's dead link)", async () => {
+        deliveryFindUnique.mockResolvedValue({
+            id: "del_1",
+            status: "CANCELLED",
+            provider: "RESEND",
+        });
+
+        const fake = new FakeCommsProvider("EMAIL");
+        const handler = new MessageSendHandler(
+            new FakeCommsProviderFactory(fake),
+        );
+
+        await expect(handler.handle(job())).resolves.toBeUndefined();
+        expect(fake.calls).toHaveLength(0);
+        expect(messageFindUnique).not.toHaveBeenCalled();
+        expect(deliveryUpdate).not.toHaveBeenCalled();
+    });
+
     it("records FAILED (no send) when no provider is connected for the channel", async () => {
         deliveryFindUnique.mockResolvedValue({ id: "del_1", status: "QUEUED" });
         messageFindUnique.mockResolvedValue(message);

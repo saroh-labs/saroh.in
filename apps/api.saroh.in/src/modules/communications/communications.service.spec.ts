@@ -34,6 +34,8 @@ jest.mock("@saroh/database", () => {
         lead: { findUnique: jest.fn() },
         invoice: { findFirst: jest.fn() },
         customerAccount: { findFirst: jest.fn() },
+        order: { findFirst: jest.fn() },
+        customerIdentityLink: { findFirst: jest.fn() },
     };
     return {
         prisma: {
@@ -57,6 +59,7 @@ import type { CredentialCheck } from "../../common/providers/provider-attention"
 import type { OrganizationContext } from "../../common/types/organization-context";
 import { decryptSecret } from "../payments/crypto";
 import { CommunicationsService } from "./communications.service";
+import { renderReviewInvitation } from "./transactional";
 
 const providerUpsert = prisma.communicationProvider.upsert as jest.Mock;
 const providerFindMany = prisma.communicationProvider.findMany as jest.Mock;
@@ -875,5 +878,122 @@ describe("CommunicationsService.queueTransactional (D17)", () => {
             id: "inv_1",
             organizationId: "org_1",
         });
+    });
+});
+
+// A review invitation (D11): to the order's storefront customer, through the
+// business's own provider only, its review link a secret link.
+describe("CommunicationsService.queueTransactional — review invitation", () => {
+    const orderFindFirst = prisma.order.findFirst as jest.Mock;
+    const linkFindFirst = prisma.customerIdentityLink.findFirst as jest.Mock;
+    const tx = prisma as unknown as Parameters<
+        CommunicationsService["queueTransactional"]
+    >[0];
+    const input = () => ({
+        template: "REVIEW_INVITATION" as const,
+        rendered: renderReviewInvitation({ store: "High Street", days: 30 }),
+        recipient: { kind: "ORDER_CUSTOMER" as const, orderId: "o_1" },
+        secretLink: () =>
+            Promise.resolve("https://renderer.test/review/tok_review"),
+        createdByUserId: "user_1",
+    });
+
+    beforeEach(() => {
+        jest.clearAllMocks();
+        orderFindFirst.mockResolvedValue({
+            customerId: "cu_1",
+            customer: { email: " ananya@example.com " },
+        });
+        linkFindFirst.mockResolvedValue({ contactId: "contact_1" });
+        providerFindUnique.mockResolvedValue({
+            provider: "RESEND",
+            status: "CONNECTED",
+        });
+        consentFindUnique.mockResolvedValue(null);
+        messageCreate.mockImplementation(
+            ({ data }: { data: { status: string } }) =>
+                Promise.resolve({ id: "msg_1", ...data }),
+        );
+        deliveryCreate.mockResolvedValue({ id: "del_1" });
+        jobCreate.mockResolvedValue({ id: "job_1" });
+    });
+
+    it("goes to the order's customer, read in this business, the link sealed in the job", async () => {
+        const res = await new CommunicationsService().queueTransactional(
+            tx,
+            "org_1",
+            input(),
+        );
+        expect(res).toMatchObject({
+            status: "QUEUED",
+            toAddress: "ananya@example.com",
+            route: "PROVIDER",
+        });
+        expect(orderFindFirst.mock.calls[0][0].where).toEqual({
+            id: "o_1",
+            organizationId: "org_1",
+        });
+        expect(linkFindFirst.mock.calls[0][0].where).toEqual({
+            organizationId: "org_1",
+            customerId: "cu_1",
+        });
+        expect(messageCreate.mock.calls[0][0].data).toMatchObject({
+            contactId: "contact_1",
+            template: "REVIEW_INVITATION",
+        });
+        expect(JSON.stringify(messageCreate.mock.calls)).not.toContain(
+            "tok_review",
+        );
+        const payload = jobCreate.mock.calls[0][0].data.payload;
+        expect(decryptSecret(payload.link)).toBe(
+            "https://renderer.test/review/tok_review",
+        );
+    });
+
+    it("reads consent on the linked contact", async () => {
+        consentFindUnique.mockResolvedValue({ status: "REVOKED" });
+        const res = await new CommunicationsService().queueTransactional(
+            tx,
+            "org_1",
+            input(),
+        );
+        expect(res.status).toBe("SUPPRESSED");
+        expect(jobCreate).not.toHaveBeenCalled();
+    });
+
+    it("never goes through Saroh: with no provider it is refused", async () => {
+        providerFindUnique.mockResolvedValue(null);
+        await expect(
+            new CommunicationsService().queueTransactional(
+                tx,
+                "org_1",
+                input(),
+            ),
+        ).rejects.toThrow(
+            "Connect an email provider in Settings to send this.",
+        );
+        expect(messageCreate).not.toHaveBeenCalled();
+    });
+
+    it.each([
+        ["another business's order", null],
+        ["a walk-in", { customerId: null, customer: null }],
+        [
+            "a phone-only placeholder",
+            {
+                customerId: "cu_1",
+                customer: { email: "phone+x@phone.invalid" },
+            },
+        ],
+    ])("has no address for %s: 409, nothing written", async (_, order) => {
+        orderFindFirst.mockResolvedValue(order);
+        await expect(
+            new CommunicationsService().queueTransactional(
+                tx,
+                "org_1",
+                input(),
+            ),
+        ).rejects.toThrow("There's no email address to send this to.");
+        expect(messageCreate).not.toHaveBeenCalled();
     });
 });

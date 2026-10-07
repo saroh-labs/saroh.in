@@ -55,13 +55,19 @@ const REF = /^[a-hj-km-np-z2-9]{8}$/;
 /**
  * Where the visitor came from, from the page's query: `plan` only when it
  * names a plan, `src` cleaned to a short fixed-alphabet word ("direct" when
- * none) so it can go to GA, and `ref` only when it looks like a referral id.
+ * none) so it can go to GA, `ref` only when it looks like a referral id,
+ * and `template` only when it is one of `templates` — the gallery's slugs
+ * (`/templates/[slug]`'s "Save … for early access", plan U13).
  */
-export function waitlistContext(params: {
-    plan?: string | string[];
-    src?: string | string[];
-    ref?: string | string[];
-}): { plan?: PlanId; src: string; ref?: string } {
+export function waitlistContext(
+    params: {
+        plan?: string | string[];
+        src?: string | string[];
+        ref?: string | string[];
+        template?: string | string[];
+    },
+    templates: readonly string[] = [],
+): { plan?: PlanId; src: string; ref?: string; template?: string } {
     const first = (v: string | string[] | undefined) =>
         Array.isArray(v) ? v[0] : v;
     const plan = first(params.plan)?.toLowerCase();
@@ -71,10 +77,12 @@ export function waitlistContext(params: {
         .replace(/[^a-z0-9._-]/g, "")
         .slice(0, 40);
     const ref = first(params.ref)?.trim().toLowerCase();
+    const template = first(params.template)?.trim().toLowerCase();
     return {
         plan: PLANS.find((p) => p === plan),
         src: src || "direct",
         ref: ref && REF.test(ref) ? ref : undefined,
+        template: templates.find((t) => t === template),
     };
 }
 
@@ -87,6 +95,14 @@ export interface WaitlistRequest {
     plan?: PlanId;
     src: string;
     ref?: string;
+    /** The gallery template the visitor saved, by slug. */
+    template?: string;
+}
+
+/** A gallery template the waitlist can save: its slug and name. */
+export interface WaitlistTemplate {
+    slug: string;
+    name: string;
 }
 
 /** What `/api/waitlist` answers (the `{status}` contract). */

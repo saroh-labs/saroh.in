@@ -39,9 +39,29 @@ const grow = access({
     ],
 });
 
+/** The API's email setup (`GET …/comms-providers/email-setup`). */
+const HELD = { connected: false, canConnect: false };
+const ROOM = { connected: false, canConnect: true };
+
 describe("connectLocksOf (DEC-091, UX-006)", () => {
+    it("email's lock is the email setup's answer, never a second read of the plan", () => {
+        expect(connectLocksOf(free, ROOM).messaging).toBeNull();
+        expect(connectLocksOf(free, null).messaging).toBeNull();
+        // The plan unread: still held, said without a plan's name.
+        expect(connectLocksOf(null, HELD)).toEqual({
+            payments: null,
+            messaging: {
+                comesWith: "Comes with a paid plan",
+                cta: "See plans",
+                href: "/settings/billing#change-plan",
+                upgrade: null,
+                full: false,
+            },
+        });
+    });
+
     it("Free: payments and email both say the plan, with See Grow", () => {
-        const locks = connectLocksOf(free);
+        const locks = connectLocksOf(free, HELD);
         for (const lock of [locks.payments, locks.messaging]) {
             expect(lock).toEqual({
                 comesWith: "Comes with Grow",
@@ -54,7 +74,7 @@ describe("connectLocksOf (DEC-091, UX-006)", () => {
     });
 
     it("Grow: nothing locked", () => {
-        expect(connectLocksOf(grow)).toEqual({
+        expect(connectLocksOf(grow, ROOM)).toEqual({
             payments: null,
             messaging: null,
         });
@@ -67,18 +87,18 @@ describe("connectLocksOf (DEC-091, UX-006)", () => {
                 row({ moduleId: "integrations", limit: 1, usage: 1 }),
             ],
         });
-        expect(connectLocksOf(full).messaging?.comesWith).toBe(
+        expect(connectLocksOf(full, HELD).messaging?.comesWith).toBe(
             "Your plan's connections are all in use",
         );
-        expect(connectLocksOf(full).payments).not.toBeNull();
+        expect(connectLocksOf(full, HELD).payments).not.toBeNull();
     });
 
     it("unread or unenforced locks nothing", () => {
-        expect(connectLocksOf(null)).toEqual({
+        expect(connectLocksOf(null, null)).toEqual({
             payments: null,
             messaging: null,
         });
-        expect(connectLocksOf({ ...free, enforced: false })).toEqual({
+        expect(connectLocksOf({ ...free, enforced: false }, ROOM)).toEqual({
             payments: null,
             messaging: null,
         });
@@ -113,7 +133,9 @@ describe("Providers rows with the plan's locks (UX-006)", () => {
     });
 
     it("Free: every row it could connect carries the lock, and no email jump", () => {
-        const view = buildProvidersView(input({ locks: connectLocksOf(free) }));
+        const view = buildProvidersView(
+            input({ locks: connectLocksOf(free, HELD) }),
+        );
         expect(view.available.length).toBeGreaterThan(0);
         expect(view.available.every((e) => e.lock?.cta === "See Grow")).toBe(
             true,
@@ -123,7 +145,9 @@ describe("Providers rows with the plan's locks (UX-006)", () => {
     });
 
     it("Grow: Connect is offered", () => {
-        const view = buildProvidersView(input({ locks: connectLocksOf(grow) }));
+        const view = buildProvidersView(
+            input({ locks: connectLocksOf(grow, ROOM) }),
+        );
         expect(view.available.every((e) => !e.lock)).toBe(true);
         expect(view.connectEmailKey).not.toBeNull();
         expect(view.paymentsLocked).toBe(false);
@@ -132,7 +156,7 @@ describe("Providers rows with the plan's locks (UX-006)", () => {
     it("a provider already connected is never locked (re-entering keys is allowed)", () => {
         const view = buildProvidersView(
             input({
-                locks: connectLocksOf(free),
+                locks: connectLocksOf(free, HELD),
                 payments: [
                     {
                         id: "RAZORPAY",
@@ -151,7 +175,7 @@ describe("Providers rows with the plan's locks (UX-006)", () => {
 
 describe("the Turn on sheet's lock line (UX-006)", () => {
     it("Free: Payments says the plan and How to pay us; email says the plan", () => {
-        const locks = connectLocksOf(free);
+        const locks = connectLocksOf(free, HELD);
         const pay = connectLockFor("PAYMENTS", locks);
         const mail = connectLockFor("COMMUNICATIONS", locks);
         expect(pay && connectLockLine("PAYMENTS", pay)).toBe(
@@ -163,7 +187,7 @@ describe("the Turn on sheet's lock line (UX-006)", () => {
     });
 
     it("Grow: no lock for either", () => {
-        const locks = connectLocksOf(grow);
+        const locks = connectLocksOf(grow, ROOM);
         expect(connectLockFor("PAYMENTS", locks)).toBeNull();
         expect(connectLockFor("COMMUNICATIONS", locks)).toBeNull();
         expect(connectLockFor("PAYMENTS", null)).toBeNull();

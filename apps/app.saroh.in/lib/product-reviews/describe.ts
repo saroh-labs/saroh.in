@@ -1,4 +1,11 @@
-import type { InvitationState, ProductRating } from "./service";
+import type { EmailNote } from "@/lib/communications/email-setup";
+import { emailRefusalNote } from "@/lib/communications/email-setup";
+
+import type {
+    InvitationState,
+    ProductRating,
+    ReviewEmailSetup,
+} from "./service";
 
 /**
  * One catalogue row's rating. A row can be one product sold in several
@@ -38,6 +45,10 @@ export function invitationSentence(s: InvitationState): string {
             return `Every item has been reviewed (${s.lines} of ${s.lines}).`;
         case "expired":
             return `The invitation expired with ${s.reviewed} of ${s.lines} reviewed.`;
+        case "sending":
+            return "Invitation sending — it shows as sent once your email provider accepts it.";
+        case "failed":
+            return "The last invitation couldn't be sent, so it didn't use one of the three. You can send it again.";
         case "sent":
             return `Invitation sent — ${s.reviewed} of ${s.lines} reviewed so far.`;
     }
@@ -46,4 +57,28 @@ export function invitationSentence(s: InvitationState): string {
 /** "★★★★☆" — the stars as text, with the number beside it for screen readers. */
 export function stars(rating: number): string {
     return "★".repeat(rating) + "☆".repeat(Math.max(0, 5 - rating));
+}
+
+/** The API's words for "no email provider" (`product-reviews.service.ts`). */
+export const NO_PROVIDER_NOTE =
+    "Review invitations go from your own email. Connect an email provider in Settings › Providers to send them.";
+export const NO_PROVIDER_PLAN_NOTE =
+    "Review invitations go from your own email, and connecting your own email needs a paid plan.";
+
+export type ReviewEmailNote = EmailNote;
+
+/**
+ * What to lead with when invitations can't go (D11): connect the business's
+ * own email, or, where the plan can't (Free, DEC-091), see the plans. Null
+ * when they can go, or when it couldn't be read. The same note as every
+ * refused send (`emailRefusalNote`), in review invitations' words.
+ */
+export function reviewEmailNote(
+    setup: ReviewEmailSetup | null | undefined,
+    may: { connect: boolean; plans: boolean },
+): ReviewEmailNote | null {
+    return emailRefusalNote(setup, may, {
+        connect: NO_PROVIDER_NOTE,
+        plans: NO_PROVIDER_PLAN_NOTE,
+    });
 }

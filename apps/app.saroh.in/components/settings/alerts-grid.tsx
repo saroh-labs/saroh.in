@@ -21,7 +21,6 @@ import {
     alertUndo,
     withAlert,
 } from "@/lib/notifications/preferences";
-import type { ConnectLock } from "@/lib/providers/connect-lock";
 
 /** The grid's columns: the alert, then 56px a channel (76px from sm). */
 const GRID_COLS: Record<number, string> = {
@@ -42,16 +41,9 @@ const GRID_COLS: Record<number, string> = {
  * the save refreshes the page, so there is no copy of it to drift.
  *
  * Only what can deliver can be switched on (`alertGrid`): a channel with no
- * provider is off and fixed, with the line that says how to fix it.
+ * provider (WhatsApp) is off and fixed, with the line that says why.
  */
-export function AlertsGrid({
-    read,
-    emailLock = null,
-}: {
-    read: AlertPreferencesRead;
-    /** The plan won't let the business connect its own email (UX-006). */
-    emailLock?: ConnectLock | null;
-}) {
+export function AlertsGrid({ read }: { read: AlertPreferencesRead }) {
     const [pending, startTransition] = useTransition();
     const [shown, flipShown] = useOptimistic(
         read,
@@ -64,7 +56,7 @@ export function AlertsGrid({
                 : current,
     );
     const { offer } = useSettingsUndo();
-    const grid = alertGrid(shown, emailLock);
+    const grid = alertGrid(shown);
     const cols = GRID_COLS[Math.max(1, grid.columns.length)];
 
     const flip = (key: AlertKey, cell: AlertCell) => {

@@ -386,10 +386,14 @@ async function prepareWebsite(
             return { siteId: site.id, siteAddress: site.subdomain };
         };
     }
-    // The `/sites/new` flow and its starter template, caps included.
+    // The `/sites/new` flow and its template, caps included.
     const plan: SitePlan = await planSiteFromTemplate(
         ctx,
-        { name: setup.siteName },
+        {
+            name: setup.siteName,
+            // The sheet's choice; absent, the kind's (planSiteFromTemplate).
+            ...(setup.templateId ? { templateId: setup.templateId } : {}),
+        },
         entitlements,
     );
     return async (tx) => {

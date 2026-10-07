@@ -3,7 +3,7 @@ import type {
     SectionContractError,
     SectionType,
 } from "@saroh/block-contract";
-import { parseSectionContent } from "@saroh/block-contract";
+import { parseSectionContent, repeatedAnchor } from "@saroh/block-contract";
 
 import type { TemplateContext, TemplateManifest } from "./manifest";
 import { resolveContent } from "./manifest";
@@ -26,8 +26,11 @@ export interface InstantiatedPage {
     path: string;
     title: string;
     isHome: boolean;
-    /** In the site's menu (UX-070); the menu keeps page order. */
-    inMenu: boolean;
+    /**
+     * In the site's menu (UX-070); the menu keeps page order. Unsaid, the
+     * site write puts every page but the home page there.
+     */
+    inMenu?: boolean;
     sections: InstantiatedSection[];
 }
 
@@ -84,8 +87,9 @@ export class TemplateInstantiationError extends Error {
  *      `parseSectionContent(type, version, content)`, and
  *   3. stores the NORMALIZED content with an `order` from its array position.
  *
- * A section whose `when` says no for this context is left out first, and
- * `order` counts only the sections laid down.
+ * A page or section whose `when` says no for this context is left out
+ * first (the home page always stays), and `order` counts only the sections
+ * laid down.
  *
  * Throws {@link TemplateInstantiationError} on the first section that fails its
  * contract — so a caller that gets a result back is guaranteed every section is
@@ -95,7 +99,10 @@ export function instantiateTemplate(
     template: TemplateManifest,
     context: TemplateContext,
 ): InstantiatedTemplate {
-    const pages: InstantiatedPage[] = template.pages.map((page) => {
+    const laidDown = template.pages.filter(
+        (page) => page.isHome === true || !page.when || page.when(context),
+    );
+    const pages: InstantiatedPage[] = laidDown.map((page) => {
         const included = page.sections.flatMap((section, sectionIndex) =>
             !section.when || section.when(context)
                 ? [{ section, sectionIndex }]
@@ -129,11 +136,37 @@ export function instantiateTemplate(
             },
         );
 
+        // An anchor is an element id on its page: a template that repeats
+        // one is a mistake in the manifest, refused like an invalid section.
+        const repeated = repeatedAnchor(sections);
+        if (repeated) {
+            const at = included[repeated.index];
+            throw new TemplateInstantiationError({
+                templateId: template.id,
+                templateVersion: template.version,
+                pagePath: page.path,
+                sectionIndex: at.sectionIndex,
+                contractError: {
+                    code: "INVALID_CONTENT",
+                    type: at.section.type,
+                    version: at.section.contractVersion,
+                    issues: [
+                        {
+                            code: "custom",
+                            path: ["anchor"],
+                            message: `"${repeated.anchor}" is already another section's link name on this page`,
+                        },
+                    ],
+                    message: `"${repeated.anchor}" is already another section's link name on this page`,
+                },
+            });
+        }
+
         return {
             path: page.path,
             title: page.title,
             isHome: page.isHome ?? false,
-            inMenu: page.inMenu ?? false,
+            ...(page.inMenu === undefined ? {} : { inMenu: page.inMenu }),
             sections,
         };
     });

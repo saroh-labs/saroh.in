@@ -10,6 +10,7 @@ import { BOUND_BLOCKS, boundHref } from "@/components/sites/block-kinds";
 import { SECTION_LABELS } from "@/components/sites/editor-constants";
 import type { HeldBackSection } from "@/components/sites/saveable-sections";
 import { SectionFields } from "@/components/sites/section-fields";
+import { SectionFrameFields } from "@/components/sites/section-fields/frame";
 import { SectionPadding } from "@/components/sites/section-fields/padding";
 import type { useServicesForPicker } from "@/components/sites/use-services-for-picker";
 import type { Flag, Section, SitePage } from "@/lib/sites/service";
@@ -194,6 +195,8 @@ export function BlockInspector({
                     ))}
                 </ul>
             ) : null}
+
+            <SectionFrameFields section={section} onChange={onChange} />
 
             <SectionPadding
                 section={section}

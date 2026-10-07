@@ -244,3 +244,69 @@ describe("derived body, muted and hairline", () => {
         expect(v["--site-body"].startsWith("215 ")).toBe(true);
     });
 });
+
+describe("the typeface pair (KTD-2)", () => {
+    it("accepts a listed pair and carries it", () => {
+        const style = parseSiteStyle({ fontPair: "fraunces-inter-tight" });
+        expect(style.fontPair).toBe("fraunces-inter-tight");
+    });
+
+    it("REFUSES a pair that is not listed, naming the field", () => {
+        // A free font string would reach a stylesheet; only listed keys may.
+        for (const fontPair of ["comic-sans", "Fraunces", 12, ""]) {
+            try {
+                parseSiteStyle({ fontPair });
+                throw new Error(`accepted ${String(fontPair)}`);
+            } catch (error) {
+                expect(error).toBeInstanceOf(BadRequestException);
+                expect(
+                    (error as BadRequestException).getResponse(),
+                ).toMatchObject({ details: { field: "fontPair" } });
+            }
+        }
+    });
+
+    it("leaves the default pair out, so an untouched site's style is unchanged", () => {
+        // The pending-change count compares `style` byte for byte with the
+        // live snapshot, and no snapshot before fonts carries the field.
+        expect(parseSiteStyle({ fontPair: "system" })).toEqual(
+            defaultSiteStyle(),
+        );
+        expect(parseSiteStyle({ fontPair: null })).toEqual(defaultSiteStyle());
+        expect(defaultSiteStyle()).not.toHaveProperty("fontPair");
+    });
+
+    it("emits the pair's key as both font variables", () => {
+        const vars = siteStyleVariables(
+            parseSiteStyle({ fontPair: "newsreader" }),
+        );
+        expect(vars["--site-font-heading"]).toBe("newsreader");
+        expect(vars["--site-font-body"]).toBe("newsreader");
+    });
+
+    it("names the pair's mono face only when it has one", () => {
+        expect(
+            siteStyleVariables(parseSiteStyle({ fontPair: "geist" }))[
+                "--site-font-mono"
+            ],
+        ).toBe("geist");
+        expect(
+            siteStyleVariables(parseSiteStyle({ fontPair: "newsreader" })),
+        ).not.toHaveProperty("--site-font-mono");
+    });
+
+    it("emits no font variable for the default, as before fonts existed", () => {
+        const vars = siteStyleVariables(defaultSiteStyle());
+        expect(vars).not.toHaveProperty("--site-font-heading");
+        expect(vars).not.toHaveProperty("--site-font-body");
+    });
+
+    it("serves the pairs the panel offers, the default first", () => {
+        const { fontPairs } = siteStyleOptions();
+        expect(fontPairs[0]).toEqual({
+            key: "system",
+            name: expect.any(String),
+        });
+        expect(fontPairs.map((p) => p.key)).toContain("archivo-narrow");
+    });
+});

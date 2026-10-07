@@ -266,7 +266,7 @@ describe("block rendering", () => {
         expect(container.innerHTML).toMatchSnapshot();
     });
 
-    it.each(["grid", "list"])("features/%s", (look) => {
+    it.each(["grid", "list", "steps"])("features/%s", (look) => {
         const { container } = render(
             <FeaturesSection
                 content={blockFixture("features", look) as RenderedFeatures}
@@ -699,7 +699,9 @@ describe("the merchant's type (H1)", () => {
     it("falls back to the neutral stack where no SiteTheme is mounted", () => {
         for (const family of Object.values(siteFontFamily)) {
             expect(family).toHaveLength(1);
-            expect(family[0]).toMatch(/^var\(--site-font-(heading|body), /);
+            expect(family[0]).toMatch(
+                /^var\(--site-font-(heading|body|mono), /,
+            );
             expect(family[0]).toContain(SITE_FONT_STACK);
         }
         expect(SITE_FONT_STACK).toContain('"Noto Sans Devanagari"');

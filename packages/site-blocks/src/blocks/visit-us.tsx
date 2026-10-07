@@ -1,7 +1,5 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
-
 import type { RenderedVisitUs } from "@saroh/block-contract";
 import { ctaHref } from "@saroh/block-contract";
 
@@ -9,7 +7,7 @@ import { DEFAULT_API_URL } from "../api-url";
 import { openState, openStateText, weekSummary } from "../lib/opening-hours";
 import { phoneText } from "../lib/phone";
 import type { PublicVisit } from "../lib/public-visit";
-import { isPublicVisit } from "../lib/public-visit";
+import { usePublicVisit } from "../lib/use-public-visit";
 import { cn } from "../lib/utils";
 
 /**
@@ -18,12 +16,17 @@ import { cn } from "../lib/utils";
  * The section stores which storefront and two switches. Everything a visitor
  * reads comes from the public visit read when the page is viewed:
  *
- *   GET ${apiUrl}/public/sites/:siteId/visit/:storeId
+ *   GET ${apiUrl}/public/sites/:siteId/visit/:storeId   — the chosen shop
+ *   GET ${apiUrl}/public/sites/:siteId/visit            — no shop chosen
  *
- * which serves a place only while it belongs to the site's business, is a
- * `SHOP` and is not closed. So:
- * - no storefront chosen, or the place is gone, closed or went online-only:
- *   the block renders NOTHING rather than a card with no place in it;
+ * The first serves a place only while it belongs to the site's business, is
+ * a `SHOP` and is not closed. With no shop chosen the block reads the
+ * business's own place (template polish), as Opening hours always has: its
+ * first open shop, else the business profile's address and hours — so a
+ * business with one place needs to choose nothing. So:
+ * - the place is gone, closed or went online-only, or the business has no
+ *   place at all: the block renders NOTHING rather than a card with no
+ *   place in it;
  * - no hours saved: the hours line and "Open now" are left out, never
  *   "Closed" (a claim the business never made);
  * - no phone: no Call button;
@@ -58,11 +61,6 @@ export function directionsHref(address: string): string {
     )}`;
 }
 
-type LoadState =
-    | { kind: "loading" }
-    | { kind: "ready"; visit: PublicVisit | null }
-    | { kind: "error" };
-
 const noPage = () => undefined;
 
 /** A value with something in it, else null: an empty string says nothing. */
@@ -93,55 +91,28 @@ export default function VisitUsSection({
     now?: Date;
 }) {
     const storeId = said(content.storeId);
-    const [state, setState] = useState<LoadState>(
-        given ? { kind: "ready", visit: given } : { kind: "loading" },
-    );
-
-    const load = useCallback(async (): Promise<LoadState> => {
-        if (!siteId || !storeId) return { kind: "ready", visit: null };
-        try {
-            const res = await fetch(
-                `${apiUrl}/public/sites/${encodeURIComponent(siteId)}/visit/${encodeURIComponent(storeId)}`,
-                { headers: { accept: "application/json" } },
-            );
-            // Gone, closed or no longer a place: nothing to show, not an error.
-            if (res.status === 404) return { kind: "ready", visit: null };
-            if (!res.ok) return { kind: "error" };
-            const body: unknown = await res.json().catch(() => null);
-            // Narrowed, not cast (#264).
-            return isPublicVisit(body)
-                ? { kind: "ready", visit: body }
-                : { kind: "error" };
-        } catch {
-            return { kind: "error" };
-        }
-    }, [apiUrl, siteId, storeId]);
-
-    useEffect(() => {
-        if (given || siteId === undefined) return;
-        let active = true;
-        void load().then((next) => {
-            if (active) setState(next);
-        });
-        return () => {
-            active = false;
-        };
-    }, [given, siteId, load]);
+    // The same read the Opening hours block makes: the chosen shop, or with
+    // none the business's own place (template polish).
+    const { state, retry } = usePublicVisit({
+        siteId,
+        storeId,
+        apiUrl,
+        given,
+    });
 
     const title = said(content.title) ?? VISIT_US_TITLE;
 
-    if (!given && siteId === undefined) {
+    if (state.kind === "idle") {
         return (
             <VisitCard title={title}>
                 <p className="mt-1.5 text-sm leading-relaxed opacity-85">
                     {storeId
                         ? "The address, opening hours and phone of your shop show here on your live site."
-                        : "Choose which shop this shows. Its address, hours and phone show here on your live site."}
+                        : "Your business's address, opening hours and phone show here on your live site. Choose a shop to show that one instead."}
                 </p>
             </VisitCard>
         );
     }
-    if (!storeId && !given) return null;
     if (state.kind === "ready" && state.visit === null) return null;
 
     if (state.kind === "loading") {
@@ -163,10 +134,7 @@ export default function VisitUsSection({
                 <div className="mt-4">
                     <button
                         type="button"
-                        onClick={() => {
-                            setState({ kind: "loading" });
-                            void load().then(setState);
-                        }}
+                        onClick={retry}
                         className={secondaryButton}
                     >
                         Try again
@@ -193,6 +161,9 @@ export default function VisitUsSection({
     const directions =
         content.showMap !== false && address ? directionsHref(address) : null;
     const phone = said(place.phone);
+    // A business's own place may be only a name (template polish): with no
+    // address, hours or phone the card would say nothing.
+    if (!address && !hours && !phone) return null;
 
     return (
         <VisitCard
@@ -278,7 +249,10 @@ function VisitCard({
         <section className="mx-auto w-full max-w-screen-xl px-5 py-[var(--site-section-padding)] sm:px-[var(--site-page-margin)]">
             <div className="bg-site-fg text-site-bg grid items-center gap-4 rounded-[calc(var(--site-radius)*1.6)] p-[22px] [grid-template-columns:repeat(auto-fit,minmax(min(220px,100%),1fr))]">
                 <div className="min-w-0">
-                    <h2 className="font-site-heading text-[calc(1.375rem*var(--site-heading-scale))] font-semibold tracking-[-0.01em]">
+                    <h2
+                        data-site-title=""
+                        className="font-site-heading text-[calc(1.375rem*var(--site-heading-scale))] font-semibold tracking-[-0.01em]"
+                    >
                         {title}
                     </h2>
                     {children}

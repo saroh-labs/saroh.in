@@ -10,8 +10,8 @@ import {
     parseSectionContent,
     Prisma,
     prisma,
+    repeatedAnchor,
 } from "@saroh/database";
-import { starterTemplate } from "@saroh/templates";
 import { isDeepStrictEqual } from "node:util";
 
 import type { OrganizationContext } from "../../common/types/organization-context";
@@ -102,20 +102,35 @@ import {
     FLAGS_AWAITING_NAVIGATION,
 } from "./site-flags";
 import type { SiteFooter } from "./site-footer";
-import { parseSiteFooter } from "./site-footer";
+import { footerAfterUpdate, parseSiteFooter } from "./site-footer";
 import {
     isTestShapedHost,
     siteHostMode,
     siteRootDomain,
 } from "./site-host-mode";
 import type { SiteNavigation } from "./site-navigation";
-import { parseSiteNavigation, resolveSiteNavigation } from "./site-navigation";
+import {
+    parseSiteNavigation,
+    resolveSiteNavigation,
+    withInPageNavigation,
+} from "./site-navigation";
 import type { SiteStyle, SiteStyleOptions } from "./site-style";
 import {
     parseSiteStyle,
     siteStyleOptions,
     siteStyleVariables,
 } from "./site-style";
+import {
+    assertSiteLookOffered,
+    recordedTemplate,
+    templateColourways,
+} from "./site-style-offer";
+import type { SiteTemplateRecord } from "./site-template-record";
+import {
+    publicationTemplate,
+    siteTemplate,
+    templateFooterLine,
+} from "./site-template-record";
 
 /**
  * Take the key a section claims, unless something earlier in the list already
@@ -442,6 +457,11 @@ export interface SiteDetailView {
      * image, style, menu, footer, page list. Null before the first publish.
      */
     pendingSiteChanges: SiteChangeKind[] | null;
+    /**
+     * The template the site was made from and the style chosen with it
+     * (KTD-7). Null for a site made before that was recorded.
+     */
+    template: SiteTemplateRecord | null;
     /** Always complete — absent choices are filled from the defaults. */
     style: SiteStyle;
     /**
@@ -566,6 +586,9 @@ const draftSiteSelect = {
     socialImageBytes: true,
     footer: true,
     navigation: true,
+    // Not part of the snapshot: what a Publication is stamped with (KTD-7).
+    templateId: true,
+    templateVersion: true,
     pages: {
         // A hidden page does not travel, for the same reason a
         // hidden section does not: a Publication is immutable once
@@ -660,7 +683,12 @@ async function storedDraftSectionsByKey(
  */
 function sanitizedFooter(footer: SiteFooter | null): SiteFooter | null {
     return footer
-        ? { format: footer.format, value: sanitizeRichHtml(footer.value) }
+        ? {
+              format: footer.format,
+              value: sanitizeRichHtml(footer.value),
+              // How it is laid out travels with it; nothing to clean.
+              ...(footer.layout === "left" ? { layout: footer.layout } : {}),
+          }
         : null;
 }
 
@@ -872,6 +900,9 @@ export class SitesService {
                 navigation: true,
                 storefrontId: true,
                 publishNeedsApproval: true,
+                templateId: true,
+                templateVersion: true,
+                templateStyleId: true,
                 createdAt: true,
                 updatedAt: true,
                 // When the site last went live. Read through the current
@@ -902,7 +933,16 @@ export class SitesService {
         // client filling gaps itself is how the preview and the published site
         // drift apart. The footer is normalized here for the same reason — the
         // editor reads back exactly what publish would write.
-        const { style, footer, navigation, storefrontId, ...rest } = site;
+        const {
+            style,
+            footer,
+            navigation,
+            storefrontId,
+            templateId,
+            templateVersion,
+            templateStyleId,
+            ...rest
+        } = site;
         const pending = await this.pendingSectionChanges([site.id]);
         const sellsFrom = (await shopRolloutOn(ctx.organizationId))
             ? await sellsFromView(prisma, {
@@ -933,8 +973,19 @@ export class SitesService {
             pendingSectionChanges: pending.get(site.id)?.sections ?? null,
             // The settings that travel into the snapshot too (#282).
             pendingSiteChanges: pending.get(site.id)?.site ?? null,
+            template: siteTemplate({
+                templateId,
+                templateVersion,
+                templateStyleId,
+            }),
             style: parseSiteStyle(style),
-            styleOptions: siteStyleOptions(),
+            // The template's colourways join the choices (DEC-090).
+            styleOptions: siteStyleOptions(
+                templateColourways(
+                    recordedTemplate({ templateId, templateVersion }),
+                ),
+                templateStyleId,
+            ),
             footer: parseSiteFooter(footer),
             footerPreview: sanitizedFooter(parseSiteFooter(footer)),
             navigation: parseSiteNavigation(navigation),
@@ -1085,6 +1136,9 @@ export class SitesService {
         // Validate BEFORE writing: an unknown colour key or a non-numeric
         // slider must be a 400, not a site that renders wrong later.
         const style = parseSiteStyle(input);
+        // A palette or type scale only as one of the template's colourways
+        // (DEC-090): never colours a merchant typed.
+        await assertSiteLookOffered(ctx.organizationId, siteId, style);
         // Changing the theme and fonts is a plan row (U13); a site keeps the
         // look it has where the plan leaves it off.
         await planMeter.assertIncluded(ctx.organizationId, "themes");
@@ -1121,13 +1175,18 @@ export class SitesService {
 
         // Validate BEFORE writing, for the same reason style does: a malformed
         // body is a 400 now rather than a footer that fails to render later.
-        const parsed = parseSiteFooter(input);
+        // An update that sends only the line keeps the stored layout (a
+        // template's left-hand row), so it is read first.
+        parseSiteFooter(input);
+        const stored = await prisma.site.findFirst({
+            where: { id: siteId, organizationId: ctx.organizationId },
+            select: { footer: true },
+        });
+        const parsed = footerAfterUpdate(input, stored?.footer ?? null);
         // Sanitized on the way IN as well as at publish (#280). Publish is not
         // the only reader of what is stored here, and "safe because publish
         // cleans it" left every other reader trusting HTML nobody had cleaned.
-        const footer: SiteFooter | null = parsed
-            ? { format: parsed.format, value: sanitizeRichHtml(parsed.value) }
-            : null;
+        const footer: SiteFooter | null = sanitizedFooter(parsed);
 
         await prisma.site.update({
             where: { id: siteId },
@@ -1589,6 +1648,17 @@ export class SitesService {
             };
         });
 
+        // A section's anchor is an element id on its page, so a page holds
+        // each one once (`section-frame.ts`). Refused with the second use's
+        // index, so the editor points at the block that repeats it.
+        const repeated = repeatedAnchor(validated);
+        if (repeated) {
+            throw new BadRequestException({
+                message: `Section at index ${repeated.index} is invalid: another section on this page already uses the link name "${repeated.anchor}"`,
+                details: { index: repeated.index, field: "anchor" },
+            });
+        }
+
         // A Product grid names only this business's collection and products
         // (G12). An id its stored self already named passes, so a deleted
         // product never blocks the page's later saves; the flag says so.
@@ -1842,9 +1912,14 @@ export class SitesService {
                  * page's entry is simply absent. Same reason style and button
                  * actions resolve here: the snapshot is the site as served.
                  */
-                navigation: resolveSiteNavigation(
-                    parseSiteNavigation(site.navigation),
-                    site.pages,
+                navigation: withInPageNavigation(
+                    resolveSiteNavigation(
+                        parseSiteNavigation(site.navigation),
+                        site.pages,
+                    ),
+                    // The home page's own sections, as this publish writes
+                    // them: each one with a menu label leads the menu.
+                    pages.find((p) => p.isHome)?.sections ?? [],
                 ),
             },
             pages,
@@ -1927,9 +2002,9 @@ export class SitesService {
              * asks the review standing INSIDE this transaction (#278): a
              * verdict posted while a publish is in flight is not missed.
              *
-             * The Site does not track which template produced it; default
-             * the Publication's required (non-null) template stamp to the
-             * starter template's identity/version.
+             * The Publication's required template stamp is the site's own
+             * template (KTD-7); a site made before that was recorded
+             * stamps the starter, as every publish did until then.
              */
             const live = await putLive(tx, {
                 site: { id: site.id, organizationId: ctx.organizationId },
@@ -1938,10 +2013,7 @@ export class SitesService {
                 actor: { userId: ctx.userId, owner: isOwner(ctx) },
                 override: options.override,
                 fingerprint,
-                template: {
-                    id: starterTemplate.id,
-                    version: starterTemplate.version,
-                },
+                template: publicationTemplate(site),
                 publishedAt,
             });
             return {
@@ -2799,6 +2871,9 @@ export class SitesService {
                 navigation: true,
                 storefrontId: true,
                 subdomain: true,
+                footer: true,
+                templateId: true,
+                templateVersion: true,
                 pages: {
                     select: {
                         id: true,
@@ -2865,6 +2940,9 @@ export class SitesService {
             seoDescription: site.seoDescription,
             published: site.currentPublicationId !== null,
             hasUnpublishedChanges,
+            // The footer still in its template's words (round 2).
+            footer: parseSiteFooter(site.footer),
+            templateFooterLine: templateFooterLine(site),
             pages: site.pages.map((page) => ({
                 id: page.id,
                 path: page.path,

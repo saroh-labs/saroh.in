@@ -2,6 +2,7 @@
 
 import { PLANS_BUTTON, PLANS_JOIN } from "@saroh/site-blocks";
 import { Input } from "@saroh/ui/input";
+import { Textarea } from "@saroh/ui/textarea";
 
 import type { PlansContent } from "@/lib/sites/service";
 
@@ -41,6 +42,16 @@ export function PlansFields({
                         patch({ title: e.target.value || undefined })
                     }
                     placeholder="Plans"
+                />
+            </Field>
+            <Field label="A line under it">
+                <Textarea
+                    value={c.intro ?? ""}
+                    onChange={(e) =>
+                        patch({ intro: e.target.value || undefined })
+                    }
+                    rows={2}
+                    placeholder="Optional. No joining fee, cancel any time."
                 />
             </Field>
 

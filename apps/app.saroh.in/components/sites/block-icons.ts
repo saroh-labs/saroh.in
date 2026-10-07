@@ -3,8 +3,10 @@ import {
     AlignLeft,
     Briefcase,
     CalendarClock,
+    CalendarDays,
     CircleHelp,
     Clock,
+    Clock4,
     Images,
     LayoutGrid,
     LayoutList,
@@ -17,6 +19,7 @@ import {
     Repeat,
     Sparkles,
     Ticket,
+    UserRound,
 } from "lucide-react";
 
 import type { SectionType } from "@/lib/sites/service";
@@ -45,4 +48,7 @@ export const SECTION_ICONS: Record<SectionType, LucideIcon> = {
     packs: Ticket,
     productGrid: LayoutGrid,
     projects: Briefcase,
+    timetable: CalendarDays,
+    hours: Clock4,
+    person: UserRound,
 };

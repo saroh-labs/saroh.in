@@ -147,14 +147,48 @@ describe("emailAttention", () => {
             "Needs you: email is disconnected",
         );
         expect(providersTabNote(null)).toBeNull();
-        // Free can't connect its own email (DEC-091): nothing needs anyone.
-        expect(providersTabNote("not-connected", false)).toBeNull();
-        expect(providersTabNote("not-connected", true)).toBe(
-            "Needs you: no email provider yet",
-        );
-        expect(providersTabNote("disconnected", false)).toBe(
+        // Free can't connect its own email (DEC-091): never "Needs you",
+        // and only who may see the plans hears a paid plan brings it.
+        const held = { connected: false, canConnect: false };
+        expect(providersTabNote("not-connected", { setup: held })).toBeNull();
+        expect(
+            providersTabNote("not-connected", { setup: held, mayPlans: true }),
+        ).toBe("Your own email comes with a paid plan");
+        expect(
+            providersTabNote("not-connected", {
+                setup: { connected: false, canConnect: true },
+            }),
+        ).toBe("Needs you: no email provider yet");
+        expect(providersTabNote("disconnected", { setup: held })).toBe(
             "Needs you: email is disconnected",
         );
+        // Keys refused (UX-012) is said whatever the plan.
+        expect(providersTabNote("refused", { setup: held })).toBe(
+            "Needs you: your email provider refused its keys",
+        );
+    });
+
+    it("on a plan that can't connect one (DEC-091), says a paid plan brings it, to who may see the plans", () => {
+        const free = { connected: false, canConnect: false };
+        expect(
+            providersTabNote("not-connected", { setup: free, mayPlans: true }),
+        ).toBe("Your own email comes with a paid plan");
+        expect(
+            providersTabNote("not-connected", { setup: free, mayPlans: false }),
+        ).toBeNull();
+        // Room to connect, or unread: as before.
+        expect(
+            providersTabNote("not-connected", {
+                setup: { connected: false, canConnect: true },
+                mayPlans: true,
+            }),
+        ).toBe("Needs you: no email provider yet");
+        expect(providersTabNote("not-connected")).toBe(
+            "Needs you: no email provider yet",
+        );
+        expect(
+            providersTabNote("disconnected", { setup: free, mayPlans: false }),
+        ).toBe("Needs you: email is disconnected");
     });
 });
 

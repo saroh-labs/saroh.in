@@ -3,19 +3,19 @@ import type { Job, Prisma } from "@saroh/database";
 import { prisma, runInOrgContext } from "@saroh/database";
 
 import { appBase } from "../../common/app-url";
+import type { TeamAlertMail } from "../../common/email";
+import { sendTeamAlertEmail } from "../../common/email";
 import { fromMinor } from "../../common/money";
-import { CommunicationsService } from "../communications/communications.service";
-import { escapeHtml } from "../communications/transactional";
 import { formatMoney } from "../invoices/invoice-send.service";
 import { holdsOnPayment, payOnHandoverWords } from "../orders/online-checkout";
 import { orderPartyName } from "../orders/walk-in";
 import { resolveCapabilities } from "../organizations/organization-policy";
+import { cleanBusinessName } from "../site-accounts/sender-name";
 import type { AlertEvent } from "./alert-preferences";
 import { alertOn, mayHearAbout } from "./alert-preferences";
 import { wordReview } from "./review-alerts";
-import type { TeamAlertPayload, TeamMail, WordedAlert } from "./team-alerts";
+import type { TeamAlertPayload, WordedAlert } from "./team-alerts";
 import { TEAM_ALERT_TYPE } from "./team-alerts";
-import { sarohMailRecipients, sendTeamMails, teamMails } from "./team-mail";
 import { putOffUntilDue, wordUncollected } from "./uncollected-alert";
 
 export { TEAM_ALERT_TYPE } from "./team-alerts";
@@ -50,6 +50,23 @@ const BUILT_IN_LABEL: Partial<Record<string, string>> = {
 };
 
 /**
+ * A name the business (or its team) typed, as Saroh's email may carry it:
+ * no URLs, addresses or domains, no control characters, at most 40
+ * characters (`site-accounts/sender-name.ts`); `fallback` when nothing is
+ * left.
+ */
+export function cleanName(name: string | null | undefined, fallback: string) {
+    return cleanBusinessName(name ?? "", fallback);
+}
+
+/** One email to one person, to hand to Saroh's sender once committed. */
+export interface AlertEmail {
+    userId: string;
+    to: string;
+    mail: TeamAlertMail;
+}
+
+/**
  * Consumer for `team.alert` (round-2 F14): tells the business's team about
  * a new order, a booking the customer made, moved or cancelled, a failed
  * payment, someone joining, a scheduled go-live of the website that ran
@@ -67,21 +84,24 @@ const BUILT_IN_LABEL: Partial<Record<string, string>> = {
  *  3. **The bell:** one notice in the business's inbox. Each person's inbox
  *     leaves out what they turned the bell off for, or can't read
  *     (`notifications.service.ts`). A booking's notice is already there.
- *  4. **Email:** through the business's own connected provider (DEC-011),
- *     to each person on the team whose role reads it and who has email on
- *     for it — by default, a failed payment and a scheduled go-live.
- *     Whoever scheduled a go-live is emailed whatever they chose. Two go by
- *     Saroh's own mail instead, once the claim commits (`team-mail.ts`): a
- *     new website order to the owners and admins (UX-042), and a review
- *     asked of a site's reviewers (UX-043).
+ *  4. **Email:** from **Saroh**, for every business, provider or not
+ *     (DEC-011, amended 2026-10-07: Saroh telling a business about its own
+ *     business, as the new-enquiry alert is). Nothing here reads the
+ *     business's email provider. To each person on the team whose role
+ *     reads it and who has email on for it — by default, a failed payment
+ *     and a scheduled go-live. Whoever scheduled a go-live is emailed
+ *     whatever they chose. Two alerts widen who is emailed: a new
+ *     website order reaches the owners and admins unless they turned the
+ *     New order email off, as an enquiry does (UX-042); a review asked for,
+ *     or a new test release, reaches the site's reviewers, who have no
+ *     bell (UX-043). Handed to Saroh's sender once the transaction has
+ *     committed, so a rolled-back run sends nothing; at most once.
  *
  * Nothing goes by WhatsApp or SMS: Saroh keeps no number for a team member.
  */
 @Injectable()
 export class TeamAlertHandler {
     private readonly logger = new Logger(TeamAlertHandler.name);
-
-    constructor(private readonly comms: CommunicationsService) {}
 
     readonly handle = async (job: Job): Promise<void> => {
         const payload = payloadOf(job.payload);
@@ -93,8 +113,7 @@ export class TeamAlertHandler {
         }
         const organizationId = job.organizationId;
         const now = new Date();
-        const mails: TeamMail[] = [];
-        await runInOrgContext(organizationId, () =>
+        const out = await runInOrgContext(organizationId, () =>
             prisma.$transaction(async (tx) => {
                 // An uncollected order not due yet (its business moved its
                 // zone since) waits for its day rather than being dropped.
@@ -102,36 +121,30 @@ export class TeamAlertHandler {
                     payload.event === "uncollected" &&
                     (await putOffUntilDue(tx, organizationId, payload, now))
                 ) {
-                    return { told: false, emailed: 0 };
+                    return { told: false, emails: [] };
                 }
-                return tellTeam(
-                    tx,
-                    this.comms,
-                    organizationId,
-                    payload,
-                    now,
-                    mails,
-                );
+                return tellTeam(tx, organizationId, payload, now);
             }),
         );
-        // Saroh's own mail goes once the claim has committed: a run that
-        // rolled back, or found it claimed, has none to send.
-        await sendTeamMails(mails);
+        for (const email of out.emails) {
+            await sendTeamAlertEmail(email.to, email.mail);
+        }
     };
 }
 
-/** Word the alert, claim it, write the bell's notice and queue the emails. */
+/**
+ * Word the alert, claim it, write the bell's notice, and work out who is
+ * emailed and what it says. The emails are returned, not sent: the caller
+ * sends them once this transaction commits.
+ */
 export async function tellTeam(
     tx: Tx,
-    comms: Pick<CommunicationsService, "emailConnected" | "queueTransactional">,
     organizationId: string,
     payload: TeamAlertPayload,
     now: Date = new Date(),
-    /** Saroh's own mails to send once this commits (`team-mail.ts`). */
-    mailOut: TeamMail[] = [],
-): Promise<{ told: boolean; emailed: number }> {
+): Promise<{ told: boolean; emails: AlertEmail[] }> {
     const alert = await wordAlert(tx, organizationId, payload, now);
-    if (!alert) return { told: false, emailed: 0 };
+    if (!alert) return { told: false, emails: [] };
 
     // Claimed first, skipping a duplicate: a Postgres transaction can't go
     // on after a caught P2002 (backend-jobs.md).
@@ -146,7 +159,7 @@ export async function tellTeam(
         ],
         skipDuplicates: true,
     });
-    if (claimed.count === 0) return { told: false, emailed: 0 };
+    if (claimed.count === 0) return { told: false, emails: [] };
 
     if (!alert.notificationId && !alert.noBell) {
         const notification = await tx.notification.create({
@@ -169,36 +182,27 @@ export async function tellTeam(
         });
     }
 
-    if (alert.sarohMail) {
-        const [to, org] = await Promise.all([
-            sarohMailRecipients(tx, organizationId, alert),
-            tx.organization.findUnique({
-                where: { id: organizationId },
-                select: { name: true },
-            }),
-        ]);
-        mailOut.push(...teamMails(alert, org?.name ?? "Your business", to));
-        return { told: true, emailed: to.length };
-    }
-    const emailed = alert.bellOnly
-        ? 0
-        : await emailTeam(tx, comms, organizationId, alert);
-    return { told: true, emailed };
+    const emails = await whoToEmail(tx, organizationId, alert);
+    return { told: true, emails };
 }
 
-/** Email each person who chose email for this alert and may read it. */
-async function emailTeam(
+/** Each person who chose email for this alert and may read it, with the email. */
+async function whoToEmail(
     tx: Tx,
-    comms: Pick<CommunicationsService, "emailConnected" | "queueTransactional">,
     organizationId: string,
     alert: WordedAlert,
-): Promise<number> {
-    if (!(await comms.emailConnected(tx, organizationId))) return 0;
-
+): Promise<AlertEmail[]> {
+    if (alert.emailReviewersOf) {
+        return reviewersToEmail(tx, organizationId, alert);
+    }
     const [members, roles, choices, org] = await Promise.all([
         tx.membership.findMany({
             where: { organizationId },
-            select: { userId: true, role: true },
+            select: {
+                userId: true,
+                role: true,
+                user: { select: { email: true } },
+            },
             orderBy: { userId: "asc" },
         }),
         tx.organizationRole.findMany({
@@ -221,6 +225,7 @@ async function emailTeam(
     ]);
 
     const recipients = members.filter((m) => {
+        if (!m.user.email.trim()) return false;
         if (m.userId === alert.skipUserId) return false;
         if (m.userId === alert.alwaysUserId) return true;
         const actions = resolveCapabilities(
@@ -230,42 +235,93 @@ async function emailTeam(
         if (!mayHearAbout(alert.event, (a) => actions.has(a), m.role)) {
             return false;
         }
-        return alertOn(
-            choices.filter((c) => c.userId === m.userId),
-            alert.event,
-            "email",
-        );
+        const own = choices.filter((c) => c.userId === m.userId);
+        // A website order: an owner or admin hears of the sale as of an
+        // enquiry, on unless they turned this row's email off (UX-042).
+        if (
+            alert.ownersAdminsByDefault &&
+            (m.role === "OWNER" || m.role === "ADMIN") &&
+            own.length === 0
+        ) {
+            return true;
+        }
+        return alertOn(own, alert.event, "email");
     });
+    if (recipients.length === 0) return [];
 
-    const rendered = renderAlertEmail(alert, org?.name ?? "Your business");
-    for (const m of recipients) {
-        await comms.queueTransactional(tx, organizationId, {
-            template: "TEAM_ALERT",
-            rendered,
-            recipient: { kind: "TEAM_MEMBER", userId: m.userId },
-            createdByUserId: null,
-        });
-    }
-    return recipients.length;
+    const mail = renderAlertEmail(alert, cleanName(org?.name, "Your business"));
+    return recipients.map((m) => ({
+        userId: m.userId,
+        to: m.user.email.trim(),
+        mail,
+    }));
 }
 
-/** The email: the alert's own words, a link, and why they got it. */
+/**
+ * The reviewers of the alert's site, still on the team (UX-043): a review
+ * asked of them, or a new test release to look over. They have no bell
+ * and no alert choices, so being a reviewer is the choice.
+ */
+async function reviewersToEmail(
+    tx: Tx,
+    organizationId: string,
+    alert: WordedAlert,
+): Promise<AlertEmail[]> {
+    const [grants, org] = await Promise.all([
+        tx.siteReviewer.findMany({
+            where: { organizationId, siteId: alert.emailReviewersOf ?? "" },
+            select: { userId: true, user: { select: { email: true } } },
+            orderBy: { userId: "asc" },
+        }),
+        tx.organization.findUnique({
+            where: { id: organizationId },
+            select: { name: true },
+        }),
+    ]);
+    const onTeam = new Set(
+        (
+            await tx.membership.findMany({
+                where: {
+                    organizationId,
+                    userId: { in: grants.map((g) => g.userId) },
+                },
+                select: { userId: true },
+            })
+        ).map((m) => m.userId),
+    );
+    const recipients = grants.filter(
+        (g) =>
+            g.user.email.trim() &&
+            g.userId !== alert.skipUserId &&
+            onTeam.has(g.userId),
+    );
+    if (recipients.length === 0) return [];
+    const mail = renderAlertEmail(alert, cleanName(org?.name, "Your business"));
+    return recipients.map((g) => ({
+        userId: g.userId,
+        to: g.user.email.trim(),
+        mail,
+    }));
+}
+
+/**
+ * The email: the alert's email words (fixed, with the business's cleaned
+ * names), a link, and why they got it. `business` is already cleaned.
+ */
 export function renderAlertEmail(
-    alert: Pick<WordedAlert, "event" | "title" | "body" | "path">,
+    alert: Pick<WordedAlert, "event" | "mail" | "path"> &
+        Partial<Pick<WordedAlert, "cta" | "emailReviewersOf">>,
     business: string,
-): { subject: string; body: string } {
-    const base = appBase();
-    const lines = [
-        `<p><strong>${escapeHtml(alert.title)}</strong></p>`,
-        alert.body ? `<p>${escapeHtml(alert.body)}</p>` : "",
-        alert.path
-            ? `<p><a href="${escapeHtml(`${base}${alert.path}`)}">Open it in Saroh</a></p>`
-            : "",
-        `<p>You get this because email is on for &ldquo;${escapeHtml(ROW_LABEL[alert.event])}&rdquo; in your alerts at ${escapeHtml(business)}. You can change it in Settings, under Your profile.</p>`,
-    ];
+): TeamAlertMail {
     return {
-        subject: `${business}: ${alert.title}`,
-        body: lines.filter(Boolean).join("\n"),
+        subject: `${business}: ${alert.mail.heading}`,
+        heading: alert.mail.heading,
+        body: alert.mail.body,
+        url: alert.path ? `${appBase()}${alert.path}` : null,
+        ...(alert.cta ? { cta: alert.cta } : {}),
+        footer: alert.emailReviewersOf
+            ? `You get this because you review the website of ${business} in Saroh.`
+            : `You get this because email is on for “${ROW_LABEL[alert.event]}” in your alerts at ${business}. You can change it in Saroh, in Settings under Your profile.`,
     };
 }
 
@@ -331,14 +387,19 @@ async function wordOrder(
         type: ORDER_NEW_NOTIFICATION_TYPE,
         title: `New order ${order.orderId} from ${orderPartyName(order)}`,
         body: `${formatMoney(order.total, order.currency)}, ${orderPaidWords(order)}.`,
+        // Not who it's from: a customer typed that.
+        mail: {
+            heading: `New order ${order.orderId}`,
+            body: `${formatMoney(order.total, order.currency)}, ${orderPaidWords(order)}.`,
+        },
         path: `/commerce/orders/${order.id}`,
         skipUserId: p.actorUserId ?? null,
         orderId: order.id,
         // A website order comes in while nobody is watching: the owners and
-        // admins hear of it by Saroh's own mail, as of an enquiry (UX-042).
-        // One taken at the counter has someone there already.
+        // admins are emailed unless they turned it off, as of an enquiry
+        // (UX-042). One taken at the counter has someone there already.
         ...(order.placedOnline
-            ? { sarohMail: "OWNERS_ADMINS" as const, cta: "Open the order" }
+            ? { ownersAdminsByDefault: true, cta: "Open the order" }
             : {}),
     };
 }
@@ -390,6 +451,12 @@ async function wordFailed(
         body: intent.viaMandateId
             ? `${who}'s autopay charge of ${amount} didn't go through. Retry it, or send them a pay link.`
             : `${who}'s payment of ${amount} didn't go through. They can try again from the same link.`,
+        mail: {
+            heading: `Payment failed on invoice ${invoice.number ?? "(draft)"}`,
+            body: intent.viaMandateId
+                ? `An autopay charge of ${amount} didn't go through. Retry it, or send the customer a pay link.`
+                : `A payment of ${amount} didn't go through. The customer can try again from the same link.`,
+        },
         path: `/billing/invoices/${invoice.id}`,
         skipUserId: null,
     };
@@ -422,6 +489,10 @@ async function wordJoined(
         type: TEAM_JOINED_NOTIFICATION_TYPE,
         title: `${who} joined the team`,
         body: `They accepted your invitation, as ${label}.`,
+        mail: {
+            heading: `${cleanName(member.user.name, "Someone new")} joined the team`,
+            body: `They accepted your invitation, as ${cleanName(label, "a member of the team")}.`,
+        },
         path: "/settings/people",
         skipUserId: p.userId,
     };
@@ -448,6 +519,8 @@ async function wordBooking(
         type: notice.type,
         title: notice.title,
         body: notice.body ?? "",
+        // The notice names the customer, who typed it: the email doesn't.
+        mail: BOOKING_MAIL[notice.type] ?? NEW_BOOKING_MAIL,
         path: bookingId?.bookingId ? `/bookings/${bookingId.bookingId}` : null,
         skipUserId: null,
     };
@@ -487,6 +560,10 @@ async function wordSite(
             type: SITE_LIVE_NOTIFICATION_TYPE,
             title: `${release.name} is live on ${release.site.name}`,
             body: "It went live at the time it was scheduled for.",
+            mail: {
+                heading: `${cleanName(release.name, "Your test release")} is live on ${cleanName(release.site.name, "your website")}`,
+                body: "It went live at the time it was scheduled for.",
+            },
             path: `/sites/${release.siteId}/versions`,
         };
     }
@@ -495,6 +572,10 @@ async function wordSite(
         type: SITE_NOT_LIVE_NOTIFICATION_TYPE,
         title: `${release.name} didn't go live on ${release.site.name}`,
         body: p.reason ?? "Go live now, or schedule it again.",
+        mail: {
+            heading: `${cleanName(release.name, "Your test release")} didn't go live on ${cleanName(release.site.name, "your website")}`,
+            body: "Open it in Saroh to see why. Go live now, or schedule it again.",
+        },
         path: `/sites/${release.siteId}/pages`,
     };
 }
@@ -530,18 +611,23 @@ async function wordProvider(
         path: "/settings/providers",
         skipUserId: null,
     };
+    // Saroh sends the email, not the provider whose keys were refused
+    // (DEC-011 amended), so an email provider's alert is emailed too.
     if (p.channel === "PAYMENTS") {
+        const body = `Customers can't pay online until you connect ${name} again with keys that work, in Settings › Providers.`;
         return {
             ...base,
             title: `${name} refused your keys`,
-            body: `Customers can't pay online until you connect ${name} again with keys that work, in Settings › Providers.`,
+            body,
+            mail: { heading: `${name} refused your keys`, body },
         };
     }
+    const body = `Emails to your customers aren't going out. Connect ${name} again with a key that works, in Settings › Providers.`;
     return {
         ...base,
         title: `${name} refused your email keys`,
-        body: `Emails to your customers aren't going out. Connect ${name} again with a key that works, in Settings › Providers.`,
-        bellOnly: true,
+        body,
+        mail: { heading: `${name} refused your email keys`, body },
     };
 }
 
@@ -552,6 +638,23 @@ const PROVIDER_NAMES: Partial<Record<string, string>> = {
     RESEND: "Resend",
     SENDGRID: "SendGrid",
     SMTP: "SMTP relay",
+};
+
+/** A booking's email words, by the notice's type: fixed, naming nobody. */
+const NEW_BOOKING_MAIL: WordedAlert["mail"] = {
+    heading: "New booking",
+    body: "A customer booked online. Open it in Saroh to see who and when.",
+};
+const BOOKING_MAIL: Partial<Record<string, WordedAlert["mail"]>> = {
+    "booking.new": NEW_BOOKING_MAIL,
+    "booking.moved": {
+        heading: "A booking was moved",
+        body: "A customer moved their booking. Open it in Saroh to see the new time.",
+    },
+    "booking.cancelled": {
+        heading: "A booking was cancelled",
+        body: "A customer cancelled their booking. Open it in Saroh to see which one.",
+    },
 };
 
 function payloadOf(value: unknown): TeamAlertPayload | null {

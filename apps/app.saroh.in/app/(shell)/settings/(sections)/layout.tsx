@@ -1,10 +1,9 @@
 import { SettingsTabs } from "@/components/settings/settings-tabs";
 import { settingsPagesFor } from "@/components/shared/nav-items";
-import { ownAccountsRoom } from "@/lib/billing/access";
+import { readEmailSetup } from "@/lib/communications/email-setup-service";
 import { listModules } from "@/lib/modules/service";
 import { resolveActiveOrganization } from "@/lib/organizations/service";
 import { listCommsProviders } from "@/lib/providers/service";
-import { billingAccessOrNull } from "@/lib/saroh-billing/service";
 import { emailAttention, providersTabNote } from "@/lib/settings/ready";
 
 /**
@@ -43,17 +42,20 @@ export default async function SettingsLayout({
         : org?.role === "OWNER" || org?.role === "ADMIN";
     let providersNote: string | null = null;
     if (mayMessaging && pages.some((p) => p.href === "/settings/providers")) {
-        const [modules, messaging] = await Promise.all([
+        const mayPlans = org?.actions
+            ? org.actions.includes("billing:read")
+            : org?.role === "OWNER" || org?.role === "ADMIN";
+        const [modules, messaging, setup] = await Promise.all([
             listModules().catch(() => null),
             listCommsProviders().catch(() => null),
+            // On a plan that can't connect one (DEC-091), the line says a
+            // paid plan brings it rather than asking for a connect.
+            readEmailSetup({ connect: true, plans: mayPlans }),
         ]);
-        const attention = emailAttention(modules, messaging);
-        // The plan is read only when it would change the line (DEC-091).
-        const ownEmail =
-            attention === "not-connected"
-                ? ownAccountsRoom(await billingAccessOrNull())
-                : true;
-        providersNote = providersTabNote(attention, ownEmail);
+        providersNote = providersTabNote(emailAttention(modules, messaging), {
+            setup,
+            mayPlans,
+        });
     }
 
     return (

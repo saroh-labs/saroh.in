@@ -28,6 +28,7 @@
 
 import type { PageKind } from "@saroh/database";
 import { BLOCK_META, exampleTextIn, resolveVariant } from "@saroh/database";
+import { templatePlaceholderInAny } from "@saroh/templates";
 
 import { trimTrailingSlashes } from "../../common/paths";
 import {
@@ -118,6 +119,14 @@ export interface FlagSiteInput {
     published: boolean;
     /** Whether the draft differs from what is live. */
     hasUnpublishedChanges: boolean;
+    /** The site's footer as stored (`Site.footer`), if it has one. */
+    footer?: { format?: string; value: string } | null;
+    /**
+     * The footer line the site's template started it with (round 2): the
+     * manifest's `footer.line` for the template and version the site
+     * records, or null when the site has no template, or one with no line.
+     */
+    templateFooterLine?: string | null;
 }
 
 // ---------------------------------------------------------------------------
@@ -144,6 +153,49 @@ function looksLikePlaceholder(value: string): boolean {
     const t = value.trim();
     if (t === "") return false;
     return PLACEHOLDER_PATTERNS.some((re) => re.test(t));
+}
+
+/** Every string inside a value, however deep. */
+function stringsOf(value: unknown, out: string[] = []): string[] {
+    if (typeof value === "string") out.push(value);
+    else if (Array.isArray(value)) value.forEach((v) => stringsOf(v, out));
+    else if (typeof value === "object" && value !== null) {
+        Object.values(value).forEach((v) => stringsOf(v, out));
+    }
+    return out;
+}
+
+/**
+ * The fields of the four blocks a template fills with placeholder words,
+ * read for the check below. Ids, links, photos and briefs are left out: a
+ * photo brief is a note to the owner by design (KTD-5) and never drawn.
+ */
+const TEMPLATE_TEXT_FIELDS: Record<string, string[]> = {
+    person: [
+        "name",
+        "role",
+        "credentials",
+        "credentialsLabel",
+        "bio",
+        "title",
+        "people",
+    ],
+    features: ["heading", "intro", "items", "note"],
+    richText: ["value", "callout"],
+    projects: ["title", "items"],
+};
+
+/** Keys inside those fields that are not text a visitor reads. */
+const NOT_VISITOR_TEXT = new Set(["imageBrief", "image", "link", "src", "alt"]);
+
+function visitorText(value: unknown): string[] {
+    if (Array.isArray(value)) return value.flatMap(visitorText);
+    if (typeof value === "object" && value !== null) {
+        return Object.entries(value)
+            .filter(([key]) => !NOT_VISITOR_TEXT.has(key))
+            .flatMap(([, v]) => visitorText(v));
+    }
+    return stringsOf(value);
 }
 
 /** Strip tags so a rich-text check reads the words, not the markup. */
@@ -226,6 +278,39 @@ function checkSection(
         );
     }
 
+    /*
+     * A template's placeholder words (template polish): an industry
+     * template ships the practitioner, the points, the text and the work as
+     * words that say what to write ("A placeholder. Say what they coach…").
+     * Named with the words themselves, once per block, so the check says
+     * exactly what to replace. The text block's own check below already
+     * names a "placeholder"; this one is not repeated for it.
+     */
+    const fields = TEMPLATE_TEXT_FIELDS[section.type] as string[] | undefined;
+    if (fields !== undefined && example === null) {
+        const found = templatePlaceholderInAny(
+            fields.flatMap((key) => visitorText(c[key])),
+        );
+        const textBlockSaysSo =
+            section.type === "richText" &&
+            looksLikePlaceholder(textOf(str(c.value)));
+        if (found !== null && !textBlockSaysSo) {
+            const label =
+                section.type in BLOCK_META
+                    ? BLOCK_META[
+                          section.type as keyof typeof BLOCK_META
+                      ].label.toLowerCase()
+                    : "block";
+            const quoted =
+                found.length > 60 ? `${found.slice(0, 57).trimEnd()}…` : found;
+            at(
+                "placeholderText",
+                `This ${label} block still has the template's placeholder words in it ("${quoted}") — replace them with your own before going live.`,
+                null,
+            );
+        }
+    }
+
     switch (section.type) {
         case "hero": {
             const heading = str(c.heading);
@@ -258,10 +343,21 @@ function checkSection(
                 );
             }
 
-            // A hero is the one section built around an image.
+            // A hero is the one section built around an image — except
+            // the "No hero" look (U2), which draws none at all.
             const image = obj(c.image);
-            if (str(image.src).trim() === "") {
-                at("missingImage", "This hero has no image.", "image");
+            if (
+                resolveVariant("hero", c) !== "none" &&
+                str(image.src).trim() === ""
+            ) {
+                const brief = str(c.imageBrief).trim();
+                at(
+                    "missingImage",
+                    brief
+                        ? `This hero has no image yet. It wants: ${brief}`
+                        : "This hero has no image.",
+                    "image",
+                );
             }
 
             const cta = obj(c.cta);
@@ -390,6 +486,32 @@ function checkSection(
                     );
                 }
             });
+            break;
+        }
+
+        case "person": {
+            // The practitioner's photo must be described (U2), as a
+            // project's is: the contract saves it before it is.
+            const photo = obj(c.image);
+            if (str(photo.src).trim() !== "" && str(photo.alt).trim() === "") {
+                at(
+                    "emptyRequiredField",
+                    "The photo in this person block has no description, so someone using a screen reader won't know what it shows.",
+                    "image",
+                );
+            }
+            const cta = obj(c.cta);
+            if (Object.keys(cta).length > 0) {
+                checkCtaTarget(
+                    cta,
+                    "cta",
+                    "The person block's button",
+                    at,
+                    pagePaths,
+                    pageIds,
+                    false,
+                );
+            }
             break;
         }
 
@@ -594,6 +716,12 @@ export function checkSite(site: FlagSiteInput): Flag[] {
         });
     }
 
+    const footerFlag = untouchedTemplateFooter(
+        site.footer,
+        site.templateFooterLine,
+    );
+    if (footerFlag) flags.push(footerFlag);
+
     /*
      * The two flags that waited on the navigation model (#206).
      *
@@ -689,6 +817,45 @@ export function checkSite(site: FlagSiteInput): Flag[] {
     }
 
     return flags;
+}
+
+/**
+ * The footer still in its template's words (round 2). A template starts the
+ * footer with a line that says what to write there ("Your street and area
+ * — and the day you close"), and the site records which template it came
+ * from, so the check compares the footer with that template's own line
+ * rather than guessing from its phrasing. The comparison is on the words:
+ * a footer the editor saved back as `<p>…</p>`, or with its spacing
+ * changed, is still the template's. Anything else — an edit of one word —
+ * is the owner's, and quiet.
+ */
+export function untouchedTemplateFooter(
+    footer: FlagSiteInput["footer"],
+    templateLine: string | null | undefined,
+): Flag | null {
+    const line = words(templateLine ?? "");
+    if (line === "" || !footer) return null;
+    const written =
+        footer.format === "html" ? textOf(footer.value) : footer.value;
+    if (words(written) !== line) return null;
+    return {
+        type: "placeholderText",
+        message:
+            "The footer still has the template's line in it — write your own (an address, the days you open) in Site settings before going live.",
+        pageId: null,
+        sectionIndex: null,
+        field: "footer",
+    };
+}
+
+/** Text compared as its words: entities read, spacing collapsed. */
+function words(value: string): string {
+    return value
+        .replace(/&mdash;/g, "—")
+        .replace(/&amp;/g, "&")
+        .replace(/&nbsp;/g, " ")
+        .replace(/\s+/g, " ")
+        .trim();
 }
 
 /** Flags on one page's sections, for the rail dots and per-field markers. */

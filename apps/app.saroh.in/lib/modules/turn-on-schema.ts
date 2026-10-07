@@ -49,6 +49,11 @@ export const websiteSetupSchema = z.object({
     siteName: z.string(),
     /** The `<address>.saroh.app` subdomain. */
     address: z.string(),
+    /**
+     * The template chosen in the sheet (U12); absent: the kind's, which
+     * the API picks itself. Never prefilled by the API.
+     */
+    templateId: z.string().optional(),
 });
 export type WebsiteSetup = z.infer<typeof websiteSetupSchema>;
 
@@ -111,7 +116,29 @@ export interface SetupDefaults {
      * which follows what is being set up (DEC-070, K15). Null: not said.
      */
     template: { id: string; name: string } | null;
+    /**
+     * Website only, with no site yet: the templates it could start from
+     * instead (U12), and what is being set up, which suggests a few of
+     * them. Empty and null when not said.
+     */
+    templates: WebsiteTemplateChoice[];
+    kind: string | null;
 }
+
+/** A template the Website step may offer (`setup-defaults`' `templates`). */
+export interface WebsiteTemplateChoice {
+    id: string;
+    name: string;
+    kinds: string[];
+    uses: string[];
+}
+
+const templateChoiceSchema = z.object({
+    id: z.string().min(1),
+    name: z.string().min(1),
+    kinds: z.array(z.string()).catch([]),
+    uses: z.array(z.string()).catch([]),
+});
 
 const defaultsEnvelopeSchema = z.object({
     /** The prefill, as the API names it. */
@@ -124,6 +151,9 @@ const defaultsEnvelopeSchema = z.object({
         .object({ id: z.string().min(1), name: z.string().min(1) })
         .nullish()
         .catch(null),
+    // Lenient: a list this app can't read offers no choice, not a failure.
+    templates: z.array(templateChoiceSchema).optional().catch(undefined),
+    kind: z.string().nullish().catch(null),
 });
 
 /**
@@ -143,6 +173,8 @@ export function decodeSetupDefaults(key: string, raw: unknown): SetupDefaults {
             hidden: false,
             read: false,
             template: null,
+            templates: [],
+            kind: null,
         };
     }
     let defaults: SetupDefaults["defaults"] = fallback;
@@ -159,6 +191,8 @@ export function decodeSetupDefaults(key: string, raw: unknown): SetupDefaults {
         hidden: parsed.data.hidden ?? false,
         read: true,
         template: parsed.data.template ?? null,
+        templates: parsed.data.templates ?? [],
+        kind: parsed.data.kind ?? null,
     };
 }
 

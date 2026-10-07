@@ -2,6 +2,7 @@
 
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Button } from "@saroh/ui/button";
+import { PartialNotice } from "@saroh/ui/data-state";
 import {
     Form,
     FormControl,
@@ -13,13 +14,6 @@ import {
 } from "@saroh/ui/form";
 import { Input } from "@saroh/ui/input";
 import { cn } from "@saroh/ui/lib/utils";
-import {
-    Select,
-    SelectContent,
-    SelectItem,
-    SelectTrigger,
-    SelectValue,
-} from "@saroh/ui/select";
 import { showError } from "@saroh/ui/toast";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
@@ -32,6 +26,9 @@ import {
 } from "@/lib/organizations/address";
 import { createSite } from "@/lib/sites/actions";
 import type { NewSiteDefaults, Template } from "@/lib/sites/service";
+import type { ModuleStates } from "@/lib/sites/template-picker";
+
+import { TemplatePicker } from "./template-picker";
 
 /**
  * Sentinel for "none picked": the API then starts the site from the kind's
@@ -61,6 +58,8 @@ const formSchema = z.object({
         .trim()
         .min(3, { message: "Choose a web address of at least 3 characters" }),
     templateId: z.string(),
+    /** The chosen colourway; empty for the template's first. */
+    styleId: z.string(),
 });
 
 type FormValues = z.infer<typeof formSchema>;
@@ -78,26 +77,44 @@ type FormValues = z.infer<typeof formSchema>;
  *
  * The template starts on the one for what is being set up (DEC-070, K15):
  * Portfolio for "A site for my work", Personal for "Just me", the starter
- * for a business. Any other can be picked; the choice is always sent.
+ * for a business; or the one the address names (`?template=`, the gallery's
+ * link). The picker (U12) shows the templates suggested for the business
+ * first and every one under "All"; any can be picked, with one of its
+ * colourways, and the choice is always sent.
  */
 export function CreateSiteForm({
     templates,
     defaults = null,
     defaultTemplateId = null,
+    startTemplateId = null,
+    suggested = [],
+    modules = null,
 }: {
-    templates: Template[];
+    /** The catalogue; null when it could not be read (said, not hidden). */
+    templates: Template[] | null;
     /** What the API offers a new site; null starts the form empty. */
     defaults?: NewSiteDefaults | null;
     /** The kind's template (`kindDefaults(kind).starterTemplate`). */
     defaultTemplateId?: string | null;
+    /** The one to start on (`?template=`, else the kind's); else the first. */
+    startTemplateId?: string | null;
+    /** The ids suggested for this business (`suggestedTemplates`). */
+    suggested?: readonly string[];
+    /** The business's modules, for "shows once Sell is on". */
+    modules?: ModuleStates | null;
 }) {
     const router = useRouter();
+    const listed = templates ?? [];
     const form = useForm<FormValues>({
         resolver: zodResolver(formSchema),
         defaultValues: {
             name: defaults?.siteName ?? "",
             subdomain: defaults?.address ?? "",
-            templateId: initialTemplateId(templates, defaultTemplateId),
+            templateId: initialTemplateId(
+                listed,
+                startTemplateId ?? defaultTemplateId,
+            ),
+            styleId: "",
         },
     });
     const [suggestion, setSuggestion] = useState<string | null>(null);
@@ -109,12 +126,19 @@ export function CreateSiteForm({
         const template =
             values.templateId === NO_TEMPLATE
                 ? undefined
-                : templates.find((t) => t.id === values.templateId);
+                : listed.find((t) => t.id === values.templateId);
+        // A colourway only of the template chosen; none sends its first.
+        const styleId = template?.colourways?.some(
+            (c) => c.id === values.styleId,
+        )
+            ? values.styleId
+            : undefined;
         const res = await createSite({
             name: values.name,
             subdomain: values.subdomain,
             templateId: template?.id,
             templateVersion: template?.version,
+            ...(styleId ? { styleId } : {}),
         });
         if (!res.ok) {
             setSuggestion(res.suggestion ?? null);
@@ -132,127 +156,164 @@ export function CreateSiteForm({
         <Form {...form}>
             <form
                 onSubmit={form.handleSubmit(onSubmit)}
-                className="grid max-w-md gap-4"
+                className="grid min-w-0 max-w-2xl gap-5"
             >
-                <FormField
-                    control={form.control}
-                    name="name"
-                    render={({ field }) => (
-                        <FormItem>
-                            <FormLabel>Site name</FormLabel>
-                            <FormControl>
-                                <Input
-                                    placeholder="My Site"
-                                    maxLength={120}
-                                    disabled={isSubmitting}
-                                    {...field}
-                                />
-                            </FormControl>
-                            <FormMessage />
-                        </FormItem>
-                    )}
-                />
-                <FormField
-                    control={form.control}
-                    name="subdomain"
-                    render={({ field, fieldState }) => (
-                        <FormItem>
-                            <FormLabel>Web address</FormLabel>
-                            <div
-                                className={cn(
-                                    "flex min-w-0 items-center rounded-md border border-input bg-background focus-within:ring-2 focus-within:ring-ring",
-                                    fieldState.error && "border-destructive",
-                                )}
-                            >
-                                <FormControl>
-                                    <Input
-                                        {...field}
-                                        onChange={(e) => {
-                                            field.onChange(
-                                                cleanAddressInput(
-                                                    e.target.value,
-                                                ),
-                                            );
-                                            form.clearErrors("subdomain");
-                                        }}
-                                        placeholder="my-business"
-                                        maxLength={MAX_ADDRESS_LENGTH}
-                                        autoComplete="off"
-                                        spellCheck={false}
-                                        inputMode="url"
-                                        disabled={isSubmitting}
-                                        className="min-w-0 flex-1 border-0 text-right shadow-none focus-visible:ring-0 focus-visible:ring-offset-0"
-                                    />
-                                </FormControl>
-                                <span
-                                    aria-hidden="true"
-                                    className="shrink-0 pr-3 text-sm text-muted-foreground"
-                                >
-                                    .saroh.app
-                                </span>
-                            </div>
-                            <FormDescription>
-                                {address
-                                    ? `Customers find this site at ${address}.saroh.app`
-                                    : "Letters, numbers and hyphens."}
-                            </FormDescription>
-                            <FormMessage />
-                            <UseSuggestedAddress
-                                suggestion={suggestion}
-                                current={address}
-                                onUse={(free) => {
-                                    form.setValue("subdomain", free, {
-                                        shouldDirty: true,
-                                    });
-                                    form.clearErrors("subdomain");
-                                }}
-                            />
-                        </FormItem>
-                    )}
-                />
-                {templates.length > 0 && (
+                <div className="grid min-w-0 max-w-md gap-4">
                     <FormField
                         control={form.control}
-                        name="templateId"
+                        name="name"
                         render={({ field }) => (
                             <FormItem>
-                                <FormLabel>Template</FormLabel>
-                                <Select
-                                    value={field.value}
-                                    onValueChange={field.onChange}
-                                    disabled={isSubmitting}
-                                >
-                                    <FormControl>
-                                        <SelectTrigger>
-                                            <SelectValue placeholder="Choose a template" />
-                                        </SelectTrigger>
-                                    </FormControl>
-                                    <SelectContent>
-                                        {templates.map((t) => (
-                                            <SelectItem key={t.id} value={t.id}>
-                                                {t.name} (v{t.version})
-                                            </SelectItem>
-                                        ))}
-                                    </SelectContent>
-                                </Select>
-                                <FormDescription>
-                                    Every page it starts with can be changed or
-                                    removed.
-                                </FormDescription>
+                                <FormLabel>Site name</FormLabel>
+                                <FormControl>
+                                    <Input
+                                        placeholder="My Site"
+                                        maxLength={120}
+                                        disabled={isSubmitting}
+                                        {...field}
+                                    />
+                                </FormControl>
                                 <FormMessage />
                             </FormItem>
                         )}
                     />
+                    <FormField
+                        control={form.control}
+                        name="subdomain"
+                        render={({ field, fieldState }) => (
+                            <FormItem>
+                                <FormLabel>Web address</FormLabel>
+                                <div
+                                    className={cn(
+                                        "flex min-w-0 items-center rounded-md border border-input bg-background focus-within:ring-2 focus-within:ring-ring",
+                                        fieldState.error &&
+                                            "border-destructive",
+                                    )}
+                                >
+                                    <FormControl>
+                                        <Input
+                                            {...field}
+                                            onChange={(e) => {
+                                                field.onChange(
+                                                    cleanAddressInput(
+                                                        e.target.value,
+                                                    ),
+                                                );
+                                                form.clearErrors("subdomain");
+                                            }}
+                                            placeholder="my-business"
+                                            maxLength={MAX_ADDRESS_LENGTH}
+                                            autoComplete="off"
+                                            spellCheck={false}
+                                            inputMode="url"
+                                            disabled={isSubmitting}
+                                            className="min-w-0 flex-1 border-0 text-right shadow-none focus-visible:ring-0 focus-visible:ring-offset-0"
+                                        />
+                                    </FormControl>
+                                    <span
+                                        aria-hidden="true"
+                                        className="shrink-0 pr-3 text-sm text-muted-foreground"
+                                    >
+                                        .saroh.app
+                                    </span>
+                                </div>
+                                <FormDescription>
+                                    {address
+                                        ? `Customers find this site at ${address}.saroh.app`
+                                        : "Letters, numbers and hyphens."}
+                                </FormDescription>
+                                <FormMessage />
+                                <UseSuggestedAddress
+                                    suggestion={suggestion}
+                                    current={address}
+                                    onUse={(free) => {
+                                        form.setValue("subdomain", free, {
+                                            shouldDirty: true,
+                                        });
+                                        form.clearErrors("subdomain");
+                                    }}
+                                />
+                            </FormItem>
+                        )}
+                    />
+                </div>
+                {listed.length > 0 ? (
+                    <FormField
+                        control={form.control}
+                        name="templateId"
+                        render={({ field }) => (
+                            <FormItem className="min-w-0">
+                                <TemplatePicker
+                                    templates={listed}
+                                    suggested={suggested}
+                                    value={field.value}
+                                    onChange={field.onChange}
+                                    styleId={form.watch("styleId")}
+                                    onStyleChange={(id) =>
+                                        form.setValue("styleId", id)
+                                    }
+                                    modules={modules}
+                                    disabled={isSubmitting}
+                                />
+                                <FormMessage />
+                            </FormItem>
+                        )}
+                    />
+                ) : (
+                    <NoTemplates
+                        failed={templates === null}
+                        onRetry={() => router.refresh()}
+                    />
                 )}
                 <Button
                     type="submit"
-                    className="wk-press"
+                    className="wk-press w-fit"
                     disabled={isSubmitting || !name.trim()}
                 >
                     {isSubmitting ? "Creating…" : "Create site"}
                 </Button>
             </form>
         </Form>
+    );
+}
+
+/**
+ * No catalogue to choose from. Failed: said, with a retry, and the site
+ * can still be made (the API starts it from the kind's template). Empty:
+ * the same start, said plainly.
+ */
+export function NoTemplates({
+    failed,
+    onRetry,
+}: {
+    failed: boolean;
+    onRetry: () => void;
+}) {
+    if (failed) {
+        return (
+            <PartialNotice
+                action={
+                    <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={onRetry}
+                    >
+                        Try again
+                    </Button>
+                }
+            >
+                The templates couldn&apos;t be loaded. You can still create the
+                site: it starts from the template for what you&apos;re setting
+                up.
+            </PartialNotice>
+        );
+    }
+    return (
+        <p className="text-sm text-muted-foreground">
+            The site starts from the template for what you&apos;re setting up.
+            Every page it starts with can be changed or removed.
+        </p>
     );
 }
 

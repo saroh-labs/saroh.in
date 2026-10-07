@@ -1045,6 +1045,32 @@ describe("Website starts from the kind's template (DEC-070, K15)", () => {
         expect((await setup.defaults(ctx, "WEBSITE")).template).toBeUndefined();
     });
 
+    it("offers the catalogue to choose from instead, with the kind (U12)", async () => {
+        const ctx = await business("Asha Rao", "WORK");
+        const read = await setup.defaults(ctx, "WEBSITE");
+        expect(read.kind).toBe("WORK");
+        expect(read.templates).toContainEqual({
+            id: "bakery",
+            name: "Bakery",
+            kinds: ["food"],
+            uses: ["COMMERCE"],
+        });
+    });
+
+    it("starts the site from the template chosen in the sheet (U12)", async () => {
+        const ctx = await business("Asha Rao", "WORK");
+        const out = await setup.enable(ctx, "WEBSITE", {
+            siteName: "Asha Rao",
+            address: `u12-${seq}-${tag}`,
+            templateId: "writing",
+        });
+        const site = await prisma.site.findUniqueOrThrow({
+            where: { id: out.created.siteId },
+            select: { templateId: true },
+        });
+        expect(site.templateId).toBe("writing");
+    });
+
     it.each([
         ["WORK", ["/", "/about", "/work"]],
         ["BUSINESS", ["/", "/about"]],

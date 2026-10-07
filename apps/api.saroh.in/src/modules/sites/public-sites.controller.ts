@@ -9,7 +9,6 @@ import {
     Param,
     Query,
 } from "@nestjs/common";
-import { listTemplates } from "@saroh/templates";
 
 import { hashClientIp } from "../../common/client-ip";
 import { FixedWindowRateLimiter } from "../enquiry/rate-limiter";
@@ -20,6 +19,8 @@ import type { SiteMoved } from "./site-moved";
 import { siteMovedTo } from "./site-moved";
 import { SitePreviewLinksService } from "./site-preview-links.service";
 import { SitesService } from "./sites.service";
+import type { CatalogueTemplate } from "./template-catalogue";
+import { templateCatalogue } from "./template-catalogue";
 import type { TestReleaseView } from "./test-release-lookup";
 import { resolveTestRelease, TEST_TOKEN_HEADER } from "./test-release-lookup";
 
@@ -59,20 +60,13 @@ export class PublicSitesController {
      * (#107). Unauthenticated on purpose: this is what a site can be built
      * from, which is a claim about the product rather than about any tenant.
      *
-     * The org-scoped `GET .../sites/templates` returns the same registry to a
-     * signed-in merchant choosing one. This adds page titles, which a showcase
-     * needs to describe a template and a picker does not, and it carries no
+     * The org-scoped `GET .../sites/templates` returns the same catalogue to a
+     * signed-in merchant choosing one (`template-catalogue.ts`). It carries no
      * Organization, Site, or Publication data of any kind.
      */
     @Get("templates")
-    templates() {
-        return listTemplates().map((template) => ({
-            id: template.id,
-            version: template.version,
-            name: template.name,
-            description: template.description,
-            pages: template.pages.map((page) => page.title),
-        }));
+    templates(): CatalogueTemplate[] {
+        return templateCatalogue();
     }
 
     /** Current publication snapshot for the site on `<subdomain>.saroh.app`. */

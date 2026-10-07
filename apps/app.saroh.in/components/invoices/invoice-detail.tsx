@@ -9,6 +9,7 @@ import type { ReactNode } from "react";
 import { useState } from "react";
 
 import { reportFailure } from "@/components/billing/plan-refusal";
+import { EmailNoteText } from "@/components/communications/email-note";
 import type { InvoiceRef } from "@/components/invoices/invoice-actions";
 import {
     CancelInvoiceDialog,
@@ -24,6 +25,8 @@ import { useBusinessDetailsStep } from "@/components/organizations/use-business-
 import { ConfirmDialog } from "@/components/shared/confirm-dialog";
 import { ReadOnlyNote } from "@/components/shared/read-only-note";
 import { ViewerDate } from "@/components/shared/viewer-date";
+import type { EmailNote } from "@/lib/communications/email-setup";
+import { INVOICE_EMAIL_WORDS } from "@/lib/communications/email-setup";
 import { createPayLink, createViewLink } from "@/lib/invoices/actions";
 import type { DetailActionId } from "@/lib/invoices/detail-actions";
 import { detailActions, owedHere } from "@/lib/invoices/detail-actions";
@@ -32,7 +35,6 @@ import { downloadInvoicePdf, hasPdf } from "@/lib/invoices/pdf";
 import { canSend, paysOnline, wasSent } from "@/lib/invoices/send";
 import type { InvoiceSend, InvoiceSent } from "@/lib/invoices/service";
 import type { PillVariant } from "@/lib/invoices/status";
-import type { ConnectLock } from "@/lib/providers/connect-lock";
 import type { OnlineBlocker } from "@/lib/staff/types";
 
 type Dialog =
@@ -101,7 +103,7 @@ export function InvoiceDetail({
     connected,
     after,
     paymentsOn = true,
-    emailLock = null,
+    emailNote = null,
 }: {
     invoice: InvoiceRef & { kind: string };
     pill: { label: string; variant: PillVariant };
@@ -139,10 +141,10 @@ export function InvoiceDetail({
      */
     paymentsOn?: boolean;
     /**
-     * The plan won't let the business connect its own email (DEC-091,
-     * UX-006): the email hint names the plan, not Providers.
+     * Why it can't be emailed when the business has no email provider of
+     * its own, with the way to fix it for this person (`emailRefusalNote`).
      */
-    emailLock?: ConnectLock | null;
+    emailNote?: EmailNote | null;
 }) {
     const [open, setOpen] = useState<Dialog | null>(null);
     // A pay link waits for the registered address (DEC-068): asked here.
@@ -411,7 +413,19 @@ export function InvoiceDetail({
                         {owed &&
                         canWrite &&
                         send?.reason === "NO_EMAIL_PROVIDER" ? (
-                            <EmailHint lock={emailLock} />
+                            // No email of its own (DEC-011): why, and the
+                            // way to fix it for who may — the note every
+                            // refused send shows.
+                            <p className="mt-2 text-[12.5px] leading-[1.5] text-muted-foreground">
+                                <EmailNoteText
+                                    note={
+                                        emailNote ?? {
+                                            text: INVOICE_EMAIL_WORDS.connect,
+                                            action: null,
+                                        }
+                                    }
+                                />
+                            </p>
                         ) : null}
                     </section>
                     {after}
@@ -488,33 +502,5 @@ export function InvoiceDetail({
                 onConfirm={() => void makeViewLink()}
             />
         </div>
-    );
-}
-
-/**
- * Why an invoice can't be emailed: no email of the business's own. On a
- * plan that can connect one, the way to Providers; on one that can't
- * (DEC-091, UX-006), the plan that has it — never a Providers dead end.
- */
-export function EmailHint({ lock }: { lock: ConnectLock | null }) {
-    const link =
-        "font-medium text-foreground underline underline-offset-4 hover:decoration-2 active:text-muted-foreground";
-    if (lock) {
-        return (
-            <p className="mt-2 text-[12.5px] leading-[1.5] text-muted-foreground">
-                {`Sending invoices by email needs your own email provider, which comes with ${lock.upgrade ?? "a paid plan"}. Copy its link and share it another way.`}{" "}
-                <Link href={lock.href} className={link}>
-                    {lock.cta}
-                </Link>
-            </p>
-        );
-    }
-    return (
-        <p className="mt-2 text-[12.5px] leading-[1.5] text-muted-foreground">
-            To send invoices by email, connect your email provider.{" "}
-            <Link href="/settings/providers" className={link}>
-                Providers
-            </Link>
-        </p>
     );
 }

@@ -1,11 +1,20 @@
 import type { TemplateManifest } from "./manifest";
+import { bakeryTemplate } from "./templates/bakery";
+import { blogsTemplate } from "./templates/blogs";
+import { ceramicsTemplate } from "./templates/ceramics";
+import { clinicTemplate } from "./templates/clinic";
+import { developerTemplate } from "./templates/developer";
+import { dieticianTemplate } from "./templates/dietician";
+import { gymTemplate } from "./templates/gym";
 import { personalTemplate } from "./templates/personal";
 import { portfolioTemplate } from "./templates/portfolio";
+import { salonTemplate } from "./templates/salon";
 import {
     starterTemplate,
     starterTemplateV1,
     starterTemplateV2,
 } from "./templates/starter";
+import { studioTemplate } from "./templates/studio";
 import { writingTemplate } from "./templates/writing";
 
 /** Registry key for an `id@version` pair. */
@@ -20,7 +29,8 @@ function key(id: string, version: number): string {
  * keep resolving it.
  *
  * In the order the picker offers them: the starter, then the three DEC-070
- * added for someone working for themselves or showing their work (K15).
+ * added for someone working for themselves or showing their work (K15),
+ * then the industry templates (industry templates plan, Phase B).
  */
 const REGISTRY: Record<string, TemplateManifest> = Object.fromEntries(
     [
@@ -30,6 +40,15 @@ const REGISTRY: Record<string, TemplateManifest> = Object.fromEntries(
         personalTemplate,
         portfolioTemplate,
         writingTemplate,
+        blogsTemplate,
+        ceramicsTemplate,
+        gymTemplate,
+        bakeryTemplate,
+        studioTemplate,
+        developerTemplate,
+        dieticianTemplate,
+        salonTemplate,
+        clinicTemplate,
     ].map((t) => [key(t.id, t.version), t]),
 );
 

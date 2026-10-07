@@ -1,5 +1,6 @@
 "use client";
 
+import { inPageNavigation, mergeInPageNavigation } from "@saroh/block-contract";
 import { Button } from "@saroh/ui/button";
 import type { RefObject, UIEvent } from "react";
 import { useEffect, useRef, useState } from "react";
@@ -45,6 +46,7 @@ export function canvasChromeFor({
     navigation,
     pages,
     footer,
+    homeSections = [],
 }: {
     /** The name as the inspector has it now (G6). */
     siteName: string;
@@ -55,17 +57,32 @@ export function canvasChromeFor({
      * sanitized copy when it is richer than a line (#336).
      */
     footer: SiteFooter | null;
+    /**
+     * The home page's sections, when it is the page open: each one with a
+     * menu label leads the menu, as publish puts it (`withInPageNavigation`
+     * in the API). On any other page the canvas has not read the home
+     * page's sections, and draws the page entries alone.
+     */
+    homeSections?: Section[];
 }): CanvasChrome {
+    const pageEntries = (navigation?.items ?? []).flatMap((item) => {
+        const page = pages.find((p) => p.id === item.pageId && !p.hidden);
+        return page
+            ? [{ label: item.label ?? page.title, href: page.path }]
+            : [];
+    });
     return {
         name: siteName,
-        navigation: (navigation?.items ?? []).flatMap((item) => {
-            const page = pages.find((p) => p.id === item.pageId && !p.hidden);
-            return page
-                ? [{ label: item.label ?? page.title, href: page.path }]
-                : [];
-        }),
-        // Sanitizing can leave nothing; nothing is no footer.
-        footer: footer?.value.trim() ? footer : null,
+        // A section entry a page entry already names is left out, as
+        // publish leaves it out (`mergeInPageNavigation`).
+        navigation: mergeInPageNavigation(
+            inPageNavigation(homeSections.filter((s) => !s.hidden)),
+            pageEntries,
+        ),
+        // Sanitizing can leave nothing, which is no footer — unless it is
+        // laid out on the left, which keeps its row (name, Runs on Saroh).
+        footer:
+            footer?.value.trim() || footer?.layout === "left" ? footer : null,
     };
 }
 

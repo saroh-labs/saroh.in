@@ -123,6 +123,13 @@ export const TO_RENDERED = {
     // The merchant's own projects: text, photos and plain links, checked
     // when authored. Nothing to resolve.
     projects: identity,
+    // Which classes and two switches; the sessions are read live.
+    timetable: identity,
+    // An id and a switch; the week is read live.
+    hours: identity,
+    // The merchant's own words and photo, and one button that resolves
+    // like hero's.
+    person: resolvesNestedCta,
 } satisfies Record<SectionType, ToRendered>;
 
 /**

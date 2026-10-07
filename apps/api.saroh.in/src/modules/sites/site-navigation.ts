@@ -1,4 +1,5 @@
 import { BadRequestException } from "@nestjs/common";
+import { inPageNavigation, mergeInPageNavigation } from "@saroh/database";
 
 import type { ModulePageKind } from "./page-kinds";
 import { isModulePageKind, MODULE_PAGE_KINDS } from "./page-kinds";
@@ -169,4 +170,31 @@ export function resolveSiteNavigation(
         out.push({ label: page.title, href: page.path, kind: page.kind });
     }
     return out;
+}
+
+/**
+ * The menu with the home page's own sections in front (industry templates,
+ * polish pass): each home-page section with a link name and a menu label is
+ * an entry, `/#anchor`, in page order — "Today's bread · Visit · Journal",
+ * as a one-page design's header reads. The page entries follow, so a site
+ * keeps every page it listed. Resolved at publish over the sections being
+ * written, like the rest of the menu: a hidden section is not in them, so
+ * its entry is simply absent.
+ *
+ * A section's label is the merchant's (or their template's) choice, made
+ * in the section's own inspector, so there is no separate switch for this.
+ *
+ * A section entry with the same label as a page entry is left out: the
+ * page is the fuller version, and "Timetable · … · Timetable" reads as a
+ * mistake (`mergeInPageNavigation`). A module page shadows its section only
+ * in the header, at view time, since its entry leaves the menu while its
+ * module is off.
+ */
+export function withInPageNavigation(
+    menu: readonly PublishedNavigationItem[],
+    homeSections: readonly { content: unknown }[],
+): PublishedNavigationItem[] {
+    return mergeInPageNavigation(inPageNavigation(homeSections), menu, {
+        shadowsOnlyAlways: true,
+    });
 }

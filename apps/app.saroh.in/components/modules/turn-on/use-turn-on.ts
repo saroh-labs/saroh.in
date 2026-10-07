@@ -32,6 +32,10 @@ import { decodeSetupDefaults } from "@/lib/modules/turn-on-schema";
 import type { EnableResult } from "@/lib/modules/turn-on-service";
 import type { ConnectLocks } from "@/lib/providers/connect-lock";
 import { connectLockFor } from "@/lib/providers/connect-lock";
+import {
+    moduleStatesWith,
+    suggestedTemplates,
+} from "@/lib/sites/template-picker";
 
 /**
  * The sheet's state: what it starts from (read from `setup-defaults` when it
@@ -225,14 +229,26 @@ export function useTurnOn({
     };
 
     // The template a new website starts from (DEC-070, K15), when said.
-    const websiteTemplate =
-        (loaded ?? []).find((d) => d.key === "WEBSITE")?.template ?? null;
+    const website = (loaded ?? []).find((d) => d.key === "WEBSITE");
+    const websiteTemplate = website?.template ?? null;
+    // The others suggested for this business (U12), what this sheet turns
+    // on counted as on: Sell turned on with Website suggests a shop's.
+    const websiteChoices =
+        website && websiteTemplate
+            ? suggestedTemplates(
+                  website.templates,
+                  website.kind,
+                  moduleStatesWith(modules, plan.order),
+                  websiteTemplate.id,
+              )
+            : [];
 
     return {
         ready: draft !== null,
         draft,
         plan,
         websiteTemplate,
+        websiteChoices,
         apiDeps,
         hidden,
         errors,
