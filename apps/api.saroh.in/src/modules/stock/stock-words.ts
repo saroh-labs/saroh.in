@@ -159,6 +159,14 @@ export function onlyLeft(available: number, storefront: string): string {
 }
 
 /**
+ * What a refusal calls a line (UX-026): the product, and its variant when
+ * it is one — "Linen kurta (L)", so the counter knows which size ran out.
+ */
+export function sellLineName(product: string, variant?: string | null): string {
+    return variant ? `${product} (${variant})` : product;
+}
+
+/**
  * Why an order can't take a line (#511): "Sourdough — Sold out", or
  * "Sourdough — Only 2 left at Hill Road". A storefront sells what is on hand
  * and not promised.

@@ -268,6 +268,21 @@ export function roomFor(
     return sellable.left === null ? null : Math.max(0, sellable.left - inCart);
 }
 
+/**
+ * A picker chip's words (UX-026): the size and price, and — said, not only
+ * greyed — "Sold out" when none can be added here, or "2 left" when few.
+ */
+export function chipWords(
+    variantTitle: string | null,
+    price: string,
+    room: number | null,
+): string {
+    const what = variantTitle ?? "Add";
+    if (room === 0) return `${what} · Sold out`;
+    if (room !== null && room <= 3) return `${what} · ${price} · ${room} left`;
+    return `${what} · ${price}`;
+}
+
 /** The products the search shows: 5 before typing, 8 once typed. */
 export function findSellables<T extends { name: string }>(
     products: readonly T[],

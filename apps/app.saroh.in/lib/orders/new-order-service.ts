@@ -8,7 +8,10 @@ import type {
     NewOrderSellable,
     NewOrderWay,
 } from "@/lib/orders/new-order";
-import type { ProductListItem } from "@/lib/products/service";
+import {
+    counterProducts,
+    sellablesOfProduct,
+} from "@/lib/orders/new-order-sellables";
 import { listProducts } from "@/lib/products/service";
 import { getStorefront } from "@/lib/stores/storefronts";
 
@@ -40,46 +43,6 @@ export interface NewOrderCatalogue {
     products: NewOrderProduct[];
 }
 
-const toCents = (money: string | null | undefined) =>
-    Math.round((Number(money) || 0) * 100);
-
-/** What is left at this storefront: on the shelf, less what is promised. */
-function leftOf(stock: ProductListItem["inventory"]): number | null {
-    return stock ? Math.max(0, stock.quantity - stock.promised) : null;
-}
-
-/** A listed product as the things it can be bought as (pure). */
-export function sellablesOfProduct(p: ProductListItem): NewOrderSellable[] {
-    const left = leftOf(p.inventory);
-    const soldOut = p.soldOut === true || left === 0;
-    if (p.variants.length === 0) {
-        return [
-            {
-                key: p.id,
-                productId: p.id,
-                variantId: null,
-                name: p.name,
-                variantTitle: null,
-                priceCents: toCents(p.price),
-                left,
-                soldOut,
-            },
-        ];
-    }
-    return p.variants.map((v) => ({
-        key: `${p.id}:${v.id}`,
-        productId: p.id,
-        variantId: v.id,
-        name: p.name,
-        variantTitle: v.title,
-        priceCents: toCents(v.price ?? p.price),
-        // The list counts stock per product; the API refuses a variant it
-        // can't promise, and says how many are left.
-        left,
-        soldOut,
-    }));
-}
-
 export async function loadNewOrderCatalogue(
     storeId: string,
 ): Promise<NewOrderCatalogue | null> {
@@ -98,14 +61,13 @@ export async function loadNewOrderCatalogue(
                 : 0,
         gstRegistered,
         takesPayments: storefront.effectiveProvider !== null,
-        products: products
-            // Not sold (archived): nobody orders it (DEC-032).
-            .filter((p) => p.status !== "ARCHIVED")
-            .map((p) => ({
-                id: p.id,
-                name: p.name,
-                sellables: sellablesOfProduct(p),
-            })),
+        // Published only: a draft isn't ready to sell, and an archived one
+        // is not sold (DEC-032, UX-026).
+        products: counterProducts(products).map((p) => ({
+            id: p.id,
+            name: p.name,
+            sellables: sellablesOfProduct(p, storeId),
+        })),
     };
 }
 

@@ -9,6 +9,7 @@ import {
     putBackRefusal,
     putBackTogetherRefusal,
     RETURNED_CANT_UNDO,
+    sellLineName,
     sellRefusal,
     SOLD_OUT_WHILE_PAYING,
 } from "./stock-words";
@@ -88,6 +89,7 @@ const LINE_SELECT = {
     heldQuantity: true,
     soldQuantity: true,
     product: { select: { name: true } },
+    variant: { select: { title: true } },
     order: { select: { storeId: true } },
 } satisfies Prisma.OrderItemSelect;
 
@@ -102,13 +104,15 @@ async function loadLines(
     });
     // A service line (E9, DEC-050) holds no stock: every flow here leaves
     // it out.
-    return rows.flatMap(({ product, productId, order, ...line }) =>
+    return rows.flatMap(({ product, productId, order, variant, ...line }) =>
         product && productId
             ? [
                   {
                       ...line,
                       productId,
-                      productName: product.name,
+                      // The size is named in a refusal (UX-026): "Linen
+                      // kurta (L) — Sold out", never just the product.
+                      productName: sellLineName(product.name, variant?.title),
                       storeId: order.storeId,
                   },
               ]
