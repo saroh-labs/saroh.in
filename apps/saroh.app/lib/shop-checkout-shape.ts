@@ -77,6 +77,15 @@ export function isCheckoutOptions(v: unknown): v is CheckoutOptions {
     );
 }
 
+/** Where a pick-up is collected (UX-025); absent from an older API. */
+function isPickup(v: unknown): boolean {
+    return (
+        v === undefined ||
+        v === null ||
+        (isRecord(v) && isString(v.address) && isStringOrNull(v.hours))
+    );
+}
+
 function isLine(v: unknown): boolean {
     return (
         isRecord(v) &&
@@ -111,7 +120,8 @@ export function isQuote(v: unknown): v is CheckoutQuote {
         typeof v.ready === "boolean" &&
         // Absent from an API before offline payment: online only.
         (v.payments === undefined ||
-            (Array.isArray(v.payments) && v.payments.every(isPayment)))
+            (Array.isArray(v.payments) && v.payments.every(isPayment))) &&
+        isPickup(v.pickup)
     );
 }
 

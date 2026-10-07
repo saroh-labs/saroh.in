@@ -148,7 +148,11 @@ describe("CheckoutConfirmationService (P4)", () => {
             fulfilment: {
                 type: "PICKUP",
                 label: "Pick-up",
-                pickup: { name: "Hill Road", address: "12 Hill Road, Bandra" },
+                pickup: {
+                    name: "Hill Road",
+                    address: "12 Hill Road, Bandra",
+                    hours: null,
+                },
             },
             refunded: false,
         });

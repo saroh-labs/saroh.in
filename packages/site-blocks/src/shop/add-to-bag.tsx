@@ -5,7 +5,23 @@ import { useState } from "react";
 import { focusRing } from "../booking-flow/styles";
 import { cn } from "../lib/utils";
 import { useProductSelection } from "../product/product-page";
-import { addToBag, openBag } from "./bag-store";
+import { addToBag, openBag, useBag } from "./bag-store";
+
+/**
+ * Whether one more can go in the bag (UX-058): not past what the page says
+ * is left ("Only 1 left"). Null `left` is a shelf the page doesn't count
+ * out loud — the bag's quote still refuses what can't be sold.
+ */
+export function roomInBag(left: number | null | undefined, inBag: number) {
+    return left === null || left === undefined || inBag < left;
+}
+
+/** The button's words once everything left is in the bag. */
+export function allInBagWords(left: number): string {
+    return left === 1
+        ? "The last one is in your bag"
+        : `All ${left} are in your bag`;
+}
 
 /**
  * The product page's action where the site takes online orders (round-2
@@ -35,14 +51,22 @@ export function AddToBag({
     const selection = useProductSelection();
     const [added, setAdded] = useState<string | null>(null);
     const [full, setFull] = useState(false);
+    const bag = useBag(site);
     if (!selection) return null;
+    const inBag =
+        bag.find(
+            (i) =>
+                i.listingId === listingId &&
+                i.variantId === selection.variantId,
+        )?.quantity ?? 0;
+    const room = roomInBag(selection.left, inBag);
 
     const what = selection.variantTitle
         ? `${selection.name} (${selection.variantTitle})`
         : selection.name;
 
     function add() {
-        if (!selection || selection.soldOut) return;
+        if (!selection || selection.soldOut || !room) return;
         const bag = addToBag(site, {
             listingId,
             variantId: selection.variantId,
@@ -63,14 +87,16 @@ export function AddToBag({
             <button
                 type="button"
                 onClick={add}
-                disabled={selection.soldOut}
+                disabled={selection.soldOut || !room}
                 className={actionButton}
             >
                 {selection.soldOut
                     ? "Sold out"
-                    : added === what
-                      ? "Add another"
-                      : "Add to bag"}
+                    : !room && typeof selection.left === "number"
+                      ? allInBagWords(selection.left)
+                      : added === what
+                        ? "Add another"
+                        : "Add to bag"}
             </button>
             {full ? (
                 <p

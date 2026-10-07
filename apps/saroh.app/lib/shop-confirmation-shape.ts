@@ -40,7 +40,13 @@ function fulfilmentOf(v: unknown): OrderConfirmationData["fulfilment"] | null {
         if (!isRecord(v.pickup) || !isString(v.pickup.name)) return null;
         const address = orNull(v.pickup.address);
         if (address === undefined) return null;
-        pickup = { name: v.pickup.name, address };
+        // When the place is open (UX-025); absent from an older API.
+        const hours = isString(v.pickup.hours) ? v.pickup.hours : null;
+        pickup = {
+            name: v.pickup.name,
+            address,
+            ...(hours ? { hours } : {}),
+        };
     }
     let deliverTo: OrderConfirmationData["fulfilment"]["deliverTo"] = null;
     if (v.deliverTo !== null) {

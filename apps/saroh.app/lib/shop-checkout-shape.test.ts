@@ -116,6 +116,24 @@ describe("the API's answers", () => {
                 ready: false,
             }),
         ).toBe(true);
+        const priced = {
+            currency: "INR",
+            lines: [],
+            ways: [],
+            fulfilment: null,
+            subtotal: "0.00",
+            delivery: "0.00",
+            total: "0.00",
+            ready: false,
+        };
+        // Where a pick-up is collected (UX-025).
+        expect(
+            isQuote({
+                ...priced,
+                pickup: { address: "12 Hill Road", hours: null },
+            }),
+        ).toBe(true);
+        expect(isQuote({ ...priced, pickup: { address: 12 } })).toBe(false);
         expect(resultOf(200, { total: 5 }, isQuote)).toMatchObject({
             ok: false,
             reason: "error",
