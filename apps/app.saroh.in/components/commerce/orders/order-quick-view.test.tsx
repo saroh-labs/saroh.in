@@ -158,7 +158,7 @@ describe("QuickViewBody — the money (UX-061, UX-010)", () => {
 
     it("lists the discount, so the lines add up to the total", () => {
         const html = renderToStaticMarkup(
-            <QuickViewBody order={order({ money } as Partial<OrderRead>)} />,
+            <QuickViewBody order={order({ money })} />,
         );
         expect(html).toContain("Discount · TEST10");
         expect(html).toContain("−₹50");
