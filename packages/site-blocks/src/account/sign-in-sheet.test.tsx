@@ -15,7 +15,7 @@ import type {
     VerifyResult,
 } from "./api";
 import { callLine, codeDigits, retryText } from "./api";
-import { SignInSheet } from "./sign-in-sheet";
+import { resendDelayMs, resendWait, SignInSheet } from "./sign-in-sheet";
 
 vi.mock("./challenge", () => ({
     ChallengeWidget: ({
@@ -294,6 +294,29 @@ describe("SignInSheet: the code step", () => {
         );
     });
 
+    it("offers Resend once the API's wait has passed (UX-075)", async () => {
+        vi.useFakeTimers({
+            shouldAdvanceTime: false,
+            toFake: ["Date", "setInterval", "clearInterval"],
+        });
+        try {
+            const { requestCode } = await toCode();
+            const wait = screen.getByRole("button", {
+                name: /Resend code in \d+s/,
+            });
+            expect(wait).toBeDisabled();
+            act(() => {
+                vi.advanceTimersByTime(31_000);
+            });
+            const resend = screen.getByRole("button", { name: "Resend code" });
+            expect(resend).toBeEnabled();
+            await press(resend);
+            expect(requestCode).toHaveBeenCalledTimes(2);
+        } finally {
+            vi.useRealTimers();
+        }
+    });
+
     it("goes back to change the email", async () => {
         await toCode();
         fireEvent.click(screen.getByRole("button", { name: "Change email" }));
@@ -385,6 +408,21 @@ describe("SignInSheet: focus and keys", () => {
             />,
         );
         expect(screen.queryByRole("dialog")).toBeNull();
+    });
+});
+
+describe("the resend wait", () => {
+    it("counts whole seconds down to zero", () => {
+        expect(resendWait(null, 5_000)).toBe(0);
+        expect(resendWait(30_000, 0)).toBe(30);
+        expect(resendWait(30_000, 29_100)).toBe(1);
+        expect(resendWait(30_000, 31_000)).toBe(0);
+    });
+
+    it("takes the API's wait, else its own limit's", () => {
+        expect(resendDelayMs(60)).toBe(60_000);
+        expect(resendDelayMs(undefined)).toBe(30_000);
+        expect(resendDelayMs(0)).toBe(30_000);
     });
 });
 

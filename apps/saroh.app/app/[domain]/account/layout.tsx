@@ -25,8 +25,8 @@ import {
  * the account's tab bar fixed to the foot of the screen.
  *
  * Switched off (`SITE_ACCOUNT_AREA`), every account page is a 404. Signed
- * out, the page asks the visitor to sign in, and the sheet brings them back
- * here. The API decides which tabs this business shows; a tab appears only
+ * out, the page asks the visitor to sign in, and the sheet keeps them on
+ * the page that asked (UX-052): `/account/messages` opens their messages. The API decides which tabs this business shows; a tab appears only
  * once its page exists.
  *
  * Private to the customer: never indexed, never cached.
@@ -63,7 +63,7 @@ export default async function AccountLayout({
                         <AccountCard
                             labelledBy="account-signed-out"
                             title="Sign in"
-                            lead={`Sign in to see your bookings, orders and receipts with ${businessName}. We'll send a one-time code to your email.`}
+                            lead={`Sign in to see your bookings, orders, messages and receipts with ${businessName}. We'll send a one-time code to your email.`}
                             actions={
                                 <AccountEntry
                                     variant="page"
