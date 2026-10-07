@@ -1,5 +1,6 @@
 import { Button } from "@saroh/ui/button";
 import { cn } from "@saroh/ui/lib/utils";
+import { useId } from "react";
 
 import { sentenceStart } from "@/lib/format/sentence";
 import { uncollectedHeading } from "@/lib/orders/pay-on-handover";
@@ -124,7 +125,9 @@ export function ChangeCard({
 /**
  * For someone who moves orders but can't record a payment (UX-010): who
  * to ask, so an unpaid order isn't handed over. Whether they may record a
- * counter payment themselves is the owner's open question (D7).
+ * counter payment is their role's permission (`order:edit`), set by the
+ * owner or an admin — never its name (DEC-098). Mark paid is shown
+ * disabled beside this.
  */
 const NO_RECORD =
     "Your role can't record payments — ask the owner or an admin to mark it paid.";
@@ -168,6 +171,7 @@ export function PaymentBanner({
     /** Open "Cancel order…", when this person may cancel it now. */
     onCancel?: () => void;
 }) {
+    const why = useId();
     const waited = handover
         ? uncollectedHeading(handover, uncollectedDays)
         : null;
@@ -181,7 +185,10 @@ export function PaymentBanner({
                     <div className="text-[13.5px] font-bold text-destructive-subtle-foreground">
                         {waited}
                     </div>
-                    <p className="mt-[3px] text-pretty text-[12.5px] leading-[1.5] text-foreground">
+                    <p
+                        id={why}
+                        className="mt-[3px] text-pretty text-[12.5px] leading-[1.5] text-foreground"
+                    >
                         {handover === "collection"
                             ? `${sentenceStart(first)} chose to pay when they collect it and hasn't come for it.`
                             : `${sentenceStart(first)} chose to pay on delivery and it hasn't been delivered.`}{" "}
@@ -198,7 +205,17 @@ export function PaymentBanner({
                     >
                         Mark paid
                     </Button>
-                ) : null}
+                ) : (
+                    // Shown, disabled, with why (FB-1, DEC-098).
+                    <Button
+                        type="button"
+                        className={actionClass("primary")}
+                        disabled
+                        aria-describedby={why}
+                    >
+                        Mark paid
+                    </Button>
+                )}
                 {onCancel ? (
                     <Button
                         type="button"
@@ -227,7 +244,10 @@ export function PaymentBanner({
                             ? "Pay on collection"
                             : "Pay on delivery"}
                     </div>
-                    <p className="mt-[3px] text-pretty text-[12.5px] leading-[1.5] text-muted-foreground">
+                    <p
+                        id={why}
+                        className="mt-[3px] text-pretty text-[12.5px] leading-[1.5] text-muted-foreground"
+                    >
                         {handover === "collection"
                             ? `${sentenceStart(first)} chose to pay when they collect it. Prepare it as usual, take the money at the counter, then mark it paid before marking it collected.`
                             : `${sentenceStart(first)} chose to pay on delivery. Prepare and send it as usual, take the money at the door, then mark it paid before marking it delivered.`}
@@ -242,7 +262,17 @@ export function PaymentBanner({
                     >
                         Mark paid
                     </Button>
-                ) : null}
+                ) : (
+                    // Shown, disabled, with why (FB-1, DEC-098).
+                    <Button
+                        type="button"
+                        className={actionClass("primary")}
+                        disabled
+                        aria-describedby={why}
+                    >
+                        Mark paid
+                    </Button>
+                )}
             </div>
         );
     }
@@ -256,7 +286,10 @@ export function PaymentBanner({
                 <div className="text-[13.5px] font-bold text-destructive-subtle-foreground">
                     {failed ? "Payment didn't go through" : "Not paid yet"}
                 </div>
-                <p className="mt-[3px] text-pretty text-[12.5px] leading-[1.5] text-neutral-700 dark:text-muted-foreground">
+                <p
+                    id={why}
+                    className="mt-[3px] text-pretty text-[12.5px] leading-[1.5] text-neutral-700 dark:text-muted-foreground"
+                >
                     {failed
                         ? `Nothing was taken. Don't start it until it's paid. Nothing has been sent to ${first} — ${link ? "send them a pay link" : "ask them to pay again"}, or take it in cash.`
                         : canRecord
@@ -283,7 +316,18 @@ export function PaymentBanner({
                 >
                     Paid in cash
                 </Button>
-            ) : null}
+            ) : (
+                // Shown, disabled, with why (FB-1, DEC-098).
+                <Button
+                    type="button"
+                    variant={link ? "outline" : "default"}
+                    className={actionClass(link ? "ghost" : "primary")}
+                    disabled
+                    aria-describedby={why}
+                >
+                    Paid in cash
+                </Button>
+            )}
         </div>
     );
 }

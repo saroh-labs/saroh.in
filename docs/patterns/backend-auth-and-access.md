@@ -117,6 +117,19 @@ what the API allows.
   "Your role can't …" (`bookings/booking-access.ts`).
   `booking-permissions.db.spec.ts` pins one row per endpoint; a new booking,
   service or pack endpoint adds its row there.
+- **Current** (DEC-098, 2026-10-07) — **Money follows permissions, never
+  role names.** Seeing amounts, taking a desk payment, marking an invoice
+  paid, recording an order's payment and refunding are asked of the role's
+  permissions only — `allows(ctx, …)` in the API, `permits(org, …)`
+  (`lib/organizations/permits.ts`) in the app, which permits nothing when
+  no permissions came back. Built-in roles keep their default permissions.
+  A role that may take desk payment (`booking:write` + `invoice:write`,
+  `mayTakeDeskPayment`) sees the diary's figures; anyone else gets
+  `toTake: true|false` in place of `take`, and the app shows Take payment
+  (and Mark paid, Paid in cash) **disabled with why**, never hidden.
+  Guarded by `organizations/money-by-permission.spec.ts` (API) and
+  `lib/organizations/money-by-permission.test.ts` (app). Storefront roles
+  (DEC-048) are their own bundle and not covered.
 - **Adopted** — **No money figures without a money read** (ADR-008). Stats,
   takings, fees and payouts go only to a role that may read that money
   (`payment:read`, `invoice:read`, `subscription:read`); the API omits them,

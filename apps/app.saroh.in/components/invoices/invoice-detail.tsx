@@ -6,7 +6,7 @@ import { showError, showSuccess } from "@saroh/ui/toast";
 import { Copy } from "lucide-react";
 import Link from "next/link";
 import type { ReactNode } from "react";
-import { useState } from "react";
+import { useId, useState } from "react";
 
 import { reportFailure } from "@/components/billing/plan-refusal";
 import { EmailNoteText } from "@/components/communications/email-note";
@@ -258,6 +258,7 @@ export function InvoiceDetail({
         refund: { onClick: () => setOpen("refund") },
         refundOrder: { href: orderHref ?? undefined },
     };
+    const readOnlyId = useId();
     const actions = detailActions({
         standing: s,
         credit,
@@ -316,6 +317,9 @@ export function InvoiceDetail({
                                 variant={variant}
                                 className={cls}
                                 disabled={a.disabled}
+                                aria-describedby={
+                                    a.reason ? readOnlyId : undefined
+                                }
                                 onClick={a.onClick}
                             >
                                 {a.label}
@@ -326,8 +330,9 @@ export function InvoiceDetail({
             </div>
 
             {!canWrite ? (
-                <ReadOnlyNote className="print:hidden">
-                    Your role can read this invoice but not change it.
+                <ReadOnlyNote id={readOnlyId} className="print:hidden">
+                    {actions.find((a) => a.reason)?.reason ??
+                        "Your role can read this invoice but not change it."}
                 </ReadOnlyNote>
             ) : null}
 

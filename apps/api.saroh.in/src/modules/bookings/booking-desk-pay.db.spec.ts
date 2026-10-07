@@ -541,5 +541,47 @@ describe("taking payment at the desk (P2, real database)", () => {
             .find((b) => b.id === paidOne.id);
         expect(row?.paidAtDesk).toEqual({ method: "UPI" });
         expect(row).not.toHaveProperty("take");
+        expect(row?.toTake).toBe(false);
+        // …and whether there is something to take, so the app can show
+        // Take payment disabled with why (DEC-098, FB-1).
+        const dueRow = theirs.diaries
+            .flatMap((d) => d.bookings)
+            .find((b) => b.id === due.id);
+        expect(dueRow).not.toHaveProperty("take");
+        expect(dueRow?.toTake).toBe(true);
+        expect(dueRow?.service).not.toHaveProperty("priceCents");
+    });
+
+    it("a role the business made with both permissions takes payment and sees what it takes, whatever its name (DEC-098)", async () => {
+        const booking = await book();
+        const frontDesk: OrganizationContext = {
+            ...owner,
+            role: "MEMBER",
+            roleKey: "front-desk",
+            actions: new Set([
+                "booking:read",
+                "booking:write",
+                "invoice:read",
+                "invoice:write",
+            ]),
+        };
+        const range = {
+            from: new Date(booking.startAt.getTime() - 3_600_000).toISOString(),
+            to: new Date(booking.endAt.getTime() + 3_600_000).toISOString(),
+        };
+        const calendar = await bookings.calendarBookings(frontDesk, range);
+        expect(calendar.money).toBe(true);
+        const row = calendar.diaries
+            .flatMap((d) => d.bookings)
+            .find((b) => b.id === booking.id);
+        expect(row).toMatchObject({
+            take: { cents: 50_000 },
+            service: { currency: "INR" },
+        });
+        const paid = await take(frontDesk, booking.id, {
+            method: "CASH",
+            amountCents: 50_000,
+        });
+        expect(paid.amountCents).toBe(50_000);
     });
 });

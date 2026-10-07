@@ -5,6 +5,7 @@ import { membershipPlansLock, onlinePaymentsLock } from "@/lib/billing/access";
 import { mayRead, paymentsLockedCopy } from "@/lib/invoices/access";
 import { contactPickerOptions } from "@/lib/invoices/contacts";
 import { modulesOrUnknown } from "@/lib/modules/guard";
+import { permitsFor } from "@/lib/organizations/permits";
 import { resolveActiveOrganization } from "@/lib/organizations/service";
 import { billingAccessOrNull } from "@/lib/saroh-billing/service";
 import { requireSession } from "@/lib/session";
@@ -40,10 +41,7 @@ export default async function SubscriptionsPage({
         resolveActiveOrganization(),
         searchParams,
     ]);
-    const may = (action: string) =>
-        organization?.actions
-            ? organization.actions.includes(action)
-            : organization?.role === "OWNER" || organization?.role === "ADMIN";
+    const may = permitsFor(organization);
 
     // Told so, and who can change it, on both tabs — rather than a read that
     // is refused halfway down the page. The design's locked card (D18).

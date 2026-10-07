@@ -11,11 +11,27 @@ const on = (...keys: string[]): ModuleStates =>
         }),
     );
 
+/** An owner, as the API resolves them: the built-in's default permissions. */
+const OWNER = {
+    role: "OWNER",
+    actions: [
+        "subscription:read",
+        "subscription:write",
+        "pack:read",
+        "pack:sell",
+        "pack:write",
+        "course:read",
+        "course:write",
+        "invoice:read",
+        "invoice:write",
+    ],
+};
+
 const ALL = on("PAYMENTS", "APPOINTMENTS", "CLASS_PACKS", "COURSES", "CRM");
 
 describe("contactPanels", () => {
     it("gives an owner with every module all four panels, each with its action", () => {
-        const plan = contactPanels({ role: "OWNER" }, ALL);
+        const plan = contactPanels(OWNER, ALL);
         expect(plan.panels).toEqual([
             "subscriptions",
             "packs",
@@ -66,7 +82,7 @@ describe("contactPanels", () => {
 
     it("drops subscriptions with Payments off and keeps invoices, with no invoice mentions on packs and courses (DEC-070)", () => {
         const plan = contactPanels(
-            { role: "OWNER" },
+            OWNER,
             on("APPOINTMENTS", "CLASS_PACKS", "COURSES", "CRM"),
         );
         expect(plan.panels).toEqual(["packs", "courses", "invoices"]);
@@ -78,33 +94,31 @@ describe("contactPanels", () => {
     });
 
     it("gives a business with no modules on its invoices, to a role that reads them", () => {
-        expect(contactPanels({ role: "OWNER" }, on()).panels).toEqual([
-            "invoices",
-        ]);
+        expect(contactPanels(OWNER, on()).panels).toEqual(["invoices"]);
         expect(contactPanels({ role: "MEMBER" }, on()).panels).toEqual([]);
     });
 
     it("drops packs with Class packs off and courses with Courses off", () => {
-        expect(contactPanels({ role: "ADMIN" }, on("PAYMENTS")).panels).toEqual(
-            ["subscriptions", "invoices"],
-        );
+        expect(
+            contactPanels({ ...OWNER, role: "ADMIN" }, on("PAYMENTS")).panels,
+        ).toEqual(["subscriptions", "invoices"]);
     });
 
     it("follows Class packs, not Appointments, for the packs panel (E12)", () => {
         expect(
             contactPanels(
-                { role: "OWNER" },
+                OWNER,
                 on("PAYMENTS", "APPOINTMENTS", "COURSES", "CRM"),
             ).panels,
         ).not.toContain("packs");
-        expect(
-            contactPanels({ role: "OWNER" }, on("CLASS_PACKS")).panels,
-        ).toContain("packs");
+        expect(contactPanels(OWNER, on("CLASS_PACKS")).panels).toContain(
+            "packs",
+        );
     });
 
     it("fails open when the modules could not be read", () => {
-        expect(contactPanels({ role: "OWNER" }, null).panels).toHaveLength(4);
-        expect(contactPanels({ role: "OWNER" }, []).panels).toHaveLength(4);
+        expect(contactPanels(OWNER, null).panels).toHaveLength(4);
+        expect(contactPanels(OWNER, []).panels).toHaveLength(4);
     });
 
     it("requests nothing with no organization", () => {
@@ -142,8 +156,8 @@ describe("sellPacksOnly (C7)", () => {
 });
 
 describe("viewerCan", () => {
-    it("falls back to owner and admin when no actions were sent", () => {
-        expect(viewerCan({ role: "ADMIN" }, "invoice:read")).toBe(true);
+    it("never reads the role's name: no permissions sent, nothing permitted (DEC-098)", () => {
+        expect(viewerCan({ role: "ADMIN" }, "invoice:read")).toBe(false);
         expect(viewerCan({ role: "REVIEWER" }, "invoice:read")).toBe(false);
         expect(viewerCan({ role: "OWNER", actions: [] }, "invoice:read")).toBe(
             false,

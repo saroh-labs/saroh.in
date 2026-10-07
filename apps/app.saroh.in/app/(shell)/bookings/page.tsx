@@ -13,8 +13,10 @@ import { packsOn } from "@/lib/class-packs/switched-on";
 import { onlinePayReady } from "@/lib/invoices/payments-on";
 import { readNoticeReach } from "@/lib/messages/notice-reach-read";
 import { modulesOrUnknown } from "@/lib/modules/guard";
+import { permitsFor } from "@/lib/organizations/permits";
 import { resolveActiveOrganization } from "@/lib/organizations/service";
 import { billingAccessOrNull } from "@/lib/saroh-billing/service";
+import { canTakeDeskPayments } from "@/lib/services/booking-money";
 import type { CalendarLayout } from "@/lib/services/calendar-href";
 import { calendarHref } from "@/lib/services/calendar-href";
 import type { LocalDate } from "@/lib/services/diary";
@@ -85,10 +87,7 @@ export default async function BookingsPage({
             readNoticeReach(),
         ]);
 
-    const may = (action: string) =>
-        organization?.actions
-            ? organization.actions.includes(action)
-            : organization?.role === "OWNER" || organization?.role === "ADMIN";
+    const may = permitsFor(organization);
     // New booking finds the customer by search (E4, `contact:read`) and can
     // send a pay link when the viewer may issue the invoice, the plan takes
     // online payment and a provider is connected to take the money. On a
@@ -175,7 +174,7 @@ export default async function BookingsPage({
                     // "Take ₹X" (P2): the pair a pay link needs, and the
                     // link itself only where the plan and a provider take it.
                     desk: {
-                        canTake: may("booking:write") && may("invoice:write"),
+                        canTake: canTakeDeskPayments(organization),
                         canLink: people.payLink,
                         online: takesOnlinePayment(await billingAccessOrNull()),
                     },

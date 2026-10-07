@@ -22,6 +22,7 @@ import {
     ordersHref,
     readOrdersQuery,
 } from "@/lib/orders/list-query";
+import { permitsFor } from "@/lib/organizations/permits";
 import { resolveActiveOrganization } from "@/lib/organizations/service";
 import { listCataloguePage } from "@/lib/products/service";
 import { billingAccessOrNull } from "@/lib/saroh-billing/service";
@@ -76,10 +77,7 @@ export default async function OrdersPage({
     // What a row's menu and quick view may offer (B5), as Order Detail
     // asks it. A pay link needs a provider that opens the checkout window
     // (DEC-054), asked only of someone who may make one.
-    const may = (action: string) =>
-        organization?.actions
-            ? organization.actions.includes(action)
-            : organization?.role === "OWNER" || organization?.role === "ADMIN";
+    const may = permitsFor(organization);
     // What this person may do to orders, each the power its endpoint asks
     // (B16): what they can't do isn't drawn.
     const powers = orderPowers(organization);

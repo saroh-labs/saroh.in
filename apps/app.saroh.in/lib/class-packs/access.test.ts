@@ -57,16 +57,13 @@ describe("the pack powers (E26)", () => {
         ).toBe(false);
     });
 
-    it("without resolved powers, owners and admins hold them all and a Member none", () => {
-        for (const role of ["OWNER", "ADMIN"]) {
-            expect(canReadPacks(org(role))).toBe(true);
-            expect(canSellPacks(org(role))).toBe(true);
-            expect(canWritePacks(org(role))).toBe(true);
-            expect(canUsePacksOnBookings(org(role))).toBe(true);
+    it("never reads the role's name: without resolved powers nobody holds them (DEC-098)", () => {
+        for (const role of ["OWNER", "ADMIN", "MEMBER"]) {
+            expect(canReadPacks(org(role))).toBe(false);
+            expect(canSellPacks(org(role))).toBe(false);
+            expect(canWritePacks(org(role))).toBe(false);
+            expect(canUsePacksOnBookings(org(role))).toBe(false);
         }
-        // Whether a Member sells packs is F18's (matrix Q1).
-        expect(canSellPacks(org("MEMBER"))).toBe(false);
-        expect(canReadPacks(org("MEMBER"))).toBe(false);
     });
 
     it("no organization holds nothing", () => {

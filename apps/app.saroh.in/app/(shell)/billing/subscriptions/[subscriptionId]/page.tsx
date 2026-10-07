@@ -5,6 +5,7 @@ import { PageContainer } from "@/components/shared/page-container";
 import { SubscriptionDetail } from "@/components/subscriptions/subscription-detail/detail-screen";
 import { mayRead, paymentsLockedCopy } from "@/lib/invoices/access";
 import { contactPickerOptions } from "@/lib/invoices/contacts";
+import { permitsFor } from "@/lib/organizations/permits";
 import { resolveActiveOrganization } from "@/lib/organizations/service";
 import { requireSession } from "@/lib/session";
 import {
@@ -46,10 +47,7 @@ export default async function SubscriptionPage({
         searchParams,
         resolveActiveOrganization(),
     ]);
-    const may = (action: string) =>
-        organization?.actions
-            ? organization.actions.includes(action)
-            : organization?.role === "OWNER" || organization?.role === "ADMIN";
+    const may = permitsFor(organization);
 
     // Told so, and who can change it — not a "not found" that reads like a
     // broken link. The design's locked card (D18).

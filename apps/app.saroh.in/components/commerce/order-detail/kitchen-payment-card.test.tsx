@@ -63,7 +63,7 @@ describe("whether it is paid, for the kitchen (UX-010)", () => {
 });
 
 describe("the pay-on-collection banner for the counter (UX-010)", () => {
-    it("offers no Mark paid and says whom to ask", () => {
+    it("shows Mark paid disabled, and says why and whom to ask (FB-1, DEC-098)", () => {
         const html = renderToStaticMarkup(
             <PaymentBanner
                 failed={false}
@@ -73,8 +73,27 @@ describe("the pay-on-collection banner for the counter (UX-010)", () => {
                 handover="collection"
             />,
         );
-        expect(html).not.toContain("Mark paid");
+        expect(html).toMatch(
+            /<button[^>]*disabled=""[^>]*>Mark paid<\/button>/,
+        );
+        const describedBy = /aria-describedby="([^"]+)"/.exec(html)?.[1];
+        expect(describedBy).toBeTruthy();
+        expect(html).toContain(`id="${describedBy}"`);
         expect(html).toContain("Your role can&#x27;t record payments");
+    });
+
+    it("an unpaid order the counter can't record shows Paid in cash disabled", () => {
+        const html = renderToStaticMarkup(
+            <PaymentBanner
+                failed={false}
+                first="Anika"
+                canRecord={false}
+                onCash={() => undefined}
+            />,
+        );
+        expect(html).toMatch(
+            /<button[^>]*disabled=""[^>]*>Paid in cash<\/button>/,
+        );
     });
 
     it("reads as before for someone who can record", () => {

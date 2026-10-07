@@ -76,6 +76,11 @@ export interface DiaryBooking {
      * Only for a viewer who may read money.
      */
     take?: DeskTake | null;
+    /**
+     * For a viewer who reads no money, in place of `take`: whether there is
+     * something to take, never how much (DEC-098). Absent from an older API.
+     */
+    toTake?: boolean;
 }
 
 /** One start of a class: places, who holds them and how each paid. */

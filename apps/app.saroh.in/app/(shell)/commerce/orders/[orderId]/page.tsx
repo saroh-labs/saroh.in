@@ -19,6 +19,7 @@ import {
 import type { AllergyNote } from "@/lib/orders/read";
 import { arrivalOf } from "@/lib/orders/row-menu";
 import { sellablesOf } from "@/lib/orders/sellables";
+import { permitsFor } from "@/lib/organizations/permits";
 import { resolveActiveOrganization } from "@/lib/organizations/service";
 import { getOrderPayments } from "@/lib/payments/service";
 import { invitationState } from "@/lib/product-reviews/service";
@@ -68,10 +69,7 @@ export default async function OrderPage({
     const order = await getOrderRead(orderId);
     if (!order) notFound();
 
-    const may = (action: string) =>
-        organization?.actions
-            ? organization.actions.includes(action)
-            : organization?.role === "OWNER" || organization?.role === "ADMIN";
+    const may = permitsFor(organization);
     // What this person may do to it, each the power its endpoint asks (B16).
     // A pay link is offered only on a plan that takes payment online
     // (R33): elsewhere the order is paid in cash or at the counter, and no

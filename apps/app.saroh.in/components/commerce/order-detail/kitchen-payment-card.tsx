@@ -6,8 +6,8 @@ import { Panel, PanelTitle, StatusPill } from "./parts";
 /**
  * The money column for someone without the money read (UX-010): whether
  * the order is paid — Paid, To pay on collection, Not paid yet — and no
- * figure (DEC-024). Recording a payment stays with whoever may (D7 is
- * open), so an unpaid order says who to ask.
+ * figure (DEC-024). Recording a payment is the role's permission
+ * (`order:edit`, DEC-098), so an unpaid order says who to ask.
  */
 export function KitchenPaymentCard({
     order,

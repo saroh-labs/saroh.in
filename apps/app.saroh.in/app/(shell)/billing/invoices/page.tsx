@@ -12,6 +12,7 @@ import { chipFromQuery } from "@/lib/invoices/sources";
 import { tabFromView } from "@/lib/invoices/status";
 import { getInvoiceBusiness } from "@/lib/invoices/tax";
 import { invoiceZone } from "@/lib/invoices/zone";
+import { permits } from "@/lib/organizations/permits";
 import { resolveActiveOrganization } from "@/lib/organizations/service";
 import { requireSession } from "@/lib/session";
 import { sinceParam } from "@/lib/views/since";
@@ -60,9 +61,7 @@ export default async function InvoicesPage({
             paidSince ? listInvoicesPaidSince(paidSince) : null,
             only ? scopeWithName(only) : null,
         ]);
-    const canWrite = organization?.actions
-        ? organization.actions.includes("invoice:write")
-        : organization?.role === "OWNER" || organization?.role === "ADMIN";
+    const canWrite = permits(organization, "invoice:write");
 
     return (
         <PageContainer width="full">

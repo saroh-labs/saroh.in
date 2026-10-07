@@ -16,6 +16,7 @@ import { useEffect, useState } from "react";
 
 import { NewBookingDialog } from "@/components/bookings/new-booking-dialog";
 import { TakePayment } from "@/components/bookings/take-payment";
+import { TakePaymentLocked } from "@/components/bookings/take-payment-locked";
 import { formatMoney } from "@/lib/format/money";
 import {
     bookingChangeText,
@@ -300,6 +301,30 @@ function OneToOne({
                 who={whoFor(b)}
                 canLink={ctx.desk.canLink}
                 online={ctx.desk.online}
+                variant="outline"
+                triggerClassName={btn.ghost}
+            />,
+        );
+    } else if (
+        !undo &&
+        ctx.desk &&
+        !ctx.desk.canTake &&
+        (b.take || b.toTake) &&
+        state !== "cancelled"
+    ) {
+        // Shown, disabled, with why (FB-1, DEC-098): the figure only when
+        // the API sent it.
+        actions.push(
+            <TakePaymentLocked
+                key="take"
+                amount={
+                    b.take
+                        ? (formatMoney(
+                              b.take.cents,
+                              b.service.currency ?? null,
+                          ) ?? null)
+                        : null
+                }
                 variant="outline"
                 triggerClassName={btn.ghost}
             />,

@@ -131,6 +131,12 @@ export interface DiaryBooking {
      * Money only — absent for a viewer who reads no money.
      */
     take?: DeskTake | null;
+    /**
+     * For a viewer who reads no money, in place of `take`: whether the desk
+     * has something to take, never how much (DEC-098, FB-1). The app shows
+     * Take payment disabled with why, rather than nothing.
+     */
+    toTake?: boolean;
 }
 
 /** One start of a class: the places, who holds them, and how each paid. */
@@ -235,7 +241,7 @@ export function diaryBooking(row: DiaryRow, money: boolean): DiaryBooking {
         subscriptionId: row.subscriptionId,
         treatment: treatmentOf(row),
         paidAtDesk: desk.paid,
-        ...(money ? { take: desk.take } : {}),
+        ...(money ? { take: desk.take } : { toTake: desk.take !== null }),
     };
 }
 

@@ -1,3 +1,5 @@
+import { CANT_MARK_PAID } from "@/lib/organizations/permits";
+
 import { sendLabel } from "./send";
 import type { InvoiceStanding } from "./service";
 
@@ -35,6 +37,8 @@ export interface DetailAction {
     primary?: boolean;
     danger?: boolean;
     disabled?: boolean;
+    /** Why it is disabled, said beside it (FB-1). */
+    reason?: string;
 }
 
 export interface DetailActionState {
@@ -139,7 +143,21 @@ export function detailActions(s: DetailActionState): DetailAction[] {
             { id: "cancel", label: "Cancel invoice", danger: true },
         ];
     }
+    // Owed, and this role can't record it (DEC-098): Mark paid is shown,
+    // disabled, with why — the permission decides, never the role's name.
+    const locked: DetailAction[] =
+        !s.canWrite && owed
+            ? [
+                  {
+                      id: "pay",
+                      label: "Mark paid",
+                      disabled: true,
+                      reason: CANT_MARK_PAID,
+                  },
+              ]
+            : [];
     const actions: DetailAction[] = [
+        ...locked,
         { id: "print", label: "Print", primary: true },
         ...pdf,
     ];

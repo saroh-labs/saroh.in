@@ -1,3 +1,5 @@
+import { permits } from "@/lib/organizations/permits";
+
 /**
  * Which of a person's holdings their contact page asks for (ADR-007, U12).
  *
@@ -69,11 +71,13 @@ export type Viewer = {
 /** A module as `listModules` returns it; null when that list failed. */
 export type ModuleStates = readonly { key: string; readiness: string }[] | null;
 
-/** May this viewer do `action`? The API's answer, else the built-in roles'. */
+/**
+ * May this viewer do `action`? The API's answer only — a panel's money
+ * (orders, invoices) follows the role's permissions, never its name
+ * (DEC-098).
+ */
 export function viewerCan(viewer: Viewer, action: string): boolean {
-    if (!viewer) return false;
-    if (viewer.actions) return viewer.actions.includes(action);
-    return viewer.role === "OWNER" || viewer.role === "ADMIN";
+    return permits(viewer, action);
 }
 
 /**
