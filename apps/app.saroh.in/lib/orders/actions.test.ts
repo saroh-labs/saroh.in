@@ -1,19 +1,22 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+import { recordPayment, updateOrder } from "./actions";
+
 /**
  * Record as paid reads the order page again (UX-063): a successful write
  * revalidates the order and the list, so the money panel doesn't keep
  * saying "Still due" until a reload. A refused one revalidates nothing.
  */
-const revalidatePath = vi.fn();
+const { revalidatePath, updateOrderApi, recordOrderPayment } = vi.hoisted(
+    () => ({
+        revalidatePath: vi.fn(),
+        updateOrderApi: vi.fn(),
+        recordOrderPayment: vi.fn(),
+    }),
+);
 vi.mock("next/cache", () => ({ revalidatePath }));
-
-const updateOrderApi = vi.fn();
-const recordOrderPayment = vi.fn();
 vi.mock("./service", () => ({ updateOrder: updateOrderApi }));
 vi.mock("./kitchen-service", () => ({ recordOrderPayment }));
-
-const { recordPayment, updateOrder } = await import("./actions");
 
 beforeEach(() => {
     revalidatePath.mockReset();

@@ -226,7 +226,7 @@ const PAID_WAY: Record<string, string> = {
 };
 
 function paidWay(method: string | null | undefined): string {
-    return (method && PAID_WAY[method]) || "";
+    return (method ? PAID_WAY[method] : undefined) ?? "";
 }
 
 /** The line at the foot: the law it is issued under, and how it stands. */

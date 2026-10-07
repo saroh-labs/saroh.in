@@ -54,7 +54,7 @@ export function sellablesOfProduct(
     );
     // Counted per variant here: every variant reads its own shelf, and one
     // with no shelf yet has none to sell. Otherwise the product's own count.
-    const perVariant = [...shelves.values()].some((s) => s !== null);
+    const perVariant = Array.from(shelves.values()).some((s) => s !== null);
     return p.variants.map((v) => {
         const own = perVariant ? (leftOf(shelves.get(v.id)) ?? 0) : left;
         return {
