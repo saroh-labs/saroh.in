@@ -3229,3 +3229,24 @@ read-only floor plus `order:stage`) for any scenario without its own role.
 on, update the permission suite's fake API to send what the real API does.
 The fake API mirrors the API's answers, not the app's fallbacks.
 **Category**: e2e · `e2e/fixtures/permissions-api.mjs`
+
+## Billing — a catalogue version move read as a downgrade to Free (N1)
+
+**Symptom**: after a pricing publish with policy `move`, Settings › Plan and
+billing told every business "Your plan changes to Free on 14 Oct". That
+included businesses already on Free, and ones on a plan override directly
+under "Pro free until 31 Dec 2027".
+**Root cause**: the plan view's pending-move note named the move's target
+plan and never compared it with the plan the business moves from. A move
+publish puts every subscription on the same plan of the new version, so a
+Free business's move is Free to Free. An override business's subscription
+is on Free underneath, so its move read "changes to Free" beside the
+override.
+**Fix**: the access read's `pendingMove` carries `fromPlanId`. The plan
+view says nothing when only the version changes, lets a live plan override
+speak until it ends (its note names where the business lands), and keeps
+the authorise prompt, worded for a new price on the same plan.
+**Rule**: a version move isn't a plan change. Before saying "your plan
+changes", compare the target with the plan the business moves from, and
+let a live plan override speak first.
+**Category**: billing · `apps/app.saroh.in/lib/saroh-billing/plan-view.ts`
