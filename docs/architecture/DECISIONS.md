@@ -122,6 +122,7 @@ Unless an entry says otherwise, its status is **Proposed — requires audit revi
 - Migration: retain the identity email sender, add the restricted self-test flow, then add Organization provider connections and business delivery records.
 - Amended 2026-09-26 by [DEC-037](#dec-037-a-businesss-customers-sign-in-on-its-own-site-with-a-code-one-account-per-business): **Saroh's identity email also sends the sign-in codes for a business's customer accounts**, in the business's name. That is still identity mail. Every other message to a business's customers goes through the business's own provider, as before.
 - Amended 2026-10-06 by [DEC-086](#dec-086-saroh-sends-a-businesss-customer-notifications-until-it-connects-its-own-email): **until a business connects its own email provider, Saroh's email sends its customer notifications** (booking confirmations and the like). Once it connects one, its provider sends them, as above.
+- Reaffirmed 2026-10-07 (owner): **a business's messages to its customers go only through its own connected email provider**, review invitations included; Saroh's identity email keeps only sign-in codes and the email-changed notice (ADR-011). DEC-086 is reversed and its code stays off.
 
 ## DEC-012 Analytics event model
 
@@ -1036,7 +1037,7 @@ Unless an entry says otherwise, its status is **Proposed — requires audit revi
 
 ## DEC-086 Saroh sends a business's customer notifications until it connects its own email
 
-**Status: Accepted — 2026-10-06** · user · in conversation · built 6 Oct for the booking notices (U1–U4), behind the `SAROH_BUSINESS_EMAIL` flag, off by default
+**Status: Reversed — 2026-10-07 (owner)** · was Accepted 2026-10-06 · user · in conversation · built 6 Oct for the booking notices (U1–U4), behind the `SAROH_BUSINESS_EMAIL` flag, off by default, and left off
 
 - Context: DEC-011 sends a business's messages to its customers only through a provider the business connects. Most new businesses connect none, so their customers get no booking confirmation or order update by email at all.
 - Decision: while a business has no connected email provider, Saroh's own email (Amazon SES, DEC-085) sends its customer notifications: booking confirmations and the other transactional messages the business would send through its provider. When the business connects a provider, its provider sends them and Saroh stops. Marketing and broadcasts never go through Saroh.
@@ -1045,6 +1046,7 @@ Unless an entry says otherwise, its status is **Proposed — requires audit revi
 - Amended 2026-10-06 (owner): **a business connects its own email provider on Grow and Pro only.** The catalogue's `integrations` row decides (a plan without it, or at its cap, can't connect one); Free relies on Saroh's allowance and upgrades to get its own. Settings and the allowance's notices offer connecting only when the plan has room for it, read by the connect's own check (`MeteringService.hasRoom`), and otherwise lead with seeing plans.
 - Still open: review invitations (MARKETING_CLAIMS D11), and the other notices after booking emails have run clean.
 - Consequences: the booking notices (confirmed, moved, cancelled) go through Saroh when the rule allows: no provider of its own, the business's flag on, an allowance with room, and no global stop. Every other notice keeps DEC-011's rule: no provider, no customer email.
+- **Reversed 2026-10-07 (owner).** (1) A business's messages to its customers go only through the business's own connected email provider; Saroh sends none of them. The code built for this decision (`sarohMaySend`, the Saroh sender, the allowance, Settings' "Booking emails" block) stays in place and stays off: the `SAROH_BUSINESS_EMAIL` flag is not switched on for any business. (2) On Free, which can't connect its own email (DEC-091), customers get no emails; they see their updates in their account on the business's site. That is intended. (3) Review invitations go through the business's own provider only; with no connected email provider, no invitation is sent (settles MARKETING_CLAIMS D11). (4) Unchanged: a site's sign-in codes and the email-changed notice stay on Saroh's own identity email (ADR-011).
 
 ## DEC-087 An in-person booking is offered only inside the business's opening hours
 
@@ -1078,6 +1080,7 @@ Unless an entry says otherwise, its status is **Proposed — requires audit revi
 - Decision: **a template's colourway may carry its own exact palette and a small type scale.** `Site.style.palette` holds one `#RRGGBB` colour per `--site-*` role (page, card, text, body, quiet text, hairline, accent and its text, hero, call-to-action band and footer, each with its text); every text pairing is checked to 4.5:1 and refused by field otherwise. `Site.style.type` holds a display size (40–72px), a body size (15–19px), a reading width (52–76ch) and a section-title style (`plain`, `eyebrow`, `eyebrowAccent`), refused outside those bounds. **Merchants still choose only from curated choices**: Website › Style lists the site's template's colourways as named options beside the swatch rows, and the API refuses a palette or type scale that is neither one of those colourways' nor the one the site already holds. There is no colour picker, and the type scale has no control of its own. The grid gap may go down to 1px for a template; the merchant's slider still starts at 6px.
 - Consequences: the colours a page wears are still the merchant's `--site-*` layer, never Saroh's. The publisher turns each hex into the HSL triple the layer already carries, so the renderer's guard is unchanged and no `#` reaches a stylesheet. Blocks read the type scale through `--site-display-size`, `--site-body-size` and `--site-measure` with today's sizes as the fallbacks, and section titles carry `data-site-title` for the eyebrow, so an untouched site renders exactly as before. Section headings use the site's heading face throughout. Product grid gains a `plates` look and gallery and projects a caption placement `over` the photo, each on a bounded band. Reset returns a template site to the colourway it was made in.
 - Migration: none. Both fields are optional JSON inside `Site.style`.
+
 ## DEC-091 A business connects its own email and payment accounts on a paid plan
 
 **Status: Accepted — 2026-10-06** · user · from the DEC-086 email work and the plan checks on saroh.io
@@ -1085,6 +1088,7 @@ Unless an entry says otherwise, its status is **Proposed — requires audit revi
 - Context: the catalogue's `integrations` row ("Third-party connections") meters connected payment and messaging providers, but it was off on every plan. With plan rules on, no business could connect its own email provider or its Razorpay or Cashfree account, which contradicts DEC-086's "connect your own email" and Grow's online payments.
 - Decision: the row is now "Your own email and payment accounts". It is included with no cap on paid plans and locked on Free. Payment and messaging providers both count towards it. Free relies on Saroh's small booking-email allowance (DEC-086) and takes money offline, and upgrades to connect its own.
 - Consequences: the published catalogue needs a new version with the row on for paid plans before plan rules are switched on anywhere. Settings and the Saroh-email notices on Free offer an upgrade rather than "Connect your email". The sample catalogue (`seed.ts`) follows with no caps.
+- Amended 2026-10-07 (owner): DEC-086 is reversed, so Free has no Saroh booking-email allowance to rely on. A Free business's customers get no emails; they see their updates in their account.
 
 ## DEC-092 Taking payment online is not a setup step on a plan without it
 
