@@ -3,7 +3,7 @@
 import type { ReactNode } from "react";
 import { createContext, useContext, useState } from "react";
 
-import { siteMoney } from "../lib/money";
+import { formatAmount } from "../lib/money";
 import { cn } from "../lib/utils";
 
 /**
@@ -105,14 +105,9 @@ export interface ProductPageData {
     reviews: ProductPageReview[];
 }
 
-export function formatAmount(
-    amount: string,
-    currency: string,
-    locale = "en-IN",
-): string {
-    // "₹2,499", "₹24.50" (DEC-073 #11): never "₹24.5".
-    return siteMoney(Number(amount), currency, locale) ?? amount;
-}
+// Lives in `lib/money` (no directive) so a server page can call it too: an
+// export of this "use client" module is only a client reference there.
+export { formatAmount };
 
 /** Whole percent off, rounded down, or null when nothing is off. */
 export function percentOff(price: string, mrp: string | null): number | null {
