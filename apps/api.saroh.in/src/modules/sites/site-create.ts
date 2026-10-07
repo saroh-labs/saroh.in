@@ -355,8 +355,10 @@ export async function writeSiteFromTemplate(
         plan.pages,
     );
 
+    const menu: { pageId: string }[] = [];
     for (const page of pages) {
-        await tx.page.create({
+        const created = await tx.page.create({
+            select: { id: true },
             data: {
                 siteId: site.id,
                 organizationId: ctx.organizationId,
@@ -384,6 +386,17 @@ export async function writeSiteFromTemplate(
                     },
                 },
             },
+        });
+        if (page.inMenu) menu.push({ pageId: created.id });
+    }
+
+    // The template's menu (UX-070), so Settings › Menu, the pre-publish
+    // check and the live header name the same one from the first draft.
+    if (menu.length > 0) {
+        await tx.site.update({
+            where: { id: site.id },
+            data: { navigation: { items: menu } },
+            select: { id: true },
         });
     }
 

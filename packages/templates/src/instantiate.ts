@@ -26,6 +26,8 @@ export interface InstantiatedPage {
     path: string;
     title: string;
     isHome: boolean;
+    /** In the site's menu (UX-070); the menu keeps page order. */
+    inMenu: boolean;
     sections: InstantiatedSection[];
 }
 
@@ -131,6 +133,7 @@ export function instantiateTemplate(
             path: page.path,
             title: page.title,
             isHome: page.isHome ?? false,
+            inMenu: page.inMenu ?? false,
             sections,
         };
     });

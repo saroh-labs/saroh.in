@@ -1,7 +1,11 @@
 import type { TemplateManifest } from "./manifest";
 import { personalTemplate } from "./templates/personal";
 import { portfolioTemplate } from "./templates/portfolio";
-import { starterTemplate, starterTemplateV1 } from "./templates/starter";
+import {
+    starterTemplate,
+    starterTemplateV1,
+    starterTemplateV2,
+} from "./templates/starter";
 import { writingTemplate } from "./templates/writing";
 
 /** Registry key for an `id@version` pair. */
@@ -21,6 +25,7 @@ function key(id: string, version: number): string {
 const REGISTRY: Record<string, TemplateManifest> = Object.fromEntries(
     [
         starterTemplateV1,
+        starterTemplateV2,
         starterTemplate,
         personalTemplate,
         portfolioTemplate,
