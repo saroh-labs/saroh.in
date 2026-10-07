@@ -1,6 +1,6 @@
+import { formatAmount } from "../lib/money";
 import { cn } from "../lib/utils";
 import { optionSummary } from "../product/option-summary";
-import { formatAmount } from "../product/product-page";
 import type { ShopListingCard } from "../product/shop-listing";
 
 /**

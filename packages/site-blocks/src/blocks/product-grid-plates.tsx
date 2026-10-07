@@ -1,5 +1,5 @@
+import { formatAmount } from "../lib/money";
 import { cn } from "../lib/utils";
-import { formatAmount } from "../product/product-page";
 import type { ShopListingCard } from "../product/shop-listing";
 import type { LeadShow } from "./product-grid-lead";
 
