@@ -88,7 +88,8 @@ export const ALERT_NOTIFICATION_TYPES: Record<AlertEvent, readonly string[]> = {
     // R34: an order to pay on handover nobody came for in three days.
     order: ["order.new", "order.uncollected"],
     booking: ["booking.new", "booking.moved", "booking.cancelled"],
-    failed: ["payment.failed"],
+    // UX-012: a provider that refused the business's keys.
+    failed: ["payment.failed", "provider.attention"],
     team: ["team.joined"],
     site: ["site.live", "site.not_live"],
 };

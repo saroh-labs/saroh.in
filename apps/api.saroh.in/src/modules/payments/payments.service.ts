@@ -11,6 +11,11 @@ import {
 import type { MerchantPaymentProvider } from "@saroh/database";
 import { Prisma, prisma } from "@saroh/database";
 
+import type { ProviderAttention } from "../../common/providers/provider-attention";
+import {
+    attentionOf,
+    NO_ATTENTION,
+} from "../../common/providers/provider-attention";
 import type { OrganizationContext } from "../../common/types/organization-context";
 import { planMeter } from "../billing/metering.service";
 import {
@@ -40,7 +45,9 @@ import { authorize } from "../organizations/organization-policy";
 import { assertPutBack, returnablePlan, STOCK_HELD } from "../stock/reserve";
 import { decryptSecret, encryptSecret } from "./crypto";
 import { businessPayLinkProvider, payLinkProvider } from "./pay-link-provider";
+import { assertKeysAccepted, providerOrderFailed } from "./provider-keys";
 import type {
+    CreateOrderIntentResult,
     MerchantProvider,
     ProviderCredentials,
     ProviderFactory,
@@ -294,6 +301,12 @@ export interface RedactedProvider {
      * no — never the secret.
      */
     webhookSecretMissing: boolean;
+    /**
+     * Null while it works; else the provider refused these keys on a live
+     * call (UX-012) — `{ reason: "KEYS_REFUSED", since }` — and Providers
+     * shows it as Needs attention until the keys are entered again.
+     */
+    attention: ProviderAttention | null;
     createdAt: Date;
     updatedAt: Date;
 }
@@ -395,6 +408,7 @@ function redact(row: MerchantPaymentProvider): RedactedProvider {
         status: row.status,
         publicKey: row.publicKey ?? null,
         webhookSecretMissing: lacksWebhookSecret(row),
+        attention: attentionOf(row),
         createdAt: row.createdAt,
         updatedAt: row.updatedAt,
     };
@@ -479,6 +493,13 @@ export class PaymentsService {
             }
         }
 
+        // The keys must work before they are kept (UX-012): one cheap
+        // authenticated read at the provider. 400 when it refuses them.
+        await assertKeysAccepted(this.factory.get(provider), provider, {
+            keyId: input.keyId,
+            keySecret: input.keySecret,
+        });
+
         // Seal { keyId, keySecret, webhookSecret? } as one blob. Plaintext
         // (incl. the webhook secret) is NEVER persisted or logged.
         const sealed = encryptSecret(
@@ -519,6 +540,8 @@ export class PaymentsService {
                         encryptedCredentials: sealed.ciphertext,
                         credentialsIv: sealed.iv,
                         credentialsAuthTag: sealed.authTag,
+                        // Keys that just passed the check need no attention.
+                        ...NO_ATTENTION,
                     },
                 }),
             {
@@ -1722,12 +1745,20 @@ export class PaymentsService {
         // Decrypt in-memory ONLY here, at the moment of the provider call.
         const credentials = this.openCredentials(providerRow);
         const provider = this.factory.get(providerRow.provider);
-        const intent = await provider.createOrderIntent({
-            amountCents,
-            currency,
-            orderId: target.id,
-            credentials,
-        });
+        let intent: CreateOrderIntentResult;
+        try {
+            intent = await provider.createOrderIntent({
+                amountCents,
+                currency,
+                orderId: target.id,
+                credentials,
+            });
+        } catch (err) {
+            // A handled 503 in the customer's words, never an unhandled
+            // 500; refused keys also flag the connection and tell the
+            // team (UX-012).
+            throw await providerOrderFailed(providerRow, err);
+        }
 
         // Persist intent + first attempt atomically. rawResponse holds only the
         // non-secret client params — never any credential.

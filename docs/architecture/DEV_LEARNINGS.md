@@ -3036,3 +3036,21 @@ When the stage can't be known, a send that may have gone is never retried.
 **Fix**: `logging: { serverFunctions: false }` in the Next config of every app whose server actions carry a secret (app, admin, accounts, saroh.app). Local logs that already held keys were scrubbed.
 **Rule**: A server action that takes a credential or code must not rely on logs staying private. Turn off dev argument logging in any app that has one, and never treat a dev log as safe to share.
 **Category**: security · `apps/*/next.config.*`
+
+## Payments — fake provider keys show CONNECTED; Pay then 500s and nobody is told (UX-012)
+
+**Problem**: An audit connected made-up Razorpay and Resend keys and both
+came back 201 CONNECTED. A customer pressing Pay got "can't take payment
+online right now", the API logged an unhandled 500
+(`Razorpay order creation failed (HTTP 401)`), and the business saw a green
+badge and heard nothing.
+**Root cause**: Connecting only sealed the keys; nothing asked the provider.
+At checkout the adapter's plain `Error` reached the global filter as a 500,
+and no code read a 401 as "these keys stopped working".
+**Fix**: An authenticated read on connect refuses keys with a field error;
+a 401/403 on a live call throws `ProviderKeysRefusedError`, which marks the
+connection `attention: KEYS_REFUSED` and queues the team's alert once; a
+failed provider order is a deliberate 503 in the customer's words. Tests in
+`common/providers/provider-key-checks.spec.ts`, `payments.service.spec.ts`
+and `message-send.handler.spec.ts`.
+**Category**: integrations · rule in `docs/patterns/backend-integrations.md` ("Keys are checked before they are kept, and watched after")

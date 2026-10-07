@@ -57,11 +57,11 @@ export class ProviderHealthService {
         const [payments, comms, domains] = await Promise.all([
             this.db.merchantPaymentProvider.findMany({
                 where,
-                select: { status: true },
+                select: { status: true, attentionAt: true },
             }),
             this.db.communicationProvider.findMany({
                 where,
-                select: { status: true },
+                select: { status: true, attentionAt: true },
             }),
             this.db.domain.findMany({ where, select: { status: true } }),
         ]);
@@ -70,21 +70,25 @@ export class ProviderHealthService {
             connectedHealth({
                 key: "PAYMENTS",
                 label: "Payments",
-                statuses: payments.map((p) => p.status),
+                statuses: payments.map(statusOf),
                 notConfigured: "Connect a payment provider to accept payments.",
                 active: "Payments are ready.",
                 degraded:
                     "A connected provider is disabled — re-enable it to take payments.",
+                refused:
+                    "Your payment provider refused its keys — connect it again to take payments.",
                 actionHref: PROVIDERS_HREF,
             }),
             connectedHealth({
                 key: "COMMUNICATIONS",
                 label: "Communications",
-                statuses: comms.map((c) => c.status),
+                statuses: comms.map(statusOf),
                 notConfigured: "Connect a provider to send messages.",
                 active: "Messaging is ready.",
                 degraded:
                     "A connected provider is disabled — re-enable it to send messages.",
+                refused:
+                    "Your messaging provider refused its keys — connect it again to send messages.",
                 actionHref: PROVIDERS_HREF,
             }),
             domainHealth(domains.map((d) => d.status)),
@@ -92,7 +96,17 @@ export class ProviderHealthService {
     }
 }
 
-/** Health for a CONNECTED|DISABLED provider set. */
+/**
+ * A connection's state for health: CONNECTED, DISABLED, or REFUSED — a
+ * connected provider that refused its keys on a live call (UX-012).
+ */
+function statusOf(row: { status: string; attentionAt?: Date | null }): string {
+    return row.status === "CONNECTED" && row.attentionAt
+        ? "REFUSED"
+        : row.status;
+}
+
+/** Health for a CONNECTED|REFUSED|DISABLED provider set. */
 function connectedHealth({
     key,
     label,
@@ -100,6 +114,7 @@ function connectedHealth({
     notConfigured,
     active,
     degraded,
+    refused,
     actionHref,
 }: {
     key: ProviderHealth["key"];
@@ -108,6 +123,7 @@ function connectedHealth({
     notConfigured: string;
     active: string;
     degraded: string;
+    refused: string;
     actionHref: string;
 }): ProviderHealth {
     if (statuses.length === 0)
@@ -120,6 +136,8 @@ function connectedHealth({
         };
     if (statuses.some((s) => s === "CONNECTED"))
         return { key, label, status: "ACTIVE", message: active, actionHref };
+    if (statuses.some((s) => s === "REFUSED"))
+        return { key, label, status: "FAILED", message: refused, actionHref };
     // Present but none connected.
     return { key, label, status: "DEGRADED", message: degraded, actionHref };
 }

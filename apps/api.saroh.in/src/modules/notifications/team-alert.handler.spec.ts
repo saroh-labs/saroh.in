@@ -75,6 +75,8 @@ function makeTx() {
             create: jest.fn().mockResolvedValue({ id: "ntf_1" }),
             findFirst: jest.fn(),
         },
+        merchantPaymentProvider: { findFirst: jest.fn() },
+        communicationProvider: { findFirst: jest.fn() },
     };
 }
 type FakeTx = ReturnType<typeof makeTx>;
@@ -462,6 +464,87 @@ describe("a scheduled go-live (DEC-071, T10)", () => {
         });
         expect(out.told).toBe(false);
         expect(tx.customerNotice.createMany).not.toHaveBeenCalled();
+    });
+});
+
+describe("a provider that refused the business's keys (UX-012)", () => {
+    const SINCE = "2026-10-07T09:30:00.000Z";
+    const flagged = (provider: string) => ({
+        provider,
+        status: "CONNECTED",
+        attentionAt: new Date(SINCE),
+    });
+
+    it("says payments can't be taken, links to Providers, and emails the owner and admin", async () => {
+        const tx = makeTx();
+        tx.merchantPaymentProvider.findFirst.mockResolvedValue(
+            flagged("RAZORPAY"),
+        );
+
+        const out = await tellTeam(asTx(tx), comms, ORG, {
+            event: "provider",
+            channel: "PAYMENTS",
+            providerId: "mpp_1",
+            since: SINCE,
+        });
+
+        expect(out.told).toBe(true);
+        expect(
+            tx.merchantPaymentProvider.findFirst.mock.calls[0][0].where,
+        ).toEqual({ id: "mpp_1", organizationId: ORG });
+        expect(
+            tx.customerNotice.createMany.mock.calls[0][0].data[0].eventKey,
+        ).toBe(`team:provider:mpp_1:${SINCE}`);
+        expect(tx.notification.create.mock.calls[0][0].data).toEqual({
+            organizationId: ORG,
+            type: "provider.attention",
+            title: "Razorpay refused your keys",
+            body: expect.stringContaining("Customers can't pay online"),
+        });
+        // On the Payment failed row, whose email is on by default.
+        expect(recipients().sort()).toEqual(["u_admin", "u_owner"]);
+    });
+
+    it("an email provider's goes to the bell only: its email would use the refused key", async () => {
+        const tx = makeTx();
+        tx.communicationProvider.findFirst.mockResolvedValue(flagged("RESEND"));
+
+        const out = await tellTeam(asTx(tx), comms, ORG, {
+            event: "provider",
+            channel: "EMAIL",
+            providerId: "cp_1",
+            since: SINCE,
+        });
+
+        expect(out).toEqual({ told: true, emailed: 0 });
+        expect(tx.notification.create.mock.calls[0][0].data.title).toBe(
+            "Resend refused your email keys",
+        );
+        expect(queueTransactional).not.toHaveBeenCalled();
+    });
+
+    it("says nothing once the keys were entered again or it was disconnected", async () => {
+        for (const row of [
+            { provider: "RAZORPAY", status: "CONNECTED", attentionAt: null },
+            { ...flagged("RAZORPAY"), status: "DISABLED" },
+            // Flagged again since: that refusal has its own alert.
+            {
+                ...flagged("RAZORPAY"),
+                attentionAt: new Date("2026-10-08T00:00:00Z"),
+            },
+            null,
+        ]) {
+            const tx = makeTx();
+            tx.merchantPaymentProvider.findFirst.mockResolvedValue(row);
+            const out = await tellTeam(asTx(tx), comms, ORG, {
+                event: "provider",
+                channel: "PAYMENTS",
+                providerId: "mpp_1",
+                since: SINCE,
+            });
+            expect(out.told).toBe(false);
+            expect(tx.notification.create).not.toHaveBeenCalled();
+        }
     });
 });
 

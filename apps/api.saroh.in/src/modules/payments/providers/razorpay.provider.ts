@@ -1,5 +1,10 @@
 import { Logger } from "@nestjs/common";
 
+import type { CredentialCheck } from "../../../common/providers/provider-attention";
+import {
+    ProviderKeysRefusedError,
+    refusesKeys,
+} from "../../../common/providers/provider-attention";
 import { providerCallSignal } from "./provider-call";
 import type {
     CheckoutReturnInput,
@@ -43,6 +48,29 @@ export class RazorpayProvider implements MerchantProvider {
     private readonly logger = new Logger(RazorpayProvider.name);
     private readonly baseUrl = "https://api.razorpay.com/v1";
 
+    /**
+     * The keys, checked on connect (UX-012) with the cheapest authenticated
+     * read Razorpay has: `GET /payments?count=1`. 2xx accepts, 401/403
+     * rejects, anything else is unsure. Only the status is ever logged.
+     */
+    async verifyCredentials(
+        credentials: ProviderCredentials,
+    ): Promise<CredentialCheck> {
+        let res: Response;
+        try {
+            res = await fetch(`${this.baseUrl}/payments?count=1`, {
+                headers: { Authorization: `Basic ${basicAuth(credentials)}` },
+                signal: providerCallSignal(),
+            });
+        } catch {
+            return "UNSURE";
+        }
+        if (res.ok) return "ACCEPTED";
+        if (refusesKeys(res.status)) return "REJECTED";
+        this.logger.warn(`Razorpay key check answered HTTP ${res.status}`);
+        return "UNSURE";
+    }
+
     async createOrderIntent(
         input: CreateOrderIntentInput,
     ): Promise<CreateOrderIntentResult> {
@@ -72,9 +100,13 @@ export class RazorpayProvider implements MerchantProvider {
             this.logger.warn(
                 `Razorpay order creation failed with HTTP ${res.status}`,
             );
-            throw new Error(
-                `Razorpay order creation failed (HTTP ${res.status})`,
-            );
+            const message = `Razorpay order creation failed (HTTP ${res.status})`;
+            // The keys themselves were refused: the connection needs
+            // attention, not a retry (UX-012).
+            if (refusesKeys(res.status)) {
+                throw new ProviderKeysRefusedError(message, res.status);
+            }
+            throw new Error(message);
         }
 
         const body = (await res.json()) as { id?: string; status?: string };

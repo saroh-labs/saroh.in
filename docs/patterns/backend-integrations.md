@@ -60,6 +60,26 @@ a note saying so.
   first** (DEC-036): a disconnected one stays listed as theirs, only what the
   API can connect is offered, and a row shows only what the API sends as
   public (a checkout's public key, a sending address), never a credential.
+- **Current** (UX-012) — **Keys are checked before they are kept, and
+  watched after.** Connecting a provider asks it one cheap authenticated
+  read with the typed keys (`verifyCredentials` on the port: Razorpay
+  `GET /payments?count=1`, Cashfree an order look-up that should 404,
+  Resend `GET /domains`, whose list must hold the sending address's domain
+  as verified; a sending-only Resend key is accepted on its
+  `restricted_api_key` answer). A refusal is a 400 under the field
+  (`keySecret`, `apiKey` or `fromAddress`); no answer is a deliberate 503
+  (`provider-unreachable`) — nothing is stored either way. Relays (SMTP,
+  SendGrid, a Resend `baseUrl`) aren't checked. Later, an adapter that gets
+  a 401 or 403 on a live call throws `ProviderKeysRefusedError`
+  (`common/providers/provider-attention.ts`); the caller marks the row
+  (`attentionReason` `KEYS_REFUSED`, `attentionAt`), which the redacted
+  view sends as `attention: { reason, since } | null` and provider health
+  reads as FAILED, and queues the team's `provider` alert on the same
+  transaction, only when the row wasn't flagged already. Entering keys
+  again clears it. A provider order that fails at checkout is a deliberate
+  503 in the customer's words (`provider-keys-refused` or
+  `provider-unavailable`), never an unhandled 500
+  (`payments/provider-keys.ts`).
 - **Current** — **Credentials are encrypted at rest** (AES-256-GCM,
   `payments/crypto.ts`) and never returned; reads are redacted views.
 - **Current** — **Adapters sanitise errors:** never surface an auth header, a

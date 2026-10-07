@@ -4482,6 +4482,11 @@ model MerchantPaymentProvider {
   provider String // "RAZORPAY" | "CASHFREE"
   status   String @default("CONNECTED") // CONNECTED | DISABLED
 
+  // Needs attention (UX-012): the provider refused these keys on a live
+  // call. Null while it works; cleared when the keys are entered again.
+  attentionReason String? // "KEYS_REFUSED"
+  attentionAt     DateTime?
+
   // Non-secret public identifier (e.g. Razorpay key_id) — safe to read back.
   publicKey String?
 
@@ -4710,6 +4715,11 @@ model CommunicationProvider {
   channel  String // "EMAIL" | "WHATSAPP"
   provider String // e.g. "RESEND" | "SENDGRID" | "SMTP" | "TWILIO" | "META"
   status   String @default("CONNECTED") // CONNECTED | DISABLED
+
+  // Needs attention (UX-012): the provider refused these keys on a live
+  // call. Null while it works; cleared when the keys are entered again.
+  attentionReason String? // "KEYS_REFUSED"
+  attentionAt     DateTime?
 
   fromAddress String? // verified sender (email address / WhatsApp number)
 

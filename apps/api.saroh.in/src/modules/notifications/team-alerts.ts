@@ -37,6 +37,12 @@ export const TEAM_ALERT_TYPE = "team.alert";
  *   unpaid and not handed over three days after it was placed (R34,
  *   `orders/uncollected.ts`). Queued with the order, for the instant it
  *   becomes due; told on the New order row's choices, once per order.
+ * - `provider`: a connected payment or email provider refused the
+ *   business's keys on a live call and was marked as needing attention
+ *   (UX-012). Keyed to the connection and the instant it was flagged, so
+ *   each refusal is told once; told on the Payment failed row. An email
+ *   provider's goes to the bell only: its own email would go through the
+ *   keys that were just refused.
  */
 export type TeamAlertPayload =
     | { event: "order"; orderId: string; actorUserId?: string | null }
@@ -44,6 +50,12 @@ export type TeamAlertPayload =
     | { event: "team"; userId: string; invitationId: string }
     | { event: "booking"; notificationId: string }
     | { event: "uncollected"; orderId: string }
+    | {
+          event: "provider";
+          channel: "PAYMENTS" | "EMAIL";
+          providerId: string;
+          since: string;
+      }
     | {
           event: "site";
           testReleaseId: string;
@@ -97,5 +109,7 @@ export interface WordedAlert {
      * scheduled a go-live hears how it went (DEC-071, T10).
      */
     alwaysUserId?: string | null;
+    /** The bell only, never an email (an email provider's own alert). */
+    bellOnly?: boolean;
     orderId?: string;
 }
