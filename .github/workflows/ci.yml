@@ -170,6 +170,10 @@ jobs:
       - name: Site blocks gate
         run: pnpm run check:blocks
 
+      # Each migration folder has its own timestamp, so replay order is chosen.
+      - name: Migration ids
+        run: pnpm run check:migration-ids
+
       # Every browser spec names what it exercises (`// @covers …`), so the
       # local gate can run only the specs a batch reaches. CI still runs all.
       - name: Browser spec coverage keys

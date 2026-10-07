@@ -3141,3 +3141,11 @@ failed provider order is a deliberate 503 in the customer's words. Tests in
 `common/providers/provider-key-checks.spec.ts`, `payments.service.spec.ts`
 and `message-send.handler.spec.ts`.
 **Category**: integrations · rule in `docs/patterns/backend-integrations.md` ("Keys are checked before they are kept, and watched after")
+
+### Two migrations with one timestamp
+
+**Symptom**: on 7 Oct two parallel units in one batch each added a `20261029153000_*` migration. An older pair (`20261024100000_*`) was already on development unnoticed.
+**Cause**: unit agents pick timestamps on their own, and nothing compared them. Prisma replays folders in name order, so two folders with one timestamp run in an order nobody chose.
+**Fix**: renamed the unapplied one (`20261029160000_billing_first_month`). `check:migration-ids` (prepush and CI) fails on any shared timestamp. The applied 24 Oct pair is allowlisted, because a migration that has run can't be renamed.
+**Rule**: before merging parallel units, the orchestrator runs `check:migration-ids`. A clash is fixed by renaming the migration that hasn't reached any database.
+**Category**: database · `scripts/check-migration-ids.mjs`
