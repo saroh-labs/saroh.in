@@ -19,10 +19,14 @@ type Node = Pick<ModuleView, "key" | "blockers"> &
     Partial<Pick<ModuleView, "lifecycle" | "dependencies">>;
 
 /**
- * Modules with no screen yet, hidden the same way (DEC-068): Automations is
- * never offered until it has one.
+ * Modules Saroh doesn't offer, hidden the same way: Automations until it has
+ * a screen (DEC-068), and class packs on no plan for now (DEC-099). Their
+ * data is kept.
  */
-export const NOT_OFFERED: ReadonlySet<string> = new Set(["AUTOMATIONS"]);
+export const NOT_OFFERED: ReadonlySet<string> = new Set([
+    "AUTOMATIONS",
+    "CLASS_PACKS",
+]);
 
 /**
  * Saroh has switched this module off (its rollout flag is off), or it has

@@ -88,3 +88,16 @@ describe("Automations until it has a screen (DEC-068)", () => {
         );
     });
 });
+
+describe("class packs on no plan (DEC-099)", () => {
+    it("is never shown, rolled out or not", () => {
+        const views = [
+            { key: "APPOINTMENTS", blockers: [] },
+            { key: "CLASS_PACKS", blockers: [] },
+        ];
+        expect(rolledOut(views).map((m) => m.key)).toEqual(["APPOINTMENTS"]);
+        expect(isHiddenByRollout({ key: "CLASS_PACKS", blockers: [] })).toBe(
+            true,
+        );
+    });
+});

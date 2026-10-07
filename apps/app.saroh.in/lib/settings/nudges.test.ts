@@ -237,13 +237,7 @@ describe("business type and logo only when money is involved (DEC-070)", () => {
     });
 
     it("asks both while anything that takes money is on", () => {
-        for (const key of [
-            "COMMERCE",
-            "APPOINTMENTS",
-            "COURSES",
-            "CLASS_PACKS",
-            "PAYMENTS",
-        ]) {
+        for (const key of ["COMMERCE", "APPOINTMENTS", "COURSES", "PAYMENTS"]) {
             expect(ask([website, mod(key)], none), key).toEqual([
                 "businessType",
                 "logo",

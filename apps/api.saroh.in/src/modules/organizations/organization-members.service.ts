@@ -19,8 +19,15 @@ import {
     AuditOutcome,
     AuditService,
 } from "../audit/audit.service";
-import { UNMETERED_ROLE } from "../billing/metering";
 import { planMeter } from "../billing/metering.service";
+import type { SeatKind } from "../billing/seats";
+import {
+    BOOKABLE_STAFF,
+    roleActionsOf,
+    seatKindOf,
+    seatModule,
+    seatOf,
+} from "../billing/seats";
 import { enqueueTeamAlert } from "../notifications/team-alerts";
 import { CAPABILITY_BY_ACTION } from "./capability-catalogue";
 import { hashInviteToken } from "./invite-token";
@@ -90,6 +97,12 @@ export interface MemberView {
      * when someone has one.
      */
     extraActions: OrgAction[];
+    /**
+     * Whether they use one of the plan's team seats (DEC-105): their role or
+     * extras can change something, or they take bookings. False for someone
+     * who can only look, who counts toward the plan's view-only people.
+     */
+    usesSeat: boolean;
 }
 
 export interface StorefrontRoleView {
@@ -109,6 +122,8 @@ export interface InvitationView {
     status: string;
     expiresAt: Date;
     createdAt: Date;
+    /** Whether the role invited to uses a team seat (DEC-105). */
+    usesSeat: boolean;
 }
 
 /**
@@ -151,6 +166,9 @@ export class OrganizationMembersService {
                         role: true,
                         extraActions: true,
                         user: { select: { name: true, email: true } },
+                        // On the diary: someone who takes bookings uses a
+                        // seat whatever their role (DEC-105).
+                        staffMember: { select: { status: true } },
                     },
                 }),
                 prisma.siteReviewer.findMany({
@@ -197,7 +215,7 @@ export class OrganizationMembersService {
                 }),
             ]);
 
-        const roleActions = new Map(roleRows.map((r) => [r.key, r.actions]));
+        const roleActions = roleActionsOf(roleRows);
         const lastActive = new Map(
             sessions.map((s) => [s.userId, s._max.updatedAt]),
         );
@@ -234,6 +252,13 @@ export class OrganizationMembersService {
                 isBuiltInRole(m.role) ? null : roleActions.get(m.role),
                 m.extraActions,
             ),
+            usesSeat:
+                seatOf(
+                    roleActions,
+                    m.role,
+                    m.extraActions,
+                    m.staffMember?.status === BOOKABLE_STAFF,
+                ) === "seat",
         }));
     }
 
@@ -245,25 +270,36 @@ export class OrganizationMembersService {
     async listInvitations(ctx: OrganizationContext): Promise<InvitationView[]> {
         authorize(ctx, "member:invite");
 
-        const invitations = await prisma.organizationInvitation.findMany({
-            where: { organizationId: ctx.organizationId, status: "PENDING" },
-            orderBy: { createdAt: "desc" },
-            select: {
-                id: true,
-                email: true,
-                role: true,
-                siteIds: true,
-                status: true,
-                expiresAt: true,
-                createdAt: true,
-            },
-        });
+        const [invitations, roleRows] = await Promise.all([
+            prisma.organizationInvitation.findMany({
+                where: {
+                    organizationId: ctx.organizationId,
+                    status: "PENDING",
+                },
+                orderBy: { createdAt: "desc" },
+                select: {
+                    id: true,
+                    email: true,
+                    role: true,
+                    siteIds: true,
+                    status: true,
+                    expiresAt: true,
+                    createdAt: true,
+                },
+            }),
+            prisma.organizationRole.findMany({
+                where: { organizationId: ctx.organizationId },
+                select: { key: true, actions: true },
+            }),
+        ]);
+        const roleActions = roleActionsOf(roleRows);
         // No token, hashed or otherwise. It is in the invitee's inbox and
         // nowhere else; a roster screen is not a place to re-read it from.
         return invitations.map((i) => ({
             ...i,
             role: toRole(i.role),
             roleKey: i.role,
+            usesSeat: seatOf(roleActions, i.role) === "seat",
         }));
     }
 
@@ -294,14 +330,14 @@ export class OrganizationMembersService {
 
         const token = randomBytes(32).toString("hex");
         const expiresAt = new Date(Date.now() + INVITE_TTL_MS);
-        // The plan's team members cap counts people and open invitations
-        // (U13), Reviewers left out: a new invitation is checked; sending a
-        // live one again adds nobody. A Reviewer is checked against the
-        // plan's own Reviewers cap instead, the same way.
-        const reviewer = dto.role === UNMETERED_ROLE;
+        // The plan's team seats count people and open invitations whose
+        // role can change something (DEC-105): a new invitation is checked;
+        // sending a live one again adds nobody. A role that only looks is
+        // checked against the plan's view-only people instead, the same way.
+        const kind = await this.seatKindFor(ctx.organizationId, dto.role);
         const invitation = await planMeter.withRoom(
             ctx.organizationId,
-            reviewer ? "reviewers" : "members",
+            seatModule(kind),
             (tx) =>
                 tx.organizationInvitation.upsert({
                     where: {
@@ -337,20 +373,23 @@ export class OrganizationMembersService {
                 }),
             {
                 // A live invitation of the same kind already counts this person.
-                addingIn: async (tx) =>
-                    (await tx.organizationInvitation.count({
+                addingIn: async (tx) => {
+                    const live = await tx.organizationInvitation.findFirst({
                         where: {
                             organizationId: ctx.organizationId,
                             email: dto.email,
                             status: "PENDING",
                             expiresAt: { gt: new Date() },
-                            role: reviewer
-                                ? UNMETERED_ROLE
-                                : { not: UNMETERED_ROLE },
                         },
-                    })) > 0
-                        ? 0
-                        : 1,
+                        select: { role: true },
+                    });
+                    if (!live) return 1;
+                    const was = await this.seatKindFor(
+                        ctx.organizationId,
+                        live.role,
+                    );
+                    return was === kind ? 0 : 1;
+                },
             },
         );
 
@@ -641,25 +680,28 @@ export class OrganizationMembersService {
         const kept = extraActionsFor(dto.role, membership.extraActions);
         const extrasChanged = kept.length !== membership.extraActions.length;
 
-        // A Reviewer isn't counted on the plan's team members (U13); moved
-        // to any other role, they are one more. Checked first on the
+        // Someone who only looks uses no team seat (DEC-105): moved to a
+        // role that can change something, they are one more seat; moved the
+        // other way, one more view-only person. Checked first on the
         // transaction, as it takes the meter's lock.
-        const joinsTheCount =
-            membership.role === UNMETERED_ROLE && dto.role !== UNMETERED_ROLE;
-        // Made a Reviewer from another role: one more on the Reviewers cap.
-        const becomesReviewer =
-            membership.role !== UNMETERED_ROLE && dto.role === UNMETERED_ROLE;
+        const bookable = membership.staffMember?.status === BOOKABLE_STAFF;
+        const [was, becomes] = await Promise.all([
+            this.seatKindFor(
+                ctx.organizationId,
+                membership.role,
+                membership.extraActions,
+                bookable,
+            ),
+            this.seatKindFor(ctx.organizationId, dto.role, kept, bookable),
+        ]);
 
         await prisma.$transaction(
             async (tx) => {
-                if (joinsTheCount) {
-                    await planMeter.roomInTx(tx, ctx.organizationId, "members");
-                }
-                if (becomesReviewer) {
+                if (was !== becomes) {
                     await planMeter.roomInTx(
                         tx,
                         ctx.organizationId,
-                        "reviewers",
+                        seatModule(becomes),
                     );
                 }
                 await tx.membership.update({
@@ -827,16 +869,28 @@ export class OrganizationMembersService {
         if (given.length > 0) {
             await planMeter.assertIncluded(organizationId, "roles");
         }
+        // An extra that changes something takes a view-only person onto a
+        // team seat (DEC-105): checked as the change is written.
+        const bookable = membership.staffMember?.status === BOOKABLE_STAFF;
+        const joinsSeats =
+            seatKindOf(before, bookable) === "viewOnly" &&
+            seatKindOf(after, bookable) === "seat";
 
-        const { count } = await prisma.membership.updateMany({
-            where: {
-                organizationId,
-                userId,
-                role: membership.role,
-                extraActions: { equals: membership.extraActions },
-            },
-            data: { extraActions: next },
-        });
+        const { count } = await planMeter.withRoom(
+            organizationId,
+            "members",
+            (tx) =>
+                tx.membership.updateMany({
+                    where: {
+                        organizationId,
+                        userId,
+                        role: membership.role,
+                        extraActions: { equals: membership.extraActions },
+                    },
+                    data: { extraActions: next },
+                }),
+            { adding: joinsSeats ? 1 : 0 },
+        );
         if (count === 0) {
             throw new ConflictException(
                 "Someone changed this person's role or permissions while you were editing. Reload to see them, then try again.",
@@ -983,7 +1037,11 @@ export class OrganizationMembersService {
                     userId,
                 },
             },
-            select: { role: true, extraActions: true },
+            select: {
+                role: true,
+                extraActions: true,
+                staffMember: { select: { status: true } },
+            },
         });
         if (!membership) {
             throw new NotFoundException(
@@ -1096,6 +1154,22 @@ export class OrganizationMembersService {
                     : `You cannot ${verb} a role that can do more than you can.`,
             );
         }
+    }
+
+    /**
+     * Whether someone at this role, with these extras, uses a team seat or
+     * is view-only (DEC-105): by what they can do, never the role's name.
+     */
+    private async seatKindFor(
+        organizationId: string,
+        roleKey: string,
+        extras?: readonly string[],
+        bookable = false,
+    ): Promise<SeatKind> {
+        return seatKindOf(
+            await this.actionsOf(organizationId, roleKey, false, extras),
+            bookable,
+        );
     }
 
     /**

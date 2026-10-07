@@ -57,6 +57,8 @@ import {
     inviteRoom,
     inviteSchema,
     teamCountLine,
+    teamCounts,
+    usesSeat,
 } from "@/lib/organizations/invitations";
 import {
     inviteMember,
@@ -246,15 +248,17 @@ export function TeamScreen({
     const [editing, setEditing] = useState<OrganizationMember | null>(null);
     const [removing, setRemoving] = useState<OrganizationMember | null>(null);
     const [inviteOpen, setInviteOpen] = useState(false);
-    // A full team still invites a Reviewer, who takes no seat (UX-028).
-    // With both caps reached, it says why, as the design flashes it: the
-    // invite would be refused, invites count too, and where more is.
+    // Full seats still invite someone view-only, who takes no seat (UX-028,
+    // DEC-105). With both caps reached, it says why, as the design flashes
+    // it: the invite would be refused, invites count too, and where more is.
     const room = inviteRoom(teamLimit);
     const inviteLabel = !teamLimit?.full
         ? "Invite someone"
         : room.open
-          ? "Invite a reviewer"
+          ? "Invite someone view-only"
           : "Team is full";
+    // What the seats count (DEC-105), from what the API says each uses.
+    const counts = teamCounts(members, invitations);
     const openInvite = () => {
         if (!room.open && teamLimit) {
             showInfo(
@@ -373,7 +377,11 @@ export function TeamScreen({
             {/* What the cap counts, so "full" never sits beside People = 1. */}
             {teamLimit && tab === "people" ? (
                 <p className="text-[12.5px] text-muted-foreground">
-                    {teamCountLine(members.length, invitations.length)}
+                    {teamCountLine(
+                        counts.people,
+                        counts.waiting,
+                        counts.viewOnly,
+                    )}
                     {teamLimit.full
                         ? " — the team is at its plan's limit."
                         : ""}
@@ -474,6 +482,7 @@ export function TeamScreen({
                     members={members}
                     invitations={invitations}
                     seatReason={room.seatReason}
+                    viewOnlyReason={room.viewOnlyReason}
                     // The new invite shows at the top of People.
                     onSent={() => setTab("people")}
                 />
@@ -1164,6 +1173,7 @@ function InviteDialog({
     members,
     invitations,
     seatReason,
+    viewOnlyReason,
     onSent,
 }: {
     open: boolean;
@@ -1173,8 +1183,10 @@ function InviteDialog({
     book: RoleBook;
     members: OrganizationMember[];
     invitations: OrganizationInvitation[];
-    /** The team is full (UX-028): only a Reviewer can be invited, and why. */
+    /** The seats are full (UX-028): only someone view-only, and why. */
     seatReason: string | null;
+    /** The view-only people are full (DEC-105): only a seat, and why. */
+    viewOnlyReason: string | null;
     onSent: () => void;
 }) {
     const router = useRouter();
@@ -1182,24 +1194,35 @@ function InviteDialog({
         memberEmails: members.map((m) => m.email),
         invitedEmails: invitations.map((i) => i.email),
     });
+    const offered = book.all.filter((r) => r.key !== "OWNER");
+    // Why a role can't be picked for want of room on the plan: by whether
+    // holding it uses a seat (DEC-105), never by its name.
+    const noRoom = (r: Role): string | null =>
+        usesSeat(r) ? seatReason : viewOnlyReason;
+    // Picked to start with: Member, or with the seats full the first
+    // view-only role the inviter may give.
+    const startRole =
+        (seatReason
+            ? offered.find((r) => noRoom(r) === null && book.withinReach(r.key))
+                  ?.key
+            : undefined) ?? "MEMBER";
     const form = useForm<InviteValues>({
         resolver: zodResolver(schema),
         defaultValues: {
             email: "",
-            role: seatReason ? "REVIEWER" : "MEMBER",
+            role: startRole,
             siteIds: [],
         },
         mode: "onTouched",
     });
     const sending = form.formState.isSubmitting;
     const role = useWatch({ control: form.control, name: "role" });
-    const offered = book.all.filter((r) => r.key !== "OWNER");
 
     function setOpen(next: boolean) {
         if (!next)
             form.reset({
                 email: "",
-                role: seatReason ? "REVIEWER" : "MEMBER",
+                role: startRole,
                 siteIds: [],
             });
         onOpenChange(next);
@@ -1291,9 +1314,9 @@ function InviteDialog({
                                         >
                                             Role
                                         </p>
-                                        {seatReason ? (
+                                        {(seatReason ?? viewOnlyReason) ? (
                                             <p className="text-[12px] leading-[1.45] text-muted-foreground">
-                                                {seatReason}
+                                                {seatReason ?? viewOnlyReason}
                                             </p>
                                         ) : null}
                                         <div
@@ -1301,33 +1324,37 @@ function InviteDialog({
                                             aria-labelledby="invite-role-label"
                                             className="grid gap-1.5"
                                         >
-                                            {offered.map(({ key: r }) => (
-                                                <RoleChoice
-                                                    key={r}
-                                                    name={field.name}
-                                                    value={r}
-                                                    label={book.labelOf(r)}
-                                                    blurb={book.blurbOf(r)}
-                                                    checked={r === field.value}
-                                                    // The API refuses to
-                                                    // invite anyone at a role
-                                                    // that can do more than
-                                                    // the inviter.
-                                                    beyond={
-                                                        !book.withinReach(r)
-                                                    }
-                                                    // A full team takes no
-                                                    // one who needs a seat.
-                                                    noSeat={
-                                                        !!seatReason &&
-                                                        r !== "REVIEWER"
-                                                    }
-                                                    disabled={sending}
-                                                    onPick={() =>
-                                                        field.onChange(r)
-                                                    }
-                                                />
-                                            ))}
+                                            {offered.map((offer) => {
+                                                const r = offer.key;
+                                                return (
+                                                    <RoleChoice
+                                                        key={r}
+                                                        name={field.name}
+                                                        value={r}
+                                                        label={book.labelOf(r)}
+                                                        blurb={book.blurbOf(r)}
+                                                        checked={
+                                                            r === field.value
+                                                        }
+                                                        // The API refuses to
+                                                        // invite anyone at a role
+                                                        // that can do more than
+                                                        // the inviter.
+                                                        beyond={
+                                                            !book.withinReach(r)
+                                                        }
+                                                        // Full seats take no one
+                                                        // who needs one; full
+                                                        // view-only places take
+                                                        // no one view-only.
+                                                        noRoom={noRoom(offer)}
+                                                        disabled={sending}
+                                                        onPick={() =>
+                                                            field.onChange(r)
+                                                        }
+                                                    />
+                                                );
+                                            })}
                                         </div>
                                     </FormItem>
                                 )}
@@ -1425,7 +1452,7 @@ function RoleChoice({
     blurb,
     checked,
     beyond,
-    noSeat = false,
+    noRoom = null,
     disabled,
     onPick,
 }: {
@@ -1435,21 +1462,15 @@ function RoleChoice({
     blurb: string;
     checked: boolean;
     beyond: boolean;
-    /** The team is full and this role takes a seat (UX-028). */
-    noSeat?: boolean;
+    /** The plan has no room for this role (UX-028, DEC-105), and why. */
+    noRoom?: string | null;
     disabled: boolean;
     onPick: () => void;
 }) {
-    const off = beyond || noSeat;
+    const off = beyond || noRoom !== null;
     return (
         <label
-            title={
-                beyond
-                    ? "Can do more than you can"
-                    : noSeat
-                      ? "The team is full"
-                      : undefined
-            }
+            title={beyond ? "Can do more than you can" : (noRoom ?? undefined)}
             className={cn(
                 "block rounded-[9px] border px-3 py-[9px] transition-colors duration-fast has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-ring has-[:focus-visible]:ring-offset-2",
                 off

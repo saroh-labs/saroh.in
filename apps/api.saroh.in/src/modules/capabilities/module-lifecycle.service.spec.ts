@@ -64,30 +64,31 @@ describe("ModuleLifecycleService", () => {
         );
     });
 
-    it("enable refuses Class packs while Appointments is off, in a sentence (E12)", async () => {
+    // Courses stands in for Class packs, which isn't offered (DEC-099).
+    it("enable refuses Courses while Appointments is off, in a sentence (E12)", async () => {
         const db = makeDb(); // Appointments not enabled
         const svc = new ModuleLifecycleService(makeReadiness(), db as never);
-        const refused = svc.enable(OWNER, "CLASS_PACKS");
+        const refused = svc.enable(OWNER, "COURSES");
         await expect(refused).rejects.toBeInstanceOf(BadRequestException);
         await expect(refused).rejects.toThrow(
-            "Class packs needs Appointments. Turn on Appointments first.",
+            "Courses needs Appointments. Turn on Appointments first.",
         );
         expect(db.organizationModule.upsert).not.toHaveBeenCalled();
     });
 
-    it("disable refuses Appointments while Class packs is on, in a sentence", async () => {
+    it("disable refuses Appointments while Courses is on, in a sentence", async () => {
         const db = makeDb();
         db.organizationModule.findUnique.mockResolvedValue({
             status: "ENABLED",
         });
         db.organizationModule.findMany.mockResolvedValue([
-            { moduleKey: "CLASS_PACKS" },
+            { moduleKey: "COURSES" },
         ]);
         const svc = new ModuleLifecycleService(makeReadiness(), db as never);
         const refused = svc.disable(OWNER, "APPOINTMENTS");
         await expect(refused).rejects.toBeInstanceOf(ConflictException);
         await expect(refused).rejects.toThrow(
-            "Class packs needs Appointments. Turn off Class packs first.",
+            "Courses needs Appointments. Turn off Courses first.",
         );
     });
 
@@ -157,7 +158,7 @@ describe("ModuleLifecycleService", () => {
             status: "ENABLED",
         });
         db.organizationModule.findMany.mockResolvedValue([
-            { moduleKey: "CLASS_PACKS" },
+            { moduleKey: "COURSES" },
         ]);
         const flags = { isEnabled: jest.fn(() => Promise.resolve(true)) };
         const svc = new ModuleLifecycleService(
@@ -167,7 +168,7 @@ describe("ModuleLifecycleService", () => {
             flags as never,
         );
         await expect(svc.disable(OWNER, "APPOINTMENTS")).rejects.toThrow(
-            "Class packs needs Appointments. Turn off Class packs first.",
+            "Courses needs Appointments. Turn off Courses first.",
         );
         expect(db.organizationModule.upsert).not.toHaveBeenCalled();
     });
@@ -415,11 +416,11 @@ describe("ModuleLifecycleService.impact (F13)", () => {
         });
         const view = await svc.impact(OWNER, "APPOINTMENTS");
         expect(view.enabled).toBe(true);
-        expect(view.goesWith).toEqual(["COURSES", "CLASS_PACKS"]);
+        // Class packs isn't offered (DEC-099), so it is never named.
+        expect(view.goesWith).toEqual(["COURSES"]);
         expect(view.items.map((i) => i.code)).toEqual([
             "APPOINTMENTS_LINE",
             "COURSES_LINE",
-            "CLASS_PACKS_LINE",
         ]);
         // Each read is asked with the viewer's own reads.
         const input = readiness.deactivationImpact.mock.calls[0][1] as {

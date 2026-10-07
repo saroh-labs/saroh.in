@@ -461,6 +461,51 @@ describe("what each limit counts (DB, U13)", () => {
         expect(await countUsage(prisma, orgId, "reviewers")).toBe(2);
     });
 
+    // DEC-105: a role of the business's own is judged on its permissions.
+    it("seats a role that books, not one that only looks; bookable staff always", async () => {
+        const { orgId } = await business("pro");
+        await prisma.organizationRole.createMany({
+            data: [
+                {
+                    organizationId: orgId,
+                    key: "looker",
+                    label: "Looker",
+                    actions: ["order:read", "booking:read"],
+                },
+                {
+                    organizationId: orgId,
+                    key: "front-desk",
+                    label: "Front desk",
+                    actions: ["booking:write"],
+                },
+            ],
+        });
+        const join = async (role: string) => {
+            const user = await prisma.user.create({
+                data: { email: `${uniq("m")}@example.test` },
+            });
+            return prisma.membership.create({
+                data: { organizationId: orgId, userId: user.id, role },
+            });
+        };
+        await join("looker");
+        await join("front-desk");
+        const trainer = await join("looker");
+        expect(await countUsage(prisma, orgId, "teamMembers")).toBe(1);
+        expect(await countUsage(prisma, orgId, "reviewers")).toBe(2);
+
+        // On the diary, taking bookings: a seat whatever the role.
+        await prisma.staffMember.create({
+            data: {
+                organizationId: orgId,
+                membershipId: trainer.id,
+                name: "Trainer",
+            },
+        });
+        expect(await countUsage(prisma, orgId, "teamMembers")).toBe(2);
+        expect(await countUsage(prisma, orgId, "reviewers")).toBe(1);
+    });
+
     it("counts live locations customers visit, never an online one", async () => {
         const { orgId, storeId } = await business("free");
         // `business` made an online one with no settings: not counted.

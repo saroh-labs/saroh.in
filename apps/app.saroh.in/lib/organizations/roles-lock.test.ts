@@ -29,6 +29,33 @@ describe("rolesLock (UX-030)", () => {
         }
     });
 
+    // DEC-099: off on the middle plan too; the line names the first plan
+    // that has it, as the catalogue says, never the next one up.
+    it("names the first plan that has it, from the middle plan too", () => {
+        const middle = row({
+            moduleId: "roles",
+            name: "Custom roles",
+            state: "locked",
+            limit: null,
+            usage: null,
+            menu: null,
+            child: null,
+            upgradeTo: { planId: "c", name: "Plan C", pricePaise: 22_200 },
+        });
+        expect(
+            rolesLock(
+                access({
+                    plan: { id: "b", name: "Plan B" },
+                    modules: [middle],
+                }),
+            ),
+        ).toEqual({
+            line: "Roles of your own come with Plan C.",
+            cta: "See Plan C",
+            href: "/settings/billing?plan=c#change-plan",
+        });
+    });
+
     it("names the plan when there's no plan above to point at", () => {
         expect(
             rolesLock(access({ modules: [roles("hidden", false)] }))?.line,

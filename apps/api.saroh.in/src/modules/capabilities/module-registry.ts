@@ -194,6 +194,10 @@ export const MODULES: readonly ModuleDescriptor[] = [
         dependencies: ["APPOINTMENTS"],
         projectSelectable: true,
         rolloutFlag: FlagKey.MODULE_CLASS_PACKS,
+        // Not offered on any plan for now (DEC-099): hidden as Automations
+        // is (DEC-068). A business that had it on keeps its setting and its
+        // packs.
+        hidden: true,
         readinessAdapter: "CLASS_PACKS",
         deactivationPolicy: "CLASS_PACKS",
     },

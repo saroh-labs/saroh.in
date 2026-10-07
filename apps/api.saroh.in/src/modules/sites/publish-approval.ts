@@ -37,6 +37,22 @@ export const APPROVAL_SETTING_OWNER_ONLY_MESSAGE =
 export const APPROVAL_SETTING_UNAVAILABLE_MESSAGE =
     "Publishing needs approval works with test releases, which aren't on for this business yet.";
 
+/**
+ * Whether "Publishing needs approval" applies to a site now (DEC-103): it
+ * is switched on, and the business's plan includes the catalogue's
+ * `review` row. Switched on under a plan without it (a move down), the
+ * setting stops applying and publishing goes through as normal; the stored
+ * value is kept, so it applies again on a plan that has it. A plan that
+ * can't be read keeps it applying (`isIncluded` fails safe).
+ */
+export async function approvalApplies(
+    organizationId: string,
+    switchedOn: boolean,
+): Promise<boolean> {
+    if (!switchedOn) return false;
+    return planMeter.isIncluded(organizationId, "review");
+}
+
 /** The 409 for going live without the approval the setting asks for. */
 export function approvalRequired(): ConflictException {
     return new ConflictException({
