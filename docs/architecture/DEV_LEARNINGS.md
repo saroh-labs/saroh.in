@@ -3068,3 +3068,22 @@ importers also kept 16.3.6. `pnpm update` did not move it either.
 that the install passed. `pnpm run check:catalog-lock` (prepush and CI)
 fails when an exactly pinned catalog entry and the lockfile disagree.
 **Category**: tooling · `pnpm-workspace.yaml`, `scripts/check-catalog-lock.mjs`
+
+## Sites — behind Cloudflare, every visitor had Cloudflare's address
+
+**Symptom**: none reported. Found while preparing merchant sites for
+Cloudflare Workers (7 Oct 2026), the same day `saroh.app` started going
+through Cloudflare's proxy to Vercel.
+**Root cause**: `visitorAddress` (`apps/saroh.app/lib/site-relay.ts`) read
+`x-real-ip`, then the first `x-forwarded-for` entry. Behind Cloudflare's
+proxy, Vercel writes Cloudflare's edge address into both, so the address
+saroh.app signs into the relay (which the API's per-visitor limits key on)
+was one of a few Cloudflare addresses for every visitor. On a Worker it is
+worse: `x-forwarded-for` starts with whatever the visitor sent.
+**Fix**: read `cf-connecting-ip` first. Cloudflare writes it and overwrites
+any a visitor sends, both on a Worker and when it proxies to Vercel.
+**Rule**: whoever terminates the visitor's connection names the visitor.
+When a proxy or CDN is added in front of an app, check which header the app
+takes the client address from (the API's version is
+`common/trust-proxy.ts`).
+**Category**: sites · `apps/saroh.app/lib/site-relay.ts`
