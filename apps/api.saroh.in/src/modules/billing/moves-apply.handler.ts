@@ -1,8 +1,20 @@
-import { Injectable, Logger } from "@nestjs/common";
+import { Injectable, Logger, Optional } from "@nestjs/common";
 import type { Job } from "@saroh/database";
 import { prisma } from "@saroh/database";
 
 import { prismaErrorCode } from "../../common/prisma-errors";
+import { businessTimezone } from "../bookings/staff-availability";
+import { paperDay } from "../invoices/invoice-paper-view";
+import { enqueueBillingEmail } from "./billing-email.job";
+import { planEndingNotice } from "./billing-emails";
+import { CatalogueAccessService } from "./catalogue-access.service";
+import {
+    PLAN_ENDING_NOTICE_KIND,
+    PLAN_ENDING_NOTIFICATION_TYPE,
+    PLAN_ENDING_SHOWN_DAYS,
+    planEndingEventKey,
+    planEndingStage,
+} from "./plan-ending";
 import { applyDueMoveInTx } from "./plan-moves";
 import { enqueueProviderCancel } from "./provider-cancel.job";
 
@@ -17,6 +29,10 @@ import { enqueueProviderCancel } from "./provider-cancel.job";
  *    plans, which bill nothing, and any webhook that never came.
  * 2. **Lapsed checkouts.** An OPEN checkout past `expiresAt` was never
  *    authorised: CANCELLED, and its provider subscription cancelled.
+ * 3. **Plans that end** (#805). A plan override with an end date that moves
+ *    the business to a cheaper plan is told 30, 7 and 1 days ahead
+ *    (`plan-ending.ts`): an inbox notice and an email to its billing
+ *    people, each claimed once as a `CustomerNotice`.
  */
 export const BILLING_MOVES_APPLY_TYPE = "billing.moves.apply";
 
@@ -24,22 +40,30 @@ export const BILLING_SWEEP_EVERY_MS = 60 * 60 * 1000;
 
 const BATCH = 200;
 
+const DAY_MS = 24 * 60 * 60 * 1000;
+
 export interface SweepOutcome {
     applied: number;
     waiting: number;
     lapsed: number;
+    reminded: number;
 }
 
 @Injectable()
 export class MovesApplyHandler {
     private readonly logger = new Logger(MovesApplyHandler.name);
 
+    constructor(
+        @Optional()
+        private readonly access: CatalogueAccessService = new CatalogueAccessService(),
+    ) {}
+
     readonly handle = async (_job: Job): Promise<void> => {
         try {
             const out = await this.sweep(new Date());
-            if (out.applied || out.lapsed) {
+            if (out.applied || out.lapsed || out.reminded) {
                 this.logger.log(
-                    `billing_sweep applied=${out.applied} waiting=${out.waiting} lapsed=${out.lapsed}`,
+                    `billing_sweep applied=${out.applied} waiting=${out.waiting} lapsed=${out.lapsed} reminded=${out.reminded}`,
                 );
             }
         } catch (error) {
@@ -56,7 +80,12 @@ export class MovesApplyHandler {
     };
 
     async sweep(now: Date): Promise<SweepOutcome> {
-        const out: SweepOutcome = { applied: 0, waiting: 0, lapsed: 0 };
+        const out: SweepOutcome = {
+            applied: 0,
+            waiting: 0,
+            lapsed: 0,
+            reminded: 0,
+        };
         const tried = new Set<string>();
         for (;;) {
             const due = await prisma.subscription.findMany({
@@ -87,7 +116,110 @@ export class MovesApplyHandler {
             if (due.length < BATCH) break;
         }
         out.lapsed = await this.lapseCheckouts(now);
+        out.reminded = await this.remindEndingPlans(now);
         return out;
+    }
+
+    /**
+     * Every business on a plan override that ends within 30 days, told the
+     * notice that is due (`planEndingStage`), once. What it is on and what
+     * follows are read by `CatalogueAccessService.planEnding`, so an end
+     * that costs it nothing, or an override that isn't the one it reads, is
+     * passed over.
+     */
+    async remindEndingPlans(now: Date): Promise<number> {
+        const horizon = new Date(
+            now.getTime() + PLAN_ENDING_SHOWN_DAYS * DAY_MS,
+        );
+        let reminded = 0;
+        let after: string | undefined;
+        for (;;) {
+            const page = await prisma.entitlementOverride.findMany({
+                where: {
+                    kind: "plan",
+                    revokedAt: null,
+                    expiresAt: { gt: now, lte: horizon },
+                    ...(after ? { organizationId: { gt: after } } : {}),
+                },
+                select: { organizationId: true },
+                distinct: ["organizationId"],
+                orderBy: { organizationId: "asc" },
+                take: BATCH,
+            });
+            for (const { organizationId } of page) {
+                try {
+                    if (await this.remindOne(organizationId, now))
+                        reminded += 1;
+                } catch (error) {
+                    // One that fails never stops the rest.
+                    this.logger.error(
+                        `plan_ending_notice_failed org=${organizationId}: ${String(error)}`,
+                    );
+                }
+            }
+            if (page.length < BATCH) break;
+            after = page[page.length - 1].organizationId;
+        }
+        return reminded;
+    }
+
+    private async remindOne(
+        organizationId: string,
+        now: Date,
+    ): Promise<boolean> {
+        const ending = await this.access.planEnding(organizationId, now);
+        if (!ending) return false;
+        const stage = planEndingStage(ending.endsAt, now);
+        if (!stage) return false;
+        const eventKey = planEndingEventKey(
+            ending.overrideId,
+            ending.endsAt,
+            stage,
+        );
+        const zone = await businessTimezone(prisma, organizationId);
+        const endsOn = paperDay(ending.endsAt.toISOString(), zone);
+        const words = planEndingNotice({
+            planName: ending.planName,
+            nextPlanName: ending.nextPlanName,
+            endsOn,
+        });
+        return prisma.$transaction(async (tx) => {
+            const claim = await tx.customerNotice.createMany({
+                data: [
+                    {
+                        organizationId,
+                        eventKey,
+                        kind: PLAN_ENDING_NOTICE_KIND,
+                    },
+                ],
+                skipDuplicates: true,
+            });
+            if (claim.count === 0) return false;
+            const notice = await tx.notification.create({
+                data: {
+                    organizationId,
+                    type: PLAN_ENDING_NOTIFICATION_TYPE,
+                    title: words.title,
+                    body: words.body,
+                },
+                select: { id: true },
+            });
+            await tx.customerNotice.updateMany({
+                where: { organizationId, eventKey },
+                data: { notificationId: notice.id },
+            });
+            await enqueueBillingEmail(tx, {
+                kind: "PLAN_ENDING",
+                organizationId,
+                overrideId: ending.overrideId,
+                endsAt: ending.endsAt.toISOString(),
+                stage,
+                planName: ending.planName,
+                nextPlanName: ending.nextPlanName,
+                endsOn,
+            });
+            return true;
+        });
     }
 
     /** OPEN checkouts nobody authorised in time. */

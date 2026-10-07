@@ -11,8 +11,11 @@ import type { RenderedEmail } from "./billing-emails";
 import {
     invoiceEmail,
     paymentFailedEmail,
+    planEndingEmail,
     trialEndingEmail,
 } from "./billing-emails";
+import type { PlanEndingStage } from "./plan-ending";
+import { PLAN_ENDING_NOTICE_DAYS } from "./plan-ending";
 import { renderSarohInvoicePdf } from "./saroh-invoice-paper";
 import { paiseToRupees, SAROH_TIMEZONE } from "./saroh-invoice-terms";
 import { sarohSeller } from "./saroh-seller";
@@ -21,15 +24,16 @@ type Tx = Prisma.TransactionClient;
 
 /**
  * Saroh's own billing mail to a business (pricing catalogue U17): the
- * invoice for a charge with its PDF, a payment that failed, and a trial
- * ending (queued by U16). Written on the caller's transaction (the outbox),
+ * invoice for a charge with its PDF, a payment that failed, a trial ending
+ * (queued by U16), and a plan that ends on a date (#805, queued by the
+ * billing sweep). Written on the caller's transaction (the outbox),
  * so the invoice or the failed charge and its email commit together, and a
  * mail provider that is down never undoes either: a send that fails throws,
  * and the queue retries it with backoff.
  *
  * Re-read, then decide. An invoice already emailed (`emailedAt`) is not
- * sent again. A failed payment that has since been paid, or a trial that is
- * no longer one, says nothing. Each kind sends at most once per event,
+ * sent again. A failed payment that has since been paid, a trial that is
+ * no longer one, or a plan whose end was moved or taken away, says nothing. Each kind sends at most once per event,
  * claimed as a `CustomerNotice` once its email has left.
  *
  * Who hears: everyone on the team whose role manages billing
@@ -57,6 +61,19 @@ export type BillingEmailPayload =
           subscriptionId: string;
           /** When the trial ends, ISO: one email per trial end. */
           endsAt: string;
+      }
+    | {
+          kind: "PLAN_ENDING";
+          organizationId: string;
+          /** The `plan` override that ends. */
+          overrideId: string;
+          /** Its end, ISO: one email per end and stage. */
+          endsAt: string;
+          stage: PlanEndingStage;
+          planName: string;
+          nextPlanName: string;
+          /** The end in the business's words ("16 Nov 2026"). */
+          endsOn: string;
       };
 
 export async function enqueueBillingEmail(
@@ -98,6 +115,17 @@ function parsePayload(payload: unknown): BillingEmailPayload | null {
         p.kind === "TRIAL_ENDING" &&
         typeof p.subscriptionId === "string" &&
         typeof p.endsAt === "string"
+    ) {
+        return p as unknown as BillingEmailPayload;
+    }
+    if (
+        p.kind === "PLAN_ENDING" &&
+        typeof p.overrideId === "string" &&
+        typeof p.endsAt === "string" &&
+        PLAN_ENDING_NOTICE_DAYS.includes(p.stage as PlanEndingStage) &&
+        typeof p.planName === "string" &&
+        typeof p.nextPlanName === "string" &&
+        typeof p.endsOn === "string"
     ) {
         return p as unknown as BillingEmailPayload;
     }
@@ -156,6 +184,7 @@ export class BillingEmailHandler {
             return;
         }
         if (p.kind === "INVOICE") return this.invoice(job, p);
+        if (p.kind === "PLAN_ENDING") return this.planEnding(job, p);
         return this.notice(job, p);
     };
 
@@ -196,7 +225,10 @@ export class BillingEmailHandler {
 
     private async notice(
         job: Job,
-        p: Exclude<BillingEmailPayload, { kind: "INVOICE" }>,
+        p: Extract<
+            BillingEmailPayload,
+            { kind: "PAYMENT_FAILED" | "TRIAL_ENDING" }
+        >,
     ): Promise<void> {
         const eventKey =
             p.kind === "PAYMENT_FAILED"
@@ -277,6 +309,68 @@ export class BillingEmailHandler {
                 ),
             });
         }
+        if (!(await this.deliver(job, p.organizationId, words))) return;
+        await prisma.customerNotice.createMany({
+            data: [
+                {
+                    organizationId: p.organizationId,
+                    eventKey,
+                    kind: BILLING_EMAIL_NOTICE_KIND,
+                },
+            ],
+            skipDuplicates: true,
+        });
+    }
+
+    /**
+     * A plan's end, 30, 7 or 1 days ahead. Re-read: an override taken away,
+     * moved to another end, or no longer the one the business reads (a
+     * newer one replaced it) says nothing; the sweep tells the new end.
+     */
+    private async planEnding(
+        job: Job,
+        p: Extract<BillingEmailPayload, { kind: "PLAN_ENDING" }>,
+    ): Promise<void> {
+        const eventKey = `saroh-billing:plan-ending:${p.overrideId}:${p.endsAt}:${p.stage}`;
+        const told = await prisma.customerNotice.findUnique({
+            where: {
+                organizationId_eventKey: {
+                    organizationId: p.organizationId,
+                    eventKey,
+                },
+            },
+            select: { id: true },
+        });
+        if (told) return this.skip(job, "already_sent");
+        // The plan override the business reads now (newest live, as
+        // `newestPlanOverride`): still this one, with the same end.
+        const now = new Date();
+        const override = await prisma.entitlementOverride.findFirst({
+            where: {
+                organizationId: p.organizationId,
+                kind: "plan",
+                revokedAt: null,
+                OR: [{ expiresAt: null }, { expiresAt: { gt: now } }],
+            },
+            orderBy: { createdAt: "desc" },
+            select: {
+                id: true,
+                expiresAt: true,
+                organization: { select: { name: true } },
+            },
+        });
+        if (
+            override?.id !== p.overrideId ||
+            override.expiresAt?.toISOString() !== p.endsAt
+        ) {
+            return this.skip(job, "plan_end_changed");
+        }
+        const words = planEndingEmail({
+            businessName: override.organization.name,
+            planName: p.planName,
+            nextPlanName: p.nextPlanName,
+            endsOn: p.endsOn,
+        });
         if (!(await this.deliver(job, p.organizationId, words))) return;
         await prisma.customerNotice.createMany({
             data: [
