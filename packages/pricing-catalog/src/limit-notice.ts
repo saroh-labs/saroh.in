@@ -109,13 +109,13 @@ export function limitNotice(
                     ? ` ${action.closed.sentence}`
                     : "")
               : ""
-        : full
-          ? up
-              ? ` ${up} ${higher}, or add more with an add-on.`
-              : " Add more with an add-on."
-          : up
-            ? ` ${up} ${higher}.`
-            : " An add-on gives you more.";
+        : up
+          ? ` ${up} ${higher}.`
+          : // Add-ons aren't bought in the app at launch (UX-080): the
+            // top plan's way to more is asking Saroh.
+            full
+            ? " Talk to us if you need more."
+            : "";
     return {
         on: true,
         full,
@@ -130,8 +130,8 @@ export function limitNotice(
                 ? action.label
                 : action.closed.label
             : up
-              ? "Upgrade or add more"
-              : "Add more",
+              ? "See plans"
+              : "See your plan",
         ...(action && open ? { href: action.href } : {}),
         why:
             full && !soft

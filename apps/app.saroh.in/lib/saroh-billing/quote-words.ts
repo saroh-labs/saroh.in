@@ -55,10 +55,13 @@ export function quoteSummary(
         value: `${formatInr(q.pricePaise)} + ${formatInr(q.gstPaise)} GST = ${formatInr(q.totalPaise)} ${per(q.cycle)}`,
     };
     const term: QuoteLine = oneTime
-        ? { label: "Then", value: "Renew with one tap before the year ends" }
+        ? {
+              label: "Then",
+              value: "Before the year ends, we ask you to pay for the next one",
+          }
         : {
               label: "Term",
-              value: `${q.termCharges || 12} monthly charges, then renew with one tap`,
+              value: `${q.termCharges || 12} monthly charges, then we ask you to pay for the next 12`,
           };
     const coupon: QuoteLine[] = q.coupon
         ? [

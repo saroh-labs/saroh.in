@@ -99,7 +99,7 @@ export function limitNoticeWords(
         const raises = row.upgradeUncapped
             ? "has no limit"
             : "raises the limit";
-        // A limit with its own way out (Saroh's emails) offers no add-on;
+        // A limit with its own way out (Saroh's emails) offers no upgrade first;
         // closed, the higher plan leads, as in `limitNotice`.
         const more = words.action
             ? open
@@ -109,7 +109,7 @@ export function limitNoticeWords(
                   : ""
             : up
               ? `${up} ${raises}.`
-              : "An add-on gives you more.";
+              : "Talk to us if you need more.";
         return {
             title: `You're past your ${limit.toLocaleString("en-IN")} ${countedWhat(words.what, limit)} on ${row.plan}`,
             body: [overBody(key, soft), more].filter(Boolean).join(" "),

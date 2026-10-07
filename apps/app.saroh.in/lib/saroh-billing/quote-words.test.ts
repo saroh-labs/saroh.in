@@ -52,7 +52,7 @@ describe("quoteSummary (DEC-093)", () => {
         expect(values(quote())).toEqual(
             expect.arrayContaining([
                 "₹261.96 (incl. GST)",
-                "12 monthly charges, then renew with one tap",
+                "12 monthly charges, then we ask you to pay for the next 12",
             ]),
         );
     });
@@ -112,7 +112,7 @@ describe("quoteSummary (DEC-093)", () => {
         expect(values(q)).toEqual(
             expect.arrayContaining([
                 "₹2,619.60 (incl. GST)",
-                "Renew with one tap before the year ends",
+                "Before the year ends, we ask you to pay for the next one",
             ]),
         );
     });

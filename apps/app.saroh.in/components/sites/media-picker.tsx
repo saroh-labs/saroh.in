@@ -497,14 +497,14 @@ function putWithProgress(
             else
                 reject(
                     new Error(
-                        `Storage refused the upload (${xhr.status}). Try again in a moment.`,
+                        `We couldn't save this file just now (${xhr.status}). Try again in a moment. Anything already saved is kept.`,
                     ),
                 );
         };
         xhr.onerror = () =>
             reject(
                 new Error(
-                    "Could not reach storage. Check the connection and try again.",
+                    "We couldn't save this file just now. Try again. Anything already saved is kept.",
                 ),
             );
         xhr.send(file);

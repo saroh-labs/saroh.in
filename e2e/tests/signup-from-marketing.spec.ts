@@ -54,7 +54,7 @@ async function setUp(page: Page, name: string) {
     await page.getByRole("radio", { name: /A business/ }).click();
     await page.getByLabel("What is it called?").fill(name);
     await expect(
-        page.getByText("Free — your website will live here."),
+        page.getByText("Available. Your website will live here."),
     ).toBeVisible();
     await page.getByRole("button", { name: "Create the business" }).click();
     await page.waitForURL((url) => !url.pathname.startsWith("/onboarding"), {

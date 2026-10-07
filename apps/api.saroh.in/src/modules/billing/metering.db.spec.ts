@@ -704,7 +704,7 @@ describe("enforcement behind PLAN_ENFORCEMENT (DB, U13)", () => {
             used: 3,
             plan: { id: "free", name: "Plan A" },
             upgradeTo: { planId: "grow", name: "Plan B" },
-            notice: { cta: "Upgrade or add more" },
+            notice: { cta: "See plans" },
         });
     });
 
@@ -914,7 +914,7 @@ describe("limit notices (DB, U13)", () => {
             },
             {
                 title: "You've reached your 5 products on Plan B",
-                body: "You can't add more products. Plan C raises the limit, or add more with an add-on.",
+                body: "You can't add more products. Plan C raises the limit.",
             },
         ]);
     });

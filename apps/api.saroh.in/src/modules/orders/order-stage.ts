@@ -151,7 +151,7 @@ export function planStageMove(order: StageSubject, to: OrderStage): StageMove {
     if (rule.visits) {
         throw new BadRequestException({
             message:
-                "An appointment moves on by its visits, not by kitchen steps.",
+                "An appointment moves on by its visits, not by order steps.",
             field: "stage",
         });
     }

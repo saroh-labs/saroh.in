@@ -125,7 +125,7 @@ export function PlanChooser({
                 <div className="flex flex-wrap items-center gap-2.5 border-b border-border/70 px-[18px] py-3">
                     <span className="flex-[1_1_260px] text-[12.5px] text-muted-foreground">
                         {canChange
-                            ? "Monthly is autopay for 12 months, then renew with one tap; yearly is one payment. Upgrades start today; downgrades from your next charge."
+                            ? "Monthly is autopay for 12 months and yearly is one payment; before either ends, we ask you to pay for the next term. Upgrades start today; downgrades from your next charge."
                             : "Changing plan is the owner's. These are Saroh's plans and what each is for."}
                     </span>
                     {yearly.on && rows ? (

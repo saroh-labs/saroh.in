@@ -78,7 +78,7 @@ export function planLimitReached(
         : {
               title: `You've reached your ${words.what} limit on ${row.plan}`,
               body: words.paused,
-              cta: "Add more",
+              cta: "See your plan",
           };
     const details: PlanLimitDetails = {
         code: PLAN_LIMIT_REACHED,

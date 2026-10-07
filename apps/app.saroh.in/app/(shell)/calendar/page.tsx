@@ -24,7 +24,7 @@ import { permitsFor } from "@/lib/organizations/permits";
 import { resolveActiveOrganization } from "@/lib/organizations/service";
 import { requireSession } from "@/lib/session";
 
-export const metadata = { title: "Calendar" };
+export const metadata = { title: "Overview" };
 
 const MONTH = /^\d{4}-(0[1-9]|1[0-2])$/;
 

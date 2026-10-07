@@ -158,7 +158,7 @@ export function payNote(
         case "CARD":
             return `Key ${total} into the machine; create once it approves.`;
         case "LINK":
-            return `You get the link to send to ${reach ?? "the customer"}. The order waits unpaid — the kitchen won't start it until it's paid.`;
+            return `You get the link to send to ${reach ?? "the customer"}. The order waits unpaid, and nobody starts it until it's paid.`;
         case "LATER":
             return "Nothing taken now. It shows as unpaid until they pay at the counter.";
     }

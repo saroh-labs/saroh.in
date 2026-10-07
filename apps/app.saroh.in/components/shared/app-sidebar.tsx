@@ -77,7 +77,7 @@ export function AppSidebar({
     locked?: readonly string[];
     /** The role as stored; see `navFor`. */
     roleKey?: string | null;
-    /** How many storefronts; with several the row reads "Storefronts". */
+    /** How many storefronts; with several the row reads "Locations". */
     storefronts?: number | null;
     /** The business tracks stock; off, Sell › Stock is not offered. */
     stockTracked?: boolean | null;

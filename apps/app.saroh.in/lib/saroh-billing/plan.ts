@@ -214,7 +214,7 @@ export function planSummary(
             : { kind: "text", text: "Date not set yet" },
         warning:
             subscription.status === "TRIALING"
-                ? "On a trial — nothing has been charged yet."
+                ? "In the first month — regular charges start after it."
                 : null,
     };
 }

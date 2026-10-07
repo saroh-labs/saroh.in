@@ -355,7 +355,7 @@ export function showsGroupLabel(group: NavGroup): boolean {
  * Navigation, named for what the merchant came to do.
  *
  * Onboarding asks "What does your business need to do?" and the merchant answers
- * in outcomes — *Sell products*, *Take appointments*, *Show up online*. The shell
+ * in outcomes — *Sell products*, *Take bookings*, *Show up online*. The shell
  * then discarded that vocabulary entirely and handed back module and entity
  * names — Commerce, Sites, Analytics — that nobody chose and nothing taught.
  * These labels are the onboarding answer, carried forward.
@@ -379,13 +379,14 @@ export const NAV_GROUPS: NavGroup[] = [
     {
         items: [
             { href: "/", label: "Home", icon: Home },
-            // Home › Calendar: one month of everything dated, after the
-            // "Saroh Business Calendar" design. Not module-gated — it spans
+            // Home › Overview (the "Saroh Business Calendar" design): one
+            // month of everything dated. Named Overview so it isn't a second
+            // "Calendar" beside Bookings › Calendar, the diary (UX-039). Not module-gated — it spans
             // modules, and each layer on it follows its own module and
             // permission (the API leaves out what the viewer may not see).
             {
                 href: "/calendar",
-                label: "Calendar",
+                label: "Overview",
                 icon: Calendar,
                 action: "org:read",
             },

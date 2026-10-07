@@ -106,13 +106,13 @@ const ROLE_LABEL: Record<OrganizationRole, string> = {
  * what the API's policy grants (`organization-policy.ts`): a business may
  * have several owners and never none; an admin lacks only closing the
  * business, so cannot change or remove an owner either; a member runs the
- * day — reads it and moves kitchen orders — sees the business's settings
+ * day — reads it and moves orders along — sees the business's settings
  * without changing them, and sees no money.
  */
 const ROLE_BLURB: Record<OrganizationRole, string> = {
     OWNER: "Can open and change everything. A business always has at least one owner, so it can never be locked out.",
     ADMIN: "Can do everything an owner can, except close the business or change or remove an owner.",
-    MEMBER: "Runs the day — sees bookings, contacts and the team, and moves kitchen orders along. No money, and no business settings.",
+    MEMBER: "Runs the day — sees bookings, contacts and the team, and moves orders along as they're prepared. No money, and no business settings.",
     REVIEWER:
         "Can look at the websites they're invited to, comment and sign them off. Nothing else in the business.",
 };
@@ -190,8 +190,8 @@ const TEAM_TABS = ["roles", "people"] as const;
  * Roles a business invents live in `RolesTab`, backed by the API's own
  * catalogue. Still not built, because nothing backs them yet: choosing a
  * role's ring colour (the avatar has one token per built-in, so invented roles
- * wear a neutral ring), and requiring two-step sign-in (the switch is drawn
- * off and says so — Saroh has no two-step sign-in).
+ * wear a neutral ring), and requiring two-step sign-in: Saroh has none, so
+ * the design's row is left out rather than drawn as "Coming soon" (UX-085).
  *
  * A person's extra permissions (F17) are set in the Edit drawer under their
  * role, and People shows an "Extra permissions" column once anyone has one
@@ -262,7 +262,7 @@ export function TeamScreen({
     const openInvite = () => {
         if (!room.open && teamLimit) {
             showInfo(
-                `${teamLimit.why} (invites count too). Upgrade or add more in Plan and billing.`,
+                `${teamLimit.why} (invites count too). See plans in Plan and billing.`,
             );
             return;
         }
@@ -527,8 +527,6 @@ function PeopleTab({
 
     return (
         <div className="space-y-3.5">
-            {canManage ? <TwoStepRequirement /> : null}
-
             {notice}
 
             {canManage && invitations.length > 0 ? (
@@ -672,40 +670,6 @@ function PeopleTab({
                     any other.
                 </p>
             </div>
-        </div>
-    );
-}
-
-/**
- * The design's "Require two-step sign-in for Owners and Admins" row, drawn
- * off and disabled. Saroh has no two-step sign-in (`your-profile.tsx` leaves
- * its row out for the same reason), so there is nothing to require: the
- * switch never moves, and the line under the title says so in place of the
- * design's "Recommended for a business that takes payments."
- */
-function TwoStepRequirement() {
-    return (
-        <div className="flex flex-wrap items-center gap-3 rounded-xl border border-border px-4 py-3">
-            <div className="min-w-0 flex-[1_1_260px]">
-                <p className="text-[13.5px] font-semibold">
-                    Require two-step sign-in for Owners and Admins
-                </p>
-                <p className="mt-0.5 text-[12px] text-muted-foreground">
-                    Coming soon — Saroh doesn&apos;t have two-step sign-in yet.
-                </p>
-            </div>
-            <button
-                type="button"
-                role="switch"
-                aria-checked={false}
-                aria-label="Require two-step sign-in"
-                disabled
-                className="shrink-0 cursor-not-allowed rounded-full p-1 opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-            >
-                <span className="relative block h-6 w-[42px] rounded-full bg-border">
-                    <span className="absolute left-[3px] top-[3px] size-[18px] rounded-full bg-card" />
-                </span>
-            </button>
         </div>
     );
 }

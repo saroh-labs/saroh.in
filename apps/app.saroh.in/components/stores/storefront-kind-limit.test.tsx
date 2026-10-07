@@ -115,7 +115,7 @@ describe("the location limit, by the radio (UX-036)", () => {
         await act(async () => {
             await new Promise((r) => setTimeout(r, 0));
         });
-        const alert = host.querySelector("#storefront-kind-error");
+        const alert = host.querySelector("#location-kind-error");
         expect(alert?.textContent).toBe(
             "You've reached your 2 places customers visit on this plan.",
         );

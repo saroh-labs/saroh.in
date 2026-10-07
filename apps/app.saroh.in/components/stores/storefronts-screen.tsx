@@ -446,7 +446,7 @@ function BasicsSection({
             </form>
 
             <div className="grid gap-2">
-                <p id="storefront-kind-label" className="text-sm font-medium">
+                <p id="location-kind-label" className="text-sm font-medium">
                     Do customers come here?
                 </p>
                 <ToggleGroup
@@ -458,11 +458,11 @@ function BasicsSection({
                         if (v === "SHOP" || v === "ONLINE") setKind(v);
                     }}
                     disabled={!canEdit || pending}
-                    aria-labelledby="storefront-kind-label"
+                    aria-labelledby="location-kind-label"
                     aria-describedby={
                         kindError
-                            ? "storefront-kind-error storefront-kind-note"
-                            : "storefront-kind-note"
+                            ? "location-kind-error location-kind-note"
+                            : "location-kind-note"
                     }
                     className={SEGMENTED}
                 >
@@ -475,14 +475,14 @@ function BasicsSection({
                 </ToggleGroup>
                 {kindError ? (
                     <p
-                        id="storefront-kind-error"
+                        id="location-kind-error"
                         role="alert"
                         className="text-pretty text-[12.5px] font-medium leading-[1.5] text-destructive-subtle-foreground"
                     >
                         {kindError}
                     </p>
                 ) : null}
-                <Note id="storefront-kind-note">
+                <Note id="location-kind-note">
                     Customers visit: it has an address, opening hours and
                     collection. No counter: stock kept for online orders, with
                     no address or hours.

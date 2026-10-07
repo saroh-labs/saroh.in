@@ -60,8 +60,7 @@ export function planRefusalOf(
             title,
             body: text(notice.body) ?? "",
             cta:
-                text(notice.cta) ??
-                (upgradeTo ? "Upgrade or add more" : "Add more"),
+                text(notice.cta) ?? (upgradeTo ? "See plans" : "See your plan"),
             upgradeTo,
             limit: typeof details.limit === "number" ? details.limit : null,
             used: typeof details.used === "number" ? details.used : null,

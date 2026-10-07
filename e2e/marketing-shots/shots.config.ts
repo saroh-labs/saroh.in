@@ -653,7 +653,7 @@ const SETUP_FILLED: Step[] = [
     { waitFor: 'text="What are you setting up?"' },
     { click: '[role="radio"]:has-text("A business")' },
     { fill: 'input[autocomplete="organization"]', value: "Tulsi Florist" },
-    { waitFor: 'text="Free — your website will live here."' },
+    { waitFor: 'text="Available. Your website will live here."' },
 ];
 
 /** A setup form item: the field's own block, label to description. */

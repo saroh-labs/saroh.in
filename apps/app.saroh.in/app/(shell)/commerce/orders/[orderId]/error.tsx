@@ -18,7 +18,7 @@ export default function Error({
             error={error}
             reset={reset}
             title="Couldn't load this order"
-            description="The kitchen can keep working from the printed ticket. Nothing has changed."
+            description="The team can keep working from the printed ticket. Nothing has changed."
             backHref="/commerce/orders"
             backLabel="Back to orders"
         />

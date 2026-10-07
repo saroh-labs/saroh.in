@@ -99,9 +99,10 @@ export default async function OnboardingPage({
                     heading="Then you are in."
                     body="Name it and Saroh opens. You decide what it does from inside, where you can see what each thing actually is."
                     points={[
-                        // True: name, type and country all change in Business
-                        // settings; the address has no editor anywhere.
-                        "Nothing here is permanent except the address",
+                        // True: name, type and country change in Business
+                        // settings, and the web address in its Web address
+                        // card, where a change breaks saved links (UX-085).
+                        "You can change any of it later in Settings",
                         "You are the Owner of what you create",
                         "Everything else is one tap away on Home",
                     ]}

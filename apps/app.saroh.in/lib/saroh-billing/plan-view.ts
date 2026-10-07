@@ -399,7 +399,7 @@ export function yourPlan(input: {
                           ? "The year you paid for ends on "
                           : `Your 12 months of ${name} end on `,
                       iso: term.endsAt,
-                      tail: `. Renew to keep ${name} from that day, at today's price; otherwise you move to Free then.`,
+                      tail: `. Pay for the next term to keep ${name} from that day, at today's price; otherwise you move to Free then.`,
                       action: { label: "Renew", planId, cycle },
                   }
                 : {
@@ -408,7 +408,7 @@ export function yourPlan(input: {
                           ? "Paid for the year, to "
                           : "Your 12 monthly charges run to ",
                       iso: term.endsAt,
-                      tail: ". You can renew with one tap in the last month.",
+                      tail: ". In its last 30 days we ask you to pay for the next term, and paying starts it.",
                       action: null,
                   },
         );

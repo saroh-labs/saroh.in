@@ -35,7 +35,7 @@ describe("rowNotice", () => {
             pct: "80%",
             title: "You've used 8 of 10 products on Plan A",
             body: "You'll be stopped at 10. Plan B gives you more.",
-            cta: "Upgrade or add more",
+            cta: "See plans",
         });
     });
 
@@ -48,7 +48,7 @@ describe("rowNotice", () => {
             on: true,
             full: true,
             title: "You've reached your 10 products on Plan A",
-            body: "You can't add more products. Plan B raises the limit, or add more with an add-on.",
+            body: "You can't add more products. Plan B raises the limit.",
             why: "You've reached your products limit on Plan A",
         });
     });
@@ -184,8 +184,8 @@ describe("rowNotice", () => {
         );
         expect(n).toMatchObject({
             full: true,
-            body: "New invites are paused. Everyone already on the team keeps access, and view-only people can still be invited. Add more with an add-on.",
-            cta: "Add more",
+            body: "New invites are paused. Everyone already on the team keeps access, and view-only people can still be invited. Talk to us if you need more.",
+            cta: "See your plan",
         });
     });
 

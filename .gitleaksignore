@@ -66,3 +66,5 @@ b0b12141037c74bc4edf462a64c9cae7147bb904:apps/api.saroh.in/src/modules/orders/of
 b0b12141037c74bc4edf462a64c9cae7147bb904:apps/api.saroh.in/src/modules/orders/offline-checkout-start.spec.ts:generic-api-key:92
 b0b12141037c74bc4edf462a64c9cae7147bb904:apps/saroh.app/lib/shop-checkout-shape.test.ts:generic-api-key:242
 b0b12141037c74bc4edf462a64c9cae7147bb904:apps/saroh.app/lib/shop-checkout-shape.test.ts:generic-api-key:251
+# A made-up idempotency key in the discount-code checkout spec (UX-060).
+ac41556585e5d71344e4f7ef0c3c0bf8684808c8:apps/api.saroh.in/src/modules/orders/offline-checkout-start.spec.ts:generic-api-key:351

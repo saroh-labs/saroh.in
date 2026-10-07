@@ -199,7 +199,7 @@ describe("/onboarding/modules", () => {
         const bookings = Array.from(
             document.querySelectorAll('[role="checkbox"]'),
         ).find((c) =>
-            c.closest("label")?.textContent.includes("Take appointments"),
+            c.closest("label")?.textContent.includes("Take bookings"),
         );
         click(bookings);
         click(buttonNamed(/Set up my workspace/));

@@ -14,7 +14,7 @@ import { AccessDenied } from "@/components/shared/access-denied";
 export function CalendarNothing() {
     return (
         <>
-            <PageHeader breadcrumb={["Home", "Calendar"]} title="Calendar" />
+            <PageHeader breadcrumb={["Home", "Overview"]} title="Overview" />
             <EmptyState
                 icon={<CalendarDays aria-hidden />}
                 title="Nothing dated to show here"
