@@ -128,9 +128,13 @@ const input: CatalogInput = {
             id: "review",
             name: "Required approval before changes go live",
             group: "site",
-            pricing: "hidden",
+            pricing: "show",
             what: "Changes to the site wait for a teammate's approval before they go live.",
-            cells: { free: X("hidden"), grow: X("hidden"), pro: X("hidden") },
+            cells: {
+                free: X("locked"),
+                grow: X("locked"),
+                pro: C("Included", "Approval before changes go live"),
+            },
         },
         {
             id: "blog",
@@ -258,10 +262,10 @@ const input: CatalogInput = {
         },
         {
             id: "reviewers",
-            name: "Reviewers",
+            name: "View-only people",
             group: "team",
             pricing: "show",
-            what: "People who only approve your website's pages. They use no team seat.",
+            what: "People who can only look and approve, never change anything. They use no team seat.",
             cells: {
                 free: C("1", "", 1),
                 grow: C("3", "", 3),
@@ -276,7 +280,7 @@ const input: CatalogInput = {
             what: "Roles you define, beyond Owner, Admin, Member and Reviewer.",
             cells: {
                 free: X("hidden"),
-                grow: C("Included", "Custom roles"),
+                grow: X("locked"),
                 pro: C("Included", "Custom roles"),
             },
         },

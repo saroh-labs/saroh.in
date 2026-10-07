@@ -1171,3 +1171,31 @@ Unless an entry says otherwise, its status is **Proposed — requires audit revi
     - When a site change or test release goes live, any open review request for it is closed.
     - Saroh's own sites show contact@saroh.in as the contact address.
     - A merchant's site footer shows the business's own contact email when the business has added one.
+
+## DEC-102 The Saroh credit on merchant sites: Free only
+
+**Status: Accepted — 2026-10-07** · user · from the UX audit (D4)
+
+- Decision: Free sites show "Made with Saroh" in the footer, linking with the business's referral code. Paid plans show no Saroh credit.
+- Consequences: the renderer reads the plan to choose the footer credit, replacing the "Runs on Saroh" line every site shows today.
+
+## DEC-103 Publishing needs approval is a Pro feature
+
+**Status: Accepted — 2026-10-07** · user · from the UX audit (D9)
+
+- Decision: the "Publishing needs approval" website setting is included on Pro only. A teammate's site edits wait for an owner's or admin's approval before going live. The setting is hidden on Free and Grow, not upsold from a switch that does nothing.
+- Consequences: the catalogue's approval row is included on Pro. An approval already switched on, on a plan without it, stops applying, and publishing goes through as normal.
+
+## DEC-104 Customers can use discount codes at a merchant site's checkout
+
+**Status: Accepted — 2026-10-07** · user · from the UX audit (D12)
+
+- Decision: on every plan that sells on its website, the site's bag and checkout accept the merchant's discount codes from Sell › Discounts, with the same rules as at the counter.
+- Consequences: the checkout quote validates and applies a code, and orders record the code used.
+
+## DEC-105 Team seats count people who can change things; view-only people have their own limit
+
+**Status: Accepted — 2026-10-07** · user · from the UX audit (D6)
+
+- Decision: anyone whose role carries a write permission (books, sells, edits), including bookable staff, uses a team seat. People whose role carries only view permissions don't use a seat. They count toward a separate per-plan limit, the one Reviewers use today, which can change by policy.
+- Consequences: metering classifies a member by their role's permissions, not its name. The catalogue's Reviewers row becomes the view-only people limit.
