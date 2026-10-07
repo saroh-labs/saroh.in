@@ -2,6 +2,7 @@ import { Transform, Type } from "class-transformer";
 import {
     ArrayMinSize,
     IsArray,
+    IsBoolean,
     IsIn,
     IsInt,
     IsISO8601,
@@ -214,6 +215,16 @@ export class CreateOrderDto {
     @ValidateNested()
     @Type(() => NewOrderPaymentInput)
     payment?: NewOrderPaymentInput;
+
+    /**
+     * Handed over now (UX-059): a counter sale the customer leaves with,
+     * paid now and picked up on the spot, is made Collected at once —
+     * never a New order that needs three more steps after they have gone.
+     * Only with a counter payment and Pick-up.
+     */
+    @IsOptional()
+    @IsBoolean({ message: "Say whether it was handed over." })
+    handedOver?: boolean;
 
     @IsArray()
     @ArrayMinSize(1, { message: "An order needs at least one item" })

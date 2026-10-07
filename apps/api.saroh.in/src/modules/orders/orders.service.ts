@@ -45,9 +45,11 @@ import {
     refundedByHandNote,
 } from "./hand-payments";
 import {
+    assertHandedOver,
     assertOneParty,
     assertStorefrontOffers,
     cashReceivedCents,
+    handOverAtCounterInTx,
     isCounterPayment,
     newOrderLines,
     orderPartyInTx,
@@ -299,6 +301,13 @@ export class OrdersService {
             });
         }
 
+        // Handed over now (UX-059): paid at the counter, picked up there.
+        assertHandedOver({
+            handedOver: dto.handedOver,
+            payment: dto.payment ?? null,
+            fulfilment: type,
+        });
+
         // Paid at the counter (B13): cash short of the total is refused.
         const counter =
             dto.payment && isCounterPayment(dto.payment.kind)
@@ -424,6 +433,13 @@ export class OrdersService {
                                 receivedCents: counter.receivedCents,
                                 at: new Date(),
                             });
+                            if (dto.handedOver) {
+                                await handOverAtCounterInTx(tx, {
+                                    orderId: order.id,
+                                    organizationId,
+                                    userId,
+                                });
+                            }
                         }
                         const payLink =
                             dto.payment?.kind === "LINK" && organizationId

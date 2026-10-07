@@ -1,5 +1,6 @@
 "use client";
 
+import { Checkbox } from "@saroh/ui/checkbox";
 import { Input } from "@saroh/ui/input";
 import { cn } from "@saroh/ui/lib/utils";
 import { useId, useState } from "react";
@@ -28,6 +29,8 @@ export function PayStep({
     format,
     discount,
     onDiscount,
+    handedOver = null,
+    onHandedOver,
 }: {
     options: { key: NewOrderPay; label: string; off: string | null }[];
     pay: NewOrderPay;
@@ -41,8 +44,15 @@ export function PayStep({
     /** A code or an amount off, as typed. */
     discount: string;
     onDiscount: (discount: string) => void;
+    /**
+     * "Handed over now" (UX-059): null where it doesn't apply, else
+     * whether the sale is Collected the moment it's made.
+     */
+    handedOver?: boolean | null;
+    onHandedOver?: (on: boolean) => void;
 }) {
     const givenId = useId();
+    const handedId = useId();
     const discountId = useId();
     const [discounting, setDiscounting] = useState(discount !== "");
     return (
@@ -103,6 +113,27 @@ export function PayStep({
             <p className="mt-2.5 text-pretty text-[12.5px] leading-[1.5] text-muted-foreground">
                 {note}
             </p>
+            {handedOver !== null ? (
+                <label
+                    htmlFor={handedId}
+                    className="mt-2.5 flex cursor-pointer items-start gap-2.5 text-[13px] coarse:min-h-11"
+                >
+                    <Checkbox
+                        id={handedId}
+                        checked={handedOver}
+                        onCheckedChange={(v) => onHandedOver?.(v === true)}
+                        className="mt-0.5"
+                    />
+                    <span>
+                        <span className="font-semibold">Handed over now</span>
+                        <span className="block text-[12px] text-muted-foreground">
+                            {handedOver
+                                ? "It's made Collected — nothing more to do."
+                                : "It starts as New, to prepare and hand over later."}
+                        </span>
+                    </span>
+                </label>
+            ) : null}
             {discounting ? (
                 <div className="mt-2.5">
                     <label

@@ -110,6 +110,8 @@ export interface NewOrderInput {
     discount?: string;
     discountCode?: string;
     currency?: string;
+    /** Handed over now (UX-059): made Collected at once. */
+    handedOver?: boolean;
     payment: { kind: NewOrderPay; received?: string };
 }
 

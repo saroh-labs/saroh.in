@@ -18,6 +18,7 @@ import {
 } from "./fulfilment";
 import type { CounterPayment } from "./new-order.dto";
 import { COUNTER_PAYMENTS } from "./new-order.dto";
+import { applyInventoryTransition, phaseOf } from "./order-inventory";
 import { RETIRED_PAY_LINK } from "./order-pay-link";
 import {
     contactByPhone,
@@ -565,5 +566,75 @@ export function assertStorefrontOffers(
             ? `This location doesn't offer ${FULFILMENT_RULES[type].label}. It offers ${words.join(", ")}.`
             : "This location doesn't offer a way for orders to leave yet. Turn one on in its settings.",
         details: { field: "fulfilment" },
+    });
+}
+
+/**
+ * "Handed over now" (UX-059) asks for what makes it true: paid at the
+ * counter, now, and picked up there. Refused before anything is written.
+ */
+export function assertHandedOver(input: {
+    handedOver?: boolean;
+    payment?: { kind: string } | null;
+    fulfilment: string;
+}): void {
+    if (!input.handedOver) return;
+    if (!input.payment || !isCounterPayment(input.payment.kind)) {
+        throw new BadRequestException({
+            message:
+                "Only an order paid at the counter now can be handed over straight away.",
+            field: "handedOver",
+        });
+    }
+    if (input.fulfilment !== "PICKUP") {
+        throw new BadRequestException({
+            message: "Only a pick-up can be handed over at the counter.",
+            field: "handedOver",
+        });
+    }
+}
+
+/** How a counter sale handed over on the spot reads on its timeline. */
+export const HANDED_OVER_NOTE = "Handed over at the counter";
+
+/**
+ * Make a counter sale Collected at once (UX-059), on the create's
+ * transaction after its payment: what it holds is sold, and one step says
+ * it was handed over at the counter. No notice goes to the customer — they
+ * were there.
+ */
+export async function handOverAtCounterInTx(
+    tx: Tx,
+    input: { orderId: string; organizationId: string | null; userId: string },
+): Promise<void> {
+    const { orderId, organizationId, userId } = input;
+    const items = await tx.orderItem.findMany({
+        where: { orderId },
+        select: { id: true },
+    });
+    await applyInventoryTransition(
+        tx,
+        items,
+        "RESERVED",
+        phaseOf("DELIVERED"),
+        userId,
+    );
+    await tx.order.update({
+        where: { id: orderId },
+        data: { stage: "COLLECTED", status: "DELIVERED" },
+    });
+    if (!organizationId) return;
+    await tx.orderEvent.create({
+        data: {
+            organizationId,
+            orderId,
+            kind: "STAGE",
+            actorUserId: userId,
+            fromStage: "NEW",
+            toStage: "COLLECTED",
+            fromStatus: "PENDING",
+            toStatus: "DELIVERED",
+            note: HANDED_OVER_NOTE,
+        },
     });
 }

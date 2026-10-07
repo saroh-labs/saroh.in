@@ -130,6 +130,20 @@ export function payOptions(input: {
     ];
 }
 
+/**
+ * Whether "Handed over now" applies (UX-059): paid at the counter, now,
+ * and picked up there — the sale the customer walks out with. The API
+ * makes such an order Collected at once, and refuses the flag otherwise.
+ */
+export function canHandOver(
+    pay: NewOrderPay,
+    way: NewOrderWay["type"] | null,
+): boolean {
+    return (
+        way === "PICKUP" && (pay === "CASH" || pay === "UPI" || pay === "CARD")
+    );
+}
+
 /** What the payment will do, said before the button (the design's note). */
 export function payNote(
     pay: NewOrderPay,
