@@ -1,10 +1,13 @@
 import { ProductEditorV2 } from "@/components/commerce/product-editor-v2/editor-shell";
 import { NoProductAccess } from "@/components/commerce/product-editor-v2/no-access";
+import { ProductLimitReached } from "@/components/commerce/product-limit-reached";
 import { StorefrontChooser } from "@/components/commerce/storefront-chooser";
 import { PageContainer } from "@/components/shared/page-container";
+import { planMeter } from "@/lib/billing/meter";
 import { resolveActiveOrganization } from "@/lib/organizations/service";
 import { loadEditorContext } from "@/lib/products/editor-data";
 import { newProductHref } from "@/lib/products/links";
+import { billingAccessOrNull } from "@/lib/saroh-billing/service";
 import { requireSession } from "@/lib/session";
 import { pickStorefront } from "@/lib/stores/pick";
 import { listBusinessStores } from "@/lib/stores/service";
@@ -25,13 +28,23 @@ export default async function NewProductPage({
     searchParams: Promise<{ storefront?: string }>;
 }) {
     await requireSession();
-    const [{ storefront }, stores, organization] = await Promise.all([
+    const [{ storefront }, stores, organization, access] = await Promise.all([
         searchParams,
         listBusinessStores(),
         resolveActiveOrganization(),
+        billingAccessOrNull(),
     ]);
     if (organization?.actions && !organization.actions.includes("store:read")) {
         return <NoProductAccess organization={organization} />;
+    }
+    // At the plan's limit, say so before the form, not on Create (UX-036).
+    const meter = planMeter(access, "products");
+    if (meter?.full) {
+        return (
+            <PageContainer width="form">
+                <ProductLimitReached meter={meter} />
+            </PageContainer>
+        );
     }
     const store = pickStorefront(stores, storefront);
 

@@ -1,10 +1,12 @@
 import { Type } from "class-transformer";
 import {
     IsIn,
+    IsInt,
     IsObject,
     IsOptional,
     IsString,
     MaxLength,
+    Min,
     MinLength,
 } from "class-validator";
 
@@ -42,4 +44,14 @@ export class PreviewImportDto {
  * a merchant can never approve one preview and have a different set of writes
  * executed — whether by tampering or by a stale tab.
  */
-export class ApplyImportDto extends PreviewImportDto {}
+export class ApplyImportDto extends PreviewImportDto {
+    /**
+     * Bring in only the first N new products — what the plan has room for
+     * (UX-036) — and leave the rest of the new rows out. Updates always go.
+     * The cap is still checked on what is written.
+     */
+    @IsOptional()
+    @IsInt({ message: "How many to bring in must be a whole number" })
+    @Min(0)
+    createAtMost?: number;
+}

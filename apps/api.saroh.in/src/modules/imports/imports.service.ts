@@ -18,7 +18,7 @@ import { StoresService } from "../stores/stores.service";
 import { CsvFormatError, parseCsv } from "./csv";
 import type { ApplyImportDto, PreviewImportDto } from "./dto";
 import type { ImportEntity } from "./entities";
-import { ENTITY_DESCRIPTORS } from "./entities";
+import { ENTITY_DESCRIPTORS, splitFullName } from "./entities";
 import type { ImportPlan, WritableRow } from "./import-plan";
 import {
     buildImportPlan,
@@ -61,7 +61,37 @@ export interface ApplyResult {
     updated: number;
     skipped: number;
     failed: number;
+    /**
+     * New products left out because the import was asked to bring in only
+     * what the plan has room for (`createAtMost`, UX-036). 0 otherwise.
+     */
+    overLimit: number;
     plan: ImportPlan;
+}
+
+/**
+ * Keep the first `most` rows that would add a product, and every update;
+ * the rest of the new ones are left out (UX-036: "import the 6 that fit").
+ * Archived rows add nothing to the count, as the cap counts (U13).
+ */
+export function keepFirstNew(
+    rows: readonly WritableRow[],
+    most: number | undefined,
+    adds: (row: WritableRow) => boolean,
+): { kept: WritableRow[]; left: number } {
+    if (most === undefined) return { kept: [...rows], left: 0 };
+    let taken = 0;
+    let left = 0;
+    const kept = rows.filter((r) => {
+        if (!adds(r)) return true;
+        if (taken < most) {
+            taken += 1;
+            return true;
+        }
+        left += 1;
+        return false;
+    });
+    return { kept, left };
 }
 
 /**
@@ -117,22 +147,25 @@ export class ImportsService {
             });
         }
 
-        const rows = writableRows(plan);
         let created = 0;
         let updated = 0;
 
         // New products count toward the plan's cap (U13): the whole file is
         // checked before anything is written, so an import that can't fit
         // is refused whole rather than stopping partway; each chunk checks
-        // again on its own transaction.
+        // again on its own transaction. Asked for only what fits
+        // (`createAtMost`, UX-036), the new rows past it are left out first.
+        const addsProduct = (r: WritableRow) =>
+            entity === "products" &&
+            r.outcome === "CREATE" &&
+            (r.values.status ?? "DRAFT") !== "ARCHIVED";
+        const { kept: rows, left: overLimit } = keepFirstNew(
+            writableRows(plan),
+            entity === "products" ? dto.createAtMost : undefined,
+            addsProduct,
+        );
         const newProducts = (chunk: readonly WritableRow[]) =>
-            entity === "products"
-                ? chunk.filter(
-                      (r) =>
-                          r.outcome === "CREATE" &&
-                          (r.values.status ?? "DRAFT") !== "ARCHIVED",
-                  ).length
-                : 0;
+            chunk.filter(addsProduct).length;
         if (organizationId && newProducts(rows) > 0) {
             await planMeter.assertRoom(organizationId, "products", {
                 adding: newProducts(rows),
@@ -171,6 +204,7 @@ export class ImportsService {
             updated,
             skipped: plan.counts.SKIP,
             failed: plan.counts.ERROR,
+            overLimit,
             plan,
         };
     }
@@ -182,6 +216,7 @@ export class ImportsService {
             entity,
             requiredFields: d.requiredFields,
             mappableFields: d.mappableFields,
+            fieldLabels: d.fieldLabels,
             keyLabel: d.keyLabel,
         };
     }
@@ -214,7 +249,11 @@ export class ImportsService {
         const mapping =
             Object.keys(dto.mapping).length > 0
                 ? dto.mapping
-                : suggestMapping(parsed.headers, descriptor.mappableFields);
+                : suggestMapping(
+                      parsed.headers,
+                      descriptor.mappableFields,
+                      descriptor.aliases,
+                  );
 
         const plan = buildImportPlan({
             records: parsed.records,
@@ -277,6 +316,13 @@ export class ImportsService {
                 image: v.image ?? null,
                 price: required(row, "price"),
                 status: v.status ?? "DRAFT",
+                // Validated per row as the editor's fields are (UX-065);
+                // a blank cell leaves them unset.
+                ...(v.mrp?.trim() ? { mrp: v.mrp.trim() } : {}),
+                ...(v.gstRate?.trim() ? { gstRate: v.gstRate.trim() } : {}),
+                ...(v.hsnCode?.trim()
+                    ? { hsnCode: v.hsnCode.replace(/\s+/g, "") }
+                    : {}),
             };
             // Every storefront belongs to a business; so does every product.
             if (!organizationId) {
@@ -338,14 +384,16 @@ export class ImportsService {
         }
 
         const email = row.key;
+        // "Full name" splits into first and last (UX-065).
+        const c = splitFullName(v);
         const data = {
-            firstName: v.firstName ?? null,
-            lastName: v.lastName ?? null,
-            phone: v.phone ?? null,
-            country: v.country ?? null,
-            state: v.state ?? null,
-            city: v.city ?? null,
-            zipCode: v.zipCode ?? null,
+            firstName: c.firstName ?? null,
+            lastName: c.lastName ?? null,
+            phone: c.phone ?? null,
+            country: c.country ?? null,
+            state: c.state ?? null,
+            city: c.city ?? null,
+            zipCode: c.zipCode ?? null,
         };
         if (row.outcome === "CREATE") {
             await tx.customer.create({
