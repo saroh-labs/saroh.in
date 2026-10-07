@@ -7,10 +7,15 @@ jest.mock("@saroh/database", () => ({
 jest.mock("../../env", () => ({
     env: { APP_URL: "https://app.saroh.localhost" },
 }));
+// Saroh's own mail to the team (UX-042, UX-043): what was sent, and when.
+jest.mock("../../common/email", () => ({
+    sendTeamNoticeEmail: jest.fn().mockResolvedValue(undefined),
+}));
 
 import type { Job, Prisma } from "@saroh/database";
 import { prisma, runInOrgContext } from "@saroh/database";
 
+import { sendTeamNoticeEmail } from "../../common/email";
 import type { CommunicationsService } from "../communications/communications.service";
 import {
     renderAlertEmail,
@@ -18,9 +23,41 @@ import {
     TeamAlertHandler,
     tellTeam,
 } from "./team-alert.handler";
+import type { TeamMail } from "./team-alerts";
 import { enqueueTeamAlert } from "./team-alerts";
 
 const ORG = "org_1";
+
+/** The team, with the emails Saroh's own mail reaches them at. */
+const MEMBERS = [
+    { userId: "u_owner", role: "OWNER", user: { email: "owner@rye.test" } },
+    { userId: "u_admin", role: "ADMIN", user: { email: "admin@rye.test" } },
+    {
+        userId: "u_kitchen",
+        role: "MEMBER",
+        user: { email: "kitchen@rye.test" },
+    },
+    {
+        userId: "u_clerk",
+        role: "stock-clerk",
+        user: { email: "clerk@rye.test" },
+    },
+    { userId: "u_rina", role: "REVIEWER", user: { email: "rina@review.test" } },
+];
+
+/** `membership.findMany`, honouring the two filters the handler uses. */
+function membersWhere(args: {
+    where?: { role?: { in: string[] }; userId?: { in: string[] } };
+}) {
+    const w = args.where ?? {};
+    return Promise.resolve(
+        MEMBERS.filter(
+            (m) =>
+                (!w.role || w.role.in.includes(m.role)) &&
+                (!w.userId || w.userId.in.includes(m.userId)),
+        ),
+    );
+}
 
 function makeTx() {
     return {
@@ -46,13 +83,14 @@ function makeTx() {
         invoice: { findFirst: jest.fn() },
         membership: {
             findUnique: jest.fn(),
-            findMany: jest.fn().mockResolvedValue([
-                { userId: "u_owner", role: "OWNER" },
-                { userId: "u_admin", role: "ADMIN" },
-                { userId: "u_kitchen", role: "MEMBER" },
-                { userId: "u_clerk", role: "stock-clerk" },
-            ]),
+            // The reviewer reads no orders, money or team: never emailed by
+            // the provider path whatever the row.
+            findMany: jest.fn(membersWhere),
         },
+        siteReviewer: { findMany: jest.fn().mockResolvedValue([]) },
+        siteApproval: { findFirst: jest.fn() },
+        siteComment: { findFirst: jest.fn(), count: jest.fn() },
+        user: { findUnique: jest.fn() },
         organizationRole: {
             findFirst: jest.fn(),
             // An invented role with the stock, and nothing about money.
@@ -99,6 +137,22 @@ beforeEach(() => {
     emailConnected.mockResolvedValue(true);
 });
 
+/** A counter order, paid there: the provider path, as F14 built it. */
+function counterOrder(tx: FakeTx) {
+    tx.order.findFirst.mockResolvedValue({
+        id: "ord_1",
+        orderId: "ORD-012",
+        total: "1240.00",
+        currency: "INR",
+        status: "PENDING",
+        paymentStatus: "PAID",
+        placedOnline: false,
+        customerId: "cus_1",
+        walkInName: null,
+        customer: { firstName: "Asha", lastName: "Rao", email: null },
+    });
+}
+
 describe("a new order", () => {
     it("puts one notice in the inbox, claimed once, in words", async () => {
         const tx = makeTx();
@@ -129,8 +183,9 @@ describe("a new order", () => {
         });
     });
 
-    it("emails nobody by default: email is on only for a failed payment", async () => {
+    it("a counter order emails nobody by default: email is on only for a failed payment", async () => {
         const tx = makeTx();
+        counterOrder(tx);
         const out = await tellTeam(asTx(tx), comms, ORG, {
             event: "order",
             orderId: "ord_1",
@@ -141,6 +196,7 @@ describe("a new order", () => {
 
     it("emails whoever turned email on and can read orders, but not the one who took it", async () => {
         const tx = makeTx();
+        counterOrder(tx);
         tx.notificationPreference.findMany.mockResolvedValue([
             // The owner took this order at the counter.
             {
@@ -612,6 +668,303 @@ describe("the job", () => {
                     paymentIntentId: "pi_1",
                 },
             },
+        });
+    });
+});
+
+describe("a new website order (UX-042)", () => {
+    it("Saroh's own mail tells the owners and admins, without a provider", async () => {
+        const tx = makeTx();
+        emailConnected.mockResolvedValue(false);
+        const mails: TeamMail[] = [];
+        const out = await tellTeam(
+            asTx(tx),
+            comms,
+            ORG,
+            { event: "order", orderId: "ord_1" },
+            new Date(),
+            mails,
+        );
+        expect(out).toEqual({ told: true, emailed: 2 });
+        expect(queueTransactional).not.toHaveBeenCalled();
+        expect(mails.map((m) => m.to)).toEqual([
+            "owner@rye.test",
+            "admin@rye.test",
+        ]);
+        expect(mails[0]).toEqual({
+            to: "owner@rye.test",
+            subject: "Rye & Co: New order ORD-012 from Asha Rao",
+            heading: "New order ORD-012 from Asha Rao",
+            text: "₹1,240.00, paid online.",
+            url: "https://app.saroh.localhost/commerce/orders/ord_1",
+            cta: "Open the order",
+        });
+        // The bell has it too, once.
+        expect(tx.notification.create).toHaveBeenCalledTimes(1);
+    });
+
+    it("leaves out whoever turned the New order email off", async () => {
+        const tx = makeTx();
+        tx.notificationPreference.findMany.mockResolvedValue([
+            {
+                userId: "u_admin",
+                event: "order",
+                channel: "email",
+                enabled: false,
+            },
+        ]);
+        const mails: TeamMail[] = [];
+        await tellTeam(
+            asTx(tx),
+            comms,
+            ORG,
+            { event: "order", orderId: "ord_1" },
+            new Date(),
+            mails,
+        );
+        expect(mails.map((m) => m.to)).toEqual(["owner@rye.test"]);
+    });
+
+    it("the same order twice mails nobody the second time", async () => {
+        const tx = makeTx();
+        tx.customerNotice.createMany.mockResolvedValue({ count: 0 });
+        const mails: TeamMail[] = [];
+        await tellTeam(
+            asTx(tx),
+            comms,
+            ORG,
+            { event: "order", orderId: "ord_1" },
+            new Date(),
+            mails,
+        );
+        expect(mails).toEqual([]);
+    });
+
+    it("the job sends once the claim commits, and a retry sends nothing", async () => {
+        const tx = makeTx();
+        (prisma.$transaction as jest.Mock).mockImplementation(
+            (fn: (t: unknown) => unknown) => fn(tx),
+        );
+        const job = {
+            id: "job_9",
+            type: TEAM_ALERT_TYPE,
+            organizationId: ORG,
+            payload: { event: "order", orderId: "ord_1" },
+        } as unknown as Job;
+        await new TeamAlertHandler(comms).handle(job);
+        expect(sendTeamNoticeEmail).toHaveBeenCalledTimes(2);
+
+        tx.customerNotice.createMany.mockResolvedValue({ count: 0 });
+        await new TeamAlertHandler(comms).handle(job);
+        expect(sendTeamNoticeEmail).toHaveBeenCalledTimes(2);
+        expect(tx.notification.create).toHaveBeenCalledTimes(1);
+    });
+});
+
+describe("the website's review (UX-043)", () => {
+    const at = new Date("2026-10-07T10:00:00Z");
+    function approval(tx: FakeTx, outcome: string, over = {}) {
+        tx.siteApproval.findFirst.mockImplementation(
+            (args: { where: { id?: string } }) =>
+                Promise.resolve(
+                    args.where.id
+                        ? {
+                              id: "apr_1",
+                              siteId: "site_1",
+                              outcome,
+                              byUserId:
+                                  outcome === "REQUESTED"
+                                      ? "u_owner"
+                                      : "u_rina",
+                              createdAt: at,
+                              testReleaseId: null,
+                              by:
+                                  outcome === "REQUESTED"
+                                      ? { name: "Owner Free", email: "o@x" }
+                                      : { name: "Rina Reviewer", email: "r@x" },
+                              site: { name: "Rye & Co" },
+                              testRelease: null,
+                              ...over,
+                          }
+                        : // The request this verdict answers.
+                          { byUserId: "u_owner", id: "apr_0" },
+                ),
+        );
+        tx.siteReviewer.findMany.mockResolvedValue([
+            { userId: "u_rina", user: { email: "rina@review.test" } },
+            // A grant for someone no longer on the team.
+            { userId: "u_gone", user: { email: "gone@review.test" } },
+        ]);
+    }
+
+    it("asking for a review mails the site's reviewers, and puts nothing in the bell", async () => {
+        const tx = makeTx();
+        approval(tx, "REQUESTED");
+        const mails: TeamMail[] = [];
+        const out = await tellTeam(
+            asTx(tx),
+            comms,
+            ORG,
+            { event: "review", about: "approval", approvalId: "apr_1" },
+            at,
+            mails,
+        );
+        expect(out).toEqual({ told: true, emailed: 1 });
+        expect(tx.notification.create).not.toHaveBeenCalled();
+        expect(mails).toEqual([
+            {
+                to: "rina@review.test",
+                subject: "Rye & Co: Owner Free asked you to review Rye & Co",
+                heading: "Owner Free asked you to review Rye & Co",
+                text: "Open it to leave notes on what you see, then approve it or ask for changes.",
+                url: "https://app.saroh.localhost/sites/site_1/review",
+                cta: "Open the review",
+            },
+        ]);
+        expect(
+            tx.customerNotice.createMany.mock.calls[0][0].data[0],
+        ).toMatchObject({ eventKey: "team:review:apr_1", kind: "TEAM_TOLD" });
+    });
+
+    it("an approval tells who publishes in the bell, and emails who asked", async () => {
+        const tx = makeTx();
+        approval(tx, "APPROVED");
+        tx.siteComment.count.mockResolvedValue(1);
+        await tellTeam(asTx(tx), comms, ORG, {
+            event: "review",
+            about: "approval",
+            approvalId: "apr_1",
+        });
+        expect(tx.notification.create.mock.calls[0][0].data).toEqual({
+            organizationId: ORG,
+            type: "site.review.approved",
+            title: "Rina Reviewer approved Rye & Co",
+            body: "With 1 open note to look at before it goes live.",
+        });
+        // The Website row's email is on by default for who can publish;
+        // the reviewer who approved it isn't told of their own verdict.
+        expect(recipients()).toEqual(["u_owner", "u_admin"]);
+    });
+
+    it("a change request says their notes say what", async () => {
+        const tx = makeTx();
+        approval(tx, "CHANGES_REQUESTED");
+        tx.siteComment.count.mockResolvedValue(2);
+        await tellTeam(asTx(tx), comms, ORG, {
+            event: "review",
+            about: "approval",
+            approvalId: "apr_1",
+        });
+        expect(tx.notification.create.mock.calls[0][0].data).toMatchObject({
+            type: "site.review.changes",
+            title: "Rina Reviewer asked for changes to Rye & Co",
+            body: "Their 2 open notes say what to change.",
+        });
+    });
+
+    it("a verdict on a release gone live since says nothing", async () => {
+        const tx = makeTx();
+        approval(tx, "APPROVED", {
+            testReleaseId: "rel_1",
+            testRelease: {
+                name: "Spring",
+                discardedAt: null,
+                wentLiveAt: at,
+            },
+        });
+        const out = await tellTeam(asTx(tx), comms, ORG, {
+            event: "review",
+            about: "approval",
+            approvalId: "apr_1",
+        });
+        expect(out.told).toBe(false);
+        expect(tx.customerNotice.createMany).not.toHaveBeenCalled();
+    });
+
+    function note(tx: FakeTx, author: string, role: string) {
+        tx.siteComment.findFirst.mockResolvedValue({
+            siteId: "site_1",
+            body: "The opening   line\nundersells you.",
+            pageTitle: "Home",
+            authorUserId: author,
+            createdAt: at,
+            testReleaseId: null,
+            author: { name: "Rina Reviewer", email: "r@x" },
+            site: { name: "Rye & Co" },
+            testRelease: null,
+        });
+        tx.membership.findUnique.mockResolvedValue({ role });
+        tx.siteApproval.findFirst.mockResolvedValue({ id: "apr_0" });
+    }
+
+    it("a reviewer's note is told once per round, quoted", async () => {
+        const tx = makeTx();
+        note(tx, "u_rina", "REVIEWER");
+        await tellTeam(asTx(tx), comms, ORG, {
+            event: "review",
+            about: "note",
+            commentId: "c_1",
+        });
+        expect(
+            tx.customerNotice.createMany.mock.calls[0][0].data[0],
+        ).toMatchObject({
+            eventKey: "team:review-note:site_1:draft:u_rina:apr_0",
+        });
+        expect(tx.notification.create.mock.calls[0][0].data).toMatchObject({
+            type: "site.review.note",
+            title: "Rina Reviewer left a note on Rye & Co",
+            body: "On Home: “The opening line undersells you.”",
+        });
+    });
+
+    it("a note by someone who publishes tells nobody", async () => {
+        const tx = makeTx();
+        note(tx, "u_owner", "OWNER");
+        const out = await tellTeam(asTx(tx), comms, ORG, {
+            event: "review",
+            about: "note",
+            commentId: "c_1",
+        });
+        expect(out.told).toBe(false);
+    });
+
+    it("a new test release mails the reviewers its link in the workspace", async () => {
+        const tx = makeTx();
+        tx.siteTestRelease = {
+            findFirst: jest.fn().mockResolvedValue({
+                id: "rel_1",
+                siteId: "site_1",
+                name: "Subheading fix",
+                discardedAt: null,
+                wentLiveAt: null,
+                createdByUserId: "u_owner",
+                site: { name: "Rye & Co" },
+            }),
+        } as never;
+        tx.user.findUnique.mockResolvedValue({
+            name: "Owner Free",
+            email: "o@x",
+        });
+        tx.siteReviewer.findMany.mockResolvedValue([
+            { userId: "u_rina", user: { email: "rina@review.test" } },
+        ]);
+        const mails: TeamMail[] = [];
+        await tellTeam(
+            asTx(tx),
+            comms,
+            ORG,
+            { event: "review", about: "release", testReleaseId: "rel_1" },
+            at,
+            mails,
+        );
+        expect(tx.notification.create).not.toHaveBeenCalled();
+        expect(mails).toHaveLength(1);
+        expect(mails[0]).toMatchObject({
+            to: "rina@review.test",
+            heading:
+                "Owner Free made a test release of Rye & Co: Subheading fix",
+            url: "https://app.saroh.localhost/sites/site_1/releases/rel_1",
+            cta: "Open the test release",
         });
     });
 });

@@ -90,6 +90,21 @@ export const METER_WORDS: Readonly<Record<MeteredLimitKey, MeterWords>> =
         METERED_LIMIT_KEYS.map((k) => [k, LIMIT_WORDS[k]]),
     ) as Record<MeteredLimitKey, MeterWords>;
 
+/**
+ * A total limit of one says nothing at 80% or at the cap (UX-041): the one
+ * thing a plan comes with (its website, its owner) is filled by setting the
+ * business up, so "you've reached your 1 website" on day one is noise. Only
+ * going past it (a soft cap) is told. A monthly one still warns: reaching
+ * this month's one booking is news.
+ */
+export function quietAtOne(
+    key: MeteredLimitKey | undefined,
+    limit: number,
+): boolean {
+    if (limit > 1) return false;
+    return key !== undefined && !METER_WORDS[key].monthly;
+}
+
 /** The catalogue rows whose limit metering counts, by row id. */
 export function meteredModules(): Map<string, MeteredLimitKey> {
     const out = new Map<string, MeteredLimitKey>();

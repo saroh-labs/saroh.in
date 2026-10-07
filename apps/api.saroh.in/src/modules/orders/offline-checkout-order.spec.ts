@@ -185,12 +185,30 @@ describe("an order paid at the handover", () => {
     it("never closes as an abandoned checkout, and tells the team now", async () => {
         await place(true);
 
-        expect(db.job.create).not.toHaveBeenCalled();
+        const types = db.job.create.mock.calls.map(
+            (c: [{ data: { type: string } }]) => c[0].data.type,
+        );
+        expect(types).not.toContain("orders.close-abandoned-checkout");
         expect(enqueueTeamAlert).toHaveBeenCalledWith(
             expect.anything(),
             "org_1",
             { event: "order", orderId: "order_1", actorUserId: null },
         );
+    });
+
+    it("tells the customer their order is in, once per order (UX-042)", async () => {
+        await place(true);
+
+        expect(db.job.create).toHaveBeenCalledTimes(1);
+        expect(db.job.create.mock.calls[0][0].data).toEqual({
+            organizationId: "org_1",
+            type: "customer.notify",
+            payload: {
+                kind: "ORDER_PLACED",
+                eventKey: "order-placed:order_1",
+                orderId: "order_1",
+            },
+        });
     });
 
     it("queues the team's Not collected for its day, on the same transaction (R34)", async () => {

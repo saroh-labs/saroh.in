@@ -63,6 +63,7 @@ import {
     isOnFrozenPage,
     releaseUnderReview,
 } from "./release-under-review";
+import { queueReviewAlert } from "./review-alert-queue";
 import type { ReviewRoute } from "./review-route";
 import { draftFingerprint } from "./review-route";
 import { sanitizeRichHtml, sanitizeSectionContent } from "./sanitize";
@@ -2346,21 +2347,32 @@ export class SitesService {
             }
         }
 
-        const comment = await prisma.siteComment.create({
-            data: {
-                siteId,
-                pageId: dto.pageId,
-                // Where the note was, for when the page itself is gone (#277).
-                pageTitle: page?.title ?? null,
-                organizationId: ctx.organizationId,
-                sectionKey: dto.sectionKey,
-                authorUserId: ctx.userId,
-                body: dto.body,
-                ...(release ? { testReleaseId: release.id } : {}),
-            },
-            select: { id: true },
+        return prisma.$transaction(async (tx) => {
+            const comment = await tx.siteComment.create({
+                data: {
+                    siteId,
+                    pageId: dto.pageId,
+                    // Where the note was, for when the page itself is gone (#277).
+                    pageTitle: page?.title ?? null,
+                    organizationId: ctx.organizationId,
+                    sectionKey: dto.sectionKey,
+                    authorUserId: ctx.userId,
+                    body: dto.body,
+                    ...(release ? { testReleaseId: release.id } : {}),
+                },
+                select: { id: true },
+            });
+            // A reviewer's note tells the people who publish (UX-043); one
+            // by them is the team talking to itself.
+            if (!allows(ctx, "site:publish")) {
+                await queueReviewAlert(tx, ctx.organizationId, {
+                    event: "review",
+                    about: "note",
+                    commentId: comment.id,
+                });
+            }
+            return comment;
         });
-        return comment;
     }
 
     /**
@@ -2427,34 +2439,52 @@ export class SitesService {
                 dto.testReleaseId,
                 { open: true },
             );
-            return prisma.siteApproval.create({
-                data: {
-                    siteId,
-                    organizationId: ctx.organizationId,
-                    byUserId: ctx.userId,
-                    outcome: dto.outcome,
-                    draftFingerprint: release.fingerprint,
-                    testReleaseId: release.id,
-                },
-                select: { id: true },
-            });
-        }
-
-        return prisma.siteApproval.create({
-            data: {
+            return this.approvalWithAlert(ctx, {
                 siteId,
                 organizationId: ctx.organizationId,
                 byUserId: ctx.userId,
                 outcome: dto.outcome,
-                // An approval names the draft it approved (#278), so later
-                // edits do not inherit it. A change request does not: it is
-                // about the work as a whole and stands until it is answered.
-                draftFingerprint:
-                    dto.outcome === "APPROVED"
-                        ? await this.currentDraftFingerprint(ctx, siteId)
-                        : null,
-            },
-            select: { id: true },
+                draftFingerprint: release.fingerprint,
+                testReleaseId: release.id,
+            });
+        }
+
+        return this.approvalWithAlert(ctx, {
+            siteId,
+            organizationId: ctx.organizationId,
+            byUserId: ctx.userId,
+            outcome: dto.outcome,
+            // An approval names the draft it approved (#278), so later
+            // edits do not inherit it. A change request does not: it is
+            // about the work as a whole and stands until it is answered.
+            draftFingerprint:
+                dto.outcome === "APPROVED"
+                    ? await this.currentDraftFingerprint(ctx, siteId)
+                    : null,
+        });
+    }
+
+    /**
+     * Write a review row and, on its transaction, tell the other side
+     * (UX-043): a request goes to the site's reviewers, a verdict to the
+     * people who publish (`notifications/review-alerts.ts`).
+     */
+    private approvalWithAlert(
+        ctx: OrganizationContext,
+        data: Prisma.SiteApprovalUncheckedCreateInput,
+    ): Promise<{ id: string }> {
+        return prisma.$transaction(async (tx) => {
+            const approval = await tx.siteApproval.create({
+                data,
+                select: { id: true },
+            });
+            await queueReviewAlert(
+                tx,
+                ctx.organizationId,
+                { event: "review", about: "approval", approvalId: approval.id },
+                data.outcome === "REQUESTED" ? data.siteId : undefined,
+            );
+            return approval;
         });
     }
 
@@ -2593,33 +2623,24 @@ export class SitesService {
                 testReleaseId,
                 { open: true },
             );
-            return prisma.siteApproval.create({
-                data: {
-                    siteId,
-                    organizationId: ctx.organizationId,
-                    byUserId: ctx.userId,
-                    outcome: "REQUESTED",
-                    draftFingerprint: release.fingerprint,
-                    testReleaseId: release.id,
-                },
-                select: { id: true },
-            });
-        }
-
-        return prisma.siteApproval.create({
-            data: {
+            return this.approvalWithAlert(ctx, {
                 siteId,
                 organizationId: ctx.organizationId,
                 byUserId: ctx.userId,
                 outcome: "REQUESTED",
-                // Which draft is being put up for review, so "approved" can
-                // later be checked against the same work.
-                draftFingerprint: await this.currentDraftFingerprint(
-                    ctx,
-                    siteId,
-                ),
-            },
-            select: { id: true },
+                draftFingerprint: release.fingerprint,
+                testReleaseId: release.id,
+            });
+        }
+
+        return this.approvalWithAlert(ctx, {
+            siteId,
+            organizationId: ctx.organizationId,
+            byUserId: ctx.userId,
+            outcome: "REQUESTED",
+            // Which draft is being put up for review, so "approved" can
+            // later be checked against the same work.
+            draftFingerprint: await this.currentDraftFingerprint(ctx, siteId),
         });
     }
 

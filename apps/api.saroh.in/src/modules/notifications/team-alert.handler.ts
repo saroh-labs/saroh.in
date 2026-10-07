@@ -12,8 +12,10 @@ import { orderPartyName } from "../orders/walk-in";
 import { resolveCapabilities } from "../organizations/organization-policy";
 import type { AlertEvent } from "./alert-preferences";
 import { alertOn, mayHearAbout } from "./alert-preferences";
-import type { TeamAlertPayload, WordedAlert } from "./team-alerts";
+import { wordReview } from "./review-alerts";
+import type { TeamAlertPayload, TeamMail, WordedAlert } from "./team-alerts";
 import { TEAM_ALERT_TYPE } from "./team-alerts";
+import { sarohMailRecipients, sendTeamMails, teamMails } from "./team-mail";
 import { putOffUntilDue, wordUncollected } from "./uncollected-alert";
 
 export { TEAM_ALERT_TYPE } from "./team-alerts";
@@ -37,7 +39,7 @@ const ROW_LABEL: Record<AlertEvent, string> = {
     booking: "New booking",
     failed: "Payment failed",
     team: "Someone joins the team",
-    site: "Website goes live",
+    site: "Your website",
 };
 
 const BUILT_IN_LABEL: Partial<Record<string, string>> = {
@@ -65,10 +67,13 @@ const BUILT_IN_LABEL: Partial<Record<string, string>> = {
  *  3. **The bell:** one notice in the business's inbox. Each person's inbox
  *     leaves out what they turned the bell off for, or can't read
  *     (`notifications.service.ts`). A booking's notice is already there.
- *  4. **Email:** through the business's own connected provider only
- *     (DEC-011), to each person on the team whose role reads it and who has
- *     email on for it — by default, a failed payment and a scheduled
- *     go-live. Whoever scheduled a go-live is emailed whatever they chose.
+ *  4. **Email:** through the business's own connected provider (DEC-011),
+ *     to each person on the team whose role reads it and who has email on
+ *     for it — by default, a failed payment and a scheduled go-live.
+ *     Whoever scheduled a go-live is emailed whatever they chose. Two go by
+ *     Saroh's own mail instead, once the claim commits (`team-mail.ts`): a
+ *     new website order to the owners and admins (UX-042), and a review
+ *     asked of a site's reviewers (UX-043).
  *
  * Nothing goes by WhatsApp or SMS: Saroh keeps no number for a team member.
  */
@@ -88,6 +93,7 @@ export class TeamAlertHandler {
         }
         const organizationId = job.organizationId;
         const now = new Date();
+        const mails: TeamMail[] = [];
         await runInOrgContext(organizationId, () =>
             prisma.$transaction(async (tx) => {
                 // An uncollected order not due yet (its business moved its
@@ -98,9 +104,19 @@ export class TeamAlertHandler {
                 ) {
                     return { told: false, emailed: 0 };
                 }
-                return tellTeam(tx, this.comms, organizationId, payload, now);
+                return tellTeam(
+                    tx,
+                    this.comms,
+                    organizationId,
+                    payload,
+                    now,
+                    mails,
+                );
             }),
         );
+        // Saroh's own mail goes once the claim has committed: a run that
+        // rolled back, or found it claimed, has none to send.
+        await sendTeamMails(mails);
     };
 }
 
@@ -111,6 +127,8 @@ export async function tellTeam(
     organizationId: string,
     payload: TeamAlertPayload,
     now: Date = new Date(),
+    /** Saroh's own mails to send once this commits (`team-mail.ts`). */
+    mailOut: TeamMail[] = [],
 ): Promise<{ told: boolean; emailed: number }> {
     const alert = await wordAlert(tx, organizationId, payload, now);
     if (!alert) return { told: false, emailed: 0 };
@@ -130,7 +148,7 @@ export async function tellTeam(
     });
     if (claimed.count === 0) return { told: false, emailed: 0 };
 
-    if (!alert.notificationId) {
+    if (!alert.notificationId && !alert.noBell) {
         const notification = await tx.notification.create({
             data: {
                 organizationId,
@@ -151,6 +169,17 @@ export async function tellTeam(
         });
     }
 
+    if (alert.sarohMail) {
+        const [to, org] = await Promise.all([
+            sarohMailRecipients(tx, organizationId, alert),
+            tx.organization.findUnique({
+                where: { id: organizationId },
+                select: { name: true },
+            }),
+        ]);
+        mailOut.push(...teamMails(alert, org?.name ?? "Your business", to));
+        return { told: true, emailed: to.length };
+    }
     const emailed = alert.bellOnly
         ? 0
         : await emailTeam(tx, comms, organizationId, alert);
@@ -262,6 +291,8 @@ export async function wordAlert(
             return wordUncollected(tx, organizationId, payload, now);
         case "provider":
             return wordProvider(tx, organizationId, payload);
+        case "review":
+            return wordReview(tx, organizationId, payload);
     }
 }
 
@@ -303,6 +334,12 @@ async function wordOrder(
         path: `/commerce/orders/${order.id}`,
         skipUserId: p.actorUserId ?? null,
         orderId: order.id,
+        // A website order comes in while nobody is watching: the owners and
+        // admins hear of it by Saroh's own mail, as of an enquiry (UX-042).
+        // One taken at the counter has someone there already.
+        ...(order.placedOnline
+            ? { sarohMail: "OWNERS_ADMINS" as const, cta: "Open the order" }
+            : {}),
     };
 }
 
@@ -540,6 +577,12 @@ function payloadOf(value: unknown): TeamAlertPayload | null {
             return str("providerId") &&
                 str("since") &&
                 (p.channel === "PAYMENTS" || p.channel === "EMAIL")
+                ? (p as TeamAlertPayload)
+                : null;
+        case "review":
+            return (p.about === "approval" && str("approvalId")) ||
+                (p.about === "note" && str("commentId")) ||
+                (p.about === "release" && str("testReleaseId"))
                 ? (p as TeamAlertPayload)
                 : null;
         case "site":

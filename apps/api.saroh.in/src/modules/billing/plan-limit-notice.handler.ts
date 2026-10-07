@@ -2,13 +2,23 @@ import { Injectable, Logger } from "@nestjs/common";
 import type { Job } from "@saroh/database";
 import { prisma } from "@saroh/database";
 import type { ModuleAccess } from "@saroh/pricing-catalog";
-import { LIMIT_WARN_AT, limitNotice } from "@saroh/pricing-catalog";
+import {
+    countedWhat,
+    LIMIT_WARN_AT,
+    limitNotice,
+} from "@saroh/pricing-catalog";
 import { DateTime } from "luxon";
 
 import { businessTimezone } from "../bookings/staff-availability";
 import { CatalogueAccessService } from "./catalogue-access.service";
 import type { MeteredLimitKey } from "./metering";
-import { countUsage, METER_WORDS, meteredKeyOf, windowKey } from "./metering";
+import {
+    countUsage,
+    METER_WORDS,
+    meteredKeyOf,
+    quietAtOne,
+    windowKey,
+} from "./metering";
 import type { PlanLimitNoticePayload } from "./metering.service";
 import { MeteringService } from "./metering.service";
 
@@ -16,7 +26,7 @@ import { MeteringService } from "./metering.service";
 export const PLAN_LIMIT_NOTIFICATION_TYPE = "plan.limit";
 
 /** The once-only claim on a limit notice (`CustomerNotice.kind`). */
-const PLAN_LIMIT_NOTICE_KIND = "PLAN_LIMIT";
+export const PLAN_LIMIT_NOTICE_KIND = "PLAN_LIMIT";
 
 /** Which notice a count earns: 80%, the cap, or past it (a soft cap). */
 export type LimitLevel = "warn" | "full" | "over";
@@ -94,7 +104,7 @@ export function limitNoticeWords(
               ? `${up} raises the limit.`
               : "An add-on gives you more.";
         return {
-            title: `You're past your ${limit.toLocaleString("en-IN")} ${words.what} on ${row.plan}`,
+            title: `You're past your ${limit.toLocaleString("en-IN")} ${countedWhat(words.what, limit)} on ${row.plan}`,
             body: [overBody(key, soft), more].filter(Boolean).join(" "),
         };
     }
@@ -163,6 +173,9 @@ export class PlanLimitNoticeHandler {
         const used = await countUsage(prisma, p.organizationId, key, now);
         const level = limitLevel(used, limit);
         if (!level) return skip("under");
+        if (level !== "over" && quietAtOne(key, limit)) {
+            return skip("one_included");
+        }
 
         const zone = await businessTimezone(prisma, p.organizationId);
         const eventKey = limitNoticeKey(

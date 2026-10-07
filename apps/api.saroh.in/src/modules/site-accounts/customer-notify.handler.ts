@@ -8,6 +8,7 @@ import { SAROH_EMAILS_KEY } from "../communications/saroh-delivery";
 import { emailRoute } from "../communications/saroh-may-send";
 import { isNoticeTemplate } from "../communications/transactional";
 import { resolveContact } from "../customer-workspace/resolve-contact";
+import { holdsOnPayment } from "../orders/online-checkout";
 import type { CustomerNotifyPayload } from "./customer-notify-queue";
 import { CUSTOMER_NOTIFY_TYPE } from "./customer-notify-queue";
 import { hasLiveAccount, threadLive } from "./notice-reach";
@@ -218,6 +219,8 @@ export async function loadSubject(
         case "BOOKING_MOVED":
         case "BOOKING_CANCELLED":
             return loadBooking(tx, organizationId, payload.kind, payload);
+        case "ORDER_PLACED":
+            return loadPlacedOrder(tx, organizationId, payload);
         case "ORDER_READY":
         case "ORDER_HANDED_OVER":
             return loadOrderStep(tx, organizationId, payload.kind, payload);
@@ -371,6 +374,51 @@ async function loadOrderStep(
                 courier: order.courierName,
                 trackingNumber: order.trackingNumber,
                 trackingUrl: order.trackingUrl,
+            },
+        },
+    };
+}
+
+/**
+ * A website order just placed (UX-042), while it still stands: not
+ * cancelled, and an online checkout only once it is paid (G13).
+ */
+async function loadPlacedOrder(
+    tx: Tx,
+    organizationId: string,
+    payload: CustomerNotifyPayload,
+): Promise<NoticeSubject | null> {
+    if (!payload.orderId) return null;
+    const order = await tx.order.findFirst({
+        where: { id: payload.orderId, organizationId },
+        select: {
+            id: true,
+            orderId: true,
+            status: true,
+            paymentStatus: true,
+            placedOnline: true,
+            payOnHandover: true,
+            fulfilment: true,
+            customerId: true,
+            customerAccountId: true,
+            customer: { select: { firstName: true } },
+        },
+    });
+    if (!order?.placedOnline || order.status === "CANCELLED") return null;
+    if (holdsOnPayment(order) && order.paymentStatus !== "PAID") return null;
+    const contactId = await orderContactId(tx, organizationId, order);
+    if (!contactId) return null;
+    return {
+        contactId,
+        orderId: order.id,
+        vars: {
+            kind: "ORDER_PLACED",
+            placed: {
+                business: await businessName(tx, organizationId),
+                firstName: firstWord(order.customer?.firstName ?? null),
+                number: order.orderId,
+                fulfilment: order.fulfilment,
+                payOnHandover: order.payOnHandover,
             },
         },
     };

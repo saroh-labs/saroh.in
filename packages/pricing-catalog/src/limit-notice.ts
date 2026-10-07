@@ -1,5 +1,6 @@
 import type { ModuleAccess } from "./access";
 import type { LimitAction } from "./limit-words";
+import { countedWhat } from "./limit-words";
 import { formatCount } from "./price";
 
 /** A notice shows from this share of the limit. */
@@ -115,8 +116,8 @@ export function limitNotice(
         left: Math.max(0, L - n),
         pct: `${Math.min(100, Math.round((n / L) * 100))}%`,
         title: full
-            ? `You've reached your ${formatCount(L)} ${what} on ${access.plan}`
-            : `You've used ${used} of ${formatCount(L)} ${what} on ${access.plan}`,
+            ? `You've reached your ${formatCount(L)} ${countedWhat(what, L)} on ${access.plan}`
+            : `You've used ${used} of ${formatCount(L)} ${countedWhat(what, L)} on ${access.plan}`,
         body: first + more,
         cta: action
             ? open
