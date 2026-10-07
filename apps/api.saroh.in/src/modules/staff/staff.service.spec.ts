@@ -35,7 +35,11 @@ jest.mock("@saroh/database", () => {
         service: { findFirst: jest.fn(), count: jest.fn() },
         membership: { findFirst: jest.fn() },
         booking: { findMany: jest.fn() },
-        store: { findMany: jest.fn().mockResolvedValue([]) },
+        // No hours saved: opening hours cut nothing (DEC-087, DEC-096).
+        store: {
+            findMany: jest.fn().mockResolvedValue([]),
+            findFirst: jest.fn().mockResolvedValue(null),
+        },
     };
     return {
         ...actual,

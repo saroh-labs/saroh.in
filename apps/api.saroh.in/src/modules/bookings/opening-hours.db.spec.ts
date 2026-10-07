@@ -1,8 +1,10 @@
 /**
- * Opening hours against a real Postgres (DEC-087): with walk-in storefronts
- * whose hours are set, in-person bookings are offered and taken only while
- * one of them is open; online ones, and an online storefront's hours, are
- * left alone. Runs in the integration project (TEST_DATABASE_URL).
+ * Opening hours against a real Postgres (DEC-087, DEC-096): with walk-in
+ * storefronts whose hours are set, in-person bookings are offered and taken
+ * only while one of them is open, and an online storefront's hours are left
+ * alone. With no walk-in storefront, the business's own week (Settings ›
+ * Hours, on its storefront) cuts in-person times. Online bookings are never
+ * cut. Runs in the integration project (TEST_DATABASE_URL).
  */
 jest.mock("../../env", () => ({
     env: {
@@ -225,5 +227,94 @@ describe("opening hours (DEC-087, real database)", () => {
             "ip_1",
         );
         expect(booking.locationType).toBe("ONLINE");
+    });
+});
+
+describe("opening hours with no walk-in storefront (DEC-096, real database)", () => {
+    /** In person, and online, with Divya: she works Mondays 09:00–13:00 UTC. */
+    let inPersonOnly: string;
+    let onlineOnly: string;
+
+    beforeAll(async () => {
+        const org = await prisma.organization.create({
+            data: { name: "Neel Physio", slug: `online-hours-${process.pid}` },
+        });
+        await prisma.businessProfile.create({
+            data: { organizationId: org.id, timezone: "UTC" },
+        });
+        // Its only storefront is online; Settings › Hours saved 10:00–12:00
+        // Mondays to it — the hours its site header shows.
+        await prisma.store.create({
+            data: {
+                organizationId: org.id,
+                name: "Online",
+                settings: {
+                    create: {
+                        kind: "ONLINE",
+                        openingHours: mondays("10:00", "12:00"),
+                    },
+                },
+            },
+        });
+        const service = (name: string, locationType: string) =>
+            prisma.service.create({
+                data: {
+                    organizationId: org.id,
+                    name,
+                    durationMinutes: 60,
+                    capacity: 1,
+                    priceCents: 50_000,
+                    currency: "INR",
+                    timezone: "UTC",
+                    locationType,
+                    meetingUrl:
+                        locationType === "IN_PERSON"
+                            ? null
+                            : "https://meet.example.in/neel",
+                },
+            });
+        inPersonOnly = (await service("Assessment", "IN_PERSON")).id;
+        onlineOnly = (await service("Video follow-up", "ONLINE")).id;
+        await prisma.staffMember.create({
+            data: {
+                organizationId: org.id,
+                name: "Divya Rao",
+                services: {
+                    create: [inPersonOnly, onlineOnly].map((serviceId) => ({
+                        organizationId: org.id,
+                        serviceId,
+                    })),
+                },
+                hours: {
+                    create: {
+                        organizationId: org.id,
+                        dayOfWeek: MONDAY,
+                        startMinute: 9 * 60,
+                        endMinute: 13 * 60,
+                    },
+                },
+            },
+        });
+    });
+
+    it("offers in person only inside the business's hours", async () => {
+        expect(await startsOn(inPersonOnly, monday(9))).toEqual([
+            ["10:00", null],
+            ["10:30", null],
+            ["11:00", null],
+        ]);
+        await expect(
+            publicBookings.bookOnline(
+                inPersonOnly,
+                booker("early@example.in", monday(9)),
+                "ip_2",
+            ),
+        ).rejects.toThrow("That time is outside opening hours.");
+    });
+
+    it("leaves an online session's times uncut", async () => {
+        expect((await startsOn(onlineOnly, monday(9))).map(([t]) => t)).toEqual(
+            ["09:00", "09:30", "10:00", "10:30", "11:00", "11:30", "12:00"],
+        );
     });
 });
