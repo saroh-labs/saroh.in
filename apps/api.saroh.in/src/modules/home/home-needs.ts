@@ -1,5 +1,6 @@
 import { DateTime } from "luxon";
 
+import { NO_EMAIL_PLAN_SUB, NO_EMAIL_SUB } from "./home-email-setup";
 import type {
     HomeAction,
     HomeEvidence,
@@ -20,11 +21,13 @@ import type {
  *    next two days, a message waiting on a reply, overdue invoices, money
  *    to refund, a refund the provider failed (B9), overdue follow-ups.
  * 2. Blocked: stock short for orders, a renewal not paid, invoices going
- *    out without the business details (DEC-068), a site not live, a
- *    module that needs fixing.
+ *    out without the business details (DEC-068), a site not live, no
+ *    email provider so customers get no emails (DEC-011), a module that
+ *    needs fixing.
  * 3. Due: orders not late yet, notes for a later visit, low-rated reviews
  *    to answer.
- * 4. Setting up: a module not ready yet.
+ * 4. Setting up: a module not ready yet, and no email provider on a plan
+ *    that can't connect one (DEC-091).
  *
  * Within a rank, sources keep {@link SOURCE_ORDER} (orders before invoices,
  * as the design lists them) and rows keep their source's order, oldest
@@ -63,7 +66,9 @@ const SOURCE_ORDER = [
     "PAYMENTS_FAILED_RENEWALS",
     "PAYMENTS_BUSINESS_DETAILS",
     "WEBSITE_NOT_LIVE",
+    "COMMUNICATIONS_NO_EMAIL",
     "COMMERCE_LOW_STAR_REVIEWS",
+    "COMMUNICATIONS_NO_EMAIL_PLAN",
 ] as const;
 
 function sourceIndex(code: string): number {
@@ -307,6 +312,10 @@ const SINGLE: Partial<Record<string, { rank: Rank; sub: string }>> = {
         rank: 2,
         sub: "Payments are still recorded, but every invoice should print it. Add it once and the next ones will.",
     },
+    // DEC-011 (7 Oct): no email provider, so customers get no emails.
+    COMMUNICATIONS_NO_EMAIL: { rank: 2, sub: NO_EMAIL_SUB },
+    // The same on a plan that can't connect one (DEC-091): setting up.
+    COMMUNICATIONS_NO_EMAIL_PLAN: { rank: 4, sub: NO_EMAIL_PLAN_SUB },
     // D8: pauses that ended while Payments is off.
     PAYMENTS_PAUSES_WAITING: {
         rank: 2,

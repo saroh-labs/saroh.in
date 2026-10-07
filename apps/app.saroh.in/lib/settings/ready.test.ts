@@ -147,6 +147,29 @@ describe("emailAttention", () => {
         );
         expect(providersTabNote(null)).toBeNull();
     });
+
+    it("on a plan that can't connect one (DEC-091), says a paid plan brings it, to who may see the plans", () => {
+        const free = { connected: false, canConnect: false };
+        expect(
+            providersTabNote("not-connected", { setup: free, mayPlans: true }),
+        ).toBe("Your own email comes with a paid plan");
+        expect(
+            providersTabNote("not-connected", { setup: free, mayPlans: false }),
+        ).toBeNull();
+        // Room to connect, or unread: as before.
+        expect(
+            providersTabNote("not-connected", {
+                setup: { connected: false, canConnect: true },
+                mayPlans: true,
+            }),
+        ).toBe("Needs you: no email provider yet");
+        expect(providersTabNote("not-connected")).toBe(
+            "Needs you: no email provider yet",
+        );
+        expect(
+            providersTabNote("disconnected", { setup: free, mayPlans: false }),
+        ).toBe("Needs you: email is disconnected");
+    });
 });
 
 describe("readyChecklist", () => {

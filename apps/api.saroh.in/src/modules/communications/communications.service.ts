@@ -16,7 +16,7 @@ import { prisma } from "@saroh/database";
 import type { OrganizationContext } from "../../common/types/organization-context";
 import { planMeter } from "../billing/metering.service";
 import { isReservedContactEmail } from "../contacts/contact-email";
-import { authorize } from "../organizations/organization-policy";
+import { allows, authorize } from "../organizations/organization-policy";
 import { encryptSecret } from "../payments/crypto";
 import type {
     NoticeChannels,
@@ -25,6 +25,8 @@ import type {
 import { contactReach, noticeChannels } from "../site-accounts/notice-reach";
 import type { NoticeVars } from "../site-accounts/notify-templates";
 import { renderNotice } from "../site-accounts/notify-templates";
+import type { EmailSetup } from "./email-setup";
+import { readEmailSetup } from "./email-setup";
 import type { MessageSendPayload } from "./message-send.handler";
 import {
     INVOICE_PDF_ATTACHMENT,
@@ -45,19 +47,18 @@ import type {
     NoticeTemplate,
     RenderedMessage,
     ReviewTemplate,
-    TeamTemplate,
 } from "./transactional";
 import { renderTransactional } from "./transactional";
 
 type Db = Prisma.TransactionClient;
 
 /**
- * Who a transactional message may go to — only ever one of four addresses
- * (D17): the bill-to email the invoice kept when it was issued, the email
- * a customer verified when they made their site account, (F14) the
- * sign-in email of someone on the business's own team, or (a review
- * invitation, D11) the email the order's storefront customer gave when
- * they ordered. Never an address the caller typed, so the path cannot be
+ * Who a transactional message may go to — only ever one of three
+ * addresses (D17): the bill-to email the invoice kept when it was issued,
+ * the email a customer verified when they made their site account, or (a
+ * review invitation, D11) the email the order's storefront customer gave
+ * when they ordered. (The team's own alerts go from Saroh, not this path:
+ * `notifications/team-alert.handler.ts`, DEC-011 amended 2026-10-07.) Never an address the caller typed, so the path cannot be
  * turned into a way to email anyone.
  *
  * ORDER_CUSTOMER mirrors INVOICE_BILL_TO: the address is the one the record
@@ -68,21 +69,18 @@ type Db = Prisma.TransactionClient;
 export type TransactionalRecipient =
     | { kind: "INVOICE_BILL_TO"; invoiceId: string }
     | { kind: "SITE_ACCOUNT"; contactId: string }
-    | { kind: "TEAM_MEMBER"; userId: string }
     | { kind: "ORDER_CUSTOMER"; orderId: string };
 
 /**
  * What a transactional message says: an invoice's template with its
- * values, or one of A14's notices or F14's team alerts, already worded by
- * its handler (`site-accounts/notify-templates.ts`,
- * `notifications/team-alert.handler.ts`), or D14's autopay set-up link
- * (`renderAutopaySetupLink`).
+ * values, or one of A14's notices already worded by its handler
+ * (`site-accounts/notify-templates.ts`), D14's autopay set-up link
+ * (`renderAutopaySetupLink`), or a review invitation.
  */
 export type TransactionalWords =
     | { template: InvoiceTemplate; vars: InvoiceMailVars }
     | {
-          template:
-              NoticeTemplate | TeamTemplate | AutopayTemplate | ReviewTemplate;
+          template: NoticeTemplate | AutopayTemplate | ReviewTemplate;
           rendered: RenderedMessage;
       }
     | {
@@ -345,6 +343,20 @@ export class CommunicationsService {
      * rule as the send (`saroh-email-state.ts`); a failed lookup reads as
      * UNREAD, never as off or a zero.
      */
+    /**
+     * Whether the business has its own email provider, and if not whether
+     * its plan lets it connect one (DEC-011, amended 2026-10-07; DEC-091):
+     * what the workspace's "connect your email" prompt is drawn from. For
+     * whoever can act on it — `comms:manage` to connect, `billing:read` for
+     * the plans — and nobody else.
+     */
+    async emailSetup(ctx: OrganizationContext): Promise<EmailSetup> {
+        if (!allows(ctx, "comms:manage") && !allows(ctx, "billing:read")) {
+            authorize(ctx, "comms:manage");
+        }
+        return readEmailSetup(prisma, ctx.organizationId);
+    }
+
     async sarohEmail(ctx: OrganizationContext): Promise<SarohEmailState> {
         authorize(ctx, "comms:manage");
         return sarohEmailState(prisma, ctx.organizationId);
@@ -669,9 +681,10 @@ export class CommunicationsService {
     // ---- Transactional (D17; A14 reuses it) -------------------------------
 
     /**
-     * Whether the business's own email provider is connected. Invoices,
-     * autopay and team alerts need it (DEC-011, default 38); booking
-     * notices may also go through Saroh while it has none (DEC-086).
+     * Whether the business's own email provider is connected. A business's
+     * email to its customers — invoices, autopay, notices, review
+     * invitations — needs it (DEC-011, amended 2026-10-07). The team's own
+     * alerts don't: Saroh sends those.
      */
     async emailConnected(db: Db, organizationId: string): Promise<boolean> {
         const row = await db.communicationProvider.findUnique({
@@ -688,9 +701,7 @@ export class CommunicationsService {
      * null when there is none. An invoice's bill-to email comes first (a
      * draft's is the contact's, which issuing copies); a reserved
      * placeholder (DEC-049) is no email, and then the contact's verified
-     * site-account email is used, if they have an active account. A team
-     * member (F14) is their sign-in email, only while they are on this
-     * business's team; no contact is involved. An order's customer (a
+     * site-account email is used, if they have an active account. An order's customer (a
      * review invitation) is the email their storefront customer record
      * holds, unless it is a placeholder; the contact is the one most
      * recently linked to that customer, if any (consent is read on it).
@@ -700,19 +711,6 @@ export class CommunicationsService {
         organizationId: string,
         recipient: TransactionalRecipient,
     ): Promise<TransactionalAddress | null> {
-        if (recipient.kind === "TEAM_MEMBER") {
-            const member = await db.membership.findUnique({
-                where: {
-                    organizationId_userId: {
-                        organizationId,
-                        userId: recipient.userId,
-                    },
-                },
-                select: { user: { select: { email: true } } },
-            });
-            const email = member?.user.email.trim();
-            return email ? { address: email, contactId: null } : null;
-        }
         if (recipient.kind === "ORDER_CUSTOMER") {
             const order = await db.order.findFirst({
                 where: { id: recipient.orderId, organizationId },

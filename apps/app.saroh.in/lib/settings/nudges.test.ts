@@ -348,3 +348,72 @@ describe("readyChecklist and rollout (DEC-057)", () => {
         expect(list.steps).toEqual([]);
     });
 });
+
+describe("the email nudge follows the plan (DEC-091, #850)", () => {
+    const base = {
+        settings: { profile, logo: { url: "https://cdn/l.png", mediaId: "m" } },
+        modules: [mod("COMMUNICATIONS")],
+        messaging: [] as ConnectedCommsProvider[],
+    };
+    const free = { connected: false, canConnect: false };
+
+    it("where the plan has room (or it can't be read), asks to connect, as before", () => {
+        for (const emailSetup of [
+            { connected: false, canConnect: true },
+            null,
+        ]) {
+            const list = settingsChecklist({
+                ...base,
+                emailSetup,
+                mayPlans: true,
+            });
+            expect(list.left.find((i) => i.key === "email")).toMatchObject({
+                cta: "Connect email",
+                href: "/settings/providers",
+            });
+            expect(list.outside).toEqual([]);
+        }
+    });
+
+    it("where it can't, never offers Connect: a paid plan, beside the steps and outside the count", () => {
+        const list = settingsChecklist({
+            ...base,
+            emailSetup: free,
+            mayPlans: true,
+        });
+        expect(keys(list.steps)).not.toContain("email");
+        expect(list.outside).toEqual([
+            {
+                key: "email",
+                label: "Email your customers",
+                why: "No email provider is connected, so invoices, booking and order updates and review invitations aren't emailed. Your customers see their updates only in their account.",
+                comesWith: "Comes with a paid plan",
+                cta: "See plans",
+                href: "/settings/billing#change-plan",
+            },
+        ]);
+    });
+
+    it("only to who may see the plans", () => {
+        const list = settingsChecklist({
+            ...base,
+            emailSetup: free,
+            mayPlans: false,
+        });
+        expect(keys(list.steps)).not.toContain("email");
+        expect(list.outside).toEqual([]);
+    });
+
+    it("a disconnected provider is still Reconnect, whatever the plan", () => {
+        const list = settingsChecklist({
+            ...base,
+            messaging: [comms("EMAIL", "DISABLED")],
+            emailSetup: free,
+            mayPlans: true,
+        });
+        expect(list.left.find((i) => i.key === "email")?.label).toBe(
+            "Reconnect email",
+        );
+        expect(list.outside).toEqual([]);
+    });
+});

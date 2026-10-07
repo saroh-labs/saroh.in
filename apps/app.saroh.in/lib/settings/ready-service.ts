@@ -1,4 +1,6 @@
 import { accessRow } from "@/lib/billing/access";
+import type { EmailMay } from "@/lib/communications/email-setup";
+import { readEmailSetup } from "@/lib/communications/email-setup-service";
 import { listModules } from "@/lib/modules/service";
 import type { OrganizationSettings } from "@/lib/organizations/settings-service";
 import { listCommsProviders } from "@/lib/providers/service";
@@ -46,14 +48,24 @@ async function onlinePaymentsUpgrade(settings: OrganizationSettings) {
  */
 export async function loadSettingsChecklist(
     settings: OrganizationSettings,
-    mayMessaging: boolean,
+    may: EmailMay,
 ): Promise<ReadyChecklist> {
-    const [modules, messaging, onlineUpgrade] = await Promise.all([
+    const [modules, messaging, onlineUpgrade, emailSetup] = await Promise.all([
         listModules().catch(() => null),
-        mayMessaging
+        may.connect
             ? listCommsProviders().catch(() => null)
             : Promise.resolve(null),
         onlinePaymentsUpgrade(settings),
+        // Whether the plan can connect one (DEC-091): never a Connect the
+        // API would refuse. Best-effort; unread asks as before.
+        readEmailSetup(may),
     ]);
-    return settingsChecklist({ settings, modules, messaging, onlineUpgrade });
+    return settingsChecklist({
+        settings,
+        modules,
+        messaging,
+        onlineUpgrade,
+        emailSetup,
+        mayPlans: may.plans,
+    });
 }

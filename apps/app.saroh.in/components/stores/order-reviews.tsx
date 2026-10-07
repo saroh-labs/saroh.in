@@ -5,7 +5,7 @@ import { showError, showSuccess, showWarning } from "@saroh/ui/toast";
 import { useRouter } from "next/navigation";
 import { useTransition } from "react";
 
-import { ReviewEmailNoteText } from "@/components/stores/review-email-note";
+import { EmailNoteText } from "@/components/communications/email-note";
 import { inviteReviews } from "@/lib/product-reviews/actions";
 import {
     invitationSentence,
@@ -69,7 +69,7 @@ export function OrderReviews({
                 <p className="text-[13px] font-medium">Reviews</p>
                 <p className="text-[12.5px] text-muted-foreground">
                     {note ? (
-                        <ReviewEmailNoteText note={note} />
+                        <EmailNoteText note={note} />
                     ) : state.blocked && state.state === "none" ? (
                         state.blocked.message
                     ) : (

@@ -262,6 +262,56 @@ export function sendEnquiryNotificationEmail(
     return Promise.resolve();
 }
 
+/** What a team alert email says, worded by `notifications/team-alert.handler.ts`. */
+export interface TeamAlertMail {
+    subject: string;
+    heading: string;
+    body: string;
+    /** Where it opens in the workspace; none when there is nowhere to open. */
+    url: string | null;
+    /** Why they got it, and where to change it. */
+    footer: string;
+}
+
+/**
+ * A team alert (round-2 F14: a new order, a booking, a failed payment,
+ * someone joining, a scheduled go-live) to one person on a business's team.
+ * Saroh telling a business about its own business, so Saroh sends it, as
+ * the new-enquiry alert above, whether or not the business has an email
+ * provider (DEC-011, amended 2026-10-07).
+ *
+ * Sent in Saroh's own name, so the handler words it in fixed words and the
+ * business's cleaned names only (`site-accounts/sender-name.ts`), never
+ * text a customer typed; everything is escaped again here. Console
+ * fallback with no SMTP, like the other `send*` helpers.
+ */
+export function sendTeamAlertEmail(
+    to: string,
+    mail: TeamAlertMail,
+): Promise<void> {
+    if (!transporter) {
+        console.info(
+            `[Team alert] (no SMTP) ${to}: ${mail.subject}${mail.url ? ` -> ${mail.url}` : ""}`,
+        );
+        return Promise.resolve();
+    }
+    const button = mail.url
+        ? `<p><a href="${esc(mail.url)}" style="display:inline-block;padding:10px 16px;background:#111;color:#fff;text-decoration:none;border-radius:6px">Open it in Saroh</a></p>`
+        : "";
+    void transporter.sendMail({
+        from: FROM,
+        to,
+        subject: mail.subject,
+        html: `<div style="font-family:sans-serif;max-width:480px;margin:0 auto">
+  <h2>${esc(mail.heading)}</h2>
+  <p>${esc(mail.body)}</p>
+  ${button}
+  <p style="color:#666;font-size:12px">${esc(mail.footer)}</p>
+</div>`,
+    });
+    return Promise.resolve();
+}
+
 /**
  * Marker prefix that stamps every self-test/preview email (S6-004). It is
  * applied to BOTH the subject and the top of the body so the message can never

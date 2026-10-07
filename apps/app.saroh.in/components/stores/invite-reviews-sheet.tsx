@@ -14,8 +14,8 @@ import { showError, showSuccess, showWarning } from "@saroh/ui/toast";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 
+import { EmailNoteText } from "@/components/communications/email-note";
 import { ViewerDate } from "@/components/shared/viewer-date";
-import { ReviewEmailNoteText } from "@/components/stores/review-email-note";
 import { inviteReviews } from "@/lib/product-reviews/actions";
 import type { ReviewEmailNote } from "@/lib/product-reviews/describe";
 import type {
@@ -113,7 +113,7 @@ export function InviteReviewsSheet({
                 {emailNote ? (
                     <div className="mt-5 flex-1">
                         <p className="text-[13px] leading-[1.5] text-muted-foreground">
-                            <ReviewEmailNoteText note={emailNote} />
+                            <EmailNoteText note={emailNote} />
                         </p>
                     </div>
                 ) : results ? (

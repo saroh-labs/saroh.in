@@ -160,7 +160,7 @@ describe("AlertsGrid", () => {
     it("a refused save says so, and offers no Undo", async () => {
         saveAlert.mockResolvedValue({
             ok: false,
-            error: "Connect email in Providers to get alerts by email.",
+            error: "Something went wrong saving your alerts.",
         });
         render(prefs());
         await act(async () => {
@@ -168,7 +168,7 @@ describe("AlertsGrid", () => {
             await Promise.resolve();
         });
         expect(showError).toHaveBeenCalledWith(
-            "Connect email in Providers to get alerts by email.",
+            "Something went wrong saving your alerts.",
             "Your alerts are as they were.",
         );
         expect(offer).not.toHaveBeenCalled();
@@ -178,7 +178,7 @@ describe("AlertsGrid", () => {
         ).toBe("true");
     });
 
-    it("with no email provider, email can't be switched on, and the way to connect one is offered", () => {
+    it("email can be switched on with no provider, and no line says one is needed", () => {
         render(
             prefs({
                 alerts: [
@@ -189,19 +189,14 @@ describe("AlertsGrid", () => {
                 ],
                 channels: {
                     bell: { available: true },
-                    email: { available: false, reason: "NO_PROVIDER" },
+                    email: { available: true },
                     whatsapp: { available: false, reason: "NO_PROVIDER" },
                 },
             }),
         );
-        const email = switchFor("New order by Email");
-        expect(email.disabled).toBe(true);
-        act(() => email.click());
-        expect(saveAlert).not.toHaveBeenCalled();
-        const link = host.querySelector<HTMLAnchorElement>(
-            'a[href="/settings/providers"]',
-        );
-        expect(link?.textContent).toBe("Connect email in Providers");
+        expect(switchFor("New order by Email").disabled).toBe(false);
+        expect(host.querySelector('a[href="/settings/providers"]')).toBeNull();
+        expect(host.textContent).not.toMatch(/provider/i);
     });
 
     it("a connected WhatsApp shows, fixed off, and never saves", () => {

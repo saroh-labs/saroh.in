@@ -1,12 +1,14 @@
 import Link from "next/link";
 
-import type { ReviewEmailNote } from "@/lib/product-reviews/describe";
+import type { EmailNote } from "@/lib/communications/email-setup";
 
 /**
- * Why review invitations can't go (D11), and the way to fix it: connect the
- * business's own email, or see the plans where its plan can't (DEC-091).
+ * Why a send can't go for want of the business's own email (DEC-011), and
+ * the way to fix it: connect one, or see the plans where its plan can't
+ * (DEC-091). Inline, in the line where the send is refused — review
+ * invitations, an invoice's send.
  */
-export function ReviewEmailNoteText({ note }: { note: ReviewEmailNote }) {
+export function EmailNoteText({ note }: { note: EmailNote }) {
     return (
         <span className="text-pretty">
             {note.text}

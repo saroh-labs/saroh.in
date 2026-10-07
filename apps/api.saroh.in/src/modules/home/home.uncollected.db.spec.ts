@@ -10,7 +10,6 @@
  */
 import { prisma } from "@saroh/database";
 
-import { CommunicationsService } from "../communications/communications.service";
 import { tellTeam } from "../notifications/team-alert.handler";
 import { flattenNeeds } from "./home-needs";
 import { uncollectedOrders } from "./home-uncollected";
@@ -210,9 +209,6 @@ describe("orders nobody came for, on Home (R34)", () => {
 });
 
 describe("the team's alert (R34)", () => {
-    // No provider is connected here, so only the bell is written.
-    const comms = new CommunicationsService();
-
     it("is told once, however often it runs, and leaves the order as it was", async () => {
         const order = await placed();
         const before = await prisma.order.findUniqueOrThrow({
@@ -220,10 +216,10 @@ describe("the team's alert (R34)", () => {
         });
         const payload = { event: "uncollected" as const, orderId: order.id };
         const first = await prisma.$transaction((tx) =>
-            tellTeam(tx, comms, orgId, payload, at("2026-10-08T00:05")),
+            tellTeam(tx, orgId, payload, at("2026-10-08T00:05")),
         );
         const again = await prisma.$transaction((tx) =>
-            tellTeam(tx, comms, orgId, payload, at("2026-10-11T09:00")),
+            tellTeam(tx, orgId, payload, at("2026-10-11T09:00")),
         );
         expect(first.told).toBe(true);
         expect(again.told).toBe(false);
@@ -256,13 +252,7 @@ describe("the team's alert (R34)", () => {
             [paid.id, at("2026-10-09T09:00")],
         ] as const) {
             const out = await prisma.$transaction((tx) =>
-                tellTeam(
-                    tx,
-                    comms,
-                    orgId,
-                    { event: "uncollected", orderId: id },
-                    now,
-                ),
+                tellTeam(tx, orgId, { event: "uncollected", orderId: id }, now),
             );
             expect(out.told).toBe(false);
         }

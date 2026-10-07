@@ -79,7 +79,7 @@ beforeEach(() => {
 });
 
 describe("reading your alerts", () => {
-    it("offers the four rows with the defaults, and email off while no provider is connected", async () => {
+    it("offers the four rows with the defaults, and email from Saroh with no provider connected", async () => {
         const view = await service().read(ctx());
 
         expect(view.alerts.map((a) => a.key)).toEqual([
@@ -88,15 +88,16 @@ describe("reading your alerts", () => {
             "failed",
             "team",
         ]);
-        // Email defaults on for a failed payment, but can't deliver yet.
+        // Email defaults on for a failed payment: Saroh sends it, so no
+        // provider is needed (DEC-011, amended 2026-10-07).
         expect(view.alerts.find((a) => a.key === "failed")?.channels).toEqual({
             bell: true,
-            email: false,
+            email: true,
             whatsapp: false,
         });
         expect(view.channels).toEqual({
             bell: { available: true },
-            email: { available: false, reason: "NO_PROVIDER" },
+            email: { available: true },
             whatsapp: { available: false, reason: "NO_PROVIDER" },
         });
         expect(view.canConnect).toBe(true);
@@ -223,7 +224,11 @@ describe("reading your alerts", () => {
         ).toEqual({ organizationId: "org_1", userId: "user_7" });
         expect(
             db.communicationProvider.findMany.mock.calls[0][0].where,
-        ).toEqual({ organizationId: "org_1", status: "CONNECTED" });
+        ).toEqual({
+            organizationId: "org_1",
+            status: "CONNECTED",
+            channel: "WHATSAPP",
+        });
     });
 });
 
@@ -311,14 +316,15 @@ describe("changing one", () => {
         expect(record).not.toHaveBeenCalled();
     });
 
-    it("email with no provider is refused in words that say how to fix it", async () => {
-        await expect(
-            service().update(ctx(), {
-                alert: "order",
-                channel: "email",
-                on: true,
-            }),
-        ).rejects.toThrow("Connect email in Providers to get alerts by email.");
+    it("email can be switched on with no provider: Saroh sends it", async () => {
+        await service().update(ctx(), {
+            alert: "order",
+            channel: "email",
+            on: true,
+        });
+        expect(db.notificationPreference.upsert).toHaveBeenCalledWith(
+            expect.objectContaining({ update: { enabled: true } }),
+        );
     });
 
     it("a row the role can't read can't be written either", async () => {
