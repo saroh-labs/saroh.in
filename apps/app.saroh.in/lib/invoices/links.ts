@@ -47,7 +47,7 @@ export function sourceHref(
 /** What following the source link shows, in the Connected panel's words. */
 export function sourceHint(i: Pick<Invoice, "source" | "order">): string {
     if (i.order || i.source === "ORDER") {
-        return "What was ordered, the kitchen steps, refunds";
+        return "What was ordered, its steps and refunds";
     }
     switch (i.source) {
         case "SUBSCRIPTION":
