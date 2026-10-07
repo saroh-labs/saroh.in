@@ -1,6 +1,9 @@
 import type { Prisma } from "@saroh/database";
 
-import { planTakesInvoiceOnline } from "../billing/online-payments-plan";
+import {
+    noProviderReason,
+    planTakesInvoiceOnline,
+} from "../billing/online-payments-plan";
 import { OPENS_CHECKOUT } from "../payments/public-key";
 import { paymentsOn } from "./payments-on";
 
@@ -57,7 +60,8 @@ export async function invoiceOnlineBlocker(
     ]);
     if (!plan) return "PLAN";
     if (!on) return "PAYMENTS_OFF";
-    return provider == null ? "NO_PROVIDER" : null;
+    // None connected, and the plan may not let one be (UX-017).
+    return provider == null ? noProviderReason(organizationId) : null;
 }
 
 /** The booking side's `OnlineBlocker`, by the same names. */

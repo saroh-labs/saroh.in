@@ -3,7 +3,7 @@ import { notFound } from "next/navigation";
 import { OrderDetail } from "@/components/commerce/order-detail/order-detail";
 import { OrderLocked } from "@/components/commerce/orders/orders-states";
 import { OrderReviews } from "@/components/stores/order-reviews";
-import { takesOnlinePayment } from "@/lib/billing/access";
+import { ownAccountsRoom, takesOnlinePayment } from "@/lib/billing/access";
 import { customerHref } from "@/lib/customers/links";
 import { hasPaymentProvider } from "@/lib/invoices/tax";
 import {
@@ -75,8 +75,11 @@ export default async function OrderPage({
     // (R33): elsewhere the order is paid in cash or at the counter, and no
     // link is drawn at all.
     const powers = orderPowers(organization);
-    const linkable =
-        powers.payLink && takesOnlinePayment(await billingAccessOrNull());
+    const billing = await billingAccessOrNull();
+    const linkable = powers.payLink && takesOnlinePayment(billing);
+    // With no provider and a plan that can't connect one (DEC-091), "Connect
+    // one" would lead to a key form the connect refuses (UX-017): no block.
+    const connectable = ownAccountsRoom(billing);
 
     const contactId = order.customer?.contactId ?? null;
     // A pay link (B11) is offered only to someone who may take or change
@@ -138,7 +141,7 @@ export default async function OrderPage({
             can={{
                 stage: powers.stage,
                 edit: powers.edit,
-                payLink: linkable,
+                payLink: linkable && (canPayOnline || connectable),
                 refund: powers.refund,
                 payOnline: canPayOnline,
                 manageProviders: may("payment:manage"),

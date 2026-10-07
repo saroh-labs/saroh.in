@@ -93,9 +93,9 @@ export interface ProviderEntry {
     /** What stops when it is disconnected, for the confirmation. */
     consequence: string;
     /**
-     * One never connected that the plan won't let the business connect
-     * (DEC-091, UX-006): the plan that has it and See plans, in place of
-     * Connect. `null` or absent: Connect is offered.
+     * One never connected, or disconnected, that the plan won't let the
+     * business connect (DEC-091, UX-006): the plan that has it and See
+     * plans, in place of Connect. `null` or absent: Connect is offered.
      */
     lock?: ConnectLock | null;
 }
@@ -315,7 +315,9 @@ export function buildProvidersView(input: ProviderRowsInput): ProvidersView {
                     (c) => c.channel === channel,
                 );
                 for (const c of own)
-                    view.connected.push(commsEntry(c, input.sarohEmail));
+                    view.connected.push(
+                        commsEntry(c, input.sarohEmail, input.locks),
+                    );
                 // A channel sends through one provider at a time: while one
                 // is connected, another would replace it, which is its row's
                 // Change keys — not a second Connect beside it.
@@ -390,6 +392,15 @@ function paymentEntry(
         target: live ? { kind: "payments", provider: p.provider } : null,
         setup: { kind: "payments", provider: p.provider },
         consequence: PAYMENTS_CONSEQUENCE,
+        // Connecting it again is one more of the business's own accounts:
+        // the plan's to allow, as the API asks it (UX-017).
+        lock: live
+            ? null
+            : input.locks
+              ? input.locks.paymentsAgain === undefined
+                  ? input.locks.payments
+                  : input.locks.paymentsAgain
+              : null,
     };
 }
 
@@ -447,6 +458,7 @@ function disconnectedEmailNote(state: SarohEmailState | null | undefined) {
 function commsEntry(
     c: ConnectedCommsProvider,
     sarohEmail?: SarohEmailState | null,
+    locks?: ConnectLocks,
 ): ProviderEntry {
     const spec = CHANNEL[c.channel];
     const live = c.status === "CONNECTED";
@@ -475,6 +487,8 @@ function commsEntry(
         target: live ? { kind: "messaging", channel: c.channel } : null,
         setup: { kind: "messaging", channel: c.channel, provider: c.provider },
         consequence: takesOver ? SAROH_TAKES_OVER : spec.consequence,
+        // Connecting it again is a new connection: the plan's to allow.
+        lock: live ? null : (locks?.messaging ?? null),
     };
 }
 

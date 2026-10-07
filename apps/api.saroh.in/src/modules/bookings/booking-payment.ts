@@ -1,7 +1,10 @@
 import { ConflictException } from "@nestjs/common";
 import { prisma } from "@saroh/database";
 
-import { planTakesOnlinePayment } from "../billing/online-payments-plan";
+import {
+    noProviderReason,
+    planTakesOnlinePayment,
+} from "../billing/online-payments-plan";
 import { paymentsOn } from "../invoices/payments-on";
 import { OPENS_CHECKOUT } from "../payments/public-key";
 import type { BookingPayment, BookingRulesValue } from "./booking-rules";
@@ -44,7 +47,8 @@ export async function onlinePaymentBlocker(
     ]);
     if (!plan) return "PLAN";
     if (!on) return "PAYMENTS_OFF";
-    return provider === null ? "NO_PROVIDER" : null;
+    // None connected, and the plan may not let one be (UX-017).
+    return provider === null ? noProviderReason(organizationId) : null;
 }
 
 /**

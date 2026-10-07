@@ -77,6 +77,7 @@ describe("connectLocksOf (DEC-091, UX-006)", () => {
         expect(connectLocksOf(grow, ROOM)).toEqual({
             payments: null,
             messaging: null,
+            paymentsAgain: null,
         });
     });
 
@@ -101,6 +102,7 @@ describe("connectLocksOf (DEC-091, UX-006)", () => {
         expect(connectLocksOf({ ...free, enforced: false }, ROOM)).toEqual({
             payments: null,
             messaging: null,
+            paymentsAgain: null,
         });
     });
 });
@@ -153,10 +155,62 @@ describe("Providers rows with the plan's locks (UX-006)", () => {
         expect(view.paymentsLocked).toBe(false);
     });
 
-    it("a provider already connected is never locked (re-entering keys is allowed)", () => {
+    it("a provider still connected is never locked (re-entering keys is allowed)", () => {
         const view = buildProvidersView(
             input({
                 locks: connectLocksOf(free, HELD),
+                payments: [
+                    {
+                        id: "RAZORPAY",
+                        provider: "RAZORPAY",
+                        status: "CONNECTED",
+                        publicKey: "rzp_test_abc",
+                        updatedAt: "",
+                    },
+                ],
+            }),
+        );
+        const razorpay = view.connected.find((e) => e.name === "Razorpay");
+        expect(razorpay?.lock ?? null).toBeNull();
+    });
+
+    it("Free: a provider connected once and disabled carries the lock, never the key form (UX-017)", () => {
+        const view = buildProvidersView(
+            input({
+                locks: connectLocksOf(free, HELD),
+                payments: [
+                    {
+                        id: "RAZORPAY",
+                        provider: "RAZORPAY",
+                        status: "DISABLED",
+                        publicKey: null,
+                        updatedAt: "",
+                    },
+                ],
+                messaging: [
+                    {
+                        id: "EMAIL",
+                        channel: "EMAIL",
+                        provider: "RESEND",
+                        status: "DISABLED",
+                        fromAddress: null,
+                        updatedAt: "",
+                    },
+                ],
+            }),
+        );
+        const razorpay = view.connected.find((e) => e.name === "Razorpay");
+        const resend = view.connected.find((e) => e.name === "Resend");
+        expect(razorpay?.state).toBe("DISCONNECTED");
+        expect(razorpay?.lock?.cta).toBe("See Grow");
+        expect(resend?.state).toBe("DISCONNECTED");
+        expect(resend?.lock?.cta).toBe("See Grow");
+    });
+
+    it("Grow: a disabled provider is offered Connect again", () => {
+        const view = buildProvidersView(
+            input({
+                locks: connectLocksOf(grow, ROOM),
                 payments: [
                     {
                         id: "RAZORPAY",

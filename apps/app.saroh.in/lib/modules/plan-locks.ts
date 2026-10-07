@@ -23,7 +23,21 @@ export interface RowPlanLock {
     href: string;
 }
 
-const NO_PROVIDER = "COMMUNICATIONS_NO_PROVIDER";
+/**
+ * The steps that are only "connect a provider" (none yet, or the one it had
+ * disabled): on a plan that won't let it connect one, the lock is the
+ * answer, never "Go to Providers" beside it (UX-017).
+ */
+const CONNECT_STEPS = new Set([
+    "PAYMENTS_NO_PROVIDER",
+    "PAYMENTS_PROVIDER_DISABLED",
+    "COMMUNICATIONS_NO_PROVIDER",
+    "COMMUNICATIONS_PROVIDER_DISABLED",
+]);
+
+const onlyConnectSteps = (module: ModuleView) =>
+    module.blockers.length > 0 &&
+    module.blockers.every((b) => CONNECT_STEPS.has(b.code));
 
 export function rowPlanLock(
     module: ModuleView,
@@ -34,10 +48,7 @@ export function rowPlanLock(
     if (!lock) return null;
     if (
         module.key === "COMMUNICATIONS" &&
-        !(
-            module.readiness === "SETUP_REQUIRED" &&
-            module.blockers[0]?.code === NO_PROVIDER
-        )
+        !(module.readiness === "SETUP_REQUIRED" && onlyConnectSteps(module))
     ) {
         return null;
     }
@@ -49,15 +60,19 @@ export function rowPlanLock(
 }
 
 /**
- * The row as the list draws it: a Communications row whose only step is a
- * provider the plan won't let it connect reads as on and ready, so it is
- * neither tagged "Finish setup" nor sorted with the ones that need work.
+ * The row as the list draws it: a Payments or Communications row whose only
+ * step is a provider the plan won't let it connect (none yet, or an old
+ * one disabled) reads as on and ready, so it is neither tagged "Finish
+ * setup" nor sorted with the ones that need work, and never says "Go to
+ * Providers" beside the plan's line (UX-017).
  */
 export function asShown(
     module: ModuleView,
     lock: RowPlanLock | null,
 ): ModuleView {
-    return lock && module.readiness === "SETUP_REQUIRED"
+    return lock &&
+        module.readiness === "SETUP_REQUIRED" &&
+        onlyConnectSteps(module)
         ? { ...module, readiness: "ACTIVE", blockers: [] }
         : module;
 }

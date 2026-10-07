@@ -186,10 +186,12 @@ export function ProviderRowView({
                         someone disconnected. Outline, all of them: a row
                         per provider would otherwise put several solid
                         buttons on one screen. */}
-                    {/* The plan won't let the business connect it
-                        (DEC-091, UX-006): the plan that has it and See
-                        plans, before any key form opens. */}
-                    {available && entry.lock ? (
+                    {/* The plan won't let the business connect it, or
+                        connect it again (DEC-091, UX-006, UX-017): the plan
+                        that has it and See plans, before any key form
+                        opens. */}
+                    {(available || entry.state === "DISCONNECTED") &&
+                    entry.lock ? (
                         <>
                             <span className="rounded-full bg-muted px-2 py-0.5 text-[11.5px] font-medium text-muted-foreground">
                                 {entry.lock.comesWith}

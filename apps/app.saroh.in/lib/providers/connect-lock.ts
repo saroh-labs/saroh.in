@@ -39,6 +39,13 @@ export interface ConnectLock {
 export interface ConnectLocks {
     payments: ConnectLock | null;
     messaging: ConnectLock | null;
+    /**
+     * Connecting again a payment provider the business once had (now
+     * disabled): the API skips the plan's payments row for one it knows,
+     * but it is still one more of its own accounts (`integrations`), so
+     * only that row's room is asked (UX-017). Absent: as `payments`.
+     */
+    paymentsAgain?: ConnectLock | null;
 }
 
 const NONE: ConnectLocks = { payments: null, messaging: null };
@@ -90,12 +97,13 @@ export function connectLocksOf(
 ): ConnectLocks {
     const messaging = messagingLockOf(emailSetup, access);
     if (!access) return { ...NONE, messaging };
+    const again = ownAccountsRoom(access)
+        ? null
+        : lockFor(access, "integrations");
     const payments = !takesOnlinePayment(access)
         ? lockFor(access, "payments")
-        : ownAccountsRoom(access)
-          ? null
-          : lockFor(access, "integrations");
-    return { payments, messaging };
+        : again;
+    return { payments, messaging, paymentsAgain: again };
 }
 
 /**
