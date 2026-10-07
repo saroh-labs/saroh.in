@@ -3211,3 +3211,21 @@ files. The optimizer only re-encoded them.
 trace showing one `/_next/image` request with no response points at the
 optimizer, not at the page.
 **Category**: marketing · `apps/saroh.in/components/v2/help/help-step.tsx`
+
+## Permissions — the permission suite's fake API stopped giving a Member any Orders (DEC-098)
+
+**Symptom**: on batch-2026-10-07-3, `permissions.spec.ts` "a business with
+no orders yet is empty" and "a failed Orders read says so" showed Orders'
+locked card ("Your role … doesn't include orders"). Sell was also missing
+from the Member's rail.
+**Root cause**: DEC-098 made the app decide money and orders by the role's
+resolved permissions only (`permits()`). A response without `actions` now
+permits nothing. The real API always sends `actions`, but the fake API
+(`e2e/fixtures/permissions-api.mjs`) sent only `role: "MEMBER"` for its
+default scenarios, which the app's old role-name fallback used to fill in.
+**Fix**: the fixture sends a built-in Member's permissions (the policy's
+read-only floor plus `order:stage`) for any scenario without its own role.
+**Rule**: when the app changes which field of an API response it decides
+on, update the permission suite's fake API to send what the real API does.
+The fake API mirrors the API's answers, not the app's fallbacks.
+**Category**: e2e · `e2e/fixtures/permissions-api.mjs`
