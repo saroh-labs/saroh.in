@@ -24,11 +24,21 @@ const tx = {
     site: { count: jest.fn() },
     media: { aggregate: jest.fn() },
     analyticsDailyAggregate: { aggregate: jest.fn() },
+    delivery: { count: jest.fn() },
 };
 const $transaction = jest.fn((fn: (t: typeof tx) => unknown) => fn(tx));
 
 jest.mock("@saroh/database", () => ({
-    prisma: { $transaction: (fn: never) => $transaction(fn) },
+    prisma: {
+        $transaction: (fn: never) => $transaction(fn),
+        // `hasRoom` counts outside a write's transaction.
+        get merchantPaymentProvider() {
+            return tx.merchantPaymentProvider;
+        },
+        get communicationProvider() {
+            return tx.communicationProvider;
+        },
+    },
     liveCatalogueVersion: jest.fn(),
 }));
 
@@ -134,6 +144,7 @@ describe("which rows metering counts", () => {
             sites: "sites",
             storage: "storageGb",
             visits: "visitsPerMonth",
+            "saroh-emails": "sarohEmailsPerMonth",
         });
         expect(meteredKeyOf("roles")).toBeNull();
     });
@@ -173,6 +184,24 @@ describe("what each count asks", () => {
                 createdAt: { gte: start },
                 status: "CONFIRMED",
                 courseEnrollmentId: null,
+            },
+        });
+    });
+
+    it("counts this month's emails Saroh queued, not those stopped or out of tries (DEC-086)", async () => {
+        tx.delivery.count.mockResolvedValue(3);
+        expect(
+            await countUsage(tx as never, "org", "sarohEmailsPerMonth", now),
+        ).toBe(3);
+        expect(tx.delivery.count).toHaveBeenCalledWith({
+            where: {
+                organizationId: "org",
+                provider: "SAROH",
+                createdAt: { gte: start },
+                NOT: [
+                    { status: "STOPPED" },
+                    { status: "FAILED", attempts: { gte: 5 } },
+                ],
             },
         });
     });
@@ -330,6 +359,101 @@ describe("crossing a notice's line", () => {
             title: "You're past your 2 orders a month on Plan A",
             body: "Your site kept taking orders, so no customer was turned away. Plan B raises the limit.",
         });
+    });
+
+    it("leads Saroh's emails with connecting the business's own, says when the month restarts, and offers no add-on (DEC-086)", () => {
+        const row = { plan: "Plan A", upgradeTo: "Plan B" };
+        const warn = limitNoticeWords(
+            row,
+            "sarohEmailsPerMonth",
+            10,
+            8,
+            "warn",
+        );
+        expect(warn.title).toBe(
+            "You've used 8 of 10 emails Saroh sends for you a month on Plan A",
+        );
+        expect(warn.body).toMatch(
+            /^You'll be stopped at 10\. Connect your own email/,
+        );
+        const full = limitNoticeWords(
+            row,
+            "sarohEmailsPerMonth",
+            10,
+            10,
+            "full",
+            "1 Nov",
+        );
+        expect(full.body).toBe(
+            "Saroh has stopped sending your booking emails for this month. It starts again on 1 Nov. Connect your own email and your booking emails go through it, with no monthly limit. Or Plan B raises the limit.",
+        );
+        const over = limitNoticeWords(
+            row,
+            "sarohEmailsPerMonth",
+            10,
+            12,
+            "over",
+        );
+        expect(over.body).not.toMatch(/add-on/);
+        expect(over.body).toMatch(/Connect your own email/);
+    });
+
+    it("leads Saroh's emails with a higher plan when the business can't connect its own (DEC-086)", () => {
+        const row = { plan: "Plan A", upgradeTo: "Plan B" };
+        const higher =
+            "A higher plan lets you connect your own email, and then your booking emails go through it with no monthly limit.";
+        const warn = limitNoticeWords(
+            row,
+            "sarohEmailsPerMonth",
+            10,
+            8,
+            "warn",
+            undefined,
+            false,
+        );
+        expect(warn.body).toBe(
+            `You'll be stopped at 10. Plan B gives you more. ${higher}`,
+        );
+        const full = limitNoticeWords(
+            row,
+            "sarohEmailsPerMonth",
+            10,
+            10,
+            "full",
+            "1 Nov",
+            false,
+        );
+        expect(full.body).toBe(
+            `Saroh has stopped sending your booking emails for this month. It starts again on 1 Nov. Plan B raises the limit. ${higher}`,
+        );
+        const over = limitNoticeWords(
+            row,
+            "sarohEmailsPerMonth",
+            10,
+            12,
+            "over",
+            undefined,
+            false,
+        );
+        expect(over.body).toBe(
+            `Saroh has stopped sending your booking emails for this month. Plan B raises the limit. ${higher}`,
+        );
+        // Unread: neither connecting nor its plan is claimed.
+        const unread = limitNoticeWords(
+            row,
+            "sarohEmailsPerMonth",
+            10,
+            10,
+            "full",
+            "1 Nov",
+            null,
+        );
+        expect(unread.body).toBe(
+            "Saroh has stopped sending your booking emails for this month. It starts again on 1 Nov. Plan B raises the limit.",
+        );
+        for (const b of [warn.body, full.body, over.body, unread.body]) {
+            expect(b).not.toMatch(/Connect your own email|add-on/);
+        }
     });
 
     it("never tells a soft cap it will be stopped", () => {
@@ -539,6 +663,77 @@ describe("MeteringService", () => {
             }),
         ).toBe("done");
         expect(write).toHaveBeenCalledWith(tx);
+    });
+});
+
+describe("hasRoom: the connect's check, asked before offering it (DEC-086)", () => {
+    // `integrations`: 1 on Plan A, 2 on Plan B, no cap on Plan C.
+    function connections(n: number) {
+        tx.merchantPaymentProvider.count.mockResolvedValue(n);
+        tx.communicationProvider.count.mockResolvedValue(0);
+    }
+
+    it("is room when the plan includes it with room for one more", async () => {
+        connections(1);
+        expect(
+            await meterFor("grow").meter.hasRoom("org", "integrations"),
+        ).toBe(true);
+    });
+
+    it("is no room when the plan leaves it off", async () => {
+        const locked = resolveAllAccess({
+            catalog: fakeMeteredCatalog((c) => {
+                const m = c.modules.find((x) => x.id === "integrations");
+                if (m) m.cells.free = { inc: false, off: "locked" };
+            }),
+            planId: "free",
+            now: new Date(),
+        });
+        const meter = new MeteringService(
+            {
+                resolve: () =>
+                    Promise.resolve({ source: "catalogue", modules: locked }),
+            } as unknown as CatalogueAccessService,
+            {
+                isEnabled: () => Promise.resolve(true),
+            } as unknown as FeatureFlagService,
+        );
+        expect(await meter.hasRoom("org", "integrations")).toBe(false);
+        expect(tx.merchantPaymentProvider.count).not.toHaveBeenCalled();
+    });
+
+    it("is no room at the cap, as the connect would refuse it", async () => {
+        connections(1);
+        expect(
+            await meterFor("free").meter.hasRoom("org", "integrations"),
+        ).toBe(false);
+        // Nothing locked, nothing told: it only asks.
+        expect(tx.$executeRaw).not.toHaveBeenCalled();
+        expect(tx.job.create).not.toHaveBeenCalled();
+    });
+
+    it("is room with no cap, without counting", async () => {
+        expect(await meterFor("pro").meter.hasRoom("org", "integrations")).toBe(
+            true,
+        );
+        expect(tx.merchantPaymentProvider.count).not.toHaveBeenCalled();
+    });
+
+    it("is room with enforcement off or off the catalogue: the connect goes ahead", async () => {
+        const off = meterFor("free", false);
+        expect(await off.meter.hasRoom("org", "integrations")).toBe(true);
+        expect(off.resolve).not.toHaveBeenCalled();
+        expect(await meterFor(null).meter.hasRoom("org", "integrations")).toBe(
+            true,
+        );
+    });
+
+    it("throws when the plan can't be read, never claiming room", async () => {
+        const { meter, resolve } = meterFor("grow");
+        resolve.mockRejectedValueOnce(new Error("down"));
+        await expect(meter.hasRoom("org", "integrations")).rejects.toThrow(
+            "down",
+        );
     });
 });
 

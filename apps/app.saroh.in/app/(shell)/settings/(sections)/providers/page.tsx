@@ -11,6 +11,7 @@ import { listOrgDomains } from "@/lib/domains/service";
 import { listProviderHealth } from "@/lib/provider-health/service";
 import { buildProvidersView } from "@/lib/providers/rows";
 import {
+    getSarohEmail,
     listCommsProviders,
     listPaymentProviders,
     listPaymentWebhooks,
@@ -33,9 +34,9 @@ export default async function ProvidersSettingsPage() {
     const result = await listProviderHealth();
     // Everything else is only read once the health read has shown this
     // person may manage providers.
-    const [payments, messaging, domains, checkout, webhooks] =
+    const [payments, messaging, domains, checkout, webhooks, sarohEmail] =
         result.status === "denied"
-            ? [null, null, null, [], null]
+            ? [null, null, null, [], null, null]
             : await Promise.all([
                   listPaymentProviders(),
                   listCommsProviders(),
@@ -44,6 +45,9 @@ export default async function ProvidersSettingsPage() {
                   // The address to register and the last payment update
                   // (DEC-063). Best-effort: it never fails the page.
                   listPaymentWebhooks(),
+                  // Saroh sending booking emails (DEC-086). Never throws:
+                  // a failed read is UNREAD, said in its own notice.
+                  getSarohEmail(),
               ]);
     const view =
         result.status === "denied"
@@ -55,6 +59,7 @@ export default async function ProvidersSettingsPage() {
                   domains,
                   checkout,
                   webhooks,
+                  sarohEmail,
               });
 
     return (

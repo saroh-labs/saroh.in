@@ -91,6 +91,31 @@ const envSchema = z.object({
     SMTP_PASS: z.string().optional(),
     USER_ACCOUNT: z.string().optional(),
     USER_PASSWORD: z.string().optional(),
+    // Saroh's sender for a business's email while it has no provider of its
+    // own (DEC-086): its own address on the notify subdomain, and the SES
+    // configuration set its bounces and complaints are measured on. The
+    // credentials are the SMTP_* set above.
+    SAROH_BUSINESS_EMAIL_FROM: z.string().email().optional(),
+    SAROH_BUSINESS_EMAIL_CONFIG_SET: z
+        .string()
+        .regex(/^[A-Za-z0-9_-]{1,64}$/)
+        .optional(),
+    // The global stop for that route: "true" stops every business's Saroh
+    // email at once, queued and retrying ones included, whatever each
+    // business's SAROH_BUSINESS_EMAIL flag says (the complaint alarm's
+    // runbook step). Checked on every send and queued job
+    // (`communications/saroh-may-send.ts`), but env is read at boot, so it
+    // takes effect once the API and workers restart with it set; for an
+    // instant stop, turn off the business's SAROH_BUSINESS_EMAIL flag.
+    SAROH_BUSINESS_EMAIL_STOP: z.enum(["true", "false"]).optional(),
+    // At most this many Saroh-sent business emails in any 24 hours, for
+    // every business together, so sign-in codes keep their room on the SES
+    // account. Unset: `SAROH_DAILY_CEILING_DEFAULT` (1,000).
+    SAROH_BUSINESS_EMAIL_DAILY_CEILING: z.coerce
+        .number()
+        .int()
+        .positive()
+        .optional(),
 
     // Sign-in codes for a business's customers on its own site (ADR-011,
     // round-2 plan A, A2). Every one is optional in the schema so dev and

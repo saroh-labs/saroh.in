@@ -591,13 +591,34 @@ export function siteCodesSmtpSecure(
     return port === 465;
 }
 
-type SiteCodesSmtpEnv = Pick<
+type SiteCodesSmtpEnv = IdentitySmtpEnv &
+    Pick<
+        typeof env,
+        | "SITE_CODES_SMTP_HOST"
+        | "SITE_CODES_SMTP_PORT"
+        | "SITE_CODES_SMTP_USER"
+        | "SITE_CODES_SMTP_PASS"
+        | "SITE_CODES_SMTP_SECURE"
+    >;
+
+/**
+ * How every pooled Saroh send connects (codes, a business's email). Codes
+ * and booking emails come in bursts, and a send that finds a connection still
+ * open skips the TLS and login round trips. An idle connection still closes
+ * after `socketTimeout`, so a lone send opens a fresh one; two at most keeps
+ * a burst from opening a crowd of them at the provider. The short timeouts
+ * let a stuck provider fail inside the request or job, so it can retry.
+ */
+export const POOLED_SEND = {
+    pool: true as const,
+    maxConnections: 2,
+    connectionTimeout: 5_000,
+    greetingTimeout: 5_000,
+    socketTimeout: 10_000,
+};
+
+type IdentitySmtpEnv = Pick<
     typeof env,
-    | "SITE_CODES_SMTP_HOST"
-    | "SITE_CODES_SMTP_PORT"
-    | "SITE_CODES_SMTP_USER"
-    | "SITE_CODES_SMTP_PASS"
-    | "SITE_CODES_SMTP_SECURE"
     | "SMTP_HOST"
     | "SMTP_HOSTNAME"
     | "SMTP_PORT"
@@ -609,39 +630,43 @@ type SiteCodesSmtpEnv = Pick<
 >;
 
 /**
- * The code transport's settings, or null with no SMTP. Pooled: codes come in
- * bursts (a busy booking page, a retry), and a send that finds a connection
- * still open skips the TLS and login round trips. An idle connection still
- * closes after `socketTimeout`, so a lone code opens a fresh one; two at most
- * keeps a burst from opening a crowd of them at the provider.
+ * A pooled transport on the identity `SMTP_*` set (in production, SES;
+ * DEC-085), connecting as the identity transport does, or null with no SMTP.
+ * Each caller makes its own pool from it, so one stream's burst never queues
+ * behind another's.
  */
-export function siteCodesTransportOptions(source: SiteCodesSmtpEnv) {
-    const own = source.SITE_CODES_SMTP_HOST !== undefined;
-    const host = own
-        ? source.SITE_CODES_SMTP_HOST
-        : (source.SMTP_HOST ?? source.SMTP_HOSTNAME);
-    const port = own ? source.SITE_CODES_SMTP_PORT : source.SMTP_PORT;
-    const user = own
-        ? source.SITE_CODES_SMTP_USER
-        : (source.SMTP_USER ?? source.USER_ACCOUNT);
-    const pass = own
-        ? source.SITE_CODES_SMTP_PASS
-        : (source.SMTP_PASS ?? source.USER_PASSWORD);
+export function identitySmtpOptions(source: IdentitySmtpEnv) {
+    const host = source.SMTP_HOST ?? source.SMTP_HOSTNAME;
+    const user = source.SMTP_USER ?? source.USER_ACCOUNT;
+    const pass = source.SMTP_PASS ?? source.USER_PASSWORD;
     if (!host || !user || !pass) return null;
-    const portNumber = port ? Number(port) : 465;
     return {
         host,
-        port: portNumber,
-        // The identity fallback connects exactly as the identity transport does.
-        secure: own
-            ? siteCodesSmtpSecure(portNumber, source.SITE_CODES_SMTP_SECURE)
-            : source.SMTP_SECURE !== "false",
+        port: source.SMTP_PORT ? Number(source.SMTP_PORT) : 465,
+        secure: source.SMTP_SECURE !== "false",
         auth: { user, pass },
-        pool: true as const,
-        maxConnections: 2,
-        connectionTimeout: 5_000,
-        greetingTimeout: 5_000,
-        socketTimeout: 10_000,
+        ...POOLED_SEND,
+    };
+}
+
+/** The code transport's settings: its own SMTP set, else the identity one. */
+export function siteCodesTransportOptions(source: SiteCodesSmtpEnv) {
+    if (source.SITE_CODES_SMTP_HOST === undefined) {
+        return identitySmtpOptions(source);
+    }
+    const host = source.SITE_CODES_SMTP_HOST;
+    const user = source.SITE_CODES_SMTP_USER;
+    const pass = source.SITE_CODES_SMTP_PASS;
+    if (!host || !user || !pass) return null;
+    const port = source.SITE_CODES_SMTP_PORT
+        ? Number(source.SITE_CODES_SMTP_PORT)
+        : 465;
+    return {
+        host,
+        port,
+        secure: siteCodesSmtpSecure(port, source.SITE_CODES_SMTP_SECURE),
+        auth: { user, pass },
+        ...POOLED_SEND,
     };
 }
 

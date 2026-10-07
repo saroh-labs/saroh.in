@@ -136,6 +136,21 @@ export async function tellAboutBooking(
     const kind = noticeKind(event?.type ?? null, payload.reason);
     const key = event?.id ?? `job:${input.jobId}`;
 
+    // The customer's notice first: it takes the plan-meter lock when Saroh
+    // emails it (DEC-086), and that lock comes before any row this
+    // transaction writes, the team's notice included (`backend-jobs.md`).
+    await notices.notify(
+        tx,
+        organizationId,
+        {
+            kind,
+            eventKey: bookingNoticeKey(key),
+            bookingId: booking.id,
+            bookingEventId: event?.id ?? null,
+        },
+        input.now,
+    );
+
     // The customer did it themselves: no team member behind the event. A
     // booking they made is the team's "New booking" (F14), as a move or a
     // cancel always was.
@@ -154,18 +169,6 @@ export async function tellAboutBooking(
             timeZone: booking.timezone,
         });
     }
-
-    await notices.notify(
-        tx,
-        organizationId,
-        {
-            kind,
-            eventKey: bookingNoticeKey(key),
-            bookingId: booking.id,
-            bookingEventId: event?.id ?? null,
-        },
-        input.now,
-    );
 }
 
 /** "Asha Rao", the booker's name, or "A customer". */

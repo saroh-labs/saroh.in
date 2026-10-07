@@ -22,7 +22,7 @@ export interface MessageDelivery {
     id: string;
     provider: string;
     providerMessageId: string | null;
-    /** QUEUED | SENT | DELIVERED | FAILED | BOUNCED */
+    /** QUEUED | SENT | DELIVERED | FAILED | BOUNCED; a Saroh send (DEC-086) also STOPPED | UNKNOWN */
     status: string;
     error: string | null;
     attempts: number;
@@ -39,7 +39,7 @@ export interface LeadMessage {
     toAddress: string;
     subject: string | null;
     body: string;
-    /** QUEUED | SENT | FAILED | SUPPRESSED */
+    /** QUEUED | SENT | FAILED | SUPPRESSED; a booking notice Saroh didn't email (DEC-086) ALLOWANCE_USED | NO_ALLOWANCE | BOOKING_LIMIT */
     status: string;
     createdAt: string;
     updatedAt: string;

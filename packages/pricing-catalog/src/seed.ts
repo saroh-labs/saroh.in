@@ -308,6 +308,20 @@ const input: CatalogInput = {
             },
         },
         {
+            // Booking emails Saroh sends for a business with no email of
+            // its own (DEC-086). Sample numbers, as everything here.
+            id: "saroh-emails",
+            name: "Booking emails Saroh sends",
+            group: "usage",
+            pricing: "show",
+            what: "Booking emails Saroh sends your customers while you haven't connected your own email. Your own email is never counted.",
+            cells: {
+                free: C("7 a month", "", 7, "month"),
+                grow: C("77 a month", "", 77, "month"),
+                pro: C("7,777 a month", "", 7777, "month"),
+            },
+        },
+        {
             id: "integrations",
             name: "Your own email and payment accounts",
             group: "team",

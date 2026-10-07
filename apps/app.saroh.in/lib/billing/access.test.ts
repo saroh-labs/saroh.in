@@ -50,6 +50,80 @@ describe("rowNotice", () => {
         });
     });
 
+    it("leads Saroh's emails with connecting the business's own email, no add-on (DEC-086)", () => {
+        const n = rowNotice(
+            access({
+                modules: [
+                    row({
+                        moduleId: "saroh-emails",
+                        limit: 10,
+                        per: "month",
+                        usage: 10,
+                    }),
+                ],
+            }),
+            "saroh-emails",
+        );
+        expect(n).toMatchObject({
+            on: true,
+            full: true,
+            cta: "Connect your email",
+            href: "/settings/providers",
+        });
+        expect(n.on && n.body).toMatch(/^Saroh has stopped sending/);
+        expect(n.on && n.body).not.toMatch(/add-on/);
+    });
+
+    describe("Saroh's emails when the plan has no room to connect its own (DEC-086)", () => {
+        const emails = (usage: number) =>
+            row({ moduleId: "saroh-emails", limit: 10, per: "month", usage });
+        const links = (over: Parameters<typeof row>[0]) =>
+            row({ moduleId: "integrations", limit: 2, usage: 0, ...over });
+        const higher =
+            "A higher plan lets you connect your own email, and then your booking emails go through it with no monthly limit.";
+
+        it("leads with a higher plan when connecting is locked, near and full", () => {
+            const locked = links({ state: "locked", usage: null });
+            const warn = rowNotice(
+                access({ modules: [emails(8), locked] }),
+                "saroh-emails",
+            );
+            expect(warn).toMatchObject({
+                full: false,
+                body: `You'll be stopped at 10. Plan B gives you more. ${higher}`,
+                cta: "See plans",
+            });
+            expect(warn).not.toHaveProperty("href");
+            const full = rowNotice(
+                access({ modules: [emails(10), locked] }),
+                "saroh-emails",
+            );
+            expect(full).toMatchObject({
+                full: true,
+                body: `Saroh has stopped sending your booking emails for this month. Plan B raises the limit. ${higher}`,
+                cta: "See plans",
+            });
+        });
+
+        it("leads with a higher plan at the connections cap", () => {
+            expect(
+                rowNotice(
+                    access({ modules: [emails(10), links({ usage: 2 })] }),
+                    "saroh-emails",
+                ),
+            ).toMatchObject({ cta: "See plans" });
+        });
+
+        it("still offers connecting with room", () => {
+            expect(
+                rowNotice(
+                    access({ modules: [emails(10), links({ usage: 1 })] }),
+                    "saroh-emails",
+                ),
+            ).toMatchObject({ cta: "Connect your email" });
+        });
+    });
+
     it("tells, never refuses, at a soft cap (storage in GB)", () => {
         const storage = (usage: number) =>
             rowNotice(

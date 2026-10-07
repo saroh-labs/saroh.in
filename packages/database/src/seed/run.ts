@@ -51,6 +51,7 @@ import {
 } from "./helpers";
 import { seedPreviousAddress } from "./previous-address";
 import { seedPlanId } from "./pricing";
+import { seedSarohEmailBusinesses } from "./saroh-email";
 import { seedStorefrontTeammate } from "./storefront-teammate";
 
 /**
@@ -313,7 +314,10 @@ export async function seed(): Promise<void> {
     // An old address of Northwind's that still forwards to its site (L3).
     await seedPreviousAddress(prisma, org.id, siteIds[0], now);
     await seedStorefrontTeammate(prisma, org.id, storeId);
-    await seedFounder(prisma);
+    const founderId = await seedFounder(prisma);
+    // Two of Asha's that Saroh sends booking emails for, flags on for them
+    // alone (DEC-086; `providers-saroh-email.spec.ts`).
+    await seedSarohEmailBusinesses(prisma, founderId, now);
     // Content after the website: a post belongs to the site it is published on
     // (ADR-004), so there has to be a site first.
     await seedContent(prisma, org.id, siteIds[0] ?? "", user.id);

@@ -4753,7 +4753,7 @@ model Message {
   subject   String?
   body      String
 
-  status String @default("QUEUED") // QUEUED | SENT | FAILED | SUPPRESSED
+  status String @default("QUEUED") // QUEUED | SENT | FAILED | SUPPRESSED; a Saroh send (DEC-086) also UNKNOWN, or, not emailed, ALLOWANCE_USED | NO_ALLOWANCE | BOOKING_LIMIT
 
   createdByUserId String?
 
@@ -4787,7 +4787,7 @@ model Delivery {
 
   provider          String
   providerMessageId String?
-  status            String  @default("QUEUED") // QUEUED | SENT | DELIVERED | FAILED | BOUNCED
+  status            String  @default("QUEUED") // QUEUED | SENT | DELIVERED | FAILED | BOUNCED; a SAROH one (DEC-086) also STOPPED | UNKNOWN
   error             String?
   attempts          Int     @default(0)
 
@@ -4796,6 +4796,11 @@ model Delivery {
 
   @@index([organizationId])
   @@index([messageId])
+  // A business's deliveries by route and time: the monthly count of the
+  // emails Saroh sends for it (DEC-086, `COUNTED_SAROH_DELIVERIES`).
+  @@index([organizationId, provider, createdAt])
+  // Every business's Saroh sends in the last day: the platform's ceiling.
+  @@index([createdAt], map: "Delivery_saroh_createdAt_idx", where: raw("provider = 'SAROH'"))
 }
 
 // Consent — a contact's opt-in/out for a channel. Enforced before any send.
@@ -6483,6 +6488,8 @@ model CustomerNotice {
   @@unique([organizationId, eventKey])
   @@index([organizationId])
   @@index([messageId])
+  // One booking's notices: Saroh's cap of emails per booking a day (DEC-086).
+  @@index([organizationId, bookingId, createdAt])
 }
 
 // ============================================================================

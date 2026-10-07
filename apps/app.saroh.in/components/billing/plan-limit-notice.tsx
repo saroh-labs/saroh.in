@@ -29,7 +29,10 @@ export async function PlanLimitNotice({
             pct={n.pct}
             body={n.body}
             cta={n.cta}
-            href={upgradeHref(accessRow(view, moduleId)?.upgradeTo?.planId)}
+            href={
+                n.href ??
+                upgradeHref(accessRow(view, moduleId)?.upgradeTo?.planId)
+            }
             className={className}
         />
     );

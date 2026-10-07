@@ -1,12 +1,15 @@
 import { providerName } from "@/lib/payments/providers";
 import type { ProviderHealth } from "@/lib/provider-health/service";
 
+import type { BookingEmails } from "./booking-emails";
+import { bookingEmailsBlock, sarohRouteOn } from "./booking-emails";
 import type {
     CommsChannel,
     ConnectedCommsProvider,
     ConnectedPaymentProvider,
     PaymentProviderName,
     PaymentWebhookSetup,
+    SarohEmailState,
 } from "./service";
 import { lastUpdateLine, webhookFor } from "./webhook";
 
@@ -110,6 +113,16 @@ export interface ProvidersView {
     unread: ("payments" | "messaging")[];
     /** `null` when the business has no module that uses a domain. */
     domains: DomainsRow | null;
+    /**
+     * Saroh sending the business's booking emails (DEC-086): a block above
+     * Available, never in Connected; `null` when Saroh doesn't (OFF).
+     */
+    bookingEmails: BookingEmails | null;
+    /**
+     * The Available entry the booking-emails block's Connect jumps to: the
+     * first email provider to connect. `null` when none is offered here.
+     */
+    connectEmailKey: string | null;
     /** Whether any module that uses a provider is on at all. */
     any: boolean;
 }
@@ -200,6 +213,8 @@ export interface ProviderRowsInput {
     webhooks?: PaymentWebhookSetup[] | null;
     /** For "2 min ago"; the time of the read by default. */
     now?: Date;
+    /** Saroh sending booking emails (DEC-086); absent or null says nothing. */
+    sarohEmail?: SarohEmailState | null;
 }
 
 /**
@@ -244,8 +259,13 @@ export function buildProvidersView(input: ProviderRowsInput): ProvidersView {
         available: [],
         unread: [],
         domains: null,
+        bookingEmails: bookingEmailsBlock(input.sarohEmail),
+        connectEmailKey: null,
         any: input.health.length > 0,
     };
+    // Saroh sends whether or not Messaging is on, so its block alone is
+    // something to show.
+    if (view.bookingEmails) view.any = true;
 
     // Each kind appears only while a module that uses it is on — the
     // health read lists exactly those.
@@ -268,7 +288,8 @@ export function buildProvidersView(input: ProviderRowsInput): ProvidersView {
                 const own = input.messaging.filter(
                     (c) => c.channel === channel,
                 );
-                for (const c of own) view.connected.push(commsEntry(c));
+                for (const c of own)
+                    view.connected.push(commsEntry(c, input.sarohEmail));
                 // A channel sends through one provider at a time: while one
                 // is connected, another would replace it, which is its row's
                 // Change keys — not a second Connect beside it.
@@ -280,6 +301,9 @@ export function buildProvidersView(input: ProviderRowsInput): ProvidersView {
             }
         } else view.unread.push("messaging");
     }
+
+    view.connectEmailKey =
+        view.available.find((e) => e.type === "Email")?.key ?? null;
 
     const domains = has("DOMAINS");
     if (domains) view.domains = domainsRow(domains, input);
@@ -366,15 +390,39 @@ const CHANNEL = {
     },
 } as const;
 
-function commsEntry(c: ConnectedCommsProvider): ProviderEntry {
+/**
+ * Booking emails go through Saroh while the business has no email of its
+ * own (DEC-086): a disconnected email row says so, and so does the warning
+ * before disconnecting one, when Saroh would take over.
+ */
+const SAROH_TAKES_OVER =
+    "Booking emails switch to Saroh's email straight away and count against your plan's monthly allowance. All other email stops being sent. Ones already sent are not affected. Connecting again means entering the keys again — they cannot be read back.";
+
+function disconnectedEmailNote(state: SarohEmailState | null | undefined) {
+    if (!state || !sarohRouteOn(state)) return null;
+    return state.state === "PAUSED"
+        ? `Disconnected — Saroh's booking emails are paused until ${state.resetsOn}; other email isn't sent until a provider is connected again.`
+        : "Disconnected — Saroh sends your booking emails for now, counted against your plan; other email isn't sent until a provider is connected again.";
+}
+
+function commsEntry(
+    c: ConnectedCommsProvider,
+    sarohEmail?: SarohEmailState | null,
+): ProviderEntry {
     const spec = CHANNEL[c.channel];
     const live = c.status === "CONNECTED";
+    const email = c.channel === "EMAIL";
+    const takesOver =
+        email && sarohEmail?.state === "OFF" && sarohEmail.takesOver;
     return {
         key: `${c.channel}:${c.provider}`,
         name: commsProviderName(c.provider),
         type: spec.type,
         state: live ? "CONNECTED" : "DISCONNECTED",
-        note: live ? spec.purpose : spec.stopped,
+        note: live
+            ? spec.purpose
+            : ((email ? disconnectedEmailNote(sarohEmail) : null) ??
+              spec.stopped),
         fix: null,
         update: null,
         refs:
@@ -384,7 +432,7 @@ function commsEntry(c: ConnectedCommsProvider): ProviderEntry {
         manageHref: live ? dashboardFor(c.provider) : null,
         target: live ? { kind: "messaging", channel: c.channel } : null,
         setup: { kind: "messaging", channel: c.channel, provider: c.provider },
-        consequence: spec.consequence,
+        consequence: takesOver ? SAROH_TAKES_OVER : spec.consequence,
     };
 }
 
