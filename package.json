@@ -4,6 +4,7 @@
     "scripts": {
         "build": "turbo run build",
         "check:blocks": "node scripts/check-blocks.mjs",
+        "check:catalog-lock": "node scripts/check-catalog-lock.mjs",
         "check:cycles": "madge --circular --extensions ts,tsx --exclude 'node_modules|\\.next|dist|\\.turbo' apps packages",
         "check:e2e-covers": "node scripts/e2e-affected.mjs --check",
         "check:routes": "node scripts/check-app-routes.mjs",

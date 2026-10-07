@@ -49,7 +49,7 @@ catalogs:
         next: 15.5.24
 
     next16:
-        next: 16.3.6
+        next: 16.3.8
 
     prisma:
         prisma: 7.9.1

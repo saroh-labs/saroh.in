@@ -1,0 +1,63 @@
+name: Build and deploy merchant sites
+
+# Builds apps/saroh.app for Cloudflare Workers (OpenNext) and deploys it.
+#
+#   push to development  -> Worker saroh-sites-dev (<address>.saroh.io, dev API)
+#
+# Production (saroh.app) still runs on Vercel; it joins this workflow at the
+# cutover (plan: merchant sites on Cloudflare, U6), from `main` only.
+#
+# NEXT_PUBLIC_* values are compiled in, so each environment is its own build.
+# The Worker's secret (SITE_RELAY_SECRET) lives on the Worker, never here; the
+# only secret this workflow reads is the deploy token, scoped to Workers.
+
+on:
+    push:
+        branches: [development]
+        paths:
+            - "apps/saroh.app/**"
+            - "packages/**"
+            - "tooling/**"
+            - "pnpm-lock.yaml"
+            - "pnpm-workspace.yaml"
+            - "package.json"
+            - "turbo.json"
+            - ".github/workflows/deploy-sites.yml"
+    workflow_dispatch:
+
+concurrency:
+    # One deploy at a time; a newer push waits rather than racing it.
+    group: deploy-sites-development
+    cancel-in-progress: false
+
+jobs:
+    deploy:
+        runs-on: ubuntu-latest
+        permissions:
+            contents: read
+        steps:
+            - uses: actions/checkout@v4
+
+            - uses: ./.github/actions/setup
+              with:
+                  prisma: "false"
+
+            - name: Build the packages the sites use
+              run: pnpm turbo run build --filter='sites^...'
+
+            - name: Build for Cloudflare
+              working-directory: apps/saroh.app
+              env:
+                  NEXT_PUBLIC_ROOT_DOMAIN: saroh.io
+                  NEXT_PUBLIC_API_URL: https://api.saroh.io
+                  API_URL: https://api.saroh.io
+                  NEXT_TELEMETRY_DISABLED: "1"
+              run: pnpm cf:build
+
+            - name: Deploy
+              working-directory: apps/saroh.app
+              env:
+                  CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_SITES_DEPLOY_TOKEN }}
+                  # The account is a repository variable, not in wrangler.jsonc.
+                  CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
+              run: pnpm exec wrangler deploy
