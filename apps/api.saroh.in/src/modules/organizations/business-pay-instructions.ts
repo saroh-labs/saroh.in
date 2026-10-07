@@ -2,6 +2,8 @@ import { BadRequestException } from "@nestjs/common";
 import type { Prisma } from "@saroh/database";
 import { prisma } from "@saroh/database";
 
+import { publicPhone } from "./business-phone";
+
 /**
  * "How to pay us" (R32): how a customer pays the business offline — a UPI
  * ID (the customer's page draws a scannable QR from it), bank details for a
@@ -249,4 +251,35 @@ export function payWaysWords(view: PayInstructionsView | null): string | null {
     if (upi) return "by UPI";
     if (bank) return "by bank transfer";
     return null;
+}
+
+/** How a customer reaches the business, when it set no way to pay (UX-007). */
+export interface BusinessContactView {
+    phone: string | null;
+    email: string | null;
+}
+
+/** A plain address: something, an @, a domain with a dot. */
+const EMAIL_SHAPE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+/**
+ * The business's phone and contact email, for a customer's own owed invoice
+ * when the business set no How to pay us (UX-007): "Contact them to pay"
+ * then names a way to reach them, as the invoice's paper already prints the
+ * business's email. Re-checked on the way out (the public phone's rule);
+ * null when neither is set. The caller resolved the business from the
+ * invoice and runs this inside its RLS context.
+ */
+export async function businessContactOf(
+    organizationId: string,
+    db: Pick<Prisma.TransactionClient, "businessProfile"> = prisma,
+): Promise<BusinessContactView | null> {
+    const profile = await db.businessProfile.findUnique({
+        where: { organizationId },
+        select: { phone: true, contactEmail: true },
+    });
+    const phone = publicPhone(profile?.phone);
+    const raw = profile?.contactEmail?.trim() ?? "";
+    const email = EMAIL_SHAPE.test(raw) ? raw : null;
+    return phone || email ? { phone, email } : null;
 }

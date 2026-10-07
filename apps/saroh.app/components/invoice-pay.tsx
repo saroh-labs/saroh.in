@@ -21,6 +21,7 @@ import { PrintButton } from "@/components/print-button";
 import { ProviderHandoff } from "@/components/provider-handoff";
 import type { CheckoutIntent } from "@/lib/checkout-shape";
 import type { PayInvoice } from "@/lib/invoice-pay";
+import type { PayContact } from "@/lib/invoice-pay-shape";
 import { payDate, payMoney, payOffer, payTitle } from "@/lib/invoice-pay-shape";
 import { hasCustomerPdf } from "@/lib/invoice-pdf";
 
@@ -276,6 +277,12 @@ export function InvoicePay({
                                 online. Keep a copy of this invoice for your
                                 records.
                             </p>
+                            {invoice.businessContact ? (
+                                <ContactToPay
+                                    contact={invoice.businessContact}
+                                    businessName={invoice.businessName}
+                                />
+                            ) : null}
                         </div>
                     )}
                     {pdf ? (
@@ -405,5 +412,47 @@ function StatusBadge({ status }: { status: PayInvoice["status"] }) {
         >
             {s.label}
         </span>
+    );
+}
+
+/**
+ * No How to pay us set (UX-007): "Contact them to pay", with the business's
+ * phone and email as links, so the customer has something to act on.
+ */
+export function ContactToPay({
+    contact,
+    businessName,
+}: {
+    contact: PayContact;
+    businessName: string;
+}) {
+    return (
+        <div className="mt-4 border-t border-site-border pt-4">
+            <p className="text-sm font-medium text-site-fg">
+                {`Contact ${businessName} to pay`}
+            </p>
+            <ul className="mt-2 flex flex-wrap justify-center gap-x-4 gap-y-1 text-sm">
+                {contact.phone ? (
+                    <li>
+                        <a
+                            href={`tel:${contact.phone}`}
+                            className="text-site-accent underline underline-offset-2"
+                        >
+                            {contact.phone}
+                        </a>
+                    </li>
+                ) : null}
+                {contact.email ? (
+                    <li>
+                        <a
+                            href={`mailto:${contact.email}`}
+                            className="break-all text-site-accent underline underline-offset-2"
+                        >
+                            {contact.email}
+                        </a>
+                    </li>
+                ) : null}
+            </ul>
+        </div>
     );
 }

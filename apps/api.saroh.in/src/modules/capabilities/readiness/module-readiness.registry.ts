@@ -12,6 +12,7 @@
 import { Injectable, Optional } from "@nestjs/common";
 import { prisma } from "@saroh/database";
 
+import { planTakesOnlinePayment } from "../../billing/online-payments-plan";
 import { lacksWebhookSecret } from "../../payments/webhook-setup";
 import {
     SHOP_AWAITS_SELLS_FROM,
@@ -386,6 +387,17 @@ export class ModuleReadinessRegistry {
                         "A connected provider is disabled — re-enable it to take payments.",
                         "/settings/providers",
                     );
+                // On a plan without online payments (catalogue row
+                // `payments`), Payments is the offline kind: invoices,
+                // money recorded at the desk, How to pay us. No provider
+                // can be connected, so none is a step left: ready, and the
+                // screens say what the plan holds back from the business's
+                // plan read (DEC-091, DEC-092, UX-017). Fails open like
+                // every plan check, so an unread plan asks as before. No
+                // blocker either: a blocker on an ACTIVE module would shut
+                // its routes (`ModuleEnforcementGuard`).
+                if (!(await planTakesOnlinePayment(organizationId)))
+                    return active();
                 return setup(
                     "PAYMENTS_NO_PROVIDER",
                     "Connect a payment provider to accept payments.",

@@ -81,6 +81,7 @@ import { prisma } from "@saroh/database";
 import { fakePaymentsRow } from "../../../test/fixtures/pricing-catalog";
 import type { OrganizationContext } from "../../common/types/organization-context";
 import { planMeter } from "../billing/metering.service";
+import { assertBusinessDetails } from "../invoices/business-details";
 import { encryptSecret } from "./crypto";
 import { PaymentsService } from "./payments.service";
 import {
@@ -409,6 +410,16 @@ describe("PaymentsService on a plan without online payments", () => {
         expect(providerCount).toHaveBeenCalledWith({
             where: { organizationId: "org_1", provider: "RAZORPAY" },
         });
+    });
+
+    it("says the plan before asking for the business details (UX-006)", async () => {
+        const { service } = makeService();
+        providerCount.mockResolvedValue(0);
+
+        await locked(service.connectProvider(ctx(), KEYS));
+        // A plan without online payments hears about the plan, never an
+        // address it would add for nothing.
+        expect(assertBusinessDetails).not.toHaveBeenCalled();
     });
 
     it("lets a business re-enter the keys of a provider it already connected (renewals charge through it)", async () => {

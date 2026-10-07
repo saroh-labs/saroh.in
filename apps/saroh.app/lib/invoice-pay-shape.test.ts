@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
     isPayInvoice,
     payChargingOf,
+    payContactOf,
     payDate,
     payMoney,
     payOffer,
@@ -120,5 +121,26 @@ describe("an autopay charge under way (D13)", () => {
         expect(payChargingOf({ at: "soon" })).toBeNull();
         expect(payChargingOf(null)).toBeNull();
         expect(payChargingOf(undefined)).toBeNull();
+    });
+});
+
+describe("payContactOf (UX-007)", () => {
+    it("keeps a phone and an email that look right", () => {
+        expect(
+            payContactOf({ phone: "+919800000000", email: "hi@shop.example" }),
+        ).toEqual({ phone: "+919800000000", email: "hi@shop.example" });
+        expect(payContactOf({ phone: null, email: "hi@shop.example" })).toEqual(
+            { phone: null, email: "hi@shop.example" },
+        );
+    });
+
+    it("drops what is strange, and is none when nothing is left", () => {
+        expect(payContactOf({ phone: "call me", email: "nope" })).toBeNull();
+        expect(payContactOf({ phone: "+919800000000", email: 4 })).toEqual({
+            phone: "+919800000000",
+            email: null,
+        });
+        expect(payContactOf(null)).toBeNull();
+        expect(payContactOf("x")).toBeNull();
     });
 });

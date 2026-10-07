@@ -21,6 +21,13 @@ jest.mock("../../payments/webhook-setup", () => ({
         row.encryptedCredentials === "no-webhook-secret",
 }));
 
+// The plan's online payments (catalogue row `payments`), switched per test;
+// the real check is pinned in billing/online-payments-plan.spec.ts.
+jest.mock("../../billing/online-payments-plan", () => ({
+    planTakesOnlinePayment: jest.fn(() => Promise.resolve(true)),
+}));
+
+import { planTakesOnlinePayment } from "../../billing/online-payments-plan";
 import { accountAreaOn } from "../../site-accounts/account-area";
 import { shopRolloutOn } from "../../sites/sells-from";
 import { siteAwaitingSellsFrom } from "../../sites/sells-from-awaiting";
@@ -255,6 +262,23 @@ describe("ModuleReadinessRegistry", () => {
                 )
             ).readiness,
         ).toBe("ACTIVE");
+    });
+
+    it("Payments: on a plan without online payments, no provider is no step (UX-017)", async () => {
+        (planTakesOnlinePayment as jest.Mock).mockResolvedValueOnce(false);
+        const result = await registry({}).evaluate("PAYMENTS", input);
+        // Offline Payments is ready, and carries no blocker: one would shut
+        // its routes (ModuleEnforcementGuard).
+        expect(result).toEqual({ readiness: "ACTIVE", blockers: [] });
+    });
+
+    it("Payments: a provider switched off still needs attention on any plan", async () => {
+        (planTakesOnlinePayment as jest.Mock).mockResolvedValue(false);
+        const result = await new ModuleReadinessRegistry(
+            dbWithProviders({ payments: { total: 1, connected: 0 } }),
+        ).evaluate("PAYMENTS", input);
+        (planTakesOnlinePayment as jest.Mock).mockResolvedValue(true);
+        expect(result.blockers[0]?.code).toBe("PAYMENTS_PROVIDER_DISABLED");
     });
 
     it("Commerce: open orders block a full disable", async () => {
