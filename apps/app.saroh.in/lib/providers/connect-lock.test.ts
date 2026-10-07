@@ -169,3 +169,62 @@ describe("the Turn on sheet's lock line (UX-006)", () => {
         expect(connectLockFor("PAYMENTS", null)).toBeNull();
     });
 });
+
+describe("a connection whose provider refused its keys (UX-012, FB-7)", () => {
+    const health = [
+        {
+            key: "PAYMENTS" as const,
+            label: "Payments",
+            status: "ACTIVE" as const,
+            message: "",
+            actionHref: "/settings/providers",
+        },
+        {
+            key: "COMMUNICATIONS" as const,
+            label: "Communications",
+            status: "ACTIVE" as const,
+            message: "",
+            actionHref: "/settings/providers",
+        },
+    ];
+    const refused = {
+        reason: "KEYS_REFUSED" as const,
+        since: "2026-10-07T00:00:00Z",
+    };
+
+    it("reads Needs attention, and Enter keys again clears it", () => {
+        const view = buildProvidersView({
+            health,
+            payments: [
+                {
+                    id: "r",
+                    provider: "RAZORPAY",
+                    status: "CONNECTED",
+                    publicKey: "rzp_live_Abc",
+                    attention: refused,
+                    updatedAt: "",
+                },
+            ],
+            messaging: [
+                {
+                    id: "e",
+                    channel: "EMAIL",
+                    provider: "RESEND",
+                    status: "CONNECTED",
+                    fromAddress: null,
+                    attention: refused,
+                    updatedAt: "",
+                },
+            ],
+            domains: [],
+            checkout: [],
+        });
+        for (const entry of view.connected) {
+            expect(entry.state).toBe("ATTENTION");
+            expect(entry.fix).toBe("Enter keys again");
+            expect(entry.note).toMatch(
+                /^Needs attention — .* refused its keys/,
+            );
+        }
+    });
+});

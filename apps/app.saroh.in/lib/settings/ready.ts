@@ -15,6 +15,9 @@ import type { ConnectedCommsProvider } from "@/lib/providers/service";
 
 import { BUSINESS_TAB_PARAM } from "./search";
 
+/** The API's readiness code for keys the payment provider refused (UX-012). */
+export const PAYMENTS_KEYS_REFUSED = "PAYMENTS_KEYS_REFUSED";
+
 /** The API's readiness code for payments that can't be confirmed (DEC-063). */
 export const PAYMENTS_WEBHOOK_SECRET_MISSING =
     "PAYMENTS_WEBHOOK_SECRET_MISSING";
@@ -36,7 +39,7 @@ export const PAYMENTS_WEBHOOK_SECRET_MISSING =
  */
 
 /** Why email needs a person, or `null` when it does not (or we can't tell). */
-export type EmailAttention = "disconnected" | "not-connected";
+export type EmailAttention = "disconnected" | "not-connected" | "refused";
 
 /**
  * On for this business, and rolled out by Saroh: a module whose rollout is
@@ -59,7 +62,13 @@ export function emailAttention(
 ): EmailAttention | null {
     if (!modules || !messaging || !on(modules, "COMMUNICATIONS")) return null;
     const email = messaging.filter((c) => c.channel === "EMAIL");
-    if (email.some((c) => c.status === "CONNECTED")) return null;
+    const connected = email.filter((c) => c.status === "CONNECTED");
+    // Connected, but its provider refused the keys (UX-012): not sending.
+    // (Read here, not from `providers/rows`, which would import this.)
+    if (connected.some((c) => c.attention?.reason !== "KEYS_REFUSED")) {
+        return null;
+    }
+    if (connected.length > 0) return "refused";
     if (email.length > 0) return "disconnected";
     return messaging.some((c) => c.status === "CONNECTED")
         ? null
@@ -78,6 +87,9 @@ export function providersTabNote(
 ) {
     if (attention === "disconnected") {
         return "Needs you: email is disconnected";
+    }
+    if (attention === "refused") {
+        return "Needs you: your email provider refused its keys";
     }
     if (attention === "not-connected" && ownEmail) {
         return "Needs you: no email provider yet";
@@ -246,6 +258,22 @@ function payments(
     // Connected, but no payment through it can be confirmed: saved without
     // its webhook signing secret (DEC-063). Not ready to take money, and
     // not "switched off" either.
+    // Its provider refused the keys on a live call (UX-012): connected, but
+    // nothing goes through until they are entered again.
+    if (
+        view.readiness === "ATTENTION_REQUIRED" &&
+        view.blockers[0]?.code === PAYMENTS_KEYS_REFUSED
+    ) {
+        return {
+            key: "payments",
+            label: "Enter your payment keys again",
+            why: "Your payment provider refused its keys, so customers can't pay online.",
+            cta: "Enter keys again",
+            href,
+            broken: true,
+            left: true,
+        };
+    }
     if (
         view.readiness === "ATTENTION_REQUIRED" &&
         view.blockers[0]?.code === PAYMENTS_WEBHOOK_SECRET_MISSING

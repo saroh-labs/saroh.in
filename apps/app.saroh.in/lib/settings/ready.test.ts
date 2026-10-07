@@ -1062,3 +1062,50 @@ describe("the address saved without its state (UX-018)", () => {
         );
     });
 });
+
+describe("keys a provider refused (UX-012, FB-7)", () => {
+    const refused = {
+        reason: "KEYS_REFUSED" as const,
+        since: "2026-10-07T00:00:00Z",
+    };
+
+    it("email: needs a person, said as refused keys", () => {
+        const comm = [mod("COMMUNICATIONS")];
+        const attention = emailAttention(comm, [
+            { ...comms("EMAIL"), attention: refused },
+        ]);
+        expect(attention).toBe("refused");
+        expect(providersTabNote(attention)).toBe(
+            "Needs you: your email provider refused its keys",
+        );
+        // One that still works is enough.
+        expect(
+            emailAttention(comm, [
+                { ...comms("EMAIL"), attention: refused },
+                { ...comms("EMAIL"), id: "b" },
+            ]),
+        ).toBeNull();
+    });
+
+    it("payments: the step asks for the keys again, broken", () => {
+        const r = readyChecklist({
+            settings: settled,
+            modules: [
+                mod("PAYMENTS", {
+                    readiness: "ATTENTION_REQUIRED",
+                    blockers: [
+                        {
+                            code: "PAYMENTS_KEYS_REFUSED",
+                            actionHref: "/settings/providers",
+                        },
+                    ],
+                }),
+            ],
+        });
+        expect(r.left.find((i) => i.key === "payments")).toMatchObject({
+            label: "Enter your payment keys again",
+            broken: true,
+            href: "/settings/providers",
+        });
+    });
+});

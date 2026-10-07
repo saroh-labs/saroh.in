@@ -12,6 +12,7 @@
 import { Injectable, Optional } from "@nestjs/common";
 import { prisma } from "@saroh/database";
 
+import { KEYS_REFUSED } from "../../../common/providers/provider-attention";
 import { planTakesOnlinePayment } from "../../billing/online-payments-plan";
 import { lacksWebhookSecret } from "../../payments/webhook-setup";
 import {
@@ -75,6 +76,13 @@ const CONNECTED = "CONNECTED";
 
 /** A live site's shop could serve, but "Sells from" is unanswered (P4). */
 export const WEBSITE_SHOP_NOT_CHOSEN = "WEBSITE_SHOP_NOT_CHOSEN";
+
+/** Every connected provider refused its keys on a live call (UX-012). */
+export const PAYMENTS_KEYS_REFUSED = "PAYMENTS_KEYS_REFUSED";
+export const COMMUNICATIONS_KEYS_REFUSED = "COMMUNICATIONS_KEYS_REFUSED";
+
+const keysRefused = (row: { attentionReason?: string | null }) =>
+    row.attentionReason === KEYS_REFUSED;
 
 /** Payments connected, but no payment through them can be confirmed (DEC-063). */
 export const PAYMENTS_WEBHOOK_SECRET_MISSING =
@@ -370,9 +378,19 @@ export class ModuleReadinessRegistry {
                                 encryptedCredentials: true,
                                 credentialsIv: true,
                                 credentialsAuthTag: true,
+                                attentionReason: true,
                             },
                         },
                     );
+                    // The provider refused the keys on a live call (UX-012,
+                    // FB-7): connected, but nothing goes through until the
+                    // keys are entered again.
+                    if (rows.length > 0 && rows.every(keysRefused))
+                        return attention(
+                            PAYMENTS_KEYS_REFUSED,
+                            "Your payment provider refused its keys — enter them again to take payments.",
+                            "/settings/providers",
+                        );
                     if (rows.length > 0 && rows.every(lacksWebhookSecret))
                         return attention(
                             PAYMENTS_WEBHOOK_SECRET_MISSING,
@@ -424,7 +442,21 @@ export class ModuleReadinessRegistry {
                     }),
                 ]);
 
-                if (connected > 0) return active();
+                if (connected > 0) {
+                    // Refused keys on a live call (UX-012, FB-7): connected,
+                    // but nothing sends until they are entered again.
+                    const rows = await this.db.communicationProvider.findMany({
+                        where: { organizationId, status: CONNECTED },
+                        select: { attentionReason: true },
+                    });
+                    if (rows.length > 0 && rows.every(keysRefused))
+                        return attention(
+                            COMMUNICATIONS_KEYS_REFUSED,
+                            "Your messaging provider refused its keys — enter them again to send messages.",
+                            "/settings/providers",
+                        );
+                    return active();
+                }
                 if (total > 0)
                     return attention(
                         "COMMUNICATIONS_PROVIDER_DISABLED",

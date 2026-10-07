@@ -255,6 +255,17 @@ export function needsPublicKey(p: ConnectedPaymentProvider): boolean {
  * paid stays "Awaiting payment". Setup requires it since then; one saved
  * before needs its keys entered again with the secret.
  */
+/**
+ * A connection still CONNECTED whose provider refused its keys on a live
+ * call (UX-012): nothing goes through it until they are entered again.
+ */
+export function keysRefused(p: {
+    status: string;
+    attention?: { reason: string } | null;
+}): boolean {
+    return p.status === "CONNECTED" && p.attention?.reason === "KEYS_REFUSED";
+}
+
 export function needsWebhookSecret(p: ConnectedPaymentProvider): boolean {
     return p.status === "CONNECTED" && p.webhookSecretMissing === true;
 }
@@ -334,9 +345,10 @@ function paymentEntry(
     input: ProviderRowsInput,
 ): ProviderEntry {
     const live = p.status === "CONNECTED";
+    const refused = keysRefused(p);
     const noKey = needsPublicKey(p);
     const noSecret = needsWebhookSecret(p);
-    const attention = noKey || noSecret;
+    const attention = refused || noKey || noSecret;
     // The storefronts whose checkout really charges through it.
     const stores = input.checkout
         .filter((s) => s.provider === p.provider)
@@ -348,14 +360,22 @@ function paymentEntry(
         state: attention ? "ATTENTION" : live ? "CONNECTED" : "DISCONNECTED",
         note: !live
             ? "Disconnected — checkout can't take online payments through it until it is connected again."
+            : refused
+              ? `Needs attention — ${providerName(p.provider)} refused its keys, so no one can pay online through it. Enter the keys again to clear it.`
+              : noKey
+                ? "Needs its key id — checkout can't open the payment window, so no one can pay online through it until you enter the keys again."
+                : noSecret
+                  ? "Needs its webhook signing secret — payments can't be confirmed until you add it."
+                  : stores.length > 0
+                    ? sentence(`Takes online payments at ${words(stores)}`)
+                    : "Ready to take online payments — no location's checkout uses it yet.",
+        fix: refused
+            ? "Enter keys again"
             : noKey
-              ? "Needs its key id — checkout can't open the payment window, so no one can pay online through it until you enter the keys again."
+              ? "Add key id"
               : noSecret
-                ? "Needs its webhook signing secret — payments can't be confirmed until you add it."
-                : stores.length > 0
-                  ? sentence(`Takes online payments at ${words(stores)}`)
-                  : "Ready to take online payments — no location's checkout uses it yet.",
-        fix: noKey ? "Add key id" : noSecret ? "Add webhook secret" : null,
+                ? "Add webhook secret"
+                : null,
         update: live
             ? lastUpdateLine(
                   webhookFor(input.webhooks, p.provider),
@@ -430,6 +450,7 @@ function commsEntry(
 ): ProviderEntry {
     const spec = CHANNEL[c.channel];
     const live = c.status === "CONNECTED";
+    const refused = keysRefused(c);
     const email = c.channel === "EMAIL";
     const takesOver =
         email && sarohEmail?.state === "OFF" && sarohEmail.takesOver;
@@ -437,12 +458,14 @@ function commsEntry(
         key: `${c.channel}:${c.provider}`,
         name: commsProviderName(c.provider),
         type: spec.type,
-        state: live ? "CONNECTED" : "DISCONNECTED",
-        note: live
-            ? spec.purpose
-            : ((email ? disconnectedEmailNote(sarohEmail) : null) ??
-              spec.stopped),
-        fix: null,
+        state: refused ? "ATTENTION" : live ? "CONNECTED" : "DISCONNECTED",
+        note: refused
+            ? `Needs attention — ${commsProviderName(c.provider)} refused its keys, so nothing is sent through it. Enter the keys again to clear it.`
+            : live
+              ? spec.purpose
+              : ((email ? disconnectedEmailNote(sarohEmail) : null) ??
+                spec.stopped),
+        fix: refused ? "Enter keys again" : null,
         update: null,
         refs:
             live && c.fromAddress

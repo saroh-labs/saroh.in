@@ -64,6 +64,17 @@ function email(
     // Sending on WhatsApp alone, with no email set up: not asked, rather
     // than ticked for something they never did.
     if (attention === null && !sends) return null;
+    if (attention === "refused") {
+        return {
+            key: "email",
+            label: "Enter your email keys again",
+            why: "Your email provider refused its keys, so receipts and messages to customers aren't sending.",
+            cta: "Enter keys again",
+            href: "/settings/providers",
+            broken: true,
+            left: true,
+        };
+    }
     if (attention === "disconnected") {
         return {
             key: "email",
