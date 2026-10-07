@@ -44,6 +44,8 @@ export interface ContactListItem extends Contact {
     /** That order's total in MAJOR units as a decimal string, and its currency. */
     lastOrderTotal: string | null;
     lastOrderCurrency: string | null;
+    /** The email their site account signs in with (UX-013); absent on an older API. */
+    accountEmail?: string | null;
 }
 
 /** A lead as embedded in a contact's detail (its current stage + pipeline). */
@@ -59,6 +61,8 @@ export interface ContactLead {
 
 export interface ContactDetail extends Contact {
     leads: ContactLead[];
+    /** The email their site account signs in with (UX-013); absent on an older API. */
+    accountEmail?: string | null;
     /** What they wrote through the site's forms, newest first (UX-002); empty without lead access. */
     enquiries?: EnquiryEntry[];
 }

@@ -1,6 +1,12 @@
 import { describe, expect, it } from "vitest";
 
-import { contactEmail, contactName, isRemovedContact } from "./format";
+import {
+    contactEmail,
+    contactName,
+    isRemovedContact,
+    openLeadsLabel,
+    shownEmail,
+} from "./format";
 
 describe("contactName", () => {
     it("is the full name, else the email", () => {
@@ -69,5 +75,30 @@ describe("isRemovedContact", () => {
             false,
         );
         expect(isRemovedContact({ email: "asha@example.in" })).toBe(false);
+    });
+});
+
+describe("one person, shown honestly (UX-013, UX-051)", () => {
+    it("names a site account's separate contact by the email they sign in with", () => {
+        const separate = {
+            firstName: null,
+            lastName: null,
+            email: "account+c9@account.invalid",
+            accountEmail: "priya@example.in",
+        };
+        expect(contactName(separate)).toBe("priya@example.in");
+        expect(shownEmail(separate)).toBe("priya@example.in");
+        expect(shownEmail({ email: "account+c9@account.invalid" })).toBeNull();
+        expect(shownEmail({ email: "asha@example.in" })).toBe(
+            "asha@example.in",
+        );
+    });
+
+    it("counts open leads in words, never “unvalued (1)”", () => {
+        expect(openLeadsLabel(0, null)).toBeNull();
+        expect(openLeadsLabel(1, null)).toBe("1 open lead");
+        expect(openLeadsLabel(3, null)).toBe("3 open leads");
+        expect(openLeadsLabel(1, "5,000.00")).toBe("5,000.00 · 1 lead");
+        expect(openLeadsLabel(2, "5,000.00")).toBe("5,000.00 · 2 leads");
     });
 });

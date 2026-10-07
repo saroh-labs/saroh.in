@@ -23,6 +23,7 @@ import type {
 } from "@/lib/customer-workspace/view";
 import {
     canStopOffers,
+    crumbsUnderSell,
     initials,
     kindOf,
     owedLine,
@@ -298,7 +299,7 @@ export function CustomerDetailScreen({
     return (
         <>
             <div className="px-[26px] pt-5">
-                <Crumbs here={name} sells={sells} />
+                <Crumbs here={name} sells={crumbsUnderSell(sells, d)} />
                 <Header
                     name={name}
                     initials={initials(name)}

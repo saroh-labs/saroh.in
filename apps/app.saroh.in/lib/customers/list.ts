@@ -311,13 +311,16 @@ export function rowName(row: {
 /**
  * The line under the name: how to reach them (`contact:read`, which the
  * list needs, covers both). The email is left out when it is already the
- * name.
+ * name — and then the line never says "No phone or email" under the
+ * email itself (UX-064): it says only that there's no phone.
  */
 export function rowSub(row: CustomerRow): string {
-    const parts = [row.phone, row.name ? row.email : null].filter(
+    const emailIsName = !row.name && Boolean(row.email);
+    const parts = [row.phone, emailIsName ? null : row.email].filter(
         (p): p is string => Boolean(p),
     );
-    return parts.length > 0 ? parts.join(" · ") : "No phone or email";
+    if (parts.length > 0) return parts.join(" · ");
+    return emailIsName ? "No phone" : "No phone or email";
 }
 
 export type TagTone = "bad" | "ok" | "off";

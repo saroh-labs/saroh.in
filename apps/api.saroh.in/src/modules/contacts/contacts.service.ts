@@ -74,6 +74,12 @@ export interface ContactListItem extends Contact {
     /** That order's total, in MAJOR units as a decimal string, with its currency. */
     lastOrderTotal: string | null;
     lastOrderCurrency: string | null;
+    /**
+     * The email their live site account signs in with, or null (UX-013). A
+     * site account's separate contact holds only a reserved placeholder
+     * (DEC-049), so this is the address the list shows for it.
+     */
+    accountEmail: string | null;
 }
 
 /** The last order found for one contact. */
@@ -141,6 +147,14 @@ export class ContactsService {
                 removedAt: null,
             },
             orderBy: { createdAt: "desc" },
+            include: {
+                customerAccounts: {
+                    where: { status: "ACTIVE" },
+                    select: { email: true },
+                    orderBy: { createdAt: "asc" },
+                    take: 1,
+                },
+            },
         });
         if (contacts.length === 0) return [];
 
@@ -152,11 +166,12 @@ export class ContactsService {
                 this.lastOrderByContact(ctx, contacts),
             ]);
 
-        return contacts.map((contact) => {
+        return contacts.map(({ customerAccounts, ...contact }) => {
             const leads = leadsByContact.get(contact.id);
             const order = lastOrderByContact.get(contact.id);
             return {
                 ...contact,
+                accountEmail: customerAccounts[0]?.email ?? null,
                 openLeadValue: leads?.value ?? null,
                 openLeadCount: leads?.count ?? 0,
                 nextBookingAt: nextBookingByContact.get(contact.id) ?? null,
@@ -417,6 +432,12 @@ export class ContactsService {
                           where: { id: { in: [] } },
                           include: { stage: true, pipeline: true },
                       },
+                customerAccounts: {
+                    where: { status: "ACTIVE" },
+                    select: { email: true },
+                    orderBy: { createdAt: "asc" },
+                    take: 1,
+                },
             },
         });
         if (contact?.organizationId !== ctx.organizationId) {
@@ -429,7 +450,14 @@ export class ContactsService {
                   contactId: contact.id,
               })
             : [];
-        return { ...contact, enquiries };
+        // The email their site account signs in with (UX-013): a site
+        // account's separate contact holds only a placeholder (DEC-049).
+        const { customerAccounts, ...record } = contact;
+        return {
+            ...record,
+            accountEmail: customerAccounts[0]?.email ?? null,
+            enquiries,
+        };
     }
 
     /**
