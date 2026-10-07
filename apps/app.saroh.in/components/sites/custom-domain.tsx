@@ -14,6 +14,7 @@ import {
     removeDomain,
     verifyDomain,
 } from "@/lib/domains/actions";
+import { bareHostname } from "@/lib/domains/hostname";
 import type { DomainCheckFailure, SiteDomain } from "@/lib/domains/service";
 import { exactDate, shortDate } from "@/lib/sites/format-date";
 
@@ -153,7 +154,8 @@ export function CustomDomain({ siteId }: { siteId: string }) {
     }, [siteId]);
 
     async function add() {
-        const value = hostname.trim().toLowerCase();
+        // A pasted https://…/ address is taken down to its domain (UX-066).
+        const value = bareHostname(hostname);
         if (!value) return;
         setBusy("add");
         setFormError(null);
@@ -161,8 +163,8 @@ export function CustomDomain({ siteId }: { siteId: string }) {
         setBusy(null);
         if (!res.ok) {
             // The api's own words: a taken hostname (409), a plan without
-            // custom domains (403), a malformed name (400). Each says what to
-            // do; none is worth rewriting into something vaguer.
+            // custom domains (403), a malformed name (400, plain since
+            // UX-066). Each says what to do.
             setFormError(res.error);
             return;
         }
@@ -301,9 +303,14 @@ export function CustomDomain({ siteId }: { siteId: string }) {
                             </div>
                         ) : (
                             <div className="space-y-2">
+                                {/* Both records at once (UX-072): one trip
+                                    to the registrar, not one per check. */}
                                 <p className="text-sm text-muted-foreground">
-                                    Add this record at your registrar to prove
-                                    you own the domain. Copy each part exactly.
+                                    Add these two records at your registrar.
+                                    Copy each part exactly.
+                                </p>
+                                <p className="text-xs font-medium">
+                                    1. Proves you own the domain
                                 </p>
                                 <CopyField
                                     label="Type"
@@ -317,6 +324,16 @@ export function CustomDomain({ siteId }: { siteId: string }) {
                                     label="Value"
                                     value={domain.dnsRecord.value}
                                 />
+                                <p className="pt-1 text-xs font-medium">
+                                    2. Sends visitors to your site once
+                                    it&apos;s verified
+                                </p>
+                                <CopyField label="Type" value="CNAME" />
+                                <CopyField
+                                    label="Name"
+                                    value={domain.hostname}
+                                />
+                                <CopyField label="Value" value={CNAME_TARGET} />
                                 <p
                                     className="text-xs text-muted-foreground"
                                     title={
@@ -398,7 +415,7 @@ export function CustomDomain({ siteId }: { siteId: string }) {
                         ) : (
                             <p className="text-xs text-muted-foreground">
                                 {domains.length === 0
-                                    ? "A domain you already own, without https://."
+                                    ? "A domain you already own, like www.yourshop.in."
                                     : "Add another domain for this site."}
                             </p>
                         )}

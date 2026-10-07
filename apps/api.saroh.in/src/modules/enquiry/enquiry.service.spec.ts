@@ -299,6 +299,27 @@ describe("EnquiryService.submit — validation (nothing created on failure)", ()
         expect(contactUpsert).not.toHaveBeenCalled();
     });
 
+    it("names the field and why, so the site can say it in words (UX-066)", async () => {
+        const service = new EnquiryService();
+        formFindUnique.mockResolvedValue(FORM);
+        const responseOf = async (data: Record<string, unknown>) => {
+            try {
+                await service.submit("form_1", data, undefined, "iphash");
+            } catch (err) {
+                return (err as BadRequestException).getResponse();
+            }
+            throw new Error("expected a refusal");
+        };
+        expect(await responseOf({ email: "a@b.com" })).toMatchObject({
+            details: { field: "name", reason: "required" },
+        });
+        expect(
+            await responseOf({ email: "not-an-email", name: "Jane" }),
+        ).toMatchObject({
+            details: { field: "email", reason: "invalid_email" },
+        });
+    });
+
     it("400s when the email field is not a valid email", async () => {
         const service = new EnquiryService();
         formFindUnique.mockResolvedValue(FORM);

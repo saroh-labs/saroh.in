@@ -133,7 +133,9 @@ export class PostsService {
             return { id: post.id };
         } catch {
             throw new ConflictException({
-                message: "That slug is already taken",
+                // In words (UX-066): the merchant set an address, not a slug.
+                message:
+                    "Another post already uses that address. Change the post's path in Details.",
                 field: "slug",
             });
         }
@@ -185,7 +187,9 @@ export class PostsService {
             return { id: postId };
         } catch {
             throw new ConflictException({
-                message: "That slug is already taken",
+                // In words (UX-066): the merchant set an address, not a slug.
+                message:
+                    "Another post already uses that address. Change the post's path in Details.",
                 field: "slug",
             });
         }
@@ -366,7 +370,9 @@ export class PostsService {
         });
         if (existing) {
             throw new ConflictException({
-                message: "That slug is already taken",
+                // In words (UX-066): the merchant set an address, not a slug.
+                message:
+                    "Another post already uses that address. Change the post's path in Details.",
                 field: "slug",
             });
         }

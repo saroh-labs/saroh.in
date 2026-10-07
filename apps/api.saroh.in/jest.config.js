@@ -94,6 +94,9 @@ module.exports = {
         // the real starter template — never touch a DB.
         "<rootDir>/src/modules/sites/**/*.spec.ts",
         "<rootDir>/src/modules/domains/**/*.spec.ts",
+        // The category refusal's words (UX-066); the rest of content's
+        // specs read the dev database.
+        "<rootDir>/src/modules/content/post-categories.slug.spec.ts",
         // S3-003 jobs: nextBackoff (pure), PrismaJobQueue.fail branch selection
         // (mocked prisma.job), the worker dispatch loop (in-memory FakeJobQueue
         // + real registry), and the registry — all DB-free / timer-free.

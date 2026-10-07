@@ -331,9 +331,12 @@ export class EnquiryService {
 
         for (const field of fields) {
             if (field.required && str(field.name) === undefined) {
-                throw new BadRequestException(
-                    `Field "${field.name}" is required`,
-                );
+                // `details` names the field and why (UX-066), so the site
+                // can say which box needs filling in, in words.
+                throw new BadRequestException({
+                    message: `Field "${field.name}" is required`,
+                    details: { field: field.name, reason: "required" },
+                });
             }
         }
 
@@ -347,9 +350,10 @@ export class EnquiryService {
         }
         const email = (str(emailField.name) ?? "").toLowerCase();
         if (!isEmailShaped(email)) {
-            throw new BadRequestException(
-                `Field "${emailField.name}" must be a valid email`,
-            );
+            throw new BadRequestException({
+                message: `Field "${emailField.name}" must be a valid email`,
+                details: { field: emailField.name, reason: "invalid_email" },
+            });
         }
 
         return {
