@@ -409,6 +409,35 @@ describe("pickerRows", () => {
         });
     });
 
+    it("a first month that costs something is said with its amount, never as a free trial (DEC-093)", () => {
+        const paidFirst = parseCatalog({
+            ...CATALOG,
+            plans: CATALOG.plans.map((p) =>
+                p.id === "c"
+                    ? { ...p, trial: { on: true, days: 30, firstPaise: 700 } }
+                    : p,
+            ),
+        });
+        const month = pickerRows({
+            catalog: paidFirst,
+            subscription: sub(),
+            cycle: "month",
+            trials: new Set(["c"]),
+        });
+        expect(month[2]).toMatchObject({
+            cta: "Start with the first month",
+            what: "For C. · first month ₹7 + GST",
+        });
+        // Yearly is one payment: no trial on it.
+        const year = pickerRows({
+            catalog: paidFirst,
+            subscription: sub(),
+            cycle: "year",
+            trials: new Set(["c"]),
+        });
+        expect(year[2]).toMatchObject({ cta: "Upgrade", what: "For C." });
+    });
+
     it("prices yearly by the catalogue's rule, and offers billing the plan yearly", () => {
         const rows = pickerRows({
             catalog: CATALOG,

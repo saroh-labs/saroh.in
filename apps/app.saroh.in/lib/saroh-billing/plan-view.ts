@@ -5,6 +5,7 @@ import {
     formatInr,
     offeredPlans,
     planPricePaise,
+    trialFirstPaise,
 } from "@saroh/pricing-catalog";
 
 import type { BillingAccessView } from "@/lib/billing/access";
@@ -487,14 +488,18 @@ export function pickerRows(input: {
     return plans.map((p, i) => {
         const up = i > onAt;
         const held = p.id === givenId;
+        // Monthly only: yearly is one payment and has no trial (DEC-093).
         const trialDays =
             up &&
             !held &&
+            cycle === "month" &&
             p.trial?.on &&
             p.pricePaise > 0 &&
             input.trials.has(p.id)
                 ? p.trial.days
                 : null;
+        // A first month that costs something isn't a free trial.
+        const firstPaise = trialDays ? trialFirstPaise(p) : 0;
         const free = p.pricePaise === 0;
         const samePlan = p.id === billedId;
         const current =
@@ -519,21 +524,28 @@ export function pickerRows(input: {
                 ? "₹0"
                 : `${priceWords(planPricePaise(catalog, p, cycle), cycle)} + GST`,
             what:
-                p.tagline + (trialDays ? ` · ${trialDays}-day free trial` : ""),
+                p.tagline +
+                (firstPaise > 0
+                    ? ` · first month ${formatInr(firstPaise)} + GST`
+                    : trialDays
+                      ? ` · ${trialDays}-day free trial`
+                      : ""),
             current,
             cta: held
                 ? `Keep ${p.name}`
                 : current || (givenId && samePlan)
                   ? null
-                  : trialDays
-                    ? `Start ${trialDays}-day trial`
-                    : samePlan
-                      ? cycle === "year"
-                          ? "Bill yearly"
-                          : "Bill monthly"
-                      : up
-                        ? "Upgrade"
-                        : "Switch",
+                  : firstPaise > 0
+                    ? "Start with the first month"
+                    : trialDays
+                      ? `Start ${trialDays}-day trial`
+                      : samePlan
+                        ? cycle === "year"
+                            ? "Bill yearly"
+                            : "Bill monthly"
+                        : up
+                          ? "Upgrade"
+                          : "Switch",
             lead: card.lead,
             lines: card.lines.slice(0, PICKER_LINES).map((l) => l.t),
             note,
