@@ -306,6 +306,15 @@ organizations/:org/customers`: everyone who has paid (an order through a
   name". Version history says which release a go-live came from, badges
   Approved, Bypassed and "Overridden by ‹owner›", and lists scheduled
   go-lives.
+- **Current** (UX-068, UX-043) — **A review closes.** Withdrawing the
+  request (`WITHDRAWN`) or putting the draft live past it (`BYPASSED`,
+  `OVERRIDDEN`) closes every request and change request before it
+  (`CLOSING_OUTCOMES` in `sites/review-route.ts`); closing never counts as
+  an approval. The person who asked isn't offered Approve or Ask for
+  changes on their own request (`askedByYou`). Ask for changes needs a
+  short reason, kept on the row and shown wherever the verdict is. Share in
+  the editor names its two choices: ask a teammate to review, or make a
+  preview link anyone can open.
 - **Current** — Section content validates against the versioned contract in
   `packages/block-contract/src/section-contract.ts`. A breaking change ships as a
   new version beside the old one, never an in-place edit, so existing
