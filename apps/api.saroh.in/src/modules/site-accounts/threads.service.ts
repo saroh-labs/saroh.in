@@ -12,6 +12,7 @@ import {
     isRemovedContact,
     resolveContact,
 } from "../customer-workspace/resolve-contact";
+import { enqueueCustomerMessageNotice } from "../notifications/customer-message-notify";
 import { allows, authorize } from "../organizations/organization-policy";
 import { accountAreaOn } from "./account-area";
 import type { CustomerContext } from "./customer-context.decorator";
@@ -33,6 +34,9 @@ export type { WaitingThread, WaitingThreads } from "./threads-waiting";
  * `customer-view.ts` (`messageView`). The team reads it with `message:read`
  * and answers with `message:write` from Customer Detail
  * (`customer-workspace/threads.controller.ts`).
+ *
+ * A customer's message that opens a turn queues the team's notice in the
+ * same transaction (`notifications/customer-message-notify.ts`, UX-014).
  *
  * Bodies are plain text with a length cap (the DTOs), stored as written and
  * never rendered as HTML. A customer's posts are limited per account by
@@ -169,6 +173,19 @@ export class ThreadsService {
                 body: text,
                 customerAccountId: ctx.accountId,
                 now,
+            });
+            // The team hears of it (UX-014): the first message of a turn
+            // queues a notice for the bell and the owners' email.
+            const thread = await tx.customerThread.findUniqueOrThrow({
+                where: { id: message.threadId },
+                select: { staffReadAt: true },
+            });
+            await enqueueCustomerMessageNotice(tx, {
+                organizationId: ctx.organizationId,
+                threadId: message.threadId,
+                messageId: message.id,
+                createdAt: message.createdAt,
+                staffReadAt: thread.staffReadAt,
             });
             return messageView(message);
         });

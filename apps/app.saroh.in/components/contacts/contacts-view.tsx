@@ -3,6 +3,7 @@
 import { Badge } from "@saroh/ui/badge";
 import { Card, CardContent } from "@saroh/ui/card";
 import Link from "next/link";
+import type { ReactNode } from "react";
 
 import { DataView } from "@/components/shared/data-view/data-view";
 import type {
@@ -11,7 +12,8 @@ import type {
 } from "@/components/shared/data-view/types";
 import { ViewerDate } from "@/components/shared/viewer-date";
 import type { ContactListItem } from "@/lib/contacts/service";
-import { contactName } from "@/lib/crm/format";
+import { contactSourceLabel } from "@/lib/contacts/source";
+import { contactName, openLeadsLabel, shownEmail } from "@/lib/crm/format";
 import { formatMoney, formatMoneyMajor } from "@/lib/format/money";
 
 /**
@@ -51,6 +53,45 @@ const FILTERS: DataFilter<ContactListItem>[] = [
     },
 ];
 
+/** The phone's labelled facts about a contact, or nothing. */
+export function ContactSummary({ contact: c }: { contact: ContactListItem }) {
+    const leads = openLeadsLabel(
+        c.openLeadCount,
+        formatMoney(c.openLeadValue, null),
+    );
+    const parts: { key: string; node: ReactNode }[] = [];
+    if (c.company) parts.push({ key: "company", node: c.company });
+    if (leads) parts.push({ key: "leads", node: leads });
+    if (c.nextBookingAt) {
+        parts.push({
+            key: "booking",
+            node: (
+                <>
+                    Next booking <ViewerDate iso={c.nextBookingAt} />
+                </>
+            ),
+        });
+    }
+    if (c.lastOrderAt) {
+        const total = formatMoneyMajor(c.lastOrderTotal, c.lastOrderCurrency);
+        parts.push({
+            key: "order",
+            node: total ? `Last order ${total}` : "Has ordered",
+        });
+    }
+    if (parts.length === 0) return null;
+    return (
+        <span className="inline-flex flex-wrap gap-x-1">
+            {parts.map((part, i) => (
+                <span key={part.key}>
+                    {i > 0 ? "· " : null}
+                    {part.node}
+                </span>
+            ))}
+        </span>
+    );
+}
+
 export function ContactsView({
     contacts,
     initialView,
@@ -79,9 +120,19 @@ export function ContactsView({
             ),
         },
         {
+            // The phone's line under the name (UX-051): each fact in words
+            // with its label, and nothing for a fact that isn't there —
+            // not a row of bare dashes. The table has a column for each.
+            id: "summary",
+            header: "Summary",
+            priority: "secondary",
+            tableHidden: true,
+            cell: (c) => <ContactSummary contact={c} />,
+        },
+        {
             id: "company",
             header: "Company",
-            priority: "secondary",
+            priority: "detail",
             sortValue: (c) => (c.company ?? "").toLowerCase(),
             // An em dash, not blank: a blank cell reads as a rendering bug,
             // while a dash reads as "we know, and there isn't one".
@@ -95,36 +146,32 @@ export function ContactsView({
         {
             id: "pipeline",
             header: "Open pipeline",
-            priority: "secondary",
+            priority: "detail",
             numeric: true,
             money: true,
             // Sorted on VALUE, so "who owes us the most conversation" is one
             // click. Unvalued open leads sort as 0 but still render their count,
             // which is the honest ordering: we cannot rank an unknown amount.
             sortValue: (c) => c.openLeadValue ?? 0,
+            // Words, not "unvalued (1)" (UX-051). Lead amounts carry no
+            // currency anywhere in the schema, so none is drawn — see
+            // `lib/format/money.ts`.
             cell: (c) => {
-                if (c.openLeadCount === 0) return <Missing />;
-                // Lead amounts carry no currency anywhere in the schema, so
-                // none is drawn — see `lib/format/money.ts`.
-                const amount = formatMoney(c.openLeadValue, null);
-                return (
-                    <span className="whitespace-nowrap">
-                        {amount ?? (
-                            <span className="text-muted-foreground">
-                                unvalued
-                            </span>
-                        )}
-                        <span className="ml-1.5 text-xs text-muted-foreground">
-                            ({c.openLeadCount})
-                        </span>
-                    </span>
+                const label = openLeadsLabel(
+                    c.openLeadCount,
+                    formatMoney(c.openLeadValue, null),
+                );
+                return label ? (
+                    <span className="whitespace-nowrap">{label}</span>
+                ) : (
+                    <Missing />
                 );
             },
         },
         {
             id: "nextBooking",
             header: "Next booking",
-            priority: "secondary",
+            priority: "detail",
             sortValue: (c) =>
                 c.nextBookingAt
                     ? new Date(c.nextBookingAt).getTime()
@@ -150,7 +197,7 @@ export function ContactsView({
         {
             id: "lastOrder",
             header: "Last order",
-            priority: "secondary",
+            priority: "detail",
             numeric: true,
             // Sorted by RECENCY, not amount: "who has gone quiet" is the
             // question this column exists to answer, and never-ordered sorts
@@ -183,7 +230,7 @@ export function ContactsView({
             id: "email",
             header: "Email",
             priority: "detail",
-            sortValue: (c) => c.email.toLowerCase(),
+            sortValue: (c) => (shownEmail(c) ?? "").toLowerCase(),
             // The one column allowed to give up space: an address is recognised
             // from its start, and the full value is a click away on the row.
             // The cap only lifts at `2xl`, where the other seven columns fit
@@ -191,7 +238,9 @@ export function ContactsView({
             // 1440px screen, which is the commonest desktop this will run on.
             cell: (c) => (
                 <span className="block max-w-[16ch] truncate text-muted-foreground 2xl:max-w-none">
-                    {c.email}
+                    {/* Never the placeholder a site account's own record
+                        holds (UX-013): the address they sign in with. */}
+                    {shownEmail(c) ?? <Missing />}
                 </span>
             ),
         },
@@ -199,18 +248,23 @@ export function ContactsView({
             id: "source",
             header: "Source",
             priority: "detail",
-            sortValue: (c) => (c.source ?? "").toLowerCase(),
-            cell: (c) =>
-                c.source ? (
+            sortValue: (c) =>
+                (c.source ? contactSourceLabel(c.source) : "").toLowerCase(),
+            // In words (UX-051): "Enquiry", "Signed in on your site" — never
+            // the stored `enquiry:form:<id>` or `SITE-ACCOUNT`.
+            cell: (c) => {
+                const label = c.source ? contactSourceLabel(c.source) : null;
+                return label ? (
                     <Badge
                         variant="secondary"
-                        className="text-[11px] font-medium uppercase tracking-wider"
+                        className="whitespace-nowrap text-[11px] font-medium"
                     >
-                        {c.source.replace(/_/g, " ").toLowerCase()}
+                        {label}
                     </Badge>
                 ) : (
                     <Missing />
-                ),
+                );
+            },
         },
         {
             id: "added",
@@ -249,9 +303,11 @@ export function ContactsView({
                     <Card className="wk-surface h-full">
                         <CardContent className="space-y-1 p-4">
                             <p className="font-medium">{contactName(c)}</p>
-                            <p className="truncate text-sm text-muted-foreground">
-                                {c.email}
-                            </p>
+                            {shownEmail(c) ? (
+                                <p className="truncate text-sm text-muted-foreground">
+                                    {shownEmail(c)}
+                                </p>
+                            ) : null}
                             {c.company ? (
                                 <p className="text-xs text-muted-foreground">
                                     {c.company}
@@ -269,9 +325,10 @@ export function ContactsView({
                                    foreground at medium weight already gives
                                    that without spending a hue. */
                                 <p className="pt-1 text-xs font-medium text-foreground">
-                                    {formatMoney(c.openLeadValue, null) ??
-                                        "Unvalued"}{" "}
-                                    open
+                                    {openLeadsLabel(
+                                        c.openLeadCount,
+                                        formatMoney(c.openLeadValue, null),
+                                    )}
                                 </p>
                             ) : null}
                         </CardContent>

@@ -3968,6 +3968,10 @@ model Notification {
   // Or a product review ("A review needs a reply"). Informational, no FK,
   // like leadId — a notice outlives nothing it could dangle from.
   reviewId String?
+  // Or a customer's message thread (UX-014): the contact it opens on, and
+  // the message that raised it. Informational, no FK, like leadId.
+  contactId String?
+  messageId String?
 
   readAt DateTime? // null = unread
 
@@ -3979,6 +3983,7 @@ model Notification {
   // unconstrained.
   @@unique([leadId, type])
   @@unique([reviewId, type])
+  @@unique([messageId, type])
   @@index([organizationId, userId, readAt])
   @@index([organizationId])
 }

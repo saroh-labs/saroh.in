@@ -6,7 +6,7 @@
  * Home and Me always show. Bookings (A6), Orders (A7), Plan (A8) and
  * Messages (A13) each show once their unit adds its key to
  * {@link SHIPPED_ACCOUNT_TABS} and the business offers it: a clinic sees
- * Appointments, a bakery Orders and no Appointments. A tab never points at a
+ * Bookings, a bakery Orders and no Bookings. A tab never points at a
  * page that isn't there.
  */
 
@@ -61,7 +61,9 @@ export function accountTabs(
 ): AccountTab[] {
     const all: [AccountTabKey, string, boolean][] = [
         ["home", "Home", true],
-        ["bookings", offers.bookingsLabel, offers.appointments],
+        // Always "Bookings" on the tab (UX-075): "Appointments" was cut to
+        // "Appointme…" on a phone. `bookingsLabel` still words the pages.
+        ["bookings", "Bookings", offers.appointments],
         ["orders", "Orders", offers.orders],
         ["plan", "Plan", offers.plans],
         ["messages", "Messages", offers.messages],

@@ -240,7 +240,7 @@ describe("Me", () => {
             // Home and Me (A5), Appointments (A6) and Messages (A13).
             tabs: [
                 { key: "home", label: "Home" },
-                { key: "bookings", label: "Appointments" },
+                { key: "bookings", label: "Bookings" },
                 { key: "messages", label: "Messages" },
                 { key: "me", label: "Me" },
             ],

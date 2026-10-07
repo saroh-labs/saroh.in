@@ -82,7 +82,7 @@ describe("the account's allow-list", () => {
             businessName: "Kavi Dental",
             tabs: [
                 { key: "home", label: "Home" },
-                { key: "bookings", label: "Appointments" },
+                { key: "bookings", label: "Bookings" },
                 { key: "messages", label: "Messages" },
                 { key: "me", label: "Me" },
             ],

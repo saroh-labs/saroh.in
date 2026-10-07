@@ -475,8 +475,49 @@ export function isIssue(b: DetailBooking): boolean {
     return b.outcome === "NO_SHOW" || b.cancelledLate;
 }
 
+/**
+ * Whether the crumbs say Sell › Customers (UX-050): only for someone who
+ * buys — a store customer is linked to them — in a business that sells.
+ * Someone who only booked, enquired or signed in is under Contacts, not
+ * framed as a shop customer with "no orders yet".
+ */
+export function crumbsUnderSell(
+    sells: boolean,
+    d: Pick<CustomerDetail, "linkedCustomers">,
+): boolean {
+    return sells && (d.linkedCustomers?.length ?? 0) > 0;
+}
+
+/** A way of paying, in words; online when it wasn't recorded by hand. */
+const PAID_BY: Record<string, string> = {
+    CASH: "Cash",
+    UPI: "UPI",
+    CARD: "Card",
+    BANK_TRANSFER: "Bank transfer",
+    OTHER: "Other",
+};
+
+/**
+ * Money in for a booking, in words (UX-049): "Paid ₹800 · Cash", or
+ * "Paid · Online" to a viewer who doesn't see the amount. Null while
+ * nothing is paid.
+ */
+export function paidText(paid: DetailBooking["paid"]): string | null {
+    if (!paid) return null;
+    const how = (paid.method && PAID_BY[paid.method]) ?? "Online";
+    const amount =
+        paid.amount && paid.currency
+            ? ` ${money(paid.amount, paid.currency)}`
+            : "";
+    return `Paid${amount} · ${how}`;
+}
+
 /** How it was paid, in the design's words. */
 export function payText(b: DetailBooking): string {
+    // Money taken since (at the desk, or online) says so: "Pays at the
+    // desk" stayed after the desk took it (UX-049).
+    const paid = paidText(b.paid);
+    if (paid) return paid;
     switch (b.paidWith) {
         case "MEMBERSHIP":
             return "Membership credit";

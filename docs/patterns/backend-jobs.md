@@ -122,6 +122,13 @@ nobody was told. Round-2 A14 closed it (`bookings/booking-notify.handler.ts`).
   `CustomerNotifyService`. **`customer.notify`** carries an order step
   (Ready, handed over), queued 10 seconds ahead so an Undo deletes it
   unsent (`cancelOrderStepNotice`); A12 adds the waitlist offer.
+- **`customer-message.notify`** (UX-014) tells the team a customer wrote
+  from their site account: one inbox notice (`message.new`, opening the
+  customer's thread, unique on `(messageId, type)`) and an email to the
+  owners and admins, as an enquiry's. Only the first message of a turn is
+  queued — one after the team last answered or opened the thread
+  (`notifications/customer-message-notify.ts`); follow-ups land in the
+  thread the team is already pointed at.
 - **Once per event.** Both claim a `CustomerNotice` row keyed to the event
   (`booking:<BookingEvent id>`, `order:<OrderEvent id>`) with
   `createMany({ skipDuplicates })` before writing anything: a Postgres

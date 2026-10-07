@@ -25,6 +25,11 @@ import { validationPipeOptions } from "../../common/validation";
 import { env } from "../../env";
 import type { MergeContactsDto } from "../customer-workspace/merge.dto";
 import { MergeService } from "../customer-workspace/merge.service";
+import {
+    CUSTOMER_MESSAGE_NOTIFY_TYPE,
+    CustomerMessageNotifyHandler,
+    MESSAGE_NEW_NOTIFICATION_TYPE,
+} from "../notifications/customer-message-notify.handler";
 import type { OrgAction } from "../organizations/organization-actions";
 import { AccountLinkingService } from "./account-linking.service";
 import { AccountUnlinkService } from "./account-unlink.service";
@@ -289,6 +294,61 @@ describe("the customer's side", () => {
             token: farah.token,
         });
         expect(after.body.unreadMessages).toBe(0);
+    });
+
+    it("the team hears of a customer's message: one notice per turn that opens their thread (UX-014)", async () => {
+        const biz = await business();
+        const farah = await signIn(biz.host);
+        const contactId = farah.account.contactId;
+        const say = (text: string) =>
+            call("POST", MESSAGES, {
+                host: biz.host,
+                token: farah.token,
+                body: { text },
+            });
+        const queued = () =>
+            prisma.job.findMany({
+                where: {
+                    organizationId: biz.ctx.organizationId,
+                    type: CUSTOMER_MESSAGE_NOTIFY_TYPE,
+                },
+                orderBy: { createdAt: "asc" },
+            });
+
+        expect((await say("Any update on Friday?")).status).toBe(201);
+        // A follow-up in the same turn adds no second notice.
+        expect((await say("Just checking.")).status).toBe(201);
+        let jobs = await queued();
+        expect(jobs).toHaveLength(1);
+
+        // The job puts it in the inbox, opening on this customer, once.
+        const handler = new CustomerMessageNotifyHandler();
+        await handler.handle(jobs[0]);
+        await handler.handle(jobs[0]);
+        const notices = await prisma.notification.findMany({
+            where: {
+                organizationId: biz.ctx.organizationId,
+                type: MESSAGE_NEW_NOTIFICATION_TYPE,
+            },
+        });
+        expect(notices).toHaveLength(1);
+        expect(notices[0]).toMatchObject({
+            contactId,
+            title: `${farah.email} sent you a message`,
+            body: "Any update on Friday?",
+        });
+        // And the message is on the contact's own thread.
+        const staffView = await threads.forStaff(biz.ctx, contactId);
+        expect(staffView.messages.map((m) => m.body)).toEqual([
+            "Any update on Friday?",
+            "Just checking.",
+        ]);
+
+        // Once the team has answered, the next message opens a new turn.
+        await threads.reply(biz.ctx, contactId, "Friday is fine.");
+        expect((await say("Thanks!")).status).toBe(201);
+        jobs = await queued();
+        expect(jobs).toHaveLength(2);
     });
 
     it("keeps the words as written: never HTML, capped, never blank, nothing extra", async () => {

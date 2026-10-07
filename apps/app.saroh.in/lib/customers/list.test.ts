@@ -301,6 +301,8 @@ describe("a row", () => {
         expect(rowSub(row({ phone: null, email: null }))).toBe(
             "No phone or email",
         );
+        // UX-064: never "No phone or email" under the email it is named by.
+        expect(rowSub(row({ name: null, phone: null }))).toBe("No phone");
     });
 
     it("tags Needs attention in words, red for Allergy and Medical", () => {

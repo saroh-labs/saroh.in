@@ -13,8 +13,8 @@ import { currentTab } from "./tab-bar";
 
 /**
  * The account area's compact header (DEC-073 #10; Saroh Customer Site
- * design): the business's letter, which goes back to the site, and the
- * current tab's title — "Hi, Asha" on Home. The site's own header and footer
+ * design): the business's letter and name, which go back to the site, and
+ * the current tab's title — "Hi, Asha" on Home. The site's own header and footer
  * are not drawn around the account (`SiteChromeFrame`), as the design's
  * signed-in app has neither.
  *
@@ -82,9 +82,22 @@ export function AccountHeader({
                         {businessInitial(businessName)}
                     </span>
                 </Link>
-                <h1 className="font-site-heading text-site-fg m-0 min-w-0 flex-1 truncate text-xl font-semibold tracking-[-0.02em]">
-                    {heading}
-                </h1>
+                <div className="min-w-0 flex-1">
+                    {/* Whose account this is, and the way back (UX-075):
+                        the letter alone read "U · Hi". */}
+                    <Link
+                        href={homeHref}
+                        className={cn(
+                            "text-site-muted hover:text-site-fg block truncate text-xs font-medium",
+                            focusRing,
+                        )}
+                    >
+                        {businessName}
+                    </Link>
+                    <h1 className="font-site-heading text-site-fg m-0 truncate text-xl font-semibold tracking-[-0.02em]">
+                        {heading}
+                    </h1>
+                </div>
             </div>
         </header>
     );

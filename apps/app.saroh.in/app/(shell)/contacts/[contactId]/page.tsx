@@ -20,11 +20,11 @@ import type { Holdings } from "@/lib/contacts/removal";
 import { getContact } from "@/lib/contacts/service";
 import { contactSourceLabel } from "@/lib/contacts/source";
 import {
-    contactEmail,
     contactName,
     formatValue,
     isRemovedContact,
     LEAD_STATUS,
+    shownEmail,
 } from "@/lib/crm/format";
 import { loadAddLead } from "@/lib/leads/add-lead-data";
 import type { LeadStatus } from "@/lib/leads/service";
@@ -72,7 +72,8 @@ export default async function ContactDetailPage({
     // opens for them, but nothing can put details back.
     const removed = isRemovedContact(contact);
     const canEdit = can("contact:write") && !removed;
-    const email = contactEmail(contact.email);
+    // Never the placeholder a site account's own record holds (UX-013).
+    const email = shownEmail(contact);
     const seesLeads = can("lead:read");
     const holdings = await loadContactHoldings(contact.id, plan);
     const person = { id: contact.id, name, email: email ?? "" };
@@ -140,6 +141,23 @@ export default async function ContactDetailPage({
                         ) : undefined
                     }
                 />
+
+                {removed ? null : (
+                    // One person, one record a click away (UX-050): this
+                    // page holds their leads and what they hold; their
+                    // bookings, orders, messages and notes are on the
+                    // customer page.
+                    <p className="text-[13px] text-muted-foreground">
+                        Bookings, orders, messages and notes are on{" "}
+                        <Link
+                            href={`/customers/${encodeURIComponent(contact.id)}`}
+                            className="font-medium text-foreground underline-offset-4 hover:underline"
+                        >
+                            {`${name}'s full record`}
+                        </Link>
+                        .
+                    </p>
+                )}
 
                 {seesLeads ? (
                     <EnquiryCard
