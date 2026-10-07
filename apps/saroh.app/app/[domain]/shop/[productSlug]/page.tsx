@@ -129,9 +129,10 @@ export default async function ShopProductPage({
         );
     // The page's own width, as the header's and every block's: at a desk
     // the product sits under the menu rather than across the whole screen.
+    // The page's main landmark (UX-082): the header and footer sit outside.
     return (
-        <div className="mx-auto w-full max-w-screen-xl">
+        <main className="mx-auto w-full max-w-screen-xl">
             <ProductPage product={product} preview={false} action={action} />
-        </div>
+        </main>
     );
 }

@@ -245,6 +245,15 @@ function isCourier(v: unknown): v is AccountOrderDetail["courier"] {
     );
 }
 
+/** A pick-up's place (UX-025); absent from an older API. */
+function isCollectFrom(v: unknown): boolean {
+    return (
+        v === undefined ||
+        v === null ||
+        (isRecord(v) && isString(v.address) && isNullableString(v.hours))
+    );
+}
+
 /** One order's Track (A7), or null when it isn't one. */
 export function orderDetailResult(v: unknown): AccountOrderDetail | null {
     if (!isRecord(v)) return null;
@@ -263,7 +272,8 @@ export function orderDetailResult(v: unknown): AccountOrderDetail | null {
         v.steps.every(isStep) &&
         isCourier(v.courier) &&
         isNullableString(v.refund) &&
-        isNullableString(v.receipt);
+        isNullableString(v.receipt) &&
+        isCollectFrom(v.collectFrom);
     return ok ? (v as unknown as AccountOrderDetail) : null;
 }
 

@@ -54,6 +54,19 @@ describe("each Product grid's products on a served page (G12)", () => {
         ]);
     });
 
+    it("marks a grid on the Shop page itself (UX-082)", async () => {
+        const feeds = await productGridFeeds(
+            [{ type: "productGrid", content: { q: "a" } }],
+            "/shop",
+            queryOf,
+            () => Promise.resolve([CARD]),
+            true,
+        );
+        expect(feeds).toEqual([
+            { products: [CARD], basePath: "/shop", atShop: true },
+        ]);
+    });
+
     it("doesn't read a grid with nothing chosen yet, and hands it an empty feed", async () => {
         const read = vi.fn(() => Promise.resolve([CARD]));
         const feeds = await productGridFeeds(

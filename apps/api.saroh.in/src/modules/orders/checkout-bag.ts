@@ -1,6 +1,8 @@
 import { prisma } from "@saroh/database";
 
 import { businessTracksStock } from "../stock/tracking";
+import type { PickupPlace } from "../stores/pickup-place";
+import { pickupPlaceOf, waysWithPlace } from "../stores/pickup-place";
 import type {
     BagLine,
     CheckoutQuote,
@@ -29,8 +31,11 @@ export interface ShopScope {
 /** What the checkout reads from the storefront's settings. */
 export interface ShopSettings {
     currency: string;
+    /** Pick-up only when `pickup` is a place to collect from (UX-025). */
     ways: StorefrontFulfilmentType[];
     fees: DeliveryFees;
+    /** Where a pick-up is collected: the address and hours; else null. */
+    pickup: PickupPlace | null;
 }
 
 export async function shopSettings(scope: ShopScope): Promise<ShopSettings> {
@@ -43,13 +48,21 @@ export async function shopSettings(scope: ShopScope): Promise<ShopSettings> {
             shippingEnabled: true,
             localDeliveryFee: true,
             shippingFee: true,
+            kind: true,
+            address: true,
+            openingHours: true,
         },
     });
+    const pickup = pickupPlaceOf(row);
     return {
         currency: row?.currency ?? "INR",
-        ways: row
-            ? storefrontTypesOf(row.fulfilmentTypes, row)
-            : NEW_STOREFRONT_TYPES,
+        ways: waysWithPlace(
+            row
+                ? storefrontTypesOf(row.fulfilmentTypes, row)
+                : NEW_STOREFRONT_TYPES,
+            pickup,
+        ),
+        pickup,
         fees: {
             localDeliveryFee: row?.localDeliveryFee ?? null,
             shippingFee: row?.shippingFee ?? null,

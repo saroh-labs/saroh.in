@@ -127,6 +127,31 @@ describe("Add to bag on the product page", () => {
         expect(screen.queryByText(/added to your bag/)).toBeNull();
     });
 
+    it("stops at what is left, and says it's all in the bag (UX-058)", () => {
+        render(
+            <ProductPage
+                product={{
+                    ...bread,
+                    variants: [
+                        { ...bread.variants[0], stock: "LOW", left: 1 },
+                        bread.variants[1],
+                    ],
+                }}
+                preview={false}
+                action={<AddToBag site={SITE} listingId="l-bread" />}
+            />,
+        );
+        fireEvent.click(screen.getByRole("button", { name: "Add to bag" }));
+        const off = screen.getByRole("button", {
+            name: "The last one is in your bag",
+        });
+        expect(off).toBeDisabled();
+        fireEvent.click(off);
+        expect(readBag(SITE)).toEqual([
+            { listingId: "l-bread", variantId: "v-small", quantity: 1 },
+        ]);
+    });
+
     it("is off, reading Sold out, for an option that can't be sold", () => {
         render(
             <ProductPage
@@ -511,6 +536,41 @@ describe("the header's bag", () => {
         expect(
             screen.getByRole("button", { name: /^Place order/ }),
         ).toBeDisabled();
+        // The bag is set to what is left, and says so (UX-058).
+        expect(
+            await screen.findByText("Only 1 left — we've set your bag to 1."),
+        ).toBeInTheDocument();
+        expect(readBag(SITE)).toEqual([
+            { listingId: "l-bread", variantId: null, quantity: 1 },
+        ]);
+        expect(
+            screen.getByText(
+                "Fewer are left than you asked for. Lower the amount to continue.",
+            ),
+        ).toBeInTheDocument();
+    });
+
+    it("says where to collect a pick-up, and when it's open (UX-025)", async () => {
+        setup({
+            signedIn: true,
+            quote: {
+                ok: true,
+                data: quoteOf({
+                    pickup: {
+                        address: "12 Hill Road, Bandra",
+                        hours: "Mon–Sat 10:00–19:00, Sun closed",
+                    },
+                }),
+            },
+        });
+        await openTheBag();
+        expect(
+            screen.getByText("12 Hill Road, Bandra", { exact: false }),
+        ).toBeInTheDocument();
+        expect(screen.getByText("Collect from")).toBeInTheDocument();
+        expect(
+            screen.getByText("Mon–Sat 10:00–19:00, Sun closed"),
+        ).toBeInTheDocument();
     });
 
     it("says a start was refused in the page's words, and keeps the bag", async () => {
