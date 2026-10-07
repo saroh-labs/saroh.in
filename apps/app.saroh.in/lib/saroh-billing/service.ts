@@ -6,6 +6,7 @@ import { ApiError } from "@/lib/api/errors";
 import { apiFetch, orgBase } from "@/lib/api/http";
 import type { BillingAccessView } from "@/lib/billing/access";
 
+import { cleanHandoff } from "./handoff";
 import type { NotAvailableYet, PlanUsage, SarohSubscription } from "./plan";
 import { NOT_AVAILABLE_YET } from "./plan";
 import type {
@@ -87,12 +88,28 @@ export function listAddons(): Promise<Read<AddonsView | null>> {
     return orgRead<AddonsView | null>("/billing/addons", null);
 }
 
-/** A checkout waiting to be authorised, and one scheduled (U15). */
-export function getCheckouts(): Promise<Read<CheckoutsView>> {
-    return orgRead<CheckoutsView>("/billing/checkout", {
+/**
+ * A checkout waiting to be paid, one scheduled (U15), and the plan's
+ * 12-month term (DEC-093).
+ */
+export async function getCheckouts(): Promise<Read<CheckoutsView>> {
+    const read = await orgRead<CheckoutsView>("/billing/checkout", {
         open: null,
         scheduled: null,
+        term: null,
     });
+    if (read.status !== "ok" || !read.data.open) return read;
+    // The window it reopens comes from a provider: checked before use.
+    return {
+        status: "ok",
+        data: {
+            ...read.data,
+            open: {
+                ...read.data.open,
+                handoff: cleanHandoff(read.data.open.handoff),
+            },
+        },
+    };
 }
 
 /**

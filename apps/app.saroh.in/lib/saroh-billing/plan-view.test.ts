@@ -5,14 +5,8 @@ import { describe, expect, it } from "vitest";
 import { access } from "@/lib/billing/fixtures.test-data";
 
 import type { SarohSubscription } from "./plan";
-import type { AddonsView, ChangeQuote } from "./plan-view";
-import {
-    addonRows,
-    pickerRows,
-    quoteSummary,
-    yearlyOffer,
-    yourPlan,
-} from "./plan-view";
+import type { AddonsView } from "./plan-view";
+import { addonRows, pickerRows, yearlyOffer, yourPlan } from "./plan-view";
 
 /** Made up on purpose: Plan A/B/C, ₹0 / ₹111 / ₹222 — no real prices. */
 const CATALOG: Catalog = parseCatalog({
@@ -205,9 +199,119 @@ describe("yourPlan", () => {
         });
         expect(authorise.notes.map((n) => n.action?.label)).toEqual([
             "Authorise",
-            "Start again",
         ]);
         expect(authorise.notes.every((n) => n.tone === "attention")).toBe(true);
+        // A checkout waiting for its payment is confirmed, never started
+        // again: that would be a second mandate (DEC-093, UX-003).
+        expect(authorise.pending).toEqual({
+            planName: "Plan C",
+            expiresAt: "2026-10-05T00:00:00.000Z",
+            handoff: null,
+        });
+    });
+
+    it("says the 12-month term, and offers the one-tap renewal in its last days", () => {
+        const base = {
+            access: access({
+                plan: { id: "b", name: "Plan B" },
+                pricePaise: 11_100,
+            }),
+            subscription: sub(),
+            catalog: CATALOG,
+            liveVersion: 3,
+            addonsHeld: false,
+        };
+        const running = yourPlan({
+            ...base,
+            checkouts: {
+                open: null,
+                scheduled: null,
+                term: {
+                    endsAt: "2027-09-01T00:00:00.000Z",
+                    payment: "AUTOPAY",
+                    renewOpen: false,
+                },
+            },
+        });
+        expect(running.notes.at(-1)).toMatchObject({
+            tone: "info",
+            lead: "Your 12 monthly charges run to ",
+            iso: "2027-09-01T00:00:00.000Z",
+            action: null,
+        });
+        const ending = yourPlan({
+            ...base,
+            checkouts: {
+                open: null,
+                scheduled: null,
+                term: {
+                    endsAt: "2026-11-01T00:00:00.000Z",
+                    payment: "AUTOPAY",
+                    renewOpen: true,
+                },
+            },
+        });
+        expect(ending.notes.at(-1)).toMatchObject({
+            tone: "attention",
+            lead: "Your 12 months of Plan B end on ",
+            action: { label: "Renew", planId: "b", cycle: "month" },
+        });
+        // Renewed: said once, and no renewal offered again.
+        const renewed = yourPlan({
+            ...base,
+            checkouts: {
+                open: null,
+                scheduled: {
+                    id: "co",
+                    kind: "SCHEDULED",
+                    status: "SCHEDULED",
+                    plan: { id: "b", name: "Plan B", version: 3 },
+                    cycle: "month",
+                    pricePaise: 11_100,
+                    startAt: "2026-11-01T00:00:00.000Z",
+                    expiresAt: "2026-10-05T00:00:00.000Z",
+                    createdAt: "2026-10-04T00:00:00.000Z",
+                },
+                term: {
+                    endsAt: "2026-11-01T00:00:00.000Z",
+                    payment: "AUTOPAY",
+                    renewOpen: true,
+                },
+            },
+        });
+        expect(renewed.notes.map((n) => n.lead)).toEqual([
+            "Your next 12 months of Plan B start on ",
+        ]);
+    });
+
+    it("a year paid once has no next charge: it's paid to its end", () => {
+        const v = yourPlan({
+            access: access({
+                plan: { id: "b", name: "Plan B" },
+                pricePaise: 11_100,
+            }),
+            subscription: sub({
+                billingCycle: "year",
+                currentPeriodEnd: "2027-10-01T00:00:00.000Z",
+            }),
+            catalog: CATALOG,
+            liveVersion: 3,
+            checkouts: {
+                open: null,
+                scheduled: null,
+                term: {
+                    endsAt: "2027-10-01T00:00:00.000Z",
+                    payment: "ONE_TIME",
+                    renewOpen: false,
+                },
+            },
+            addonsHeld: false,
+        });
+        expect(v.next).toEqual({
+            kind: "paidTo",
+            iso: "2027-10-01T00:00:00.000Z",
+        });
+        expect(v.notes.at(-1)?.lead).toBe("Paid for the year, to ");
     });
 
     it("says an overdue payment without inventing a date", () => {
@@ -237,8 +341,58 @@ describe("pickerRows", () => {
         });
         expect(rows.map((r) => [r.name, r.price, r.current, r.cta])).toEqual([
             ["Plan A", "₹0", false, "Switch"],
-            ["Plan B", "₹111 a month", true, null],
-            ["Plan C", "₹222 a month", false, "Upgrade"],
+            ["Plan B", "₹111 a month + GST", true, null],
+            ["Plan C", "₹222 a month + GST", false, "Upgrade"],
+        ]);
+    });
+
+    it("says what each plan unlocks, from the catalogue's card lines (UX-045)", () => {
+        const rows = pickerRows({
+            catalog: CATALOG,
+            subscription: sub(),
+            cycle: "month",
+            trials: new Set(),
+        });
+        expect(rows.map((r) => [r.lead, r.lines])).toEqual([
+            ["", ["10"]],
+            ["Everything in Plan A, plus:", ["100"]],
+            ["Everything in Plan B, plus:", ["222"]],
+        ]);
+    });
+
+    it("under a plan given for a while, that plan is the one it's on, with no trial on it (UX-044)", () => {
+        const rows = pickerRows({
+            catalog: CATALOG,
+            subscription: sub({
+                provider: null,
+                currentPeriodEnd: null,
+                plan: { ...sub().plan, key: "catalog.a", priceCents: 0 },
+            }),
+            cycle: "month",
+            trials: new Set(["c"]),
+            given: { planId: "c", until: "2027-12-31T00:00:00.000Z" },
+        });
+        expect(
+            rows.map((r) => [r.name, r.current, r.cta, r.note, r.what]),
+        ).toEqual([
+            [
+                "Plan A",
+                false,
+                null,
+                { lead: "After ", iso: "2027-12-31T00:00:00.000Z" },
+                "For A.",
+            ],
+            ["Plan B", false, "Switch", null, "For B."],
+            [
+                "Plan C",
+                true,
+                "Keep Plan C",
+                {
+                    lead: "You're on this until ",
+                    iso: "2027-12-31T00:00:00.000Z",
+                },
+                "For C.",
+            ],
         ]);
     });
 
@@ -264,8 +418,8 @@ describe("pickerRows", () => {
         });
         expect(rows.map((r) => [r.price, r.current, r.cta])).toEqual([
             ["₹0", false, "Switch"],
-            ["₹1,110 a year", false, "Bill yearly"],
-            ["₹2,220 a year", false, "Upgrade"],
+            ["₹1,110 a year + GST", false, "Bill yearly"],
+            ["₹2,220 a year + GST", false, "Upgrade"],
         ]);
         expect(yearlyOffer(CATALOG)).toEqual({ on: true, freeMonths: 2 });
         expect(
@@ -285,96 +439,6 @@ describe("pickerRows", () => {
             "Upgrade",
             "Start 14-day trial",
         ]);
-    });
-});
-
-const quote = (over: Partial<ChangeQuote> = {}): ChangeQuote => ({
-    plan: { id: "c", name: "Plan C", version: 3 },
-    cycle: "month",
-    kind: "NEW",
-    pricePaise: 22_200,
-    gstPaise: 3_996,
-    totalPaise: 26_196,
-    chargeNowPaise: 0,
-    chargeNowGstPaise: 0,
-    chargeNowTotalPaise: 0,
-    startAt: null,
-    effectiveAt: null,
-    trialEndsAt: null,
-    coupon: null,
-    firstChargePaise: 22_200,
-    firstChargeGstPaise: 3_996,
-    firstChargeTotalPaise: 26_196,
-    ...over,
-});
-
-describe("quoteSummary", () => {
-    it("shows every amount the API sent, never one of its own", () => {
-        const s = quoteSummary(quote());
-        expect(s.title).toBe("Start Plan C");
-        expect(s.lines[0]).toEqual({
-            label: "Plan C, monthly",
-            value: "₹222 + ₹39.96 GST = ₹261.96 a month",
-        });
-        expect(s).toMatchObject({
-            confirm: "Continue to payment",
-            toPayment: true,
-        });
-    });
-
-    it("says an upgrade's charge today and when the plan's own start", () => {
-        const s = quoteSummary(
-            quote({
-                kind: "UPGRADE",
-                chargeNowPaise: 5_550,
-                chargeNowGstPaise: 999,
-                chargeNowTotalPaise: 6_549,
-                startAt: "2026-11-01T00:00:00.000Z",
-            }),
-        );
-        expect(s.lines[0].value).toBe("₹55.50 + ₹9.99 GST = ₹65.49");
-        expect(s.lines[2]).toMatchObject({
-            label: "Then from",
-            iso: "2026-11-01T00:00:00.000Z",
-        });
-    });
-
-    it("says a coupon's discount and the first charge after it", () => {
-        const s = quoteSummary(
-            quote({
-                coupon: { code: "HELLO", discountPaise: 2_200, charges: 2 },
-                firstChargePaise: 20_000,
-                firstChargeGstPaise: 3_600,
-                firstChargeTotalPaise: 23_600,
-            }),
-        );
-        expect(s.lines.map((l) => l.value)).toContain(
-            "₹22 off each of the first 2 months",
-        );
-        expect(s.lines.map((l) => l.value)).toContain("₹200 + ₹36 GST = ₹236");
-    });
-
-    it("needs no payment page to move to free, and nothing for no change", () => {
-        expect(
-            quoteSummary(
-                quote({
-                    kind: "TO_FREE",
-                    plan: { id: "a", name: "Plan A", version: 3 },
-                }),
-            ),
-        ).toMatchObject({
-            confirm: "Move to Plan A",
-            toPayment: false,
-        });
-        expect(quoteSummary(quote({ kind: "NONE" })).confirm).toBeNull();
-        expect(
-            quoteSummary(
-                quote({
-                    kind: "TRIAL",
-                    trialEndsAt: "2026-10-18T00:00:00.000Z",
-                }),
-            ).title,
-        ).toBe("Start your Plan C trial");
     });
 });
 
