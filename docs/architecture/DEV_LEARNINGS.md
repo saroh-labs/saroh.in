@@ -3028,3 +3028,11 @@ that closes after "354", so the shape is nodemailer's, not ours.
 library itself (a stub server is minutes of work), not a hand-made object.
 When the stage can't be known, a send that may have gone is never retried.
 **Category**: email · `modules/communications/providers/saroh-email.sender.ts`
+
+### Next's dev server logged provider keys and sign-in codes from server actions
+
+**Symptom**: during the 7 Oct local UX audit, the stack log held the Razorpay and email API keys typed into Settings › Providers, plus sign-in codes.
+**Cause**: Next 16 defaults `logging.serverFunctions` to true. In development (`NODE_ENV === 'development'` only; production never logs them) every server action's arguments go to the terminal, and a dev log captures them.
+**Fix**: `logging: { serverFunctions: false }` in the Next config of every app whose server actions carry a secret (app, admin, accounts, saroh.app). Local logs that already held keys were scrubbed.
+**Rule**: A server action that takes a credential or code must not rely on logs staying private. Turn off dev argument logging in any app that has one, and never treat a dev log as safe to share.
+**Category**: security · `apps/*/next.config.*`
