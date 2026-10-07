@@ -37,8 +37,10 @@ afterEach(() => {
 });
 
 async function renderPage() {
-    const { default: WaitlistPage, revalidate } = await import("./page");
-    expect(revalidate).toBe(300);
+    const page = await import("./page");
+    const WaitlistPage = page.default;
+    // Static, with no regeneration: the site is rebuilt to change it.
+    expect("revalidate" in page).toBe(false);
     // A static page takes no props: no searchParams to make it dynamic.
     expect(WaitlistPage.length).toBe(0);
     return render(await WaitlistPage());

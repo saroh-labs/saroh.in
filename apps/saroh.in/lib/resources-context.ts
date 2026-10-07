@@ -40,9 +40,3 @@ export function resourcesContext(now: Date = new Date()): PublishContext {
         routes: parseBuiltRoutes(env.SAROH_BUILT_ROUTES),
     };
 }
-
-/**
- * How often a page is rendered again (ISR), so a page dated today appears
- * within this many seconds of midnight in India with no deploy (KTD-2).
- */
-export const PUBLISH_REVALIDATE_SECONDS = 300;
