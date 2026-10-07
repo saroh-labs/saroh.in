@@ -25,13 +25,21 @@ import { addMonthsUtc, planRows } from "@saroh/pricing-catalog";
 
 import { fakeCatalog } from "../../../test/fixtures/pricing-catalog";
 import type { SarohBillingEmail } from "../../common/email";
+import type { OrganizationContext } from "../../common/types/organization-context";
 import {
     BILLING_EMAIL_TYPE,
     BillingEmailHandler,
     enqueueBillingEmail,
 } from "./billing-email.job";
 import { ONE_TIME_PAYMENT } from "./billing-term";
+import { CheckoutService } from "./checkout.service";
 import { PLAN_ENDING_NOTIFICATION_TYPE } from "./plan-ending";
+import { PlansService } from "./plans.service";
+import {
+    FakeBillingProvider,
+    FakeBillingProviderFactory,
+} from "./providers/fake.provider";
+import { endTermAtInTx } from "./term-end";
 import { TERM_ENDING_NOTICE_KIND } from "./term-ending";
 import { remindEndingTerms } from "./term-ending-notice";
 
@@ -82,7 +90,15 @@ async function business() {
     await prisma.membership.create({
         data: { organizationId: org.id, userId: owner.id, role: "OWNER" },
     });
-    return { organizationId: org.id, ownerEmail: owner.email };
+    return {
+        organizationId: org.id,
+        ownerEmail: owner.email,
+        ctx: {
+            organizationId: org.id,
+            userId: owner.id,
+            role: "OWNER",
+        } as OrganizationContext,
+    };
 }
 
 function planRow(interval: "month" | "year") {
@@ -284,6 +300,67 @@ describe("a 12-month term that ends", () => {
         expect(
             await remindEndingTerms(new Date(now.getTime() + 14 * DAY), logger),
         ).toBe(0);
+    });
+});
+
+describe("a term whose owner chose Free (DEC-100)", () => {
+    async function noticesOf(organizationId: string) {
+        return prisma.notification.findMany({
+            where: { organizationId, type: PLAN_ENDING_NOTIFICATION_TYPE },
+        });
+    }
+
+    it("Free chosen in Plan and billing: told it moves to Free as chosen, never asked to pay", async () => {
+        const b = await business();
+        const now = new Date();
+        const ends = new Date(now.getTime() + 5 * DAY);
+        await onPlanB(b.organizationId, { cycle: "year", periodEnd: ends });
+        const factory = new FakeBillingProviderFactory(
+            new FakeBillingProvider("RAZORPAY", "whsec_fake_platform_secret"),
+        );
+        const checkout = new CheckoutService(new PlansService(), factory);
+        const r = await checkout.changePlan(b.ctx, {
+            plan: "free",
+            cycle: "month",
+        });
+        expect(r.kind).toBe("TO_FREE");
+        const row = await prisma.subscription.findUniqueOrThrow({
+            where: { organizationId: b.organizationId },
+        });
+        expect(row.cancelAtPeriodEnd).toBe(true);
+        expect(row.freeChosenAt).not.toBeNull();
+
+        expect(await remindEndingTerms(now, logger)).toBe(1);
+        const [notice] = await noticesOf(b.organizationId);
+        expect(notice?.title).toMatch(
+            /^Your plan moves to Free on .+, as you chose$/,
+        );
+        await runMail();
+        expect(sent).toHaveLength(1);
+        expect(sent[0]!.subject).toMatch(/moves to the Free plan on /);
+        expect(sent[0]!.html).toContain("as you chose");
+        expect(`${sent[0]!.subject} ${sent[0]!.html}`).not.toMatch(
+            /pay for the next term/i,
+        );
+    });
+
+    it("a term run out with nothing renewed (no choice recorded) is still asked to pay", async () => {
+        const b = await business();
+        const now = new Date();
+        const ends = new Date(now.getTime() + 5 * DAY);
+        const sub = await onPlanB(b.organizationId, {
+            cycle: "year",
+            periodEnd: ends,
+        });
+        // The provider's `completed`: on course for Free at the end.
+        await prisma.$transaction((tx) =>
+            endTermAtInTx(tx, { ...sub, plan: { version: 1 } }, ends),
+        );
+        expect(await remindEndingTerms(now, logger)).toBe(1);
+        const [notice] = await noticesOf(b.organizationId);
+        expect(notice?.title).toMatch(/^Your Plan B term ends on /);
+        await runMail();
+        expect(sent[0]!.subject).toMatch(/^Pay for /);
     });
 });
 

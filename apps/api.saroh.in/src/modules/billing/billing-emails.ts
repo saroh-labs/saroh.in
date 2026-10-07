@@ -173,7 +173,10 @@ export function termEndingEmail(input: {
     payment: TermPayment;
     price: string | null;
     payUrl: string;
+    /** The owner chose Free for the end: say so, ask nothing. */
+    chosenFree?: boolean;
 }): RenderedEmail {
+    if (input.chosenFree) return freeChosenEmail(input);
     const done =
         input.payment === "AUTOPAY"
             ? `${input.businessName}'s 12 monthly payments for the ${input.planName} plan are done, and its term ends on ${input.endsOn}.`
@@ -194,6 +197,40 @@ export function termEndingEmail(input: {
             ],
             { label: "Pay for the next term", href: input.payUrl },
         ),
+    };
+}
+
+/**
+ * The term ends and the owner chose Free for then (DEC-100): no request to
+ * pay, only what happens, and how to change their mind.
+ */
+export function freeChosenEmail(input: {
+    businessName: string;
+    planName: string;
+    endsOn: string;
+    payUrl: string;
+}): RenderedEmail {
+    return {
+        subject: `${input.businessName} moves to the Free plan on ${input.endsOn}`,
+        html: wrap(
+            `Your plan moves to Free on ${input.endsOn}, as you chose`,
+            [
+                `${input.businessName}'s ${input.planName} plan ends on ${input.endsOn}, and the business moves to the Free plan, as you chose. Everything you made is kept.`,
+                `Changed your mind? Choose ${input.planName} again in Plan and billing before then.`,
+            ],
+            { label: "Open Plan and billing", href: input.payUrl },
+        ),
+    };
+}
+
+/** The same in the business's inbox (`plan.ending`). */
+export function freeChosenNotice(input: { planName: string; endsOn: string }): {
+    title: string;
+    body: string;
+} {
+    return {
+        title: `Your plan moves to Free on ${input.endsOn}, as you chose`,
+        body: `Your ${input.planName} plan ends then. Everything you made is kept. To keep ${input.planName}, choose it again in Plan and billing.`,
     };
 }
 

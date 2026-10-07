@@ -354,6 +354,7 @@ export class BillingEmailHandler {
                         ? null
                         : money(ending.nextPricePaise),
                 payUrl: `${appBase()}/settings/billing#change-plan`,
+                chosenFree: ending.chosenFree,
             });
         });
     }

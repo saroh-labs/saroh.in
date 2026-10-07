@@ -5047,6 +5047,12 @@ model Subscription {
 
   currentPeriodEnd  DateTime?
   cancelAtPeriodEnd Boolean   @default(false)
+  // When the owner chose to end the plan at the period's end (Free in
+  // Plan and billing, or cancel), as against the term ending with nothing
+  // renewed, which sets `cancelAtPeriodEnd` too (DEC-100). A term's end
+  // then says "as you chose" rather than asking to pay. Cleared whenever
+  // `cancelAtPeriodEnd` is.
+  freeChosenAt      DateTime?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt

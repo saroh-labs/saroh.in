@@ -649,6 +649,8 @@ export class CheckoutService {
                         pendingPlanId: target.id,
                         pendingFrom: periodEnd,
                         cancelAtPeriodEnd: true,
+                        // Chosen here, not a term run out (DEC-100).
+                        freeChosenAt: now,
                     },
                 });
                 await enqueueProviderCancel(tx, {
@@ -681,6 +683,7 @@ export class CheckoutService {
                     providerCustomerId: null,
                     currentPeriodEnd: null,
                     cancelAtPeriodEnd: false,
+                    freeChosenAt: null,
                     pendingPlanId: null,
                     pendingFrom: null,
                     providerEventAt: null,

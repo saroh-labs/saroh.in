@@ -22,7 +22,9 @@ type Tx = Prisma.TransactionClient;
  *
  * A business that has already arranged what follows — the renewal or
  * another paid plan authorised (a SCHEDULED checkout), or a move that takes
- * over before the end — is not asked.
+ * over before the end — is not asked. One whose owner chose Free (or
+ * cancelled) for the period's end (`freeChosenAt`) isn't asked either: it
+ * is told its plan moves to Free then, as it chose (`chosenFree`).
  */
 
 /** The once-only claim on each notice (`CustomerNotice.kind`). */
@@ -62,6 +64,8 @@ export interface TermEnding {
     stage: PlanEndingStage;
     /** The plan's live price before GST, or null when it isn't offered. */
     nextPricePaise: number | null;
+    /** The owner chose Free for the end: told so, never asked to pay. */
+    chosenFree: boolean;
 }
 
 /**
@@ -84,6 +88,8 @@ export async function termEndingOf(
             provider: true,
             providerSubscriptionId: true,
             currentPeriodEnd: true,
+            cancelAtPeriodEnd: true,
+            freeChosenAt: true,
             pendingFrom: true,
             pendingPlan: { select: { priceCents: true } },
             plan: {
@@ -155,6 +161,7 @@ export async function termEndingOf(
         stage,
         nextPricePaise:
             next?.active && next.priceCents > 0 ? next.priceCents : null,
+        chosenFree: sub.freeChosenAt !== null && sub.cancelAtPeriodEnd,
     };
 }
 

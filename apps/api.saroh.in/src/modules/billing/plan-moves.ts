@@ -163,6 +163,7 @@ export async function applyDueMoveInTx(
         data.providerCustomerId = scheduled.providerCustomerId;
         data.status = "ACTIVE";
         data.cancelAtPeriodEnd = false;
+        data.freeChosenAt = null;
         data.currentPeriodEnd =
             options.currentPeriodEnd ??
             periodEnd(scheduled.startAt ?? sub.pendingFrom, cycle);
@@ -191,6 +192,7 @@ export async function applyDueMoveInTx(
         data.providerCustomerId = null;
         data.status = "ACTIVE";
         data.cancelAtPeriodEnd = false;
+        data.freeChosenAt = null;
         data.currentPeriodEnd = null;
         data.providerEventAt = null;
     } else if (options.currentPeriodEnd !== undefined) {

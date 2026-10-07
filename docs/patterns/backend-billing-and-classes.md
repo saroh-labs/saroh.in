@@ -80,7 +80,11 @@ business is asked to pay for the next term, never renewed by itself
 (DEC-100): the hourly sweep sends the request 30, 7 and 1 days before the
 end, in the inbox and by email, once per stage (`term-ending.ts`,
 `term-ending-notice.ts`), and says nothing once a renewal or another plan
-is authorised. Rules in `PRICING_ROLLOUT.md` › "Checkout and term
+is authorised. A business whose owner chose Free or cancelled for the
+period's end (`Subscription.freeChosenAt`, set by Plan and billing's move
+to Free and by cancel, cleared wherever `cancelAtPeriodEnd` is) is told
+its plan moves to Free then, as it chose, and never asked to pay; the
+term run out (`term-end.ts`) sets `cancelAtPeriodEnd` without it. Rules in `PRICING_ROLLOUT.md` › "Checkout and term
 (DEC-093)".
 
 **First month, not trial (DEC-093).** A TRIAL checkout that took a charge

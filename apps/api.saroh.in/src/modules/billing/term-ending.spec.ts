@@ -1,5 +1,6 @@
 import {
     firstMonthEndingEmail,
+    freeChosenNotice,
     termEndingEmail,
     termEndingNotice,
     trialEndingEmail,
@@ -65,6 +66,27 @@ describe("a 12-month term's end (DEC-100)", () => {
             "Your Plan B term ends on 7 Oct 2027",
         );
         expect(termEndingNotice(base).body).toContain("moves to Free");
+    });
+});
+
+describe("a term whose owner chose Free", () => {
+    it("says it moves to Free as chosen, and asks nothing", () => {
+        const email = termEndingEmail({
+            businessName: "Rye",
+            planName: "Plan B",
+            endsOn: "7 Oct 2027",
+            payment: "AUTOPAY",
+            price: "₹222",
+            payUrl: "https://app.example.test/settings/billing",
+            chosenFree: true,
+        });
+        expect(email.subject).toBe("Rye moves to the Free plan on 7 Oct 2027");
+        expect(email.html).toContain("as you chose");
+        expect(email.html).not.toMatch(/pay for the next term|₹222/i);
+        expect(
+            freeChosenNotice({ planName: "Plan B", endsOn: "7 Oct 2027" })
+                .title,
+        ).toBe("Your plan moves to Free on 7 Oct 2027, as you chose");
     });
 });
 

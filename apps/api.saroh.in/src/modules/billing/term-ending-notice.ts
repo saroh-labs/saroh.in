@@ -4,7 +4,7 @@ import { prisma } from "@saroh/database";
 import { businessTimezone } from "../bookings/staff-availability";
 import { paperDay } from "../invoices/invoice-paper-view";
 import { enqueueBillingEmail } from "./billing-email.job";
-import { termEndingNotice } from "./billing-emails";
+import { freeChosenNotice, termEndingNotice } from "./billing-emails";
 import { PLAN_ENDING_NOTIFICATION_TYPE } from "./plan-ending";
 import {
     TERM_ENDING_NOTICE_KIND,
@@ -16,7 +16,8 @@ import {
 /**
  * The billing sweep's step for terms that end (DEC-100, `term-ending.ts`):
  * every subscription whose 12-month term ends within the renew window is
- * asked, once per stage, to pay for the next term — an inbox notice
+ * asked, once per stage, to pay for the next term (or, when its owner
+ * chose Free for then, told it moves to Free as it chose) — an inbox notice
  * (`plan.ending`, opening the plans) and a `TERM_ENDING` billing email,
  * claimed as a `CustomerNotice` on one transaction. One that fails never
  * stops the rest. Returns how many were told.
@@ -45,10 +46,13 @@ async function remindTerm(subscriptionId: string, now: Date): Promise<boolean> {
     const { organizationId, term, stage } = ending;
     const eventKey = termEndingEventKey(subscriptionId, term.endsAt, stage);
     const zone = await businessTimezone(prisma, organizationId);
-    const words = termEndingNotice({
+    const said = {
         planName: ending.planName,
         endsOn: paperDay(term.endsAt.toISOString(), zone),
-    });
+    };
+    const words = ending.chosenFree
+        ? freeChosenNotice(said)
+        : termEndingNotice(said);
     return prisma.$transaction(async (tx) => {
         const claim = await tx.customerNotice.createMany({
             data: [{ organizationId, eventKey, kind: TERM_ENDING_NOTICE_KIND }],
