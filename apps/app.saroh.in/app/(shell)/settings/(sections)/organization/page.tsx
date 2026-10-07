@@ -67,7 +67,10 @@ export default async function OrganizationSettingsPage() {
     // Home's "Get ready to take money" steps, and what Settings adds.
     const ready =
         settings && canEdit
-            ? await loadSettingsChecklist(settings, may("comms:manage"))
+            ? await loadSettingsChecklist(settings, {
+                  connect: may("comms:manage"),
+                  plans: may("billing:read"),
+              })
             : null;
 
     return (
