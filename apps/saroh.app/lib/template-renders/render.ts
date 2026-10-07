@@ -52,6 +52,15 @@ export function pageFileName(path: string): string {
     return name === "" ? "home" : name;
 }
 
+/**
+ * A sample business's email: its host's first label at example.com
+ * ("kesarsalon.saroh.app" → "kesarsalon@example.com"), as every seeded
+ * business and customer is addressed.
+ */
+export function sampleEmail(host: string): string {
+    return `${host.split(".")[0]}@example.com`;
+}
+
 /** The sample business's profile, as `instantiateTemplate` reads it. */
 export function sampleContext(
     template: TemplateManifest,
@@ -62,11 +71,9 @@ export function sampleContext(
         organizationName: sample.name,
         // Every module it uses on, as the gallery lays it out.
         modules: ["WEBSITE", ...(template.uses ?? [])],
-        // An address only on the sample's own saroh.app host: never one
-        // that could be somebody's real inbox.
-        ...(sample.host.endsWith(".saroh.app")
-            ? { contactEmail: `hello@${sample.host}` }
-            : {}),
+        // Named for the sample, on example.com (reserved, never delivered):
+        // never an address that could be somebody's real inbox.
+        ...(sample.host ? { contactEmail: sampleEmail(sample.host) } : {}),
         ...fixture?.context,
     };
 }

@@ -17,6 +17,7 @@ import {
     galleryTemplates,
     pageFileName,
     sampleContext,
+    sampleEmail,
     templateRender,
     templateRenderIndex,
 } from "./render";
@@ -218,11 +219,15 @@ describe("templateRender", () => {
         }
     });
 
-    it("never gives a sample an email off its own saroh.app address", () => {
+    it("gives every sample an email named for it at example.com", () => {
         for (const t of galleryTemplates()) {
-            const email = sampleContext(t).contactEmail;
-            if (email) expect(email).toMatch(/@[a-z0-9-]+\.saroh\.app$/);
+            expect(sampleContext(t).contactEmail, t.id).toMatch(
+                /^[a-z0-9-]+@example\.com$/,
+            );
         }
+        expect(sampleEmail("kesarsalon.saroh.app")).toBe(
+            "kesarsalon@example.com",
+        );
     });
 });
 

@@ -532,7 +532,7 @@ async function writeOrdersAndReviews(
             id: cid,
             storeId,
             organizationId: orgId,
-            email: `${first}.${last}.${n}@example.in`.toLowerCase(),
+            email: `${first}.${last}.${n}@example.com`.toLowerCase(),
             firstName: first,
             lastName: last,
             country: "India",
@@ -577,7 +577,7 @@ async function writeOrdersAndReviews(
             const customerId = customerFor(r.displayName);
             const email =
                 customerRows.find((c) => c.id === customerId)?.email ??
-                "guest@example.in";
+                "guest@example.com";
             orders.push({
                 id: orderId,
                 storeId,

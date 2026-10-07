@@ -18,7 +18,7 @@ export const kaviId = (...parts: (string | number)[]) =>
 export const KAVI_NAME = "Kavi Dental";
 /** Its legal name and contact email, as the profile holds them and its paper prints them (DEC-082). */
 export const KAVI_LEGAL_NAME = "Kavi Dental Care LLP";
-export const KAVI_CONTACT_EMAIL = "desk@kavidental.example.in";
+export const KAVI_CONTACT_EMAIL = "kavidental@example.com";
 
 export const KAVI = {
     key: KAVI_KEY,
@@ -279,7 +279,7 @@ export const KAVI_PATIENTS: readonly PatientFixture[] = [
         key: "rahul",
         first: "Rahul",
         last: "Verma",
-        email: "rahul.verma@example.in",
+        email: "rahul.verma@example.com",
         phone: "+91 98451 22019",
         attention: [
             {
@@ -300,7 +300,7 @@ export const KAVI_PATIENTS: readonly PatientFixture[] = [
         key: "farah",
         first: "Farah",
         last: "Khan",
-        email: "farah.k@example.in",
+        email: "farah.k@example.com",
         phone: "+91 99001 45566",
         attention: [
             {
@@ -315,7 +315,7 @@ export const KAVI_PATIENTS: readonly PatientFixture[] = [
         key: "vikram",
         first: "Vikram",
         last: "Rao",
-        email: "vikram.rao@example.in",
+        email: "vikram.rao@example.com",
         phone: "+91 98860 77120",
         attention: [],
     },
@@ -323,7 +323,7 @@ export const KAVI_PATIENTS: readonly PatientFixture[] = [
         key: "leela",
         first: "Leela",
         last: "Menon",
-        email: "leela.m@example.in",
+        email: "leela.m@example.com",
         phone: "+91 97400 31188",
         attention: [
             {

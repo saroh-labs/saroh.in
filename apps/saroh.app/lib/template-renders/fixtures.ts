@@ -42,8 +42,8 @@ import {
  *
  * Honest by construction: no stock photograph. Every image slot is drawn
  * as its brief — the words saying what the photograph should show — on a
- * tinted ground (`brief-image.ts`); no phone number; and an email only on
- * the sample's own `saroh.app` address.
+ * tinted ground (`brief-image.ts`); no phone number; and an email only at
+ * `example.com`, named for the sample (`sampleEmail`).
  */
 
 /** A product as the gallery shows it: its photograph is still a brief. */

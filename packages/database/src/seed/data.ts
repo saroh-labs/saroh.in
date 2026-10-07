@@ -719,7 +719,7 @@ export const COMMUNICATION_PROVIDER = {
     channel: "EMAIL",
     provider: "RESEND",
     status: "CONNECTED",
-    fromAddress: "orders@northwindsupply.in",
+    fromAddress: "northwind@example.com",
 } as const;
 
 /**
