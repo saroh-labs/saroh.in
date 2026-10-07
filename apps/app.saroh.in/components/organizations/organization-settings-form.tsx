@@ -958,7 +958,8 @@ export function OrganizationSettingsForm({
                                 <Input {...field} type="email" />
                             </FormControl>
                             <FormDescription>
-                                Where customers can reach the business.
+                                Where customers can reach the business. Your
+                                website shows it at the foot of every page.
                             </FormDescription>
                             <FormMessage />
                         </FormItem>

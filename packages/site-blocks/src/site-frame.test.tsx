@@ -238,7 +238,7 @@ describe("the header's in-page entries", () => {
 });
 
 describe("the left footer", () => {
-    it("is one row: the name in the heading face, the line, Runs on Saroh", () => {
+    it("is one row: the name in the heading face, the line, Made with Saroh on Free", () => {
         const { container } = render(
             <SiteFooter
                 name="Rye & Co."
@@ -247,6 +247,7 @@ describe("the left footer", () => {
                     value: "14 Hill Road, Bandra West · Closed Mondays",
                     layout: "left",
                 }}
+                credit={{ href: "https://saroh.in/?ref=k7m2p9qa" }}
             />,
         );
         const footer = container.querySelector("footer");
@@ -257,26 +258,27 @@ describe("the left footer", () => {
         expect(parts).toEqual([
             "Rye & Co.",
             "14 Hill Road, Bandra West · Closed Mondays",
-            "Runs on Saroh",
+            "Made with Saroh",
         ]);
         expect(screen.getByText("Rye & Co.")).toHaveClass("font-site-heading");
-        expect(screen.getByRole("link", { name: "Runs on Saroh" })).toHaveClass(
-            "ml-auto",
-        );
+        expect(
+            screen.getByRole("link", { name: "Made with Saroh" }),
+        ).toHaveClass("ml-auto");
     });
 
-    it("keeps its layout with no line written: the name and Runs on Saroh", () => {
+    it("keeps its layout with no line written: the name and Made with Saroh", () => {
         const { container } = render(
             <SiteFooter
                 name="Rye & Co."
                 footer={{ format: "html", value: "", layout: "left" }}
+                credit={{ href: "https://saroh.in/?ref=k7m2p9qa" }}
             />,
         );
         expect(
             Array.from(container.querySelectorAll(".flex > *")).map(
                 (el) => el.textContent,
             ),
-        ).toEqual(["Rye & Co.", "Runs on Saroh"]);
+        ).toEqual(["Rye & Co.", "Made with Saroh"]);
     });
 
     it("draws a footer richer than a line above the row, left-aligned", () => {

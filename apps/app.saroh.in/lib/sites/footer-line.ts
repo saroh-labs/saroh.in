@@ -6,7 +6,7 @@ import type { SiteFooter } from "./service";
  * The footer as the inspector's one-line field sees it (round 2, G6).
  *
  * The live footer (`SiteFooter`, G17) draws the merchant's line, then
- * " · Runs on Saroh". The inspector edits that line as plain text, so it can
+ * " · Made with Saroh" on Free. The inspector edits that line as plain text, so it can
  * only take a footer that IS one plain line. Anything richer — two
  * paragraphs, a list, a link or bold text — would lose its markup in a text
  * box, so it stays with the rich editor in Website settings and the

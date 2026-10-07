@@ -416,6 +416,7 @@ export {
     SiteFooter,
     SiteHeader,
     footerLine,
+    madeWithSarohHref,
     siteMenu,
     withShopLink,
 } from "./site-chrome";
@@ -423,6 +424,7 @@ export type {
     FooterLayout,
     ModulePageStates,
     SiteContact,
+    SiteCredit,
     SiteFooterContent,
 } from "./site-chrome";
 // A module page's address while its module is off (G15).

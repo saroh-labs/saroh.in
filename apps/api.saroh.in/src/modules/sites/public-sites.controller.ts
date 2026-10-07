@@ -13,6 +13,8 @@ import {
 import { hashClientIp } from "../../common/client-ip";
 import { FixedWindowRateLimiter } from "../enquiry/rate-limiter";
 import { SITE_RELAY_HEADER, visitorKey } from "../site-accounts/site-relay";
+import type { PublicFooter } from "./public-footer.service";
+import { PublicFooterService } from "./public-footer.service";
 import type { PublicVisit } from "./public-visit.service";
 import { PublicVisitService } from "./public-visit.service";
 import type { SiteMoved } from "./site-moved";
@@ -53,6 +55,7 @@ export class PublicSitesController {
         private readonly sites: SitesService,
         private readonly previewLinks: SitePreviewLinksService,
         private readonly visits: PublicVisitService,
+        private readonly footers: PublicFooterService,
     ) {}
 
     /**
@@ -194,6 +197,23 @@ export class PublicSitesController {
         @Headers(SITE_RELAY_HEADER) relay: string | undefined,
     ): Promise<PublicVisit> {
         return this.visits.read(siteId, undefined, visitorKey(ip, relay));
+    }
+
+    /**
+     * What the site's footer shows beside the snapshot (DEC-101, DEC-102):
+     * the business's contact email when it has one, and "Made with Saroh"
+     * with its referral code on Free. Read live, never cached, so a plan
+     * change or a new email shows at once. The visitor is relayed as for
+     * `/visit`.
+     */
+    @Get(":siteId/footer")
+    @Header("Cache-Control", "no-store")
+    footer(
+        @Param("siteId") siteId: string,
+        @Ip() ip: string,
+        @Headers(SITE_RELAY_HEADER) relay: string | undefined,
+    ): Promise<PublicFooter> {
+        return this.footers.read(siteId, visitorKey(ip, relay));
     }
 
     /**

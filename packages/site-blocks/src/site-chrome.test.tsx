@@ -4,6 +4,7 @@ import { describe, expect, it } from "vitest";
 import type { SiteFooterContent } from "./site-chrome";
 import {
     footerLine,
+    madeWithSarohHref,
     SiteFooter,
     SiteHeader,
     siteMenu,
@@ -13,7 +14,7 @@ import {
 /**
  * The customer site's v2 header and footer (G17): one row with the name,
  * the menu and "Book" at the desk, a menu button with a full-width "Book"
- * below 820px, and a footer that ends in "Runs on Saroh".
+ * below 820px, and a footer that ends in "Made with Saroh" on Free.
  *
  * jsdom has no layout, so "at the desk" and "at 390px" are the classes that
  * switch at 820px; the four scenes are checked in a browser.
@@ -227,21 +228,28 @@ describe("the site header (G17)", () => {
     });
 });
 
-describe("the site footer (G17)", () => {
-    const runsOn = () => screen.getByRole("link", { name: "Runs on Saroh" });
+describe("the site footer (G17, DEC-102)", () => {
+    /** A Free site's credit, with a made-up referral code. */
+    const FREE = { href: madeWithSarohHref("k7m2p9qa") };
+    const madeWith = () =>
+        screen.getByRole("link", { name: "Made with Saroh" });
 
-    it("ends in Runs on Saroh, linking to saroh.in in a new tab", () => {
+    it("ends in Made with Saroh on Free, linking with the referral code in a new tab", () => {
         const { container } = render(
             <SiteFooter
                 footer={{ format: "markdown", value: "Pulse · Indiranagar" }}
                 name="Pulse Fitness"
+                credit={FREE}
             />,
         );
-        expect(runsOn()).toHaveAttribute("href", "https://saroh.in");
-        expect(runsOn()).toHaveAttribute("target", "_blank");
-        expect(runsOn()).toHaveAttribute("rel", "noopener");
-        expect(runsOn().closest("p")?.textContent).toBe(
-            "Pulse · Indiranagar · Runs on Saroh",
+        expect(madeWith()).toHaveAttribute(
+            "href",
+            "https://saroh.in/?ref=k7m2p9qa",
+        );
+        expect(madeWith()).toHaveAttribute("target", "_blank");
+        expect(madeWith()).toHaveAttribute("rel", "noopener");
+        expect(madeWith().closest("p")?.textContent).toBe(
+            "Pulse · Indiranagar · Made with Saroh",
         );
         // The merchant's footer colours, not Saroh's.
         expect(screen.getByRole("contentinfo")).toHaveClass(
@@ -252,6 +260,50 @@ describe("the site footer (G17)", () => {
         expect(container.innerHTML).toMatchSnapshot();
     });
 
+    it("shows no Saroh credit on a paid plan", () => {
+        render(
+            <SiteFooter
+                footer={{ format: "markdown", value: "Pulse · Indiranagar" }}
+                name="Pulse Fitness"
+            />,
+        );
+        const footer = screen.getByRole("contentinfo");
+        expect(footer.textContent).toBe("Pulse · Indiranagar");
+        expect(footer.textContent).not.toMatch(/Saroh/);
+        expect(screen.queryByRole("link")).toBeNull();
+    });
+
+    it("shows no Saroh credit in the left layout on a paid plan", () => {
+        render(
+            <SiteFooter
+                footer={{
+                    format: "markdown",
+                    value: "Open daily",
+                    layout: "left",
+                }}
+                name="Rye"
+            />,
+        );
+        expect(screen.getByRole("contentinfo").textContent).not.toMatch(
+            /Saroh/,
+        );
+    });
+
+    it("ends the left layout's row in the credit on Free", () => {
+        render(
+            <SiteFooter
+                footer={{
+                    format: "markdown",
+                    value: "Open daily",
+                    layout: "left",
+                }}
+                name="Rye"
+                credit={FREE}
+            />,
+        );
+        expect(madeWith()).toHaveClass("ml-auto");
+    });
+
     it("uses the site's name when the merchant wrote nothing", () => {
         const empties: (SiteFooterContent | null)[] = [
             null,
@@ -259,10 +311,10 @@ describe("the site footer (G17)", () => {
         ];
         for (const footer of empties) {
             const { unmount } = render(
-                <SiteFooter footer={footer} name="Kavi Dental" />,
+                <SiteFooter footer={footer} name="Kavi Dental" credit={FREE} />,
             );
-            expect(runsOn().closest("p")?.textContent).toBe(
-                "Kavi Dental · Runs on Saroh",
+            expect(madeWith().closest("p")?.textContent).toBe(
+                "Kavi Dental · Made with Saroh",
             );
             unmount();
         }
@@ -276,14 +328,15 @@ describe("the site footer (G17)", () => {
                     value: "<p>Rye · <strong>Koramangala</strong></p>",
                 }}
                 name="Rye"
+                credit={FREE}
             />,
         );
-        const line = runsOn().closest("p");
-        expect(line?.textContent).toBe("Rye · Koramangala · Runs on Saroh");
+        const line = madeWith().closest("p");
+        expect(line?.textContent).toBe("Rye · Koramangala · Made with Saroh");
         expect(line?.querySelector("strong")?.textContent).toBe("Koramangala");
     });
 
-    it("puts Runs on Saroh on its own line under a longer footer", () => {
+    it("puts the credit on its own line under a longer footer", () => {
         const { container } = render(
             <SiteFooter
                 footer={{
@@ -291,12 +344,13 @@ describe("the site footer (G17)", () => {
                     value: "<p>Rye Bakery</p><p>Open 7am to 7pm</p>",
                 }}
                 name="Rye"
+                credit={FREE}
             />,
         );
         expect(container.querySelector(".prose")?.innerHTML).toBe(
             "<p>Rye Bakery</p><p>Open 7am to 7pm</p>",
         );
-        expect(runsOn().closest("p")?.textContent).toBe("Runs on Saroh");
+        expect(madeWith().closest("p")?.textContent).toBe("Made with Saroh");
     });
 
     it("keeps a plain footer's line breaks", () => {
@@ -304,12 +358,13 @@ describe("the site footer (G17)", () => {
             <SiteFooter
                 footer={{ format: "markdown", value: "Rye\nKoramangala" }}
                 name="Rye"
+                credit={FREE}
             />,
         );
         expect(
             container.querySelector(".whitespace-pre-wrap")?.textContent,
         ).toBe("Rye\nKoramangala");
-        expect(runsOn().closest("p")?.textContent).toBe("Runs on Saroh");
+        expect(madeWith().closest("p")?.textContent).toBe("Made with Saroh");
     });
 });
 
@@ -693,6 +748,37 @@ describe("the site footer's contact line (UX-038)", () => {
         const call = screen.getByRole("link", { name: "Call +91 98450 00000" });
         expect(call).toHaveAttribute("href", "tel:+919845000000");
         expect(screen.getByText("12 Main Rd, Indiranagar")).toBeInTheDocument();
+    });
+
+    it("shows the business's contact email when it has added one (DEC-101)", () => {
+        render(
+            <SiteFooter
+                footer={null}
+                name="Pulse Fitness"
+                contact={{
+                    phone: "+91 98450 00000",
+                    address: null,
+                    email: " hi@pulse.example ",
+                }}
+            />,
+        );
+        expect(
+            screen.getByRole("link", { name: "hi@pulse.example" }),
+        ).toHaveAttribute("href", "mailto:hi@pulse.example");
+    });
+
+    it("shows no email when the business hasn't added one", () => {
+        for (const email of [null, undefined, "  "]) {
+            const { unmount } = render(
+                <SiteFooter
+                    footer={null}
+                    name="Pulse Fitness"
+                    contact={{ phone: "+91 98450 00000", address: null, email }}
+                />,
+            );
+            expect(screen.queryByRole("link", { name: /@/ })).toBeNull();
+            unmount();
+        }
     });
 
     it("draws no line when the business shows neither", () => {

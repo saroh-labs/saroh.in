@@ -619,7 +619,7 @@ export interface SiteFooter {
     format: "html" | "markdown";
     value: string;
     /**
-     * `left`: the designs' row (name, line, Runs on Saroh), set by a template
+     * `left`: the designs' row (name, line, Saroh credit on Free), set by a template
      * (industry templates). The API keeps it when a save sends only the line.
      */
     layout?: "left";
