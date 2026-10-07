@@ -229,6 +229,7 @@ describe("what each person sees of the inbox (F14)", () => {
                 "booking.moved",
                 "booking.cancelled",
                 "payment.failed",
+                "provider.attention",
                 "site.live",
                 "site.not_live",
             ],
