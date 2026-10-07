@@ -362,7 +362,10 @@ function Panel({
     return (
         <div className="bg-site-surface border-site-border text-site-fg rounded-[calc(var(--site-radius)+16px)] border px-4 pb-2.5 pt-4 shadow-[0_10px_30px_hsl(var(--site-fg)/0.06)]">
             <div className="mb-1.5 flex items-baseline gap-2">
-                <h2 className="font-site-heading flex-1 text-[19px] font-semibold tracking-[-0.01em]">
+                <h2
+                    data-site-title=""
+                    className="font-site-heading flex-1 text-[19px] font-semibold tracking-[-0.01em]"
+                >
                     {title}
                 </h2>
                 {sub ? (

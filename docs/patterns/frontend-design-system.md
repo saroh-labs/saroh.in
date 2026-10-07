@@ -23,11 +23,51 @@
   and footer, preview frames). A surface that draws no block goes on the list
   with its reason; a block goes in the package. **G7:** no Saroh typeface on a
   merchant's site — no `font-sans`, `font-display` or `font-mono` in a block,
-  and no `packages/ui/fonts` path or `next/font` import in `apps/saroh.app`.
-  Blocks set type with `font-site-heading` and `font-site-body` (see "Type and
-  the mark").
+  no `packages/ui/fonts` path in `apps/saroh.app`, and `next/font` only in its
+  merchant font list, `lib/site-fonts.ts`.
+  Blocks set type with `font-site-heading` and `font-site-body`, and small
+  machine facts (a time, a year, a handle) with `font-site-mono`, which falls
+  back to the body face for a pair without a mono (see "Type and the mark").
 - **Current** — Every `siteColors` key has a default in `SiteTheme` (`muted` and
   `border` did not until `00cd219`).
+- **Current** — **A template may carry exact colours and a type scale
+  (DEC-090)**, never a merchant: `Site.style.palette` (`#RRGGBB` per role,
+  every text pairing 4.5:1, `parsePalette` in `@saroh/block-contract`) and
+  `Site.style.type` (`parseTypeScale`). The API accepts either only as one of
+  the site's template's colourways (`site-style-offer.ts`), and publishes the
+  hex as HSL triples, so `SiteTheme`'s guard never admits a `#`. A block reads
+  the type scale as `var(--site-display-size, <today's size>)`,
+  `--site-body-size` and `--site-measure` with today's value as the fallback,
+  and marks a section title `data-site-title` (the eyebrow rule `SiteTheme`
+  writes from `--site-label-style`). Section headings use `font-site-heading`.
+- **Current** — **A section's frame and the page's column** (industry
+  templates, polish pass). Every section may carry `anchor`, `navLabel` and
+  `band` beside its own fields (`section-frame.ts` in `@saroh/block-contract`;
+  `parseSectionContent` keeps them for every block, so a block schema never
+  names them). `PageSections` puts the anchor on the wrapper as its `id` and
+  the band as `data-site-band`; `SiteTheme` recolours the section's own
+  `--site-*` tokens inside a band (through `--site-band-*` aliases), so a block
+  never knows it is in one. A home-page section with a menu label leads the
+  header's menu as `/#anchor`, resolved at publish (`withInPageNavigation`).
+  A template's `type.contentWidth` (720–1320px) becomes `--site-content-width`:
+  the chrome reads it as `max-w-site-content`, and while it is set `SiteTheme`
+  sets the blocks' `max-w-screen-md/lg/xl` inside sections to it. The footer
+  may be laid out `left` (`Site.footer.layout`), which a save of the line
+  alone keeps. `left` is the designs' row (name, line, "Runs on Saroh" at
+  the end) with its margins inside `max-w-site-content`, as the header's.
+- **Current** — **Template round 2.** A palette may name two optional
+  status roles, `status` (the "open now" dot on the page) and
+  `statusInverse` (over a hero photo's wash or an inverse band), each held
+  to 3:1 (a graphic, WCAG 1.4.11) on its ground and never filled in: unset,
+  `bg-site-status`/`bg-site-status-inverse` fall back to the accent, so a
+  palette without them draws as before; an inverse band swaps them and an
+  accent band clears them. A text block may set its own `h2`/`h3` as the
+  site's section titles (`headingStyle: "label"`, `data-site-headings`),
+  its `dl` terms as quiet uppercase labels (`factsStyle: "labels"`,
+  `data-site-facts`) and carry a small `label` over it (`data-site-title`);
+  the rules are `SiteTheme`'s. `features.introStyle: "display"` sets the
+  intro as one large heading-face line; `productGrid.columns` (3–5) fixes
+  the bare cards' count across at the desk.
 
 ## Saroh tokens — Ink & Saffron
 
@@ -201,6 +241,19 @@
   mounts. The root layout imports no `next/font`, and a block never writes
   `font-sans`, `font-display` or `font-mono`, which all resolve to Saroh's
   faces. Gate G7 enforces both.
+- **Current** — **A site's typeface is a pair from `FONT_PAIRS`**
+  (`@saroh/block-contract`, industry templates KTD-2): `Site.style.fontPair`
+  holds a key, the API refuses any other, and `siteStyleVariables()` emits the
+  KEY as `--site-font-heading/body` (nothing for the default `system` pair).
+  `SiteTheme` turns the key into stacks from the list — a snapshot's value is
+  never written into CSS — using the faces the app loaded (`faces` prop). The
+  faces are loaded with `next/font/google` (latin, swap, `preload: false`) in
+  `apps/saroh.app/lib/site-fonts.ts` and, for the editor's previews,
+  `apps/app.saroh.in/lib/sites/site-fonts.ts` (`SiteFacesProvider`); a
+  browser fetches only the pair the page is set in. A new pair is a list entry
+  plus a loader in both files; tests hold the three in step. A pair may name a
+  third, `mono` face (`archivo-narrow`: IBM Plex Mono; `geist`: JetBrains
+  Mono), emitted as `--site-font-mono` only when it has one.
 - **Current** — **The mark is one SVG master** in `packages/ui/brand`, with
   `<Wordmark>` / `<SarohSymbol>` from `@saroh/ui/wordmark`. Never re-draw it.
   The stroke is never Saffron, and the dot drops below 20px. Every brand app

@@ -122,6 +122,9 @@ const DEFAULTS: Record<string, SetupDefaults["defaults"]> = {
 let hiddenKeys: string[] = [];
 /** The template the API says a new site starts from (K15); null says none. */
 let websiteTemplate: { id: string; name: string } | null = null;
+/** The templates the API says it could start from instead (U12). */
+let websiteTemplates: SetupDefaults["templates"] = [];
+let websiteKind: string | null = null;
 
 /** jsdom has no layout, so nothing to observe. */
 class NoResize {
@@ -145,6 +148,8 @@ beforeEach(() => {
     ).IS_REACT_ACT_ENVIRONMENT = true;
     hiddenKeys = [];
     websiteTemplate = null;
+    websiteTemplates = [];
+    websiteKind = null;
     // Radix's checkbox measures itself; jsdom has no ResizeObserver.
     vi.stubGlobal("ResizeObserver", NoResize);
     readSetupDefaultsAction.mockReset();
@@ -157,6 +162,8 @@ beforeEach(() => {
                 hidden: hiddenKeys.includes(key),
                 read: true,
                 template: key === "WEBSITE" ? websiteTemplate : null,
+                templates: key === "WEBSITE" ? websiteTemplates : [],
+                kind: key === "WEBSITE" ? websiteKind : null,
             })),
         ),
     );
@@ -435,6 +442,65 @@ describe("Website", () => {
             siteName: "Northwind",
             address: "northwind",
         });
+    });
+
+    it("offers the templates suggested for the business, and sends one chosen (U12)", async () => {
+        websiteTemplate = { id: "starter", name: "Starter" };
+        websiteKind = "BUSINESS";
+        websiteTemplates = [
+            { id: "starter", name: "Starter", kinds: [], uses: [] },
+            { id: "portfolio", name: "Portfolio", kinds: [], uses: [] },
+            {
+                id: "bakery",
+                name: "Bakery",
+                kinds: ["food"],
+                uses: ["COMMERCE"],
+            },
+            { id: "gym", name: "Gym", kinds: ["gym"], uses: ["APPOINTMENTS"] },
+        ];
+        // Sell is turned on with the website, so a shop's template suits.
+        await open(["COMMERCE", "WEBSITE"]);
+        const group = () => {
+            const label = Array.from(sheet().querySelectorAll("span")).find(
+                (el) => el.textContent === "Starts from",
+            );
+            const el = sheet().querySelector(
+                `[role="radiogroup"][aria-labelledby="${label?.id}"]`,
+            );
+            if (!el) throw new Error("No template choice");
+            return el;
+        };
+        const radios = () =>
+            Array.from(
+                group().querySelectorAll<HTMLButtonElement>('[role="radio"]'),
+            );
+        const names = radios().map((r) => r.closest("label")?.textContent);
+        // The kind's first; Bookings is off, so not the gym's; Portfolio
+        // is not a business's.
+        expect(names).toEqual(["Starter", "BakeryUses Products"]);
+        expect(radios()[0]?.getAttribute("aria-checked")).toBe("true");
+        expect(text()).toContain("Uses Products");
+
+        await press(radios()[1]);
+        await press(button(/^Turn on/));
+        expect(enableModuleAction).toHaveBeenCalledWith("WEBSITE", {
+            siteName: "Northwind",
+            address: "northwind",
+            templateId: "bakery",
+        });
+    });
+
+    it("keeps the sentence when only the kind's template suits", async () => {
+        websiteTemplate = { id: "portfolio", name: "Portfolio" };
+        websiteKind = "WORK";
+        websiteTemplates = [
+            { id: "starter", name: "Starter", kinds: [], uses: [] },
+            { id: "portfolio", name: "Portfolio", kinds: [], uses: [] },
+        ];
+        await open(["WEBSITE"]);
+        expect(text()).toContain(
+            "Starts from the Portfolio template. Change its pages any time.",
+        );
     });
 
     it("says a refusal it can't place at the top of the sheet", async () => {

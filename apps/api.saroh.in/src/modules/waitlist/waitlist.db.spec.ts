@@ -69,6 +69,30 @@ describe("joining", () => {
         expect(second.refCode).not.toBe(first.refCode);
     });
 
+    it("keeps the gallery template a visitor saved, and only one it knows (U13)", async () => {
+        await joined({
+            email: mail("tpl"),
+            business: "Iron & Oak",
+            kind: "gym",
+            template: "gym",
+        });
+        await joined({
+            email: mail("tpl-unknown"),
+            business: "Kesar Salon",
+            kind: "salon",
+            template: "no-such-template",
+        });
+        const rows = await prisma.waitlistSignup.findMany({
+            where: { email: { in: [mail("tpl"), mail("tpl-unknown")] } },
+            select: { email: true, template: true },
+            orderBy: { position: "asc" },
+        });
+        expect(rows).toEqual([
+            { email: mail("tpl"), template: "gym" },
+            { email: mail("tpl-unknown"), template: null },
+        ]);
+    });
+
     it("treats A.B+x@gmail.com as ab@gmail.com: a repeat, no place, no new row", async () => {
         const address = `ab${process.pid}@gmail.com`;
         await joined({

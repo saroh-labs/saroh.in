@@ -25,6 +25,8 @@ import type {
 import { toPublicBooking } from "./public-booking-page";
 import type { PublicHold, PublicStaff } from "./public-bookings.service";
 import { PublicBookingsService } from "./public-bookings.service";
+import type { PublicTimetable } from "./public-timetable";
+import { PublicTimetableService, timetableIds } from "./public-timetable";
 import type { PublicToday } from "./public-today";
 import { PublicTodayService } from "./public-today";
 
@@ -199,6 +201,7 @@ export class PublicBookingPageController {
     constructor(
         private readonly bookings: PublicBookingsService,
         private readonly today: PublicTodayService,
+        private readonly timetable: PublicTimetableService,
     ) {}
 
     @Get(":siteId/booking")
@@ -221,5 +224,25 @@ export class PublicBookingPageController {
         @Ip() ip: string,
     ): Promise<PublicToday> {
         return this.today.read(siteId, hashClientIp(ip));
+    }
+
+    /**
+     * The week's class sessions for the Timetable block (industry templates
+     * U2): every class the booking page offers, or `?services=a,b` of them,
+     * for seven days, with places left. Read live, so never cached; limited
+     * per visitor like On today. The source IP is hashed here.
+     */
+    @Get(":siteId/timetable")
+    @Header("Cache-Control", "no-store")
+    timetableWeek(
+        @Param("siteId") siteId: string,
+        @Ip() ip: string,
+        @Query("services") services?: unknown,
+    ): Promise<PublicTimetable> {
+        return this.timetable.read(
+            siteId,
+            timetableIds(services),
+            hashClientIp(ip),
+        );
     }
 }

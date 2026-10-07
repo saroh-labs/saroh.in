@@ -1,11 +1,13 @@
 "use client";
 
+import { resolveVariant } from "@saroh/block-contract";
 import { Input } from "@saroh/ui/input";
 import { Textarea } from "@saroh/ui/textarea";
 
 import type { FeaturesContent } from "@/lib/sites/service";
 
 import { Field } from "./field";
+import { OptionSwitch } from "./option-switch";
 import type { SectionFieldsProps } from "./props";
 import { RepeatedItems } from "./repeated-items";
 
@@ -34,6 +36,8 @@ export function FeaturesFields({
     const c = section.content;
     const patch = (next: Partial<FeaturesContent>) =>
         onChange({ ...section, content: { ...c, ...next } });
+    const look = resolveVariant("features", c);
+    const listLook = look === "list" || look === "steps";
 
     return (
         <div className="grid gap-3">
@@ -71,6 +75,21 @@ export function FeaturesFields({
                                 placeholder="Stocked, not ordered in"
                             />
                         </Field>
+                        <Field label="Figure">
+                            <Input
+                                value={item.value ?? ""}
+                                onChange={(e) =>
+                                    set({
+                                        value: e.target.value || undefined,
+                                    })
+                                }
+                                placeholder={
+                                    look === "facts"
+                                        ? "14 years"
+                                        : "Optional. A rate or a number, set large."
+                                }
+                            />
+                        </Field>
                         <Field label="Detail">
                             <Textarea
                                 value={item.body ?? ""}
@@ -82,6 +101,25 @@ export function FeaturesFields({
                     </>
                 )}
             </RepeatedItems>
+
+            {listLook ? (
+                <OptionSwitch
+                    label="Two columns"
+                    checked={c.columns === 2}
+                    onChange={(on) => patch({ columns: on ? 2 : undefined })}
+                    note="On a desk the points sit in two columns; on a phone, one."
+                />
+            ) : null}
+            <Field label="Note under the points">
+                <Textarea
+                    value={c.note ?? ""}
+                    onChange={(e) =>
+                        patch({ note: e.target.value || undefined })
+                    }
+                    rows={2}
+                    placeholder="Optional. A caveat or disclaimer, in smaller type."
+                />
+            </Field>
         </div>
     );
 }

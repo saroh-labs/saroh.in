@@ -76,6 +76,18 @@ const heroVariants = [
         description:
             "Copy on one side, image on the other, side by side from the large breakpoint up.",
     },
+    {
+        id: "fullBleed",
+        label: "Full-bleed photo",
+        description:
+            "The photo fills the band edge to edge under a dark wash, with the headline, a line and the button over it. The site's menu sits over the photo when this hero opens the page.",
+    },
+    {
+        id: "none",
+        label: "No hero",
+        description:
+            "Just the page's heading and a line under it, small, for pages that go straight to a list.",
+    },
 ] as const;
 
 /** The single look a block has, when it honestly has one. */
@@ -181,18 +193,75 @@ export const BLOCK_META = {
                     height: 800,
                 },
             },
+            fullBleed: {
+                variant: "fullBleed",
+                heading: "Bread, the slow way",
+                subheading:
+                    "Sourdough and rye from a wood-fired oven, out by seven every morning.",
+                cta: {
+                    label: "See what's on the counter",
+                    href: "/shop",
+                    style: "link",
+                    action: { kind: "page" },
+                },
+                image: {
+                    src: "data:image/svg+xml;utf8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='1600' height='900'%3E%3Crect width='1600' height='900' fill='%236b5a48'/%3E%3Crect y='560' width='1600' height='340' fill='%233d3128'/%3E%3Cellipse cx='520' cy='560' rx='260' ry='120' fill='%23c8a06a'/%3E%3Cellipse cx='1000' cy='580' rx='220' ry='100' fill='%23b88c58'/%3E%3C/svg%3E",
+                    alt: "Loaves cooling on the counter in morning light",
+                    width: 1600,
+                    height: 900,
+                },
+                onToday: true,
+            },
+            none: {
+                variant: "none",
+                heading: "Writing",
+                subheading:
+                    "Notes on building small things, about once a month.",
+            },
+        },
+        cases: {
+            // A slot shipped as a brief (KTD-5): no photo yet, so the live
+            // site draws the band without one.
+            brief: {
+                variant: "fullBleed",
+                heading: "Bread, the slow way",
+                imageBrief:
+                    "Morning light on the counter, loaves stacked, steam rising",
+            },
         },
     },
     richText: {
         label: "Rich text",
         description:
             "A block of written copy. Sanitized at publish, so what reaches a page is already clean.",
-        variants: soleVariant("A single column of prose."),
+        /*
+         * `default` first: the centred column every text block has always
+         * been. `left` sits the same column on the page's left edge, level
+         * with the blocks around it (template polish).
+         */
+        variants: [
+            {
+                id: "default",
+                label: "Centred column",
+                description: "A single column of prose, centred on the page.",
+            },
+            {
+                id: "left",
+                label: "Left-aligned",
+                description:
+                    "The same column of prose on the page's left edge, in line with the blocks around it.",
+            },
+        ] as const,
         fixtures: {
             default: {
                 variant: "default",
                 format: "html",
                 value: "<h2>About the bakery</h2><p>We have been on the same corner since 1998.</p>",
+            },
+            left: {
+                variant: "left",
+                format: "html",
+                value: "<h2>The starter</h2><p>It was made in a rented kitchen in 2015, and it has been fed almost every evening since.</p>",
             },
         },
         cases: {
@@ -209,6 +278,24 @@ export const BLOCK_META = {
                     height: 600,
                 },
                 imageSide: "left",
+            },
+            // A case study: the photo above, parts labelled, a result boxed.
+            caseStudy: {
+                variant: "left",
+                format: "html",
+                value: "<h2>Taking a warehouse off three spreadsheets</h2><h3>The problem</h3><p>Dispatch ran on three spreadsheets that disagreed by the middle of every morning.</p><h3>What I decided</h3><p>The new system read the old sheets for six weeks, so both were true at once.</p>",
+                image: {
+                    src: "data:image/svg+xml;utf8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='1600' height='900'%3E%3Crect width='1600' height='900' fill='%23efefec'/%3E%3Crect x='160' y='140' width='1280' height='620' rx='12' fill='%23ffffff'/%3E%3Crect x='220' y='210' width='360' height='40' rx='6' fill='%2355575c'/%3E%3C/svg%3E",
+                    alt: "The dispatch board as shipped",
+                    width: 1600,
+                    height: 900,
+                },
+                imageSide: "above",
+                partLabels: true,
+                callout: {
+                    label: "What changed",
+                    text: "Dispatch moved off the spreadsheets in five months with no day of downtime.",
+                },
             },
         },
     },
@@ -258,6 +345,25 @@ export const BLOCK_META = {
             grid: { variant: "grid", images: [...GALLERY_IMAGES] },
             carousel: { variant: "carousel", images: [...GALLERY_IMAGES] },
             masonry: { variant: "masonry", images: [...GALLERY_IMAGES] },
+        },
+        cases: {
+            // A line under each photo (U2), as the studio design writes them.
+            captions: {
+                variant: "grid",
+                images: GALLERY_IMAGES.map((image, i) => ({
+                    ...image,
+                    caption: i === 0 ? "The counter, 6am" : "The deck oven",
+                })),
+            },
+            // The same lines on a bounded band over each photo (DEC-090).
+            captionsOver: {
+                variant: "grid",
+                captionPlacement: "over",
+                images: GALLERY_IMAGES.map((image, i) => ({
+                    ...image,
+                    caption: i === 0 ? "The counter, 6am" : "The deck oven",
+                })),
+            },
         },
     },
     enquiry: {
@@ -314,6 +420,18 @@ export const BLOCK_META = {
                 description:
                     "Points stacked in one column, each with room to explain itself. Better when the copy is longer than a line.",
             },
+            {
+                id: "steps",
+                label: "Numbered steps",
+                description:
+                    "Points stacked in one column, each numbered 01, 02, 03 beside its title, for something done in order.",
+            },
+            {
+                id: "facts",
+                label: "Facts row",
+                description:
+                    "Short facts side by side: each point's figure set large, its title as the label under it. For a few numbers worth knowing first.",
+            },
         ] as const,
         fixtures: {
             grid: {
@@ -352,6 +470,57 @@ export const BLOCK_META = {
                         body: "Anything stocked. Custom runs get their own date, agreed before you commit.",
                     },
                 ],
+            },
+            steps: {
+                variant: "steps",
+                heading: "How I work",
+                intro: "Three stages, and the whole of the first one is listening.",
+                items: [
+                    {
+                        title: "We talk first",
+                        body: "What you eat, when, who cooks it, and what has already been tried.",
+                    },
+                    {
+                        title: "We change three things",
+                        body: "Not thirty. Three changes you can make, written down in plain language.",
+                    },
+                    {
+                        title: "We check in",
+                        body: "To see what held and what did not, and change the ones that did not.",
+                    },
+                ],
+            },
+            facts: {
+                variant: "facts",
+                items: [
+                    { title: "In practice", value: "14 years" },
+                    { title: "First consultation", value: "45 min" },
+                    {
+                        title: "Consultations in",
+                        value: "Hindi, English, Marathi",
+                    },
+                ],
+            },
+        },
+        cases: {
+            // A figure per point, the merchant's own (a rate), and a note.
+            values: {
+                variant: "list",
+                heading: "What I charge",
+                columns: 2,
+                items: [
+                    {
+                        title: "Day rate",
+                        value: "Your day rate",
+                        body: "For short pieces of work and reviews.",
+                    },
+                    {
+                        title: "Project",
+                        value: "Your usual range",
+                        body: "Fixed price after a paid week of scoping.",
+                    },
+                ],
+                note: "Scoping weeks are paid, and the fee comes off the project if you go ahead.",
             },
         },
     },
@@ -471,10 +640,36 @@ export const BLOCK_META = {
         label: "Services",
         description:
             "Your bookable services with their duration and price, kept current from Appointments.",
-        variants: soleVariant(
-            "Services in a list, each with its duration and price.",
-        ),
+        variants: [
+            {
+                id: "default",
+                label: "Services",
+                description:
+                    "Services in a list, each with its duration and price.",
+            },
+            {
+                id: "priceCard",
+                label: "One price",
+                description:
+                    "One appointment as a card — its price set large, how long it takes and a button — beside what it includes. For a practice with a single consultation.",
+            },
+        ] as const,
         fixtures: {
+            priceCard: {
+                variant: "priceCard",
+                heading: "One consultation",
+                intro: "There is one appointment type and one price. If a follow-up is useful I will say so at the end of the first one.",
+                serviceIds: ["fixture-consult"],
+                buttonLabel: "Ask for a time",
+                modeLine: "In person, or by video",
+                followUpLine:
+                    "Follow-ups are shorter and usually six weeks apart.",
+                includesLabel: "What it includes",
+                includes: [
+                    "A written plan afterwards, in plain language",
+                    "Review of any blood work or notes you bring",
+                ],
+            },
             default: {
                 variant: "default",
                 heading: "Services",
@@ -516,12 +711,31 @@ export const BLOCK_META = {
         label: "Journal",
         description:
             "The site's latest published posts, newest first, read live from the posts the site owns.",
-        variants: soleVariant(
-            "Cards with a photo, the author and date, the title and an excerpt, linking to each post.",
-        ),
+        variants: [
+            {
+                id: "default",
+                label: "Latest posts",
+                description:
+                    "Cards with a photo, the author and date, the title and an excerpt, linking to each post.",
+            },
+            {
+                id: "archive",
+                label: "Archive",
+                description:
+                    "Every published post as a dated list: the date in a column, the title and its line beside it.",
+            },
+            {
+                id: "lead",
+                label: "Lead piece",
+                description:
+                    "The newest post in depth: its title set large, its opening paragraphs and Continue reading. For a site that is mostly writing.",
+            },
+        ] as const,
         fixtures: {
             // The catalog and the snapshot hand the component sample posts.
             default: { variant: "default", title: "Journal", count: 3 },
+            archive: { variant: "archive", title: "All writing" },
+            lead: { variant: "lead" },
         },
         cases: {
             // Two rows, words only: the switches off and the larger count.
@@ -531,6 +745,22 @@ export const BLOCK_META = {
                 count: 6,
                 showExcerpts: false,
                 showImages: false,
+            },
+            // The archive by year, with the total, after a lead (template polish).
+            byYear: {
+                variant: "archive",
+                title: "Archive",
+                afterLead: true,
+                groupByYear: true,
+                showTotal: true,
+                showExcerpts: false,
+            },
+            // The newest few with a link to all of them, dates without the year.
+            latest: {
+                variant: "archive",
+                title: "From the bakery",
+                archiveLimit: 3,
+                shortDates: true,
             },
         },
     },
@@ -554,18 +784,43 @@ export const BLOCK_META = {
                 buttonLabel: "Ask to join",
                 showDescriptions: false,
             },
+            // A line under the title, the merchant's own (template polish).
+            intro: {
+                variant: "default",
+                title: "What it costs",
+                intro: "No joining fee, and nothing that renews without telling you.",
+            },
         },
     },
     productGrid: {
         label: "Product grid",
         description:
             "Products from the catalogue, the newest, a collection's or hand-picked, read live from the storefront the site sells from.",
-        variants: soleVariant(
-            "Cards with a photo, the options it comes in, the name, a line about it and the price, each opening its product page.",
-        ),
+        variants: [
+            {
+                id: "default",
+                label: "Even grid",
+                description:
+                    "Cards with a photo, the options it comes in, the name, a line about it and the price, each opening its product page.",
+            },
+            {
+                id: "lead",
+                label: "Lead piece",
+                description:
+                    "The first product takes twice the room, with tall photos and the price set large. One column on a phone.",
+            },
+            {
+                id: "plates",
+                label: "Plates",
+                description:
+                    "Photos in fixed-height cells with hairlines between, the first twice the room; the name, a line and a small price sit on a band over each photo.",
+            },
+        ] as const,
         fixtures: {
             // The catalog and the snapshot hand the component sample products.
             default: { variant: "default", title: "From the counter" },
+            lead: { variant: "lead", title: "On the counter today" },
+            plates: { variant: "plates", title: "Current collection" },
         },
         cases: {
             // Hand-picked, two of them, no prices.
@@ -576,6 +831,14 @@ export const BLOCK_META = {
                 productIds: ["sample-sourdough", "sample-croissant"],
                 count: 2,
                 showPrices: false,
+            },
+            // Bare cards, a count of what is left and a note (template polish).
+            bare: {
+                variant: "default",
+                title: "Today's bread",
+                cardStyle: "bare",
+                showAvailability: true,
+                note: "Baked this morning. What is gone usually goes before ten.",
             },
         },
     },
@@ -623,8 +886,80 @@ export const BLOCK_META = {
                 description:
                     "One project per row, the photo on the left. Better for a longer line about each.",
             },
+            {
+                id: "rhythm",
+                label: "Rhythm",
+                description:
+                    "Photos at changing sizes: a wide lead, then an equal pair, then a portrait beside a landscape, and on in that pattern. For work best judged by its photographs.",
+            },
+            {
+                id: "rows",
+                label: "Rows",
+                description:
+                    "Hairline rows with no photos, like a CV: the year, then the work and a line about it, then your role.",
+            },
         ] as const,
         fixtures: {
+            rhythm: {
+                variant: "rhythm",
+                title: "Work",
+                captionPlacement: "over",
+                items: [
+                    {
+                        ...PROJECT_ITEMS[0],
+                        caption: "Identity, packaging · 2026",
+                    },
+                    {
+                        ...PROJECT_ITEMS[1],
+                        caption: "Menus, signage · 2025",
+                    },
+                    {
+                        ...PROJECT_ITEMS[0],
+                        title: "A shopfront in Bandra",
+                        caption: "Signage · 2025",
+                    },
+                    {
+                        ...PROJECT_ITEMS[1],
+                        title: "Labels for a ceramics studio",
+                        caption: "Print · 2024",
+                    },
+                    {
+                        ...PROJECT_ITEMS[0],
+                        title: "A van livery",
+                        caption: "Identity, livery · 2024",
+                    },
+                ],
+            },
+            rows: {
+                variant: "rows",
+                title: "Work",
+                showCount: true,
+                items: [
+                    {
+                        year: "2026",
+                        title: "A dispatch board for a wholesaler",
+                        summary:
+                            "Replaced three spreadsheets and a group chat with one board the warehouse uses.",
+                        meta: "Go · Postgres · React",
+                        role: "Sole engineer",
+                        link: "https://example.com/dispatch",
+                    },
+                    {
+                        year: "2024",
+                        title: "Ordering for a café group",
+                        summary:
+                            "The ordering and payments layer behind eleven outlets.",
+                        meta: "TypeScript · Postgres",
+                        role: "Lead, team of 3",
+                    },
+                    {
+                        year: "2019–2022",
+                        title: "Payments infrastructure",
+                        meta: "Go · Kafka",
+                        role: "Senior engineer",
+                    },
+                ],
+            },
             cards: {
                 variant: "cards",
                 title: "Selected work",
@@ -634,6 +969,209 @@ export const BLOCK_META = {
                 variant: "list",
                 title: "Selected work",
                 items: PROJECT_ITEMS.map((item) => ({ ...item })),
+            },
+        },
+        cases: {
+            // A line under each photo (U2), and a slot shipped as a brief.
+            captions: {
+                variant: "cards",
+                title: "Selected work",
+                items: [
+                    { ...PROJECT_ITEMS[0], caption: "Photographed on site" },
+                    {
+                        title: "A shopfront in Bandra",
+                        imageBrief: "The finished shopfront at dusk",
+                    },
+                ],
+            },
+            // Title and caption over the photo, the studio's work (DEC-090).
+            captionsOver: {
+                variant: "cards",
+                title: "Selected work",
+                captionPlacement: "over",
+                items: [
+                    { ...PROJECT_ITEMS[0], caption: "Photographed on site" },
+                ],
+            },
+        },
+    },
+    timetable: {
+        label: "Timetable",
+        description:
+            "The week's classes, day by day, with who takes each and the places left, read live from the booking page.",
+        /*
+         * `grid` first: it is the design's look, and it becomes the list on a
+         * phone anyway, so neither demands more content than the other.
+         */
+        variants: [
+            {
+                id: "grid",
+                label: "Week grid",
+                description:
+                    "Days across, times down, each class in its cell with who takes it and the places left. Day by day on a phone.",
+            },
+            {
+                id: "list",
+                label: "Day by day",
+                description:
+                    "Each day in turn, its classes one per row. Better for a short week.",
+            },
+            {
+                id: "accent",
+                label: "Bold week",
+                description:
+                    "The week grid with the classes that fill set on your accent colour, still saying Fills fast or Full, and times in a clock face. Day by day on a phone.",
+            },
+        ] as const,
+        fixtures: {
+            // The catalog and the snapshot hand the component a sample week.
+            grid: { variant: "grid", title: "This week" },
+            list: { variant: "list", title: "This week" },
+            accent: {
+                variant: "accent",
+                title: "This week",
+                intro: "No contract. Book from your phone on the way in.",
+                weekdaysOnly: true,
+                showCounts: true,
+            },
+        },
+    },
+    hours: {
+        label: "Opening hours",
+        description:
+            "The week's opening hours as a table, read live from Settings › Hours. Closed days are said, not left out.",
+        variants: soleVariant(
+            "A table of the seven days and their hours, today marked, closed days muted but stated.",
+        ),
+        fixtures: {
+            // The catalog and the snapshot hand the component a sample week.
+            default: { variant: "default", title: "Opening hours" },
+        },
+        cases: {
+            // Days in a row with the same hours on one line, the address under.
+            grouped: {
+                variant: "default",
+                title: "Come in the morning",
+                groupDays: true,
+                showAddress: true,
+            },
+        },
+    },
+    person: {
+        label: "Person",
+        description:
+            "One practitioner: a photo, their name, what they do, their qualifications and a few lines about them.",
+        /*
+         * `default` first: it needs nothing the others do not. `portrait`
+         * is the practitioner's page opening (a narrow portrait column with
+         * the qualifications under it); `team` lays several people out.
+         */
+        variants: [
+            {
+                id: "default",
+                label: "Photo beside",
+                description:
+                    "The photo beside the words, stacking on a phone; qualifications as a list.",
+            },
+            {
+                id: "portrait",
+                label: "Portrait column",
+                description:
+                    "A narrow portrait with the qualifications under it, the name, role and words beside. For a practitioner's page that opens on them.",
+            },
+            {
+                id: "team",
+                label: "Team",
+                description:
+                    "Several people side by side, each with a tall photo, their name, what they do and a line about them. Four across on a desk, two on a phone.",
+            },
+        ] as const,
+        fixtures: {
+            portrait: {
+                variant: "portrait",
+                asTitle: true,
+                image: {
+                    src: "data:image/svg+xml;utf8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='800' height='1000'%3E%3Crect width='800' height='1000' fill='%23edf2ec'/%3E%3Ccircle cx='400' cy='380' r='150' fill='%23a8b5a4'/%3E%3Crect x='200' y='580' width='400' height='420' rx='180' fill='%238a9a86'/%3E%3C/svg%3E",
+                    alt: "Portrait of the dietician, seated",
+                    width: 800,
+                    height: 1000,
+                },
+                name: "Dr Anika Rao",
+                role: "Registered dietician · Pune",
+                credentialsLabel: "Qualifications",
+                credentials: [
+                    {
+                        title: "MSc Clinical Nutrition",
+                        detail: "A university, and the year",
+                    },
+                    {
+                        title: "Registered Dietitian",
+                        detail: "The body you are registered with",
+                    },
+                ],
+                bio: "I see people who have been told to change how they eat and have not been told how.\nMy work is mostly translation: from what you already eat to the smallest change that makes a difference.",
+            },
+            team: {
+                variant: "team",
+                title: "Who is coaching",
+                name: "Devika Rane",
+                role: "Strength",
+                bio: "Coaches the barbell sessions.",
+                image: {
+                    src: "data:image/svg+xml;utf8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='600' height='800'%3E%3Crect width='600' height='800' fill='%23171715'/%3E%3Ccircle cx='300' cy='300' r='110' fill='%23595954'/%3E%3Crect x='150' y='450' width='300' height='350' rx='140' fill='%23454541'/%3E%3C/svg%3E",
+                    alt: "Devika beside a loaded bar, coaching",
+                    width: 600,
+                    height: 800,
+                },
+                people: [
+                    {
+                        name: "Arjun Patel",
+                        role: "Conditioning",
+                        bio: "Runs the lunchtime thirties.",
+                    },
+                    {
+                        name: "Ritu Bansal",
+                        role: "Mobility",
+                        bio: "Thursday mornings.",
+                    },
+                    {
+                        name: "Sameer Khan",
+                        role: "Boxing",
+                        bio: "Pads on Wednesdays.",
+                    },
+                ],
+            },
+            default: {
+                variant: "default",
+                image: {
+                    src: "data:image/svg+xml;utf8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='800' height='1000'%3E%3Crect width='800' height='1000' fill='%23d8d2c4'/%3E%3Ccircle cx='400' cy='380' r='150' fill='%23a89a84'/%3E%3Crect x='200' y='580' width='400' height='420' rx='180' fill='%238a7d68'/%3E%3C/svg%3E",
+                    alt: "Portrait of the dietician at her desk",
+                    width: 800,
+                    height: 1000,
+                },
+                name: "Dr Anika Rao",
+                role: "Clinical dietician",
+                credentials: [
+                    "MSc Clinical Nutrition",
+                    "Registered Dietitian",
+                    "12 years in hospital practice",
+                ],
+                bio: "I help people eat for the conditions they live with: diabetes, PCOS, kidney care.\nEvery plan starts with what you already cook.",
+                cta: {
+                    label: "Book a consultation",
+                    href: "/book",
+                    style: "primary",
+                    action: { kind: "page" },
+                },
+            },
+        },
+        cases: {
+            // Words only, as a template ships it before the photo (KTD-5).
+            brief: {
+                variant: "default",
+                imageBrief: "A plain portrait, natural light, at the desk",
+                name: "Dr Anika Rao",
+                role: "Clinical dietician",
             },
         },
     },

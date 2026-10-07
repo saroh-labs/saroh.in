@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import type { RenderedServicesList } from "@saroh/block-contract";
+import { resolveVariant } from "@saroh/block-contract";
 
 import { destructiveAlertClasses } from "../alert";
 import { DEFAULT_API_URL } from "../api-url";
@@ -158,6 +159,17 @@ export default function ServicesListSection({
     };
 
     if (state.kind === "ready" && state.services.length === 0) return null;
+    // One appointment, one price (template polish).
+    if (resolveVariant("servicesList", content) === "priceCard") {
+        return (
+            <PriceCardSection
+                content={content}
+                state={state}
+                retry={retry}
+                bookHref={bookHref}
+            />
+        );
+    }
 
     const showPrices = content.showPrices !== false;
     const showDescriptions = content.showDescriptions !== false;
@@ -175,7 +187,10 @@ export default function ServicesListSection({
             }
         >
             {content.heading ? (
-                <h2 className="text-site-fg text-[calc(1.875rem*var(--site-heading-scale))] font-bold tracking-tight">
+                <h2
+                    data-site-title=""
+                    className="font-site-heading text-site-fg text-[calc(1.875rem*var(--site-heading-scale))] font-bold tracking-tight"
+                >
                     {content.heading}
                 </h2>
             ) : null}
@@ -232,7 +247,7 @@ export default function ServicesListSection({
                                     className="border-site-border flex flex-wrap items-baseline justify-between gap-x-6 gap-y-1 border-b py-5"
                                 >
                                     <div className="min-w-0 flex-1">
-                                        <h3 className="text-site-fg text-[calc(1.125rem*var(--site-heading-scale))] font-semibold">
+                                        <h3 className="font-site-heading text-site-fg text-[calc(1.125rem*var(--site-heading-scale))] font-semibold">
                                             {service.name}
                                         </h3>
                                         {showDescriptions &&
@@ -376,5 +391,187 @@ function ServiceCards({
                 );
             })}
         </ul>
+    );
+}
+
+/**
+ * The `priceCard` look (template polish), as the dietician design sets out
+ * its one consultation: on the left the heading, the intro and what the
+ * appointment includes (rows under a label, hairlines between); on the
+ * right a card for the first service still offered — its name, its price
+ * set large in the heading face with "for 45 minutes", the merchant's mode
+ * line, a full-width button and their follow-up line. The price and the
+ * duration are always the service's own, read live; the lines around them
+ * are the merchant's words. With no price set the card says how long it
+ * takes and nothing about cost. On a phone the card follows the words.
+ */
+function PriceCardSection({
+    content,
+    state,
+    retry,
+    bookHref,
+}: {
+    content: RenderedServicesList;
+    state: LoadState;
+    retry: () => void;
+    bookHref?: string;
+}) {
+    const heading = said(content.heading);
+    const intro = said(content.intro);
+    const includes = (content.includes ?? [])
+        .map((line) => line.trim())
+        .filter(Boolean);
+    const includesLabel = said(content.includesLabel);
+    const words = heading !== null || intro !== null || includes.length > 0;
+    const service = state.kind === "ready" ? state.services[0] : undefined;
+
+    const card =
+        state.kind === "loading" ? (
+            <p className="text-site-muted text-sm">Loading…</p>
+        ) : state.kind === "error" ? (
+            <div>
+                <p role="alert" className={destructiveAlertClasses}>
+                    We couldn&apos;t load this right now — please try again
+                    shortly.
+                </p>
+                <button
+                    type="button"
+                    onClick={retry}
+                    className={cn(ctaClasses("secondary"), "mt-3")}
+                >
+                    Try again
+                </button>
+            </div>
+        ) : service ? (
+            <PriceCard
+                content={content}
+                service={service}
+                bookHref={bookHref}
+            />
+        ) : null;
+
+    return (
+        <section className="text-site-fg mx-auto w-full max-w-screen-xl px-5 py-[var(--site-section-padding)] sm:px-[var(--site-page-margin)]">
+            <div
+                className={
+                    words
+                        ? "grid items-start gap-10 md:grid-cols-[minmax(0,1fr)_316px] md:gap-14"
+                        : "max-w-[316px]"
+                }
+            >
+                {words ? (
+                    <div className="min-w-0">
+                        {heading ? (
+                            <h2
+                                data-site-title=""
+                                className="font-site-heading text-[calc(1.6875rem*var(--site-heading-scale))] font-semibold tracking-[-0.01em]"
+                            >
+                                {heading}
+                            </h2>
+                        ) : null}
+                        {intro ? (
+                            <p className="text-site-body mt-3 max-w-[var(--site-measure,62ch)] whitespace-pre-line text-[length:var(--site-body-size,1rem)] leading-relaxed">
+                                {intro}
+                            </p>
+                        ) : null}
+                        {includes.length > 0 ? (
+                            <div className="mt-7">
+                                {includesLabel ? (
+                                    <p className="text-site-muted mb-2 text-[12px] font-semibold uppercase tracking-[0.1em]">
+                                        {includesLabel}
+                                    </p>
+                                ) : null}
+                                <ul aria-label={includesLabel ?? undefined}>
+                                    {includes.map((line, i) => (
+                                        <li
+                                            key={i}
+                                            className="border-site-border text-site-body border-t py-2.5 text-[15px] leading-snug"
+                                        >
+                                            {line}
+                                        </li>
+                                    ))}
+                                </ul>
+                            </div>
+                        ) : null}
+                    </div>
+                ) : null}
+                {card}
+            </div>
+        </section>
+    );
+}
+
+function PriceCard({
+    content,
+    service,
+    bookHref,
+}: {
+    content: RenderedServicesList;
+    service: PublicService;
+    bookHref?: string;
+}) {
+    const price =
+        content.showPrices !== false
+            ? formatPrice(service.priceCents, service.currency)
+            : null;
+    const duration = formatDuration(service.durationMinutes);
+    const mode = said(content.modeLine);
+    const followUp = said(content.followUpLine);
+    const words = said(content.buttonLabel) ?? "Book";
+    const button = cn(
+        "inline-flex min-h-11 w-full items-center justify-center rounded-[var(--site-radius)] bg-site-accent px-4 text-[15px] font-semibold text-site-accent-fg",
+    );
+    return (
+        <div
+            data-price-card=""
+            className="border-site-border bg-site-surface rounded-[calc(var(--site-radius)*1.4)] border p-6"
+        >
+            <h3 className="text-site-muted text-[12px] font-semibold uppercase tracking-[0.1em]">
+                {service.name}
+            </h3>
+            {price ? (
+                <p className="mt-3 flex flex-wrap items-baseline gap-x-2">
+                    <span className="font-site-heading text-[calc(2.25rem*var(--site-heading-scale))] font-medium tabular-nums leading-none tracking-[-0.02em]">
+                        {price}
+                    </span>
+                    <span className="text-site-muted text-[14px]">
+                        for {duration}
+                    </span>
+                </p>
+            ) : (
+                <p className="font-site-heading mt-3 text-[calc(1.5rem*var(--site-heading-scale))] font-medium">
+                    {duration}
+                </p>
+            )}
+            {mode ? (
+                <p className="text-site-body mt-2 text-[14px]">{mode}</p>
+            ) : null}
+            <div className="mt-5">
+                {content.cta ? (
+                    <CtaButton content={content.cta} />
+                ) : bookHref ? (
+                    <a
+                        href={serviceHref(bookHref, service.id)}
+                        aria-label={`${words}: ${service.name}`}
+                        className={cn(
+                            button,
+                            "cursor-pointer transition-opacity hover:opacity-90",
+                            focusRing,
+                        )}
+                    >
+                        {words}
+                    </a>
+                ) : (
+                    // The editor's canvas has no booking page: the words
+                    // show, and go nowhere.
+                    <span className={button}>{words}</span>
+                )}
+            </div>
+            {followUp ? (
+                <p className="text-site-muted mt-3 text-[13px] leading-relaxed">
+                    {followUp}
+                </p>
+            ) : null}
+        </div>
     );
 }

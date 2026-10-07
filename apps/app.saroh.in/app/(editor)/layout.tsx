@@ -1,6 +1,8 @@
 import type { ReactNode } from "react";
 
 import { ModuleGate } from "@/components/modules/module-gate";
+import { SiteFacesProvider } from "@/components/sites/site-faces";
+import { SITE_FACES } from "@/lib/sites/site-fonts";
 
 /**
  * Full-screen editing surfaces.
@@ -16,5 +18,10 @@ import { ModuleGate } from "@/components/modules/module-gate";
  * the capability check behind (§21).
  */
 export default function EditorLayout({ children }: { children: ReactNode }) {
-    return <ModuleGate moduleKey="WEBSITE">{children}</ModuleGate>;
+    // The merchant faces, so the preview shows the site's chosen typeface.
+    return (
+        <ModuleGate moduleKey="WEBSITE">
+            <SiteFacesProvider faces={SITE_FACES}>{children}</SiteFacesProvider>
+        </ModuleGate>
+    );
 }

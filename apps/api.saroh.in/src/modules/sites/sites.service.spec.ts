@@ -22,9 +22,11 @@ jest.mock("@saroh/database", () => {
             findMany: jest.fn(),
             count: jest.fn(),
             create: jest.fn(),
+            // A template's other pages go in its menu.
+            update: jest.fn(),
         },
         page: {
-            create: jest.fn(),
+            create: jest.fn(async () => ({ id: "page_1" })),
         },
         // Addresses held after a change (DEC-069, L1): none here.
         addressReservation: {
@@ -328,6 +330,21 @@ describe("SitesService.createFromTemplate", () => {
         });
     });
 
+    it("records the template a site was asked to be made from (KTD-7)", async () => {
+        // Personal has an enquiry section, which gets its Form.
+        (prisma.form.create as jest.Mock).mockResolvedValue({ id: "form_1" });
+        await service.createFromTemplate(ctx(), {
+            name: "Acme",
+            templateId: "personal",
+        });
+
+        expect(siteCreate.mock.calls[0][0].data).toMatchObject({
+            templateId: "personal",
+            templateVersion: 1,
+            templateStyleId: null,
+        });
+    });
+
     it("creates a Site + Pages + DRAFT PageVersions + Sections in one org-scoped transaction from the real starter template", async () => {
         const dto: CreateSiteFromTemplateDto = { name: "Acme" };
 
@@ -346,6 +363,10 @@ describe("SitesService.createFromTemplate", () => {
                 slug: "acme",
                 // Never without an address (L5): the business's own.
                 subdomain: "acme",
+                // The template it came from (KTD-7): the kind's default.
+                templateId: STARTER_TEMPLATE_ID,
+                templateVersion: 2,
+                templateStyleId: null,
                 storefrontId: null,
             },
             select: { id: true, slug: true },

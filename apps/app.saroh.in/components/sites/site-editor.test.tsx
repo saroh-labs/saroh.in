@@ -120,7 +120,14 @@ function hero(key: string, heading: string): Section {
 
 const SECTIONS: Section[] = [hero("s1", "Welcome in"), hero("s2", "Our story")];
 
-const STYLE_OPTIONS: SiteStyleOptions = { rows: [], scalars: [] };
+const STYLE_OPTIONS: SiteStyleOptions = {
+    rows: [],
+    scalars: [],
+    fontPairs: [
+        { key: "system", name: "Your visitor's system font" },
+        { key: "newsreader", name: "Newsreader" },
+    ],
+};
 const NO_FLAGS: SiteFlags = { flags: [], awaitingNavigation: [] };
 const REVIEW: ReviewState = {
     openNotes: 0,
@@ -560,13 +567,31 @@ describe("SiteEditor shell", () => {
         const { siteId } = render();
         click(button("Brand"));
         expect(button("Brand").getAttribute("aria-selected")).toBe("true");
-        expect(host.textContent).toContain("plain system font");
+        // The typeface choice (KTD-2), the default chosen.
+        expect(host.textContent).toContain("Typeface");
+        expect(
+            host.querySelector('[role="radio"][aria-checked="true"]')
+                ?.textContent,
+        ).toBe("Your visitor's system font");
         expect(() => button("Header")).toThrow();
         // Remembered, so a reload comes back to it as it did to Style.
         expect(prefs.getPlace(siteId, SECTIONS.length).rail).toBe("style");
         click(button("Page"));
         expect(button("Page").getAttribute("aria-selected")).toBe("true");
         expect(button("Header")).toBeTruthy();
+    });
+
+    it("saves a typeface chosen in the Brand tab through the style save", async () => {
+        actions.updateSiteStyle.mockResolvedValue({ ok: true });
+        render();
+        click(button("Brand"));
+        click(button("Newsreader"));
+        expect(button("Newsreader").getAttribute("aria-checked")).toBe("true");
+        await wait(700);
+        expect(actions.updateSiteStyle).toHaveBeenCalledWith(
+            expect.any(String),
+            expect.objectContaining({ fontPair: "newsreader" }),
+        );
     });
 
     it("shows the Add tab and adds a block after the selected one", () => {

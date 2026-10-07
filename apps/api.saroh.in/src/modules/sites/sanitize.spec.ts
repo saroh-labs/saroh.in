@@ -76,6 +76,14 @@ describe("sanitizeRichHtml", () => {
         expect(out).toContain('colspan="2"');
     });
 
+    it("keeps a definition list, and drops what it does not allow inside", () => {
+        const html =
+            '<dl class="x" onclick="steal()"><dt>Clay</dt><dd>Stoneware <script>x()</script></dd></dl>';
+        expect(sanitizeRichHtml(html)).toBe(
+            "<dl><dt>Clay</dt><dd>Stoneware </dd></dl>",
+        );
+    });
+
     it("is stable on a second pass, so sanitizing on save and again at publish changes nothing", () => {
         const once = sanitizeRichHtml(
             '<p style="text-align: right"><mark data-color="#bbf7d0" style="background-color: #bbf7d0; color: inherit">a &lt; b</mark> <a href="https://x.test" target="_blank">link</a></p>',

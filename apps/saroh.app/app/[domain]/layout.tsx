@@ -20,6 +20,7 @@ import { getCatalogue } from "@/lib/catalogue";
 import { customerReader } from "@/lib/customer-reader";
 import { getSignedInCustomer } from "@/lib/customer-session";
 import { headerAction } from "@/lib/header-action";
+import { liveMenu } from "@/lib/in-page-menu";
 import {
     getMovedTo,
     getPublicationForHost,
@@ -36,6 +37,7 @@ import { getTestRelease, rootDomain } from "@/lib/test-release";
 import { HEADER_BELOW_BAR } from "@/lib/test-release-chrome";
 import { SiteFooter, SiteHeader } from "@saroh/site-blocks";
 
+import { SITE_FACES } from "@/lib/site-fonts";
 import {
     loadSignInOptions,
     requestSignInCode,
@@ -181,13 +183,15 @@ export default async function SiteLayout({
      * from the catalogue's answer, and waiting for it would add a round
      * trip to every page of a site that sells.
      */
-    const [booking, catalogue, checkout] = siteId
-        ? await Promise.all([
-              getBookingPage(siteId),
-              getCatalogue(siteId),
-              getCheckoutOptions(siteId),
-          ])
-        : [null, null, null];
+    const [booking, catalogue, checkout, navigation] = await Promise.all([
+        siteId ? getBookingPage(siteId) : null,
+        siteId ? getCatalogue(siteId) : null,
+        siteId ? getCheckoutOptions(siteId) : null,
+        // The menu less entries to home sections with nothing to show now
+        // (a Journal with no posts, Plans with none on sale): read beside
+        // the rest, not after it.
+        liveMenu(snapshot, siteId),
+    ]);
     const shopServes = catalogue?.ok ?? false;
     const action = headerAction({ booking, shopServes });
 
@@ -279,7 +283,10 @@ export default async function SiteLayout({
                         <style>{HEADER_BELOW_BAR}</style>
                     </>
                 ) : null}
-                <SiteTheme variables={snapshot.site.styleVariables} />
+                <SiteTheme
+                    variables={snapshot.site.styleVariables}
+                    faces={SITE_FACES}
+                />
                 {/* The account area draws its own compact header and no
                 footer (DEC-073 #10): the frame leaves these out there. */}
                 <SiteChromeFrame
@@ -287,7 +294,7 @@ export default async function SiteLayout({
                     header={
                         <SiteHeader
                             name={snapshot.site.name}
-                            navigation={snapshot.site.navigation ?? []}
+                            navigation={navigation}
                             // A module page leaves the menu while its module is
                             // off (G15).
                             modules={resolved.modules}

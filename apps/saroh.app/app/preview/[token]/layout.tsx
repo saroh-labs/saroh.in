@@ -4,7 +4,9 @@ import { notFound } from "next/navigation";
 import { SiteTheme } from "@saroh/site-blocks";
 
 import { PreviewGone } from "@/components/preview-gone";
+import { previewMenu } from "@/lib/in-page-menu";
 import { getPreviewByToken } from "@/lib/publication";
+import { SITE_FACES } from "@/lib/site-fonts";
 import { SiteFooter, SiteHeader } from "@saroh/site-blocks";
 
 /**
@@ -47,14 +49,19 @@ export default async function PreviewLayout({
 
     const base = `/preview/${encodeURIComponent(token)}`;
     const { snapshot, siteName, expiresAt, modules } = preview;
+    // Less entries to home sections with nothing to show now (G10, G9…).
+    const navigation = await previewMenu(snapshot, preview.siteId, token);
 
     return (
         <div className="min-h-screen bg-site-bg text-site-body">
             <PreviewBar siteName={siteName} expiresAt={expiresAt} />
-            <SiteTheme variables={snapshot.site.styleVariables} />
+            <SiteTheme
+                variables={snapshot.site.styleVariables}
+                faces={SITE_FACES}
+            />
             <SiteHeader
                 name={snapshot.site.name}
-                navigation={snapshot.site.navigation ?? []}
+                navigation={navigation}
                 // The menu the live site would draw now (G19): a module
                 // page whose module is off is out of it here too.
                 modules={modules}

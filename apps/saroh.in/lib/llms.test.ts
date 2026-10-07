@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import { summarise } from "@/content/help";
 import type { PublishContext } from "@/content/resources";
+import { galleryTemplates } from "@/content/templates";
 
 import { helpArticles } from "./help-docs";
 import { llmsText } from "./llms";
@@ -107,6 +108,27 @@ describe("llmsText", () => {
         expect(paths).toContain("/help");
         expect(paths.some((p) => p.startsWith("/help/"))).toBe(false);
         expect(paths).not.toContain("/tools/link-preview");
+    });
+
+    it("lists the Templates gallery and each template from 17 Oct, once built", () => {
+        const routes = [...ALL_ROUTES, "/templates", "/templates/[slug]"];
+        const before = linked(llmsText(BASE, at(BEFORE, { routes }), articles));
+        expect(before.some((p) => p.startsWith("/templates"))).toBe(false);
+        const text = llmsText(BASE, at(AFTER, { routes }), articles);
+        const paths = linked(text);
+        expect(paths).toContain("/templates");
+        expect(text).toContain("## Templates");
+        for (const t of galleryTemplates()) {
+            expect(text).toContain(
+                `- [${t.name}](${BASE}/templates/${t.slug}): ${t.description}`,
+            );
+        }
+        // Not built in this build: neither the page nor its templates.
+        expect(
+            linked(llmsText(BASE, at(AFTER), articles)).some((p) =>
+                p.startsWith("/templates"),
+            ),
+        ).toBe(false);
     });
 
     it("gives every link a one-line description", () => {

@@ -73,6 +73,8 @@ export interface JoinBody {
     plan?: string;
     source: string;
     ref?: string;
+    /** A gallery template's slug (`?template=`); the API keeps only one it knows. */
+    template?: string;
     /** Two letters, from the host's view of the connection. */
     country?: string;
 }
@@ -105,6 +107,7 @@ export function joinBody(posted: unknown): JoinBody | null {
         plan: text(p.plan, 10),
         source: text(p.src, 64) ?? "direct",
         ref: text(p.ref, 64),
+        template: text(p.template, 40),
     };
 }
 

@@ -12,8 +12,21 @@
  * and a merchant's storefront must never inherit it. Gate G1 enforces this;
  * it is not a convention.
  */
-export { PageSections, default as SectionRenderer } from "./section-renderer";
+export {
+    PageSections,
+    default as SectionRenderer,
+    opensOverPhoto,
+} from "./section-renderer";
 export type { Section } from "./section-renderer";
+// A business's live data given to a whole page (template renders, U14).
+export type { SiteFixtures } from "./site-fixtures";
+// Server-safe: which sections are known to draw nothing, for the menu.
+export {
+    FEED_BACKED_SECTIONS,
+    sectionRendersNothing,
+    withoutEmptyInPageEntries,
+} from "./section-empty";
+export type { FeedsFor, SectionFeeds } from "./section-empty";
 
 export {
     BlockFixturePreview,
@@ -21,6 +34,7 @@ export {
     SAMPLE_POSTS,
     SAMPLE_PRODUCTS,
     SAMPLE_SERVICES,
+    SAMPLE_TIMETABLE,
     SAMPLE_VISIT,
 } from "./block-fixture-preview";
 export { default as BookingSection } from "./blocks/booking";
@@ -33,6 +47,18 @@ export { default as FaqSection } from "./blocks/faq";
 export { default as FeaturesSection } from "./blocks/features";
 export { default as GallerySection } from "./blocks/gallery";
 export { default as HeroSection } from "./blocks/hero";
+export { default as FullBleedHero } from "./blocks/hero-full-bleed";
+export {
+    HOURS_TITLE,
+    default as HoursSection,
+    hoursRows,
+} from "./blocks/hours";
+export { default as PersonSection } from "./blocks/person";
+export {
+    TIMETABLE_TITLE,
+    default as TimetableSection,
+} from "./blocks/timetable";
+// Server-safe: the Timetable read's shape, check and words.
 export {
     default as JournalSection,
     postExcerpt,
@@ -53,6 +79,14 @@ export {
     packEyebrow,
     packPerClass,
 } from "./blocks/packs";
+export {
+    dayLabel,
+    isPublicTimetable,
+    placesWord,
+    sessionHref,
+    timetableQuery,
+} from "./lib/timetable-read";
+export type { PublicTimetable, TimetableSession } from "./lib/timetable-read";
 // Called by saroh.app's server: from a module with no "use client".
 export type { PacksFeed, PublicPack } from "./blocks/packs";
 export {
@@ -375,20 +409,34 @@ export { destructiveAlertClasses } from "./alert";
 export { DEFAULT_API_URL } from "./api-url";
 export { cn } from "./lib/utils";
 export {
+    FOOTER_LAYOUTS,
     SiteFooter,
     SiteHeader,
     footerLine,
     siteMenu,
     withShopLink,
 } from "./site-chrome";
-export type { ModulePageStates, SiteFooterContent } from "./site-chrome";
+export type {
+    FooterLayout,
+    ModulePageStates,
+    SiteFooterContent,
+} from "./site-chrome";
 // A module page's address while its module is off (G15).
 export { ModulePageUnavailable } from "./module-page-unavailable";
 // A module page's title and lead (DEC-073 #9).
 export { ModulePageTop, modulePageTopOf } from "./module-page-top";
 export type { ModulePageTopContent } from "./module-page-top";
 export type { SiteHeaderAction, SiteNavItem } from "./site-header-menu";
-export { SiteTheme, SiteThemeScope } from "./site-theme";
+export { SiteTheme, SiteThemeScope, fontPairStacks } from "./site-theme";
+export type { LoadedSiteFaces } from "./site-theme";
+// The typeface pairs (KTD-2), for the renderer's loader and the Style panel.
+export {
+    FONT_PAIRS,
+    findFontPair,
+    fontPairFamilies,
+    isFontPairKey,
+} from "@saroh/block-contract";
+export type { FontPairKey, SiteFontPair } from "@saroh/block-contract";
 
 // A test release (DEC-071, T6): the layout's provider, the hook the flows
 // read, the stop they show instead of taking a real order, booking,

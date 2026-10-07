@@ -59,9 +59,9 @@ function DraftChip() {
 
 export function PostArticle({ post }: { post: PostViewModel }) {
     return (
-        <article className="mx-auto w-full max-w-[68ch] px-5 py-[var(--site-section-padding)] sm:px-[var(--site-page-margin)]">
+        <article className="mx-auto w-full max-w-[var(--site-measure,68ch)] px-5 py-[var(--site-section-padding)] sm:px-[var(--site-page-margin)]">
             <header className="mb-8">
-                <h1 className="text-[calc(2.25rem*var(--site-heading-scale))] font-bold leading-tight tracking-tight text-site-fg sm:text-[calc(2.75rem*var(--site-heading-scale))]">
+                <h1 className="font-site-heading text-[calc(2.25rem*var(--site-heading-scale))] font-bold leading-tight tracking-tight text-site-fg sm:text-[calc(2.75rem*var(--site-heading-scale))]">
                     {post.title}
                 </h1>
                 <p className="mt-3 flex flex-wrap items-center gap-2 text-sm text-site-body">
@@ -94,7 +94,7 @@ export function PostArticle({ post }: { post: PostViewModel }) {
                    so a post reads like the rest of the site rather than like
                    a second typography system: the merchant's own text colour
                    at 80%, never the plugin's greys. */
-                className="prose max-w-none prose-headings:text-site-fg prose-p:text-site-fg/80 prose-a:text-site-accent prose-strong:text-site-fg prose-li:text-site-fg/80"
+                className="prose max-w-none text-[length:var(--site-body-size,1rem)] prose-headings:font-site-heading prose-headings:text-site-fg prose-p:text-site-fg/80 prose-a:text-site-accent prose-strong:text-site-fg prose-li:text-site-fg/80"
                 // Sanitized at publish — see the note above.
                 dangerouslySetInnerHTML={{ __html: post.content }}
             />
@@ -117,7 +117,7 @@ export function PostIndex({
 }) {
     return (
         <div className="mx-auto w-full max-w-[68ch] px-5 py-[var(--site-section-padding)] sm:px-[var(--site-page-margin)]">
-            <h1 className="text-[calc(2rem*var(--site-heading-scale))] font-bold tracking-tight text-site-fg">
+            <h1 className="font-site-heading text-[calc(2rem*var(--site-heading-scale))] font-bold tracking-tight text-site-fg">
                 {title}
             </h1>
 
@@ -146,7 +146,7 @@ export function PostIndex({
                                     />
                                 ) : null}
                                 <div className="min-w-0">
-                                    <h2 className="text-[calc(1.35rem*var(--site-heading-scale))] font-semibold leading-snug text-site-fg group-hover:text-site-accent">
+                                    <h2 className="font-site-heading text-[calc(1.35rem*var(--site-heading-scale))] font-semibold leading-snug text-site-fg group-hover:text-site-accent">
                                         {post.title}
                                     </h2>
                                     <p className="mt-1 flex flex-wrap items-center gap-2 text-sm text-site-body">

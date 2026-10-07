@@ -93,6 +93,16 @@ export class JoinWaitlistDto {
     source?: string;
 
     /**
+     * The gallery template the visitor saved (`?template=`). Kept only when
+     * it is one of the gallery's (`waitlistTemplate`), else dropped.
+     */
+    @IsOptional()
+    @Transform(blankToUndefined)
+    @IsString()
+    @MaxLength(40)
+    template?: string;
+
+    /**
      * The referral id from the page's `?ref=`. A malformed or unknown one is
      * ignored by the service rather than refused: a bad link must not stop
      * someone joining.

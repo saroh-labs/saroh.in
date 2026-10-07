@@ -118,6 +118,10 @@ const LEGACY_RESOLVERS = {
     productGrid: () => defaultVariant("productGrid"),
     packs: () => defaultVariant("packs"),
     projects: () => defaultVariant("projects"),
+    // Born with their looks (U2): nothing predates them.
+    timetable: () => defaultVariant("timetable"),
+    hours: () => defaultVariant("hours"),
+    person: () => defaultVariant("person"),
 } satisfies Record<SectionType, LegacyResolver>;
 
 /**

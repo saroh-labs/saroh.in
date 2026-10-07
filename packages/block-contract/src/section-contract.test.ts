@@ -395,6 +395,9 @@ describe("per-section padding override (#189)", () => {
         productGrid: {},
         packs: {},
         projects: { items: [{ title: "Menus for a bakery" }] },
+        timetable: {},
+        hours: {},
+        person: { name: "Anika Rao" },
     };
 
     it("is accepted on every section type", () => {

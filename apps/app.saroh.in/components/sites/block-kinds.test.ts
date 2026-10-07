@@ -23,11 +23,26 @@ describe("the Add block groups", () => {
             "booking",
             "servicesList",
             "visitUs",
+            "hours",
+            "timetable",
             "journal",
             "plans",
             "packs",
             "productGrid",
         ]);
+    });
+});
+
+describe("the industry templates' blocks (U2)", () => {
+    it("offers Person as a structure block and Timetable and Hours as the business's", () => {
+        const { structure, business } = addBlockGroups(SECTION_ORDER);
+        expect(structure).toContain("person");
+        expect(business).toEqual(
+            expect.arrayContaining(["timetable", "hours"]),
+        );
+        expect(BOUND_BLOCKS.hours?.href).toBe(
+            "/settings/organization?section=hours",
+        );
     });
 });
 

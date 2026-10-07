@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 
+import { resolveVariant } from "@saroh/block-contract";
 import { Button } from "@saroh/ui/button";
 import { Input } from "@saroh/ui/input";
 import {
@@ -12,6 +13,7 @@ import {
     SelectValue,
 } from "@saroh/ui/select";
 import { Skeleton } from "@saroh/ui/skeleton";
+import { Textarea } from "@saroh/ui/textarea";
 import { ToggleGroup, ToggleGroupItem } from "@saroh/ui/toggle-group";
 
 import { SEGMENT, SEGMENTED } from "@/components/shared/segmented";
@@ -26,6 +28,7 @@ import {
     wordsOrAbsent,
 } from "./display-options";
 import { Field } from "./field";
+import { OptionSwitch } from "./option-switch";
 import type { SectionFieldsProps } from "./props";
 
 /** The contract's cap, and the counts offered. */
@@ -189,6 +192,36 @@ export function ProductGridFieldsView({
                     note: "Words at the foot of each card, like “View”. Leave empty for none: the whole card opens the product.",
                 }}
             />
+            {resolveVariant("productGrid", c) === "default" &&
+            (c.layout ?? "cards") === "cards" ? (
+                <OptionSwitch
+                    label="Without a card"
+                    checked={c.cardStyle === "bare"}
+                    onChange={(on) =>
+                        patch({ cardStyle: on ? "bare" : undefined })
+                    }
+                    note="Tall photos with the name and price under them, no box around each. Sold out sits on the photo's corner."
+                />
+            ) : null}
+            <OptionSwitch
+                label="Say how many are left"
+                checked={c.showAvailability === true}
+                onChange={(on) =>
+                    patch({ showAvailability: on ? true : undefined })
+                }
+                note="Beside the title, counted from the products shown: “3 of 5 available”."
+            />
+            <Field label="A line under the products">
+                <Textarea
+                    value={c.note ?? ""}
+                    onChange={(e) =>
+                        patch({ note: e.target.value || undefined })
+                    }
+                    rows={2}
+                    maxLength={400}
+                    placeholder="Optional. Baked this morning; what is gone usually goes before ten."
+                />
+            </Field>
         </div>
     );
 }
