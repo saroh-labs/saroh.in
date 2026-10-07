@@ -58,4 +58,6 @@ jobs:
               working-directory: apps/saroh.app
               env:
                   CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_SITES_DEPLOY_TOKEN }}
+                  # The account is a repository variable, not in wrangler.jsonc.
+                  CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
               run: pnpm exec wrangler deploy

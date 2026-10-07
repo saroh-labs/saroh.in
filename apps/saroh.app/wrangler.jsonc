@@ -1,10 +1,11 @@
 // Cloudflare Worker for the merchant-site renderer, built by OpenNext
 // (`pnpm cf:build`). `saroh-sites-dev` serves dev businesses on
 // <address>.saroh.io against the dev API. Vercel still serves saroh.app.
+// The account comes from CLOUDFLARE_ACCOUNT_ID (a repository variable in CI;
+// set it locally to Saroh labs' id before `wrangler deploy`).
 {
     "$schema": "node_modules/wrangler/config-schema.json",
     "name": "saroh-sites-dev",
-    "account_id": "498cfe3e983411f15a0b6184f43bfc8d",
     "main": ".open-next/worker.js",
     "compatibility_date": "2026-10-01",
     "compatibility_flags": ["nodejs_compat", "global_fetch_strictly_public"],
