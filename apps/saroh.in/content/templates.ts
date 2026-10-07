@@ -456,7 +456,7 @@ export const templatesPage = {
         title: "Website templates for small businesses — Saroh",
         socialTitle: "Pick a site that looks like your business.",
         description:
-            "Website templates made for a bakery, a gym, a shop, a dietician, a writer, a studio and a developer, each with its own type and colours, built on your products, bookings and posts in Saroh.",
+            "Website templates for a bakery, a salon, a gym, a clinic, a shop, a dietician, a writer, a studio and a developer, each with its own type and colours, built on your products, bookings and posts in Saroh.",
     },
     intro(templates: readonly GalleryTemplate[]): string {
         const n = templates.length;

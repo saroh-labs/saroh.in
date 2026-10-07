@@ -93,7 +93,7 @@ const rngFor = (...parts: string[]) =>
 const NAME = "Rye & Co.";
 /** Its legal name and contact email, as the profile holds them and its paper prints them (DEC-082). */
 const LEGAL_NAME = "Rye & Co. Bakers LLP";
-const CONTACT_EMAIL = "hello@ryeandco.example.in";
+const CONTACT_EMAIL = "ryeandco@example.com";
 const DAY = 86_400_000;
 const IST = 330 * 60_000;
 const CURRENCY = "INR";
@@ -411,7 +411,7 @@ const SHOPPER = Object.fromEntries(
     SHOPPERS.map((s, i) => [s.key, i]),
 ) as Record<string, number>;
 const emailOf = (s: { first: string; last: string }) =>
-    `${s.first}.${s.last}@example.in`.toLowerCase();
+    `${s.first}.${s.last}@example.com`.toLowerCase();
 /** A shopper's key from their email, as a review names its writer. */
 export const ryeShopperKey = (email: string) =>
     SHOPPERS.find((s) => emailOf(s) === email)?.key;
@@ -423,7 +423,7 @@ const CAFES = [
         first: "Anand",
         last: "Rao",
         company: "Kiln & Co. Café",
-        email: "anand@kilnandco.example.in",
+        email: "kilnandco@example.com",
         phone: "+91 80 4110 2231",
         pan: "AAKFK8124M",
         state: "29",
@@ -435,7 +435,7 @@ const CAFES = [
         first: "Shruti",
         last: "Menon",
         company: "Little Fern Café",
-        email: "shruti@littlefern.example.in",
+        email: "littlefern@example.com",
         phone: "+91 80 4092 7710",
         pan: "AAGFL5531Q",
         state: "29",
@@ -447,7 +447,7 @@ const CAFES = [
         first: "Vivek",
         last: "Nair",
         company: "Brew Lane",
-        email: "vivek@brewlane.example.in",
+        email: "brewlane@example.com",
         phone: "+91 80 4718 3302",
         pan: "ABCFB2207K",
         state: "29",
@@ -459,7 +459,7 @@ const CAFES = [
         first: "Joaquim",
         last: "D'Souza",
         company: "Salt Pan Café",
-        email: "joaquim@saltpan.example.in",
+        email: "saltpan@example.com",
         phone: "+91 832 222 4190",
         pan: "AAQFS6618D",
         state: "30",
