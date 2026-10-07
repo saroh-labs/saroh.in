@@ -95,12 +95,12 @@ const input: CatalogInput = {
             id: "sites",
             name: "Websites",
             group: "site",
-            pricing: "show",
+            pricing: "hidden",
             what: "How many websites the business can run.",
             cells: {
                 free: C("1", "", 1),
                 grow: C("1", "", 1),
-                pro: C("Up to 30", "Up to 30 websites", 30),
+                pro: C("1", "", 1),
             },
         },
         {

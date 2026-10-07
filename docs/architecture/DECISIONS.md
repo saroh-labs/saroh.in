@@ -1085,3 +1085,27 @@ Unless an entry says otherwise, its status is **Proposed — requires audit revi
 - Context: on a plan without online payments, the "Ready to take payments" checklist (Settings › Business) and Home's "Get ready to take money" counted "Take payment online" as a step left (#835). Nothing in setup could finish it, so a Free business could never reach all done.
 - Decision: that step is not counted. Both checklists show it beside the steps, outside the count and the bar, as "Comes with ‹plan›" when the catalogue's `payments` row names the plan that has it, otherwise "Comes with a paid plan", with See plans to `/settings/billing#change-plan`. Payments' other steps (connect, finish connecting, reconnect) still count on a plan that takes payment online.
 - Consequences: `readyChecklist` returns the plan's asides as `outside`, apart from `done` and `total`; `loadReadyChecklist` and `loadSettingsChecklist` read billing access only on such a plan, best-effort. Once every counted step is done the checklists hide, aside included; the plan page and the Payment panel still say it.
+
+## DEC-093 A paid plan starts with a nominal first month on autopay, for a 12-month term
+
+**Status: Accepted — 2026-10-07** · user · from the UX audit (UX-003, D1/D2)
+
+- Context: the plan checkout's quote said "30-day free trial, nothing charged today", while Razorpay took a small mandate check. Monthly subscriptions were created as open-ended mandates running for years, and the yearly plan as a yearly autopay. None of it matched the pricing decided on 5 Oct.
+- Decision: after launch, a new paid plan starts with a nominal first month and autopay. The checkout names the mandate check honestly, and says if it is refunded. A monthly plan runs for 12 charges and then renews with one tap. A yearly plan is a single payment for the year. The launch offer comes from the catalogue, never fixed text.
+- Consequences: the subscription is created with a 12-charge limit and the yearly plan as a one-time order. The checkout and Plan and billing describe exactly what is charged today and later. Returning from Razorpay checks the payment, without waiting for the webhook. Builds #803.
+
+## DEC-094 One website per business at launch, on every plan
+
+**Status: Accepted — 2026-10-07** · user · from the UX audit (D3)
+
+- Context: the catalogue sold Pro with more than one website, but the app allows one per business.
+- Decision: one website on every plan for launch. The Websites row is hidden from the pricing page, and the Website row says "your own domain". More websites per business is future work.
+- Consequences: the catalogue on each instance needs a new version with the row changed before the pricing page is live.
+
+## DEC-095 Free's monthly booking cap counts only bookings customers make online
+
+**Status: Accepted — 2026-10-07** · user · from the UX audit (D5)
+
+- Context: Free's monthly bookings cap also refused bookings the owner made at the desk, and customers learned bookings were paused only after filling in the whole form.
+- Decision: the cap counts bookings customers make on the business's site. Bookings staff make in the workspace are never capped. Past the cap, the booking page says up front that online booking is paused, before the form.
+- Consequences: metering filters by where a booking came from. The booking page reads the cap state before showing the form.
