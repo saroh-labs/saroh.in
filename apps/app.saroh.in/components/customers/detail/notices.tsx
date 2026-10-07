@@ -4,7 +4,10 @@ import { Button } from "@saroh/ui/button";
 import { useRouter } from "next/navigation";
 import { useTransition } from "react";
 
-import { duplicateLine } from "@/lib/customer-workspace/merge";
+import {
+    duplicateHeading,
+    duplicateLine,
+} from "@/lib/customer-workspace/merge";
 import type { DuplicateSuggestion } from "@/lib/customer-workspace/service";
 
 /**
@@ -60,21 +63,25 @@ export function PossibleMatch({
 }
 
 /**
- * Another record that looks like the same person (C2's suggestions, C10):
- * a quiet line with Merge for whoever may merge. Saroh suggests and never
- * merges on its own (DEC-042); there is no Dismiss this round.
+ * Another record that looks like the same person (C2's suggestions, C10;
+ * DEC-097 on a same email): a quiet line with Merge for whoever may merge.
+ * Saroh suggests and never merges on its own (DEC-042, ADR-011); there is
+ * no Dismiss this round. The caller decides which duplicates are shown
+ * (`shownDuplicates`).
  */
 export function DuplicateNotice({
     duplicates,
     onMerge,
+    className = "mb-4",
 }: {
     duplicates: DuplicateSuggestion[];
     /** Absent for a role without `customer:merge`. */
     onMerge?: (duplicate: DuplicateSuggestion) => void;
+    className?: string;
 }) {
     if (!duplicates.length) return null;
     return (
-        <div className="mb-4 grid gap-1.5">
+        <div className={`${className} grid gap-1.5`}>
             {duplicates.slice(0, 3).map((dup) => (
                 <div
                     key={dup.contactId}
@@ -83,7 +90,7 @@ export function DuplicateNotice({
                 >
                     <span className="min-w-0 flex-[1_1_240px] text-[13px] text-foreground/75 [overflow-wrap:anywhere]">
                         <strong className="font-semibold text-foreground">
-                            Looks like the same person:
+                            {duplicateHeading(dup)}
                         </strong>{" "}
                         {duplicateLine(dup)}
                     </span>
