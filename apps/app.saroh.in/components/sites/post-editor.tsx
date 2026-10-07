@@ -58,6 +58,16 @@ const RichTextEditor = dynamic(
  * otherwise tell.
  */
 
+/**
+ * Point the address bar at a post that now exists, without a navigation.
+ * Next's router follows `history.replaceState`, so `usePathname` and a later
+ * reload both see the new address, while the editor and what is typed in it
+ * stay mounted.
+ */
+export function adoptPostAddress(path: string): void {
+    window.history.replaceState(window.history.state, "", path);
+}
+
 /** Long enough to be worth saying, short enough not to nag. */
 const AUTOSAVE_MS = 2500;
 
@@ -168,8 +178,11 @@ export function PostEditor({
                 if (!postId && res.data.id) {
                     // A new post becomes a real one on its first save, and the
                     // address should say so — otherwise a reload loses the work.
+                    // The address changes in place (UX-034): a navigation to
+                    // `/posts/<id>` remounted the editor from the server's copy,
+                    // and whatever was typed while the save was out was lost.
                     setPostId(res.data.id);
-                    router.replace(`/sites/${siteId}/posts/${res.data.id}`);
+                    adoptPostAddress(`/sites/${siteId}/posts/${res.data.id}`);
                 }
                 if (!opts.silent) showSuccess("Draft saved.");
                 return res.data.id;
@@ -182,7 +195,7 @@ export function PostEditor({
                 inFlight.current = null;
             }
         },
-        [postId, router, siteId],
+        [postId, siteId],
     );
 
     // Autosave, and only when there is something to save. An editor that loses
@@ -194,6 +207,17 @@ export function PostEditor({
         const t = setTimeout(() => void save({ silent: true }), AUTOSAVE_MS);
         return () => clearTimeout(t);
     }, [dirty, saving, title, content, slug, excerpt, categoryId, image, save]);
+
+    /*
+     * Re-read the server's copy after publishing or taking a post down — only
+     * when the editor opened on a saved post. A post begun at `/posts/new`
+     * changed its address in place, so a refresh would draw the `[postId]`
+     * page and remount the editor over anything typed meanwhile (UX-034);
+     * its header already says what changed.
+     */
+    const refreshServer = useCallback(() => {
+        if (post) router.refresh();
+    }, [post, router]);
 
     // The browser's own guard, for the case the timer has not yet fired.
     useLeaveGuard(dirty);
@@ -225,7 +249,7 @@ export function PostEditor({
         setLive(true);
         setLiveAt(new Date().toISOString());
         showSuccess(`Published. It is live at ${res.data.path}.`);
-        router.refresh();
+        refreshServer();
     }
 
     async function onUnpublish() {
@@ -240,7 +264,7 @@ export function PostEditor({
         setLive(false);
         setLiveAt(null);
         showSuccess("Taken off the site. The writing is still here.");
-        router.refresh();
+        refreshServer();
     }
 
     async function onDelete() {
