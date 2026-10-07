@@ -4,6 +4,8 @@ import {
     isRemovedStoreCustomer,
     REMOVED_CUSTOMER_NAME,
 } from "../customers/anonymise-customer";
+import type { PaymentMethod } from "../invoices/invoice-state";
+import { PAYMENT_METHODS } from "../invoices/invoice-state";
 import type { InvoiceTitle } from "../invoices/invoice-title";
 import type { FulfilmentView, LateThresholds, LateView } from "./fulfilment";
 import { fulfilmentView, lateOf } from "./fulfilment";
@@ -133,6 +135,12 @@ export interface OrderMoneyDto {
      * hand, so `paid` is what was recorded rather than a provider sum.
      */
     recordedByHand: boolean;
+    /**
+     * Recorded by hand, how (#834): CASH, UPI, BANK_TRANSFER, CARD or
+     * OTHER, from the order's invoice. Null when it was paid online, or
+     * marked paid before the way was asked.
+     */
+    paidHow: PaymentMethod | null;
     discountCode: { code: string; rule: string } | null;
     /**
      * Refunds whose provider answer was lost (#508): the money is held, and
@@ -642,6 +650,7 @@ export function serializeOrderRead(
                   refunded: money(refundedCents),
                   due: money(amountDueCents(order, capturedCents)),
                   recordedByHand: byHand,
+                  paidHow: byHand ? handPaidHow(order.invoices) : null,
                   refundsBeingConfirmed: order.paymentIntents.flatMap((p) =>
                       p.refunds.flatMap((r) =>
                           r.status === "PENDING" && !r.providerRefundId
@@ -716,4 +725,18 @@ export function amountDueCents(
         0,
         cents(order.total) - (captured - editRefunds) - handPaidCents(order),
     );
+}
+
+/**
+ * How an order paid by hand was paid (#834): the way its invoice records,
+ * when it is one a business picks. "RECORDED" (marked paid before the way
+ * was asked) and "ORDER" say nothing more than "by hand".
+ */
+export function handPaidHow(
+    invoices: readonly { kind: string; paymentMethod?: string | null }[] = [],
+): PaymentMethod | null {
+    const method = invoices.find((i) => i.kind === "INVOICE")?.paymentMethod;
+    return method && (PAYMENT_METHODS as readonly string[]).includes(method)
+        ? (method as PaymentMethod)
+        : null;
 }

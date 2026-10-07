@@ -44,7 +44,13 @@ export function InvoiceQuickLook({
     canWrite,
     businessName,
     onOpenChange,
+    timeZone,
 }: {
+    /**
+     * The business's zone, which the invoice's dates are written in
+     * (#836), as on the paper the customer gets. Absent, the viewer's.
+     */
+    timeZone?: string;
     businessName: string;
     /** The row it opened from; null when closed. */
     invoice: Invoice | null;
@@ -159,7 +165,11 @@ export function InvoiceQuickLook({
                 <>
                     {paperTitle(i)} ·{" "}
                     {i.issuedAt ? (
-                        <ViewerDate iso={i.issuedAt} variant="dayMonth" />
+                        <ViewerDate
+                            iso={i.issuedAt}
+                            variant="dayMonth"
+                            timeZone={timeZone}
+                        />
                     ) : (
                         "not issued"
                     )}
@@ -201,7 +211,11 @@ export function InvoiceQuickLook({
                     className="rounded-[12px] border border-destructive-subtle-foreground bg-destructive-subtle px-3.5 py-[11px] text-[13px] font-bold text-destructive-subtle-foreground"
                 >
                     {late.before} — due{" "}
-                    <ViewerDate iso={i.dueAt} variant="dayMonth" />
+                    <ViewerDate
+                        iso={i.dueAt}
+                        variant="dayMonth"
+                        timeZone={timeZone}
+                    />
                 </div>
             ) : null}
 

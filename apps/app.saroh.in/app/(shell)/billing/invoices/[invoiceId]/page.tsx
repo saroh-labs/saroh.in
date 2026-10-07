@@ -24,6 +24,7 @@ import {
     whenLine,
 } from "@/lib/invoices/status";
 import { getInvoiceBusiness } from "@/lib/invoices/tax";
+import { invoiceZone } from "@/lib/invoices/zone";
 import { resolveActiveOrganization } from "@/lib/organizations/service";
 import { requireSession } from "@/lib/session";
 
@@ -72,6 +73,8 @@ export default async function InvoicePage({
     const who = billedTo(invoice);
     const money = (a: string) => formatMoneyMajor(a, invoice.currency) ?? a;
     const late = whenLine(invoice);
+    // Its dates in the business's zone, as its paper prints them (#836).
+    const zone = invoiceZone(business);
     // Whether its link takes payment: the API's word (DEC-070).
     const payOnline = paysOnline(invoice.send, invoice.online);
     const again = payOnline ? "Send the pay link again" : "Send it again";
@@ -97,6 +100,7 @@ export default async function InvoicePage({
                                 <ViewerDate
                                     iso={invoice.issuedAt}
                                     variant="dayMonth"
+                                    timeZone={zone}
                                 />
                             </>
                         ) : (
@@ -125,6 +129,7 @@ export default async function InvoicePage({
                             <ViewerDate
                                 iso={invoice.dueAt}
                                 variant="dayMonth"
+                                timeZone={zone}
                             />
                             .{" "}
                             {invoice.source === "SUBSCRIPTION"

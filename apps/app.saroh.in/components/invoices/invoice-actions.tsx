@@ -40,14 +40,10 @@ import {
 } from "@/lib/invoices/actions";
 import { sendLabel } from "@/lib/invoices/send";
 import type { InvoiceStanding, PaymentMethod } from "@/lib/invoices/service";
+import { PAID_HOW } from "@/lib/orders/paid-how";
 
-const METHODS: { value: PaymentMethod; label: string }[] = [
-    { value: "CASH", label: "Cash" },
-    { value: "UPI", label: "UPI" },
-    { value: "BANK_TRANSFER", label: "Bank transfer" },
-    { value: "CARD", label: "Card at the counter" },
-    { value: "OTHER", label: "Something else" },
-];
+// The ways an order's Record as paid offers too (#834).
+const METHODS = PAID_HOW;
 
 export interface InvoiceRef {
     id: string;

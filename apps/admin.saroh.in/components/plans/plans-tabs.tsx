@@ -42,11 +42,12 @@ export type { PlansFocus, PlansNav } from "./plans-nav";
 export function PlansTabs() {
     const { tab, setTab } = usePlansNav();
     const { pricing } = usePlans();
-    const { hasDraft, check } = useDraft();
+    const { hasDraft, check, live } = useDraft();
     const labels = tabLabels({
         versions: pricing.versions.length,
         hasDraft,
         changes: check.changes.length,
+        firstVersion: live === null,
     });
 
     return (

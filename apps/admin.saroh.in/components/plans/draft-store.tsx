@@ -47,6 +47,8 @@ import type {
  *   "Not saved" with Try again. Neither loses what is on screen.
  * - Without `pricing:edit` nothing edits: `edit` does nothing, and the tabs
  *   draw read-only from `canEdit`.
+ * - With nothing live there is nothing to clone: `start` hands the store
+ *   the first draft whole (the starter catalogue, or a blank one).
  */
 
 export const AUTOSAVE_MS = 800;
@@ -74,6 +76,12 @@ export interface DraftStore {
     editors: StaffName[];
     /** Change the draft; the first change starts it. */
     edit: (change: (draft: Catalog) => void) => void;
+    /**
+     * Start the first draft from a whole catalogue, on an instance with
+     * nothing live and no draft (the first-run screen). Does nothing once
+     * either exists.
+     */
+    start: (catalog: Catalog) => void;
     /**
      * Save now. `saved` when what is on screen is saved, with the revision it
      * is saved as (what a preview link or a publish names).
@@ -259,6 +267,21 @@ export function DraftProvider({
         [canEdit, liveCatalog, schedule],
     );
 
+    const start = useCallback(
+        (first: Catalog) => {
+            if (!canEdit || conflictRef.current) return;
+            if (draftRef.current || liveCatalog) return;
+            const next = structuredClone(first);
+            draftRef.current = next;
+            setDraft(next);
+            stoppedRef.current = false;
+            setSaveError(null);
+            setSave("saving");
+            schedule();
+        },
+        [canEdit, liveCatalog, schedule],
+    );
+
     const flush = useCallback(async () => {
         if (timerRef.current) {
             clearTimeout(timerRef.current);
@@ -373,6 +396,7 @@ export function DraftProvider({
             impact: impact?.revision === revision ? impact.impact : null,
             editors,
             edit,
+            start,
             flush,
             retry,
             reload,
@@ -391,6 +415,7 @@ export function DraftProvider({
             impact,
             editors,
             edit,
+            start,
             flush,
             retry,
             reload,

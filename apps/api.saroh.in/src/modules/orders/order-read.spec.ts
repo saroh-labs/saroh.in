@@ -523,6 +523,32 @@ describe("amountDueCents", () => {
         );
     });
 
+    it("says how a payment recorded by hand was paid, from its invoice (#834)", () => {
+        const paper = (paymentMethod: string | null) => ({
+            id: "inv_1",
+            number: "INV-1",
+            kind: "INVOICE",
+            status: "PAID",
+            paymentMethod,
+        });
+        const how = (paymentMethod: string | null) =>
+            serializeOrderRead(
+                {
+                    ...base,
+                    paymentIntents: [],
+                    invoices: [paper(paymentMethod)],
+                },
+                opts(true),
+            ).money?.paidHow;
+        expect(how("BANK_TRANSFER")).toBe("BANK_TRANSFER");
+        expect(how("CASH")).toBe("CASH");
+        // Marked paid before the way was asked: only "by hand".
+        expect(how("RECORDED")).toBeNull();
+        expect(how(null)).toBeNull();
+        // Paid online: no hand way, whatever the paper says.
+        expect(serializeOrderRead(base, opts(true)).money?.paidHow).toBeNull();
+    });
+
     it("reads a counter payment edited up as what was taken, and the difference due", () => {
         const read = serializeOrderRead(
             {

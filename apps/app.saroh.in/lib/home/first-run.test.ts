@@ -5,6 +5,8 @@ import { INVOICE_JOB } from "@/lib/organizations/kind";
 
 import {
     firstRunJobs,
+    heldByPlan,
+    mayManageModules,
     mayWriteInvoices,
     onButNotOpen,
     sidebarName,
@@ -297,5 +299,39 @@ describe("onButNotOpen", () => {
                 }),
             ]),
         ).toBe(false);
+    });
+});
+
+describe("heldByPlan (#837)", () => {
+    const plan = { code: "ENTITLEMENT_REQUIRED" } as const;
+
+    it("is true when what is on is shut only by the plan", () => {
+        expect(
+            heldByPlan([
+                mod("COMMERCE", { lifecycle: "ENABLED", blockers: [plan] }),
+            ]),
+        ).toBe(true);
+    });
+
+    it("is false when nothing is on, or something else shuts it too", () => {
+        expect(heldByPlan([mod("COMMERCE", { blockers: [plan] })])).toBe(false);
+        expect(
+            heldByPlan([
+                mod("COMMERCE", {
+                    lifecycle: "ENABLED",
+                    blockers: [{ code: "UNAUTHORIZED" }, plan],
+                }),
+            ]),
+        ).toBe(false);
+    });
+});
+
+describe("mayManageModules", () => {
+    it("reads module:manage off the server's views", () => {
+        expect(mayManageModules([mod("CRM")])).toBe(true);
+        expect(mayManageModules([mod("CRM", { canManage: false })])).toBe(
+            false,
+        );
+        expect(mayManageModules([])).toBe(false);
     });
 });

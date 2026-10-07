@@ -4,6 +4,8 @@ import type { ApiResult } from "@/lib/api/failure";
 import { toFailure } from "@/lib/api/failure";
 import type { CappedList } from "@/lib/lists/capped";
 import { withLive } from "@/lib/lists/capped";
+import type { PayInstructionsSettings } from "@/lib/organizations/pay-instructions";
+import type { OnlineBlocker } from "@/lib/staff/types";
 
 /**
  * Invoices a business issues (ADR-007) — read and written through the
@@ -56,6 +58,12 @@ export interface InvoiceOnline {
      * Null or absent (an API older than D13): none.
      */
     autopayCharge?: { at: string } | null;
+    /**
+     * Why its link can't take payment, or null when it can (#835): the
+     * plan (connecting a provider changes nothing), Payments off, or no
+     * provider. Absent from an older API.
+     */
+    onlineBlocker?: OnlineBlocker | null;
 }
 
 /** Where an invoice can be sent (D17): the business's email, the account thread. */
@@ -242,6 +250,12 @@ export interface Invoice {
     /** On the detail read only; absent from an API before D17: no Send. */
     send?: InvoiceSend;
     sent?: InvoiceSent[];
+    /**
+     * "How to pay us" (R32, #833), on the detail read of an unpaid invoice:
+     * the paper prints it, as the PDF does. Null when none is set; absent
+     * otherwise.
+     */
+    payInstructions?: PayInstructionsSettings | null;
 }
 
 export interface InvoiceInput {
@@ -437,6 +451,20 @@ export function createPayLink(id: string) {
         "POST",
         {},
         "Could not make a pay link.",
+    );
+}
+
+/**
+ * A link that only shows the invoice (#833, DEC-070): no Pay button, with
+ * "How to pay us". For a business whose invoices can't be paid online; like
+ * a pay link it is seen once, and replaces the one before.
+ */
+export function createViewLink(id: string) {
+    return send<{ url: string }>(
+        `${at(id)}/view-link`,
+        "POST",
+        {},
+        "Could not make a link to the invoice.",
     );
 }
 

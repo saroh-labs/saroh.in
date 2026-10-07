@@ -28,6 +28,25 @@ export async function invoicePayOnline(
     organizationId: string,
     invoice?: { subscriptionId?: string | null } | null,
 ): Promise<boolean> {
+    return (await invoiceOnlineBlocker(db, organizationId, invoice)) === null;
+}
+
+/**
+ * Why this invoice can't be paid online, or null when it can (#835): the
+ * plan first — on a plan without online payments, Payments and a provider
+ * can't change it, so the merchant is pointed at the plan, not at
+ * connecting one — then Payments switched off, then no provider whose
+ * checkout can open. The booking side's `onlinePaymentBlocker`
+ * (`bookings/booking-payment.ts`) asks the same, minus the renewal.
+ */
+export async function invoiceOnlineBlocker(
+    db: Pick<
+        Prisma.TransactionClient,
+        "organizationModule" | "merchantPaymentProvider"
+    >,
+    organizationId: string,
+    invoice?: { subscriptionId?: string | null } | null,
+): Promise<InvoiceOnlineBlocker | null> {
     const [on, provider, plan] = await Promise.all([
         paymentsOn(db, organizationId),
         db.merchantPaymentProvider.findFirst({
@@ -36,8 +55,13 @@ export async function invoicePayOnline(
         }),
         planTakesInvoiceOnline(organizationId, invoice),
     ]);
-    return on && provider != null && plan;
+    if (!plan) return "PLAN";
+    if (!on) return "PAYMENTS_OFF";
+    return provider == null ? "NO_PROVIDER" : null;
 }
+
+/** The booking side's `OnlineBlocker`, by the same names. */
+export type InvoiceOnlineBlocker = "PLAN" | "PAYMENTS_OFF" | "NO_PROVIDER";
 
 /** What the pay page's payment routes answer when {@link invoicePayOnline} is false. */
 export const NOT_PAID_ONLINE = "This business doesn't take payment online.";

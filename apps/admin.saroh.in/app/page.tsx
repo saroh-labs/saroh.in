@@ -43,7 +43,9 @@ export default async function DashboardPage() {
         getMetrics(),
         getHealth().catch(() => null),
     ]);
-    if (!metrics) return <NotAuthorized email={session.user.email} />;
+    if (!metrics) {
+        return <NotAuthorized email={session.user.email} staff={staff} />;
+    }
 
     return (
         <AdminShell staff={staff}>

@@ -20,7 +20,9 @@ Signing in needs a staff grant or an address on the API's `ADMIN_ALLOWLIST`
 
 - **Every screen opens with `requireStaff(permission)`** (`lib/console.ts`)
   and hides what the operator cannot do with `can(...)`. That is a courtesy:
-  the API refuses regardless.
+  the API refuses regardless. Staff refused a screen see "Not authorized"
+  inside the shell, with the menu of what they can open; only someone who is
+  not staff at all gets the bare page (`components/not-authorized.tsx`, #840).
 - **Every write is an `OperatorDialog`** (`components/operator-dialog.tsx`):
   it says what will change, asks for a reason, asks for the business's name for
   anything that takes one down, and mints one idempotency key per attempt.

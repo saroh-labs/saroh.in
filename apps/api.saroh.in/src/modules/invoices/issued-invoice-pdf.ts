@@ -2,6 +2,10 @@ import { Injectable, Logger } from "@nestjs/common";
 import { prisma } from "@saroh/database";
 
 import { MediaService } from "../media/media.service";
+import {
+    PAY_SELECT,
+    publicPayInstructions,
+} from "../organizations/business-pay-instructions";
 import { paperView } from "./invoice-paper-view";
 import { pdfFileName, renderInvoicePdf } from "./invoice-pdf";
 import { loadInvoiceLogo } from "./invoice-pdf-logo";
@@ -28,7 +32,8 @@ export interface IssuedPdf {
  * particular the law asks for), read from storage with a time and size
  * guard; a logo that cannot be read in time goes unprinted, never the PDF
  * (`invoice-pdf-logo.ts`). Only the business's own name and logo print:
- * no Saroh brand on the page.
+ * no Saroh brand on the page. An unpaid invoice prints "How to pay us"
+ * (#833): the PDF reaches a customer the pay page may not.
  */
 export async function drawPaperPdf(
     media: Pick<MediaService, "readReadyObjectStart">,
@@ -49,6 +54,8 @@ export async function drawPaperPdf(
                 timezone: true,
                 logoUrl: true,
                 logoMediaId: true,
+                // "How to pay us" on an unpaid invoice (#833).
+                ...PAY_SELECT,
             },
         }),
     ]);
@@ -61,6 +68,7 @@ export async function drawPaperPdf(
             email: profile?.contactEmail ?? null,
         },
         profile?.timezone ?? DEFAULT_ZONE,
+        publicPayInstructions(profile),
     );
     return {
         file: await renderInvoicePdf(view, { logo, organizationId }),

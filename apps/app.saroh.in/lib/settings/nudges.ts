@@ -154,6 +154,7 @@ export function settingsChecklist(input: {
         Pick<OrganizationSettings, "logo">;
     modules: readonly ModuleView[] | null;
     messaging: readonly ConnectedCommsProvider[] | null;
+    onlineUpgrade?: Parameters<typeof readyChecklist>[0]["onlineUpgrade"];
 }): ReadyChecklist {
     const ready = readyChecklist(input);
     const nudges = settingsNudges(input);
@@ -170,5 +171,6 @@ export function settingsChecklist(input: {
         left,
         done: steps.length - left.length,
         total: steps.length,
+        outside: ready.outside,
     };
 }

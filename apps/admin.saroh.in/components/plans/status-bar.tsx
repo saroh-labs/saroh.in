@@ -81,7 +81,7 @@ function LiveBar() {
             )}
             <span className="text-[12.5px] text-muted-foreground sm:ml-auto">
                 {access.canEdit
-                    ? "Change anything below to start a draft. Coupons are the exception: they work as soon as you save them."
+                    ? "Edits make a shared draft. Businesses see nothing until you publish. Coupons apply as soon as you save them."
                     : "You can see pricing here but not change it."}
             </span>
         </section>
@@ -97,9 +97,12 @@ function DraftBanner() {
     const [previewError, setPreviewError] = useState<string | null>(null);
 
     const others = otherEditors(draft.editors, me);
-    const count = draft.check.valid
-        ? `Draft · ${changeCount(draft.check.changes.length)}`
-        : "Draft · not ready to publish";
+    const first = draft.live === null;
+    const count = !draft.check.valid
+        ? "Draft · not ready to publish"
+        : first
+          ? "Draft · first version"
+          : `Draft · ${changeCount(draft.check.changes.length)}`;
 
     async function preview() {
         setPreviewError(null);
@@ -147,7 +150,11 @@ function DraftBanner() {
                     <SaveState />
                 </p>
                 <p className="text-[12.5px] leading-normal text-muted-foreground">
-                    {draftSummary({ check: draft.check, impact: draft.impact })}
+                    {draftSummary({
+                        check: draft.check,
+                        impact: draft.impact,
+                        firstVersion: first,
+                    })}
                 </p>
                 {previewError && (
                     <p role="alert" className="text-[12.5px] text-destructive">

@@ -591,32 +591,63 @@ export function siteCodesSmtpSecure(
     return port === 465;
 }
 
-function getSiteCodesTransporter(): Transporter | null {
-    const own = env.SITE_CODES_SMTP_HOST !== undefined;
+type SiteCodesSmtpEnv = Pick<
+    typeof env,
+    | "SITE_CODES_SMTP_HOST"
+    | "SITE_CODES_SMTP_PORT"
+    | "SITE_CODES_SMTP_USER"
+    | "SITE_CODES_SMTP_PASS"
+    | "SITE_CODES_SMTP_SECURE"
+    | "SMTP_HOST"
+    | "SMTP_HOSTNAME"
+    | "SMTP_PORT"
+    | "SMTP_SECURE"
+    | "SMTP_USER"
+    | "SMTP_PASS"
+    | "USER_ACCOUNT"
+    | "USER_PASSWORD"
+>;
+
+/**
+ * The code transport's settings, or null with no SMTP. Pooled: codes come in
+ * bursts (a busy booking page, a retry), and a send that finds a connection
+ * still open skips the TLS and login round trips. An idle connection still
+ * closes after `socketTimeout`, so a lone code opens a fresh one; two at most
+ * keeps a burst from opening a crowd of them at the provider.
+ */
+export function siteCodesTransportOptions(source: SiteCodesSmtpEnv) {
+    const own = source.SITE_CODES_SMTP_HOST !== undefined;
     const host = own
-        ? env.SITE_CODES_SMTP_HOST
-        : (env.SMTP_HOST ?? env.SMTP_HOSTNAME);
-    const port = own ? env.SITE_CODES_SMTP_PORT : env.SMTP_PORT;
+        ? source.SITE_CODES_SMTP_HOST
+        : (source.SMTP_HOST ?? source.SMTP_HOSTNAME);
+    const port = own ? source.SITE_CODES_SMTP_PORT : source.SMTP_PORT;
     const user = own
-        ? env.SITE_CODES_SMTP_USER
-        : (env.SMTP_USER ?? env.USER_ACCOUNT);
+        ? source.SITE_CODES_SMTP_USER
+        : (source.SMTP_USER ?? source.USER_ACCOUNT);
     const pass = own
-        ? env.SITE_CODES_SMTP_PASS
-        : (env.SMTP_PASS ?? env.USER_PASSWORD);
+        ? source.SITE_CODES_SMTP_PASS
+        : (source.SMTP_PASS ?? source.USER_PASSWORD);
     if (!host || !user || !pass) return null;
     const portNumber = port ? Number(port) : 465;
-    return nodemailer.createTransport({
+    return {
         host,
         port: portNumber,
         // The identity fallback connects exactly as the identity transport does.
         secure: own
-            ? siteCodesSmtpSecure(portNumber, env.SITE_CODES_SMTP_SECURE)
-            : env.SMTP_SECURE !== "false",
+            ? siteCodesSmtpSecure(portNumber, source.SITE_CODES_SMTP_SECURE)
+            : source.SMTP_SECURE !== "false",
         auth: { user, pass },
+        pool: true as const,
+        maxConnections: 2,
         connectionTimeout: 5_000,
         greetingTimeout: 5_000,
         socketTimeout: 10_000,
-    });
+    };
+}
+
+function getSiteCodesTransporter(): Transporter | null {
+    const options = siteCodesTransportOptions(env);
+    return options ? nodemailer.createTransport(options) : null;
 }
 
 const siteCodesTransporter = getSiteCodesTransporter();

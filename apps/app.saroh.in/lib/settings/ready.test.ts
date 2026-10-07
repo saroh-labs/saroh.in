@@ -240,6 +240,129 @@ describe("readyChecklist", () => {
         expect(pay?.why).toMatch(/Turn on Payments/);
     });
 
+    it("on a plan without online payments, says it beside the steps, outside the count (#835, DEC-092)", () => {
+        const facts = {
+            products: 0,
+            services: 0,
+            sites: 0,
+            sitesNotLive: 0,
+            onlinePaymentsInPlan: false,
+        };
+        const notConnected = mod("PAYMENTS", {
+            readiness: "SETUP_REQUIRED",
+            blockers: [
+                {
+                    code: "PAYMENTS_NO_PROVIDER",
+                    actionHref: "/settings/providers",
+                },
+            ],
+        });
+        const r = readyChecklist({
+            settings: { ...settled, setup: facts },
+            modules: [notConnected],
+        });
+        // Not a step: neither counted nor left.
+        expect(r.steps.map((s) => s.key)).not.toContain("payments");
+        expect(r.left.map((i) => i.key)).not.toContain("payments");
+        expect(r.outside).toHaveLength(1);
+        expect(r.outside[0]).toMatchObject({
+            key: "payments",
+            label: "Take payment online",
+            comesWith: "Comes with a paid plan",
+            cta: "See plans",
+            href: "/settings/billing#change-plan",
+        });
+        expect(r.outside[0]?.why).toMatch(/How to pay us/);
+        // The heading stays about money.
+        expect(checklistHeading(r, "settings")).toBe("Ready to take payments");
+
+        // The catalogue names the plan that has it: said, and linked to.
+        const named = readyChecklist({
+            settings: { ...settled, setup: facts },
+            modules: [notConnected],
+            onlineUpgrade: { planId: "plan_b", name: "Plan B", pricePaise: 0 },
+        });
+        expect(named.outside[0]).toMatchObject({
+            comesWith: "Comes with Plan B",
+            href: "/settings/billing?plan=plan_b#change-plan",
+        });
+
+        // Payments off and something sells: still the plan, not "Turn on".
+        const off = readyChecklist({
+            settings: { ...settled, setup: facts },
+            modules: [
+                mod("PAYMENTS", {
+                    lifecycle: "DISABLED",
+                    readiness: "DISABLED",
+                }),
+                mod("APPOINTMENTS"),
+            ],
+        });
+        expect(off.left.map((i) => i.key)).not.toContain("payments");
+        expect(off.outside.map((a) => a.key)).toEqual(["payments"]);
+        // Off with nothing that sells: no money to take, nothing said.
+        const quiet = readyChecklist({
+            settings: { ...settled, setup: facts },
+            modules: [
+                mod("PAYMENTS", {
+                    lifecycle: "DISABLED",
+                    readiness: "DISABLED",
+                }),
+            ],
+        });
+        expect(quiet.steps.map((s) => s.key)).not.toContain("payments");
+        expect(quiet.outside).toEqual([]);
+
+        // A plan with online payments keeps the provider step, counted.
+        const paid = readyChecklist({
+            settings: {
+                ...settled,
+                setup: { ...facts, onlinePaymentsInPlan: true },
+            },
+            modules: [notConnected],
+        });
+        expect(paid.left.find((i) => i.key === "payments")).toMatchObject({
+            label: "Connect payments",
+            href: "/settings/providers",
+        });
+        expect(paid.outside).toEqual([]);
+    });
+
+    it("lets a business on a plan without online payments reach all done (DEC-092)", () => {
+        const facts = {
+            products: 1,
+            services: 0,
+            sites: 1,
+            sitesNotLive: 0,
+            onlinePaymentsInPlan: false,
+        };
+        const modules = [
+            mod("PAYMENTS", {
+                readiness: "SETUP_REQUIRED",
+                blockers: [{ code: "PAYMENTS_NO_PROVIDER" }],
+            }),
+            mod("COMMERCE"),
+            mod("WEBSITE"),
+        ];
+        const r = readyChecklist({
+            settings: { ...settled, setup: facts },
+            modules,
+        });
+        expect(r.total).toBeGreaterThan(0);
+        expect(r.done).toBe(r.total);
+        expect(r.left).toEqual([]);
+        expect(takeMoneyPlace(r, false)).toBeNull();
+        expect(r.outside.map((a) => a.key)).toEqual(["payments"]);
+        // Settings' card carries the same aside, and the same count.
+        const settings = settingsChecklist({
+            settings: { ...settled, setup: facts, logo: null },
+            modules,
+            messaging: null,
+        });
+        expect(settings.outside).toEqual(r.outside);
+        expect(settings.steps.map((s) => s.key)).not.toContain("payments");
+    });
+
     it("says a provider that stopped is broken", () => {
         const r = readyChecklist({
             settings: settled,

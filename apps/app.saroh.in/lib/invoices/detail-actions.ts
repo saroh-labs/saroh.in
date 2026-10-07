@@ -10,7 +10,8 @@ import type { InvoiceStanding } from "./service";
  * reminded, gets its pay link copied, is marked paid, printed or
  * cancelled; a paid one is printed or refunded. "Copy pay link" is offered
  * only where the link takes payment (`payOnline`, DEC-070): without it the
- * link only shows the invoice, and Send says "Send invoice".
+ * link only shows the invoice, Send says "Send invoice", and "Copy view
+ * link" hands the merchant that link to send themselves (#833).
  */
 export type DetailActionId =
     | "draftSend"
@@ -20,6 +21,7 @@ export type DetailActionId =
     | "send"
     | "remind"
     | "copyLink"
+    | "copyViewLink"
     | "pay"
     | "print"
     | "pdf"
@@ -114,6 +116,14 @@ export function detailActions(s: DetailActionState): DetailAction[] {
                 id: "copyLink",
                 label: s.linkBusy ? "Making a link…" : "Copy pay link",
                 primary: !s.sendable,
+                disabled: s.linkBusy,
+            });
+        } else if (!s.payOnline && !s.charging) {
+            // No pay link can be made (#833): a link that shows the
+            // invoice and how to pay, for the merchant to send themselves.
+            actions.push({
+                id: "copyViewLink",
+                label: s.linkBusy ? "Making a link…" : "Copy view link",
                 disabled: s.linkBusy,
             });
         }

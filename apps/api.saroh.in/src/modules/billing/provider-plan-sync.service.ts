@@ -4,6 +4,7 @@ import { liveCatalogueVersion, prisma } from "@saroh/database";
 import { withGstPaise } from "@saroh/pricing-catalog";
 
 import { enqueueSiteRevalidation } from "../pricing/revalidate-site.job";
+import { enqueueFreeRows } from "./free-rows.job";
 import type { BillingProviderFactory } from "./providers/billing-provider.port";
 import {
     BILLING_PROVIDER_FACTORY,
@@ -283,7 +284,8 @@ export class ProviderPlanSyncService {
 
     /**
      * After a row is SYNCED: when that was the version's last one and its
-     * go-live has passed, it is live now — tell saroh.in. A version still
+     * go-live has passed, it is live now — tell saroh.in and give their Free
+     * row to the businesses that signed up meanwhile (#839). A version still
      * scheduled was given its go-live refresh when it was published.
      */
     private async goLiveIfComplete(
@@ -301,6 +303,7 @@ export class ProviderPlanSyncService {
         const live = await liveCatalogueVersion(tx, now);
         if (live?.version !== version) return false;
         await enqueueSiteRevalidation(tx, { version, cause: "go-live" }, now);
+        await enqueueFreeRows(tx, { version }, now, now);
         this.logger.log(`pricing_version_live version=${version} cause=sync`);
         return true;
     }
