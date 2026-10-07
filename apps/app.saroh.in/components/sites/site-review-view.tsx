@@ -8,6 +8,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 
+import { useBusinessZone } from "@/components/shared/business-zone";
 import { SectionReview } from "@/components/sites/section-review";
 import { createApproval } from "@/lib/sites/actions";
 import { exactDate } from "@/lib/sites/format-date";
@@ -65,6 +66,7 @@ export function SiteReviewView({
     review: ReviewState;
     releases?: ReleasesForReview;
 }) {
+    const zone = useBusinessZone();
     const router = useRouter();
     const [recording, setRecording] = useState(false);
 
@@ -116,7 +118,7 @@ export function SiteReviewView({
                 <p
                     role="status"
                     className="rounded-lg border bg-muted px-4 py-3 text-sm"
-                    title={exactDate(review.latestApproval.at)}
+                    title={exactDate(review.latestApproval.at, zone)}
                 >
                     {review.latestApproval.outcome === "REQUESTED"
                         ? `${review.latestApproval.by} asked for a review.`

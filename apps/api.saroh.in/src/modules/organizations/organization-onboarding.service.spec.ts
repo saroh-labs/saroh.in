@@ -106,6 +106,8 @@ describe("OrganizationOnboardingService.onboard", () => {
                 taxId: undefined,
                 contactEmail: undefined,
                 website: undefined,
+                // No zone sent, and the US keeps several: India's (UX-008).
+                timezone: "Asia/Kolkata",
             },
         });
         expect(membershipCreate).toHaveBeenCalledWith({
@@ -254,15 +256,58 @@ describe("OrganizationOnboardingService.onboard", () => {
         expect(membershipArg.role).toBe("OWNER");
     });
 
-    it("skips the BusinessProfile when no profile fields are supplied", async () => {
-        await service.onboard("user_1", { name: "Acme" });
-        expect(profileCreate).not.toHaveBeenCalled();
-        expect(membershipCreate).toHaveBeenCalledTimes(1);
-    });
+    describe("the business's time zone (UX-008)", () => {
+        const zoneOf = () =>
+            (
+                profileCreate.mock.lastCall?.[0] as {
+                    data: { timezone?: string };
+                }
+            ).data.timezone;
 
-    it("skips the BusinessProfile when the profile object is empty", async () => {
-        await service.onboard("user_1", { name: "Acme", profile: {} });
-        expect(profileCreate).not.toHaveBeenCalled();
+        it("gives a business with no profile fields India's zone", async () => {
+            await service.onboard("user_1", { name: "Acme" });
+            expect(profileCreate).toHaveBeenCalledWith({
+                data: { organizationId: "org_1", timezone: "Asia/Kolkata" },
+            });
+            expect(membershipCreate).toHaveBeenCalledTimes(1);
+        });
+
+        it("gives an empty profile India's zone too", async () => {
+            await service.onboard("user_1", { name: "Acme", profile: {} });
+            expect(zoneOf()).toBe("Asia/Kolkata");
+        });
+
+        it("keeps the zone setup sent (the browser's) where the country keeps several", async () => {
+            await service.onboard("user_1", {
+                name: "Acme",
+                profile: { country: "US", timezone: "America/Chicago" },
+            });
+            expect(zoneOf()).toBe("America/Chicago");
+        });
+
+        it("gives an Indian business India's zone wherever its owner signs up from", async () => {
+            await service.onboard("user_1", {
+                name: "Acme",
+                profile: { country: "IN", timezone: "Asia/Dubai" },
+            });
+            expect(zoneOf()).toBe("Asia/Kolkata");
+        });
+
+        it("reads a one-zone country's zone when none was sent", async () => {
+            await service.onboard("user_1", {
+                name: "Acme",
+                profile: { country: "ae" },
+            });
+            expect(zoneOf()).toBe("Asia/Dubai");
+        });
+
+        it("falls back past a zone the tz database doesn't know", async () => {
+            await service.onboard("user_1", {
+                name: "Acme",
+                profile: { timezone: "Mars/Olympus" },
+            });
+            expect(zoneOf()).toBe("Asia/Kolkata");
+        });
     });
 
     it("throws Conflict on a slug collision and creates nothing", async () => {

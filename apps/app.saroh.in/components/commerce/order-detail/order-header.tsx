@@ -3,7 +3,7 @@ import { ChevronLeft } from "lucide-react";
 import Link from "next/link";
 import type { ReactNode } from "react";
 
-import { ViewerDate } from "@/components/shared/viewer-date";
+import { BusinessDate } from "@/components/shared/business-zone";
 import { howWords } from "@/lib/orders/lifecycle";
 import type { StepTone } from "@/lib/orders/list-row";
 import type { OrderRead } from "@/lib/orders/read";
@@ -91,7 +91,7 @@ export function OrderHeading({
                         </span>
                     ) : null}
                     <span>
-                        <ViewerDate iso={order.placedAt} variant="moment" /> ·{" "}
+                        <BusinessDate iso={order.placedAt} variant="moment" /> ·{" "}
                         {order.store.name} · {how ?? howWords(order)}
                     </span>
                 </div>

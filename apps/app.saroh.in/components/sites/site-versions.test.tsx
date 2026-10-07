@@ -1,6 +1,7 @@
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
 
+import { BusinessZoneProvider } from "@/components/shared/business-zone";
 import { ReviewPanel } from "@/components/sites/review-panel";
 import { RESTORE_NEEDS_OWNER } from "@/lib/sites/release-review";
 import type { ReviewState, SitePublication } from "@/lib/sites/service";
@@ -206,5 +207,48 @@ describe("the review panel says what it reviews (T12)", () => {
         });
         expect(text(html)).not.toContain("Approve");
         expect(text(html)).not.toContain("Ask for a review");
+    });
+});
+
+describe("version times in the business's zone (UX-008)", () => {
+    const at = (publishedAt: string, zone?: string) => {
+        const list = (
+            <SiteVersions
+                siteId="site_1"
+                publications={[version({ id: "pub_x", publishedAt })]}
+                changesRequested={false}
+                canRestore
+            />
+        );
+        return text(
+            renderToStaticMarkup(
+                zone ? (
+                    <BusinessZoneProvider zone={zone}>
+                        {list}
+                    </BusinessZoneProvider>
+                ) : (
+                    list
+                ),
+            ),
+        );
+    };
+
+    it("says an evening in India as the business's evening, not UTC's afternoon", () => {
+        const out = at("2025-10-06T14:59:00Z", "Asia/Kolkata");
+        expect(out).toContain("6 Oct 2025, 20:29");
+        expect(out).not.toContain("UTC");
+    });
+
+    it("puts a time just before UTC's midnight on the business's next day", () => {
+        expect(at("2025-10-05T20:00:00Z", "Asia/Kolkata")).toContain(
+            "6 Oct 2025, 01:30",
+        );
+        expect(at("2025-10-05T20:00:00Z", "Europe/London")).toContain(
+            "5 Oct 2025, 21:00",
+        );
+    });
+
+    it("reads India's outside a business, never the server's UTC", () => {
+        expect(at("2025-10-05T20:00:00Z")).toContain("6 Oct 2025, 01:30");
     });
 });

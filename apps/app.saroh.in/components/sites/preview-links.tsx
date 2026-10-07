@@ -5,6 +5,7 @@ import { cn } from "@saroh/ui/lib/utils";
 import { showError, showSuccess } from "@saroh/ui/toast";
 import { useEffect, useState } from "react";
 
+import { useBusinessZone } from "@/components/shared/business-zone";
 import { env } from "@/env";
 import {
     createPreviewLink,
@@ -66,6 +67,7 @@ async function copy(text: string): Promise<boolean> {
 }
 
 export function PreviewLinks({ siteId }: { siteId: string }) {
+    const zone = useBusinessZone();
     const [links, setLinks] = useState<SitePreviewLinkView[] | null>(null);
     // Addresses of links created in this session, by id. Nothing else can
     // supply one: the API never returns a token after creation (#284).
@@ -163,7 +165,7 @@ export function PreviewLinks({ siteId }: { siteId: string }) {
                                 </div>
                             ) : (
                                 <p className="text-[0.6875rem] leading-relaxed text-muted-foreground">
-                                    Shared {shortDate(link.createdAt)}
+                                    Shared {shortDate(link.createdAt, zone)}
                                     {link.createdBy.name
                                         ? ` by ${link.createdBy.name}`
                                         : ""}
@@ -174,9 +176,11 @@ export function PreviewLinks({ siteId }: { siteId: string }) {
                             <p className="mt-1.5 text-[0.6875rem] leading-relaxed text-muted-foreground">
                                 Stops working on {dayOf(link.expiresAt)}.{" "}
                                 {link.lastUsedAt ? (
-                                    <span title={exactDate(link.lastUsedAt)}>
-                                        Last opened {shortDate(link.lastUsedAt)}
-                                        .
+                                    <span
+                                        title={exactDate(link.lastUsedAt, zone)}
+                                    >
+                                        Last opened{" "}
+                                        {shortDate(link.lastUsedAt, zone)}.
                                     </span>
                                 ) : (
                                     "Not opened yet."

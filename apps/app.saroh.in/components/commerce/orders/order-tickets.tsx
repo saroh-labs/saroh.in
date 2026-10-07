@@ -5,7 +5,7 @@ import { ChevronLeft, Printer } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useRef } from "react";
 
-import { ViewerDate } from "@/components/shared/viewer-date";
+import { BusinessDate } from "@/components/shared/business-zone";
 import { formatMoneyMajor } from "@/lib/format/money";
 import { goesToAddress } from "@/lib/orders/lifecycle";
 import type { OrderRead } from "@/lib/orders/read";
@@ -162,7 +162,7 @@ function Ticket({ order }: { order: OrderRead }) {
                 {ticketWho(order)} · {order.fulfilmentLabel}
             </p>
             <p className="text-muted-foreground">
-                <ViewerDate iso={order.placedAt} variant="moment" /> ·{" "}
+                <BusinessDate iso={order.placedAt} variant="moment" /> ·{" "}
                 {order.store.name}
             </p>
             <hr className="my-2 border-border" />

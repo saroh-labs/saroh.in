@@ -5,6 +5,7 @@ import { cn } from "@saroh/ui/lib/utils";
 import { showError, showSuccess } from "@saroh/ui/toast";
 import { useState } from "react";
 
+import { useBusinessZone } from "@/components/shared/business-zone";
 import { PreviewLinks } from "@/components/sites/preview-links";
 import {
     createApproval,
@@ -371,6 +372,7 @@ function Note({
     onToggle: (() => void) | null;
     onJump: (pageId: string, sectionKey: string) => void;
 }) {
+    const zone = useBusinessZone();
     const settled = note.resolvedAt !== null;
     // A local const narrows where the property access does not: the page is
     // null once it has been deleted (#277).
@@ -388,7 +390,7 @@ function Note({
                     {note.author.name}
                 </span>
                 <span className="shrink-0 text-[11px] text-muted-foreground">
-                    {shortDate(note.createdAt)}
+                    {shortDate(note.createdAt, zone)}
                 </span>
             </div>
 

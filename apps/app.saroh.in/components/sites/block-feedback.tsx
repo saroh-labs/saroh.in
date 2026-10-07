@@ -5,6 +5,7 @@ import { Textarea } from "@saroh/ui/textarea";
 import { showError, showSuccess } from "@saroh/ui/toast";
 import { useState } from "react";
 
+import { useBusinessZone } from "@/components/shared/business-zone";
 import { createComment, setCommentResolved } from "@/lib/sites/actions";
 import { exactDate, shortDate } from "@/lib/sites/format-date";
 import type { SiteCommentView } from "@/lib/sites/service";
@@ -55,6 +56,7 @@ export function BlockFeedback({
     comments: SiteCommentView[];
     onChanged: () => Promise<void>;
 }) {
+    const zone = useBusinessZone();
     const [reply, setReply] = useState("");
     const [sending, setSending] = useState(false);
     /** Notes with a settle/reopen in flight — one each, so one click never re-enables another's button. */
@@ -142,9 +144,9 @@ export function BlockFeedback({
                             </p>
                             <p
                                 className="text-xs text-muted-foreground"
-                                title={exactDate(c.createdAt)}
+                                title={exactDate(c.createdAt, zone)}
                             >
-                                {shortDate(c.createdAt)}
+                                {shortDate(c.createdAt, zone)}
                             </p>
                             <Button
                                 type="button"
@@ -188,8 +190,10 @@ export function BlockFeedback({
                                 >
                                     <p className="text-xs font-medium">
                                         {c.author.name} ·{" "}
-                                        <span title={exactDate(c.createdAt)}>
-                                            {shortDate(c.createdAt)}
+                                        <span
+                                            title={exactDate(c.createdAt, zone)}
+                                        >
+                                            {shortDate(c.createdAt, zone)}
                                         </span>
                                     </p>
                                     <p className="whitespace-pre-line text-[0.8125rem] leading-relaxed">

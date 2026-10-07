@@ -11,6 +11,7 @@ import { ImageIcon } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useRef, useState, useTransition } from "react";
 
+import { useBusinessZone } from "@/components/shared/business-zone";
 import { CustomDomain } from "@/components/sites/custom-domain";
 import { MediaPicker } from "@/components/sites/media-picker";
 import { PublishApprovalSection } from "@/components/sites/publish-approval-row";
@@ -88,6 +89,7 @@ export function SiteSettings({
      */
     approval?: PublishApproval | null;
 }) {
+    const zone = useBusinessZone();
     const [seoTitle, setSeoTitle] = useState(site.seoTitle ?? "");
     const [seoDescription, setSeoDescription] = useState(
         site.seoDescription ?? "",
@@ -272,7 +274,7 @@ export function SiteSettings({
                         // "9/3/2026, 9:34:34 PM" for the same instant, and
                         // React reported the difference as a hydration error
                         // on every visit to this page.
-                        exactDate(site.currentPublication.publishedAt)
+                        exactDate(site.currentPublication.publishedAt, zone)
                     ) : (
                         <span className="text-muted-foreground">Never</span>
                     )}

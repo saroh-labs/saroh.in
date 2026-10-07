@@ -3036,3 +3036,28 @@ When the stage can't be known, a send that may have gone is never retried.
 **Fix**: `logging: { serverFunctions: false }` in the Next config of every app whose server actions carry a secret (app, admin, accounts, saroh.app). Local logs that already held keys were scrubbed.
 **Rule**: A server action that takes a credential or code must not rely on logs staying private. Turn off dev argument logging in any app that has one, and never treat a dev log as safe to share.
 **Category**: security · `apps/*/next.config.*`
+## Time zones — server-rendered times read UTC for a business that never set its zone
+
+**Symptom** (UX audit, 7 Oct; #836): Order Detail said "Today, 04:28" on a
+full load and 09:58 after a client navigation; the site editor said "In
+review … 04:39 UTC" and "Last published 04:24 UTC"; the console showed the
+business's time zone as "Not set".
+**Root cause**: two halves. A business set up with no profile fields had no
+`BusinessProfile`, and setup never stored a zone, so most businesses had
+none. And the app had no shared way to write a time in the business's
+zone: `ViewerDate` renders the server's UTC first and corrects in the
+browser, and the site editor's `exactDate` pinned UTC on purpose to dodge
+hydration mismatches.
+**Fix**: setup always stores a zone (the country's when it keeps one, else
+the browser's, else India's; `organizations/business-zone.ts`), and
+`20261029153000_business_time_zone_backfill` gives every existing business
+the zone its readers already fell back to, never overwriting one. `GET
+/organizations` carries `timeZone`; the app shell provides it
+(`BusinessZoneProvider`), and `BusinessDate` / `useBusinessZone` /
+`activeBusinessZone()` write times in it, so server and browser agree from
+the first paint. `invoiceZone` (#836) is the same rule (`businessZone`).
+**Rule**: A time a business reads about its own work (an order, a version,
+a review) is written in the business's zone, never the viewer's or the
+server's: `BusinessDate`, or `useBusinessZone()` for a string. Pinning UTC
+avoids a hydration mismatch by being wrong for everyone.
+**Category**: dates · `app.saroh.in/components/shared/business-zone.tsx`
