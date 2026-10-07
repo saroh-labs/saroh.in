@@ -794,6 +794,7 @@ fi
 # packages import (test_deps), then runs with --only, so no two turbo runs
 # ever build the same package at the same time.
 bg_step routes pnpm run check:routes
+bg_step catalog-lock pnpm run check:catalog-lock
 bg_step blocks pnpm run check:blocks
 bg_step cycles pnpm run check:cycles
 bg_step e2e-covers pnpm run check:e2e-covers

@@ -3050,3 +3050,21 @@ files. The optimizer only re-encoded them.
 trace showing one `/_next/image` request with no response points at the
 optimizer, not at the page.
 **Category**: marketing · `apps/saroh.in/components/v2/help/help-step.tsx`
+
+## Dependencies — a catalog bump that changed nothing
+
+**Symptom**: the `next16` catalog in `pnpm-workspace.yaml` moved from
+16.3.6 to 16.3.8 (the Cloudflare adapter needs at least 16.3.8), and
+`pnpm install` finished cleanly. Every Next 16 app still installed 16.3.6,
+and the adapter's build used it. `pnpm install --frozen-lockfile` passed.
+**Root cause**: pnpm 9.9 rewrote the lockfile's catalog `specifier` to
+16.3.8 and kept `version: 16.3.6`. better-auth's peer resolution in two
+importers also kept 16.3.6. `pnpm update` did not move it either.
+**Fix**: set the catalog entry's `version` and the two peer references to
+16.3.8 by hand, then `pnpm install` (which also dropped the entries only
+16.3.6 had used).
+**Rule**: after changing a catalog pin, check what got installed
+(`node -p "require('next/package.json').version"` from an app), not only
+that the install passed. `pnpm run check:catalog-lock` (prepush and CI)
+fails when an exactly pinned catalog entry and the lockfile disagree.
+**Category**: tooling · `pnpm-workspace.yaml`, `scripts/check-catalog-lock.mjs`
