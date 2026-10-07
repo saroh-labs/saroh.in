@@ -10,6 +10,7 @@ import { cn, trimTrailingSlashes } from "../lib/utils";
 import type { ArchiveYear } from "./journal-archive";
 import { JournalArchive, JournalArchiveByYear } from "./journal-archive";
 import { JournalLead } from "./journal-lead";
+import type { JournalFeed, JournalPost } from "./journal-posts";
 import { JOURNAL_DEFAULT_COUNT, journalCardPosts } from "./journal-posts";
 import { cardLink, listCard, listPhoto } from "./list-layout";
 
@@ -36,27 +37,9 @@ import { cardLink, listCard, listPhoto } from "./list-layout";
  * Drawn from `--site-*` only; gates G2 and G7 fail the build otherwise.
  */
 
-/** What the block needs of a post: less than the live or preview read has. */
-export interface JournalPost {
-    title: string;
-    slug: string;
-    excerpt?: string | null;
-    /** The post's body, already sanitized at publish; only read for text. */
-    content?: string | null;
-    image?: string | null;
-    author?: string | null;
-    /** Null for a post behind a preview token that has never gone live. */
-    publishedAt: string | null;
-    /** False only behind a preview token, for a post not published yet. */
-    live?: boolean;
-}
-
-/** The posts to show and where they live: `/blog` unless the merchant chose. */
-export interface JournalFeed {
-    posts: JournalPost[];
-    /** The posts index; each post is at `${basePath}/${slug}`. */
-    basePath: string;
-}
+// The post and feed shapes live beside the rule for which posts are listed,
+// so that module needs nothing from this one.
+export type { JournalFeed, JournalPost };
 
 /** What the section is called when the merchant left the title empty. */
 export const JOURNAL_TITLE = "Journal";
