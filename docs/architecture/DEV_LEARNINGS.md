@@ -3028,3 +3028,25 @@ that closes after "354", so the shape is nodemailer's, not ours.
 library itself (a stub server is minutes of work), not a hand-made object.
 When the stage can't be known, a send that may have gone is never retried.
 **Category**: email · `modules/communications/providers/saroh-email.sender.ts`
+
+## Images — one Help screen never loaded in CI, and the retry hung on the same one
+
+**Symptom**: `help.spec.ts` "the article draws its five real screens" failed
+twice in a row on PR #845, on phone and then on desk, both times with the
+retry too. Each time one shot's `/_next/image?url=…&w=…` request never got a
+response (trace status -1 after 15s). The other four loaded in about 0.2s.
+Within a run it was the same image and width on both tries (product-5 at
+1200 on phone, product-4 at 750 on desk). The test passed in every earlier
+PR's CI and 256/256 times locally on a cold image cache.
+**Root cause**: not pinned down. CI runs the marketing site with `next
+start`, so Next's own image optimizer serves every shot. A request for one
+key stalled, and later requests for that key waited on it. On Vercel the
+optimizer is separate infrastructure, so it's a CI-stack failure.
+**Fix**: Help's shots are captured as WebP at the size they're shown
+(≤ ~110 KB), so `help-step.tsx` passes `unoptimized` and they're served as
+files. The optimizer only re-encoded them.
+**Rule**: An image we capture and compress ourselves doesn't go through
+`/_next/image`. If a browser spec waits on an image's `naturalWidth`, a
+trace showing one `/_next/image` request with no response points at the
+optimizer, not at the page.
+**Category**: marketing · `apps/saroh.in/components/v2/help/help-step.tsx`

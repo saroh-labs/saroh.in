@@ -46,6 +46,10 @@ export function HelpStep({ step, index }: { step: Step; index: number }) {
                         width={shot.width}
                         height={shot.height}
                         sizes="(min-width: 900px) 680px, 100vw"
+                        // Captured as WebP at their size already (≤ ~110 KB);
+                        // the optimizer only re-encodes them, and under `next
+                        // start` in CI one request in it can hang (DEV_LEARNINGS).
+                        unoptimized
                         className="block h-auto w-full"
                     />
                     {mark ? (
