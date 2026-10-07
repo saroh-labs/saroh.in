@@ -6,6 +6,7 @@ import {
     fillSecretLink,
     renderAutopayCancelled,
     renderAutopaySetupLink,
+    renderReviewInvitation,
     renderTransactional,
     SECRET_LINK_SLOT,
 } from "./transactional";
@@ -200,5 +201,37 @@ describe("the autopay-cancelled note (D14)", () => {
         expect(autopayCancelledSentence(vars)).toBe(
             "Pulse & Co. turned off autopay for Monthly unlimited. Nothing more is taken automatically — your next renewal comes as an invoice with a link to pay.",
         );
+    });
+});
+
+describe("renderReviewInvitation (D11)", () => {
+    it("asks how the order was, in the store's name, with the link as a slot", () => {
+        const { subject, body } = renderReviewInvitation({
+            store: "High Street",
+            days: 30,
+        });
+        expect(subject).toBe("How was your order from High Street?");
+        expect(body).toContain("<p>How was your order?</p>");
+        expect(body).toContain(
+            "High Street would like to hear what you thought of what you bought. It takes a minute, and you can review each item. The link works for 30 days.",
+        );
+        expect(body).toContain(`href="${SECRET_LINK_SLOT}"`);
+        expect(body).not.toContain("/review/");
+    });
+
+    it("escapes the store's name in the body", () => {
+        const { body } = renderReviewInvitation({
+            store: "<b>Rye</b> & Co.",
+            days: 30,
+        });
+        expect(body).toContain("&lt;b&gt;Rye&lt;/b&gt; &amp; Co.");
+        expect(body).not.toContain("<b>Rye</b>");
+    });
+
+    it("takes its link only at send time", () => {
+        const { body } = renderReviewInvitation({ store: "Rye", days: 30 });
+        expect(
+            fillSecretLink(body, "https://x.test/review/t?a=1&b=2"),
+        ).toContain('href="https://x.test/review/t?a=1&amp;b=2"');
     });
 });

@@ -44,6 +44,7 @@ import type {
     InvoiceTemplate,
     NoticeTemplate,
     RenderedMessage,
+    ReviewTemplate,
     TeamTemplate,
 } from "./transactional";
 import { renderTransactional } from "./transactional";
@@ -51,17 +52,24 @@ import { renderTransactional } from "./transactional";
 type Db = Prisma.TransactionClient;
 
 /**
- * Who a transactional message may go to — only ever one of three addresses
+ * Who a transactional message may go to — only ever one of four addresses
  * (D17): the bill-to email the invoice kept when it was issued, the email
- * a customer verified when they made their site account, or (F14) the
- * sign-in email of someone on the business's own team. Never an address
- * the caller typed, so the path cannot be turned into a way to email
- * anyone.
+ * a customer verified when they made their site account, (F14) the
+ * sign-in email of someone on the business's own team, or (a review
+ * invitation, D11) the email the order's storefront customer gave when
+ * they ordered. Never an address the caller typed, so the path cannot be
+ * turned into a way to email anyone.
+ *
+ * ORDER_CUSTOMER mirrors INVOICE_BILL_TO: the address is the one the record
+ * already holds, read here by the record's id in this business. A review
+ * invitation is about an order, and an order names a storefront customer,
+ * not a contact or a site account, so neither of those kinds fits it.
  */
 export type TransactionalRecipient =
     | { kind: "INVOICE_BILL_TO"; invoiceId: string }
     | { kind: "SITE_ACCOUNT"; contactId: string }
-    | { kind: "TEAM_MEMBER"; userId: string };
+    | { kind: "TEAM_MEMBER"; userId: string }
+    | { kind: "ORDER_CUSTOMER"; orderId: string };
 
 /**
  * What a transactional message says: an invoice's template with its
@@ -73,7 +81,8 @@ export type TransactionalRecipient =
 export type TransactionalWords =
     | { template: InvoiceTemplate; vars: InvoiceMailVars }
     | {
-          template: NoticeTemplate | TeamTemplate | AutopayTemplate;
+          template:
+              NoticeTemplate | TeamTemplate | AutopayTemplate | ReviewTemplate;
           rendered: RenderedMessage;
       }
     | {
@@ -681,7 +690,10 @@ export class CommunicationsService {
      * placeholder (DEC-049) is no email, and then the contact's verified
      * site-account email is used, if they have an active account. A team
      * member (F14) is their sign-in email, only while they are on this
-     * business's team; no contact is involved.
+     * business's team; no contact is involved. An order's customer (a
+     * review invitation) is the email their storefront customer record
+     * holds, unless it is a placeholder; the contact is the one most
+     * recently linked to that customer, if any (consent is read on it).
      */
     async transactionalAddress(
         db: Db,
@@ -700,6 +712,25 @@ export class CommunicationsService {
             });
             const email = member?.user.email.trim();
             return email ? { address: email, contactId: null } : null;
+        }
+        if (recipient.kind === "ORDER_CUSTOMER") {
+            const order = await db.order.findFirst({
+                where: { id: recipient.orderId, organizationId },
+                select: {
+                    customerId: true,
+                    customer: { select: { email: true } },
+                },
+            });
+            const email = order?.customer?.email.trim();
+            if (!order?.customerId || !email || isReservedContactEmail(email)) {
+                return null;
+            }
+            const link = await db.customerIdentityLink.findFirst({
+                where: { organizationId, customerId: order.customerId },
+                orderBy: { createdAt: "desc" },
+                select: { contactId: true },
+            });
+            return { address: email, contactId: link?.contactId ?? null };
         }
         let contactId: string | null;
         let candidate: string | null = null;

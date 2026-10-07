@@ -1,4 +1,5 @@
 import {
+    ConflictException,
     HttpException,
     Injectable,
     NotFoundException,
@@ -7,14 +8,14 @@ import {
 import type { ProductReview } from "@saroh/database";
 import { prisma } from "@saroh/database";
 
-import type { EmailOutcome } from "../../common/email";
-import { sendReviewInvitationEmail } from "../../common/email";
 import type { OrganizationContext } from "../../common/types/organization-context";
 import {
     AuditAction,
     AuditOutcome,
     AuditService,
 } from "../audit/audit.service";
+import { CommunicationsService } from "../communications/communications.service";
+import { renderReviewInvitation } from "../communications/transactional";
 import { contactEmailForDisplay } from "../contacts/contact-email";
 import { FixedWindowRateLimiter } from "../enquiry/rate-limiter";
 import { PRODUCT_LINES } from "../orders/order-line";
@@ -31,9 +32,9 @@ const DAY_MS = 24 * 60 * 60 * 1000;
 /** How far back "Invite a review" looks for orders nobody was asked about. */
 const INVITABLE_WINDOW_DAYS = 90;
 /**
- * Invitations per business per day. The platform sender can reach any
- * address a merchant types onto a customer; a cap keeps it from being a
- * free mailer.
+ * Invitations per business per day. They go through the business's own
+ * provider now (D11), but an order's customer email is still whatever was
+ * typed onto the order, so a cap keeps a bulk invite from becoming a mailer.
  */
 const DAILY_INVITES = 200;
 
@@ -76,13 +77,16 @@ export type InviteSkip =
     | "completed"
     | "send-limit"
     | "unsubscribed"
-    | "email-unavailable"
-    | "email-failed"
+    | "no-email-provider"
     | "daily-limit";
 
 export type InviteResult =
     | {
           orderId: string;
+          /**
+           * Queued through the business's own email provider; the send job
+           * hands it over (and retries) from there.
+           */
           status: "sent";
           /** No contact linked or matched, so consent could not be checked. */
           note?: "consent-not-checked";
@@ -109,8 +113,8 @@ const SKIP_MESSAGE: Record<Exclude<InviteSkip, IneligibleReason>, string> = {
     completed: "Every item on this order has been reviewed.",
     "send-limit": "This order has already been asked three times.",
     unsubscribed: "This customer has unsubscribed from email.",
-    "email-unavailable": "Email is not set up, so nothing was sent.",
-    "email-failed": "The email could not be sent. Try again.",
+    "no-email-provider":
+        "Review invitations go from your own email. Connect an email provider in Settings › Providers to send them.",
     "daily-limit": "Today's invitations are used up. Try again tomorrow.",
 };
 
@@ -146,11 +150,13 @@ function reviewLink(token: string): string {
  * Every read and write is scoped by the organization from the request
  * context; another business's review or order is a 404. Invitations are the
  * only way a review can begin: one per order, sent only for an order that was
- * paid and shipped, and only once its email has actually left.
+ * paid and shipped, through the business's own email provider (DEC-011,
+ * MARKETING_CLAIMS D11); with none connected, nothing is sent.
  */
 @Injectable()
 export class ProductReviewsService {
     constructor(
+        private readonly comms: CommunicationsService,
         @Optional() private readonly audit?: AuditService,
         @Optional()
         private readonly dailyLimiter: FixedWindowRateLimiter = new FixedWindowRateLimiter(
@@ -283,7 +289,11 @@ export class ProductReviewsService {
               : inv.expiresAt < new Date()
                 ? "expired"
                 : "sent";
-        const reason = this.blockedReason(order);
+        const reason =
+            this.blockedReason(order) ??
+            ((await this.comms.emailConnected(prisma, organizationId))
+                ? null
+                : "no-email-provider");
         return {
             state,
             sentAt: inv?.lastSentAt.toISOString() ?? null,
@@ -296,9 +306,10 @@ export class ProductReviewsService {
 
     /**
      * Ask the customers of these orders for reviews. Per order: eligible, not
-     * finished, under the send limit, not unsubscribed — then the email, and
-     * only once it has left is the invitation written (a resend rotates the
-     * token in place, so the old link stops working).
+     * finished, under the send limit, the business's email provider
+     * connected, not unsubscribed — then the email is queued through that
+     * provider and the invitation written in the same transaction (a resend
+     * rotates the token in place, so the old link stops working).
      */
     async invite(
         ctx: OrganizationContext,
@@ -330,6 +341,9 @@ export class ProductReviewsService {
         const email =
             contactEmailForDisplay(order.customer?.email)?.trim() ?? "";
         if (!email || !order.customerId) return skip("no-email");
+        if (!(await this.comms.emailConnected(prisma, ctx.organizationId))) {
+            return skip("no-email-provider");
+        }
         const consent = await this.consentFor(
             ctx.organizationId,
             order.customerId,
@@ -342,35 +356,71 @@ export class ProductReviewsService {
         }
 
         const { token, tokenHash } = mintReviewToken();
-        const outcome: EmailOutcome = await sendReviewInvitationEmail(
-            email,
-            reviewLink(token),
-            order.store.name,
-        );
-        if (outcome === "not-configured") return skip("email-unavailable");
-        if (outcome === "failed") return skip("email-failed");
+        const outcome = await prisma
+            .$transaction(async (tx) => {
+                const queued = await this.comms.queueTransactional(
+                    tx,
+                    ctx.organizationId,
+                    {
+                        template: "REVIEW_INVITATION",
+                        rendered: renderReviewInvitation({
+                            store: order.store.name,
+                            days: REVIEW_LINK_DAYS,
+                        }),
+                        recipient: { kind: "ORDER_CUSTOMER", orderId },
+                        // The review link is a secret link, like a pay
+                        // link: sealed into the send job, never stored.
+                        secretLink: () => Promise.resolve(reviewLink(token)),
+                        createdByUserId: ctx.userId,
+                    },
+                );
+                // The send path's own consent gate (the linked contact).
+                if (queued.status === "SUPPRESSED") return "unsubscribed";
 
-        const expiresAt = new Date(Date.now() + REVIEW_LINK_DAYS * DAY_MS);
-        const now = new Date();
-        await prisma.reviewInvitation.upsert({
-            where: { orderId },
-            create: {
-                organizationId: ctx.organizationId,
-                orderId,
-                tokenHash,
-                toAddress: email,
-                expiresAt,
-                lastSentAt: now,
-                createdByUserId: ctx.userId,
-            },
-            update: {
-                tokenHash,
-                toAddress: email,
-                expiresAt,
-                lastSentAt: now,
-                sendCount: { increment: 1 },
-            },
-        });
+                // Written once the email is QUEUED, in the same transaction
+                // (it used to be written only once Saroh's sender said it had
+                // left). The business's provider sends it from the job, which
+                // retries; the token in the job is the one hashed here.
+                const expiresAt = new Date(
+                    Date.now() + REVIEW_LINK_DAYS * DAY_MS,
+                );
+                const now = new Date();
+                await tx.reviewInvitation.upsert({
+                    where: { orderId },
+                    create: {
+                        organizationId: ctx.organizationId,
+                        orderId,
+                        tokenHash,
+                        toAddress: queued.toAddress,
+                        expiresAt,
+                        lastSentAt: now,
+                        createdByUserId: ctx.userId,
+                    },
+                    update: {
+                        tokenHash,
+                        toAddress: queued.toAddress,
+                        expiresAt,
+                        lastSentAt: now,
+                        sendCount: { increment: 1 },
+                    },
+                });
+                return "queued" as const;
+            })
+            .catch((err: unknown) => {
+                // No address the send path accepts, or the provider went
+                // between the check and the send.
+                if (err instanceof ConflictException) return "conflict";
+                throw err;
+            });
+        if (outcome === "unsubscribed") return skip("unsubscribed");
+        if (outcome === "conflict") {
+            return skip(
+                (await this.comms.emailConnected(prisma, ctx.organizationId))
+                    ? "no-email"
+                    : "no-email-provider",
+            );
+        }
+
         await this.audit?.record({
             action: AuditAction.ProductReviewInvite,
             actorUserId: ctx.userId,

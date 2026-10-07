@@ -1,14 +1,16 @@
-// Product reviews, the business's side: who may be invited, that nothing is
-// recorded until the email has left, that consent is honoured, and that the
-// raw token is never stored. Prisma, the email sender and env are mocked.
+// Product reviews, the business's side: who may be invited, that an
+// invitation goes only through the business's own email provider (D11) and
+// is recorded as it is queued, that consent is honoured, and that the raw
+// token is never stored. Prisma, the send path and env are mocked.
 jest.mock("../../env", () => ({
     env: { NODE_ENV: "test", RENDERER_URL: "https://renderer.test" },
 }));
-jest.mock("../../common/email", () => ({
-    sendReviewInvitationEmail: jest.fn(),
+jest.mock("../communications/communications.service", () => ({
+    CommunicationsService: class {},
 }));
 jest.mock("@saroh/database", () => ({
     prisma: {
+        $transaction: jest.fn(),
         order: { findFirst: jest.fn(), findMany: jest.fn() },
         reviewInvitation: { upsert: jest.fn() },
         customerIdentityLink: { findMany: jest.fn() },
@@ -24,12 +26,13 @@ jest.mock("@saroh/database", () => ({
     },
 }));
 
-import { NotFoundException } from "@nestjs/common";
+import { ConflictException, NotFoundException } from "@nestjs/common";
 import { prisma } from "@saroh/database";
 
-import { sendReviewInvitationEmail } from "../../common/email";
 import type { OrganizationContext } from "../../common/types/organization-context";
 import type { AuditService } from "../audit/audit.service";
+import type { CommunicationsService } from "../communications/communications.service";
+import { SECRET_LINK_SLOT } from "../communications/transactional";
 import { FixedWindowRateLimiter } from "../enquiry/rate-limiter";
 import {
     ProductReviewsService,
@@ -38,7 +41,18 @@ import {
 import { hashReviewToken } from "./token";
 
 const db = prisma as unknown as Record<string, Record<string, jest.Mock>>;
-const send = sendReviewInvitationEmail as jest.Mock;
+const comms = {
+    emailConnected: jest.fn(),
+    queueTransactional: jest.fn(),
+};
+/** The secret link the last queued invitation would carry. */
+async function queuedLink(call = 0): Promise<string> {
+    const input = comms.queueTransactional.mock.calls[call][2] as {
+        secretLink: () => Promise<string>;
+    };
+    return input.secretLink();
+}
+const send = comms.queueTransactional;
 const audit = { record: jest.fn() } as unknown as AuditService;
 
 const ctx: OrganizationContext = {
@@ -61,7 +75,11 @@ const order = (over: Record<string, unknown> = {}) => ({
 });
 
 const make = (limit = 100) =>
-    new ProductReviewsService(audit, new FixedWindowRateLimiter(limit, 60_000));
+    new ProductReviewsService(
+        comms as unknown as CommunicationsService,
+        audit,
+        new FixedWindowRateLimiter(limit, 60_000),
+    );
 
 beforeEach(() => {
     jest.clearAllMocks();
@@ -69,22 +87,50 @@ beforeEach(() => {
     db.customerIdentityLink!.findMany!.mockResolvedValue([]);
     db.contact!.findMany!.mockResolvedValue([{ id: "ct_1" }]);
     db.consent!.findFirst!.mockResolvedValue(null);
-    send.mockResolvedValue("sent");
+    db.$transaction!.mockImplementation((fn: (tx: unknown) => unknown) =>
+        fn(prisma),
+    );
+    comms.emailConnected.mockResolvedValue(true);
+    send.mockResolvedValue({
+        id: "m_1",
+        status: "QUEUED",
+        toAddress: "ananya@example.com",
+        route: "PROVIDER",
+    });
 });
 
 describe("invite", () => {
-    it("emails a link whose token is stored only as its hash", async () => {
+    it("queues the invitation through the business's provider, to the order's customer", async () => {
         const [result] = await make().invite(ctx, ["o_1"]);
         expect(result).toEqual({ orderId: "o_1", status: "sent" });
+        const [tx, org, input] = send.mock.calls[0];
+        expect(tx).toBe(prisma);
+        expect(org).toBe("org_1");
+        expect(input).toMatchObject({
+            template: "REVIEW_INVITATION",
+            recipient: { kind: "ORDER_CUSTOMER", orderId: "o_1" },
+            createdByUserId: "u_1",
+        });
+        expect(input.rendered.subject).toBe(
+            "How was your order from High Street?",
+        );
+        // The stored body holds the slot, never the link.
+        expect(input.rendered.body).toContain(SECRET_LINK_SLOT);
+        expect(input.rendered.body).not.toContain("/review/");
+        expect(audit.record).toHaveBeenCalledWith(
+            expect.objectContaining({ action: "product-review.invite" }),
+        );
+    });
 
-        const [to, url, store] = send.mock.calls[0] as [string, string, string];
-        expect(to).toBe("ananya@example.com");
-        expect(store).toBe("High Street");
+    it("sends a link whose token is stored only as its hash", async () => {
+        const [result] = await make().invite(ctx, ["o_1"]);
+        const url = await queuedLink();
         const token = url.split("/review/")[1]!;
         expect(url.startsWith("https://renderer.test/review/")).toBe(true);
 
         const written = db.reviewInvitation!.upsert!.mock.calls[0][0];
         expect(written.create.tokenHash).toBe(hashReviewToken(token));
+        expect(written.create.toAddress).toBe("ananya@example.com");
         // The raw token is in the email, and nowhere in what was stored.
         expect(JSON.stringify(written)).not.toContain(token);
         expect(JSON.stringify(result)).not.toContain(token);
@@ -155,18 +201,61 @@ describe("invite", () => {
         });
     });
 
+    it("sends nothing without a connected email provider, and says where to connect one", async () => {
+        comms.emailConnected.mockResolvedValue(false);
+        const [result] = await make().invite(ctx, ["o_1"]);
+        expect(result).toEqual({
+            orderId: "o_1",
+            status: "skipped",
+            reason: "no-email-provider",
+            message:
+                "Review invitations go from your own email. Connect an email provider in Settings › Providers to send them.",
+        });
+        expect(send).not.toHaveBeenCalled();
+        expect(db.reviewInvitation!.upsert).not.toHaveBeenCalled();
+    });
+
+    it("never counts a skip for no provider against the daily cap", async () => {
+        comms.emailConnected.mockResolvedValueOnce(false);
+        const results = await make(1).invite(ctx, ["o_1", "o_2"]);
+        expect(results.map((r) => r.status)).toEqual(["skipped", "sent"]);
+    });
+
+    it("records nothing when the send path's consent gate suppressed it", async () => {
+        send.mockResolvedValue({
+            id: "m_1",
+            status: "SUPPRESSED",
+            toAddress: "ananya@example.com",
+        });
+        const [result] = await make().invite(ctx, ["o_1"]);
+        expect(result).toMatchObject({
+            status: "skipped",
+            reason: "unsubscribed",
+        });
+        expect(db.reviewInvitation!.upsert).not.toHaveBeenCalled();
+        expect(audit.record).not.toHaveBeenCalled();
+    });
+
     it.each([
-        ["not-configured", "email-unavailable"],
-        ["failed", "email-failed"],
+        [true, "no-email"],
+        [false, "no-email-provider"],
     ] as const)(
-        "records nothing when the email was %s",
-        async (outcome, reason) => {
-            send.mockResolvedValue(outcome);
+        "turns the send path's 409 into a skip (provider still connected: %s)",
+        async (connected, reason) => {
+            send.mockRejectedValue(new ConflictException("no"));
+            comms.emailConnected
+                .mockResolvedValueOnce(true)
+                .mockResolvedValueOnce(connected);
             const [result] = await make().invite(ctx, ["o_1"]);
             expect(result).toMatchObject({ status: "skipped", reason });
             expect(db.reviewInvitation!.upsert).not.toHaveBeenCalled();
         },
     );
+
+    it("lets any other failure through", async () => {
+        send.mockRejectedValue(new Error("db down"));
+        await expect(make().invite(ctx, ["o_1"])).rejects.toThrow("db down");
+    });
 
     it("resends by rotating the hash and counting the send", async () => {
         db.order!.findFirst!.mockResolvedValue(
@@ -182,7 +271,8 @@ describe("invite", () => {
         );
         await make().invite(ctx, ["o_1"]);
         const update = db.reviewInvitation!.upsert!.mock.calls[0][0].update;
-        expect(update.tokenHash).toMatch(/^[0-9a-f]{64}$/);
+        const token = (await queuedLink()).split("/review/")[1]!;
+        expect(update.tokenHash).toBe(hashReviewToken(token));
         expect(update.sendCount).toEqual({ increment: 1 });
     });
 
@@ -281,6 +371,27 @@ describe("invite", () => {
             ["b", "skipped"],
             ["c", "sent"],
         ]);
+    });
+});
+
+describe("invitationState", () => {
+    it("blocks an invitable order when the business has no email provider", async () => {
+        comms.emailConnected.mockResolvedValue(false);
+        const state = await make().invitationState("org_1", "o_1");
+        expect(state.state).toBe("none");
+        expect(state.blocked).toMatchObject({ reason: "no-email-provider" });
+    });
+
+    it("leaves it open when the provider is connected", async () => {
+        const state = await make().invitationState("org_1", "o_1");
+        expect(state.blocked).toBeNull();
+    });
+
+    it("names the order's own reason first", async () => {
+        comms.emailConnected.mockResolvedValue(false);
+        db.order!.findFirst!.mockResolvedValue(order({ status: "PENDING" }));
+        const state = await make().invitationState("org_1", "o_1");
+        expect(state.blocked).toMatchObject({ reason: "not-shipped" });
     });
 });
 
