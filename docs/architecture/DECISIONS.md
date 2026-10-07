@@ -1036,13 +1036,15 @@ Unless an entry says otherwise, its status is **Proposed — requires audit revi
 
 ## DEC-086 Saroh sends a business's customer notifications until it connects its own email
 
-**Status: Accepted — 2026-10-06** · user · in conversation · planned 6 Oct, not built
+**Status: Accepted — 2026-10-06** · user · in conversation · built 6 Oct for the booking notices (U1–U4), behind the `SAROH_BUSINESS_EMAIL` flag, off by default
 
 - Context: DEC-011 sends a business's messages to its customers only through a provider the business connects. Most new businesses connect none, so their customers get no booking confirmation or order update by email at all.
 - Decision: while a business has no connected email provider, Saroh's own email (Amazon SES, DEC-085) sends its customer notifications: booking confirmations and the other transactional messages the business would send through its provider. When the business connects a provider, its provider sends them and Saroh stops. Marketing and broadcasts never go through Saroh.
 - Settled with the owner the same day: the booking notices (confirmed, moved, cancelled) come first. Each email Saroh sends counts against a monthly plan allowance; Free gets a small allowance and Grow and Pro more, with the numbers kept only in the plans catalogue. At the allowance, or when it can't be read, Saroh does not send (the customer's account message still stands). Mail goes from its own subdomain (`bookings@notify.saroh.in`, own DKIM and MAIL FROM) as "‹Business› via Saroh", replies to the business. A separate AWS account comes only if volume grows, since SES judges reputation per account.
+- Settled with the owner after the code review (6 Oct): Saroh sends at most 3 emails about one booking in any 24 hours, so a customer moving a booking again and again can't drain the business's allowance through Saroh's address (past it the account message still stands and nothing is counted); the business's own provider has no such cap. A plan cell marked soft gives Saroh no allowance, since a soft cap never stops a send.
+- Amended 2026-10-06 (owner): **a business connects its own email provider on Grow and Pro only.** The catalogue's `integrations` row decides (a plan without it, or at its cap, can't connect one); Free relies on Saroh's allowance and upgrades to get its own. Settings and the allowance's notices offer connecting only when the plan has room for it, read by the connect's own check (`MeteringService.hasRoom`), and otherwise lead with seeing plans.
 - Still open: review invitations (MARKETING_CLAIMS D11), and the other notices after booking emails have run clean.
-- Consequences: until built, DEC-011's rule stands in code: no provider, no customer email.
+- Consequences: the booking notices (confirmed, moved, cancelled) go through Saroh when the rule allows: no provider of its own, the business's flag on, an allowance with room, and no global stop. Every other notice keeps DEC-011's rule: no provider, no customer email.
 
 ## DEC-087 An in-person booking is offered only inside the business's opening hours
 
@@ -1083,22 +1085,3 @@ Unless an entry says otherwise, its status is **Proposed — requires audit revi
 - Context: on a plan without online payments, the "Ready to take payments" checklist (Settings › Business) and Home's "Get ready to take money" counted "Take payment online" as a step left (#835). Nothing in setup could finish it, so a Free business could never reach all done.
 - Decision: that step is not counted. Both checklists show it beside the steps, outside the count and the bar, as "Comes with ‹plan›" when the catalogue's `payments` row names the plan that has it, otherwise "Comes with a paid plan", with See plans to `/settings/billing#change-plan`. Payments' other steps (connect, finish connecting, reconnect) still count on a plan that takes payment online.
 - Consequences: `readyChecklist` returns the plan's asides as `outside`, apart from `done` and `total`; `loadReadyChecklist` and `loadSettingsChecklist` read billing access only on such a plan, best-effort. Once every counted step is done the checklists hide, aside included; the plan page and the Payment panel still say it.
-## DEC-085 The API sends its email through Amazon SES in Mumbai
-
-**Status: Accepted — 2026-10-06** · user · in conversation
-
-- Context: the API sent identity mail and site sign-in codes through a Google Workspace account over SMTP. A personal mailbox is the wrong sender for a product's transactional mail (sending limits, one person's credentials).
-- Decision: the `SMTP_*` set points at Amazon SES in `ap-south-1`, next to the API's servers in India. `saroh.in` sends with SES's DKIM and a `mail.saroh.in` MAIL FROM domain; account-level suppression stops mail to addresses that bounced or complained. The credentials can only send, only from `@saroh.in`. Google Workspace stays the mailbox people write to. The code transport is pooled (two connections at most), so a burst of codes reuses an open connection. No code path changed: the switch was configuration.
-- Consequences: the privacy page lists Amazon Web Services (SES) for sending and Google Workspace for our mailboxes (dated 6 Oct). Bounce and complaint notices go to SES, not to a webhook: nothing in Saroh marks an address undeliverable yet, which is fine at today's volume and is the next step if bounces grow. Rolling back is a configuration change on the host.
-
-## DEC-086 Saroh sends a business's customer notifications until it connects its own email
-
-**Status: Accepted — 2026-10-06** · user · in conversation · built 6 Oct for the booking notices (U1–U4), behind the `SAROH_BUSINESS_EMAIL` flag, off by default
-
-- Context: DEC-011 sends a business's messages to its customers only through a provider the business connects. Most new businesses connect none, so their customers get no booking confirmation or order update by email at all.
-- Decision: while a business has no connected email provider, Saroh's own email (Amazon SES, DEC-085) sends its customer notifications: booking confirmations and the other transactional messages the business would send through its provider. When the business connects a provider, its provider sends them and Saroh stops. Marketing and broadcasts never go through Saroh.
-- Settled with the owner the same day: the booking notices (confirmed, moved, cancelled) come first. Each email Saroh sends counts against a monthly plan allowance; Free gets a small allowance and Grow and Pro more, with the numbers kept only in the plans catalogue. At the allowance, or when it can't be read, Saroh does not send (the customer's account message still stands). Mail goes from its own subdomain (`bookings@notify.saroh.in`, own DKIM and MAIL FROM) as "‹Business› via Saroh", replies to the business. A separate AWS account comes only if volume grows, since SES judges reputation per account.
-- Settled with the owner after the code review (6 Oct): Saroh sends at most 3 emails about one booking in any 24 hours, so a customer moving a booking again and again can't drain the business's allowance through Saroh's address (past it the account message still stands and nothing is counted); the business's own provider has no such cap. A plan cell marked soft gives Saroh no allowance, since a soft cap never stops a send.
-- Amended 2026-10-06 (owner): **a business connects its own email provider on Grow and Pro only.** The catalogue's `integrations` row decides (a plan without it, or at its cap, can't connect one); Free relies on Saroh's allowance and upgrades to get its own. Settings and the allowance's notices offer connecting only when the plan has room for it, read by the connect's own check (`MeteringService.hasRoom`), and otherwise lead with seeing plans.
-- Still open: review invitations (MARKETING_CLAIMS D11), and the other notices after booking emails have run clean.
-- Consequences: the booking notices (confirmed, moved, cancelled) go through Saroh when the rule allows: no provider of its own, the business's flag on, an allowance with room, and no global stop. Every other notice keeps DEC-011's rule: no provider, no customer email.
