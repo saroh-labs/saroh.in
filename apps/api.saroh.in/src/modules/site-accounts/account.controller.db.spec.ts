@@ -247,6 +247,8 @@ describe("Me", () => {
             offers: { appointments: true, orders: false, plans: false },
             bookingsLabel: "Appointments",
             healthNotes: true,
+            // Its site records no template: general words (UX-040).
+            notesKind: "general",
             unreadMessages: 0,
         });
 

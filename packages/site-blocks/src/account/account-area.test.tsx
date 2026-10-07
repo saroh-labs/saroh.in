@@ -461,6 +461,35 @@ describe("Me", () => {
         ).toBeInTheDocument();
     });
 
+    it("words the notes card by what the business is (UX-040)", () => {
+        const at = (notesKind: "health" | "food" | "general") =>
+            render(
+                <Me
+                    account={{ ...ACCOUNT, healthNotes: true, notesKind }}
+                    receipts={{ ok: true, value: [] }}
+                    notes={{ ok: true, value: [] }}
+                    options={OPTIONS}
+                    api={meApi()}
+                />,
+            );
+        const bakery = at("food");
+        expect(
+            screen.getByRole("heading", { name: "Allergies and notes" }),
+        ).toBeInTheDocument();
+        expect(screen.queryByText(/medicines/)).toBeNull();
+        bakery.unmount();
+        const shop = at("general");
+        expect(
+            screen.getByRole("heading", { name: "Notes for the team" }),
+        ).toBeInTheDocument();
+        expect(screen.queryByText("Health notes")).toBeNull();
+        shop.unmount();
+        at("health");
+        expect(
+            screen.getByRole("heading", { name: "Health notes" }),
+        ).toBeInTheDocument();
+    });
+
     it("signs out here, or everywhere", async () => {
         const api = meApi();
         render(

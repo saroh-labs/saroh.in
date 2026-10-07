@@ -46,8 +46,34 @@ export interface AccountView {
     bookingsLabel: "Bookings" | "Appointments";
     /** Whether "Add a health note" shows (once staff can act on it, C12). */
     healthNotes: boolean;
+    /**
+     * What the notes card asks for, by what the business is (UX-040):
+     * `health` for a practice, `food` for a kitchen, else `general`.
+     */
+    notesKind: NotesKind;
     /** Messages from the business they haven't opened yet (A13): the tab's dot. */
     unreadMessages: number;
+}
+
+/** What the customer's notes for the team are about (UX-040). */
+export type NotesKind = "health" | "food" | "general";
+
+/**
+ * The industry templates (`@saroh/templates`) whose businesses ask about
+ * health or about food. A site made from any other, or before the template
+ * was recorded, asks in general words: never health on a bakery or a
+ * boutique (UX-040).
+ */
+const NOTES_BY_TEMPLATE: Readonly<Record<string, NotesKind>> = {
+    clinic: "health",
+    dietician: "health",
+    gym: "health",
+    bakery: "food",
+};
+
+/** The notes' kind for a business whose website was made from `templateId`. */
+export function notesKindOf(templateId: string | null | undefined): NotesKind {
+    return (templateId && NOTES_BY_TEMPLATE[templateId]) || "general";
 }
 
 export interface AccountBooking {
@@ -338,6 +364,7 @@ export function accountView(input: {
     offers: { appointments: boolean; orders: boolean; plans: boolean };
     bookingsLabel: "Bookings" | "Appointments";
     healthNotes: boolean;
+    notesKind?: NotesKind;
     unreadMessages: number;
 }): AccountView {
     return {
@@ -353,6 +380,7 @@ export function accountView(input: {
         },
         bookingsLabel: input.bookingsLabel,
         healthNotes: input.healthNotes,
+        notesKind: input.notesKind ?? "general",
         unreadMessages: Math.max(0, Math.trunc(input.unreadMessages)),
     };
 }

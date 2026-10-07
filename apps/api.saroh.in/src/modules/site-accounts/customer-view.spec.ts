@@ -4,6 +4,7 @@ import {
     accountView,
     bookingView,
     messageView,
+    notesKindOf,
     noteView,
     orderDetailView,
     orderView,
@@ -89,6 +90,7 @@ describe("the account's allow-list", () => {
             offers: { appointments: true, orders: false, plans: false },
             bookingsLabel: "Appointments",
             healthNotes: false,
+            notesKind: "general",
             unreadMessages: 2,
         });
         expect(leaks(view)).toEqual([]);
@@ -808,5 +810,17 @@ describe("the account's allow-list", () => {
         } as never);
         expect(saroh.from).toBe("business");
         expect(Object.keys(saroh)).toEqual(["ref", "from", "text", "sentAt"]);
+    });
+});
+
+describe("the notes card's words follow what the business is (UX-040)", () => {
+    it("asks about health for a practice, food for a kitchen, else in general words", () => {
+        expect(notesKindOf("clinic")).toBe("health");
+        expect(notesKindOf("dietician")).toBe("health");
+        expect(notesKindOf("bakery")).toBe("food");
+        expect(notesKindOf("ceramics")).toBe("general");
+        // Unknown (a site from before templates were recorded): never health.
+        expect(notesKindOf(null)).toBe("general");
+        expect(notesKindOf("not-a-template")).toBe("general");
     });
 });

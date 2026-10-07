@@ -77,6 +77,11 @@ export function isAccountView(v: unknown): v is AccountView {
         (v.bookingsLabel === "Bookings" ||
             v.bookingsLabel === "Appointments") &&
         isBoolean(v.healthNotes) &&
+        // UX-040's words; an API from before it sends none.
+        (v.notesKind === undefined ||
+            v.notesKind === "health" ||
+            v.notesKind === "food" ||
+            v.notesKind === "general") &&
         // A13's unread count; an API from before it sends none.
         (v.unreadMessages === undefined || isNumber(v.unreadMessages))
     );
