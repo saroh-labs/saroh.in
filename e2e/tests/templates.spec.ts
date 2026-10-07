@@ -10,7 +10,7 @@ import { urls } from "../playwright.config";
  * plan U6): what only a running site shows.
  *
  * - /templates draws a card per gallery template, each linking to its page,
- *   and the Creators chip narrows them to the creators' templates;
+ *   and the Salons and Creators chips narrow them to that kind's templates;
  * - /templates/gym: the save button carries `template=gym` to the waitlist,
  *   the page switcher and the Phone toggle change the frame, the facts have
  *   no Plan row, and every related card answers 200;
@@ -50,7 +50,7 @@ test("/templates lists each template, and a chip narrows them", async ({
         }),
     ).toBeVisible();
     const cards = page.locator("main a[data-template]");
-    await expect(cards).toHaveCount(7);
+    await expect(cards).toHaveCount(9);
     await expect(page.locator('main a[data-template="gym"]')).toHaveAttribute(
         "href",
         "/templates/gym",
@@ -60,9 +60,12 @@ test("/templates lists each template, and a chip narrows them", async ({
             "Every business shown is a sample, made up to show the template.",
         ),
     ).toBeVisible();
-    // No chip for a kind with no template: Salons aren't built.
+    // "All" and a chip per kind with a template: none for "Other".
     const chips = page.getByRole("group", { name: "Kind of business" });
-    await expect(chips.getByRole("button", { name: "Salons" })).toHaveCount(0);
+    await expect(chips.getByRole("button")).toHaveCount(8);
+    await chips.getByRole("button", { name: "Salons" }).click();
+    await expect(cards).toHaveCount(1);
+    await expect(page.locator('main a[data-template="salon"]')).toHaveCount(1);
 
     await chips.getByRole("button", { name: "Creators" }).click();
     await expect(

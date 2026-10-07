@@ -1,13 +1,33 @@
 import type { RenderedJournal } from "@saroh/block-contract";
 import { resolveVariant } from "@saroh/block-contract";
 
-import type { JournalFeed } from "./journal";
-
 /**
  * Which posts the Journal lists, out of its client module so the server can
  * ask it too (`section-empty.ts`): a "use client" module's exports reach a
  * server component as references, not as functions it can call.
  */
+
+/** What the block needs of a post: less than the live or preview read has. */
+export interface JournalPost {
+    title: string;
+    slug: string;
+    excerpt?: string | null;
+    /** The post's body, already sanitized at publish; only read for text. */
+    content?: string | null;
+    image?: string | null;
+    author?: string | null;
+    /** Null for a post behind a preview token that has never gone live. */
+    publishedAt: string | null;
+    /** False only behind a preview token, for a post not published yet. */
+    live?: boolean;
+}
+
+/** The posts to show and where they live: `/blog` unless the merchant chose. */
+export interface JournalFeed {
+    posts: JournalPost[];
+    /** The posts index; each post is at `${basePath}/${slug}`. */
+    basePath: string;
+}
 
 /** How many posts the block shows when the count is not set. */
 export const JOURNAL_DEFAULT_COUNT = 3;
