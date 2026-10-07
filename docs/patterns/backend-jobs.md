@@ -191,9 +191,14 @@ nobody was told. Round-2 A14 closed it (`bookings/booking-notify.handler.ts`).
   and queues `team.alert` with that notice's id for the email only.
 - **One notice, filtered per person.** The bell is one org-wide
   `Notification`; `NotificationsService` leaves out, per viewer, the types
-  of rows they turned the bell off for or can't read. Email goes through
-  the business's own provider (`queueTransactional`, recipient
-  `TEAM_MEMBER`) to each member whose role reads it and who has email on.
+  of rows they turned the bell off for or can't read. Email goes from
+  **Saroh** (`sendTeamAlertEmail`, `common/email.ts`), provider or not —
+  Saroh telling a business about its own business (DEC-011, amended
+  2026-10-07) — to each member whose role reads it and who has email on.
+  `tellTeam` returns the emails and the handler sends them after the
+  transaction commits (at most once). Saroh's email carries fixed words and
+  the business's names cleaned (`cleanName`), never a customer's name or a
+  run's free text; the bell keeps the full words.
 - **Once per event**, claimed as a `CustomerNotice` (`TEAM_TOLD`,
   `team:<event>:<id>`), and re-read first: an unpaid checkout, a payment
   that went through after all, or someone who left again is not announced.

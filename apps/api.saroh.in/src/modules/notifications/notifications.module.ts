@@ -4,7 +4,6 @@ import { forwardRef, Module } from "@nestjs/common";
 import { OrganizationGuard } from "../../common/guards/organization.guard";
 import { AuditModule } from "../audit/audit.module";
 import { CapabilitiesModule } from "../capabilities/capabilities.module";
-import { CommunicationsService } from "../communications/communications.service";
 import { FeatureFlagModule } from "../feature-flags/feature-flags.module";
 import { JobHandlerRegistry } from "../jobs/job-handler.registry";
 import { JobsModule } from "../jobs/jobs.module";
@@ -35,9 +34,9 @@ import { TEAM_ALERT_TYPE, TeamAlertHandler } from "./team-alert.handler";
  *    ({@link OrganizationsModule} supplies the `OrganizationContextService`
  *    that `OrganizationGuard` needs, via forwardRef).
  *
- * D17's transactional send path ({@link CommunicationsService}) is
- * stateless, so it is provided here, as SiteAccountsModule does, rather
- * than importing CommunicationsModule and its controller's wiring.
+ * Both alerts go from Saroh's own email (`common/email.ts`), not the
+ * business's provider (DEC-011, amended 2026-10-07), so nothing here needs
+ * the transactional send path.
  */
 @Module({
     imports: [
@@ -53,7 +52,6 @@ import { TEAM_ALERT_TYPE, TeamAlertHandler } from "./team-alert.handler";
         NotificationPreferencesService,
         EnquiryNotifyHandler,
         TeamAlertHandler,
-        CommunicationsService,
         OrganizationGuard,
     ],
     exports: [NotificationsService],

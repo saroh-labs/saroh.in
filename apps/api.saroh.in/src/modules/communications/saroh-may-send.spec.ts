@@ -114,7 +114,6 @@ describe("sarohMaySend (DEC-086)", () => {
             "ORDER_HANDED_OVER",
             "WAITLIST_OFFER",
             "INVOICE_SENT",
-            "TEAM_ALERT",
         ]) {
             expect(await sarohRefusal(db(), "org_1", t, NOW, deps())).toBe(
                 "NOT_A_BOOKING_NOTICE",

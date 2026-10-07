@@ -138,7 +138,9 @@ export function alertOn(
 /**
  * Why a channel can't be used, when it can't:
  * - `NO_INBOX`: the person's role doesn't see the bell (`notification:read`).
- * - `NO_PROVIDER`: the business has no connected provider for it.
+ * - `NO_PROVIDER`: the business has no connected provider for it (WhatsApp
+ *   only: email alerts come from Saroh, whatever the business connected,
+ *   DEC-011 amended 2026-10-07).
  * - `NO_NUMBER`: WhatsApp is connected, but Saroh keeps no WhatsApp number
  *   for a team member, so nothing could reach them there.
  */
@@ -151,7 +153,6 @@ export type ChannelState =
 export function channelState(input: {
     channel: AlertChannel;
     seesInbox: boolean;
-    emailConnected: boolean;
     whatsappConnected: boolean;
 }): ChannelState {
     switch (input.channel) {
@@ -160,9 +161,8 @@ export function channelState(input: {
                 ? { available: true }
                 : { available: false, reason: "NO_INBOX" };
         case "email":
-            return input.emailConnected
-                ? { available: true }
-                : { available: false, reason: "NO_PROVIDER" };
+            // Saroh sends it, so it reaches anyone with a sign-in email.
+            return { available: true };
         case "whatsapp":
             return input.whatsappConnected
                 ? { available: false, reason: "NO_NUMBER" }

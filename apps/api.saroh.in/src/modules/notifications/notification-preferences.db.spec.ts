@@ -2,8 +2,9 @@
  * F14 against a real Postgres: a person's alert choices are theirs alone,
  * turning the bell off for New order takes those notices out of their
  * inbox (and only theirs), a settings-audit entry is written, and a
- * `team.alert` puts one notice in the inbox and emails, through the
- * business's own provider, the people who chose email.
+ * `team.alert` puts one notice in the inbox and has Saroh email the
+ * people who chose email, whether or not the business connected a
+ * provider, and never through it (DEC-011, amended 2026-10-07).
  *
  * Runs in the integration project (TEST_DATABASE_URL).
  */
@@ -12,7 +13,6 @@ import { prisma } from "@saroh/database";
 import type { OrganizationContext } from "../../common/types/organization-context";
 import { AuditService } from "../audit/audit.service";
 import type { ModuleAvailabilityService } from "../capabilities/module-availability.service";
-import { CommunicationsService } from "../communications/communications.service";
 import { FeatureFlagService } from "../feature-flags/feature-flags.service";
 import { NotificationPreferencesService } from "./notification-preferences.service";
 import { NotificationsService } from "./notifications.service";
@@ -37,7 +37,6 @@ const preferences = new NotificationPreferencesService(
     new FeatureFlagService(),
 );
 const inbox = new NotificationsService();
-const comms = new CommunicationsService();
 
 interface Business {
     organizationId: string;
@@ -209,7 +208,94 @@ describe("alerts (real database)", () => {
         ).toBe(0);
     });
 
-    it("someone joining: one notice in the inbox, and an email through the business's provider to who chose it", async () => {
+    /** Meera joins `b`'s team: the alert's payload. */
+    async function joiner(b: Business) {
+        const user = await prisma.user.create({
+            data: { email: `${uniq("meera")}@rye.in`, name: "Meera" },
+        });
+        await prisma.membership.create({
+            data: {
+                organizationId: b.organizationId,
+                userId: user.id,
+                role: "MEMBER",
+            },
+        });
+        return {
+            event: "team" as const,
+            userId: user.id,
+            invitationId: uniq("inv"),
+        };
+    }
+
+    async function nothingThroughTheProvider(b: Business) {
+        expect(
+            await prisma.message.count({
+                where: { organizationId: b.organizationId },
+            }),
+        ).toBe(0);
+        expect(
+            await prisma.job.count({
+                where: {
+                    organizationId: b.organizationId,
+                    type: "message.send",
+                },
+            }),
+        ).toBe(0);
+    }
+
+    it("someone joining, with no email provider: one notice in the inbox, and Saroh emails who chose it, not who turned it off", async () => {
+        const b = await business();
+        for (const [user, role] of [
+            [b.admin, "ADMIN"],
+            [b.owner, "OWNER"],
+        ] as const) {
+            await preferences.update(as(b, user, role), {
+                alert: "team",
+                channel: "email",
+                on: true,
+            });
+        }
+        // The owner turns email alerts off again.
+        await preferences.update(as(b, b.owner, "OWNER"), {
+            alert: "team",
+            channel: "email",
+            on: false,
+        });
+        const payload = await joiner(b);
+
+        const first = await prisma.$transaction((tx) =>
+            tellTeam(tx, b.organizationId, payload),
+        );
+        const again = await prisma.$transaction((tx) =>
+            tellTeam(tx, b.organizationId, payload),
+        );
+
+        const admin = await prisma.user.findUniqueOrThrow({
+            where: { id: b.admin },
+        });
+        expect(first.told).toBe(true);
+        expect(first.emails).toEqual([
+            {
+                userId: b.admin,
+                to: admin.email,
+                mail: expect.objectContaining({
+                    subject: "Rye & Co: Meera joined the team",
+                }),
+            },
+        ]);
+        expect(again).toEqual({ told: false, emails: [] });
+        const notices = await prisma.notification.findMany({
+            where: { organizationId: b.organizationId },
+        });
+        expect(notices).toHaveLength(1);
+        expect(notices[0]).toMatchObject({
+            type: "team.joined",
+            title: "Meera joined the team",
+        });
+        await nothingThroughTheProvider(b);
+    });
+
+    it("with an email provider connected, the team's alert still goes from Saroh, not the provider", async () => {
         const b = await business();
         await prisma.communicationProvider.create({
             data: {
@@ -227,63 +313,13 @@ describe("alerts (real database)", () => {
             channel: "email",
             on: true,
         });
-        const joiner = await prisma.user.create({
-            data: { email: `${uniq("meera")}@rye.in`, name: "Meera" },
-        });
-        await prisma.membership.create({
-            data: {
-                organizationId: b.organizationId,
-                userId: joiner.id,
-                role: "MEMBER",
-            },
-        });
+        const payload = await joiner(b);
 
-        const payload = {
-            event: "team" as const,
-            userId: joiner.id,
-            invitationId: uniq("inv"),
-        };
-        const first = await prisma.$transaction((tx) =>
-            tellTeam(tx, comms, b.organizationId, payload),
-        );
-        const again = await prisma.$transaction((tx) =>
-            tellTeam(tx, comms, b.organizationId, payload),
+        const out = await prisma.$transaction((tx) =>
+            tellTeam(tx, b.organizationId, payload),
         );
 
-        expect(first).toEqual({ told: true, emailed: 1 });
-        expect(again).toEqual({ told: false, emailed: 0 });
-        const notices = await prisma.notification.findMany({
-            where: { organizationId: b.organizationId },
-        });
-        expect(notices).toHaveLength(1);
-        expect(notices[0]).toMatchObject({
-            type: "team.joined",
-            title: "Meera joined the team",
-        });
-        const admin = await prisma.user.findUniqueOrThrow({
-            where: { id: b.admin },
-        });
-        const messages = await prisma.message.findMany({
-            where: { organizationId: b.organizationId },
-            include: { deliveries: true },
-        });
-        expect(messages).toHaveLength(1);
-        expect(messages[0]).toMatchObject({
-            channel: "EMAIL",
-            toAddress: admin.email,
-            contactId: null,
-            template: "TEAM_ALERT",
-            status: "QUEUED",
-            subject: "Rye & Co: Meera joined the team",
-        });
-        expect(messages[0]?.deliveries).toHaveLength(1);
-        expect(
-            await prisma.job.count({
-                where: {
-                    organizationId: b.organizationId,
-                    type: "message.send",
-                },
-            }),
-        ).toBe(1);
+        expect(out.emails.map((e) => e.userId)).toEqual([b.admin]);
+        await nothingThroughTheProvider(b);
     });
 });

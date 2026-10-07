@@ -18,7 +18,6 @@ import { DateTime } from "luxon";
 import { backendPid, waitUntilBlockedBy } from "../../../test/lock-wait";
 import type { OrganizationContext } from "../../common/types/organization-context";
 import type { EntitlementService } from "../billing/entitlement.service";
-import { CommunicationsService } from "../communications/communications.service";
 import { FeatureFlagService } from "../feature-flags/feature-flags.service";
 import { tellTeam } from "../notifications/team-alert.handler";
 import type { TeamAlertPayload } from "../notifications/team-alerts";
@@ -538,13 +537,8 @@ describe("the site.go_live job (T10)", () => {
             },
         ]);
         // The notice, told twice, is one notice.
-        const comms = new CommunicationsService();
-        await prisma.$transaction((tx) =>
-            tellTeam(tx, comms, b.org.id, told[0]),
-        );
-        await prisma.$transaction((tx) =>
-            tellTeam(tx, comms, b.org.id, told[0]),
-        );
+        await prisma.$transaction((tx) => tellTeam(tx, b.org.id, told[0]));
+        await prisma.$transaction((tx) => tellTeam(tx, b.org.id, told[0]));
         const notices = await prisma.notification.findMany({
             where: { organizationId: b.org.id },
             select: { type: true, title: true },
@@ -715,9 +709,7 @@ describe("the site.go_live job (T10)", () => {
             "Ravi, who scheduled it, is no longer on the team. Go live now, or schedule it again.",
         );
         const told = await alerts(b.org.id);
-        await prisma.$transaction((tx) =>
-            tellTeam(tx, new CommunicationsService(), b.org.id, told[0]),
-        );
+        await prisma.$transaction((tx) => tellTeam(tx, b.org.id, told[0]));
         // The bell is the business's: its owner, who can publish, sees it.
         expect(
             await prisma.notification.findMany({

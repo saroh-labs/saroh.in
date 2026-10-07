@@ -336,9 +336,10 @@ organizations/:org/customers`: everyone who has paid (an order through a
   room for one, and "See plans" otherwise — never a connect the API would
   refuse. Saroh's own email is for Saroh speaking to its own users (DEC-011,
   amended 2026-10-07): sign-in and account mail, team invitations, Saroh's
-  billing, the waitlist, alerts to a business's own team (enquiries; the
-  team alerts move from the business's provider to Saroh, decided and not
-  yet built), a site's customer sign-in codes and the email-changed notice
+  billing, the waitlist, alerts to a business's own team (enquiries, and
+  the team alerts — new order, booking, failed payment, someone joining, a
+  go-live — for every business, provider or not, in fixed words with the
+  business's names cleaned; built, #849), a site's customer sign-in codes and the email-changed notice
   with Saroh's built-in customer accounts (ADR-011), and a template test
   sent to the signed-in user's own verified address. A business that brings
   its own login system sends its own codes (not built). The workspace is to
