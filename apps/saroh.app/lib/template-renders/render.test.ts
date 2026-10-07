@@ -1,3 +1,4 @@
+import { openState } from "@saroh/site-blocks";
 import {
     CLINIC_GALLERY_SAMPLE,
     DIETICIAN_GALLERY_SAMPLE,
@@ -6,6 +7,7 @@ import {
 import { describe, expect, it } from "vitest";
 
 import { briefImage, wrapBrief } from "./brief-image";
+import { FIXTURE_DAY, FIXTURE_NOW, FIXTURE_TIME_ZONE } from "./fixtures";
 import {
     drawBriefs,
     galleryTemplates,
@@ -175,6 +177,43 @@ describe("templateRender", () => {
         },
     );
 
+    it("is drawn at one fixed weekday morning, open, whatever the clock says", () => {
+        const now = new Date(FIXTURE_NOW);
+        // A Tuesday, 10:30 in India, on the day Free today is for.
+        expect(
+            new Intl.DateTimeFormat("en-GB", {
+                timeZone: FIXTURE_TIME_ZONE,
+                weekday: "short",
+                hour: "2-digit",
+                minute: "2-digit",
+                hourCycle: "h23",
+            }).format(now),
+        ).toBe("Tue 10:30");
+        expect(
+            new Intl.DateTimeFormat("en-CA", {
+                timeZone: FIXTURE_TIME_ZONE,
+            }).format(now),
+        ).toBe(FIXTURE_DAY);
+        for (const t of galleryTemplates()) {
+            const render = templateRender(t.id, undefined, "/");
+            expect(render?.fixtures.now).toBe(FIXTURE_NOW);
+            const { visit, today } = render?.fixtures ?? {};
+            // Every sample with hours is open then, so the open line and
+            // Free today never disagree.
+            for (const hours of [visit?.hours, today?.hours]) {
+                if (!hours) continue;
+                expect(
+                    openState(hours, now, FIXTURE_TIME_ZONE)?.open,
+                    t.id,
+                ).toBe(true);
+            }
+            if (today) expect(today.date, t.id).toBe(FIXTURE_DAY);
+            // A timetable's seven days start today, as the live read's do.
+            const timetable = render?.fixtures.timetable;
+            if (timetable) expect(timetable.days[0], t.id).toBe(FIXTURE_DAY);
+        }
+    });
+
     it("never gives a sample an email off its own saroh.app address", () => {
         for (const t of galleryTemplates()) {
             const email = sampleContext(t).contactEmail;
@@ -202,6 +241,34 @@ describe("drawBriefs", () => {
         expect(out.image.alt).toBe("A loaf");
         expect(out.items[0]?.image?.alt).toBe("A mug");
         expect(out.items[1]?.image).toBeUndefined();
+    });
+
+    it("shapes a full-bleed hero's brief as the band, its words high up", () => {
+        const out = drawBriefs(
+            { variant: "fullBleed", imageBrief: "Loaves cooling" },
+            colours,
+            "hero",
+        ) as { image: { src: string; width: number; height: number } };
+        // The band's shape on a computer, so nothing is cropped off its top
+        // and the brief sits below the header drawn over it.
+        expect([out.image.width, out.image.height]).toEqual([1600, 840]);
+        const svg = decodeURIComponent(out.image.src.split(",")[1] ?? "");
+        const label = /<text x="\d+" y="(\d+)"[^>]*>PHOTOGRAPH/.exec(svg);
+        expect(Number(label?.[1])).toBeGreaterThan(840 * 0.12);
+        expect(Number(label?.[1])).toBeLessThan(840 * 0.25);
+    });
+
+    it("keeps a plate's brief above the name set over its foot", () => {
+        const render = templateRender("ceramics", undefined, "/");
+        const grid = render?.productGrids.find(Boolean);
+        const url = grid?.products[0]?.image?.url ?? "";
+        const svg = decodeURIComponent(url.split(",")[1] ?? "");
+        const lines = (svg.match(/<text x="\d+" y="\d+"/g) ?? []).map((m) =>
+            Number(/y="(\d+)"/.exec(m)?.[1]),
+        );
+        expect(lines.length).toBeGreaterThan(1);
+        // Every line in the top half of the square.
+        expect(Math.max(...lines)).toBeLessThan(500);
     });
 
     it("leaves a real photo alone, and fills an empty gallery", () => {

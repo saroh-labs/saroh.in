@@ -82,6 +82,20 @@ export interface TemplateFixture {
 /** India, as the designs are. */
 export const FIXTURE_TIME_ZONE = "Asia/Kolkata";
 
+/**
+ * The day every render is drawn on: a Tuesday, the first day every sample
+ * business is open (the bakery, the studio and the salon shut on Mondays).
+ */
+export const FIXTURE_DAY = "2026-10-13";
+
+/**
+ * The moment every render is drawn at (`SiteFixtures.now`): 10:30 in India
+ * on {@link FIXTURE_DAY}, inside every sample business's opening hours. So
+ * "Open now" and "Free today" agree, and a capture taken at night reads the
+ * same as one taken in the morning. Live sites read the clock.
+ */
+export const FIXTURE_NOW = `${FIXTURE_DAY}T05:00:00.000Z`;
+
 type Day = OpeningHoursDay["day"];
 
 /** A week of hours from "07:00–15:00"-style rows; days not named are closed. */
@@ -231,15 +245,29 @@ const ceramics: TemplateFixture = {
 // Gym — "Iron & Oak" (Gym.dc.html)
 // ---------------------------------------------------------------------------
 
-/** The design's week, Monday 12 Oct 2026 on: fixed, so every capture matches. */
+/**
+ * The seven days from {@link FIXTURE_DAY} (a Tuesday), as the live read
+ * sends them, so the timetable never opens on a day already gone. The
+ * design's Monday-to-Friday classes keep their weekdays: Monday's fall on
+ * the coming Monday, 19 Oct (`GYM_CLASS_DAYS`).
+ */
 const GYM_WEEK = [
-    "2026-10-12",
     "2026-10-13",
     "2026-10-14",
     "2026-10-15",
     "2026-10-16",
     "2026-10-17",
     "2026-10-18",
+    "2026-10-19",
+];
+
+/** The date each of the design's columns, Monday to Friday, falls on. */
+const GYM_CLASS_DAYS = [
+    "2026-10-19",
+    "2026-10-13",
+    "2026-10-14",
+    "2026-10-15",
+    "2026-10-16",
 ];
 
 /** One row per time; `fills` is a class that usually fills (a place or two left). */
@@ -294,7 +322,7 @@ function gymTimetable(): PublicTimetable {
         slot.cells.forEach((cell, day) => {
             if (!cell) return;
             const [name, coach, fills] = cell;
-            const date = GYM_WEEK[day] ?? GYM_WEEK[0];
+            const date = GYM_CLASS_DAYS[day] ?? FIXTURE_DAY;
             sessions.push({
                 serviceId: `gym-${name.toLowerCase().replace(/\W+/g, "-")}`,
                 serviceName: name,
@@ -571,7 +599,7 @@ function withSamples(
 // ---------------------------------------------------------------------------
 
 /** The day the captures show: a Monday, fixed, so every capture matches. */
-const SAMPLE_DAY = "2026-10-12";
+const SAMPLE_DAY = FIXTURE_DAY;
 
 /** One free appointment time today, as the public today read sends it. */
 function freeAt(

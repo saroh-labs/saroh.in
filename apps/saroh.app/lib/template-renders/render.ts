@@ -22,7 +22,7 @@ import {
 import type { BriefColours } from "./brief-image";
 import { briefImage, hslOf } from "./brief-image";
 import type { TemplateFixture } from "./fixtures";
-import { FIXTURE_TIME_ZONE, TEMPLATE_FIXTURES } from "./fixtures";
+import { FIXTURE_NOW, FIXTURE_TIME_ZONE, TEMPLATE_FIXTURES } from "./fixtures";
 
 /**
  * One page of a gallery template, ready to draw (industry templates U14):
@@ -199,7 +199,15 @@ export function templateRender(
             s.type === "productGrid" && fixture?.products
                 ? {
                       products: fixture.products.map((p) =>
-                          productCard(p, colours),
+                          productCard(
+                              p,
+                              colours,
+                              // Plates set the name over the photo's foot.
+                              (s.content as { variant?: unknown }).variant ===
+                                  "plates"
+                                  ? "upper"
+                                  : "centre",
+                          ),
                       ),
                       basePath: "/shop",
                   }
@@ -218,6 +226,8 @@ export function templateRender(
                 : undefined,
             timetable: fixture?.timetable,
             today: fixture?.today,
+            // A fixed weekday morning, not the clock (`fixtures.ts`).
+            now: FIXTURE_NOW,
         },
     };
 }
@@ -256,6 +266,7 @@ function patched(
 function productCard(
     p: NonNullable<TemplateFixture["products"]>[number],
     colours: BriefColours,
+    placement: "centre" | "upper",
 ): ShopListingCard {
     return {
         slug: p.slug,
@@ -265,7 +276,12 @@ function productCard(
         mrp: null,
         priceFrom: false,
         image: {
-            url: briefImage(p.brief, colours, { width: 1000, height: 1000 }),
+            url: briefImage(
+                p.brief,
+                colours,
+                { width: 1000, height: 1000 },
+                placement,
+            ),
             alt: p.brief,
         },
         variantTitles: [],
@@ -281,6 +297,9 @@ const SLOT_SIZES: Readonly<
     hero: { width: 1600, height: 1000 },
     person: { width: 800, height: 1000 },
 };
+
+/** A full-bleed hero's photo: the band's own shape on a computer. */
+const FULL_BLEED_SIZE = { width: 1600, height: 840 } as const;
 
 /**
  * Every image slot that has only a brief (KTD-5) given the brief as its
@@ -304,10 +323,14 @@ export function drawBriefs(
     const brief =
         typeof out.imageBrief === "string" ? out.imageBrief.trim() : "";
     if (!brief) return out;
-    const size = SLOT_SIZES[type] ?? { width: 1200, height: 900 };
     // Words are set over a full-bleed hero's photo, low down: keep the
-    // brief at the top, clear of them.
+    // brief at the top, clear of them. Shaped as the band is on a computer
+    // (1440 by at most 760), so the picture is not cropped there and the
+    // brief's top stays below the header drawn over it.
     const over = type === "hero" && out.variant === "fullBleed";
+    const size = over
+        ? FULL_BLEED_SIZE
+        : (SLOT_SIZES[type] ?? { width: 1200, height: 900 });
     const image = {
         src: briefImage(brief, colours, size, over ? "top" : "centre"),
         alt: brief,
