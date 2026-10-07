@@ -5,8 +5,8 @@ import { accountBookingBody } from "./account-booking";
 /**
  * What the signed-in booking forwards to the API (round-2 plan A, A9): the
  * page's own fields only. A server action's arguments come from the
- * browser, so nothing else is passed on — never an email, a phone, an
- * amount or a business.
+ * browser, so nothing else is passed on — never an email, an amount or a
+ * business, and a phone only when it looks like one (UX-049).
  */
 const REQUEST = {
     serviceId: "svc_pt",
@@ -38,11 +38,20 @@ describe("accountBookingBody", () => {
         const body = accountBookingBody({
             ...REQUEST,
             bookerEmail: "someone-else@example.in",
-            bookerPhone: "+91 98450",
+            bookerPhone: "call me <script>",
             amount: 1,
             organizationId: "org_other",
         });
         expect(body).toEqual(REQUEST);
+    });
+
+    it("forwards a phone they gave (UX-049)", () => {
+        expect(
+            accountBookingBody({
+                ...REQUEST,
+                bookerPhone: " +91 98450 12345 ",
+            }),
+        ).toEqual({ ...REQUEST, bookerPhone: "+91 98450 12345" });
     });
 
     it("forwards paying a deposit (E8), never an amount", () => {

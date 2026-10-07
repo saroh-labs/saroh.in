@@ -170,6 +170,8 @@ async function booking(
             timezone: "Asia/Kolkata",
             snapshot: {},
             bookerEmail: `${uniq("b")}@example.test`,
+            // Made on the site unless a test says the team made it.
+            bookedOnline: true,
             ...over,
         },
     });
@@ -308,6 +310,11 @@ describe("what each limit counts (DB, U13)", () => {
             createdAt: new Date(start.getTime() - 15 * MINUTE),
         });
         await booking(orgId, { status: "CANCELLED" });
+        // One the team made in the workspace is never counted (DEC-095).
+        await booking(orgId, {
+            createdAt: new Date(start.getTime() + 20 * MINUTE),
+            bookedOnline: false,
+        });
         // A pay-now hold isn't a booking until it is paid.
         await booking(orgId, {
             status: "PENDING",

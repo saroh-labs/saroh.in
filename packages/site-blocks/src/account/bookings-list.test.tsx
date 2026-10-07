@@ -271,9 +271,22 @@ describe("the Bookings tab (A6)", () => {
         expect(calls.moveTimes).toHaveBeenCalledWith("bk_1");
         const go = within(sheet).getByRole("button", { name: "Pick a time" });
         expect(go).toBeDisabled();
+        // The booking page's day strip, open on the first day with a free
+        // time, and every free time of it (UX-055).
+        expect(
+            await within(sheet).findByRole("radio", {
+                name: "Tue 6 Oct: 2 times free",
+            }),
+        ).toHaveAttribute("aria-checked", "true");
+        expect(
+            within(sheet).getByRole("radio", { name: "Wed 7 Oct: no times" }),
+        ).toBeDisabled();
+        expect(
+            within(sheet).getByRole("radio", { name: "12:00 with Dr. Rao" }),
+        ).toBeInTheDocument();
         fireEvent.click(
             await within(sheet).findByRole("radio", {
-                name: /Tue 6 Oct at 11:00/,
+                name: "11:00 with Dr. Rao",
             }),
         );
         fireEvent.click(
@@ -312,7 +325,7 @@ describe("the Bookings tab (A6)", () => {
         const sheet = await screen.findByRole("dialog");
         fireEvent.click(
             await within(sheet).findByRole("radio", {
-                name: /Tue 6 Oct at 11:00/,
+                name: "11:00 with Dr. Rao",
             }),
         );
         fireEvent.click(
@@ -406,7 +419,7 @@ describe("the Bookings tab (A6)", () => {
         const sheet = await screen.findByRole("dialog");
         fireEvent.click(
             await within(sheet).findByRole("radio", {
-                name: /Tue 6 Oct at 11:00/,
+                name: "11:00 with Dr. Rao",
             }),
         );
         fireEvent.click(
@@ -512,7 +525,7 @@ describe("the Bookings tab (A6)", () => {
         ).toBeInTheDocument();
         fireEvent.click(
             await within(sheet).findByRole("radio", {
-                name: /Thu 8 Oct at 11:00/,
+                name: "11:00 with Dr. Mehta",
             }),
         );
         fireEvent.click(
@@ -543,6 +556,29 @@ describe("the Bookings words (A6)", () => {
                 cancelledLate: true,
             }),
         ).toBe("Visit 2 of 3 · With Dr. Rao · Video call · Cancelled late");
+    });
+
+    it("a row says what was paid and how (UX-049)", () => {
+        expect(
+            bookingSub({
+                ...CHECK_UP,
+                paid: { how: "online", amount: "800.00", currency: "INR" },
+            }),
+        ).toBe("With Dr. Rao · Paid ₹800 online");
+        expect(
+            bookingSub({
+                ...CHECK_UP,
+                paid: { how: "desk", amount: "1200.00", currency: "INR" },
+            }),
+        ).toBe("With Dr. Rao · Paid ₹1,200 at the desk");
+        expect(
+            bookingSub({
+                ...CHECK_UP,
+                paid: { how: "pack", amount: null, currency: null },
+            }),
+        ).toBe("With Dr. Rao · Paid with your class pack");
+        // Nothing paid yet, or an older API: nothing said.
+        expect(bookingSub({ ...CHECK_UP, paid: null })).toBe("With Dr. Rao");
     });
 
     it("the cancel sheet's note follows the terms, and never names a way to pay", () => {

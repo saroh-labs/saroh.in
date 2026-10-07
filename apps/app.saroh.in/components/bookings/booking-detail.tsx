@@ -105,6 +105,24 @@ export function BookingDetailView({
     return (
         <main className="mx-auto w-full max-w-4xl p-6 sm:p-8">
             <PageHeader
+                // Where it sits (UX-083): Bookings › All bookings › this one.
+                breadcrumb={[
+                    <Link
+                        key="bookings"
+                        href="/bookings"
+                        className="hover:text-foreground"
+                    >
+                        Bookings
+                    </Link>,
+                    <Link
+                        key="all"
+                        href="/bookings/all"
+                        className="hover:text-foreground"
+                    >
+                        All bookings
+                    </Link>,
+                    service.name,
+                ]}
                 title={service.name}
                 description={
                     madeBy

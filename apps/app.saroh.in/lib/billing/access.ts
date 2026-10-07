@@ -20,6 +20,8 @@ export interface UpgradeTo {
     planId: string;
     name: string;
     pricePaise: number;
+    /** That plan has no cap on the row (UX-083); absent from an older API. */
+    uncapped?: boolean;
 }
 
 /** One catalogue row. */
@@ -102,6 +104,7 @@ export function rowNotice(
             limit: row.limit,
             plan: view.plan?.name ?? "",
             upgradeTo: row.upgradeTo?.name ?? "",
+            upgradeUncapped: row.upgradeTo?.uncapped === true,
             soft: row.soft === true,
         },
         row.usage,

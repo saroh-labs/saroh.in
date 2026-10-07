@@ -488,7 +488,9 @@ describe("Contacts and Insights", () => {
     it("asks nothing, just Turn on", async () => {
         await open(["CRM"]);
         expect(text()).toContain("Turn on Contacts");
-        expect(text()).toContain("Nothing to fill in.");
+        // Never "works as soon as it's on" before "Finish setup" (UX-083).
+        expect(text()).toContain("Nothing to fill in here.");
+        expect(text()).not.toContain("It works as soon as it's on");
         expect(sheet().querySelectorAll("input")).toHaveLength(0);
         await press(button(/^Turn on$/));
         expect(enableModuleAction).toHaveBeenCalledWith("CRM", {});

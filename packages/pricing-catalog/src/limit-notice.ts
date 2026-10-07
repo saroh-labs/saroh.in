@@ -62,7 +62,7 @@ export interface LimitNoticeOptions {
  */
 export function limitNotice(
     access: Pick<ModuleAccess, "inc" | "limit" | "plan" | "upgradeTo"> &
-        Partial<Pick<ModuleAccess, "soft">>,
+        Partial<Pick<ModuleAccess, "soft" | "upgradeUncapped">>,
     count: number,
     what: string,
     pausedText: string,
@@ -90,7 +90,13 @@ export function limitNotice(
         : soft
           ? `Nothing stops at ${formatCount(L)}; we'll let you know when you reach it.`
           : `You'll be stopped at ${formatCount(L)}.`;
-    const higher = full ? "raises the limit" : "gives you more";
+    // A higher plan with no cap says so (UX-083: never "raises the limit").
+    const uncapped = access.upgradeUncapped === true;
+    const higher = uncapped
+        ? "has no limit"
+        : full
+          ? "raises the limit"
+          : "gives you more";
     // A limit's own way out comes first, a higher plan second, no add-on;
     // closed, the higher plan leads and says what it opens.
     const more = action
@@ -104,10 +110,10 @@ export function limitNotice(
               : ""
         : full
           ? up
-              ? ` ${up} raises the limit, or add more with an add-on.`
+              ? ` ${up} ${higher}, or add more with an add-on.`
               : " Add more with an add-on."
           : up
-            ? ` ${up} gives you more.`
+            ? ` ${up} ${higher}.`
             : " An add-on gives you more.";
     return {
         on: true,

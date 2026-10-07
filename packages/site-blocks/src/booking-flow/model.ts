@@ -76,6 +76,12 @@ export interface BookingPageData {
     businessName: string;
     /** False when the business has switched Appointments off. */
     open: boolean;
+    /**
+     * Online booking is paused (DEC-095): the business has had all the
+     * online bookings its plan takes this month. Said before the form,
+     * naming no plan. Absent from an older API: not paused.
+     */
+    paused?: boolean;
     timezone: string;
     /**
      * Pay now is on offer: the business allows it (DEC-088), Payments is on
@@ -104,6 +110,11 @@ export interface BookingDay {
     /** `YYYY-MM-DD` in the business's zone. */
     date: string;
     open: boolean;
+    /**
+     * The business itself is closed that day (UX-054): a closure, or no
+     * opening hours that day. Absent from an older API: not known.
+     */
+    closed?: boolean;
     starts: BookingStart[];
 }
 
@@ -189,6 +200,7 @@ export function isBookingPage(v: unknown): v is BookingPageData {
     return (
         isStr(v.businessName) &&
         typeof v.open === "boolean" &&
+        (v.paused === undefined || typeof v.paused === "boolean") &&
         isStr(v.timezone) &&
         typeof v.payOnline === "boolean" &&
         numOrNull(r.bookAheadDays) &&
@@ -227,6 +239,7 @@ export function isBookingDays(v: unknown): v is BookingDays {
                 isStr(d.date) &&
                 /^\d{4}-\d{2}-\d{2}$/.test(d.date) &&
                 typeof d.open === "boolean" &&
+                (d.closed === undefined || typeof d.closed === "boolean") &&
                 Array.isArray(d.starts) &&
                 d.starts.every(isStart),
         )
@@ -651,14 +664,16 @@ export function dateIn(iso: string, zone: string): string {
 
 /**
  * What a day button says under its date: how many times are free, or Full
- * (it is open and all taken), or Closed (nobody works then). On a phone the
- * count stands alone and Closed shortens to Shut.
+ * (it is open and all taken), Closed (the business is closed that day), or
+ * No times (it is open, but nobody takes this service then) — UX-054: never
+ * Closed on a day the header says it's open. On a phone the count stands
+ * alone; the words are the same on both.
  */
 export function dayCountLabel(day: BookingDay, phone: boolean): string {
     const n = day.starts.length;
     if (n > 0) return phone ? String(n) : `${n} free`;
     if (day.open) return "Full";
-    return phone ? "Shut" : "Closed";
+    return day.closed ? "Closed" : "No times";
 }
 
 /** The screen-reader name of a day button. */
@@ -668,7 +683,9 @@ export function dayAria(day: BookingDay): string {
         ? `${n} ${n === 1 ? "time" : "times"} free`
         : day.open
           ? "full"
-          : "closed";
+          : day.closed
+            ? "closed"
+            : "no times";
     return `${dateText(day.date, true)}: ${what}`;
 }
 
@@ -749,21 +766,35 @@ function keptText(rules: BookingRules, payingOnline: boolean): string | null {
         : null;
 }
 
-/**
- * The confirmation's closing line. Saroh sends no message, so there is no
- * "link in your confirmation" to point at: changes go through the business.
- */
-export function changeText(
-    business: string,
-    rules: BookingRules,
-    paidOnline = false,
-): string {
+/** The words after "Need to change it? …": the free-cancel window and refund policy. */
+export function changeRules(rules: BookingRules, paidOnline = false): string {
     const free =
         rules.freeCancelHours !== null
             ? ` Free to cancel until ${describeMinutes(rules.freeCancelHours * 60)} before the start.`
             : "";
     const kept = keptText(rules, paidOnline);
-    return `Need to change it? Get in touch with ${business}.${free}${kept ? ` ${kept}` : ""}`;
+    return `${free}${kept ? ` ${kept}` : ""}`;
+}
+
+/** Where a signed-in booker moves or cancels it (UX-055). */
+export const MOVE_OR_CANCEL = "Move or cancel it from your bookings";
+
+/**
+ * The confirmation's closing line. Saroh sends no message, so there is no
+ * "link in your confirmation" to point at. A booking made signed in (every
+ * booking since A9) is moved or cancelled from the booker's own bookings
+ * (UX-055); `movable` false — no account to go to — says to get in touch.
+ */
+export function changeText(
+    business: string,
+    rules: BookingRules,
+    paidOnline = false,
+    movable = false,
+): string {
+    const how = movable
+        ? `${MOVE_OR_CANCEL} on ${business}'s website.`
+        : `Get in touch with ${business}.`;
+    return `Need to change it? ${how}${changeRules(rules, paidOnline)}`;
 }
 
 /** "Places left" words for a class session. */

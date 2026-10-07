@@ -4224,6 +4224,12 @@ model Booking {
   customerAccountId String?
   customerAccount   CustomerAccount? @relation(fields: [customerAccountId], references: [id], onDelete: SetNull)
 
+  // Made by the customer on the business's site, not by someone on the team
+  // (DEC-095). Free's monthly bookings cap counts only these: a booking the
+  // team makes in the workspace is never capped. Written once, when the
+  // booking is made (`reserveInTx`: no actor means the booker did it).
+  bookedOnline Boolean @default(false)
+
   // The free-cancel deadline, fixed when the booking is made (E8, DEC-051):
   // its start less the business's free-cancel hours then. A move never
   // changes it. Null — bookings before the column, or made with no rule —

@@ -51,6 +51,14 @@ describe("resolveAccess", () => {
         });
     });
 
+    it("says when the plan above has no cap on a row (UX-083)", () => {
+        expect(resolveAccess(on("a"), "orders")).toMatchObject({
+            upgradeTo: "Plan B",
+            upgradeUncapped: true,
+        });
+        expect(resolveAccess(on("a"), "invoicing").upgradeUncapped).toBe(true);
+    });
+
     it("leaves a module the catalogue doesn't list on", () => {
         expect(resolveAccess(on("a"), "unknown").state).toBe("on");
     });

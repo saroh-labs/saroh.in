@@ -59,9 +59,11 @@ export const LIMIT_WORDS: Readonly<Record<string, LimitWords>> = {
         paused: "New orders at the counter are paused until next month; your site keeps taking them.",
         monthly: true,
     },
+    // Only bookings customers make on the site count (DEC-095): the team's
+    // own are never capped, so the notice says the desk still books.
     bookingsPerMonth: {
-        what: "bookings a month",
-        paused: "New bookings are paused until next month.",
+        what: "online bookings a month",
+        paused: "Online booking on your site is paused until next month; you can still book customers in yourself.",
         monthly: true,
     },
     blogPosts: {

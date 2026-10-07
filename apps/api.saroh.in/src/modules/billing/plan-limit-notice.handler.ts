@@ -62,7 +62,10 @@ function overBody(key: MeteredLimitKey, soft: boolean): string {
  * so its 80% notice doesn't say "you'll be stopped".
  */
 export function limitNoticeWords(
-    row: Pick<ModuleAccess, "plan" | "upgradeTo"> & { soft?: boolean },
+    row: Pick<ModuleAccess, "plan" | "upgradeTo"> & {
+        soft?: boolean;
+        upgradeUncapped?: boolean;
+    },
     key: MeteredLimitKey,
     limit: number,
     used: number,
@@ -82,16 +85,20 @@ export function limitNoticeWords(
     if (level === "over") {
         const open = actionOpen === undefined || actionOpen === true;
         const up = row.upgradeTo;
+        // A higher plan with no cap says so (UX-083).
+        const raises = row.upgradeUncapped
+            ? "has no limit"
+            : "raises the limit";
         // A limit with its own way out (Saroh's emails) offers no add-on;
         // closed, the higher plan leads, as in `limitNotice`.
         const more = words.action
             ? open
-                ? `${words.action.sentence}${up ? ` Or ${up} raises the limit.` : ""}`
+                ? `${words.action.sentence}${up ? ` Or ${up} ${raises}.` : ""}`
                 : up
-                  ? `${up} raises the limit.${actionOpen === false ? ` ${words.action.closed.sentence}` : ""}`
+                  ? `${up} ${raises}.${actionOpen === false ? ` ${words.action.closed.sentence}` : ""}`
                   : ""
             : up
-              ? `${up} raises the limit.`
+              ? `${up} ${raises}.`
               : "An add-on gives you more.";
         return {
             title: `You're past your ${limit.toLocaleString("en-IN")} ${words.what} on ${row.plan}`,
@@ -100,7 +107,14 @@ export function limitNoticeWords(
     }
     // The shared rule words a soft cap too, so the inbox and the screen agree.
     const n = limitNotice(
-        { inc: true, limit, plan: row.plan, upgradeTo: row.upgradeTo, soft },
+        {
+            inc: true,
+            limit,
+            plan: row.plan,
+            upgradeTo: row.upgradeTo,
+            upgradeUncapped: row.upgradeUncapped,
+            soft,
+        },
         used,
         words.what,
         words.paused,

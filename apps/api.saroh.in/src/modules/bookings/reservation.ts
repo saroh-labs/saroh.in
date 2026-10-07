@@ -395,13 +395,16 @@ export async function reserveInTx(
     const organizationId = service.organizationId;
     const email = input.bookerEmail.trim().toLowerCase();
     const snapshot = buildSnapshot(service, input, startAt, endAt);
-    // The plan's monthly bookings cap (U13), before anything is written. A
+    // The plan's monthly bookings cap (U13), before anything is written.
+    // It counts and refuses only bookings customers make themselves
+    // (DEC-095): one the team makes in the workspace is never capped. A
     // course's sessions are the course's (COURSES), not counted here. The
     // booking page is told only that the business isn't taking bookings
     // online, and nothing is paid yet (a pay-now hold is made below).
-    if (!course) {
+    const bookedOnline = by.actorUserId === null;
+    if (!course && bookedOnline) {
         await planMeter.roomInTx(tx, organizationId, "bookings", {
-            refuse: by.actorUserId === null ? bookingsPaused : undefined,
+            refuse: bookingsPaused,
         });
     }
     // The free-cancel deadline, fixed now from today's rule (E8, DEC-051):
@@ -528,6 +531,7 @@ export async function reserveInTx(
             ),
             intakeNote: intakeNoteOf(input.intakeNote),
             customerAccountId: by.account?.accountId ?? null,
+            bookedOnline,
             freeCancelUntil,
             ...(person
                 ? {
@@ -732,14 +736,23 @@ async function accountContactInTx(
     }
     const contact = await tx.contact.findFirst({
         where: { id: resolved.id, organizationId },
-        select: { id: true, firstName: true, lastName: true },
+        select: { id: true, firstName: true, lastName: true, phone: true },
     });
     if (!contact) throw new NotFoundException("Sign in to continue.");
     const { first, last } = splitName(input.bookerName);
+    const data: Prisma.ContactUpdateInput = {};
     if (!contact.firstName?.trim() && !contact.lastName?.trim() && first) {
+        data.firstName = first;
+        data.lastName = last ?? null;
+    }
+    // A phone they gave on the booking page fills a record that has none
+    // (UX-049); one the business already has is never replaced from here.
+    const phone = input.bookerPhone?.trim();
+    if (phone && !contact.phone?.trim()) data.phone = phone;
+    if (Object.keys(data).length > 0) {
         await tx.contact.update({
             where: { id: contact.id },
-            data: { firstName: first, lastName: last ?? null },
+            data,
             select: { id: true },
         });
     }

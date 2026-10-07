@@ -7,8 +7,10 @@ import type { SignedInBookRequest } from "@saroh/site-blocks";
  * page makes. The API checks every field again; this only keeps anything
  * else from being forwarded.
  *
- * There is never an email, a phone or an amount: the booker is the
- * account's and the price is the service's.
+ * There is never an email or an amount: the booker is the account's and
+ * the price is the service's. A phone is passed on only when it looks like
+ * one (UX-049); the API keeps it on the booking and gives it to the
+ * account's record only when that has none.
  */
 export type AccountBookingBody = SignedInBookRequest;
 
@@ -16,6 +18,8 @@ const MAX_ID = 64;
 const MAX_KEY = 128;
 const MAX_NAME = 128;
 const MAX_NOTE = 1_000;
+/** A phone as people type one: digits, spaces, +, -, brackets. */
+const PHONE = /^\+?[\d\s()-]{6,24}$/;
 
 function text(value: unknown, max: number): string | undefined {
     if (typeof value !== "string") return undefined;
@@ -75,5 +79,7 @@ export function accountBookingBody(
     if (typeof r.intakeNote === "string" && r.intakeNote.trim()) {
         body.intakeNote = r.intakeNote.slice(0, MAX_NOTE + 1);
     }
+    const bookerPhone = text(r.bookerPhone, 24);
+    if (bookerPhone && PHONE.test(bookerPhone)) body.bookerPhone = bookerPhone;
     return body;
 }

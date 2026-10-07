@@ -525,10 +525,25 @@ export interface Column {
 }
 
 /**
+ * When customers can book with nobody on the diary (UX-023): each
+ * one-to-one service's own weekly hours, together, in the business's zone,
+ * and the business's closures as time off — what the booking page offers.
+ */
+export interface ServiceHours {
+    hours: StaffView["hours"];
+    timeOff: StaffView["timeOff"];
+}
+
+/** The column that draws {@link ServiceHours}: Unassigned's place. */
+export const SERVICE_HOURS_NAME = "Service hours";
+
+/**
  * The day by person: everyone active on the diary in the staff list's order,
  * anyone else only on a day they hold something, and Unassigned last when it
  * holds something (bookings from before staff existed). With no staff list
- * (it failed to load), the people the bookings read names.
+ * (it failed to load), the people the bookings read names. With nobody on
+ * the diary, one column draws the services' own hours and what is free in
+ * them, as the booking page offers it (UX-023), with every booking in it.
  */
 export function dayColumns(
     calendar: BookingsCalendar,
@@ -538,6 +553,8 @@ export function dayColumns(
     gapAfter: (serviceId: string) => number,
     /** The shortest gap worth offering a person: what they could book. */
     minFree: (person: StaffView) => number = () => MIN_FREE_MINUTES,
+    /** The services' own hours, read only while nobody is on the diary. */
+    serviceHours: ServiceHours | null = null,
 ): Column[] {
     const byPerson = blocksOnDay(calendar, date, timeZone);
     const columns: Column[] = [];
@@ -573,7 +590,21 @@ export function dayColumns(
         });
     }
     const unassigned = byPerson.get(UNASSIGNED) ?? [];
-    if (unassigned.length > 0) {
+    const nobody = staff !== null && !staff.some((p) => p.status === "ACTIVE");
+    if (nobody && serviceHours && serviceHours.hours.length > 0) {
+        columns.push({
+            key: UNASSIGNED,
+            name: SERVICE_HOURS_NAME,
+            title: "Each service's own hours",
+            day: personDay(
+                { ...serviceHours, extraHours: [] },
+                date,
+                timeZone,
+                busySpans(unassigned, gapAfter),
+            ),
+            blocks: unassigned,
+        });
+    } else if (unassigned.length > 0) {
         columns.push({
             key: UNASSIGNED,
             name: "Unassigned",
@@ -606,7 +637,8 @@ export function paidText(b: DiaryBooking): string {
         case "PACK":
             return b.packName ? `Pack · ${b.packName}` : "Class pack";
         case "PAID":
-            return "Paid";
+            // How, beside the "Paid" label: never "Paid · Paid" (UX-049).
+            return "Paid online";
         case "DESK":
             return "Pays at the session";
         default:

@@ -150,7 +150,7 @@ describe("weekRows", () => {
             week({ owed: { totals: [], bills: 0, overdue: 0, href: "/x" } }),
         );
         expect(row).toMatchObject({
-            value: "All paid",
+            value: "All invoices paid",
             sub: "Nothing unpaid",
             bad: false,
         });

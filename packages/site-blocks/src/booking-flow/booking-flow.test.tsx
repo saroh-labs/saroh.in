@@ -99,7 +99,7 @@ const ONE_DAYS = {
     capacity: 1,
     days: [
         { date: "2026-09-18", open: true, starts: [] },
-        { date: "2026-09-19", open: false, starts: [] },
+        { date: "2026-09-19", open: false, closed: true, starts: [] },
         {
             date: "2026-09-20",
             open: true,
@@ -292,11 +292,32 @@ describe("the booking page (U19)", () => {
             pay: "DESK",
         });
         expect(body).not.toHaveProperty("amount");
-        // The booker is the account's (A9): no email, phone or name sent.
+        // The booker is the account's (A9): no email or name sent, and no
+        // phone when none was given.
         expect(body).not.toHaveProperty("bookerEmail");
         expect(body).not.toHaveProperty("bookerPhone");
         expect(body).not.toHaveProperty("bookerName");
         expect(typeof body.idempotencyKey).toBe("string");
+    });
+
+    it("sends a phone they gave, optional (UX-049)", async () => {
+        serve((url) =>
+            url.endsWith("/days") ? json(ONE_DAYS) : json(booked(), 201),
+        );
+        render(<BookingFlow page={PAGE} apiUrl={API} account={account()} />);
+        await chooseOneToOne();
+        fireEvent.change(screen.getByLabelText("Phone (optional)"), {
+            target: { value: " +91 98450 12345 " },
+        });
+        fireEvent.click(screen.getByRole("radio", { name: /Pay at the desk/ }));
+        fireEvent.click(
+            screen.getByRole("button", { name: "Book — pay at the desk" }),
+        );
+        await screen.findByRole("heading", { name: "You're booked, Asha." });
+        const post = calls.find((c) => c.url.endsWith("/book"));
+        expect(JSON.parse(post?.init?.body as string)).toMatchObject({
+            bookerPhone: "+91 98450 12345",
+        });
     });
 
     it("pays now: holds the place, starts the payment, and confirms when the hold does", async () => {
@@ -736,6 +757,28 @@ describe("the booking page (U19)", () => {
                 name: "Online booking isn't open right now",
             }),
         ).toBeInTheDocument();
+    });
+
+    it("says online booking is paused before the form, naming no plan (DEC-095)", () => {
+        serve(() => json({}));
+        render(
+            <BookingFlow
+                page={{ ...PAGE, paused: true }}
+                apiUrl={API}
+                account={account()}
+            />,
+        );
+        expect(
+            screen.getByRole("heading", {
+                name: "Online booking is paused for now",
+            }),
+        ).toBeInTheDocument();
+        // Nothing to pick: no service, day or time before being told.
+        expect(
+            screen.queryByRole("radio", { name: /Personal training/ }),
+        ).toBeNull();
+        expect(document.body.textContent).not.toMatch(/plan|limit/i);
+        expect(calls).toHaveLength(0);
     });
 });
 
@@ -1639,7 +1682,7 @@ describe("sign-in at the last step (A9)", () => {
         expect(bookCalls()[0]).toMatchObject({ bookerName: "Neha Joshi" });
     });
 
-    it("never draws a guest details form: no email or phone field, signed in or not", async () => {
+    it("never draws a guest details form: no email field, signed in or not — a phone is optional (UX-049)", async () => {
         serve(() => json(ONE_DAYS));
         const { unmount } = render(
             <BookingFlow
@@ -1650,13 +1693,13 @@ describe("sign-in at the last step (A9)", () => {
         );
         await pickSeven();
         expect(screen.queryByLabelText("Email")).toBeNull();
-        expect(screen.queryByLabelText(/Phone/)).toBeNull();
+        expect(screen.getByLabelText("Phone (optional)")).toHaveValue("");
         unmount();
 
         render(<BookingFlow page={PAGE} apiUrl={API} account={account()} />);
         await pickSeven();
         expect(screen.queryByLabelText("Email")).toBeNull();
-        expect(screen.queryByLabelText(/Phone/)).toBeNull();
+        expect(screen.getByLabelText("Phone (optional)")).not.toBeRequired();
     });
 
     it("'Not you?' signs out, and the last step is signing in again", async () => {
