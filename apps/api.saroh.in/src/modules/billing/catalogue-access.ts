@@ -277,6 +277,16 @@ export interface BillingAccessView {
     pricePaise: number | null;
     /** A plan override it is on (a grandfathered business: until when). */
     planOverride: { planKey: string; expiresAt: string | null } | null;
+    /**
+     * A plan that ends within 30 days (`PLAN_ENDING_SHOWN_DAYS`) and moves
+     * the business to a cheaper one (#805): the app's countdown. Null
+     * otherwise.
+     */
+    planEnding: {
+        planName: string;
+        endsAt: string;
+        nextPlanName: string;
+    } | null;
     pendingMove: {
         /** The plan it moves to, on `version`. */
         planId: string;

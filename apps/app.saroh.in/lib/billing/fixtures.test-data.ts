@@ -32,6 +32,7 @@ export function access(
         plan: { id: "a", name: "Plan A" },
         pricePaise: 0,
         planOverride: null,
+        planEnding: null,
         pendingMove: null,
         modules: [row()],
         ...over,

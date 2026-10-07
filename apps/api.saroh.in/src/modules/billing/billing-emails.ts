@@ -1,8 +1,9 @@
 /**
  * The words of Saroh's own billing mail to a business (pricing catalogue
- * U17): the invoice for a charge, a payment that failed, and a trial about
- * to end. Pure; every value is escaped, since a business's name is text its
- * owner typed. Merchant voice: say what happened and what happens next.
+ * U17): the invoice for a charge, a payment that failed, a trial about to
+ * end, and a plan that ends on a date (#805). Pure; every value is
+ * escaped, since a business's name is text its owner typed. Merchant
+ * voice: say what happened and what happens next.
  */
 
 export interface RenderedEmail {
@@ -84,5 +85,36 @@ export function trialEndingEmail(input: {
             `${input.businessName}'s ${input.planName} trial ends on ${input.endsOn}. We'll charge ${input.total} then, and you'll get an invoice.`,
             "To stay on Free instead, change your plan in Settings › Plan before then.",
         ]),
+    };
+}
+
+/**
+ * A plan that ends on a date (#805: the launch offer, or one Saroh set) and
+ * moves the business to a cheaper one. Sent 30, 7 and 1 days ahead.
+ */
+export function planEndingEmail(input: {
+    businessName: string;
+    planName: string;
+    nextPlanName: string;
+    endsOn: string;
+}): RenderedEmail {
+    return {
+        subject: `${input.businessName}'s ${input.planName} plan ends on ${input.endsOn}`,
+        html: wrap(`Your ${input.planName} plan ends on ${input.endsOn}`, [
+            `${input.businessName} is on the ${input.planName} plan until ${input.endsOn}. After that it moves to the ${input.nextPlanName} plan.`,
+            `Everything you made is kept. To stay on ${input.planName}, choose a plan in Settings › Plan before then.`,
+        ]),
+    };
+}
+
+/** The same notice in the business's inbox (`plan.ending`). */
+export function planEndingNotice(input: {
+    planName: string;
+    nextPlanName: string;
+    endsOn: string;
+}): { title: string; body: string } {
+    return {
+        title: `Your ${input.planName} plan ends on ${input.endsOn}`,
+        body: `After that, your business moves to the ${input.nextPlanName} plan. Everything you made is kept. To stay on ${input.planName}, choose a plan in Settings › Plan.`,
     };
 }

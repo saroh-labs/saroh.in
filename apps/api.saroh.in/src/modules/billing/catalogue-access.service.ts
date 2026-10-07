@@ -42,6 +42,7 @@ import {
     withoutRaises,
 } from "./catalogue-access";
 import { usageByModule } from "./metering";
+import { PLAN_ENDING_SHOWN_DAYS } from "./plan-ending";
 import type { MoveReadiness } from "./plan-moves";
 import { moveReadiness } from "./plan-moves";
 
@@ -135,6 +136,21 @@ export interface LegacyAccess extends AccessCommon {
 }
 
 export type BusinessAccess = CatalogueAccess | LegacyAccess;
+
+/**
+ * A plan that ends and moves the business to a cheaper one (#805): the plan
+ * override it is on now, and what it reads the moment that ends.
+ */
+export interface PlanEnding {
+    overrideId: string;
+    endsAt: Date;
+    planId: string;
+    planName: string;
+    nextPlanId: string;
+    nextPlanName: string;
+}
+
+const SHOWN_MS = PLAN_ENDING_SHOWN_DAYS * 24 * 60 * 60 * 1000;
 
 /** Parsed snapshots by version row id: versions never change once written. */
 const parsedVersions = new Map<string, Catalog>();
@@ -453,6 +469,7 @@ export class CatalogueAccessService {
                 plan: null,
                 pricePaise: null,
                 planOverride,
+                planEnding: null,
                 pendingMove: null,
                 modules: [],
             };
@@ -464,6 +481,11 @@ export class CatalogueAccessService {
             plan: { id: a.planId, name: a.planName },
             pricePaise: a.pricePaise,
             planOverride,
+            planEnding: await this.endingSoon(
+                ctx.organizationId,
+                a,
+                new Date(),
+            ),
             pendingMove: a.pendingMove
                 ? {
                       planId: a.pendingMove.planId,
@@ -485,6 +507,59 @@ export class CatalogueAccessService {
                 ),
             ),
         };
+    }
+
+    /**
+     * The plan the business is on that ends and moves it to a cheaper one
+     * (#805): its newest live plan override with an end date, read again at
+     * that end. Null with no such override, off the catalogue, or when what
+     * follows costs as much or more — a business that has since chosen a
+     * plan as good loses nothing when the override ends. A business with no
+     * plan row of its own reads Free after it (#839).
+     */
+    async planEnding(
+        organizationId: string,
+        now: Date = new Date(),
+        current?: BusinessAccess,
+    ): Promise<PlanEnding | null> {
+        const a = current ?? (await this.resolve(organizationId, now));
+        const o = a.planOverride;
+        if (a.source !== "catalogue" || !o?.expiresAt) return null;
+        const after = await this.resolve(organizationId, o.expiresAt);
+        const next =
+            after.source === "catalogue"
+                ? after.catalog.plans.find((p) => p.id === after.planId)
+                : after.reason === "no-plan"
+                  ? a.catalog.plans.find((p) => p.id === FREE_PLAN_ID)
+                  : undefined;
+        const plan = a.catalog.plans.find((p) => p.id === a.planId);
+        if (!next || !plan || next.pricePaise >= plan.pricePaise) return null;
+        return {
+            overrideId: o.id,
+            endsAt: o.expiresAt,
+            planId: plan.id,
+            planName: plan.name,
+            nextPlanId: next.id,
+            nextPlanName: next.name,
+        };
+    }
+
+    /** The app's countdown: {@link planEnding} within its 30 days. */
+    private async endingSoon(
+        organizationId: string,
+        a: BusinessAccess,
+        now: Date,
+    ): Promise<BillingAccessView["planEnding"]> {
+        const end = a.planOverride?.expiresAt;
+        if (!end || end.getTime() - now.getTime() > SHOWN_MS) return null;
+        const ending = await this.planEnding(organizationId, now, a);
+        return ending
+            ? {
+                  planName: ending.planName,
+                  endsAt: ending.endsAt.toISOString(),
+                  nextPlanName: ending.nextPlanName,
+              }
+            : null;
     }
 
     /**

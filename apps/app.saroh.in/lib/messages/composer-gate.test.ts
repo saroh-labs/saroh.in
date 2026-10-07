@@ -39,6 +39,7 @@ const access = (
     pricePaise: null,
     planOverride: null,
     pendingMove: null,
+    planEnding: null,
     modules: [integrations],
 });
 

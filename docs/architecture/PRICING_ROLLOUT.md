@@ -90,7 +90,16 @@ release time.
   id such as `grow`) and `expiresAt` (null lasts until removed). The
   migration's CHECK requires the `planKey`.
 - Live means unrevoked and not past `expiresAt`, read at request time; there
-  is no sweep. With several, the newest applies.
+  is no sweep at the end itself. With several, the newest applies.
+- Before it ends (#805): when the end moves the business to a cheaper plan,
+  the hourly billing sweep (`billing.moves.apply`, step 3) tells it 30, 7
+  and 1 days ahead, with an inbox notice (`plan.ending`) and an email to its
+  billing people, each claimed once per override, end and stage
+  (`CustomerNotice` `PLAN_ENDING`). A plan with ten days left is told at
+  once. `GET …/billing/access` returns `planEnding` in its last 30 days, and
+  the app shows a countdown above every page. An end that costs nothing (a
+  business that has since paid for a plan as good) says nothing.
+  `billing/plan-ending.ts`, `CatalogueAccessService.planEnding`.
 - It replaces the subscription's plan; raises still apply on top
   (`OVERRIDE_ORDER`: plan first). Since U12 its `planKey` goes straight to
   `resolveAccess` on the business's version; one naming a plan that version
@@ -562,7 +571,8 @@ What keeps the waitlist's promise when Saroh opens. Code:
   `joinedOrganizationId`) and writes a `plan` override, `planKey: grow`,
   `expiresAt` = now + `LAUNCH_OFFER_DAYS`, audited as
   `organization.plan.launch_offer`. No payment details; when it ends the
-  business reads its own row (Free).
+  business reads its own row (Free), told 30, 7 and 1 days ahead (#805,
+  U5 above).
 - **Refused, politely:** an unknown link (404), a used or expired one (410,
   "ask for a new invite"), another address (403 — the account's address,
   the one its sign-up code was checked against, must match the entry's,

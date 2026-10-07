@@ -1,6 +1,7 @@
 import { getServerSession } from "@saroh/auth/next";
 import { cookies, headers } from "next/headers";
 
+import { PlanEndingBanner } from "@/components/billing/plan-ending-banner";
 import { PlanRefusalHost } from "@/components/billing/plan-refusal";
 import { AppHeader } from "@/components/shared/app-header";
 import { AppSidebar } from "@/components/shared/app-sidebar";
@@ -248,6 +249,8 @@ export async function AppShell({ children }: { children: React.ReactNode }) {
                          * keeps it, on the server's first paint too.
                          */}
                         <BusinessZoneProvider zone={businessZone(activeOrg)}>
+                            {/* A plan that ends within 30 days (#805). */}
+                            <PlanEndingBanner ending={billing?.planEnding} />
                             {children}
                         </BusinessZoneProvider>
                     </div>

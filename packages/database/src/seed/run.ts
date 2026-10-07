@@ -50,6 +50,7 @@ import {
     syncStorefrontFulfilmentTypes,
     writeSite,
 } from "./helpers";
+import { seedPlanEndingBusiness } from "./plan-ending";
 import { seedPreviousAddress } from "./previous-address";
 import { seedPlanId } from "./pricing";
 import { seedSarohEmailBusinesses } from "./saroh-email";
@@ -322,6 +323,9 @@ export async function seed(): Promise<void> {
     // Three with no email of their own, Communications rolled out for them
     // alone, one on an enforced entry plan (#850; `email-setup-prompt.spec.ts`).
     await seedEmailPromptBusinesses(prisma, founderId, now);
+    // One of Asha's on a plan that ends in ten days (#805;
+    // `plan-ending.spec.ts`).
+    await seedPlanEndingBusiness(prisma, founderId, now);
     // Content after the website: a post belongs to the site it is published on
     // (ADR-004), so there has to be a site first.
     await seedContent(prisma, org.id, siteIds[0] ?? "", user.id);
