@@ -52,7 +52,7 @@ const UNIT: Record<Exclude<AddonKind, "module">, [string, string]> = {
     members: ["team member", "team members"],
     products: ["product", "products"],
     orders: ["order a month", "orders a month"],
-    bookings: ["booking a month", "bookings a month"],
+    bookings: ["online booking a month", "online bookings a month"],
     integrations: ["connection", "connections"],
 };
 
