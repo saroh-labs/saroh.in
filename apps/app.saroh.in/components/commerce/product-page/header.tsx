@@ -29,15 +29,20 @@ export function ProductCrumbs({
     overview,
     storeId,
     view,
+    shopUrl = null,
 }: {
     overview: ProductOverview;
     storeId: string;
     view: "team" | "customer";
+    /** Its page on the live online shop (`shopProductUrl`); null when none. */
+    shopUrl?: string | null;
 }) {
     const { product } = overview;
     const live = product.status === "PUBLISHED";
     const note = live
-        ? "The shop's product page arrives with the website."
+        ? shopUrl
+            ? null
+            : "Its shop page opens once your online shop is live."
         : product.status === "ARCHIVED"
           ? "Archived — its page does not open for customers."
           : "Publish it first — a draft has no public page.";
@@ -67,13 +72,15 @@ export function ProductCrumbs({
                 {product.name}
             </span>
             <div className="ml-auto flex flex-wrap items-center justify-end gap-2">
-                <span
-                    id="shop-link-why"
-                    role="status"
-                    className="max-w-[300px] text-pretty text-[12px] text-muted-foreground max-sm:hidden"
-                >
-                    {note}
-                </span>
+                {note ? (
+                    <span
+                        id="shop-link-why"
+                        role="status"
+                        className="max-w-[300px] text-pretty text-[12px] text-muted-foreground max-sm:hidden"
+                    >
+                        {note}
+                    </span>
+                ) : null}
                 <div
                     role="group"
                     aria-label="View as"
@@ -97,24 +104,47 @@ export function ProductCrumbs({
                         </Link>
                     ))}
                 </div>
-                <Button
-                    type="button"
-                    variant="ghost"
-                    disabled
-                    aria-describedby="shop-link-why"
-                    className="h-7 gap-1.5 rounded-[7px] px-2 text-[12.5px] font-medium coarse:h-11"
-                >
-                    {live
-                        ? "View on the shop"
-                        : product.status === "ARCHIVED"
-                          ? "Not on the shop"
-                          : "Not on the shop yet"}
-                    <ArrowUpRight
-                        aria-hidden
-                        className="size-3"
-                        strokeWidth={2}
-                    />
-                </Button>
+                {shopUrl ? (
+                    // Live on the shop (UX-082): open it as customers see it.
+                    <Button
+                        asChild
+                        variant="ghost"
+                        className="h-7 gap-1.5 rounded-[7px] px-2 text-[12.5px] font-medium coarse:h-11"
+                    >
+                        <a
+                            href={shopUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            aria-label="View on the shop — opens in a new tab"
+                        >
+                            View on the shop
+                            <ArrowUpRight
+                                aria-hidden
+                                className="size-3"
+                                strokeWidth={2}
+                            />
+                        </a>
+                    </Button>
+                ) : (
+                    <Button
+                        type="button"
+                        variant="ghost"
+                        disabled
+                        aria-describedby="shop-link-why"
+                        className="h-7 gap-1.5 rounded-[7px] px-2 text-[12.5px] font-medium coarse:h-11"
+                    >
+                        {live
+                            ? "View on the shop"
+                            : product.status === "ARCHIVED"
+                              ? "Not on the shop"
+                              : "Not on the shop yet"}
+                        <ArrowUpRight
+                            aria-hidden
+                            className="size-3"
+                            strokeWidth={2}
+                        />
+                    </Button>
+                )}
             </div>
         </div>
     );

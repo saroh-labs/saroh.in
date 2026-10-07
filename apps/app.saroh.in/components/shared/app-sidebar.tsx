@@ -72,7 +72,10 @@ export function AppSidebar({
     storefronts = null,
     stockTracked = null,
     collapsed: collapsedAtLoad = false,
+    kind,
 }: {
+    /** What is being set up (DEC-070); see `navFor`. */
+    kind?: string | null;
     /** Rows the business's plan locks (U14): drawn with a lock. */
     locked?: readonly string[];
     /** The role as stored; see `navFor`. */
@@ -103,6 +106,7 @@ export function AppSidebar({
         moduleKeys,
         storefronts,
         stockTracked,
+        kind,
     });
     const pathname = navPathname(usePathname(), groups);
     const [collapsed, setCollapsed] = useState(collapsedAtLoad);

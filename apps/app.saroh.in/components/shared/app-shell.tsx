@@ -218,6 +218,7 @@ export async function AppShell({ children }: { children: React.ReactNode }) {
                     locked={lockedHrefs}
                     stockTracked={stockTracked}
                     storefronts={storefronts?.used ?? null}
+                    kind={activeOrg?.kind ?? null}
                 />
                 {/* The working area is white and the rail sits on Paper: the
                 product spends white surfaces, and the page you work on is
@@ -264,6 +265,7 @@ export async function AppShell({ children }: { children: React.ReactNode }) {
                 counts={counts}
                 stockTracked={stockTracked}
                 storefronts={storefronts?.used ?? null}
+                kind={activeOrg?.kind ?? null}
             />
         </div>
     );

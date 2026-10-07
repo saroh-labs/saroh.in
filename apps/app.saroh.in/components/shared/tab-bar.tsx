@@ -34,7 +34,10 @@ export function TabBar({
     counts,
     storefronts = null,
     stockTracked = null,
+    kind,
 }: {
+    /** What is being set up (DEC-070); see `navFor`. */
+    kind?: string | null;
     /** The role as stored; see `navFor`. */
     roleKey?: string | null;
     /** How many storefronts; with several the row reads "Storefronts". */
@@ -58,6 +61,7 @@ export function TabBar({
         moduleKeys,
         storefronts,
         stockTracked,
+        kind,
     });
     const nav = buildMobileNav({
         groups,

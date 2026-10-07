@@ -21,6 +21,7 @@ import {
 } from "lucide-react";
 
 import { mayAddWebsite } from "@/lib/business-limits";
+import { kindOf } from "@/lib/organizations/kind";
 import { isLocationScopedRole } from "@/lib/organizations/storefront-team";
 
 /**
@@ -913,6 +914,7 @@ export function navFor({
     sites,
     storefronts,
     stockTracked,
+    kind,
 }: {
     /** `null` when it could not be resolved; the nav then fails open. */
     role: NavRole | null;
@@ -943,6 +945,14 @@ export function navFor({
      * offered; `null` or absent (unknown) fails open.
      */
     stockTracked?: boolean | null;
+    /**
+     * What is being set up (DEC-070). A site for my work bills nobody to
+     * begin with, so Invoices isn't a rail row of its own (UX-074): it is
+     * under Payments once that is on, and reached from Settings › Your
+     * details › Tax and invoices and the command menu (which passes no
+     * kind). Absent: every row, as for a business.
+     */
+    kind?: unknown;
 }): NavGroup[] {
     const tracked = filterNavGroupsByRole(
         filterNavGroups(
@@ -954,9 +964,11 @@ export function navFor({
     );
     const stocked =
         stockTracked === false ? withoutStockRows(tracked) : tracked;
+    const billed =
+        kindOf(kind) === "WORK" ? withoutStandaloneInvoices(stocked) : stocked;
     const groups = isLocationScopedRole(roleKey)
-        ? sellOrdersOnly(stocked)
-        : stocked;
+        ? sellOrdersOnly(billed)
+        : billed;
     return (storefronts ?? 0) > 1 ? pluralStorefronts(groups) : groups;
 }
 
@@ -980,6 +992,18 @@ function sellOrdersOnly(groups: NavGroup[]): NavGroup[] {
                     ? [{ ...item, href: ORDERS_HREF, children }]
                     : [];
             }),
+        }))
+        .filter((group) => group.items.length > 0);
+}
+
+/** The Invoices row that stands in while Payments is off, taken out. */
+function withoutStandaloneInvoices(groups: NavGroup[]): NavGroup[] {
+    return groups
+        .map((group) => ({
+            ...group,
+            items: group.items.filter(
+                (item) => !(item.href === INVOICES_HREF && item.unlessModule),
+            ),
         }))
         .filter((group) => group.items.length > 0);
 }

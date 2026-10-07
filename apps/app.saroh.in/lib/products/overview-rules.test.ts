@@ -13,6 +13,7 @@ import {
     orderRef,
     ordersSummary,
     sellableByStore,
+    shopProductUrl,
     websiteSummary,
     whereItSells,
 } from "./overview-words";
@@ -191,6 +192,44 @@ describe("Linked to this product", () => {
                 }),
             ).headline,
         ).toBe("Shown on 2 pages");
+    });
+});
+
+describe("a product live on the online shop (UX-082)", () => {
+    const placement = (pages: number): ProductPlacement => ({
+        collections: [],
+        website: {
+            showsProducts: pages > 0,
+            pages: Array.from({ length: pages }, (_, i) => ({
+                siteId: "s",
+                siteName: "Rye",
+                path: `/p${i}`,
+                title: `Page ${i}`,
+            })),
+        },
+    });
+
+    it("links its own shop page only while both are live", () => {
+        const shop = "https://rye.saroh.app/shop";
+        expect(
+            shopProductUrl(shop, { status: "PUBLISHED", slug: "sourdough" }),
+        ).toBe("https://rye.saroh.app/shop/sourdough");
+        expect(
+            shopProductUrl(null, { status: "PUBLISHED", slug: "sourdough" }),
+        ).toBeNull();
+        expect(
+            shopProductUrl(shop, { status: "DRAFT", slug: "sourdough" }),
+        ).toBeNull();
+    });
+
+    it("never says it isn't on the website", () => {
+        expect(websiteSummary(placement(0), true)).toEqual({
+            headline: "On the online shop",
+            lines: ["No other page of the website shows it."],
+        });
+        expect(websiteSummary(placement(2), true).headline).toBe(
+            "On the online shop and 2 pages",
+        );
     });
 });
 

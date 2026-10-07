@@ -14,7 +14,9 @@ import { Input } from "@saroh/ui/input";
 import { cn } from "@saroh/ui/lib/utils";
 import { Switch } from "@saroh/ui/switch";
 import { showError, showInfo } from "@saroh/ui/toast";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
+import type { ReactNode } from "react";
 import { useEffect, useRef, useState } from "react";
 import type { FieldErrors, Resolver } from "react-hook-form";
 import { useForm, useWatch } from "react-hook-form";
@@ -785,7 +787,21 @@ export function OrganizationSettingsForm({
             },
         ],
     };
-    const notes: Partial<Record<SectionKey, string>> = {
+    const notes: Partial<Record<SectionKey, ReactNode>> = {
+        // The invoices themselves, from here too: a site for my work has
+        // no Invoices row in the rail until Payments is on (UX-074).
+        tax: (
+            <>
+                The invoices you send, and their numbers, are in{" "}
+                <Link
+                    href="/billing/invoices"
+                    className="font-medium text-foreground underline underline-offset-4 hover:decoration-2"
+                >
+                    Invoices
+                </Link>
+                .
+            </>
+        ),
         identity:
             "Invoices are issued in the legal name, if you've set one. Your links keep working if you rename the business.",
         address:
