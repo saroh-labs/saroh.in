@@ -5,7 +5,7 @@ import { LateRuleNotice } from "@/components/commerce/orders/late-rule-notice";
 import { OrdersScreen } from "@/components/commerce/orders/orders-screen";
 import { OrdersLocked } from "@/components/commerce/orders/orders-states";
 import { PageContainer } from "@/components/shared/page-container";
-import { takesOnlinePayment } from "@/lib/billing/access";
+import { createBlock, takesOnlinePayment } from "@/lib/billing/access";
 import { hasPaymentProvider } from "@/lib/invoices/tax";
 import {
     orderPowers,
@@ -86,7 +86,8 @@ export default async function OrdersPage({
     // On a plan without online payments no pay link is offered at all —
     // not on a row, not in New order (R33); "Paid in cash" and the counter
     // ways stay. The API refuses one anyway.
-    const online = takesOnlinePayment(await billingAccessOrNull());
+    const billing = await billingAccessOrNull();
+    const online = takesOnlinePayment(billing);
     const linkable = powers.payLink && online;
     const payOnline =
         linkable && access.money
@@ -159,6 +160,9 @@ export default async function OrdersPage({
                               openOnArrival: params.new === "1",
                               canSearch: may("contact:read"),
                               online,
+                              // The month's orders used up: said before the
+                              // sheet is filled, not after (UX-036).
+                              blocked: createBlock(billing, "orders"),
                           }
                         : null
                 }
