@@ -28,6 +28,11 @@ vi.mock("@saroh/auth/client", () => ({
     authClient: { signOut: vi.fn() },
 }));
 vi.mock("@/lib/accounts", () => ({ accountsLoginUrl: "/login" }));
+// The browser's zone, sent with the business (UX-008).
+const browserZone = vi.fn<() => string | null>(() => "America/Chicago");
+vi.mock("@/lib/organizations/time-zones", () => ({
+    browserZone: () => browserZone(),
+}));
 const startCheckout = vi.fn();
 const takeOffer = vi.fn();
 vi.mock("@/lib/saroh-billing/checkout-actions", () => ({
@@ -184,7 +189,12 @@ describe("What are you setting up? (DEC-070)", () => {
             name: "Asha Rao",
             kind: "SOLO",
             address: "asha-rao",
-            profile: { type: "individual", registered: false, country: "IN" },
+            profile: {
+                type: "individual",
+                registered: false,
+                country: "IN",
+                timezone: "America/Chicago",
+            },
         });
     });
 
@@ -197,7 +207,11 @@ describe("What are you setting up? (DEC-070)", () => {
             name: "Rye & Co. Bakery",
             kind: "BUSINESS",
             address: "rye-co-bakery",
-            profile: { registered: true, country: "IN" },
+            profile: {
+                registered: true,
+                country: "IN",
+                timezone: "America/Chicago",
+            },
         });
     });
 
@@ -217,8 +231,18 @@ describe("What are you setting up? (DEC-070)", () => {
             name: "Asha Rao Studio",
             kind: "WORK",
             address: "asha-rao-studio",
-            profile: { country: "IN" },
+            profile: { country: "IN", timezone: "America/Chicago" },
         });
+    });
+
+    it("sends no zone when the browser can't say one (UX-008)", async () => {
+        browserZone.mockReturnValueOnce(null);
+        act(() => radio("A site for my work").click());
+        typeInto(labelled("Your name or brand"), "Asha Rao Studio");
+        await submit();
+        expect(createOrganization).toHaveBeenLastCalledWith(
+            expect.objectContaining({ profile: { country: "IN" } }),
+        );
     });
 
     it("moves the choice with the arrow keys, as a radio group does", () => {

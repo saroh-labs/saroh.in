@@ -13,3 +13,15 @@ export const accountsLoginUrl = `${accountsUrl}/login`;
  * are signed in. Identity lives there, so Your profile links out to it.
  */
 export const accountSettingsUrl = `${accountsUrl}/account`;
+
+/**
+ * The invitation's own page on accounts for an invitation link
+ * (`/join/:token`), or null for any other path (UX-029). Someone signed out
+ * who follows the email's link reads the business, who asked and the role,
+ * then picks "Create an account" or "Log in" — instead of a bare "Log in ·
+ * Welcome back" that never mentions the invitation.
+ */
+export function inviteLandingFor(pathname: string): string | null {
+    const token = /^\/join\/([^/]+)\/?$/.exec(pathname)?.[1];
+    return token ? `${accountsUrl}/invite/${token}` : null;
+}

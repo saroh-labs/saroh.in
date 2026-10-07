@@ -1,10 +1,19 @@
 import { Logger } from "@nestjs/common";
 
+import type { CredentialCheck } from "../../../common/providers/provider-attention";
+import {
+    ProviderKeysRefusedError,
+    refusesKeys,
+} from "../../../common/providers/provider-attention";
+import { providerCallSignal } from "../../payments/providers/provider-call";
 import type {
     CommsProvider,
     CommsSendInput,
     CommsSendResult,
+    CommsVerifyInput,
 } from "./provider.port";
+
+const RESEND_API = "https://api.resend.com";
 
 /**
  * Email adapter (S6-001).
@@ -42,6 +51,58 @@ export class EmailCommsProvider implements CommsProvider {
         return this.attaching.includes(provider);
     }
 
+    /**
+     * Resend's key, checked on connect (UX-012) with `GET /domains`: a
+     * full-access key lists the account's domains, so the sending
+     * address's domain must be among them and verified; a sending-only key
+     * is refused that read as `restricted_api_key`, which still proves the
+     * key, so its domain is left to the first send. 401/403 otherwise
+     * rejects; anything else is unsure. SENDGRID and SMTP go through a
+     * relay of this same shape whose checks we don't know, and a Resend
+     * key pointed at another `baseUrl` is a relay too: not checked (null).
+     */
+    async verifyCredentials(
+        input: CommsVerifyInput,
+    ): Promise<CredentialCheck | null> {
+        const { apiKey, baseUrl } = input.credentials as {
+            apiKey?: string;
+            baseUrl?: string;
+        };
+        if (input.provider !== "RESEND" || baseUrl) return null;
+        if (!apiKey) return "REJECTED";
+
+        let res: Response;
+        try {
+            res = await fetch(`${RESEND_API}/domains`, {
+                headers: { Authorization: `Bearer ${apiKey}` },
+                signal: providerCallSignal(),
+            });
+        } catch {
+            return "UNSURE";
+        }
+        const body = await readJson(res);
+        if (res.ok) {
+            const domain = domainOf(input.fromAddress);
+            if (!domain) return "ACCEPTED";
+            const domains = Array.isArray(body?.data) ? body.data : [];
+            const verified = domains.some(
+                (d) =>
+                    typeof d === "object" &&
+                    d !== null &&
+                    String((d as { name?: unknown }).name).toLowerCase() ===
+                        domain &&
+                    (d as { status?: unknown }).status === "verified",
+            );
+            return verified ? "ACCEPTED" : "DOMAIN_UNVERIFIED";
+        }
+        if (res.status === 401 && body?.name === "restricted_api_key") {
+            return "ACCEPTED";
+        }
+        if (refusesKeys(res.status)) return "REJECTED";
+        this.logger.warn(`Resend key check answered HTTP ${res.status}`);
+        return "UNSURE";
+    }
+
     async send(input: CommsSendInput): Promise<CommsSendResult> {
         const { to, from, subject, body, credentials, attachments } = input;
 
@@ -53,7 +114,7 @@ export class EmailCommsProvider implements CommsProvider {
             // Shape error only — never name/echo any credential value.
             throw new Error("Email send failed: provider api key is missing");
         }
-        const url = `${(baseUrl ?? "https://api.resend.com").replace(/\/$/, "")}/emails`;
+        const url = `${(baseUrl ?? RESEND_API).replace(/\/$/, "")}/emails`;
 
         let res: Response;
         try {
@@ -86,7 +147,13 @@ export class EmailCommsProvider implements CommsProvider {
 
         if (!res.ok) {
             this.logger.warn(`Email send failed with HTTP ${res.status}`);
-            throw new Error(`Email send failed (HTTP ${res.status})`);
+            const message = `Email send failed (HTTP ${res.status})`;
+            // The provider refused the keys (or what they may send): the
+            // connection needs attention, not only a retry (UX-012).
+            if (refusesKeys(res.status)) {
+                throw new ProviderKeysRefusedError(message, res.status);
+            }
+            throw new Error(message);
         }
 
         const payload = (await res.json()) as { id?: string };
@@ -97,4 +164,29 @@ export class EmailCommsProvider implements CommsProvider {
         }
         return { providerMessageId: payload.id };
     }
+}
+
+/** A JSON answer's top level, or null when it has none we can read. */
+async function readJson(
+    res: Response,
+): Promise<{ data?: unknown[]; name?: unknown } | null> {
+    try {
+        const body: unknown = await res.json();
+        return typeof body === "object" && body !== null ? body : null;
+    } catch {
+        return null;
+    }
+}
+
+/** The domain an address sends from, lower-cased; null without one. */
+export function domainOf(address?: string | null): string | null {
+    const at = address?.lastIndexOf("@") ?? -1;
+    if (!address || at < 0) return null;
+    // "Name <hello@shop.in>" as well as "hello@shop.in".
+    const domain = address
+        .slice(at + 1)
+        .replace(/>.*$/, "")
+        .trim()
+        .toLowerCase();
+    return domain || null;
 }

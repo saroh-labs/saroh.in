@@ -19,14 +19,16 @@ export { accountsLoginUrl, accountsUrl } from "./accounts";
  * every user out on one api restart, and land them at accounts — which reads
  * the same session from the same api — with their place lost.
  */
-export async function requireSession() {
+export async function requireSession(signedOutUrl: string = accountsLoginUrl) {
     const result = await resolveServerSession(await headers());
 
     if (result.status === "unavailable") {
         throw new SessionUnavailableError(result);
     }
     if (result.status === "anonymous") {
-        redirect(accountsLoginUrl);
+        // `signedOutUrl`: a page with a better first step than the login
+        // (an invitation's own page, UX-029).
+        redirect(signedOutUrl);
     }
 
     return result.session;

@@ -3,6 +3,7 @@
 jest.mock("@saroh/database", () => ({
     prisma: {
         lead: { findUnique: jest.fn() },
+        submission: { findFirst: jest.fn() },
         notification: { create: jest.fn() },
         membership: { findMany: jest.fn() },
     },
@@ -30,6 +31,7 @@ import {
 const leadFindUnique = prisma.lead.findUnique as jest.Mock;
 const notificationCreate = prisma.notification.create as jest.Mock;
 const membershipFindMany = prisma.membership.findMany as jest.Mock;
+const submissionFindFirst = prisma.submission.findFirst as jest.Mock;
 const sendEmail = sendEnquiryNotificationEmail as jest.Mock;
 
 /** A claimed job carrying the enquiry-notify payload. */
@@ -70,6 +72,7 @@ describe("EnquiryNotifyHandler", () => {
     beforeEach(() => {
         jest.clearAllMocks();
         leadFindUnique.mockResolvedValue(lead);
+        submissionFindFirst.mockResolvedValue(null);
         membershipFindMany.mockResolvedValue([
             { role: "OWNER", user: { email: "owner@example.com" } },
             { role: "ADMIN", user: { email: "admin@example.com" } },
@@ -105,6 +108,40 @@ describe("EnquiryNotifyHandler", () => {
         expect(sendEmail).toHaveBeenCalledWith(
             "admin@example.com",
             expect.any(Object),
+        );
+    });
+
+    it("puts what they wrote in the notification and the email (UX-002)", async () => {
+        leadFindUnique.mockResolvedValue({
+            ...lead,
+            form: {
+                id: "form_1",
+                name: "Contact us",
+                fields: [
+                    { name: "email", label: "Email", type: "email" },
+                    { name: "message", label: "Message", type: "textarea" },
+                ],
+            },
+        });
+        submissionFindFirst.mockResolvedValue({
+            data: {
+                email: "ada@example.com",
+                message: "Do you   open on Sundays?",
+            },
+        });
+        notificationCreate.mockResolvedValue({ id: "notif_1" });
+
+        await new EnquiryNotifyHandler().handle(job());
+
+        expect(submissionFindFirst.mock.calls[0][0].where).toEqual({
+            leadId: "lead_1",
+        });
+        expect(notificationCreate.mock.calls[0][0].data.body).toBe(
+            'Ada Lovelace via "Contact us": Do you open on Sundays?',
+        );
+        expect(sendEmail).toHaveBeenCalledWith(
+            "owner@example.com",
+            expect.objectContaining({ message: "Do you open on Sundays?" }),
         );
     });
 

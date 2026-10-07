@@ -1,3 +1,4 @@
+import type { CredentialCheck } from "../../../common/providers/provider-attention";
 import type {
     CancelMandateInput,
     CheckoutReturnInput,
@@ -17,6 +18,7 @@ import type {
     PreDebitStatus,
     PreparedMandateCharge,
     PrepareMandateChargeInput,
+    ProviderCredentials,
     ProviderFactory,
     ProviderMandate,
     ProviderMandateStatus,
@@ -192,12 +194,33 @@ export class FakeMerchantProvider implements MerchantProvider {
         },
     };
 
+    /** What the connect-time key check answers (UX-012); accepts by default. */
+    credentialCheck: CredentialCheck = "ACCEPTED";
+    /** Every key check asked for, with the keys it was given. */
+    readonly verifyCalls: ProviderCredentials[] = [];
+    /** Errors the next `createOrderIntent` calls throw, in order. */
+    private readonly intentFailures: Error[] = [];
+
     constructor(readonly name = "RAZORPAY") {}
+
+    verifyCredentials(
+        credentials: ProviderCredentials,
+    ): Promise<CredentialCheck> {
+        this.verifyCalls.push(credentials);
+        return Promise.resolve(this.credentialCheck);
+    }
+
+    /** Make the next provider order fail with `err` (a refused key, an outage). */
+    failNextIntent(err: Error): void {
+        this.intentFailures.push(err);
+    }
 
     createOrderIntent(
         input: CreateOrderIntentInput,
     ): Promise<CreateOrderIntentResult> {
         this.calls.push(input);
+        const failure = this.intentFailures.shift();
+        if (failure) return Promise.reject(failure);
         return Promise.resolve({
             providerIntentId: `fake_${this.name.toLowerCase()}_${input.orderId}`,
             clientParams: {

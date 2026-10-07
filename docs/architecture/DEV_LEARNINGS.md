@@ -3070,3 +3070,74 @@ the component test asserts the exact text.
 **Rule**: a sentence with an interpolation in it is one string expression,
 not JSX text wrapped over lines.
 **Category**: react · `components/organizations/pay-instructions-section.tsx`
+
+### Next's dev server logged provider keys and sign-in codes from server actions
+
+**Symptom**: during the 7 Oct local UX audit, the stack log held the Razorpay and email API keys typed into Settings › Providers, plus sign-in codes.
+**Cause**: Next 16 defaults `logging.serverFunctions` to true. In development (`NODE_ENV === 'development'` only; production never logs them) every server action's arguments go to the terminal, and a dev log captures them.
+**Fix**: `logging: { serverFunctions: false }` in the Next config of every app whose server actions carry a secret (app, admin, accounts, saroh.app). Local logs that already held keys were scrubbed.
+**Rule**: A server action that takes a credential or code must not rely on logs staying private. Turn off dev argument logging in any app that has one, and never treat a dev log as safe to share.
+**Category**: security · `apps/*/next.config.*`
+
+## Time zones — server-rendered times read UTC for a business that never set its zone
+
+**Symptom** (UX audit, 7 Oct; #836): Order Detail said "Today, 04:28" on a
+full load and 09:58 after a client navigation; the site editor said "In
+review … 04:39 UTC" and "Last published 04:24 UTC"; the console showed the
+business's time zone as "Not set".
+**Root cause**: two halves. A business set up with no profile fields had no
+`BusinessProfile`, and setup never stored a zone, so most businesses had
+none. And the app had no shared way to write a time in the business's
+zone: `ViewerDate` renders the server's UTC first and corrects in the
+browser, and the site editor's `exactDate` pinned UTC on purpose to dodge
+hydration mismatches.
+**Fix**: setup always stores a zone (the country's when it keeps one, else
+the browser's, else India's; `organizations/business-zone.ts`), and
+`20261029153000_business_time_zone_backfill` gives every existing business
+the zone its readers already fell back to, never overwriting one. `GET
+/organizations` carries `timeZone`; the app shell provides it
+(`BusinessZoneProvider`), and `BusinessDate` / `useBusinessZone` /
+`activeBusinessZone()` write times in it, so server and browser agree from
+the first paint. `invoiceZone` (#836) is the same rule (`businessZone`).
+**Rule**: A time a business reads about its own work (an order, a version,
+a review) is written in the business's zone, never the viewer's or the
+server's: `BusinessDate`, or `useBusinessZone()` for a string. Pinning UTC
+avoids a hydration mismatch by being wrong for everyone.
+**Category**: dates · `app.saroh.in/components/shared/business-zone.tsx`
+
+## Team — a custom role was lost when the invitation was accepted (UX-004)
+
+**Problem**: Someone invited as "Front desk" joined as a Member: no New
+booking, no order changes, and Roles said "Front desk · 0 people". The
+invitation row read `role=front-desk ACCEPTED`; the membership `MEMBER`.
+**Root cause**: `accept` stored `toRole(invitation.role)`, the helper that
+narrows a stored key to the four built-ins for display. Every unit test
+mocked Prisma and checked a Reviewer invite, so nothing ran invite → accept →
+resolve with a role the business made.
+**Fix**: Accept stores the invited key when that role still exists in the
+business (MEMBER when it was removed since); migration
+`20261029141100_invited_custom_role` puts back the memberships the old accept
+dropped, only where nobody changed the role since.
+`invite-custom-role.db.spec.ts` runs the whole path and then asks the booking
+and order services what the role may do.
+**Category**: roles · rule in `docs/patterns/backend-auth-and-access.md`
+(invitations). `toRole` is for the response's `role` field only — never for
+what is written.
+
+## Payments — fake provider keys show CONNECTED; Pay then 500s and nobody is told (UX-012)
+
+**Problem**: An audit connected made-up Razorpay and Resend keys and both
+came back 201 CONNECTED. A customer pressing Pay got "can't take payment
+online right now", the API logged an unhandled 500
+(`Razorpay order creation failed (HTTP 401)`), and the business saw a green
+badge and heard nothing.
+**Root cause**: Connecting only sealed the keys; nothing asked the provider.
+At checkout the adapter's plain `Error` reached the global filter as a 500,
+and no code read a 401 as "these keys stopped working".
+**Fix**: An authenticated read on connect refuses keys with a field error;
+a 401/403 on a live call throws `ProviderKeysRefusedError`, which marks the
+connection `attention: KEYS_REFUSED` and queues the team's alert once; a
+failed provider order is a deliberate 503 in the customer's words. Tests in
+`common/providers/provider-key-checks.spec.ts`, `payments.service.spec.ts`
+and `message-send.handler.spec.ts`.
+**Category**: integrations · rule in `docs/patterns/backend-integrations.md` ("Keys are checked before they are kept, and watched after")

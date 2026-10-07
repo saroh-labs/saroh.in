@@ -10,6 +10,7 @@ import {
     listMembers,
 } from "@/lib/organizations/members";
 import { getRoleCatalogue, listRoles } from "@/lib/organizations/roles";
+import { rolesLock } from "@/lib/organizations/roles-lock";
 import { resolveActiveOrganization } from "@/lib/organizations/service";
 import { billingAccessOrNull } from "@/lib/saroh-billing/service";
 import { requireSession } from "@/lib/session";
@@ -73,10 +74,13 @@ export default async function PeoplePage() {
         // they can't be read, holds nothing back.
         modulesOrUnknown(),
     ]);
+    // The plan, for whoever changes the team or its roles.
+    const access =
+        canManage || canEditRoles ? await billingAccessOrNull() : null;
     // The plan's team limit (U14): people plus open invites, as the API counts.
-    const team = canManage
-        ? rowNotice(await billingAccessOrNull(), "members")
-        : null;
+    const team = canManage ? rowNotice(access, "members") : null;
+    // Reviewers have their own cap (U13): a full team still invites one.
+    const reviewers = canManage ? rowNotice(access, "reviewers") : null;
     const catalogue = shownCatalogue(fullCatalogue, modules);
 
     return (
@@ -95,9 +99,18 @@ export default async function PeoplePage() {
                 teamLimit={
                     // A soft cap never stops an invite.
                     team?.on && !team.soft
-                        ? { full: team.full, why: team.why }
+                        ? {
+                              full: team.full,
+                              why: team.why,
+                              reviewersFull: !!(
+                                  reviewers?.on &&
+                                  !reviewers.soft &&
+                                  reviewers.full
+                              ),
+                          }
                         : null
                 }
+                rolesLock={canEditRoles ? rolesLock(access) : null}
                 limitNotice={
                     canManage ? <PlanLimitNotice moduleId="members" /> : null
                 }

@@ -132,6 +132,9 @@ what the API allows.
   routes are `member:read` / `member:invite` / `member:role:update` /
   `member:remove`, plus `POST /organization-invitations/:token/accept`, which
   runs on the session alone because the caller is not a member yet.
+  Accepting stores the role as invited — a built-in, or a role the business
+  made while it still exists (else MEMBER) — never the built-in it maps to
+  (UX-004, `invite-custom-role.db.spec.ts`).
 - **Current** (F19) — **Granting is bounded by reach.** Nobody gives a role a
   permission they don't hold, or changes, renames or removes a role that can
   already do more than they can — their own role included. Members (who can
@@ -159,7 +162,9 @@ what the API allows.
   or removing someone also counts their extras; moving someone to Reviewer
   drops their non-review extras. Each change writes
   `membership.extras.update` (given and taken, keys and labels), which
-  Settings › Activity reads as "gave Ravi Refund orders".
+  Settings › Activity reads as "gave Ravi Refund orders". Giving an extra
+  asks the plan's `roles` row ("Custom roles", UX-030) — taking one away
+  never does.
 - **Current** (F16, DEC-048) — **A storefront's people are on the team.**
   Accepting a storefront invite (`members/members.service.ts`) also makes a
   `Membership` in the store's business, in the same transaction, in the

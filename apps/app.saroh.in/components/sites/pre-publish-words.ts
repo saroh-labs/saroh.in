@@ -39,7 +39,11 @@ export const APPROVAL_LINE: Record<
     ApprovalOutcome,
     {
         approved: boolean;
-        text: (approval: NonNullable<ReviewState["latestApproval"]>) => string;
+        /** `zone`: the business's, for the day it was decided (UX-008). */
+        text: (
+            approval: NonNullable<ReviewState["latestApproval"]>,
+            zone: string,
+        ) => string;
     }
 > = {
     // Asked for and not yet answered (#278). Publishing is still allowed from
@@ -55,14 +59,14 @@ export const APPROVAL_LINE: Record<
     },
     BYPASSED: {
         approved: false,
-        text: ({ by, at }) =>
-            `${by} published without approval on ${shortDate(at)}`,
+        text: ({ by, at }, zone) =>
+            `${by} published without approval on ${shortDate(at, zone)}`,
     },
     // An owner's override of "Publishing needs approval" (DEC-071, T9).
     OVERRIDDEN: {
         approved: false,
-        text: ({ by, at }) =>
-            `${by} went live without approval on ${shortDate(at)}`,
+        text: ({ by, at }, zone) =>
+            `${by} went live without approval on ${shortDate(at, zone)}`,
     },
 };
 

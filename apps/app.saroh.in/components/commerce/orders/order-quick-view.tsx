@@ -6,8 +6,8 @@ import { ChevronRight } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 
+import { BusinessDate } from "@/components/shared/business-zone";
 import { QuickLook } from "@/components/shared/quick-look";
-import { ViewerDate } from "@/components/shared/viewer-date";
 import { customerHref } from "@/lib/customers/links";
 import { formatMoneyMajor } from "@/lib/format/money";
 import { attentionLines } from "@/lib/orders/attention";
@@ -142,7 +142,7 @@ export function OrderQuickView({
             titleClassName="font-display text-[20px] font-semibold tracking-[-0.02em]"
             subtitle={
                 <>
-                    <ViewerDate iso={row.placedAt} variant="moment" /> ·{" "}
+                    <BusinessDate iso={row.placedAt} variant="moment" /> ·{" "}
                     {row.store.name} · {row.fulfilmentLabel}
                 </>
             }

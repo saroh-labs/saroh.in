@@ -1,11 +1,19 @@
 import { getServerSession } from "@saroh/auth/next";
 import { SplitPanel, SplitShell } from "@saroh/ui/split-shell";
 import type { Metadata } from "next";
-import { headers } from "next/headers";
+import { cookies, headers } from "next/headers";
 import { redirect } from "next/navigation";
 
 import { BusinessSetupForm } from "@/components/organizations/business-setup-form";
-import { listOrganizations } from "@/lib/organizations/service";
+import { ACTIVE_ORG_COOKIE } from "@/lib/api/http";
+import {
+    ACTIVE_ORG_NAME_COOKIE,
+    leftBusinessNotice,
+} from "@/lib/organizations/left-business";
+import {
+    getOrganization,
+    listOrganizations,
+} from "@/lib/organizations/service";
 import { readInviteIntent } from "@/lib/saroh-billing/invite-intent";
 import { inviteNote, inviteToTake } from "@/lib/saroh-billing/launch-offer";
 import {
@@ -65,6 +73,23 @@ export default async function OnboardingPage({
             ? ({ kind: "none" } as const)
             : await readPlanIntent(query);
     const note = inviteNote(invite) ?? planIntentNote(intent);
+    // Removed from the business they were in: said, not set up as new.
+    const jar = await cookies();
+    const activeId = jar.get(ACTIVE_ORG_COOKIE)?.value;
+    const maybeLeft = leftBusinessNotice({
+        activeId,
+        activeName: jar.get(ACTIVE_ORG_NAME_COOKIE)?.value,
+        memberOf: organizations.map((o) => o.id),
+    });
+    // Asked of that business itself before saying it: an empty list can be
+    // an outage, and "you're no longer in" must only ever be a 403 or 404.
+    const left =
+        maybeLeft && activeId
+            ? await getOrganization(activeId).then(
+                  (org) => (org ? null : maybeLeft),
+                  () => null,
+              )
+            : null;
 
     return (
         <SplitShell
@@ -91,6 +116,14 @@ export default async function OnboardingPage({
                     ? "It sits beside the ones you have, and you switch between them from the top of the workspace."
                     : "Last step. You can change all of this later, and you pick what Saroh does for you once you are inside."}
             </p>
+            {left ? (
+                <p
+                    role="status"
+                    className="-mt-2.5 mb-[22px] text-pretty rounded-[9px] bg-muted px-[13px] py-[11px] text-[13px] leading-[1.55] text-foreground"
+                >
+                    {left}
+                </p>
+            ) : null}
             {note ? (
                 <p
                     data-testid="plan-intent"

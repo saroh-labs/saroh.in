@@ -35,6 +35,10 @@ if (missing.length > 0) {
 
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+    // Development logs every server action's arguments by default, and some
+    // carry secrets: provider keys, sign-in codes (UX-005, 7 Oct). Production
+    // never logs them; this keeps local logs clean too.
+    logging: { serverFunctions: false },
     turbopack: {},
     // @saroh/auth/client and @saroh/ui both ship as source (no built dist), so
     // Next must transpile them — required for a webpack `next build`, not just

@@ -2,8 +2,8 @@ import Link from "next/link";
 import type { ReactNode } from "react";
 
 import { focusRing } from "../booking-flow/styles";
+import { formatAmount } from "../lib/money";
 import { cn } from "../lib/utils";
-import { formatAmount } from "../product/product-page";
 
 /**
  * The order confirmation on a merchant's site (round-2 P4), at

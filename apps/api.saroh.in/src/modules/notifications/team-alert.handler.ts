@@ -25,6 +25,7 @@ export const PAYMENT_FAILED_NOTIFICATION_TYPE = "payment.failed";
 export const TEAM_JOINED_NOTIFICATION_TYPE = "team.joined";
 export const SITE_LIVE_NOTIFICATION_TYPE = "site.live";
 export const SITE_NOT_LIVE_NOTIFICATION_TYPE = "site.not_live";
+export const PROVIDER_ATTENTION_NOTIFICATION_TYPE = "provider.attention";
 
 type Tx = Prisma.TransactionClient;
 
@@ -150,7 +151,9 @@ export async function tellTeam(
         });
     }
 
-    const emailed = await emailTeam(tx, comms, organizationId, alert);
+    const emailed = alert.bellOnly
+        ? 0
+        : await emailTeam(tx, comms, organizationId, alert);
     return { told: true, emailed };
 }
 
@@ -257,6 +260,8 @@ export async function wordAlert(
             return wordSite(tx, organizationId, payload);
         case "uncollected":
             return wordUncollected(tx, organizationId, payload, now);
+        case "provider":
+            return wordProvider(tx, organizationId, payload);
     }
 }
 
@@ -457,6 +462,61 @@ async function wordSite(
     };
 }
 
+/**
+ * A provider that refused the business's keys (UX-012), told while it
+ * still needs attention: keys entered again since, or a disconnect, and
+ * there is nothing to say. Names the provider, never a key.
+ */
+async function wordProvider(
+    tx: Tx,
+    organizationId: string,
+    p: Extract<TeamAlertPayload, { event: "provider" }>,
+): Promise<WordedAlert | null> {
+    const where = { id: p.providerId, organizationId };
+    const select = {
+        provider: true,
+        status: true,
+        attentionAt: true,
+    } as const;
+    const row =
+        p.channel === "PAYMENTS"
+            ? await tx.merchantPaymentProvider.findFirst({ where, select })
+            : await tx.communicationProvider.findFirst({ where, select });
+    if (row?.status !== "CONNECTED" || !row.attentionAt) return null;
+    if (row.attentionAt.toISOString() !== p.since) return null;
+    const name = PROVIDER_NAMES[row.provider] ?? row.provider;
+    const base = {
+        event: "failed" as const,
+        eventKey: `team:provider:${p.providerId}:${p.since}`,
+        notificationId: null,
+        type: PROVIDER_ATTENTION_NOTIFICATION_TYPE,
+        path: "/settings/providers",
+        skipUserId: null,
+    };
+    if (p.channel === "PAYMENTS") {
+        return {
+            ...base,
+            title: `${name} refused your keys`,
+            body: `Customers can't pay online until you connect ${name} again with keys that work, in Settings › Providers.`,
+        };
+    }
+    return {
+        ...base,
+        title: `${name} refused your email keys`,
+        body: `Emails to your customers aren't going out. Connect ${name} again with a key that works, in Settings › Providers.`,
+        bellOnly: true,
+    };
+}
+
+/** How a provider is named in an alert. */
+const PROVIDER_NAMES: Partial<Record<string, string>> = {
+    RAZORPAY: "Razorpay",
+    CASHFREE: "Cashfree",
+    RESEND: "Resend",
+    SENDGRID: "SendGrid",
+    SMTP: "SMTP relay",
+};
+
 function payloadOf(value: unknown): TeamAlertPayload | null {
     if (typeof value !== "object" || value === null) return null;
     const p = value as Record<string, unknown>;
@@ -476,6 +536,12 @@ function payloadOf(value: unknown): TeamAlertPayload | null {
             return str("notificationId") ? (p as TeamAlertPayload) : null;
         case "uncollected":
             return str("orderId") ? (p as TeamAlertPayload) : null;
+        case "provider":
+            return str("providerId") &&
+                str("since") &&
+                (p.channel === "PAYMENTS" || p.channel === "EMAIL")
+                ? (p as TeamAlertPayload)
+                : null;
         case "site":
             return str("testReleaseId") &&
                 str("goLiveAt") &&

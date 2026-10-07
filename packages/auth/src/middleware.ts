@@ -17,6 +17,13 @@ export interface AuthMiddlewareOptions {
      * Return false for public paths the app wants to leave open.
      */
     isProtected?: (pathname: string) => boolean;
+    /**
+     * Where a visitor with no session goes instead of `loginUrl`, for a path
+     * that has a better first page; null for the login. An invitation link
+     * (`/join/:token`) opens the invitation itself — the business, who asked
+     * and the role — rather than "Log in · Welcome back" (UX-029).
+     */
+    signedOutUrl?: (pathname: string) => string | null;
 }
 
 /**
@@ -51,6 +58,8 @@ export function createAuthMiddleware(opts: AuthMiddlewareOptions) {
             cookiePrefix: sessionCookiePrefix(),
         });
         if (!sessionCookie) {
+            const instead = opts.signedOutUrl?.(request.nextUrl.pathname);
+            if (instead) return NextResponse.redirect(new URL(instead));
             const loginUrl = new URL(opts.loginUrl);
             loginUrl.searchParams.set("redirect", publicUrl(request));
             return NextResponse.redirect(loginUrl);

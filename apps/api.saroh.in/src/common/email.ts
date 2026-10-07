@@ -239,9 +239,15 @@ export function sendDeleteAccountEmail(
  */
 export function sendEnquiryNotificationEmail(
     to: string,
-    details: { contactName: string; formName: string; leadUrl: string },
+    details: {
+        contactName: string;
+        formName: string;
+        leadUrl: string;
+        /** A short line of what they wrote (UX-002); null when nothing but an address. */
+        message?: string | null;
+    },
 ): Promise<void> {
-    const { contactName, formName, leadUrl } = details;
+    const { contactName, formName, leadUrl, message } = details;
     if (!transporter) {
         console.info(
             `[New enquiry] (no SMTP) ${to}: ${contactName} via ${formName} -> ${leadUrl}`,
@@ -254,7 +260,9 @@ export function sendEnquiryNotificationEmail(
         subject: `New enquiry from ${contactName}`,
         html: actionEmail(
             `New enquiry from ${contactName}`,
-            `${contactName} submitted the "${formName}" form. Open the lead to follow up.`,
+            message
+                ? `${contactName} wrote through the "${formName}" form: “${message}” Open the lead to reply.`
+                : `${contactName} submitted the "${formName}" form. Open the lead to follow up.`,
             leadUrl,
             "View lead",
         ),

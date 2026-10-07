@@ -35,6 +35,10 @@ if (missing.length > 0) {
 
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+    // Development logs every server action's arguments by default, and some
+    // carry secrets: provider keys, sign-in codes (UX-005, 7 Oct). Production
+    // never logs them; this keeps local logs clean too.
+    logging: { serverFunctions: false },
     // @saroh/auth ships its client/middleware/next entries as source. admin no
     // longer touches the database — it reads the session over HTTP from
     // api.saroh.in via @saroh/auth/next — so no Prisma externalization needed.

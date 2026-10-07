@@ -8,6 +8,7 @@ import Link from "next/link";
 import type { ReactNode } from "react";
 import { useState } from "react";
 
+import { useBusinessZone } from "@/components/shared/business-zone";
 import type { Device, Zoom } from "@/components/sites/editor-constants";
 import {
     publishTitle,
@@ -134,6 +135,7 @@ export function EditorTopBar({
     testRelease?: TestReleaseActions;
 }) {
     /** The page switcher under the page name in the breadcrumb. */
+    const zone = useBusinessZone();
     const [pagesOpen, setPagesOpen] = useState(false);
 
     const activePage = pages.find((page) => page.id === pageId);
@@ -157,6 +159,7 @@ export function EditorTopBar({
         lastSavedAt,
         openNotes,
         scheduled,
+        zone,
     });
     const publishHint = publishTitle({
         publishing,

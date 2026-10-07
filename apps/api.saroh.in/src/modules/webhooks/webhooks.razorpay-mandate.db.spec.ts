@@ -120,6 +120,8 @@ beforeAll(async () => {
     });
     await giveBusinessDetails(org.id);
     owner = { organizationId: org.id, userId: user.id, role: "OWNER" };
+    // Razorpay answers the key check on connect (UX-012).
+    routes["GET /payments"] = { items: [] };
     await payments.connectProvider(owner, {
         provider: "RAZORPAY",
         publicKey: "rzp_test_Public1",

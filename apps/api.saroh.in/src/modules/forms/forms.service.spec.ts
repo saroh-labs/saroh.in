@@ -250,6 +250,64 @@ describe("FormsService.update", () => {
         expect(formUpdate).not.toHaveBeenCalled();
     });
 
+    it("binds a form saved without a site to the site the editor names (UX-002)", async () => {
+        const service = new FormsService();
+        formFindUnique.mockResolvedValue({
+            id: "form_1",
+            organizationId: "org_1",
+            siteId: null,
+            deletedAt: null,
+        });
+        siteFindUnique.mockResolvedValue({
+            id: "site_1",
+            organizationId: "org_1",
+        });
+        formUpdate.mockResolvedValue({ id: "form_1" });
+
+        await service.update(ctx(), "form_1", {
+            name: "Ask",
+            siteId: "site_1",
+        });
+
+        expect(formUpdate).toHaveBeenCalledWith({
+            where: { id: "form_1" },
+            data: { site: { connect: { id: "site_1" } }, name: "Ask" },
+        });
+    });
+
+    it("never moves a form already on a site, and 404s another business's site", async () => {
+        const service = new FormsService();
+        formFindUnique.mockResolvedValue({
+            id: "form_1",
+            organizationId: "org_1",
+            siteId: "site_1",
+            deletedAt: null,
+        });
+        formUpdate.mockResolvedValue({ id: "form_1" });
+        await service.update(ctx(), "form_1", { siteId: "site_2" });
+        expect(siteFindUnique).not.toHaveBeenCalled();
+        expect(formUpdate).toHaveBeenCalledWith({
+            where: { id: "form_1" },
+            data: {},
+        });
+
+        formUpdate.mockClear();
+        formFindUnique.mockResolvedValue({
+            id: "form_1",
+            organizationId: "org_1",
+            siteId: null,
+            deletedAt: null,
+        });
+        siteFindUnique.mockResolvedValue({
+            id: "site_x",
+            organizationId: "org_2",
+        });
+        await expect(
+            service.update(ctx(), "form_1", { siteId: "site_x" }),
+        ).rejects.toBeInstanceOf(NotFoundException);
+        expect(formUpdate).not.toHaveBeenCalled();
+    });
+
     it("denies a MEMBER write", async () => {
         const service = new FormsService();
         await expect(

@@ -4,6 +4,11 @@ import { prisma } from "@saroh/database";
 
 import { appBase } from "../../common/app-url";
 import { sendEnquiryNotificationEmail } from "../../common/email";
+import {
+    emailFieldNames,
+    enquiryPreview,
+    readableAnswers,
+} from "../forms/enquiry-entries";
 
 /** The `type` this handler is registered under (matches the enquiry producer). */
 export const ENQUIRY_NOTIFY_TYPE = "enquiry.notify";
@@ -66,7 +71,12 @@ export class EnquiryNotifyHandler {
         const contactName = this.contactName(lead.contact);
         const formName = lead.form?.name ?? "your enquiry form";
         const title = `New enquiry from ${contactName}`;
-        const body = `${contactName} submitted "${formName}".`;
+        // What they wrote, so the owner can read the question from the
+        // notification itself (UX-002), not only that one came in.
+        const message = await this.message(lead.id, lead.form?.fields);
+        const body = message
+            ? `${contactName} via "${formName}": ${message}`
+            : `${contactName} submitted "${formName}".`;
 
         // (1) Durable notification, guarded by the (leadId, type) unique so the
         // at-least-once worker delivers it EXACTLY once.
@@ -102,9 +112,27 @@ export class EnquiryNotifyHandler {
                 contactName,
                 formName,
                 leadUrl,
+                message,
             });
         }
     };
+
+    /** A short line of what the lead's latest submission said, or null. */
+    private async message(
+        leadId: string,
+        formFields: unknown,
+    ): Promise<string | null> {
+        const submission = await prisma.submission.findFirst({
+            where: { leadId },
+            orderBy: { createdAt: "desc" },
+            select: { data: true },
+        });
+        if (!submission) return null;
+        return enquiryPreview(
+            readableAnswers(submission.data, formFields),
+            emailFieldNames(formFields),
+        );
+    }
 
     /** A human name for the contact, falling back to the email/"someone". */
     private contactName(contact: Contact | null): string {

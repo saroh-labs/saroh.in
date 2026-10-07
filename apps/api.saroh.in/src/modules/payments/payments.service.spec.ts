@@ -31,7 +31,9 @@ jest.mock("@saroh/database", () => {
             findMany: jest.fn(),
             findUnique: jest.fn(),
             update: jest.fn(),
+            updateMany: jest.fn(),
         },
+        job: { create: jest.fn() },
         paymentIntent: {
             findUnique: jest.fn(),
             findFirst: jest.fn(),
@@ -191,6 +193,8 @@ describe("PaymentsService.connectProvider", () => {
             publicKey: "rzp_test_Key123",
             // Saved without one: the list flags it (DEC-063).
             webhookSecretMissing: true,
+            // Keys that passed the check need no attention (UX-012).
+            attention: null,
             createdAt: expect.any(Date),
             updatedAt: expect.any(Date),
         });
@@ -1401,5 +1405,212 @@ describe("PaymentsService.initiateRefund", () => {
         ).rejects.toBeInstanceOf(NotFoundException);
         expect(fake.refundCalls).toHaveLength(0);
         expect(refundCreate).not.toHaveBeenCalled();
+    });
+});
+
+describe("PaymentsService — keys checked on connect (UX-012)", () => {
+    beforeEach(() => {
+        jest.clearAllMocks();
+        providerUpsert.mockImplementation(
+            ({ create }: { create: Record<string, unknown> }) =>
+                Promise.resolve({
+                    id: "mpp_1",
+                    createdAt: new Date("2026-01-01"),
+                    updatedAt: new Date("2026-01-01"),
+                    ...create,
+                }),
+        );
+    });
+
+    const KEYS = {
+        provider: "razorpay",
+        keyId: "rzp_test_Fake123",
+        keySecret: "fake-secret-typo",
+    };
+
+    it("refuses keys the provider rejects: 400 under the secret, nothing stored", async () => {
+        const { service, fake } = makeService();
+        fake.credentialCheck = "REJECTED";
+
+        const err = await service
+            .connectProvider(ctx(), KEYS)
+            .catch((e: unknown) => e);
+
+        expect(err).toBeInstanceOf(BadRequestException);
+        expect((err as BadRequestException).getResponse()).toEqual({
+            message: expect.stringContaining(
+                "Razorpay didn't accept these keys",
+            ),
+            field: "keySecret",
+        });
+        expect(JSON.stringify((err as Error).message)).not.toContain(
+            "fake-secret-typo",
+        );
+        expect(providerUpsert).not.toHaveBeenCalled();
+        // It was asked with the keys typed, once.
+        expect(fake.verifyCalls).toEqual([
+            { keyId: "rzp_test_Fake123", keySecret: "fake-secret-typo" },
+        ]);
+    });
+
+    it("refuses with a deliberate 503 when the provider can't say", async () => {
+        const { service, fake } = makeService();
+        fake.credentialCheck = "UNSURE";
+
+        const err = await service
+            .connectProvider(ctx(), KEYS)
+            .catch((e: unknown) => e);
+
+        expect(err).toBeInstanceOf(ServiceUnavailableException);
+        expect((err as ServiceUnavailableException).getResponse()).toEqual({
+            message: expect.stringContaining("couldn't reach Razorpay"),
+            details: { reason: "provider-unreachable" },
+        });
+        expect(providerUpsert).not.toHaveBeenCalled();
+    });
+
+    it("keeps keys the provider accepts, and clears an earlier Needs attention", async () => {
+        const { service } = makeService();
+
+        const result = await service.connectProvider(ctx(), KEYS);
+
+        expect(providerUpsert).toHaveBeenCalledTimes(1);
+        const call = providerUpsert.mock.calls[0][0];
+        expect(call.update).toEqual(
+            expect.objectContaining({
+                status: "CONNECTED",
+                attentionReason: null,
+                attentionAt: null,
+            }),
+        );
+        expect(result.attention).toBeNull();
+    });
+
+    it("lists a connection that refused its keys as needing attention, and since when", async () => {
+        const { service } = makeService();
+        const since = new Date("2026-10-07T09:30:00Z");
+        providerFindMany.mockResolvedValue([
+            {
+                ...connectedRow(),
+                attentionReason: "KEYS_REFUSED",
+                attentionAt: since,
+            },
+        ]);
+
+        const [row] = await service.listProviders(ctx());
+
+        expect(row.status).toBe("CONNECTED");
+        expect(row.attention).toEqual({ reason: "KEYS_REFUSED", since });
+    });
+});
+
+describe("PaymentsService — a provider failing at checkout (UX-012)", () => {
+    const ORDER = {
+        id: "order_1",
+        organizationId: "org_1",
+        storeId: "store_1",
+        total: "42.50",
+        currency: "INR",
+        status: "PENDING",
+        paymentStatus: "UNPAID",
+        store: { settings: null },
+    };
+    const updateMany = prisma.merchantPaymentProvider.updateMany as jest.Mock;
+    const jobCreate = prisma.job.create as jest.Mock;
+
+    beforeEach(() => {
+        jest.clearAllMocks();
+        orderFindUnique.mockResolvedValue(ORDER);
+        providerFindMany.mockResolvedValue([connectedRow()]);
+    });
+
+    it("answers refused keys with a handled 503 in the customer's words, flags the connection and tells the team", async () => {
+        const { service, fake } = makeService();
+        const { ProviderKeysRefusedError } =
+            await import("../../common/providers/provider-attention");
+        fake.failNextIntent(
+            new ProviderKeysRefusedError(
+                "Razorpay order creation failed (HTTP 401)",
+                401,
+            ),
+        );
+        updateMany.mockResolvedValue({ count: 1 });
+
+        const err = await service
+            .createIntentForOrder(ctx(), "order_1")
+            .catch((e: unknown) => e);
+
+        expect(err).toBeInstanceOf(ServiceUnavailableException);
+        expect((err as ServiceUnavailableException).getResponse()).toEqual({
+            message:
+                "The business can't take payment online right now. Please try again later, or pay them another way.",
+            details: { reason: "provider-keys-refused" },
+        });
+        // Only a connection not already flagged is marked…
+        expect(updateMany).toHaveBeenCalledWith({
+            where: { id: "mpp_1", organizationId: "org_1", attentionAt: null },
+            data: {
+                attentionReason: "KEYS_REFUSED",
+                attentionAt: expect.any(Date),
+            },
+        });
+        // …and the team's alert is queued with it, naming no key.
+        expect(jobCreate).toHaveBeenCalledTimes(1);
+        const job = jobCreate.mock.calls[0][0].data;
+        expect(job).toEqual({
+            organizationId: "org_1",
+            type: "team.alert",
+            payload: {
+                event: "provider",
+                channel: "PAYMENTS",
+                providerId: "mpp_1",
+                since: expect.any(String),
+            },
+        });
+        expect(JSON.stringify(job)).not.toContain("super-secret-value");
+        expect(intentCreate).not.toHaveBeenCalled();
+    });
+
+    it("tells the team once: a connection already flagged queues nothing more", async () => {
+        const { service, fake } = makeService();
+        const { ProviderKeysRefusedError } =
+            await import("../../common/providers/provider-attention");
+        fake.failNextIntent(new ProviderKeysRefusedError("HTTP 401", 401));
+        updateMany.mockResolvedValue({ count: 0 });
+
+        await expect(
+            service.createIntentForOrder(ctx(), "order_1"),
+        ).rejects.toBeInstanceOf(ServiceUnavailableException);
+        expect(jobCreate).not.toHaveBeenCalled();
+    });
+
+    it("answers any other provider failure with the same handled 503, flagging nothing", async () => {
+        const { service, fake } = makeService();
+        fake.failNextIntent(
+            new Error("Razorpay order creation failed (HTTP 502)"),
+        );
+
+        const err = await service
+            .createIntentForOrder(ctx(), "order_1")
+            .catch((e: unknown) => e);
+
+        expect(err).toBeInstanceOf(ServiceUnavailableException);
+        expect(
+            (err as ServiceUnavailableException).getResponse(),
+        ).toMatchObject({ details: { reason: "provider-unavailable" } });
+        expect(updateMany).not.toHaveBeenCalled();
+        expect(jobCreate).not.toHaveBeenCalled();
+    });
+
+    it("still answers the customer when the flag can't be written", async () => {
+        const { service, fake } = makeService();
+        const { ProviderKeysRefusedError } =
+            await import("../../common/providers/provider-attention");
+        fake.failNextIntent(new ProviderKeysRefusedError("HTTP 401", 401));
+        updateMany.mockRejectedValue(new Error("db down"));
+
+        await expect(
+            service.createIntentForOrder(ctx(), "order_1"),
+        ).rejects.toBeInstanceOf(ServiceUnavailableException);
     });
 });

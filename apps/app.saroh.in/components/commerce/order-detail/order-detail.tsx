@@ -6,6 +6,7 @@ import { useState } from "react";
 
 import type { OrderMenuPending } from "@/components/commerce/order-actions";
 import { OrderActions } from "@/components/commerce/order-actions";
+import { useBusinessZone } from "@/components/shared/business-zone";
 import { formatMoneyMajor } from "@/lib/format/money";
 import { useClock } from "@/lib/hooks/use-clock";
 import { readyNoticeText } from "@/lib/messages/notice-reach";
@@ -153,7 +154,9 @@ export function OrderDetail({
     const appointment = isAppointment(order);
     const visits = appointment ? order.visits : undefined;
     const now = new Date(clock ?? Date.parse(order.updatedAt));
-    const zone = visits?.service.timezone ?? "UTC";
+    // The service's zone, else the business's (UX-008), never UTC.
+    const businessZone = useBusinessZone();
+    const zone = visits?.service.timezone ?? businessZone;
     const standing = appointment
         ? (({ label, tone }) => ({ label, tone: VISITS_TONE[tone] }))(
               visitsStanding(

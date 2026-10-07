@@ -169,6 +169,7 @@ describe("OrganizationContextService.listForUser", () => {
                     slug: "beta",
                     lifecycleStatus: "SUSPENDED",
                     kind: "WORK",
+                    businessProfile: { timezone: "Europe/London" },
                 },
             },
         ]);
@@ -183,6 +184,8 @@ describe("OrganizationContextService.listForUser", () => {
                 role: "OWNER",
                 // No kind on the row reads as a business (DEC-070).
                 kind: "BUSINESS",
+                // No profile: no zone, and the app reads India's (UX-008).
+                timeZone: null,
             },
             {
                 id: "org_2",
@@ -193,6 +196,8 @@ describe("OrganizationContextService.listForUser", () => {
                 lifecycleStatus: "SUSPENDED",
                 // So the switcher's words fit before it is opened.
                 kind: "WORK",
+                // So server-rendered times are the business's (UX-008).
+                timeZone: "Europe/London",
             },
         ]);
         // Each membership carries what the actor may do there, so the rail

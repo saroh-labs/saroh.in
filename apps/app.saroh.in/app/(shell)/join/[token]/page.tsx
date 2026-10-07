@@ -1,6 +1,7 @@
 import { EmptyState } from "@saroh/ui/empty-state";
 import { redirect } from "next/navigation";
 
+import { inviteLandingFor } from "@/lib/accounts";
 import { setActiveOrganization } from "@/lib/organizations/actions";
 import { acceptInvitation } from "@/lib/organizations/members";
 import { requireSession } from "@/lib/session";
@@ -12,9 +13,9 @@ import { requireSession } from "@/lib/session";
  * store-level invites, which are a different thing with a different role
  * vocabulary.
  *
- * `requireSession` first: an invitee who has never used Saroh is sent to sign
- * in or sign up and comes back here, because the sign-in return-to carries the
- * URL they were trying to reach (#222).
+ * `requireSession` first: an invitee who has never used Saroh is sent to the
+ * invitation's page on accounts (business, inviter, role, their address),
+ * whose two doors carry this URL back through sign-up or log-in (UX-029).
  *
  * On success the invited workspace becomes the active one. Without that, a
  * person who already had a workspace of their own would accept an invitation
@@ -29,7 +30,9 @@ export default async function JoinPage({
     params: Promise<{ token: string }>;
 }) {
     const { token } = await params;
-    await requireSession();
+    // Behind the middleware's own redirect: signed out, the invitation's
+    // page on accounts, never the bare login (UX-029).
+    await requireSession(inviteLandingFor(`/join/${token}`) ?? undefined);
 
     const result = await acceptInvitation(token);
     if (!result.ok) {

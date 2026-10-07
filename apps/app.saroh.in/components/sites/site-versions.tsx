@@ -11,6 +11,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 
+import { useBusinessZone } from "@/components/shared/business-zone";
 import { restorePublication } from "@/lib/sites/actions";
 import { exactDate } from "@/lib/sites/format-date";
 import type { RestoreGate, VersionBadgeTone } from "@/lib/sites/release-review";
@@ -89,6 +90,7 @@ export function SiteVersions({
     canOverride?: boolean;
     scheduled?: ScheduledGoLives;
 }) {
+    const zone = useBusinessZone();
     const router = useRouter();
     const [confirming, setConfirming] = useState<string | null>(null);
     const [pending, startTransition] = useTransition();
@@ -152,7 +154,7 @@ export function SiteVersions({
                                 <div className="min-w-0">
                                     <div className="flex flex-wrap items-center gap-2">
                                         <span className="text-sm font-medium">
-                                            {exactDate(when)}
+                                            {exactDate(when, zone)}
                                         </span>
                                         {/*
                                          * Live is marked, not implied by
@@ -294,12 +296,13 @@ function RestoreConfirm({
     current: SitePublication | undefined;
     changesRequested: boolean;
 }) {
+    const zone = useBusinessZone();
     return (
         <div className="space-y-2 border-t pt-3">
             <p className="text-sm text-muted-foreground">
                 This replaces what visitors see now
                 {current
-                    ? ` (published ${exactDate(current.publishedAt)})`
+                    ? ` (published ${exactDate(current.publishedAt, zone)})`
                     : ""}
                 . Nothing is deleted — this version is published again as a new
                 entry, so you can undo it from this same list. Your unpublished

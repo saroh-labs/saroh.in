@@ -111,6 +111,16 @@ export class UpdateFormDto {
     @IsIn(FORM_STATUSES)
     status?: FormStatus;
 
+    /**
+     * The site whose editor holds this form. Binds a form saved without one
+     * (UX-002: the editor used to leave it null, so the Forms tab never
+     * listed it); a form already on a site stays on it.
+     */
+    @IsOptional()
+    @IsString()
+    @MaxLength(64)
+    siteId?: string;
+
     @IsOptional()
     @IsString()
     @MaxLength(64)
