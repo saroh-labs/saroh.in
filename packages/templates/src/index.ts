@@ -114,7 +114,11 @@ export {
 export { WRITING_TEMPLATE_ID, writingTemplate } from "./templates/writing";
 
 // The Blogs industry template (Journal shape; industry templates U8).
-export { BLOGS_TEMPLATE_ID, blogsTemplate } from "./templates/blogs";
+export {
+    BLOGS_GALLERY_SAMPLE,
+    BLOGS_TEMPLATE_ID,
+    blogsTemplate,
+} from "./templates/blogs";
 
 // The Personal/consultant template (DEC-070, K14): the default for "Just me".
 export {
@@ -132,20 +136,27 @@ export {
 // Ceramics, the gallery's "Store" (industry templates plan, U5).
 export {
     CERAMICS_COLLECTION_COUNT,
+    CERAMICS_GALLERY_SAMPLE,
     CERAMICS_TEMPLATE_ID,
     ceramicsSellsProducts,
     ceramicsTemplate,
 } from "./templates/ceramics";
 // The Gym industry template (industry templates plan, U6).
-export { GYM_TEMPLATE_ID, gymTemplate } from "./templates/gym";
+export {
+    GYM_GALLERY_SAMPLE,
+    GYM_TEMPLATE_ID,
+    gymTemplate,
+} from "./templates/gym";
 // The Bakery industry template (industry templates plan, U4).
 export {
+    BAKERY_GALLERY_SAMPLE,
     BAKERY_IMAGE_BRIEFS,
     BAKERY_TEMPLATE_ID,
     bakeryTemplate,
 } from "./templates/bakery";
 // Studio, the gallery's "Portfolio" (industry templates plan, U10).
 export {
+    STUDIO_GALLERY_SAMPLE,
     STUDIO_PROJECT_BRIEFS,
     STUDIO_TEMPLATE_ID,
     studioHasEmail,
@@ -154,6 +165,7 @@ export {
 // Developer (industry templates U9): a one-page portfolio for an independent
 // engineer.
 export {
+    DEVELOPER_GALLERY_SAMPLE,
     DEVELOPER_TEMPLATE_ID,
     developerTemplate,
 } from "./templates/developer";
@@ -177,3 +189,13 @@ export {
     salonServiceIds,
     salonTemplate,
 } from "./templates/salon";
+
+// Every gallery template's sample words, by id (KTD-6): gallery renders only.
+export { GALLERY_SAMPLES } from "./gallery-samples";
+
+// The pre-publish check's matcher for a template's placeholder words.
+export {
+    TEMPLATE_PLACEHOLDER_PATTERNS,
+    templatePlaceholderIn,
+    templatePlaceholderInAny,
+} from "./placeholders";

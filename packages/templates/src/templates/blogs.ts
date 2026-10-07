@@ -212,3 +212,19 @@ export const blogsTemplate: TemplateManifest = {
         },
     ],
 };
+
+/**
+ * The design's words for the gallery's render of this template (KTD-6), in
+ * place of the placeholders a live site starts with: the About paragraphs
+ * and the footer's line. Never laid down on a merchant's site — only the
+ * gallery render applies it.
+ */
+export const BLOGS_GALLERY_SAMPLE = {
+    footer: "Bengaluru · Roughly monthly since 2022",
+    about: {
+        paragraphs: [
+            "I am a designer in Bengaluru. I work on my own, mostly on software that has to be understood by people who did not choose to use it — internal tools, public services, the screens nobody writes case studies about.",
+            "This is where I put things down while I still remember getting them wrong. It is roughly monthly, which is a polite way of saying it depends on the month.",
+        ],
+    },
+} as const;

@@ -461,4 +461,9 @@ export const CLINIC_GALLERY_SAMPLE = {
             bio: "Check-ups and whitening, and video consultations for a first opinion. Late mornings.",
         },
     ],
+    /**
+     * The footer's line: the sample clinic's address and its days. Never a
+     * registration number — an invented one would read as a real record.
+     */
+    footer: "12th Main, Indiranagar, Bengaluru · Open every day",
 } as const;

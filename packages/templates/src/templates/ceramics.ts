@@ -279,3 +279,26 @@ export const ceramicsTemplate: TemplateManifest = {
         },
     ],
 };
+
+/**
+ * The design's words for the gallery's render of this template (KTD-6), in
+ * place of the placeholders a live site starts with: the material notes,
+ * the studio's paragraphs and facts, and the footer's line. Never laid
+ * down on a merchant's site — only the gallery render applies it.
+ */
+export const CERAMICS_GALLERY_SAMPLE = {
+    footer: "Koregaon Park, Pune · Open Saturdays, 9 to 1",
+    material: [
+        "Dug near Nashik and blended with 12% grog, which is why the surface never looks flat.",
+        "Two celadons and one ash, mixed in 20-litre batches — so colour shifts between them.",
+        "Reduction to cone 10. Roughly one piece in nine comes out of the kiln unusable.",
+    ],
+    studio: {
+        paragraphs: [
+            "Everything is thrown on one wheel in a room behind a house in Koregaon Park. There are no moulds and no second pair of hands, which is the reason a set of four tumblers are four slightly different heights.",
+            "Pieces are made in runs of twenty or thirty and fired together, so a batch shares a colour the next one will not. When a glaze is gone it is genuinely gone.",
+        ],
+        /** The facts' values, in the template's order (its labels stay). */
+        facts: ["Koregaon Park, Pune", "Anjali Deshpande", "2018"],
+    },
+} as const;

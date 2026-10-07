@@ -269,3 +269,20 @@ export const bakeryTemplate: TemplateManifest = {
         },
     ],
 };
+
+/**
+ * The design's words for the gallery's render of this template (KTD-6), in
+ * place of the placeholders a live site starts with: the starter's story
+ * and the footer's line. Never laid down on a merchant's site —
+ * `instantiateTemplate` does not read it; only the gallery render applies it.
+ */
+export const BAKERY_GALLERY_SAMPLE = {
+    footer: "14 Hill Road, Bandra West · Closed Mondays",
+    story: {
+        paragraphs: [
+            "The starter was made in a rented kitchen in 2015 from flour, water and the skin of a black grape. It has been fed almost every evening since, and it is the only ingredient in this bakery we cannot buy again.",
+            "That is most of what makes the bread taste of something. The rest is time — the dough is mixed at four in the afternoon, folded until seven, and left cold overnight so the flour has somewhere to go.",
+        ],
+        sign: "— Priya, who mixes",
+    },
+} as const;

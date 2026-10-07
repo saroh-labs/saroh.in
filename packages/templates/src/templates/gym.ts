@@ -415,12 +415,15 @@ export const gymTemplate: TemplateManifest = {
                     },
                 },
                 {
+                    // The page's own heading and line already say what this
+                    // is ("Membership", "Every way in…"): the plans are
+                    // titled as one of the two kinds of way in, beside
+                    // Class packs, with no second line repeating the first.
                     type: "plans",
                     contractVersion: 1,
                     when: plansOn,
                     content: {
-                        title: "Memberships",
-                        intro: MEMBERSHIP_INTRO,
+                        title: "Plans",
                         highlight: "none",
                     },
                 },
@@ -458,3 +461,42 @@ export const gymTemplate: TemplateManifest = {
         },
     ],
 };
+
+/**
+ * The design's words for the gallery's render of this template (KTD-6), in
+ * place of the placeholders a live site starts with: the four coaches
+ * (their photo briefs stay the template's), what the two first-visit steps
+ * ask the owner to say, and the footer's line — the place only, since a
+ * gallery render never shows a phone number. Never laid down on a
+ * merchant's site — only the gallery render applies it.
+ */
+export const GYM_GALLERY_SAMPLE = {
+    footer: "Bandra West, Mumbai",
+    coaches: [
+        {
+            name: "Devika Rane",
+            role: "Strength",
+            bio: "Coaches the barbell sessions. Will spend a whole hour on your setup if that is what the lift needs.",
+        },
+        {
+            name: "Arjun Patel",
+            role: "Conditioning",
+            bio: "Runs the conditioning and the lunchtime thirties. Ex-hockey, and it shows in the warm-ups.",
+        },
+        {
+            name: "Ritu Bansal",
+            role: "Mobility",
+            bio: "Thursday mornings. Most people arrive because something hurts and stay because it stopped.",
+        },
+        {
+            name: "Sameer Khan",
+            role: "Boxing",
+            bio: "Pads on Wednesdays. No sparring unless you ask for it twice.",
+        },
+    ],
+    /** The first visit's step bodies, in order; the third is the template's own. */
+    firstVisit: [
+        "Ask at the desk. The first class is free and you do not need to book it.",
+        "There are lockers but no padlocks, so bring one of those too if you want it.",
+    ],
+} as const;
