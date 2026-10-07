@@ -2,6 +2,7 @@ import { toRendered } from "@saroh/block-contract";
 import type { TemplateContext, TemplateManifest } from "@saroh/templates";
 import {
     getTemplate,
+    HERO_PROMPT,
     instantiateTemplate,
     STARTER_TEMPLATE_ID,
     starterTemplate,
@@ -58,7 +59,7 @@ function imageSources(container: HTMLElement): string[] {
 }
 
 describe("the starter template, rendered", () => {
-    it("starter@2 draws no image a new site cannot load", () => {
+    it("starter@3 draws no image a new site cannot load", () => {
         expect(getTemplate(STARTER_TEMPLATE_ID)).toBe(starterTemplate);
         for (const page of renderSite(starterTemplate)) {
             expect(imageSources(page.container)).toEqual([]);
@@ -67,14 +68,12 @@ describe("the starter template, rendered", () => {
         }
     });
 
-    it("starter@2 draws its words on both pages", () => {
+    it("starter@3 draws its words on both pages, prompting the owner (UX-070)", () => {
         const [home, about] = renderSite(starterTemplate).map((p) =>
             within(p.container),
         );
         expect(home.getByRole("heading", { name: "Asha Rao" })).toBeVisible();
-        expect(
-            home.getByText("Welcome — here's what Asha Rao does."),
-        ).toBeVisible();
+        expect(home.getByText(HERO_PROMPT)).toBeVisible();
         expect(
             home.getByRole("heading", { name: "What Asha Rao does" }),
         ).toBeVisible();

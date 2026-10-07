@@ -47,6 +47,12 @@ export function footerLine(
     return { kind: "html", value: inner };
 }
 
+/** A trimmed string, or null when there is nothing in it. */
+function nonBlank(value: string | null | undefined): string | null {
+    const trimmed = value?.trim() ?? "";
+    return trimmed === "" ? null : trimmed;
+}
+
 /** The business's public phone and place, for the footer (UX-038). */
 export interface SiteContact {
     phone: string | null;
@@ -91,8 +97,8 @@ export function SiteFooter({
     /** The business's public phone and place (UX-038); null draws neither. */
     contact?: SiteContact | null;
 }) {
-    const phone = contact?.phone?.trim() || null;
-    const address = contact?.address?.trim() || null;
+    const phone = nonBlank(contact?.phone);
+    const address = nonBlank(contact?.address);
     const written = footer && footer.value.trim() !== "" ? footer : null;
     const line = written
         ? footerLine(written)
