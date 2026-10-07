@@ -10,6 +10,7 @@ import { showPlanRefusal } from "@/components/billing/plan-refusal";
 import { NeedsYou } from "@/components/commerce/needs-you";
 import { ConfirmDialog } from "@/components/shared/confirm-dialog";
 import { DataView } from "@/components/shared/data-view/data-view";
+import type { PlanMeter } from "@/lib/billing/meter";
 import type { PlanRefusal } from "@/lib/billing/refusal";
 import type { ProductRating } from "@/lib/product-reviews/service";
 import { deleteProduct, setProductStatus } from "@/lib/products/actions";
@@ -67,6 +68,7 @@ export function CatalogueScreen({
     canStock,
     collectionsPanel,
     collectionCount = null,
+    meter = null,
 }: {
     query: ListQuery;
     /** The first page, read on the server. */
@@ -86,6 +88,8 @@ export function CatalogueScreen({
     collectionsPanel?: ReactNode;
     /** How many collections there are; null when they couldn't be read. */
     collectionCount?: number | null;
+    /** The plan's product limit, shown before New product (UX-036). */
+    meter?: PlanMeter | null;
 }) {
     const router = useRouter();
     const [navigating, startNavigation] = useTransition();
@@ -299,6 +303,7 @@ export function CatalogueScreen({
                 stores={stores}
                 storeId={query.storefront}
                 canWrite={canWrite}
+                meter={meter}
             />
             <NeedsYou
                 needs={data.needs}
