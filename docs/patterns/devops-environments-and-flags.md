@@ -51,7 +51,7 @@ session can't touch production's.
 | ------------------------------------ | ----------------------------------------------- | --------------------- |
 | API (Coolify `saroh-api-dev`)        | `api.saroh.io`                                  | `api.saroh.in`        |
 | Workspace, sign-in, admin, marketing | `app.` `accounts.` `admin.saroh.io`, `saroh.io` | the `.saroh.in` hosts |
-| Merchant sites                       | `*.dev.saroh.app`                               | `*.saroh.app`         |
+| Merchant sites                       | `<address>.saroh.io` (Cloudflare Worker)        | `*.saroh.app`         |
 
 - Each Vercel project serves the dev host from the `development` branch, and
   its Preview variables point at the dev API and dev sign-in.

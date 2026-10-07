@@ -1,0 +1,43 @@
+// Cloudflare Worker for the merchant-site renderer, built by OpenNext
+// (`pnpm cf:build`). `saroh-sites-dev` serves dev businesses on
+// <address>.saroh.io against the dev API. Vercel still serves saroh.app.
+// The account comes from CLOUDFLARE_ACCOUNT_ID (a repository variable in CI;
+// set it locally to Saroh labs' id before `wrangler deploy`).
+{
+    "$schema": "node_modules/wrangler/config-schema.json",
+    "name": "saroh-sites-dev",
+    "main": ".open-next/worker.js",
+    "compatibility_date": "2026-10-01",
+    "compatibility_flags": ["nodejs_compat", "global_fetch_strictly_public"],
+    "assets": {
+        "directory": ".open-next/assets",
+        "binding": "ASSETS",
+    },
+    "services": [
+        {
+            "binding": "WORKER_SELF_REFERENCE",
+            "service": "saroh-sites-dev",
+        },
+    ],
+    "images": {
+        "binding": "IMAGES",
+    },
+    "observability": {
+        "enabled": true,
+    },
+    "workers_dev": true,
+    // Dev merchant sites: every <address>.saroh.io (one label, so the
+    // universal certificate covers it). The zone's own hosts (api, app,
+    // admin, accounts, www, media) have "no Worker" routes, so the wildcard
+    // never reaches them; the apex stays the dev marketing site.
+    "routes": [
+        { "pattern": "*.saroh.io/*", "zone_name": "saroh.io" },
+        // A merchant's own domain, attached through Cloudflare for SaaS
+        // (custom hostname on saroh.io, fallback origin sites.saroh.io).
+        { "pattern": "shop-test.virashi.dev/*", "zone_name": "saroh.io" },
+    ],
+    // Public values; SITE_RELAY_SECRET is a Worker secret.
+    "vars": {
+        "API_URL": "https://api.saroh.io",
+    },
+}
