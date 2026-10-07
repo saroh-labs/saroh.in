@@ -141,6 +141,11 @@ export interface ProductSelection {
     price: string;
     /** Nothing of it can be sold now: the action is off. */
     soldOut: boolean;
+    /**
+     * How many can be sold, when the page says so ("Only 2 left"); null
+     * otherwise. The bag never offers more than this (UX-058).
+     */
+    left?: number | null;
 }
 
 const SelectionContext = createContext<ProductSelection | null>(null);
@@ -544,6 +549,10 @@ export default function ProductPage({
                                 name: product.name,
                                 price,
                                 soldOut,
+                                left:
+                                    stock?.word === "LOW"
+                                        ? (stock.left ?? null)
+                                        : null,
                             }}
                         >
                             <div className="mt-5">{action}</div>

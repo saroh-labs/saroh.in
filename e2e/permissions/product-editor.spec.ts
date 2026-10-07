@@ -101,7 +101,7 @@ test("an older product: counted whole, a variant on its own title, sold at two s
         "false",
     );
     await expect(variants.getByText("Unsaved")).toBeVisible();
-    await expect(page.getByText("Variants is unsaved")).toBeVisible();
+    await expect(page.getByText("Variants not saved yet")).toBeVisible();
 
     await page.screenshot({
         path: testInfo.outputPath("older-product.png"),

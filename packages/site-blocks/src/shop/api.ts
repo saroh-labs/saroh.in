@@ -66,6 +66,18 @@ export interface CheckoutQuote {
      * which takes online payment only.
      */
     payments?: QuotePayment[];
+    /**
+     * Where a pick-up is collected (UX-025): the place's address and
+     * hours. Null when Pick-up isn't offered; absent from an older API.
+     */
+    pickup?: PickupPlace | null;
+}
+
+/** A place customers visit, to collect a pick-up from. */
+export interface PickupPlace {
+    address: string;
+    /** "Mon–Sat 10:00–19:00, Sun closed"; null when not set. */
+    hours: string | null;
 }
 
 /** Where a Local delivery or a shipment goes. */

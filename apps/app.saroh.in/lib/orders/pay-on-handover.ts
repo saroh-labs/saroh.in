@@ -31,3 +31,45 @@ export function uncollectedHeading(
     const what = handover === "collection" ? "Not collected" : "Not delivered";
     return `${what} for ${days} days`;
 }
+
+/**
+ * Whether the order is paid, for someone who moves its steps without the
+ * money read (`order:stage` alone, DEC-024; UX-010): the state, never a
+ * figure. The counter must know not to hand over an unpaid order; the API
+ * refuses Collected or Delivered on one paid at the handover until it is
+ * marked paid (`order-stage.ts`), and this says so before anyone tries.
+ * Null for a cancelled order.
+ */
+export function kitchenPayment(
+    order: Pick<
+        OrderRead,
+        "status" | "paymentStatus" | "fulfilmentType" | "refundStanding"
+    > &
+        Partial<Pick<OrderRead, "payOnHandover">>,
+): {
+    label: string;
+    tone: "ready" | "new" | "bad" | "done";
+    body: string | null;
+} | null {
+    if (order.status === "CANCELLED") return null;
+    if (order.refundStanding === "REFUNDED") {
+        return { label: "Refunded", tone: "done", body: null };
+    }
+    if (order.paymentStatus === "PAID" || order.paymentStatus === "REFUNDED") {
+        return { label: "Paid", tone: "ready", body: null };
+    }
+    const handover = handoverPayment(order);
+    if (handover) {
+        const step = handover === "collection" ? "collected" : "delivered";
+        return {
+            label: `To pay on ${handover}`,
+            tone: "new",
+            body: `Not paid yet. It can be marked ${step} once the payment is recorded.`,
+        };
+    }
+    return {
+        label: "Not paid yet",
+        tone: "bad",
+        body: "Don't start it until it's paid.",
+    };
+}

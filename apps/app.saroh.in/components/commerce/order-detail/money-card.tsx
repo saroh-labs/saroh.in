@@ -118,6 +118,10 @@ export function MoneyCard({
     if (n(money.paid) > 0) pay.push(["Taken", format(n(money.paid))]);
     if (n(money.refunded) > 0) {
         pay.push(["Refunded", format(n(money.refunded))]);
+    } else if (paymentStatus === "REFUNDED" && n(money.paid) > 0) {
+        // Recorded as refunded by hand (UX-061): what was taken went back
+        // outside Saroh, so it reads as refunded, not still taken.
+        pay.push(["Refunded", `${format(n(money.paid))} · by hand`]);
     }
     if (n(money.due) > 0) pay.push(["Still due", format(n(money.due))]);
     // Paid, then changed to cost more: the difference is still owed until

@@ -253,6 +253,39 @@ describe("the account's allow-list", () => {
             expect(leaks(view)).toEqual([]);
         });
 
+        it("a pick-up says where to collect it, from a place customers visit (UX-025)", () => {
+            const view = orderDetailView({
+                ...order,
+                store: {
+                    settings: {
+                        kind: "SHOP",
+                        address: "12 Hill Road",
+                        openingHours: null,
+                        pausedAt: "secret",
+                    },
+                },
+            } as never);
+            expect(view.collectFrom).toEqual({
+                address: "12 Hill Road",
+                hours: null,
+            });
+            expect(view.steps[2].line).toBe(
+                "Now · Collect from 12 Hill Road — show #1019",
+            );
+            expect(leaks(view)).toEqual([]);
+            // A "No counter" place has no door: no address is given.
+            const online = orderDetailView({
+                ...order,
+                store: {
+                    settings: { kind: "ONLINE", address: "12 Hill Road" },
+                },
+            } as never);
+            expect(online.collectFrom).toBeNull();
+            expect(online.steps[2].line).toBe(
+                "Now · At the counter — show #1019",
+            );
+        });
+
         it("a shipment shows the courier and tracking number once recorded", () => {
             const shipped = {
                 ...order,

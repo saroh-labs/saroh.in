@@ -27,6 +27,7 @@ import {
     ORDER_CLOSED_WHILE_PAYING,
     SOLD_OUT_REFUNDING,
 } from "../stock/stock-words";
+import type { PickupPlace } from "../stores/pickup-place";
 import type { ShopScope } from "./checkout-bag";
 import { priceBag, shopSettings } from "./checkout-bag";
 import type { SiteAccount } from "./checkout-order";
@@ -100,12 +101,19 @@ export interface CheckoutOptions {
     ways: CheckoutWay[];
     /** How it can be paid: online, on handover, both, or neither (can't). */
     payments: { online: boolean; onHandover: boolean };
+    /**
+     * Where a pick-up is collected (UX-025): the storefront's address and
+     * hours, the business's public details. Null when Pick-up isn't offered.
+     */
+    pickup: PickupPlace | null;
 }
 
 /** The bag priced now, and how an order leaving the chosen way is paid. */
 export interface PricedBag extends CheckoutQuote {
     /** Empty until a way is chosen, or when the shop can't take orders. */
     payments: CheckoutPayOption[];
+    /** Where a pick-up is collected (UX-025); null when Pick-up isn't offered. */
+    pickup: PickupPlace | null;
 }
 
 /**
@@ -188,21 +196,28 @@ export class PublicCheckoutService {
                 scope.storefront.id,
             );
             const pays = paysOf(ready);
+            const ways = ready.ok
+                ? payableWays(pays, settings.ways).map((type) => {
+                      const fee = feeCents(type, settings.fees);
+                      return {
+                          type,
+                          label: FULFILMENT_RULES[type].label,
+                          fee: fee > 0 ? fromCents(fee) : null,
+                      };
+                  })
+                : [];
             return {
-                canOrder: ready.ok,
+                // No way an order can leave (Pick-up from a place with no
+                // address, UX-025): the product page asks about ordering
+                // rather than filling a bag that can't be checked out.
+                canOrder: ready.ok && ways.length > 0,
                 storefront: { name: scope.storefront.name },
                 currency: settings.currency,
-                ways: ready.ok
-                    ? payableWays(pays, settings.ways).map((type) => {
-                          const fee = feeCents(type, settings.fees);
-                          return {
-                              type,
-                              label: FULFILMENT_RULES[type].label,
-                              fee: fee > 0 ? fromCents(fee) : null,
-                          };
-                      })
-                    : [],
+                ways,
                 payments: pays,
+                pickup: ways.some((w) => w.type === "PICKUP")
+                    ? settings.pickup
+                    : null,
             };
         });
     }
@@ -226,7 +241,7 @@ export class PublicCheckoutService {
             // always has (a test release's bag, DEC-071); only the ways
             // to pay are empty.
             const canPay = pays.online || pays.onHandover;
-            const { quote } = await priceBag(
+            const { quote, settings } = await priceBag(
                 scope,
                 bagOf(dto.lines),
                 dto.fulfilment ?? null,
@@ -234,6 +249,9 @@ export class PublicCheckoutService {
             );
             return {
                 ...quote,
+                pickup: quote.ways.some((w) => w.type === "PICKUP")
+                    ? settings.pickup
+                    : null,
                 payments: quote.fulfilment
                     ? payOptionsFor(pays, quote.fulfilment)
                     : [],

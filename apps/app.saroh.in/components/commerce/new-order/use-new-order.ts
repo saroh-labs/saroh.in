@@ -14,6 +14,7 @@ import type {
 } from "@/lib/orders/new-order";
 import {
     bump,
+    canHandOver,
     cashChange,
     clashText,
     EMPTY_ADDRESS,
@@ -74,6 +75,8 @@ export function useNewOrder({
     const [chosenPay, setPay] = useState<NewOrderPay>("CASH");
     const [given, setGiven] = useState("");
     const [discount, setDiscount] = useState("");
+    // A counter sale is handed over on the spot by default (UX-059).
+    const [handedOverChoice, setHandedOver] = useState(true);
 
     // The storefront's products, currency and tax.
     useEffect(() => {
@@ -183,6 +186,8 @@ export function useNewOrder({
             : "CASH"
         : chosenPay;
     const change = cashChange(given, total);
+    // Null where it doesn't apply: a delivery, a link, pay later.
+    const handedOver = canHandOver(pay, way) ? handedOverChoice : null;
     const problem = sheetProblem({
         lines: lines.length,
         pick,
@@ -224,6 +229,8 @@ export function useNewOrder({
         setPay,
         given,
         setGiven,
+        handedOver,
+        setHandedOver,
         discount,
         setDiscount,
         change,

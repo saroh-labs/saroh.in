@@ -118,6 +118,20 @@ export function TrackSheet({
                 ))}
             </ol>
 
+            {order.collectFrom && order.state === "open" ? (
+                <p className="text-site-body mt-3 text-[13.5px] leading-normal">
+                    <span className="text-site-fg font-semibold">
+                        Collect from
+                    </span>{" "}
+                    {order.collectFrom.address}
+                    {order.collectFrom.hours ? (
+                        <span className="text-site-muted block text-[12.5px]">
+                            Open {order.collectFrom.hours}
+                        </span>
+                    ) : null}
+                </p>
+            ) : null}
+
             {courier?.trackingUrl ? (
                 <a
                     href={courier.trackingUrl}

@@ -179,6 +179,7 @@ export function PhotosSection({ product }: { product: ProductDetail | null }) {
             return;
         }
         if (full) return;
+        setError(null);
         setDraft([
             ...draft,
             {
@@ -425,6 +426,8 @@ export function PhotosSection({ product }: { product: ProductDetail | null }) {
                 <div className="mt-2">
                     <AddressPanel
                         onAdd={(url, alt) => {
+                            // An earlier upload's failure is behind us now.
+                            setError(null);
                             setDraft((list) =>
                                 mediaCounts(list).photos >= LIMITS.photos
                                     ? list

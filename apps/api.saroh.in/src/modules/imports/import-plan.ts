@@ -236,10 +236,18 @@ function normalizeName(value: string): string {
 export function suggestMapping(
     headers: readonly string[],
     mappableFields: readonly string[],
+    /** Other normalized headings for a field ("fullname" → "name"). */
+    aliases: Readonly<Record<string, string>> = {},
 ): Record<string, string> {
-    const byNormalized = new Map(
-        mappableFields.map((field) => [normalizeName(field), field]),
-    );
+    const byNormalized = new Map<string, string>([
+        ...Object.entries(aliases).filter(([, f]) =>
+            mappableFields.includes(f),
+        ),
+        ...mappableFields.map((field): [string, string] => [
+            normalizeName(field),
+            field,
+        ]),
+    ]);
     const mapping: Record<string, string> = {};
     const claimed = new Set<string>();
 

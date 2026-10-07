@@ -14,7 +14,9 @@ import type { LateRuleNotice } from "@/lib/stores/storefronts";
 
 /**
  * One storefront's one-time notice on Orders (plan B, B17): pick-up orders
- * now count as late after 2 hours, where a counter may want 20 minutes.
+ * now count as late after 2 hours; a business sets what suits its counter.
+ * No business type's figure is suggested (UX-082), and on a phone it keeps
+ * to one line of words so it doesn't take the screen.
  * "Change it" opens the setting; someone who can't change it is told who
  * can. Dismissed for the storefront, for everyone who works there.
  */
@@ -43,14 +45,16 @@ export function LateRuleNoticeCard({
     return (
         <div
             role="note"
-            className="mb-4 flex flex-wrap items-center gap-2.5 rounded-[10px] border border-highlight bg-brand-subtle px-[13px] py-2.5"
+            className="mb-4 flex flex-wrap items-center gap-2 rounded-[10px] border border-highlight bg-brand-subtle px-[13px] py-2 sm:gap-2.5 sm:py-2.5"
         >
             <span className="flex-[1_1_260px] text-pretty text-[13px] text-brand-subtle-foreground">
                 <strong className="font-semibold">
                     Pick-up orders at {notice.name} now count as late after{" "}
                     {lateAfterWords(notice.pickupLateAfterMinutes)}.
                 </strong>{" "}
-                A café counter often uses 20 minutes.
+                <span className="max-sm:hidden">
+                    Set it to what suits your counter.
+                </span>
             </span>
             {canChange ? (
                 <Button

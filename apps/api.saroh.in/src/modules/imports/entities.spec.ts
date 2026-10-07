@@ -1,6 +1,6 @@
 import "reflect-metadata";
 
-import { ENTITY_DESCRIPTORS, isImportEntity } from "./entities";
+import { ENTITY_DESCRIPTORS, isImportEntity, splitFullName } from "./entities";
 
 const products = ENTITY_DESCRIPTORS.products;
 const customers = ENTITY_DESCRIPTORS.customers;
@@ -94,5 +94,56 @@ describe("customers descriptor", () => {
             firstName: "x".repeat(101),
         });
         expect(issues.some((i) => i.field === "firstName")).toBe(true);
+    });
+});
+
+describe("human labels and the full name (UX-065)", () => {
+    it("labels every mappable field in words", () => {
+        for (const d of [products, customers]) {
+            for (const field of d.mappableFields) {
+                expect(d.fieldLabels[field]).toMatch(/^[A-Z]/);
+            }
+        }
+        expect(customers.fieldLabels.zipCode).toBe("Postcode / PIN");
+        expect(products.keyLabel).toBe("the product's web address");
+    });
+
+    it("splits a full name into first and last", () => {
+        expect(
+            splitFullName({ name: "  Asha  Rani Verma ", email: "a@x.test" }),
+        ).toEqual({
+            email: "a@x.test",
+            firstName: "Asha",
+            lastName: "Rani Verma",
+        });
+        expect(splitFullName({ name: "Asha" })).toEqual({ firstName: "Asha" });
+    });
+
+    it("never lets the full name overwrite first and last name", () => {
+        expect(splitFullName({ name: "A B", firstName: "Asha" })).toEqual({
+            firstName: "Asha",
+        });
+    });
+
+    it("refuses a GST rate GST doesn't have, on its own field", () => {
+        const issues = products.validateRow({
+            name: "Chair",
+            price: "20.00",
+            gstRate: "7",
+        });
+        expect(issues).toEqual([
+            expect.objectContaining({
+                field: "gstRate",
+                message: expect.stringContaining("7% is not a GST rate"),
+            }),
+        ]);
+        expect(
+            products.validateRow({
+                name: "Chair",
+                price: "20.00",
+                gstRate: "18",
+                mrp: "25.00",
+            }),
+        ).toEqual([]);
     });
 });

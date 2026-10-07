@@ -42,6 +42,25 @@ describe("confirmationOf", () => {
         expect(order?.lines[0]).not.toHaveProperty("stockLevelId");
     });
 
+    it("keeps when the pick-up place is open (UX-025)", () => {
+        const open = {
+            ...BODY,
+            fulfilment: {
+                ...BODY.fulfilment,
+                pickup: {
+                    name: "Hill Road",
+                    address: "12 Hill Road",
+                    hours: "Mon–Sat 10:00–19:00, Sun closed",
+                },
+            },
+        };
+        expect(confirmationOf(open)?.fulfilment.pickup).toEqual({
+            name: "Hill Road",
+            address: "12 Hill Road",
+            hours: "Mon–Sat 10:00–19:00, Sun closed",
+        });
+    });
+
     it("reads a delivery address", () => {
         const delivered = {
             ...BODY,

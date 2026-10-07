@@ -125,3 +125,44 @@ export async function recordPaidByHandInTx(
     });
     return byHand;
 }
+
+/**
+ * How money handed back outside Saroh ("Record as refunded", UX-061) reads
+ * on the order's timeline, by how it went back. No amount in the note, as
+ * above; the step's amount says it to a money reader.
+ */
+export const REFUNDED_BY_HAND_NOTE: Record<PaymentMethod, string> = {
+    CASH: "Handed back in cash",
+    UPI: "Handed back by UPI",
+    BANK_TRANSFER: "Handed back by bank transfer",
+    CARD: "Handed back to the card at the counter",
+    OTHER: "Handed back another way",
+};
+
+export function refundedByHandNote(how: PaymentMethod | undefined): string {
+    return how ? REFUNDED_BY_HAND_NOTE[how] : "Recorded as refunded by hand";
+}
+
+/**
+ * What the order still holds of what was paid for it, in minor units: what
+ * was paid by hand, and each online payment less every refund on it that
+ * didn't fail. Recording the order refunded hands this back (UX-061).
+ */
+export function heldCents(order: {
+    total: DecimalLike;
+    paymentStatus: string;
+    paidByHand?: DecimalLike | null;
+    paymentIntents: readonly {
+        amountCents: number;
+        refunds: readonly { amountCents: number }[];
+    }[];
+}): number {
+    const online = order.paymentIntents.reduce(
+        (s, p) =>
+            s +
+            p.amountCents -
+            p.refunds.reduce((t, r) => t + r.amountCents, 0),
+        0,
+    );
+    return Math.max(0, handPaidCents(order) + online);
+}

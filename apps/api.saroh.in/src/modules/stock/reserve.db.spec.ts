@@ -448,7 +448,7 @@ describe("editing an order before preparing", () => {
             kitchen.edit(owner, order, {
                 lines: [{ itemId: item, quantity: 6 }],
             }),
-        ).rejects.toThrow("Tee — Only 1 left at Hill Road");
+        ).rejects.toThrow("Tee (S) — Only 1 left at Hill Road");
         await kitchen.edit(owner, order, {
             lines: [{ itemId: item, quantity: 1 }],
         });

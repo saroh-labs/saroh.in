@@ -123,6 +123,22 @@ export function rowNotice(
 }
 
 /**
+ * Why a create button is off before anyone starts (UX-036): the limit's
+ * own title ("You've reached …") once one more wouldn't get past the API's
+ * check, else null. Only for an enforced catalogue business, and never for
+ * a soft cap, which informs and doesn't refuse.
+ */
+export function createBlock(
+    view: BillingAccessView | null,
+    moduleId: string,
+): string | null {
+    if (view?.source !== "catalogue" || !view.enforced) return null;
+    if (roomForOneMore(view, moduleId) !== false) return null;
+    const n = rowNotice(view, moduleId);
+    return n.on ? n.why || n.title : null;
+}
+
+/**
  * Whether one more of a row's things would get past the API's check now
  * (`MeteringService.hasRoom`, the same decision as the write's), from the
  * figures the access read gave: for an enforced catalogue business only.

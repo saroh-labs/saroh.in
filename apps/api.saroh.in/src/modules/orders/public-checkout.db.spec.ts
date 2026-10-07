@@ -181,6 +181,10 @@ async function shop(
             currency: "INR",
             fulfilmentTypes: ["PICKUP", "LOCAL_DELIVERY"],
             collectionEnabled: true,
+            // Pick-up is offered from a place customers visit, with its
+            // address (UX-025).
+            kind: "SHOP",
+            address: "12 Hill Road, Bandra",
             localDeliveryFee: "60.00",
             pausedAt: over.paused ? new Date() : null,
         },
@@ -381,7 +385,27 @@ describe("the site's checkout options and quote (G13)", () => {
                     fee: "60.00",
                 },
             ],
+            // Where a pick-up is collected (UX-025).
+            pickup: { address: "12 Hill Road, Bandra", hours: null },
         });
+    });
+
+    it("offers no Pick-up from a place with no address (UX-025)", async () => {
+        const s = await shop();
+        await prisma.storeSettings.update({
+            where: { storeId: s.storeId },
+            data: { kind: "ONLINE" },
+        });
+        const res = await call(
+            "GET",
+            `/public/sites/${s.siteId}/checkout/options`,
+            { host: s.host },
+        );
+        expect(res.status).toBe(200);
+        expect(res.body.ways.map((w: { type: string }) => w.type)).toEqual([
+            "LOCAL_DELIVERY",
+        ]);
+        expect(res.body.pickup).toBeNull();
     });
 
     it("prices the bag from listings, and shows a changed price before paying", async () => {

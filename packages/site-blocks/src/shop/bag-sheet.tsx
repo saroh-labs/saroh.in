@@ -90,6 +90,80 @@ export function lineNote(line: QuoteLine): string | null {
     return null;
 }
 
+/** A bag line's key: its listing and variant. */
+const lineKey = (l: Pick<QuoteLine, "listingId" | "variantId">) =>
+    `${l.listingId}:${l.variantId ?? ""}`;
+
+/**
+ * The lines asking for more than is left, and how many each can have
+ * (UX-058): the bag is set to that, and says so, rather than holding the
+ * button with no reason.
+ */
+export function overStock(
+    lines: readonly QuoteLine[],
+): { line: QuoteLine; left: number }[] {
+    return lines.flatMap((line) =>
+        line.state === "short" &&
+        typeof line.available === "number" &&
+        line.available > 0 &&
+        line.quantity > line.available
+            ? [{ line, left: line.available }]
+            : [],
+    );
+}
+
+/** "Only 1 left — we've set your bag to 1." */
+export function stockNotice(
+    capped: readonly { line: QuoteLine; left: number }[],
+): string | null {
+    if (capped.length === 0) return null;
+    if (capped.length === 1) {
+        const { left } = capped[0];
+        return `Only ${left} left — we've set your bag to ${left}.`;
+    }
+    const each = capped
+        .map(({ line, left }) => {
+            const name = line.variantTitle
+                ? `${line.name} (${line.variantTitle})`
+                : line.name;
+            return `${name} to ${left}`;
+        })
+        .join(", ");
+    return `Fewer are left than you asked for — we've set ${each}.`;
+}
+
+/**
+ * Why the button is held, in a sentence beside it (UX-058): never a grey
+ * button with no reason. Null when it can be placed, or while the quote
+ * is still on its way.
+ */
+export function holdReason(input: {
+    quote: CheckoutQuote | null;
+    way: ShopWay | null;
+    addressOk: boolean;
+    payable: boolean;
+}): string | null {
+    const { quote, way } = input;
+    if (!quote) return null;
+    if (quote.lines.some((l) => l.state === "gone")) {
+        return "Take out what's no longer sold to continue.";
+    }
+    if (quote.lines.some((l) => l.state === "sold-out")) {
+        return "Take out what's sold out to continue.";
+    }
+    if (quote.lines.some((l) => l.state === "short")) {
+        return "Fewer are left than you asked for. Lower the amount to continue.";
+    }
+    if (quote.ways.length === 0) return null; // said above the button already
+    if (!way || quote.fulfilment !== way) {
+        return "Choose how your order reaches you.";
+    }
+    if (!input.addressOk) return "Add the address to deliver to.";
+    if (!input.payable)
+        return "This can't be paid for this way. Choose another.";
+    return null;
+}
+
 const field = cn(
     "border-site-border text-site-fg mt-1 block h-11 w-full rounded-[calc(var(--site-radius)+8px)] border px-3 text-[15px]",
     inputFill,
@@ -167,6 +241,29 @@ export function BagSheet({
         onDraft((d) => ({ ...d, address: change(d.address) }));
     const [load, setLoad] = useState<Load>({ kind: "loading" });
     const [round, setRound] = useState(0);
+    // What each line was capped at once the quote said fewer are left
+    // (UX-058): "+" stops there, and the bag says why.
+    const [caps, setCaps] = useState<Readonly<Record<string, number>>>({});
+    const [notice, setNotice] = useState<string | null>(null);
+
+    // Asking for more than is left: set the bag to what is, and say so.
+    function capOverStock(lines: readonly QuoteLine[]) {
+        const over = overStock(lines);
+        if (over.length === 0) return;
+        setCaps((c) => {
+            const next = { ...c };
+            for (const { line, left } of over) next[lineKey(line)] = left;
+            return next;
+        });
+        setNotice(stockNotice(over));
+        for (const { line, left } of over) {
+            setQuantity(
+                site,
+                { listingId: line.listingId, variantId: line.variantId },
+                left,
+            );
+        }
+    }
 
     // The quote, again whenever the bag or the way changes.
     const bagPrint = JSON.stringify(items);
@@ -184,6 +281,7 @@ export function BagSheet({
                     if (!live) return;
                     if (result?.ok) {
                         setLoad({ kind: "ready", quote: result.data });
+                        capOverStock(result.data.lines);
                         if (!way && result.data.fulfilment) {
                             setWay(result.data.fulfilment);
                         }
@@ -231,6 +329,10 @@ export function BagSheet({
         pay !== null &&
         !busy;
     const total = quote ? formatAmount(quote.total, quote.currency) : "";
+    const held = busy
+        ? null
+        : holdReason({ quote, way, addressOk, payable: pay !== null });
+    const pickup = way === "PICKUP" ? (quote?.pickup ?? null) : null;
 
     function place() {
         if (!canPlace || !way) return;
@@ -343,7 +445,11 @@ export function BagSheet({
                                         }
                                         disabled={
                                             line.state !== "ok" ||
-                                            line.quantity >= MAX_ITEM_QUANTITY
+                                            line.quantity >=
+                                                MAX_ITEM_QUANTITY ||
+                                            line.quantity >=
+                                                (caps[lineKey(line)] ??
+                                                    Infinity)
                                         }
                                         aria-label={`One more ${name}`}
                                         className={stepper}
@@ -457,6 +563,18 @@ export function BagSheet({
                         </>
                     ) : null}
 
+                    {pickup ? (
+                        <p className="text-site-body mt-2.5 text-[13.5px] leading-normal">
+                            <span className="font-semibold">Collect from</span>{" "}
+                            {pickup.address}
+                            {pickup.hours ? (
+                                <span className="text-site-muted block text-[12.5px]">
+                                    {pickup.hours}
+                                </span>
+                            ) : null}
+                        </p>
+                    ) : null}
+
                     {needsAddress(way) ? (
                         <fieldset className="mt-3.5">
                             <legend className="text-site-muted mb-1 text-xs font-bold uppercase tracking-[0.08em]">
@@ -477,6 +595,22 @@ export function BagSheet({
                 </p>
             ) : null}
 
+            {notice ? (
+                <p
+                    role="status"
+                    className="text-site-fg mt-3 text-[13.5px] font-semibold"
+                >
+                    {notice}
+                </p>
+            ) : null}
+            {held && !problem ? (
+                <p
+                    id={`${site}-held`}
+                    className="text-site-body mt-2.5 text-[13px] leading-normal"
+                >
+                    {held}
+                </p>
+            ) : null}
             {payNote ? (
                 <p className="text-site-muted mt-2.5 text-[12.5px] leading-normal">
                     {payNote}
@@ -486,6 +620,7 @@ export function BagSheet({
                 type="button"
                 onClick={place}
                 disabled={!canPlace}
+                aria-describedby={held && !problem ? `${site}-held` : undefined}
                 className={sheetButton(!canPlace)}
             >
                 {busy

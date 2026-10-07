@@ -3,8 +3,10 @@ import { DateTime } from "luxon";
 import { toMoneyString } from "../../common/money";
 import { isBillOfSupply } from "../invoices/invoice-title";
 import type { OrderStage } from "../orders/dto";
-import { goesByCourier } from "../orders/fulfilment";
+import { goesByCourier, typeOf } from "../orders/fulfilment";
 import { isServiceLine, lineName } from "../orders/order-line";
+import type { PickupPlace } from "../stores/pickup-place";
+import { pickupPlaceOf } from "../stores/pickup-place";
 import type { AccountTab } from "./account-tabs";
 import type { TrackState, TrackStep } from "./account-track";
 import { orderTrack, REFUND_LINE } from "./account-track";
@@ -119,6 +121,11 @@ export interface AccountOrderDetail {
     refund: string | null;
     /** The paid invoice's ref, for its receipt; null until there is one. */
     receipt: string | null;
+    /**
+     * A pick-up's place (UX-025): the storefront's public address and
+     * hours, when it is a place customers visit with an address; else null.
+     */
+    collectFrom: PickupPlace | null;
 }
 
 export interface AccountPlan {
@@ -517,8 +524,21 @@ export function orderDetailView(row: {
     bookings: VisitRow[];
     /** Its paid invoice, newest first; at most the first is read. */
     invoices: { id: string }[];
+    /** The storefront's settings, for a pick-up's place (UX-025). */
+    store?: {
+        settings: {
+            kind: string | null;
+            address: string | null;
+            openingHours?: unknown;
+        } | null;
+    } | null;
 }): AccountOrderDetail {
+    const collectFrom =
+        typeOf(row.fulfilment) === "PICKUP"
+            ? pickupPlaceOf(row.store?.settings)
+            : null;
     const track = orderTrack({
+        collectFrom: collectFrom?.address ?? null,
         number: row.orderId,
         placedAt: row.createdAt,
         fulfilment: row.fulfilment,
@@ -560,6 +580,7 @@ export function orderDetailView(row: {
                 : null,
         refund: track.state === "refunded" ? REFUND_LINE : null,
         receipt: row.invoices[0]?.id ?? null,
+        collectFrom,
     };
 }
 

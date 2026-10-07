@@ -38,7 +38,12 @@ export interface OrderConfirmationData {
     fulfilment: {
         type: string;
         label: string;
-        pickup: { name: string; address: string | null } | null;
+        /** `hours` (UX-025): when the place is open; absent when not set. */
+        pickup: {
+            name: string;
+            address: string | null;
+            hours?: string | null;
+        } | null;
         deliverTo: { name: string | null; lines: string[] } | null;
     };
     refunded: boolean;
@@ -177,6 +182,11 @@ function Handover({ order }: { order: OrderConfirmationData }) {
                     {pickup.address ? (
                         <span className="block whitespace-pre-line break-words">
                             {pickup.address}
+                        </span>
+                    ) : null}
+                    {pickup.hours ? (
+                        <span className="text-site-muted mt-1 block">
+                            Open {pickup.hours}
                         </span>
                     ) : null}
                 </address>

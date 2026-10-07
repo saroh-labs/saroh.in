@@ -30,27 +30,32 @@ export function RecordPaidDialog({
     onOpenChange,
     initial,
     onRecord,
+    refund = false,
 }: {
     open: boolean;
     onOpenChange: (open: boolean) => void;
     /** A way already known, picked when it opens. */
     initial?: PaymentMethod;
     onRecord: (how: PaymentMethod) => void;
+    /**
+     * "Record this order as refunded?" (UX-061): money handed back outside
+     * Saroh, and how it went back, so the timeline can say.
+     */
+    refund?: boolean;
 }) {
     const id = useId();
     const [how, setHow] = useState<PaymentMethod | null>(initial ?? null);
+    const words = recordWords(refund);
 
     return (
         <AlertDialog open={open} onOpenChange={onOpenChange}>
             <AlertDialogContent className="max-w-[420px]">
                 <AlertDialogHeader>
                     <AlertDialogTitle className="font-display text-[17px] tracking-[-0.02em]">
-                        Record this order as paid?
+                        {words.title}
                     </AlertDialogTitle>
                     <AlertDialogDescription>
-                        For a payment taken outside Saroh. Nothing is charged,
-                        and nothing is sent to the customer. This cannot be
-                        taken back.
+                        {words.body}
                     </AlertDialogDescription>
                 </AlertDialogHeader>
                 <fieldset className="grid gap-2">
@@ -58,7 +63,7 @@ export function RecordPaidDialog({
                         id={`${id}-legend`}
                         className="mb-2 text-[13px] font-semibold"
                     >
-                        How was it paid?
+                        {words.legend}
                     </legend>
                     <RadioGroup
                         aria-labelledby={`${id}-legend`}
@@ -89,10 +94,29 @@ export function RecordPaidDialog({
                             if (how) onRecord(how);
                         }}
                     >
-                        Record as paid
+                        {words.verb}
                     </AlertDialogAction>
                 </AlertDialogFooter>
             </AlertDialogContent>
         </AlertDialog>
     );
+}
+
+const PAID_WORDS = {
+    title: "Record this order as paid?",
+    body: "For a payment taken outside Saroh. Nothing is charged, and nothing is sent to the customer. This cannot be taken back.",
+    legend: "How was it paid?",
+    verb: "Record as paid",
+};
+
+const REFUND_WORDS = {
+    title: "Record this order as refunded?",
+    body: "For money handed back outside Saroh. Nothing is sent back from here — to refund a card payment, use Refund. This cannot be taken back.",
+    legend: "How did it go back?",
+    verb: "Record as refunded",
+};
+
+/** The dialog's words: recording money taken, or money handed back. */
+export function recordWords(refund: boolean) {
+    return refund ? REFUND_WORDS : PAID_WORDS;
 }

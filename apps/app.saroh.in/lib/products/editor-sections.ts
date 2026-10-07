@@ -724,8 +724,8 @@ export function saveHint(
     if (dirty.length === 0) return "All changes saved";
     const head =
         dirty.length === 1
-            ? `${names[dirty[0]]} is unsaved`
-            : `${dirty.length} sections unsaved`;
+            ? `${names[dirty[0]]} not saved yet`
+            : `${dirty.length} sections not saved yet`;
     if (stuck.length === 0) return head;
     return `${head} · ${joinAnd(stuck.map((k) => names[k]))} ${
         stuck.length === 1 ? "needs" : "need"
