@@ -1,10 +1,5 @@
 import { cn } from "../../lib/utils";
-import type {
-    BookingDay,
-    BookingDays,
-    BookingService,
-    BookingStart,
-} from "../model";
+import type { BookingDay, BookingDays, BookingStart } from "../model";
 import {
     dateText,
     dayAria,
@@ -16,12 +11,16 @@ import {
 } from "../model";
 import { focusRing, quietFill } from "../styles";
 
+/**
+ * The two weeks' day strip and the chosen day's free times — the booking
+ * page's, and the account's Move sheet's (UX-055).
+ */
 export function OneToOne({
     days,
     day,
     zone,
     phone,
-    service,
+    staff,
     chosen,
     onDay,
     onStart,
@@ -31,7 +30,8 @@ export function OneToOne({
     day: BookingDay | null;
     zone: string;
     phone: boolean;
-    service: BookingService;
+    /** Who takes it, by name: one is named beside the count. */
+    staff: string[];
     chosen: BookingStart | null;
     onDay: (date: string) => void;
     onStart: (start: BookingStart) => void;
@@ -41,7 +41,7 @@ export function OneToOne({
     const firstDay = list.at(0);
     const lastDay = list.at(-1);
     const count = day?.starts.length ?? 0;
-    const onlyOne = service.staff.length === 1 ? service.staff[0] : null;
+    const onlyOne = staff.length === 1 ? staff[0] : null;
     return (
         <>
             <div className="mb-2 flex items-baseline gap-2">
@@ -161,7 +161,7 @@ export function OneToOne({
                     </div>
                 </div>
             )}
-            {service.staff.length > 1 ? (
+            {staff.length > 1 ? (
                 <p className="text-site-muted mt-2.5 text-[12.5px]">
                     Times are with whoever is free — you&apos;ll see who before
                     you confirm.

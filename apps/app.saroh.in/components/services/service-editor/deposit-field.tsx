@@ -68,6 +68,16 @@ export function DepositField({
     const label = useId();
     const lock = depositLock(paymentsLock, saved !== "NONE");
     const paused = lock !== null && deposit !== "NONE";
+    // When online can't take it, only what happens instead is said (UX-056):
+    // paid at the desk — never "they pay ₹300 when booking" right above it —
+    // or, when it can't be booked online at all, the problem alone.
+    const note = paused
+        ? depositPausedNote
+        : problem
+          ? problem.blocked
+              ? null
+              : depositNote(deposit, price, currency, visits, "DESK")
+          : depositNote(deposit, price, currency, visits, way);
     return (
         <>
             <Eyebrow id={label} className="mt-3">
@@ -93,11 +103,7 @@ export function DepositField({
                     </Chip>
                 ))}
             </div>
-            <p className={HELP}>
-                {paused
-                    ? depositPausedNote
-                    : depositNote(deposit, price, currency, visits, way)}
-            </p>
+            {note === null ? null : <p className={HELP}>{note}</p>}
             {lock ? (
                 <LimitNoticeBlock
                     full={false}

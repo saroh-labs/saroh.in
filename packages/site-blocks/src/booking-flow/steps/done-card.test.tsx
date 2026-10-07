@@ -97,3 +97,14 @@ describe("DoneCard: how to pay ahead (R32)", () => {
         expect(screen.queryByText("Or pay ahead")).toBeNull();
     });
 });
+
+describe("the confirmation's way to change it (UX-055)", () => {
+    it("links to the booker's own bookings to move or cancel, not 'get in touch'", () => {
+        done();
+        const link = screen.getByRole("link", {
+            name: "Move or cancel it from your bookings",
+        });
+        expect(link).toHaveAttribute("href", "/account/bookings");
+        expect(document.body.textContent).not.toMatch(/Get in touch/);
+    });
+});

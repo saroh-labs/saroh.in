@@ -11,7 +11,8 @@ export function ServiceEditorState({
     state,
     retryHref,
 }: {
-    state: "missing" | "failed" | "forbidden";
+    /** "cant-add": the role sees services but can't add one (UX-083). */
+    state: "missing" | "failed" | "forbidden" | "cant-add";
     /** Where Try again goes: this page again. */
     retryHref: string;
 }) {
@@ -55,12 +56,14 @@ export function ServiceEditorState({
                 <div className="px-[22px] py-[60px] max-[759px]:px-4">
                     <FailedState
                         title={
-                            state === "forbidden"
-                                ? "Your role can't see services"
-                                : "Couldn't load this service"
+                            state === "cant-add"
+                                ? "Your role can't add services"
+                                : state === "forbidden"
+                                  ? "Your role can't see services"
+                                  : "Couldn't load this service"
                         }
                         description={
-                            state === "forbidden"
+                            state === "forbidden" || state === "cant-add"
                                 ? "An owner or admin can change what your role reaches in Team."
                                 : "The connection dropped while we were fetching it. Nothing has changed — try again, or come back in a minute."
                         }

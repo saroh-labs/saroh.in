@@ -47,6 +47,11 @@ export interface ModuleAccess {
     upgradeTo: string;
     upgradePlanId: string;
     upgradePricePaise: number;
+    /**
+     * That plan has no cap on it: a notice says "has no limit", never
+     * "raises the limit" (UX-083).
+     */
+    upgradeUncapped: boolean;
     /** The plan's name the business is on (after a plan override). */
     plan: string;
     planId: string;
@@ -92,6 +97,7 @@ export function resolveAccess(
         upgradeTo: "",
         upgradePlanId: "",
         upgradePricePaise: 0,
+        upgradeUncapped: false,
         plan: plan?.name ?? planId,
         planId,
     };
@@ -178,6 +184,8 @@ export function resolveAccess(
         r.upgradeTo = up.name;
         r.upgradePlanId = up.id;
         r.upgradePricePaise = up.pricePaise;
+        const upCell = cellOf(mod, up.id);
+        r.upgradeUncapped = upCell.inc && upCell.limit === null;
     }
     return r;
 }

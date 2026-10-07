@@ -11,7 +11,7 @@
  * | ------------------ | ---------------------------------------------------------------------- |
  * | `products`         | products not archived                                                  |
  * | `ordersPerMonth`   | orders placed this month that stand: not cancelled, and not an online checkout nobody paid (OQ-7); one to be paid on handover stands from the start |
- * | `bookingsPerMonth` | bookings made this month that stand (CONFIRMED), a course's sessions left out |
+ * | `bookingsPerMonth` | bookings customers made on the site this month that stand (CONFIRMED), a course's sessions left out; the team's own bookings never count (DEC-095) |
  * | `blogPosts`        | posts live on a site that isn't deleted                                |
  * | `teamMembers`      | people in the business, plus invitations still open; Reviewers left out (they only look at the website) |
  * | `reviewers`        | Reviewers in the business, plus Reviewer invitations still open |
@@ -191,12 +191,17 @@ export function standingOrders(since: Date): Prisma.OrderWhereInput {
     };
 }
 
-/** Bookings that stand, a course's sessions left out (COURSES' own). */
+/**
+ * Bookings customers made online that stand, a course's sessions left out
+ * (COURSES' own). A booking the team made in the workspace never counts
+ * (DEC-095).
+ */
 export function standingBookings(since: Date): Prisma.BookingWhereInput {
     return {
         createdAt: { gte: since },
         status: "CONFIRMED",
         courseEnrollmentId: null,
+        bookedOnline: true,
     };
 }
 

@@ -175,7 +175,7 @@ describe("what each count asks", () => {
         });
     });
 
-    it("counts this month's confirmed bookings, a course's left out", async () => {
+    it("counts this month's confirmed online bookings, a course's and the team's left out", async () => {
         tx.booking.count.mockResolvedValue(2);
         await countUsage(tx as never, "org", "bookingsPerMonth", now);
         expect(tx.booking.count).toHaveBeenCalledWith({
@@ -184,6 +184,7 @@ describe("what each count asks", () => {
                 createdAt: { gte: start },
                 status: "CONFIRMED",
                 courseEnrollmentId: null,
+                bookedOnline: true,
             },
         });
     });

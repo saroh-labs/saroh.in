@@ -1,9 +1,16 @@
+import { BOOKINGS_HREF } from "../../account/bookings-model";
 import { cn } from "../../lib/utils";
 import { payInstructionsOf, payWaysText } from "../../pay-instructions/model";
 import { PayInstructionsCard } from "../../pay-instructions/pay-instructions";
 import type { Phase } from "../flow-state";
 import type { BookingPageData } from "../model";
-import { buildIcs, changeText, firstVisitText } from "../model";
+import {
+    buildIcs,
+    changeRules,
+    changeText,
+    firstVisitText,
+    MOVE_OR_CANCEL,
+} from "../model";
 import { card, focusRing } from "../styles";
 
 export function DoneCard({
@@ -36,8 +43,8 @@ export function DoneCard({
             startAt: booking.startAt,
             endAt: booking.endAt,
             description: booking.meetingUrl
-                ? `Join online: ${booking.meetingUrl} ${changeText(business, rules, phase.paid)}`
-                : changeText(business, rules, phase.paid),
+                ? `Join online: ${booking.meetingUrl} ${changeText(business, rules, phase.paid, true)}`
+                : changeText(business, rules, phase.paid, true),
         });
         const url = URL.createObjectURL(
             new Blob([ics], { type: "text/calendar;charset=utf-8" }),
@@ -144,8 +151,19 @@ export function DoneCard({
                     Book another
                 </button>
             </div>
+            {/* Moved or cancelled from their own bookings (UX-055). */}
             <p className="text-site-muted border-site-border mt-4 border-t pt-3.5 text-[12.5px] leading-[1.55]">
-                {changeText(business, rules, phase.paid)}
+                Need to change it?{" "}
+                <a
+                    href={BOOKINGS_HREF}
+                    className={cn(
+                        "text-site-fg rounded-sm font-semibold underline underline-offset-2",
+                        focusRing,
+                    )}
+                >
+                    {MOVE_OR_CANCEL}
+                </a>
+                .{changeRules(rules, phase.paid)}
             </p>
         </div>
     );

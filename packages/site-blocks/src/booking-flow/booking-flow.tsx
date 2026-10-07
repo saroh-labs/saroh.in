@@ -164,6 +164,8 @@ export interface BookingAccount {
     waitlist?: WaitlistApi;
 }
 
+/** What is left while the name isn't typed (UX-083: a next step until they try to book). */
+const NAME_LEFT = "Add your name.";
 export interface BookingFlowProps {
     page: BookingPageData;
     /** Sign-in and booking with it, through the site's server (A9). */
@@ -219,6 +221,8 @@ export default function BookingFlow({
     // Where, for a service offered either way, and the note (E7).
     const [where, setWhere] = useState<BookingWhere>("IN_PERSON");
     const [note, setNote] = useState("");
+    // A phone to reach them on (UX-049), optional; filled into checkout.
+    const [phoneNo, setPhoneNo] = useState("");
     const [touched, setTouched] = useState(false);
     const [payChoice, setPayChoice] = useState<BookPay | null>(null);
     const [sessionsShown, setSessionsShown] = useState(SESSIONS_SHOWN);
@@ -443,6 +447,7 @@ export default function BookingFlow({
     const extras = {
         ...(asks ? { locationType: whereNow } : {}),
         ...(note.trim() ? { intakeNote: note.trim() } : {}),
+        ...(phoneNo.trim() ? { bookerPhone: phoneNo.trim() } : {}),
     };
 
     // A name is asked for only while the account has none (A9).
@@ -454,7 +459,7 @@ export default function BookingFlow({
     const block = !service
         ? "Pick what you'd like to book."
         : (unpayable ??
-          (!chosenStart ? "Pick a time." : !whoOk ? "Add your name." : ""));
+          (!chosenStart ? "Pick a time." : !whoOk ? NAME_LEFT : ""));
 
     const whenText = chosenStart
         ? `${dateText(dateIn(chosenStart.startAt, zone), true)} at ${timeIn(chosenStart.startAt, zone)}${
@@ -966,6 +971,7 @@ export default function BookingFlow({
         setPayChoice(null);
         setWhere("IN_PERSON");
         setNote("");
+        setPhoneNo("");
         setTouched(false);
         setSubmitError(null);
         wanted.current = null;
@@ -977,13 +983,19 @@ export default function BookingFlow({
         dueLabel,
         due,
         block,
+        // A name not typed yet is a next step until they try to book.
+        quiet: !touched && block === NAME_LEFT,
         submitError,
         submitting,
         onConfirm: () => void confirm(),
     };
     const choosing = phase.kind === "choose";
     const facts = headerFacts(visit);
-    const showBar = phone && choosing && services.length > 0 && page.open;
+    // Online booking paused at the plan's monthly cap (DEC-095): said up
+    // front, before any choosing, never after the booker has done the work.
+    const paused = page.paused === true;
+    const bookable = page.open && services.length > 0 && !paused;
+    const showBar = phone && choosing && bookable;
 
     return (
         <div
@@ -1032,7 +1044,32 @@ export default function BookingFlow({
 
             <div className="mx-auto -mt-[18px] flex max-w-[1060px] flex-wrap items-start gap-5 px-5">
                 <div className="grid min-w-0 flex-[999_1_460px] grid-cols-[minmax(0,1fr)] gap-3.5">
-                    {!page.open || services.length === 0 ? (
+                    {page.open && services.length > 0 && paused ? (
+                        <div className={card}>
+                            <h2 className="font-site-heading text-site-fg text-[19px] font-semibold tracking-[-0.02em]">
+                                Online booking is paused for now
+                            </h2>
+                            <p className="text-site-body mt-2 text-sm">
+                                {facts.phone ? (
+                                    <>
+                                        Call {page.businessName} on{" "}
+                                        <a
+                                            href={`tel:${facts.phone}`}
+                                            className="focus-visible:ring-site-accent rounded-sm underline underline-offset-2 focus-visible:outline-none focus-visible:ring-2"
+                                        >
+                                            {phoneText(facts.phone)}
+                                        </a>{" "}
+                                        to book a time.
+                                    </>
+                                ) : (
+                                    <>
+                                        Get in touch with {page.businessName} to
+                                        book a time.
+                                    </>
+                                )}
+                            </p>
+                        </div>
+                    ) : !page.open || services.length === 0 ? (
                         <div className={card}>
                             <h2 className="font-site-heading text-site-fg text-[19px] font-semibold tracking-[-0.02em]">
                                 Online booking isn&apos;t open right now
@@ -1078,6 +1115,9 @@ export default function BookingFlow({
                             booker={{
                                 name: bookerName,
                                 email: customer?.email ?? "",
+                                ...(phoneNo.trim()
+                                    ? { phone: phoneNo.trim() }
+                                    : {}),
                             }}
                             busy={leaving}
                             // Only when the desk is on offer: never for a
@@ -1167,6 +1207,8 @@ export default function BookingFlow({
                                     note={note}
                                     onWhere={pickWhere}
                                     onNote={setNote}
+                                    phone={phoneNo}
+                                    onPhone={setPhoneNo}
                                     forWaitlist={waiting}
                                 />
                             ) : null}
@@ -1189,7 +1231,7 @@ export default function BookingFlow({
                     )}
                 </div>
 
-                {choosing && !phone && services.length > 0 && page.open ? (
+                {choosing && !phone && bookable ? (
                     <SummaryAside
                         serviceName={service?.name ?? null}
                         visits={visitsOf(service)}

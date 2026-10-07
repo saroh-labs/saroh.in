@@ -325,6 +325,7 @@ export function moduleAccessViews(
                       planId: a.upgradePlanId,
                       name: a.upgradeTo,
                       pricePaise: a.upgradePricePaise,
+                      uncapped: a.upgradeUncapped,
                   }
                 : null,
         };

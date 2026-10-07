@@ -40,7 +40,11 @@ interface Edit {
 
 const CHIP = "h-[34px] text-[13px]";
 
-export function WhatItIs({ draft, set, kindUp }: Edit & { kindUp: boolean }) {
+/**
+ * Name, what to tell customers, and Kind — one-to-one or a class — up
+ * front, since it decides how everything below works (UX-056).
+ */
+export function WhatItIs({ draft, set }: Edit) {
     const ids = { name: useId(), desc: useId(), kind: useId() };
     return (
         <Section title="What it is">
@@ -69,33 +73,32 @@ export function WhatItIs({ draft, set, kindUp }: Edit & { kindUp: boolean }) {
                 className="mt-[5px] rounded-[8px] text-[14px]"
             />
             <p className={HELP}>Shown on the booking page under the name.</p>
-            {kindUp ? (
-                <>
-                    <Eyebrow id={ids.kind} className="mt-3">
-                        Kind
-                    </Eyebrow>
-                    <div
-                        role="radiogroup"
-                        aria-labelledby={ids.kind}
-                        className="flex flex-wrap gap-1.5"
-                    >
-                        <Chip
-                            on={draft.kind === "one"}
-                            className={CHIP}
-                            onClick={() => set({ kind: "one" })}
-                        >
-                            One-to-one
-                        </Chip>
-                        <Chip
-                            on={draft.kind === "class"}
-                            className={CHIP}
-                            onClick={() => set({ kind: "class" })}
-                        >
-                            Class
-                        </Chip>
-                    </div>
-                </>
-            ) : null}
+            <Eyebrow id={ids.kind} className="mt-3">
+                Kind
+            </Eyebrow>
+            <div
+                role="radiogroup"
+                aria-labelledby={ids.kind}
+                className="flex flex-wrap gap-1.5"
+            >
+                <Chip
+                    on={draft.kind === "one"}
+                    className={CHIP}
+                    onClick={() => set({ kind: "one" })}
+                >
+                    One-to-one
+                </Chip>
+                <Chip
+                    on={draft.kind === "class"}
+                    className={CHIP}
+                    onClick={() => set({ kind: "class" })}
+                >
+                    Class
+                </Chip>
+            </div>
+            <p className={HELP}>
+                A class runs at set times with a number of places.
+            </p>
         </Section>
     );
 }
@@ -278,7 +281,12 @@ export function BookingPageCard({
     draft,
     set,
     hasPage,
-}: Edit & { hasPage: boolean | null }) {
+    hasHours = true,
+}: Edit & {
+    hasPage: boolean | null;
+    /** It has times to offer (UX-024); true when unknown. */
+    hasHours?: boolean;
+}) {
     return (
         <Section title="Booking page">
             <label className="flex cursor-pointer items-start gap-[9px] text-[13px]">
@@ -292,7 +300,11 @@ export function BookingPageCard({
                 <span>
                     Show on the booking page
                     <span className="mt-0.5 block text-[12px] text-muted-foreground">
-                        {bookingPageNote(hasPage, draft.showOnBookingPage)}
+                        {bookingPageNote(
+                            hasPage,
+                            draft.showOnBookingPage,
+                            hasHours,
+                        )}
                     </span>
                 </span>
             </label>

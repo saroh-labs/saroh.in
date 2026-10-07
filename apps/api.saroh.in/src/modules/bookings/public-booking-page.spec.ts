@@ -821,9 +821,19 @@ describe("the next two weeks (U19)", () => {
             "2026-09-18T10:30:00.000Z",
             "2026-09-18T11:00:00.000Z",
         ]);
-        // Sat and Sun: no hours, so Closed.
-        expect(out.days[1]).toMatchObject({ date: "2026-09-19", open: false });
-        expect(out.days[2]).toMatchObject({ date: "2026-09-20", open: false });
+        // Sat and Sun: the service has no hours, so no times — but the
+        // business isn't closed: it has no opening hours or closure to say
+        // so, and the page reads "No times", not "Closed" (UX-054).
+        expect(out.days[1]).toMatchObject({
+            date: "2026-09-19",
+            open: false,
+            closed: false,
+        });
+        expect(out.days[2]).toMatchObject({
+            date: "2026-09-20",
+            open: false,
+            closed: false,
+        });
         // Mon: open, and nothing free — Full.
         expect(out.days[3]).toMatchObject({
             date: "2026-09-21",
@@ -1001,6 +1011,28 @@ describe("the next two weeks in opening hours (DEC-087)", () => {
 });
 
 describe("the booking page's read (U19)", () => {
+    it("says online booking is paused before the form at the monthly cap (DEC-095)", async () => {
+        db.site.findFirst.mockResolvedValue({
+            organizationId: "org_1",
+            organization: { name: "Pulse Fitness" },
+        });
+        db.service.findMany.mockResolvedValue([]);
+        const room = jest
+            .spyOn(planMeter, "hasRoom")
+            .mockResolvedValueOnce(false);
+        const page = await new PublicBookingsService().publicBookingPage(
+            "site_1",
+        );
+        expect(room).toHaveBeenCalledWith("org_1", "bookings");
+        expect(page.paused).toBe(true);
+        // A plan that can't be read never pauses the page.
+        room.mockRejectedValueOnce(new Error("catalogue down"));
+        await expect(
+            new PublicBookingsService().publicBookingPage("site_1"),
+        ).resolves.toMatchObject({ paused: false });
+        room.mockRestore();
+    });
+
     it("is a 404 for a site that is not published", async () => {
         db.site.findFirst.mockResolvedValue(null);
         await expect(
@@ -1065,13 +1097,28 @@ describe("the booking page's read (U19)", () => {
         });
         expect(page.services[1]).toMatchObject({ kind: "class", capacity: 12 });
         // Only services of this site or of no site.
-        expect(db.service.findMany.mock.calls[0][0].where).toMatchObject({
+        const [offered, withTimes] = db.service.findMany.mock.calls[0][0].where
+            .AND as unknown[];
+        expect(offered).toMatchObject({
             organizationId: "org_1",
             status: "ACTIVE",
             // A service hidden from the booking page is left out (E1).
             showOnBookingPage: true,
             OR: [{ siteId: null }, { siteId: "site_1" }],
         });
+        // …and one with no times to offer (UX-024): no hours of its own,
+        // and no one to take it (a class's instructor gives no hours).
+        expect(withTimes).toEqual({
+            OR: [
+                { availabilityRules: { some: {} } },
+                {
+                    capacity: 1,
+                    staffServices: { some: { staff: { status: "ACTIVE" } } },
+                },
+            ],
+        });
+        // Not paused: online booking has room (DEC-095).
+        expect(page.paused).toBe(false);
         expect(JSON.stringify(page)).not.toMatch(/org_1/);
     });
 

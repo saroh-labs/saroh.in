@@ -160,6 +160,8 @@ describe("a booking paid at the desk, as the screens say it", () => {
         expect(paidText(booking)).toBe("Pays at the session");
         const paid = { ...booking, paidAtDesk: { method: "UPI" } };
         expect(paidText(paid)).toBe("Paid at the desk · UPI");
+        // Paid online says how, never "Paid · Paid" (UX-049).
+        expect(paidText({ ...booking, paidWith: "PAID" })).toBe("Paid online");
         const block = (b: DiaryBooking) =>
             ({ kind: "one", booking: b, state: "booked" }) as Parameters<
                 typeof blockLine

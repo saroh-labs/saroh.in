@@ -280,6 +280,7 @@ export type {
 export { AccountBookingsTab } from "./account/bookings-list";
 export { BOOKINGS_HREF, moveClassHref } from "./account/bookings-model";
 export type {
+    AccountBookingPaid,
     AccountBookingRow,
     AccountBookingState,
     AccountBookings,

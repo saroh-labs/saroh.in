@@ -12,6 +12,12 @@ export interface ConfirmSummary {
     due: string;
     /** Why it cannot go yet, or "" when it can. */
     block: string;
+    /**
+     * The block is only what is left to do — a name not typed yet, before
+     * they've tried to book — so it reads as a next step, not an error
+     * (UX-083).
+     */
+    quiet?: boolean;
     submitError: string | null;
     submitting: boolean;
     onConfirm: () => void;
@@ -29,6 +35,7 @@ export function SummaryAside({
     dueLabel,
     due,
     block,
+    quiet = false,
     submitError,
     submitting,
     onConfirm,
@@ -78,7 +85,12 @@ export function SummaryAside({
             {(block && hasService) || submitError ? (
                 <p
                     role="status"
-                    className="text-site-accent mt-2.5 text-[13px]"
+                    className={cn(
+                        "mt-2.5 text-[13px]",
+                        quiet && !submitError
+                            ? onDarkMuted
+                            : "text-site-accent",
+                    )}
                 >
                     {submitError ?? block}
                 </p>
@@ -146,6 +158,7 @@ export function PhoneBar({
     dueLabel,
     due,
     block,
+    quiet = false,
     submitError,
     submitting,
     onConfirm,
@@ -161,12 +174,12 @@ export function PhoneBar({
                     role="status"
                     className={cn(
                         "mb-2 truncate text-[12.5px]",
-                        block || submitError
+                        submitError || (block && !quiet)
                             ? "text-site-accent"
                             : "text-site-bg",
                     )}
                 >
-                    {submitError ?? (block || whenText)}
+                    {submitError ?? ((quiet ? whenText : block) || whenText)}
                 </p>
             ) : null}
             <div className="flex items-center gap-3">

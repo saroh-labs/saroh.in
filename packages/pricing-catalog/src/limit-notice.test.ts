@@ -48,6 +48,18 @@ describe("limitNotice", () => {
         });
     });
 
+    it("never says a plan with no cap 'raises the limit' (UX-083)", () => {
+        const none = { ...access, upgradeUncapped: true };
+        expect(
+            limitNotice(none, 100, "things", "New things are paused."),
+        ).toMatchObject({
+            body: "New things are paused. Plan B has no limit, or add more with an add-on.",
+        });
+        expect(limitNotice(none, 85, "things", "")).toMatchObject({
+            body: "You'll be stopped at 100. Plan B has no limit.",
+        });
+    });
+
     it("never says a soft cap stops anything", () => {
         const soft = { ...access, soft: true };
         expect(limitNotice(soft, 85, "GB of things", "")).toMatchObject({

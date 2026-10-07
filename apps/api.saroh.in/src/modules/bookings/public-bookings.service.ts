@@ -704,11 +704,19 @@ export class PublicBookingsService {
         // An empty name is no name.
         const typed = given.bookerName?.trim() ?? "";
         const bookerName = [known, typed].find((n) => n !== "");
+        // An empty phone is no phone.
+        const givenPhone =
+            given.bookerPhone?.trim() === ""
+                ? undefined
+                : given.bookerPhone?.trim();
         return {
             ...given,
             bookerEmail: account.email,
             bookerName,
-            bookerPhone: account.contact.phone ?? undefined,
+            // The phone they gave for this booking (UX-049), else the one
+            // their record has. The record keeps its own; a given phone
+            // fills it only when it has none (`reserveInTx`).
+            bookerPhone: givenPhone ?? account.contact.phone ?? undefined,
         };
     }
 

@@ -570,7 +570,8 @@ const UNIT: Record<string, [string, string]> = {
     members: ["team member", "team members"],
     products: ["product", "products"],
     orders: ["order a month", "orders a month"],
-    bookings: ["booking a month", "bookings a month"],
+    // Online ones only (DEC-095): the team's own bookings are never capped.
+    bookings: ["online booking a month", "online bookings a month"],
     integrations: ["connection", "connections"],
     blog: ["blog post", "blog posts"],
 };

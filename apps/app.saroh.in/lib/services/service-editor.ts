@@ -358,22 +358,33 @@ export function statePill(
         : { label: "Not taking bookings", tone: "neutral" };
 }
 
-/** What the Save toast says. */
+/**
+ * What the Save toast says. A new service is bookable only once it has
+ * times (UX-024): a one-to-one someone takes books in their hours; with
+ * nobody, or a class, it needs its own weekly hours first, and stays off
+ * the booking page until then.
+ */
 export function savedMessage({
     isNew,
     name,
     kind,
     comingUp,
+    hasPerson = false,
 }: {
     isNew: boolean;
     name: string;
     kind: ServiceKind;
     comingUp: number | null;
+    /** Someone on the diary takes it. */
+    hasPerson?: boolean;
 }): string {
     if (isNew) {
-        return kind === "class"
-            ? `${name} added. Set its weekly times under More settings.`
-            : `${name} added. It's bookable now.`;
+        if (kind === "class") {
+            return `${name} added. Set its weekly times under More settings so customers can book it.`;
+        }
+        return hasPerson
+            ? `${name} added. Customers can book it in the free time of who takes it.`
+            : `${name} added. Give it hours under More settings so customers can book it.`;
     }
     if (!comingUp) {
         return comingUp === 0
@@ -467,13 +478,34 @@ export function whereNote(where: LocationType): string {
  * The note under "Show on the booking page". Null `hasPage` is "couldn't
  * tell", which says only what the switch does.
  */
-export function bookingPageNote(hasPage: boolean | null, on: boolean): string {
+export function bookingPageNote(
+    hasPage: boolean | null,
+    on: boolean,
+    /** It has times to offer: its own weekly hours, or (one-to-one) someone to take it (UX-024). */
+    hasHours = true,
+): string {
     if (hasPage === false) {
         return "You don't have a booking page yet. Staff can still book it from the calendar.";
+    }
+    if (on && !hasHours) {
+        return "It goes on the booking page once it has weekly hours or someone to take it. Staff can book it from the calendar meanwhile.";
     }
     return on
         ? "Customers can book it themselves."
         : "Only staff can book it, from the calendar.";
+}
+
+/**
+ * Whether a service has times the booking page can offer (UX-024), as the
+ * API keeps it off the page until then: its own weekly hours, or a
+ * one-to-one someone takes. A class's times are always its own hours.
+ */
+export function hasBookableHours(
+    kind: ServiceKind,
+    ruleCount: number,
+    staffCount: number,
+): boolean {
+    return ruleCount > 0 || (kind === "one" && staffCount > 0);
 }
 
 /** The note under Who takes it. */
@@ -532,18 +564,4 @@ export function glance(
         ["Booked this week", counted(usage?.thisWeek)],
         ["Still to come", counted(usage?.comingUp)],
     ];
-}
-
-/**
- * Whether the business runs classes, so the editor shows Kind up front: it
- * has one, it has no services yet, or this one is a class. A business of
- * one-to-one services only (a clinic) finds Kind under More settings.
- */
-export function showKind(
-    services: readonly { id: string; capacity: number }[],
-    editing: { capacity: number } | null,
-): boolean {
-    if (editing && editing.capacity > 1) return true;
-    if (services.length === 0) return true;
-    return services.some((s) => s.capacity > 1);
 }
