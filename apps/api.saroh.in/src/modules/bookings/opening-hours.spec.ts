@@ -14,7 +14,7 @@ import {
 } from "./opening-hours";
 import { eitherWay } from "./public-booking-page";
 
-// DEC-087: in-person bookings keep to the business's opening hours. Pure
+// DEC-087, DEC-096: in-person bookings keep to the business's opening hours. Pure
 // geometry and the reading; the booking paths are in their own specs.
 
 const MON = "2026-09-21"; // a Monday
@@ -86,10 +86,17 @@ describe("openingWindows — a stored week as weekly windows", () => {
     });
 });
 
-describe("loadOpeningHours — every open shop's week", () => {
-    function db(shops: unknown[], timezone = "Asia/Kolkata") {
+describe("loadOpeningHours — the shops' weeks, or the business's", () => {
+    function db(
+        shops: unknown[],
+        first: unknown = null,
+        timezone = "Asia/Kolkata",
+    ) {
         return {
-            store: { findMany: jest.fn().mockResolvedValue(shops) },
+            store: {
+                findMany: jest.fn().mockResolvedValue(shops),
+                findFirst: jest.fn().mockResolvedValue(first),
+            },
             businessProfile: {
                 findUnique: jest.fn().mockResolvedValue({ timezone }),
             },
@@ -97,12 +104,11 @@ describe("loadOpeningHours — every open shop's week", () => {
         };
     }
 
-    it("is null with no walk-in storefront: bookings work as before", async () => {
-        const client = db([]);
+    it("is null when the business has no hours saved: bookings work as before", async () => {
+        const client = db([], null);
         await expect(
             loadOpeningHours(client as never, "org_1"),
         ).resolves.toBeNull();
-        // Only open shops are read — never an online storefront's week.
         expect(client.store.findMany.mock.calls[0][0].where).toEqual({
             organizationId: "org_1",
             deletedAt: null,
@@ -110,11 +116,34 @@ describe("loadOpeningHours — every open shop's week", () => {
         });
     });
 
-    it("is null when no shop has its hours set", async () => {
-        const client = db([{ settings: { openingHours: null } }]);
+    it("reads the business's week with no walk-in storefront (DEC-096)", async () => {
+        // An online-only business: Settings › Hours saved to its storefront.
+        const client = db([], {
+            settings: { openingHours: week("10:00", "19:00", ["SUN"]) },
+        });
+        const hours = await loadOpeningHours(client as never, "org_1");
+        expect(hours!.zone).toBe("Asia/Kolkata");
+        expect(hours!.windows).toHaveLength(6);
+        expect(hours!.windows).toContainEqual({
+            dayOfWeek: 1,
+            startMinute: 600,
+            endMinute: 1140,
+        });
+        // The first storefront, as the site header reads it.
+        expect(client.store.findFirst.mock.calls[0][0]).toMatchObject({
+            where: { organizationId: "org_1", deletedAt: null },
+            orderBy: [{ createdAt: "asc" }, { id: "asc" }],
+        });
+    });
+
+    it("is null when no shop has its hours set, and never falls back past a shop", async () => {
+        const client = db([{ settings: { openingHours: null } }], {
+            settings: { openingHours: week("00:00", "23:59") },
+        });
         await expect(
             loadOpeningHours(client as never, "org_1"),
         ).resolves.toBeNull();
+        expect(client.store.findFirst).not.toHaveBeenCalled();
     });
 
     it("puts two shops' weeks together, in the business's zone", async () => {
@@ -167,7 +196,7 @@ describe("a person's hours cut to opening hours", () => {
         expect(at).not.toContain("17:30");
     });
 
-    it("is unchanged with no opening hours (no shop, or online)", () => {
+    it("is unchanged with no opening hours saved, or online", () => {
         const slots = personSlots(
             ONE_TO_ONE,
             [],

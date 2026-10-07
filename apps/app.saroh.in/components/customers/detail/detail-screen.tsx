@@ -9,6 +9,7 @@ import {
     stopOffersAction,
 } from "@/lib/customer-workspace/actions";
 import type { CustomerDetail } from "@/lib/customer-workspace/detail";
+import { shownDuplicates } from "@/lib/customer-workspace/merge";
 import { pageMissing } from "@/lib/customer-workspace/packs";
 import type {
     DuplicateSuggestion,
@@ -317,7 +318,11 @@ export function CustomerDetailScreen({
                     menu={more.menu}
                 />
                 <DuplicateNotice
-                    duplicates={duplicates}
+                    // A same email is offered to whoever edits contacts
+                    // (DEC-097); a phone pair as before (C2).
+                    duplicates={shownDuplicates(duplicates, {
+                        canEdit: canWrite,
+                    })}
                     onMerge={more.mergeDuplicate}
                 />
                 {canWrite && d.attention?.suggestions?.length ? (

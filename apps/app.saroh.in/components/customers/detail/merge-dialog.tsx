@@ -69,12 +69,15 @@ export function MergeDialog({
     target,
     open,
     onOpenChange,
+    survivorHref = (id) => `/customers/${encodeURIComponent(id)}`,
 }: {
     hereId: string;
     /** The other record; null to search for it first. */
     target: MergeTarget | null;
     open: boolean;
     onOpenChange: (open: boolean) => void;
+    /** Where the record kept opens when it isn't this one. */
+    survivorHref?: (contactId: string) => string;
 }) {
     const router = useRouter();
     const [other, setOther] = useState<MergeTarget | null>(target);
@@ -169,10 +172,7 @@ export function MergeDialog({
         onOpenChange(false);
         showSuccess(mergedToast(gone));
         if (res.data.survivorId === hereId) router.refresh();
-        else
-            router.push(
-                `/customers/${encodeURIComponent(res.data.survivorId)}`,
-            );
+        else router.push(survivorHref(res.data.survivorId));
     }
 
     const otherName = names?.there ?? other?.name ?? "the other record";

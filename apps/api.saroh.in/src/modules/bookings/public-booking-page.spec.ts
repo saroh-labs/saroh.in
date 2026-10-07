@@ -41,8 +41,11 @@ jest.mock("@saroh/database", () => {
         staffExtraHours: { findMany: jest.fn().mockResolvedValue([]) },
         staffTimeOff: { findMany: jest.fn().mockResolvedValue([]) },
         businessClosure: { findMany: jest.fn().mockResolvedValue([]) },
-        // No walk-in storefront: opening hours cut nothing (DEC-087).
-        store: { findMany: jest.fn().mockResolvedValue([]) },
+        // No hours saved: opening hours cut nothing (DEC-087, DEC-096).
+        store: {
+            findMany: jest.fn().mockResolvedValue([]),
+            findFirst: jest.fn().mockResolvedValue(null),
+        },
         businessProfile: {
             findUnique: jest.fn().mockResolvedValue({ timezone: "UTC" }),
         },
@@ -1007,6 +1010,35 @@ describe("the next two weeks in opening hours (DEC-087)", () => {
             ["10:30", null],
             ["11:00", null],
         ]);
+    });
+
+    it("keeps to Settings › Hours with no walk-in storefront (DEC-096)", async () => {
+        // The week the shop above had, saved to an online-only business's
+        // one storefront, as Settings › Hours does.
+        const [shop] = (await storeFindMany()) as unknown[];
+        storeFindMany.mockResolvedValue([]);
+        const storeFindFirst = prisma.store.findFirst as jest.Mock;
+        storeFindFirst.mockResolvedValue(shop);
+        try {
+            const inPerson = await new PublicBookingsService().publicDays(
+                "svc_1",
+                NOW,
+            );
+            expect(
+                monday(inPerson).map((s) => s.startAt.slice(11, 16)),
+            ).toEqual(["10:00", "10:30", "11:00"]);
+
+            db.service.findUnique.mockResolvedValue(
+                service({ locationType: "ONLINE" }),
+            );
+            const online = await new PublicBookingsService().publicDays(
+                "svc_1",
+                NOW,
+            );
+            expect(monday(online)).toHaveLength(5);
+        } finally {
+            storeFindFirst.mockResolvedValue(null);
+        }
     });
 });
 

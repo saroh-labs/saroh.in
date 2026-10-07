@@ -132,7 +132,7 @@ export function AvailabilityEditor({
     staff: StaffView[];
     /** When the whole business is closed (E3). */
     closures: Closure[];
-    /** When the business is open (DEC-087), or null with no shop hours. */
+    /** When the business is open (DEC-087, DEC-096), or null with no hours saved. */
     openingHours: WeeklyRange[] | null;
     rules: BookingRules;
     timezone: string;
