@@ -1,6 +1,7 @@
 // Cloudflare Worker for the merchant-site renderer, built by OpenNext
-// (`pnpm cf:build`). `saroh-sites-dev` serves dev businesses on
-// <address>.saroh.io against the dev API. Vercel still serves saroh.app.
+// (`pnpm cf:build`). The top level is dev: `saroh-sites-dev` serves dev
+// businesses on <address>.saroh.io against the dev API. `env.production`
+// below is saroh.app's Worker.
 // The account comes from CLOUDFLARE_ACCOUNT_ID (a repository variable in CI;
 // set it locally to Saroh labs' id before `wrangler deploy`).
 {
@@ -36,5 +37,30 @@
     // Public values; SITE_RELAY_SECRET is a Worker secret.
     "vars": {
         "API_URL": "https://api.saroh.io",
+    },
+    "env": {
+        // Production (`wrangler deploy --env production`, from main):
+        // `saroh-sites` for saroh.app against api.saroh.in. No routes yet, so
+        // a deploy takes no traffic; saroh.app stays on Vercel (through
+        // Cloudflare's proxy) until the cutover adds `saroh.app/*` and
+        // `*.saroh.app/*` here. Bindings and vars are not inherited, so each
+        // is repeated.
+        "production": {
+            "name": "saroh-sites",
+            "workers_dev": true,
+            "routes": [],
+            "services": [
+                {
+                    "binding": "WORKER_SELF_REFERENCE",
+                    "service": "saroh-sites",
+                },
+            ],
+            "images": {
+                "binding": "IMAGES",
+            },
+            "vars": {
+                "API_URL": "https://api.saroh.in",
+            },
+        },
     },
 }
