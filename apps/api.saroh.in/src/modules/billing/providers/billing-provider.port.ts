@@ -59,6 +59,11 @@ export interface CreateSubscriptionInput {
     /** When the recurring charges start; absent or null: at authorisation. */
     startAt?: Date | null;
     /**
+     * How many charges the subscription makes (DEC-093: a 12-month term,
+     * then a one-tap renewal). Absent: the adapter's own open-ended count.
+     */
+    totalCount?: number;
+    /**
      * A one-off charge taken at authorisation (an upgrade's difference for
      * the rest of the period), GST included, in paise. Worked out by Saroh.
      */
@@ -175,6 +180,67 @@ export interface ProviderChargeCapability {
     ): Promise<{ providerChargeId: string }>;
 }
 
+/** A one-time payment to make (DEC-093: a yearly plan, paid once). */
+export interface CreateOrderInput {
+    /** GST included, in paise, worked out by Saroh (KTD-18). */
+    amountPaise: number;
+    currency: string;
+    /** Saroh's reference (the checkout id), kept in the order's notes. */
+    reference: string;
+    organizationId: string;
+    planKey: string;
+}
+
+/**
+ * One-time payments (DEC-093). Optional on the port: a provider without it
+ * can't sell a yearly plan.
+ */
+export interface ProviderOrderCapability {
+    createOrder(input: CreateOrderInput): Promise<{ providerOrderId: string }>;
+}
+
+/**
+ * What the provider says a checkout's subscription or order is, asked
+ * directly when the business comes back from paying (DEC-093), so the plan
+ * moves without waiting for the webhook. Read as the event the webhook
+ * would have sent, and reconciled by the same rule.
+ */
+export interface CheckoutStatus {
+    /** What it amounts to; `other` when it's still waiting for the business. */
+    phase: BillingEventPhase;
+    status: SubscriptionStatus | "IGNORED";
+    /** The end of the period now paid, when the provider says. */
+    currentPeriodEnd?: Date | null;
+    /** The payment that paid it, when one did. */
+    providerPaymentId?: string | null;
+}
+
+export interface ProviderStatusCapability {
+    /** `ref` is the checkout's provider subscription id, or its order's. */
+    checkoutStatus(ref: string, oneTime: boolean): Promise<CheckoutStatus>;
+}
+
+/**
+ * What the browser needs to open the provider's own checkout window over
+ * Saroh (DEC-093): its public key, the subscription or order to pay, and
+ * the business's details pre-filled. Never a secret.
+ */
+export interface CheckoutHandoff {
+    provider: string;
+    /** The provider's public key (Razorpay's key id). */
+    keyId: string;
+    subscriptionId: string | null;
+    orderId: string | null;
+    /** An order's amount, GST included, in paise; null for a subscription. */
+    amountPaise: number | null;
+    currency: string;
+    prefill: {
+        name: string | null;
+        email: string | null;
+        contact: string | null;
+    };
+}
+
 /**
  * A provider call that failed, classified: `REFUSED` is an answer it would
  * give again (a 4xx), `UNKNOWN` may have worked (network, timeout, 5xx, 429).
@@ -233,6 +299,15 @@ export interface BillingProvider {
     readonly plans?: ProviderPlanCapability;
     /** Items on the next charge (U16 add-ons); absent: can't bill them. */
     readonly charges?: ProviderChargeCapability;
+    /** One-time payments (DEC-093 yearly); absent: can't sell yearly. */
+    readonly orders?: ProviderOrderCapability;
+    /** Asking how a checkout stands (DEC-093); absent: the webhook alone. */
+    readonly statuses?: ProviderStatusCapability;
+    /**
+     * The public key the browser opens the provider's checkout with, or
+     * null when there's no such window (the page link is used instead).
+     */
+    publicKey?(): string | null;
     /**
      * Constant-time HMAC verify over the RAW bytes using Saroh's PLATFORM
      * webhook secret (from `process.env`). Never throws on mismatch — returns

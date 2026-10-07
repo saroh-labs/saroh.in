@@ -91,6 +91,21 @@ describe("pricingPageModel", () => {
         expect(m.plans[2].trial).toBe("");
     });
 
+    it("a first month that costs something says its amount, and yearly has no trial (DEC-093)", () => {
+        const model = pricingPageModel(
+            fakeCatalog((c) => {
+                c.plans[1].trial = { on: true, days: 30, firstPaise: 700 };
+            }),
+        );
+        const m = model.views["month-excl"];
+        expect(m.plans[1].trial).toBe("First month ₹7 + GST");
+        expect(m.plans[1].cta.trialDays).toBeUndefined();
+        const y = Object.entries(model.views).find(([k]) =>
+            k.startsWith("year"),
+        )?.[1];
+        expect(y?.plans[1].trial).toBe("");
+    });
+
     it("coming soon is marked; hidden modules are left out", () => {
         const model = pricingPageModel(fakeCatalog());
         const labels = model.rows.map((r) => r.label);

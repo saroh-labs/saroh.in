@@ -1,6 +1,10 @@
 import type { BillingCheckout, Prisma } from "@saroh/database";
 import type { Addon, BillingCycle, Catalog } from "@saroh/pricing-catalog";
-import { cellOf, validateCatalog } from "@saroh/pricing-catalog";
+import {
+    cellOf,
+    trialFirstPaise,
+    validateCatalog,
+} from "@saroh/pricing-catalog";
 
 import { prorateDifferencePaise } from "./checkout-quote";
 
@@ -62,6 +66,15 @@ export function planTrialDays(catalog: Catalog, planId: string): number | null {
     const plan = catalog.plans.find((p) => p.id === planId);
     if (!plan || plan.pricePaise === 0 || !plan.trial?.on) return null;
     return plan.trial.days;
+}
+
+/**
+ * What the plan's trial days cost, before GST (DEC-093's nominal first
+ * month, from the catalogue's offer); zero when they're free.
+ */
+export function planFirstPaise(catalog: Catalog, planId: string): number {
+    const plan = catalog.plans.find((p) => p.id === planId);
+    return plan ? trialFirstPaise(plan) : 0;
 }
 
 /** When the trial-ending email goes: some days ahead, never in the past. */

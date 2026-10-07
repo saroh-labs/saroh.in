@@ -6,6 +6,7 @@ import {
     GST_PERCENT,
     monthlyEquivalentPaise,
     offeredPlans,
+    trialFirstPaise,
     withGstPaise,
     yearlyPaise,
 } from "@saroh/pricing-catalog";
@@ -92,7 +93,10 @@ function planViews(
         else if (year) {
             sub = `About ${formatInr(monthlyEquivalentPaise(charge))} a month${withGst ? " incl. GST" : " + GST"}`;
         } else sub = withGst ? "Incl. GST" : "+ GST";
-        const trialOn = paid && p.trial?.on === true;
+        // DEC-093: the offer is monthly only (yearly is one payment), and
+        // a first month that costs something is said with its amount.
+        const trialOn = paid && !year && p.trial?.on === true;
+        const first = trialOn ? trialFirstPaise(p) : 0;
         const cl = cardLines(catalog, p.id);
         return {
             id: p.id,
@@ -106,11 +110,15 @@ function planViews(
                 plan: p.id,
                 planName: p.name,
                 paid,
-                trialDays: trialOn ? p.trial?.days : undefined,
+                trialDays: trialOn && first === 0 ? p.trial?.days : undefined,
                 cycle: year ? "year" : "month",
             },
             lead: cl.lead,
-            trial: trialOn ? `Try it free for ${p.trial?.days} days` : "",
+            trial: !trialOn
+                ? ""
+                : first > 0
+                  ? `First month ${formatInr(gst(first))}${withGst ? " incl. GST" : " + GST"}`
+                  : `Try it free for ${p.trial?.days} days`,
             lines: cl.lines,
         };
     });

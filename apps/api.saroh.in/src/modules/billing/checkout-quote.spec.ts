@@ -3,7 +3,7 @@
  * every amount, from the plan rows alone. Made-up prices (111, 222, 333
  * rupees in paise) — never a real plan.
  */
-import { gstPaise } from "@saroh/pricing-catalog";
+import { gstPaise, withGstPaise } from "@saroh/pricing-catalog";
 
 import type { QuotePlanRow, QuoteSubscription } from "./checkout-quote";
 import { prorateDifferencePaise, quoteChange } from "./checkout-quote";
@@ -340,6 +340,185 @@ describe("offers in the quote (U16)", () => {
             discountPaise: 0,
             discountCharges: 0,
             firstChargePaise: 33_300,
+        });
+    });
+});
+
+describe("how it's paid (DEC-093)", () => {
+    const DAY = 24 * 60 * 60 * 1000;
+    const C_YEAR = row("c-year@1", 333_000, "year", "catalog.c");
+    const fromFree = sub({
+        plan: FREE,
+        provider: null,
+        providerSubscriptionId: null,
+        currentPeriodEnd: null,
+    });
+
+    it("monthly is autopay for 12 charges; the first charge is the mandate's payment", () => {
+        expect(
+            quoteChange({ subscription: fromFree, target: B, now: NOW }),
+        ).toMatchObject({
+            kind: "NEW",
+            payment: "AUTOPAY",
+            termCharges: 12,
+            payNowTotalPaise: 22_200 + gstPaise(22_200),
+            mandateCheck: "PAID",
+        });
+    });
+
+    it("a nominal first month is taken now, GST added, and is the mandate's payment", () => {
+        const q = quoteChange({
+            subscription: fromFree,
+            target: B,
+            now: NOW,
+            trialDays: 30,
+            trialFirstPaise: 700,
+        });
+        expect(q).toMatchObject({
+            kind: "TRIAL",
+            chargeNowPaise: 700,
+            chargeNowGstPaise: gstPaise(700),
+            chargeNowTotalPaise: 700 + gstPaise(700),
+            payNowTotalPaise: 700 + gstPaise(700),
+            mandateCheck: "PAID",
+            trialEndsAt: new Date(NOW.getTime() + 30 * DAY),
+        });
+    });
+
+    it("free first days owe nothing now: the provider's check is refunded", () => {
+        expect(
+            quoteChange({
+                subscription: fromFree,
+                target: B,
+                now: NOW,
+                trialDays: 30,
+            }),
+        ).toMatchObject({
+            kind: "TRIAL",
+            payNowTotalPaise: 0,
+            mandateCheck: "REFUNDED",
+        });
+        // A scheduled change, authorised now, owes nothing now either.
+        expect(
+            quoteChange({
+                subscription: sub({ plan: C }),
+                target: B,
+                now: NOW,
+            }),
+        ).toMatchObject({ kind: "SCHEDULED", mandateCheck: "REFUNDED" });
+    });
+
+    it("never charges more for the first month than a month", () => {
+        expect(
+            quoteChange({
+                subscription: fromFree,
+                target: B,
+                now: NOW,
+                trialDays: 30,
+                trialFirstPaise: 99_999_999,
+            }).chargeNowPaise,
+        ).toBe(22_200);
+    });
+
+    it("yearly is one payment, never autopay, and never a trial", () => {
+        const q = quoteChange({
+            subscription: fromFree,
+            target: B_YEAR,
+            now: NOW,
+            trialDays: 30,
+            trialFirstPaise: 700,
+            coupon: { discountPaise: 111, months: 1 },
+        });
+        expect(q).toMatchObject({
+            kind: "NEW",
+            payment: "ONE_TIME",
+            termCharges: 1,
+            mandateCheck: "NONE",
+            payNowTotalPaise: withGstPaise(222_000 - 111),
+        });
+    });
+
+    it("yearly from monthly is paid now for a year that starts at the period's end", () => {
+        expect(
+            quoteChange({ subscription: sub(), target: B_YEAR, now: NOW }),
+        ).toMatchObject({
+            kind: "SCHEDULED",
+            startAt: END,
+            payment: "ONE_TIME",
+            payNowTotalPaise: withGstPaise(222_000),
+        });
+    });
+
+    it("a pricier year mid-year pays the difference now, once", () => {
+        const yearEnd = new Date(NOW.getTime() + 100 * DAY);
+        const q = quoteChange({
+            subscription: sub({ plan: B_YEAR, currentPeriodEnd: yearEnd }),
+            target: C_YEAR,
+            now: NOW,
+        });
+        expect(q.kind).toBe("UPGRADE");
+        expect(q.payment).toBe("ONE_TIME");
+        expect(q.payNowTotalPaise).toBe(q.chargeNowTotalPaise);
+        expect(q.chargeNowPaise).toBeGreaterThan(0);
+    });
+
+    it("yearly while a trial runs starts the year now", () => {
+        expect(
+            quoteChange({
+                subscription: sub({ status: "TRIALING" }),
+                target: B_YEAR,
+                now: NOW,
+            }),
+        ).toMatchObject({ kind: "NEW", payment: "ONE_TIME" });
+    });
+
+    it("the plan it's on is a renewal from its term's end, inside the last 30 days only", () => {
+        const soon = new Date(NOW.getTime() + 10 * DAY);
+        expect(
+            quoteChange({
+                subscription: sub(),
+                target: B,
+                now: NOW,
+                termEndsAt: soon,
+            }),
+        ).toMatchObject({
+            kind: "RENEW",
+            startAt: soon,
+            effectiveAt: soon,
+            payment: "AUTOPAY",
+            termCharges: 12,
+            mandateCheck: "REFUNDED",
+        });
+        // At today's price: a later version's row of the same plan.
+        expect(
+            quoteChange({
+                subscription: sub(),
+                target: { ...B, id: "b@2", version: 2, priceCents: 23_300 },
+                now: NOW,
+                termEndsAt: soon,
+            }),
+        ).toMatchObject({ kind: "RENEW", pricePaise: 23_300 });
+        const later = new Date(NOW.getTime() + 60 * DAY);
+        expect(
+            quoteChange({
+                subscription: sub(),
+                target: B,
+                now: NOW,
+                termEndsAt: later,
+            }).kind,
+        ).toBe("NONE");
+        // A year paid once renews as one payment for the next year.
+        expect(
+            quoteChange({
+                subscription: sub({ plan: B_YEAR }),
+                target: B_YEAR,
+                now: NOW,
+                termEndsAt: soon,
+            }),
+        ).toMatchObject({
+            kind: "RENEW",
+            payment: "ONE_TIME",
+            payNowTotalPaise: withGstPaise(222_000),
         });
     });
 });

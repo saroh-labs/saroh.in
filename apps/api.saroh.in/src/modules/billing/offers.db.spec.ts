@@ -375,7 +375,7 @@ describe("trials", () => {
 });
 
 describe("yearly", () => {
-    it("a yearly checkout bills the plan's yearly row on its yearly provider plan", async () => {
+    it("a yearly checkout bills the plan's yearly row as one payment (DEC-093)", async () => {
         await install();
         const ctx = await business();
         const cYear = await row("c", "year");
@@ -386,11 +386,13 @@ describe("yearly", () => {
                 cycle: "year",
                 pricePaise: cYear.priceCents,
                 totalPaise: withGstPaise(cYear.priceCents),
+                payment: "ONE_TIME",
             },
         });
-        expect(fake.createCalls[0]).toMatchObject({
-            providerPlanId: `plan_${cYear.id}`,
-            interval: "year",
+        expect(fake.createCalls).toHaveLength(0);
+        expect(fake.orders.created[0]).toMatchObject({
+            amountPaise: withGstPaise(cYear.priceCents),
+            planKey: "catalog.c",
         });
     });
 });
@@ -474,7 +476,11 @@ describe("coupons", () => {
             discountPaise: 333,
             charges: 1,
         });
-        expect(fake.createCalls[0]?.discount?.charges).toBe(1);
+        // One payment: the order is for the discounted year, no Offer needed.
+        const cYear = await row("c", "year");
+        expect(fake.orders.created[0]?.amountPaise).toBe(
+            withGstPaise(cYear.priceCents - 333),
+        );
     });
 
     it("a trial's coupon is redeemed with the trial's first charge, not before", async () => {

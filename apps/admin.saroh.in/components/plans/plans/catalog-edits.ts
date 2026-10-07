@@ -66,7 +66,8 @@ function samePlan(a: Plan, b: Plan): boolean {
         a.featured === b.featured &&
         a.retired === b.retired &&
         (a.trial?.on ?? false) === (b.trial?.on ?? false) &&
-        (a.trial?.days ?? null) === (b.trial?.days ?? null)
+        (a.trial?.days ?? null) === (b.trial?.days ?? null) &&
+        (a.trial?.firstPaise ?? 0) === (b.trial?.firstPaise ?? 0)
     );
 }
 

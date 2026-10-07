@@ -15,6 +15,7 @@ import { BillingWebhookController } from "./billing-webhook.controller";
 import { BillingWebhookService } from "./billing-webhook.service";
 import { BillingController, PlansController } from "./billing.controller";
 import { CatalogueAccessService } from "./catalogue-access.service";
+import { CheckoutConfirmService } from "./checkout-confirm.service";
 import { CheckoutService } from "./checkout.service";
 import { EntitlementService } from "./entitlement.service";
 import { BILLING_FREE_ROWS_TYPE, FreeRowsHandler } from "./free-rows.job";
@@ -98,6 +99,7 @@ const CHAIN_CHECK_MS = 6 * 60 * 60 * 1000;
         PlanLimitNoticeHandler,
         BillingWebhookService,
         CheckoutService,
+        CheckoutConfirmService,
         ProviderPlanSyncService,
         ProviderCancelHandler,
         MovesApplyHandler,
