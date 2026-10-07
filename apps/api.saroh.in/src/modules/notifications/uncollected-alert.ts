@@ -61,6 +61,10 @@ export async function wordUncollected(
         type: ORDER_UNCOLLECTED_NOTIFICATION_TYPE,
         title: `${notHandedOverWords(order.fulfilment)}: order ${order.orderId} from ${orderPartyName(order)}`,
         body: `Placed ${days} days ago to ${payOnHandoverWords(order.fulfilment)}, and not paid yet. ${pickup ? "Nobody has collected it" : "It hasn't been delivered"}. Cancel it to put the stock back, or keep waiting. Nothing cancels on its own.`,
+        mail: {
+            heading: `${notHandedOverWords(order.fulfilment)}: order ${order.orderId}`,
+            body: `Placed ${days} days ago to ${payOnHandoverWords(order.fulfilment)}, and not paid yet. ${pickup ? "Nobody has collected it" : "It hasn't been delivered"}. Cancel it to put the stock back, or keep waiting. Nothing cancels on its own.`,
+        },
         path: `/commerce/orders/${order.id}`,
         skipUserId: null,
         orderId: order.id,

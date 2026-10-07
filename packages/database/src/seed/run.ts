@@ -32,6 +32,7 @@ import {
     SITES,
     SUBMISSIONS,
 } from "./data";
+import { seedEmailPromptBusinesses } from "./email-prompt";
 import { seedFounder } from "./founder";
 import type { Db } from "./helpers";
 import {
@@ -319,6 +320,9 @@ export async function seed(): Promise<void> {
     // Two of Asha's that Saroh sends booking emails for, flags on for them
     // alone (DEC-086; `providers-saroh-email.spec.ts`).
     await seedSarohEmailBusinesses(prisma, founderId, now);
+    // Three with no email of their own, Communications rolled out for them
+    // alone, one on an enforced entry plan (#850; `email-setup-prompt.spec.ts`).
+    await seedEmailPromptBusinesses(prisma, founderId, now);
     // One of Asha's on a plan that ends in ten days (#805;
     // `plan-ending.spec.ts`).
     await seedPlanEndingBusiness(prisma, founderId, now);

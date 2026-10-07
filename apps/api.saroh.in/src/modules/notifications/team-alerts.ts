@@ -6,8 +6,8 @@ import type { AlertEvent } from "./alert-preferences";
  * transaction, so a committed order, a failed payment or an accepted
  * invitation always has its alert (the transactional outbox). The
  * `team.alert` job (`team-alert.handler.ts`) re-reads what it is about,
- * puts it in the business's inbox (the bell) and emails the people who
- * chose email for it.
+ * puts it in the business's inbox (the bell) and emails, from Saroh, the
+ * people who chose email for it.
  *
  * Plain functions over the caller's transaction: no module has to import
  * the notifications module to raise one.
@@ -88,6 +88,13 @@ export interface WordedAlert {
     type: string;
     title: string;
     body: string;
+    /**
+     * What the email says (DEC-011, amended 2026-10-07): Saroh sends it in
+     * its own name, so fixed words and the business's own names, cleaned
+     * (`cleanName`), and never what a customer typed: no customer's name,
+     * no free text from a run. The bell keeps the full words above.
+     */
+    mail: { heading: string; body: string };
     /** Where it opens in the workspace, for the email. */
     path: string | null;
     /** Not emailed about their own doing. */

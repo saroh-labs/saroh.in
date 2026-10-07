@@ -6,14 +6,15 @@
 #   ROWS   apps/app.saroh.in/lib/providers/rows.ts (COMMS_NAME, CHANNEL.EMAIL)
 #   PAGE   apps/app.saroh.in/app/(shell)/settings/(sections)/providers/page.tsx
 #   SEND   apps/api.saroh.in/src/modules/communications/providers/email.provider.ts
-#   WHAT   apps/api.saroh.in/src/modules/communications/transactional.ts,
-#          apps/api.saroh.in/src/modules/notifications/team-alert.handler.ts
+#   WHAT   apps/api.saroh.in/src/modules/communications/transactional.ts
+#   TEAM   apps/api.saroh.in/src/modules/notifications/team-alert.handler.ts
+#          (team alerts go from Saroh, not the provider: DEC-011, 7 Oct)
 # Email has no webhook, so this page names no webhook path or events.
 slug: email
 name: Your own email
 category: Email
 title: "Your own email on Saroh: invoices sent from your address · Saroh"
-description: "Connect Resend, SendGrid or an SMTP relay to Saroh, and invoices, reminders and team alerts go out through your own email provider, from an address you choose."
+description: "Connect Resend, SendGrid or an SMTP relay to Saroh, and invoices and reminders go out through your own email provider, from an address you choose."
 intro: "Saroh sends your business's email through your own email provider, not Saroh's. Connect Resend, SendGrid or an SMTP relay, choose the address it comes from, and invoices and reminders go out as you."
 doesTitle: What it sends
 # PAGE: the screen is titled "Providers"; SETUP: the email form is titled "Messaging".
@@ -91,12 +92,12 @@ faq:
       a: "With Resend, yes: the invoice's PDF goes with the email. Through SendGrid or an SMTP relay, the email carries a link to the invoice instead."
     # PAGE + ROWS: email isn't sent until a provider is connected.
     - q: What if I don't connect one?
-      a: "Then invoices, reminders and team alerts aren't emailed. Everything else in Saroh works as before."
+      a: "Then invoices and reminders aren't emailed. Alerts to your team still come from Saroh, and everything else in Saroh works as before."
     # SETUP: "Keys are sealed when saved and never shown again."
     - q: Can Saroh read my API key back?
       a: "No. It's sealed when you save it and never shown again, here or anywhere. To change it, you enter a new one."
     - q: Does Saroh send sign-in emails from my address?
-      a: "No. Sign-in and security email comes from Saroh. Your provider sends only your business's email to your customers and team."
+      a: "No. Sign-in and security email comes from Saroh. Your provider sends only your business's email to your customers."
 links:
     - { label: Take payments with Razorpay, href: /integrations/razorpay }
 ---
@@ -104,8 +105,7 @@ links:
 {/*
 What goes through the business's own provider, from the code:
 WHAT: INVOICE_TEMPLATES = INVOICE_SENT, INVOICE_REMINDER (MARKETING_CLAIMS BI2);
-TEAM_TEMPLATES = TEAM_ALERT, "a new order, a booking, a failed payment,
-someone joining … sent only to the people who chose email for them".
+Team alerts are not here: TEAM sends them from Saroh (sendTeamAlertEmail).
 Booking and order notices to customers (NOTICE_TEMPLATES) go only to a live
 site account's verified email (site-accounts/notice-reach.ts), and customer
 accounts are behind SITE_ACCOUNT_AREA, so they aren't claimed here.
@@ -113,6 +113,4 @@ accounts are behind SITE_ACCOUNT_AREA, so they aren't claimed here.
 
 **Invoices and reminders.** When you send an invoice or a reminder, it goes to your customer from your address, with a link to pay it when you take payments online.
 
-**Alerts to your team.** A new order, a booking, a failed payment or someone joining is emailed to the people on your team who chose email for it.
-
-**Sign-in email stays with Saroh.** Sign-in and security email comes from Saroh, not from your provider.
+**Sign-in email and team alerts stay with Saroh.** Sign-in and security email, and the alerts your team chose to get by email (a new order, a booking, a failed payment, someone joining), come from Saroh, not from your provider.

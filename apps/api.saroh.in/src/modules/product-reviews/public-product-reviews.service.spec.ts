@@ -1,6 +1,9 @@
 // The customer's side of a review link: no session, so the token is the only
 // key — found by its hash, never trusted for anything else. Prisma is mocked;
 // `$transaction` runs its callback against the same mocked client.
+jest.mock("../communications/communications.service", () => ({
+    CommunicationsService: class {},
+}));
 jest.mock("@saroh/database", () => {
     const actual = jest.requireActual("@saroh/database");
     const client = {

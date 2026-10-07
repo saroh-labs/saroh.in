@@ -25,6 +25,7 @@ import type {
 import { ViewerDate } from "@/components/shared/viewer-date";
 import { InviteReviewsSheet } from "@/components/stores/invite-reviews-sheet";
 import { replyToReview, setReviewHidden } from "@/lib/product-reviews/actions";
+import type { ReviewEmailNote } from "@/lib/product-reviews/describe";
 import { stars } from "@/lib/product-reviews/describe";
 import type { InvitableOrder, Review } from "@/lib/product-reviews/service";
 
@@ -51,12 +52,15 @@ export function ReviewsView({
     reviews,
     invitable,
     canWrite,
+    emailNote = null,
     tabs,
     initialReviewId,
 }: {
     reviews: Review[];
     invitable: InvitableOrder[];
     canWrite: boolean;
+    /** Why invitations can't go (D11); the invite sheet leads with it. */
+    emailNote?: ReviewEmailNote | null;
     tabs: ReactNode;
     /** `?review=<id>` — opened on arrival, from a notification. */
     initialReviewId?: string;
@@ -192,6 +196,7 @@ export function ReviewsView({
                     open={inviting}
                     onOpenChange={setInviting}
                     orders={invitable}
+                    emailNote={emailNote}
                 />
             ) : null}
         </div>

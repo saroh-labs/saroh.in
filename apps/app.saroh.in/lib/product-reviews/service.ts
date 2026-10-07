@@ -39,17 +39,30 @@ export interface InvitableOrder {
     itemCount: number;
 }
 
+/**
+ * Whether review invitations can go (D11): only through the business's own
+ * email provider. `canConnect`, when it has none: whether its plan lets it
+ * connect one (false on Free); null when unknown.
+ */
+export interface ReviewEmailSetup {
+    connected: boolean;
+    canConnect: boolean | null;
+}
+
+/** queued: handed to the business's provider; it shows as sent once taken. */
 export type InviteResult =
-    | { orderId: string; status: "sent"; note?: "consent-not-checked" }
+    | { orderId: string; status: "queued"; note?: "consent-not-checked" }
     | { orderId: string; status: "skipped"; reason: string; message: string };
 
 export interface InvitationState {
-    state: "none" | "sent" | "completed" | "expired";
+    state: "none" | "sending" | "failed" | "sent" | "completed" | "expired";
     sentAt: string | null;
     sendCount: number;
     reviewed: number;
     lines: number;
     blocked: { reason: string; message: string } | null;
+    /** Absent from an API before D11's provider-only invitations. */
+    email?: ReviewEmailSetup;
 }
 
 /**
@@ -105,6 +118,13 @@ export async function invitableOrders(): Promise<InvitableOrder[]> {
             `${base}/product-reviews/invitable-orders`,
         )) ?? []
     );
+}
+
+/** Null when it couldn't be read: the sheet then offers the list as before. */
+export async function reviewEmailSetup(): Promise<ReviewEmailSetup | null> {
+    const base = await orgBase();
+    if (!base) return null;
+    return getJson<ReviewEmailSetup>(`${base}/product-reviews/email-setup`);
 }
 
 export async function invitationState(

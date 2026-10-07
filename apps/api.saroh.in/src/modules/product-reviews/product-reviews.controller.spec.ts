@@ -7,8 +7,8 @@ jest.mock("../../common/guards/organization.guard", () => ({
 jest.mock("../capabilities/module-enforcement.guard", () => ({
     ModuleEnforcementGuard: class {},
 }));
-jest.mock("../../common/email", () => ({
-    sendReviewInvitationEmail: jest.fn(),
+jest.mock("../communications/communications.service", () => ({
+    CommunicationsService: class {},
 }));
 jest.mock("../../env", () => ({ env: { NODE_ENV: "test" } }));
 

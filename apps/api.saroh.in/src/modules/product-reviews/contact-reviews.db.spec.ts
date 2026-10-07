@@ -11,11 +11,13 @@ import { randomBytes } from "node:crypto";
 import { prisma } from "@saroh/database";
 
 import type { OrganizationContext } from "../../common/types/organization-context";
+import { CommunicationsService } from "../communications/communications.service";
 import { FixedWindowRateLimiter } from "../enquiry/rate-limiter";
 import { ProductReviewsService } from "./product-reviews.service";
 
 const tag = `${process.pid}-${Date.now()}`;
 const reviews = new ProductReviewsService(
+    new CommunicationsService(),
     undefined,
     new FixedWindowRateLimiter(100, 60_000),
 );

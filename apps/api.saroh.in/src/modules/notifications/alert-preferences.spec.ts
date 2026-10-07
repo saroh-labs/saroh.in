@@ -74,7 +74,6 @@ describe("alerts", () => {
     describe("channels", () => {
         const base = {
             seesInbox: true,
-            emailConnected: true,
             whatsappConnected: true,
         };
 
@@ -87,17 +86,17 @@ describe("alerts", () => {
             ).toEqual({ available: false, reason: "NO_INBOX" });
         });
 
-        it("email, only through the business's own connected provider", () => {
+        it("email, always: Saroh sends it, provider or not (DEC-011, 7 Oct)", () => {
             expect(channelState({ ...base, channel: "email" })).toEqual({
                 available: true,
             });
             expect(
                 channelState({
                     ...base,
-                    emailConnected: false,
+                    whatsappConnected: false,
                     channel: "email",
                 }),
-            ).toEqual({ available: false, reason: "NO_PROVIDER" });
+            ).toEqual({ available: true });
         });
 
         it("WhatsApp never: with a provider, there is still no number for a team member", () => {

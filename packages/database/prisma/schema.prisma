@@ -1557,8 +1557,8 @@ model Order {
   currency String @default("USD")
 
   // Status
-  status        String @default("PENDING") // PENDING, PROCESSING, SHIPPED, DELIVERED, CANCELLED
-  paymentStatus String @default("UNPAID") // UNPAID, PAID, FAILED, REFUNDED
+  status        String  @default("PENDING") // PENDING, PROCESSING, SHIPPED, DELIVERED, CANCELLED
+  paymentStatus String  @default("UNPAID") // UNPAID, PAID, FAILED, REFUNDED
   // Money taken outside Saroh and recorded on the order: cash, UPI or a
   // card machine at the counter, a payment marked by hand, a difference
   // after an edit recorded as paid — less what an edit handed back from the
@@ -4753,7 +4753,7 @@ model Message {
   subject   String?
   body      String
 
-  status String @default("QUEUED") // QUEUED | SENT | FAILED | SUPPRESSED; a Saroh send (DEC-086) also UNKNOWN, or, not emailed, ALLOWANCE_USED | NO_ALLOWANCE | BOOKING_LIMIT
+  status String @default("QUEUED") // QUEUED | SENT | FAILED | SUPPRESSED | CANCELLED (a review invitation resent before it went); a Saroh send (DEC-086) also UNKNOWN, or, not emailed, ALLOWANCE_USED | NO_ALLOWANCE | BOOKING_LIMIT
 
   createdByUserId String?
 
@@ -4770,10 +4770,17 @@ model Message {
   invoice   Invoice? @relation(fields: [invoiceId], references: [id], onDelete: SetNull)
   template  String?
 
+  // The review invitation this message carried (REVIEW_INVITATION, D11).
+  // Its deliveries say whether the invitation went: only one the provider
+  // accepted (SENT or DELIVERED) shows as sent and counts as a send.
+  reviewInvitationId String?
+  reviewInvitation   ReviewInvitation? @relation(fields: [reviewInvitationId], references: [id], onDelete: SetNull)
+
   @@index([organizationId])
   @@index([leadId])
   @@index([contactId])
   @@index([invoiceId, createdAt])
+  @@index([reviewInvitationId, createdAt])
 }
 
 // Delivery — one provider send attempt for a Message, with its final state.
@@ -4787,7 +4794,7 @@ model Delivery {
 
   provider          String
   providerMessageId String?
-  status            String  @default("QUEUED") // QUEUED | SENT | DELIVERED | FAILED | BOUNCED; a SAROH one (DEC-086) also STOPPED | UNKNOWN
+  status            String  @default("QUEUED") // QUEUED | SENT | DELIVERED | FAILED | BOUNCED | CANCELLED (a review invitation resent before it went); a SAROH one (DEC-086) also STOPPED | UNKNOWN
   error             String?
   attempts          Int     @default(0)
 
@@ -5376,11 +5383,15 @@ model ReviewInvitation {
   expiresAt       DateTime
   // Every line reviewed: the link has done its job.
   completedAt     DateTime?
+  // Sends by Saroh's own sender, before invitations moved to the business's
+  // provider (D11, 2026-10-07). Since then a send counts only once its
+  // provider accepted it, read from `messages`' deliveries; new rows hold 0.
   sendCount       Int       @default(1)
   lastSentAt      DateTime  @default(now())
   createdByUserId String?
 
-  reviews ProductReview[]
+  reviews  ProductReview[]
+  messages Message[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
