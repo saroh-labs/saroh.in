@@ -1199,3 +1199,11 @@ Unless an entry says otherwise, its status is **Proposed — requires audit revi
 
 - Decision: anyone whose role carries a write permission (books, sells, edits), including bookable staff, uses a team seat. People whose role carries only view permissions don't use a seat. They count toward a separate per-plan limit, the one Reviewers use today, which can change by policy.
 - Consequences: metering classifies a member by their role's permissions, not its name. The catalogue's Reviewers row becomes the view-only people limit.
+
+## DEC-106 Storefront roles follow permissions for money too
+
+**Status: Accepted — 2026-10-07** · user · amends DEC-048 · extends DEC-098
+
+- Context: DEC-048 let a storefront's Admin, Manager or Editor take and change that storefront's orders, recording payment included, because of their storefront role name.
+- Decision: on a storefront too, seeing amounts and recording or taking payment depend only on the permissions the person's roles carry. No storefront role name grants money.
+- Consequences: the storefront role checks in the stores service give way to permissions. A storefront role that should take payments needs a role carrying the payment permission.
