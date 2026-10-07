@@ -3141,3 +3141,19 @@ failed provider order is a deliberate 503 in the customer's words. Tests in
 `common/providers/provider-key-checks.spec.ts`, `payments.service.spec.ts`
 and `message-send.handler.spec.ts`.
 **Category**: integrations · rule in `docs/patterns/backend-integrations.md` ("Keys are checked before they are kept, and watched after")
+
+## Renderer — an unknown page on a merchant's site answered 200 (UX-071)
+
+**Problem**: `/news/anything` on a live site showed the not-found page, but the
+response was `200` — a soft 404 that search engines and uptime checks read as
+a real page.
+**Root cause**: `apps/saroh.app/app/[domain]/loading.tsx` wrapped every page of
+a site in a Suspense boundary, so the response started streaming (status and
+headers sent) before the page ran `notFound()`. Next can't change the status
+after that; it only adds a `noindex` tag. The middleware already worked around
+it for `/account`.
+**Fix**: The segment loading state went. A site's pages render fully before
+the first byte, so `notFound()` (unknown page, post or product) answers 404.
+`e2e/tests/site-not-found.spec.ts` pins it. Don't put a `loading.tsx`, or a
+`<Suspense>` around `children`, above a page that can 404.
+**Category**: renderer · Next streaming

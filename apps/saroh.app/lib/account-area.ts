@@ -43,8 +43,7 @@ import { isPayInvoice } from "./invoice-pay-shape";
  * shipped (waves plan, release boundary 4). Readers of this switch: this
  * file (`accountAreaOn`, defined in `account-area-switch.ts` so the edge
  * middleware can read it too) and `middleware.ts`, which answers `/account`
- * with a real 404 while it is off — the page's own `notFound()` comes too
- * late for a status, after `[domain]/loading.tsx` has started the stream.
+ * with a 404 while it is off, before the layout reads the site.
  * Delete it with the API's once the area has been on a release.
  *
  * Every read goes through `accountFetch`: the session cookie, forwarded
