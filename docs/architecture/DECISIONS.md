@@ -1122,3 +1122,52 @@ Unless an entry says otherwise, its status is **Proposed — requires audit revi
 - Context: Free's monthly bookings cap also refused bookings the owner made at the desk, and customers learned bookings were paused only after filling in the whole form.
 - Decision: the cap counts bookings customers make on the business's site. Bookings staff make in the workspace are never capped. Past the cap, the booking page says up front that online booking is paused, before the form.
 - Consequences: metering filters by where a booking came from. The booking page reads the cap state before showing the form.
+
+## DEC-096 Opening hours limit in-person booking times for every business
+
+**Status: Accepted — 2026-10-07** · user · amends DEC-087 · from the UX audit (UX-009, D8)
+
+- Context: DEC-087 cut booking times only to walk-in (SHOP) storefronts' hours. Settings › Hours saves to the business's hours shown in the site header, so a business with no walk-in location offered times outside the hours its own site displays.
+- Decision: the hours set in Settings › Hours limit in-person booking times for every business, whatever its storefronts. Online-only sessions are not cut, as in DEC-087.
+- Consequences: one source of opening hours for the header, the booking page and the slot engine. Bookings already made are never moved.
+
+## DEC-097 Possible duplicate contacts are offered to staff to merge, never merged automatically
+
+**Status: Accepted — 2026-10-07** · user · keeps DEC-049 · from the UX audit (UX-013)
+
+- Context: a customer signing in on a merchant site gets a separate contact unless the existing contact's email was already verified (DEC-049). The audit saw duplicates as a bug.
+- Decision: DEC-049 stands, for safety: a shared or mistyped inbox must not open someone else's history. Staff see "This may be the same person" with a merge action on both contacts, and merging is their choice (ADR-011: nothing merges silently).
+- Consequences: a merge prompt on the contact pages, backed by an email match. Merging keeps both histories.
+
+## DEC-098 Counter money follows permissions, never role names
+
+**Status: Accepted — 2026-10-07** · user · from the UX audit (D7)
+
+- Context: seeing amounts and recording payments at the counter was decided partly by role name (Owner, Admin, Member).
+- Decision: what a person can see and do with money is decided only by the permissions their role carries, as set by the owner or an admin. No screen or endpoint checks a role name for money.
+- Consequences: every role-name check for money is replaced by its permission (ADR-008). Built-in roles keep their default permissions.
+
+## DEC-099 Custom roles are a Pro feature; class packs aren't offered yet
+
+**Status: Accepted — 2026-10-07** · user · from the UX audit
+
+- Decision:
+    - Custom roles are included on Pro only. Free and Grow can't create them or give a role permissions beyond the built-in ones (taking permissions away is never blocked).
+    - Class packs aren't offered on any plan for now. The module is hidden like Automations (DEC-068), and existing data is kept.
+- Consequences: the catalogue's Custom roles row is off on Free and Grow, and the class packs module joins the not-offered list.
+
+## DEC-100 The 12-month term ends with a request to pay; paying resubscribes
+
+**Status: Accepted — 2026-10-07** · user · clarifies DEC-093
+
+- Decision: a monthly plan's 12 charges, or a yearly plan's year, run to the end of the term. Before the end the owner is asked to pay for the next term, and paying resubscribes them for another term. The first month is priced before GST, like every Saroh price.
+- Consequences: the renew prompt opens in the term's last 30 days. A business that doesn't pay moves to Free at the term's end, with the move-down rules (#800/#801).
+
+## DEC-101 A release going live closes its review; footers carry a contact email
+
+**Status: Accepted — 2026-10-07** · user
+
+- Decision:
+    - When a site change or test release goes live, any open review request for it is closed.
+    - Saroh's own sites show contact@saroh.in as the contact address.
+    - A merchant's site footer shows the business's own contact email when the business has added one.
