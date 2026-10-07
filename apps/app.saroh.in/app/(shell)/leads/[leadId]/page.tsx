@@ -6,6 +6,7 @@ import { notFound } from "next/navigation";
 import { ActivityComposer } from "@/components/crm/activity-composer";
 import { ActivityTimeline } from "@/components/crm/activity-timeline";
 import { ConsentToggle } from "@/components/crm/consent-toggle";
+import { EnquiryCard } from "@/components/crm/enquiry-card";
 import { LeadStatusControl } from "@/components/crm/lead-status-control";
 import { MessageComposer } from "@/components/crm/message-composer";
 import { MessageHistory } from "@/components/crm/message-history";
@@ -109,6 +110,15 @@ export default async function LeadDetailPage({
                     </>
                 }
             />
+
+            {lead.enquiries && lead.enquiries.length > 0 ? (
+                <div className="mb-8">
+                    <EnquiryCard
+                        enquiries={lead.enquiries}
+                        knownEmail={lead.contact?.email ?? null}
+                    />
+                </div>
+            ) : null}
 
             <div className="mb-8 flex flex-wrap gap-4 rounded-lg border p-4">
                 {stages.length > 0 && (

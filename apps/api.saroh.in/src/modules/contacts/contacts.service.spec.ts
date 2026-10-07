@@ -13,6 +13,8 @@ jest.mock("@saroh/database", () => {
                 delete: jest.fn(),
             },
             lead: { groupBy: jest.fn(), count: jest.fn() },
+            // A contact's detail carries what they wrote (UX-002).
+            submission: { findMany: jest.fn().mockResolvedValue([]) },
             // Either form: a batch resolves each queued call in order, and a
             // callback runs against the same mocked client.
             $transaction: jest.fn((arg: unknown) =>
@@ -442,6 +444,9 @@ describe("ContactsService.get", () => {
         expect(res.id).toBe("c_1");
         const include = findUnique.mock.calls[0]?.[0]?.include;
         expect(include.leads).toMatchObject({ where: { id: { in: [] } } });
+        // Nor what they wrote through a form: an enquiry is sales data.
+        expect(res.enquiries).toEqual([]);
+        expect(prisma.submission.findMany).not.toHaveBeenCalled();
     });
 
     it("404s a cross-tenant contact", async () => {

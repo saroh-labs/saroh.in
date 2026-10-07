@@ -10,6 +10,7 @@ import { prisma } from "@saroh/database";
 import type { OrganizationContext } from "../../common/types/organization-context";
 import { AuditAction, auditMetadata } from "../audit/audit.service";
 import { BookingEventType } from "../bookings/booking-event-type";
+import { enquiryEntriesFor } from "../forms/enquiry-entries";
 import { realOrderWhere } from "../orders/open-orders";
 import { allows, authorize } from "../organizations/organization-policy";
 import {
@@ -421,7 +422,14 @@ export class ContactsService {
         if (contact?.organizationId !== ctx.organizationId) {
             throw new NotFoundException("Contact not found");
         }
-        return contact;
+        // What they wrote through the site's forms (UX-002), with the same
+        // gate as their leads: an enquiry is sales data.
+        const enquiries = allows(ctx, "lead:read")
+            ? await enquiryEntriesFor(ctx.organizationId, {
+                  contactId: contact.id,
+              })
+            : [];
+        return { ...contact, enquiries };
     }
 
     /**

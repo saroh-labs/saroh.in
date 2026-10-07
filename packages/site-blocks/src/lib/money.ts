@@ -30,3 +30,19 @@ export function siteMoney(
         return null;
     }
 }
+
+/**
+ * A decimal string from the API as the site shows it, in "en-IN" unless
+ * told otherwise; the string itself when it can't be formatted. Here, not
+ * in the "use client" product page, so a server component can call it: the
+ * order confirmation page crashed for every buyer when it called the
+ * client copy (UX-001).
+ */
+export function formatAmount(
+    amount: string,
+    currency: string,
+    locale = "en-IN",
+): string {
+    // "₹2,499", "₹24.50" (DEC-073 #11): never "₹24.5".
+    return siteMoney(Number(amount), currency, locale) ?? amount;
+}

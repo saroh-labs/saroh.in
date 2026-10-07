@@ -97,11 +97,13 @@ export {
 } from "./lib/opening-hours";
 export type { OpenState, OpeningHoursDay, Weekday } from "./lib/opening-hours";
 
+// A price as the site shows it; no directive, so server pages can call it.
+export { formatAmount } from "./lib/money";
+
 // Not a page block: a product as its shop page shows it (#465) — the
 // workspace's Customer view today, the storefront product page later.
 export {
     default as ProductPage,
-    formatAmount,
     percentOff,
     stockLabel,
     useProductSelection,
