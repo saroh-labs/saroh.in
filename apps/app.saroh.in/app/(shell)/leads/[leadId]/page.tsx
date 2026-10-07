@@ -5,6 +5,7 @@ import { notFound } from "next/navigation";
 
 import { ActivityComposer } from "@/components/crm/activity-composer";
 import { ActivityTimeline } from "@/components/crm/activity-timeline";
+import { ComposerNotice } from "@/components/crm/composer-notice";
 import { ConsentToggle } from "@/components/crm/consent-toggle";
 import { LeadStatusControl } from "@/components/crm/lead-status-control";
 import { MessageComposer } from "@/components/crm/message-composer";
@@ -16,8 +17,13 @@ import { EditLeadDialog } from "@/components/leads/edit-lead-dialog";
 import { PageContainer } from "@/components/shared/page-container";
 import { contactName, formatValue, LEAD_STATUS } from "@/lib/crm/format";
 import { getLead } from "@/lib/leads/service";
+import { composerGate } from "@/lib/messages/composer-gate";
 import type { ConsentStatus, MessageChannel } from "@/lib/messages/service";
 import { listContactConsents, listLeadMessages } from "@/lib/messages/service";
+import { rolledOut } from "@/lib/modules/rollout";
+import { listModules } from "@/lib/modules/service";
+import { listCommsProviders } from "@/lib/providers/service";
+import { billingAccessOrNull } from "@/lib/saroh-billing/service";
 import { requireSession } from "@/lib/session";
 
 /**
@@ -34,6 +40,13 @@ import { requireSession } from "@/lib/session";
  * worker drives it to a terminal state, so the panel reflects live status,
  * never a faked SENT). A REVOKED consent makes the composer warn and the send
  * gate SUPPRESS.
+ *
+ * UX-067: the composer shows only while Communications is on, and a channel
+ * with nothing connected to send it says so up front — connect it where the
+ * plan has room, or the plan that has it (DEC-086, DEC-091) — rather than
+ * letting the owner write into a refusal (`composerGate`). The modules,
+ * providers and plan are aids, read best-effort: unread, the composer shows
+ * as before.
  */
 export default async function LeadDetailPage({
     params,
@@ -54,10 +67,32 @@ export default async function LeadDetailPage({
     // Communications (S6-002): message history (newest first) + this contact's
     // per-channel consent. Messages need no contact; consent is contact-scoped.
     const contactId = lead.contact?.id ?? null;
-    const [messages, consents] = await Promise.all([
+    const [messages, consents, modules] = await Promise.all([
         listLeadMessages(lead.id),
         contactId ? listContactConsents(contactId) : Promise.resolve([]),
+        listModules().catch(() => null),
     ]);
+    const comms = modules
+        ? rolledOut(modules).find((m) => m.key === "COMMUNICATIONS")
+        : undefined;
+    const communicationsOn = modules ? comms?.lifecycle === "ENABLED" : null;
+    // Providers and plan matter only while it is on; a read refused for
+    // this role is unknown, never a reason to hide the composer.
+    const [providers, access] = communicationsOn
+        ? await Promise.all([
+              listCommsProviders().catch(() => null),
+              billingAccessOrNull(),
+          ])
+        : [null, null];
+    const gateFor = (channel: MessageChannel) =>
+        composerGate({
+            channel,
+            communicationsOn,
+            canManageModules: comms?.canManage ?? false,
+            providers,
+            access,
+        });
+    const gates = { EMAIL: gateFor("EMAIL"), WHATSAPP: gateFor("WHATSAPP") };
     const consentByChannel = consents.reduce<
         Partial<Record<MessageChannel, ConsentStatus>>
     >((acc, c) => {
@@ -134,33 +169,46 @@ export default async function LeadDetailPage({
                 </div>
             </div>
 
-            <div className="mb-8 grid gap-4 rounded-lg border p-4">
-                <div className="grid gap-2">
-                    <h2 className="text-sm font-medium">Send a message</h2>
-                    {contactId ? (
-                        <MessageComposer
-                            leadId={lead.id}
-                            contactId={contactId}
-                            consent={consentByChannel}
-                        />
-                    ) : (
-                        <p className="text-sm text-muted-foreground">
-                            Link a contact to this lead to send a message.
-                        </p>
+            {gates.EMAIL.kind === "off" ? (
+                // Communications off: nothing can be sent or consented to
+                // here. Someone who may turn it on is told where; anyone
+                // else sees no composer at all.
+                gates.EMAIL.canManage ? (
+                    <div className="mb-8 grid gap-2 rounded-lg border p-4">
+                        <h2 className="text-sm font-medium">Send a message</h2>
+                        <ComposerNotice gate={gates.EMAIL} />
+                    </div>
+                ) : null
+            ) : (
+                <div className="mb-8 grid gap-4 rounded-lg border p-4">
+                    <div className="grid gap-2">
+                        <h2 className="text-sm font-medium">Send a message</h2>
+                        {contactId ? (
+                            <MessageComposer
+                                leadId={lead.id}
+                                contactId={contactId}
+                                consent={consentByChannel}
+                                gates={gates}
+                            />
+                        ) : (
+                            <p className="text-sm text-muted-foreground">
+                                Link a contact to this lead to send a message.
+                            </p>
+                        )}
+                    </div>
+                    {contactId && (
+                        <div className="grid gap-2 border-t pt-4">
+                            <h2 className="text-sm font-medium">
+                                Consent &amp; unsubscribe
+                            </h2>
+                            <ConsentToggle
+                                contactId={contactId}
+                                consent={consentByChannel}
+                            />
+                        </div>
                     )}
                 </div>
-                {contactId && (
-                    <div className="grid gap-2 border-t pt-4">
-                        <h2 className="text-sm font-medium">
-                            Consent &amp; unsubscribe
-                        </h2>
-                        <ConsentToggle
-                            contactId={contactId}
-                            consent={consentByChannel}
-                        />
-                    </div>
-                )}
-            </div>
+            )}
 
             <h2 className="mb-3 text-lg font-semibold">Messages</h2>
             <div className="mb-8">
