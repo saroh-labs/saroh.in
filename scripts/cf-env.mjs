@@ -11,6 +11,7 @@
  *
  *   node scripts/cf-env.mjs apps/accounts.saroh.in development
  *   node scripts/cf-env.mjs apps/accounts.saroh.in production
+ *   node scripts/cf-env.mjs --routes apps/accounts.saroh.in production
  *
  * Only `vars` (settings that aren't secret). Secrets come from GitHub and are
  * never printed.
@@ -57,7 +58,26 @@ export function appVars(appDir, environment) {
     );
 }
 
+/** The routes a deploy gives the Worker: `[{ pattern, zone_name }]`. */
+export function appRoutes(appDir, environment) {
+    const config = parseJsonc(
+        readFileSync(join(appDir, "wrangler.jsonc"), "utf8"),
+    );
+    const routes =
+        environment === "production"
+            ? config.env?.production?.routes
+            : config.routes;
+    return Array.isArray(routes) ? routes : [];
+}
+
 if (import.meta.url === `file://${process.argv[1]}`) {
+    // `--routes`: "zone pattern" lines for the deploy's fail-open step.
+    if (process.argv[2] === "--routes") {
+        for (const r of appRoutes(process.argv[3], process.argv[4])) {
+            console.log(`${r.zone_name} ${r.pattern}`);
+        }
+        process.exit(0);
+    }
     const [appDir, environment] = process.argv.slice(2);
     if (!appDir || !environment) {
         console.error(

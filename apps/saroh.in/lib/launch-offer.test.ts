@@ -17,6 +17,10 @@ const env = vi.hoisted(() => {
     return e;
 });
 vi.mock("@/env", () => ({ env }));
+// Retries without waiting (the delays are `build-retry.ts`'s own concern).
+vi.mock("./build-retry", () => ({
+    withBuildRetries: <T>(read: () => Promise<T>) => read(),
+}));
 
 type FetchInit = RequestInit;
 

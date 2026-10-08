@@ -1,3 +1,4 @@
+// @vitest-environment jsdom
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 
@@ -45,7 +46,10 @@ describe("ContactSummary", () => {
                 })}
             />,
         );
-        const text = html.replace(/<[^>]+>/g, "").replace(/&amp;/g, "&");
+        // The text a reader sees, read by the DOM rather than by stripping
+        // tags with a regex.
+        const text = new DOMParser().parseFromString(html, "text/html").body
+            .textContent;
         expect(text).toContain("Rao & Co");
         expect(text).toContain("· 1 open lead");
         expect(text).toMatch(/· Last order .*499/);

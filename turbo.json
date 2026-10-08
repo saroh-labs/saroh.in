@@ -109,6 +109,19 @@
     "tasks": {
         "build": {
             "dependsOn": ["^build"],
+            // What a build reads, so its hash is the app's build fingerprint:
+            // tests, stories and docs change nothing that ships, so they
+            // neither break the cache nor deploy an app (scripts/cf-plan.mjs).
+            "inputs": [
+                "$TURBO_DEFAULT$",
+                "!**/*.test.{ts,tsx,js,mjs}",
+                "!**/*.spec.{ts,tsx,js,mjs}",
+                "!**/*.stories.{ts,tsx}",
+                "!**/__tests__/**",
+                "!**/*.md",
+                "!**/vitest.config.*",
+                "!**/jest.config.*"
+            ],
             "outputs": ["dist/**", ".next/**", "!.next/cache/**"]
         },
         "db:migrate:deploy": {},
