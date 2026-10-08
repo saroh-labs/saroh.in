@@ -1,4 +1,5 @@
 import "@saroh/ui/globals.css";
+import { Toaster } from "@saroh/ui/sonner";
 import { ThemeProvider } from "@saroh/ui/theme-provider";
 import type { Metadata } from "next";
 import localFont from "next/font/local";
@@ -66,6 +67,9 @@ export default function RootLayout({
                     disableTransitionOnChange
                 >
                     {children}
+                    {/* The one toaster (`@saroh/ui/toast`): a change's
+                        confirmation and its Undo, as Releases says them. */}
+                    <Toaster />
                 </ThemeProvider>
             </body>
         </html>

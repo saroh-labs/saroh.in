@@ -48,6 +48,8 @@ export function OperatorDialog({
     reasonRequired = true,
     disabled = false,
     disabledReason,
+    quickReasons,
+    reasonLabel = "Reason (kept in the audit trail)",
     onSubmit,
 }: {
     trigger: string;
@@ -72,6 +74,12 @@ export function OperatorDialog({
     reasonRequired?: boolean;
     disabled?: boolean;
     disabledReason?: string;
+    /**
+     * Common reasons, one tap each. A tap fills the field, which stays
+     * editable, so detail can be added before it goes on the record.
+     */
+    quickReasons?: readonly string[];
+    reasonLabel?: string;
     onSubmit: (
         input: OperatorSubmit,
     ) => Promise<{ ok: boolean; error?: string }>;
@@ -155,8 +163,29 @@ export function OperatorDialog({
                         {reasonRequired && (
                             <div className="grid gap-1.5">
                                 <Label htmlFor={`${id}-reason`}>
-                                    Reason (kept in the audit trail)
+                                    {reasonLabel}
                                 </Label>
+                                {quickReasons && quickReasons.length > 0 && (
+                                    <div className="flex flex-wrap gap-2">
+                                        {quickReasons.map((quick) => (
+                                            <Button
+                                                key={quick}
+                                                type="button"
+                                                size="sm"
+                                                variant={
+                                                    reason === quick
+                                                        ? "secondary"
+                                                        : "outline"
+                                                }
+                                                aria-pressed={reason === quick}
+                                                disabled={pending}
+                                                onClick={() => setReason(quick)}
+                                            >
+                                                {quick}
+                                            </Button>
+                                        ))}
+                                    </div>
+                                )}
                                 <Textarea
                                     id={`${id}-reason`}
                                     value={reason}

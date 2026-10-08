@@ -3331,6 +3331,31 @@ against a concurrent twin; insert-or-skip on the unique key instead.
 `feature-flags.service.db.spec.ts` forces two businesses on at once.
 **Category**: backend · `apps/api.saroh.in/src/modules/feature-flags/feature-flags.service.ts`
 
+## Security — CodeQL on the 8 Oct release (#901): two alerts from the site-trackers batch
+
+**Symptom**: the release PR (#901) failed CodeQL with 2 high alerts in code
+that #902 (site verification and trackers) brought in: `js/incomplete-sanitization`
+at `packages/block-contract/src/site-tracking.ts` and
+`js/incomplete-url-substring-sanitization` at `e2e/tests/site-trackers.spec.ts`.
+**Root cause**:
+
+- `extractVerificationCode` built a RegExp from a meta tag name and escaped only
+  `.` and `:`, the characters today's four names contain. A name added later
+  with `+`, `(` or `[` would have changed what the pattern matches.
+- The browser spec decided a request went to Google with
+  `u.includes("googletagmanager.com")`, which a look-alike host or a path
+  containing that text would also pass.
+  **Fix**: the name is escaped for every regex special character
+  (`/[.*+?^${}()|[\]\\]/g`). The spec parses each URL and checks the hostname
+  (`googletagmanager.com` or a subdomain of it, never a look-alike) and, where it
+  matters, the path and `id` query. The Plausible check does the same. Shipped
+  in batch-2026-10-08-9 (#903).
+  **Rule**: build a RegExp from a string only through a full escape, never a
+  hand-picked character class; and in tests as well as code, decide a URL's
+  host with `new URL(u).hostname`, never a substring. CodeQL runs only on PRs to
+  `main` (see the #772 entry), so a batch can pass `development` with these in it.
+  **Category**: security · CodeQL · `packages/block-contract/src/site-tracking.ts` · e2e
+
 ## Security — CodeQL stopped the 8 Oct release on six alerts
 
 **Symptom**: the release PR (#881) failed CodeQL with 1 critical and 5 high

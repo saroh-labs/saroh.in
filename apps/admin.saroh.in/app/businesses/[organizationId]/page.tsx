@@ -121,11 +121,14 @@ export default async function BusinessPage({
                         </CardHeader>
                         <CardContent className="grid gap-3">
                             <p className="max-w-[68ch] text-sm text-muted-foreground">
-                                Read-only, for thirty minutes, and written into
-                                the trail with your name and reason on it. You
-                                see what an operator needs — people, modules,
-                                plan, activity — and never the business&rsquo;s
-                                own customers.
+                                A business&rsquo;s details are its own, so every
+                                look inside one is on the record: pick or write
+                                a reason, and the details open read-only for
+                                thirty minutes, written into the audit trail
+                                with your name and reason. You see what an
+                                operator needs — people, modules, plan,
+                                trackers, activity — and never the
+                                business&rsquo;s own customers.
                             </p>
                             <OpenAccess organizationId={organizationId} />
                         </CardContent>

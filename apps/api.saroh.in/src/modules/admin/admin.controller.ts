@@ -85,7 +85,7 @@ export class AdminController {
     @Get("flags/:flagKey/history")
     @RequireAdminPermission(AdminPermission.FlagsRead)
     async history(@Param("flagKey") flagKey: string) {
-        return this.flags.history(assertKnownFlag(flagKey));
+        return this.adminFlags.history(assertKnownFlag(flagKey));
     }
 
     /**

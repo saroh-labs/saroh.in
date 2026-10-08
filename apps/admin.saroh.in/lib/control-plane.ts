@@ -29,6 +29,9 @@ export interface AdminFlag {
     key: string;
     /** What it is for, who owns it, and when it should go. */
     metadata: {
+        /** The name a business sees ("Payments"), under the code key. */
+        shownAs: string;
+        group: "module" | "feature" | "safety" | "migration";
         purpose: string;
         owner: string;
         reviewBy: string;
@@ -52,9 +55,13 @@ export interface AdminOrganization {
 export interface FlagChange {
     id: string;
     organizationId: string | null;
+    /** `null` for a change to everyone's default. */
+    organizationName: string | null;
     previousValue: boolean | null;
     newValue: boolean;
     actorUserId: string;
+    /** The operator's name, else email; `null` when the account is gone. */
+    actorName: string | null;
     reason: string | null;
     createdAt: string;
 }

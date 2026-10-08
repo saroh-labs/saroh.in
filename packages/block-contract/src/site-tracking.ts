@@ -164,7 +164,12 @@ export function extractVerificationCode(
     pasted: string,
 ): string {
     const text = pasted.trim();
-    const name = VERIFICATION_META_NAMES[service].replace(/[.:]/g, "\\$&");
+    // Every regex special character escaped, not only the ones today's names
+    // use: a name added later must never change what the pattern matches.
+    const name = VERIFICATION_META_NAMES[service].replace(
+        /[.*+?^${}()|[\]\\]/g,
+        "\\$&",
+    );
     const tag = new RegExp(
         `<meta[^>]*name=["']${name}["'][^>]*content=["']([^"']+)["']|<meta[^>]*content=["']([^"']+)["'][^>]*name=["']${name}["']`,
         "i",
