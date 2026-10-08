@@ -134,7 +134,13 @@ if [ -n "$TREE" ]; then
     done
 fi
 
-W=$(mktemp -d -t prepush)
+# A template with its X's works on GNU and BSD mktemp alike; `-t prepush`
+# fails on Linux, and every step then reports a FAIL it never ran. Lost
+# once to a merge that kept the old line (DEV_LEARNINGS), so stop loudly.
+W=$(mktemp -d "${TMPDIR:-/tmp}/prepush.XXXXXX") || {
+    echo "prepush: could not make its log directory" >&2
+    exit 1
+}
 LOG=$W/step.log
 FAILED=""
 # cached <step> [<step that also counts>…]
@@ -623,7 +629,7 @@ e2e_start() {
     [ -n "$(git status --porcelain)" ] && \
         echo "    (uncommitted changes are not in the browser run: it tests HEAD)"
     SHA=$(git rev-parse HEAD)
-    E2E_LOGS=$(mktemp -d -t prepush-e2e-logs)
+    E2E_LOGS=$(mktemp -d "${TMPDIR:-/tmp}/prepush-e2e-logs.XXXXXX")
     [ "$E2E_STATUS" = run ] &&
         echo "=== e2e (in the background) $(echo "$specs" | wc -w | tr -d ' ') spec files, desk + phone"
     [ "$PERM_STATUS" = run ] &&
@@ -799,6 +805,7 @@ bg_step blocks pnpm run check:blocks
 bg_step cycles pnpm run check:cycles
 bg_step e2e-covers pnpm run check:e2e-covers
 bg_step migration-ids pnpm run check:migration-ids
+bg_step mktemp pnpm run check:mktemp
 
 # Unit tests. The quick run takes only the specs the change reaches; --int and
 # --all run the full suites. As CI: the api's unit tests mock the environment,
