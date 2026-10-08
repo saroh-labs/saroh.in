@@ -3,6 +3,8 @@ import { parseCatalog } from "@saroh/pricing-catalog";
 
 import { env } from "@/env";
 
+import { withBuildRetries } from "./build-retry";
+
 /**
  * Saroh's own pricing, read from api.saroh.in's published catalogue (plans
  * catalogue U24, KTD-10, KTD-E2). Nothing about a price, a limit or a plan's
@@ -60,7 +62,8 @@ export async function readLivePricing(
 ): Promise<Catalog | null> {
     const api = env.API_URL;
     if (!api) return null;
-    try {
+    const deploying = building() && Boolean(env.VERCEL_ENV);
+    const once = async (): Promise<Catalog | null> => {
         const res = await fetcher(`${api}/public/pricing`, {
             headers: { accept: "application/json" },
             // Read once, when the page is built: the site is static, and a
@@ -71,8 +74,12 @@ export async function readLivePricing(
         if (res.status === 404) return null;
         if (!res.ok) throw new Error(`GET /public/pricing: ${res.status}`);
         return parsePricingResponse(await res.json()).catalog;
+    };
+    try {
+        // A deployment's build rides out an API restart (`build-retry.ts`).
+        return deploying ? await withBuildRetries(once) : await once();
     } catch (err) {
-        if (!(building() && env.VERCEL_ENV)) {
+        if (!deploying) {
             console.warn(
                 "[pricing] the catalogue could not be read; showing the placeholder",
                 err instanceof Error ? err.message : err,
