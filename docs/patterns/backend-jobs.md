@@ -280,6 +280,31 @@ nobody was told. Round-2 A14 closed it (`bookings/booking-notify.handler.ts`).
 - A queued job still runs with `SITE_TEST_RELEASES` off (KTD-16): it is a
   go-live the merchant was told would happen.
 
+## Site page cache — **Current** (#863)
+
+- **`site.pages.revalidate`** tells the merchant sites' Worker which kept
+  pages to stop serving (`sites/page-cache.job.ts`). The payload names
+  sites (`siteIds`), products (`productIds`) or stock rows
+  (`stockLevelIds`), plus the business when the products may be gone (a
+  delete); the handler resolves them, as they stand, into the tags the
+  renderer keeps pages under (`site:<id>`, `site:<id>:products`,
+  `site:<id>:product:<id>`) and POSTs them, signed with
+  `SITE_RELAY_SECRET`. A 2xx or nothing to name ends it; anything else
+  throws and is retried. Queued only while `SITE_PAGE_CACHE` is `on`.
+- **Who queues it** (`sites/page-cache-revalidate.ts`): `putLive` (every
+  publish, restore and go-live), a web-address change, a post published,
+  unpublished or deleted, trackers saved or switched by Saroh, and the
+  catalogue. **Stock is heard at its locks:** every flow that changes a
+  stock row or how a product counts takes `lockStockLevels`, `lockProduct`
+  or `lockProducts` (`products/stock-levels.ts`, the lock order), and those
+  queue on the same transaction, once per row or product per transaction.
+  A new stock writer that keeps the lock order is covered; one that skips
+  it isn't. `page-cache-triggers.spec.ts` pins the rest. A price or detail
+  saved outside a transaction queues after its write.
+- **A business with no live site still queues** on a stock change: knowing
+  would cost a read in the hottest stock paths, so the handler finds no
+  site and ends. The one place the "never enqueue a no-op" rule bends.
+
 ## Plan limit notices — **Current** (plans catalogue U13)
 
 - **`plan.limit.notice`** tells a business it has used 80% of a plan

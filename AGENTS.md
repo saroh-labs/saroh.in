@@ -62,6 +62,7 @@ the right-hand files **before** writing code.
 | Agree a product or architecture decision with the user — write it down the same day                        | `docs/architecture/DECISIONS.md` · `docs/architecture/adr/` · `00-universal.md` §13            |
 | Add a route, page, layout, component or `lib/` module in a Next app                                        | `docs/patterns/frontend-app-structure.md` · `.agents/skills/saroh-architecture/SKILL.md`       |
 | Read or write API data from a Next app, or add client or URL state                                         | `docs/patterns/frontend-data-and-state.md`                                                     |
+| Add a merchant-site page or read, or an API write that changes what a published page shows                 | `docs/patterns/frontend-data-and-state.md` → page cache · `docs/patterns/backend-jobs.md`      |
 | Build or change a form                                                                                     | `docs/patterns/frontend-forms.md`                                                              |
 | Show a toast, an error, or an empty, loading or failed state                                               | `docs/patterns/frontend-error-feedback.md` · `.agents/skills/saroh-product-states/SKILL.md`    |
 | Touch session handling, `packages/auth`, or anything that redirects to sign-in                             | `docs/patterns/frontend-error-feedback.md` · `docs/patterns/backend-auth-and-access.md`        |
