@@ -177,15 +177,15 @@ export class FeatureFlagService {
             // first: the value an unconfigured flag already resolves to, so
             // no other organization changes. It is a write like any other,
             // so it is audited: the history shows when the global default
-            // came to exist and why.
-            const flag = await tx.featureFlag.findUnique({
-                where: { key },
-                select: { key: true },
+            // came to exist and why. Two first overrides at once (two
+            // businesses forced on together) both find no row; skipping the
+            // duplicate lets the second wait for the first and go on, rather
+            // than fail the key's unique index with a 500.
+            const registered = await tx.featureFlag.createMany({
+                data: [{ key, enabledByDefault: false }],
+                skipDuplicates: true,
             });
-            if (!flag) {
-                await tx.featureFlag.create({
-                    data: { key, enabledByDefault: false },
-                });
+            if (registered.count === 1) {
                 await tx.featureFlagAudit.create({
                     data: {
                         flagKey: key,
