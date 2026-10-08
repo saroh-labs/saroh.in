@@ -61,6 +61,7 @@ export function SubscriptionsScreen({
     canWrite,
     initialTab,
     openSubscribe,
+    subscribePlanId,
     nowIso,
     settings = null,
     autopayOffered = false,
@@ -81,8 +82,10 @@ export function SubscriptionsScreen({
     renewNote: { text: string; late: boolean } | null;
     canWrite: boolean;
     initialTab: ScreenTab;
-    /** `?subscribe=1`, from the command menu. */
+    /** `?subscribe=1`, from the command menu or a plan's page. */
     openSubscribe?: boolean;
+    /** `&plan=…`: the plan the dialog opens on (UX-080). */
+    subscribePlanId?: string;
     nowIso: string;
     /** "Members can pause from their account" (A8); null when unread. */
     settings?: SubscriptionSettings | null;
@@ -113,6 +116,7 @@ export function SubscriptionsScreen({
         if (open || !openSubscribe) return;
         const url = new URL(window.location.href);
         url.searchParams.delete("subscribe");
+        url.searchParams.delete("plan");
         router.replace(url.pathname + url.search, { scroll: false });
     }
 
@@ -368,6 +372,15 @@ export function SubscriptionsScreen({
                     onOpenChange={onSubscribeOpenChange}
                     contacts={contacts}
                     plans={plans}
+                    initialPlanId={
+                        plans.some(
+                            (p) =>
+                                p.id === subscribePlanId &&
+                                p.status === "ACTIVE",
+                        )
+                            ? subscribePlanId
+                            : undefined
+                    }
                     autopayOffered={autopayOffered}
                 />
             ) : null}

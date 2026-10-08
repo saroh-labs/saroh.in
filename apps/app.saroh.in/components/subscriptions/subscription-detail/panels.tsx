@@ -7,6 +7,7 @@ import Link from "next/link";
 import { useState } from "react";
 
 import type { ChargeRow, CollectionRow } from "@/lib/subscriptions/view";
+import { chargeHref } from "@/lib/subscriptions/view";
 
 import { Pill } from "../pill";
 
@@ -140,7 +141,7 @@ export function ChargesCard({
                         </span>
                         {c.number ? (
                             <Link
-                                href={`/billing/invoices/${c.id}`}
+                                href={chargeHref(c.id)}
                                 className="font-mono text-[11.5px] text-brand transition-colors hover:text-foreground active:text-muted-foreground"
                             >
                                 {c.number}

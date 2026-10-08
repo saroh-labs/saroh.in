@@ -27,6 +27,19 @@ import {
 /** Plans, as a tab of Subscriptions (D3): where Plan Detail goes back to. */
 export const PLANS_HREF = "/billing/subscriptions?tab=plans";
 
+/**
+ * "Subscribe someone" from a plan's page (UX-080): Subscriptions with the
+ * dialog open on this plan. Null for a plan nobody can join (a draft or
+ * archived one), whose page offers none.
+ */
+export function subscribeHref(plan: {
+    id: string;
+    status: string;
+}): string | null {
+    if (plan.status !== "ACTIVE") return null;
+    return `/billing/subscriptions?subscribe=1&plan=${encodeURIComponent(plan.id)}`;
+}
+
 export type DetailTab = "overview" | "subscribers" | "history";
 
 /** `?tab=subscribers|history`; the design's own `subs` is taken too. */

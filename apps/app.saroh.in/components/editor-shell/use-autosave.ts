@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 
+import { isTypingIn } from "@/lib/editor-shell/address";
 import { Autosave } from "@/lib/editor-shell/autosave";
 import type { SaveState } from "@/lib/editor-shell/state";
 import { initialSave } from "@/lib/editor-shell/state";
@@ -51,6 +52,15 @@ export function useAutosave<V>({
         live.current = { adapter, ready, hrefFor };
     });
 
+    /** A new record's edit page, until the address may move to it. */
+    const pendingHref = useRef<string | null>(null);
+    const moveAddress = useCallback(() => {
+        const href = pendingHref.current;
+        if (!href) return;
+        pendingHref.current = null;
+        window.history.replaceState(null, "", href);
+    }, []);
+
     const [ctrl] = useState(
         () =>
             new Autosave<V, EditorRecord<V>>({
@@ -81,16 +91,26 @@ export function useAutosave<V>({
                 setRecord(next);
                 if (created) {
                     setFirstSave(true);
-                    window.history.replaceState(
-                        null,
-                        "",
-                        live.current.hrefFor(next.id),
-                    );
+                    // The address waits while they type (UX-080): it
+                    // jumped from /new to /<id>/edit mid-word.
+                    pendingHref.current = live.current.hrefFor(next.id);
+                    if (!isTypingIn(document.activeElement)) moveAddress();
                 }
             },
         });
         return () => ctrl.dispose();
-    }, [ctrl]);
+    }, [ctrl, moveAddress]);
+
+    // Focus leaving every text field moves the address, once.
+    useEffect(() => {
+        const onFocusOut = () => {
+            window.setTimeout(() => {
+                if (!isTypingIn(document.activeElement)) moveAddress();
+            }, 0);
+        };
+        document.addEventListener("focusout", onFocusOut);
+        return () => document.removeEventListener("focusout", onFocusOut);
+    }, [moveAddress]);
 
     const edit = useCallback(
         (patch: Partial<V>) => {
@@ -122,6 +142,7 @@ export function useAutosave<V>({
         EditorRecord<V>
     > | null> => {
         if (!(await ctrl.flush())) return null;
+        moveAddress();
         const r = recordRef.current;
         if (!r) return null;
         const res = await live.current.adapter.publish(r.id, revision());
@@ -132,7 +153,7 @@ export function useAutosave<V>({
             ctrl.conflict(res.conflict);
         }
         return res;
-    }, [apply, ctrl, revision]);
+    }, [apply, ctrl, moveAddress, revision]);
 
     /** Discard changes: nothing more is sent, and the live values come back. */
     const discard = useCallback(async (): Promise<EditorResult<

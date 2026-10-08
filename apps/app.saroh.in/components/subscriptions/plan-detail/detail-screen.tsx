@@ -21,6 +21,7 @@ import {
     historyRows,
     includedText,
     planHeader,
+    subscribeHref,
     subscriberRows,
     subscribersEmptyText,
 } from "@/lib/subscriptions/plan-detail";
@@ -168,6 +169,7 @@ export function PlanDetail({
         router.refresh();
     }
 
+    const subscribeTo = subscribeHref(plan);
     const TABS: { key: DetailTab; label: string }[] = [
         { key: "overview", label: "Overview" },
         {
@@ -208,6 +210,19 @@ export function PlanDetail({
                         >
                             {head.archiveLabel}
                         </Button>
+                        {subscribeTo ? (
+                            // From the plan itself (UX-080): the dialog,
+                            // opened on this plan.
+                            <Button
+                                asChild
+                                variant="outline"
+                                className={cn(BTN, "coarse:h-11")}
+                            >
+                                <Link href={subscribeTo}>
+                                    Subscribe someone
+                                </Link>
+                            </Button>
+                        ) : null}
                         <Button asChild className={cn(BTN, "coarse:h-11")}>
                             <Link href={editHref(plan.id)}>Edit plan</Link>
                         </Button>

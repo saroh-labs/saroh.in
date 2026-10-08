@@ -13,6 +13,7 @@ import type {
     SubscriptionCharge,
 } from "@/lib/subscriptions/service";
 import {
+    chargeHref,
     chargeRow,
     collectionRows,
     dayText,
@@ -235,9 +236,13 @@ function Body({
                 {charges.state === "ok" ? (
                     last.length ? (
                         last.map((c) => (
-                            <div
+                            // Each charge opens its invoice (UX-080), as
+                            // the subscription's own page does.
+                            <Link
                                 key={c.id}
-                                className="flex items-baseline gap-2.5 border-t border-border/70 py-[7px]"
+                                href={chargeHref(c.id)}
+                                aria-label={`${c.number ?? "Invoice"} · ${c.date} · ${c.result} · ${c.amount}`}
+                                className="-mx-1.5 flex items-baseline gap-2.5 rounded-[6px] border-t border-border/70 px-1.5 py-[7px] transition-colors duration-fast hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring active:bg-accent-active coarse:min-h-11 coarse:items-center"
                             >
                                 <span className="w-[60px] shrink-0 text-[12.5px] text-muted-foreground">
                                     {c.date}
@@ -247,7 +252,7 @@ function Body({
                                 <span className="font-semibold tabular-nums">
                                     {c.amount}
                                 </span>
-                            </div>
+                            </Link>
                         ))
                     ) : (
                         <p className="border-t border-border/70 py-2 text-[12.5px] text-muted-foreground">

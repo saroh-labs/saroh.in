@@ -78,9 +78,15 @@ type Tx = Prisma.TransactionClient;
  */
 export interface LinkOptions {
     requireProvider: boolean;
+    /**
+     * A paid invoice may have one too (UX-080): Invoice Detail's "Copy view
+     * link", so the merchant can hand over the paid invoice. Only a link
+     * that takes no money; a pay link is still refused once it is paid.
+     */
+    allowPaid?: boolean;
 }
 const PAY_LINK: LinkOptions = { requireProvider: true };
-const VIEW_LINK: LinkOptions = { requireProvider: false };
+const VIEW_LINK: LinkOptions = { requireProvider: false, allowPaid: true };
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 const LIST_LIMIT = 500;
@@ -313,7 +319,10 @@ export class InvoicesService {
         const ctx = { organizationId };
         const current = await this.read(ctx.organizationId, id, db);
         this.assertOwnPaper(current, "given a pay link");
-        if (current.status !== "ISSUED") {
+        // A view link may hand over a paid invoice too (UX-080).
+        const paidView =
+            options.allowPaid === true && current.status === "PAID";
+        if (current.status !== "ISSUED" && !paidView) {
             throw new ConflictException(
                 current.status === "DRAFT"
                     ? "Issue the invoice before sharing a pay link."
@@ -336,7 +345,7 @@ export class InvoicesService {
             where: {
                 id,
                 organizationId: ctx.organizationId,
-                status: "ISSUED",
+                status: paidView ? "PAID" : "ISSUED",
                 orderId: null,
                 kind: { not: "CREDIT_NOTE" },
             },
