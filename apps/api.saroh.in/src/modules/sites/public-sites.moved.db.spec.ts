@@ -13,6 +13,7 @@ import { prisma } from "@saroh/database";
 
 import { FixedWindowRateLimiter } from "../bookings/rate-limiter";
 import type { PublicFooterService } from "./public-footer.service";
+import type { PublicHeadService } from "./public-head.service";
 import { PublicSitesController } from "./public-sites.controller";
 import type { PublicVisitService } from "./public-visit.service";
 import { siteMovedTo } from "./site-moved";
@@ -134,6 +135,7 @@ describe("where an old address forwards", () => {
             {} as SitePreviewLinksService,
             {} as PublicVisitService,
             {} as PublicFooterService,
+            {} as PublicHeadService,
         );
         await expect(
             controller.moved(old, "203.0.113.9", undefined),
