@@ -1,6 +1,8 @@
 import type { LaunchOfferTerms } from "@/content/waitlist";
 import { env } from "@/env";
 
+import { withBuildRetries } from "./build-retry";
+
 /**
  * The launch offer, read from api.saroh.in (`GET /public/waitlist/offer`,
  * marketing plan U31): the plan the opening-day invites put a business on,
@@ -40,7 +42,9 @@ export async function readLaunchOffer(
 ): Promise<LaunchOfferTerms | null> {
     const api = env.API_URL;
     if (!api) return null;
-    try {
+    const deploying =
+        env.NEXT_PHASE === "phase-production-build" && Boolean(env.VERCEL_ENV);
+    const once = async (): Promise<LaunchOfferTerms | null> => {
         const res = await fetcher(`${api}/public/waitlist/offer`, {
             headers: { accept: "application/json" },
             // Read once, when the page is built (the site is static).
@@ -53,12 +57,14 @@ export async function readLaunchOffer(
         const offer = parseLaunchOffer(await res.json());
         if (!offer) throw new Error("The launch offer answer is malformed");
         return offer;
+    };
+    try {
+        // A deployment's build rides out an API restart (`build-retry.ts`).
+        return deploying ? await withBuildRetries(once) : await once();
     } catch (err) {
         // A deployment's build fails rather than publish the placeholder over
         // a real offer (the site is static; see `readLivePricing`).
-        if (env.NEXT_PHASE === "phase-production-build" && env.VERCEL_ENV) {
-            throw err;
-        }
+        if (deploying) throw err;
         console.warn(
             "[waitlist] the launch offer could not be read; showing the placeholder",
             err instanceof Error ? err.message : err,
