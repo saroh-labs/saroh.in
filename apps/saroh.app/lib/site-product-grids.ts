@@ -2,6 +2,7 @@ import type { ProductGridFeed } from "@saroh/site-blocks";
 import { productCardsOf, productGridQuery } from "@saroh/site-blocks";
 
 import { shopFetch } from "./catalogue";
+import { dontCachePage, listsProducts } from "./page-cache/site-rules";
 import { productGridFeeds } from "./product-grid-feed";
 
 /**
@@ -16,9 +17,16 @@ async function getGridProducts(
     siteId: string,
     query: string,
 ): Promise<ProductGridFeed["products"]> {
+    // Its cards' prices and stock are on the page (#863).
+    listsProducts(siteId);
     const res = await shopFetch(
         `${encodeURIComponent(siteId)}/shop/products?${query}`,
     );
+    // A shop that isn't open is an empty grid, as kept as any page; a read
+    // that failed is not what every visitor should see for minutes.
+    if (!res || (!res.ok && res.status !== 404)) {
+        dontCachePage("grid unavailable");
+    }
     if (!res?.ok) return [];
     return productCardsOf(await res.json().catch(() => null)) ?? [];
 }

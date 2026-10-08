@@ -10,6 +10,7 @@ import {
 import { PublishedPage } from "@/components/published-page";
 import { getCatalogue } from "@/lib/catalogue";
 import { isFreePage, moduleLabel, moduleRoute } from "@/lib/module-pages";
+import { dontCachePage, listsProducts } from "@/lib/page-cache/site-rules";
 import type { PublicationSnapshot } from "@/lib/publication";
 import { findPageByPath, getSiteForHost, postsPrefix } from "@/lib/publication";
 import { getCheckoutOptions } from "@/lib/shop-checkout";
@@ -109,8 +110,11 @@ export default async function ShopPage({
     ]);
     if (!lookup.ok) {
         if (lookup.reason === "missing") notFound();
+        dontCachePage("shop unavailable");
         return <ShopUnavailable business={snapshot.site.name} />;
     }
+    // Every listed product's price and stock is on this page (#863).
+    listsProducts(siteId);
     // Each card's Add to bag (the design's shop), only where the site takes
     // online orders now; otherwise the cards open the product, whose page
     // offers "Ask about ordering".
