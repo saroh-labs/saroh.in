@@ -3322,6 +3322,7 @@ when this request made it.
 against a concurrent twin; insert-or-skip on the unique key instead.
 `feature-flags.service.db.spec.ts` forces two businesses on at once.
 **Category**: backend · `apps/api.saroh.in/src/modules/feature-flags/feature-flags.service.ts`
+
 ## Security — CodeQL stopped the 8 Oct release on six alerts
 
 **Symptom**: the release PR (#881) failed CodeQL with 1 critical and 5 high
@@ -3348,3 +3349,19 @@ alerts in code it changed.
   `no-super-linear-move` catch the regex cases; they flag 53 existing places,
   so turning them on is its own task.
   **Category**: security · CodeQL on PRs (`.github` code scanning)
+
+## Tooling — prepush failed every step on Linux again
+
+**Symptom**: `pnpm prepush` printed `mktemp: too few X's in template
+'prepush'`, then FAIL for every step in about five seconds, none of them run
+(8 Oct 2026).
+**Root cause**: the 3 Oct fix (`mktemp -d "${TMPDIR:-/tmp}/prepush.XXXXXX"`)
+was undone by two branch merges (`34fb8004`, `59dc3265`) that kept the
+branch's older `mktemp -d -t prepush`. BSD mktemp takes `-t prefix`; GNU
+needs the X's. Nothing ran prepush on Linux to notice: CI runs its own steps.
+**Fix**: the X template again, and prepush stops with one clear line when it
+cannot make its log directory.
+**Rule**: a fix that only a developer's own machine would notice needs a
+check CI runs. `pnpm run check:mktemp` (prepush and CI) fails on any `mktemp
+-t` without X's in `scripts/` and `.husky/`.
+**Category**: tooling · `scripts/prepush.sh`, `scripts/check-mktemp.mjs`
