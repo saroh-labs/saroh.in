@@ -7,6 +7,7 @@
         "check:catalog-lock": "node scripts/check-catalog-lock.mjs",
         "check:cycles": "madge --circular --extensions ts,tsx --exclude 'node_modules|\\.next|dist|\\.turbo' apps packages",
         "check:edge-headers": "node scripts/check-edge-headers.mjs",
+        "check:security-headers": "node scripts/check-security-headers.mjs",
         "check:e2e-covers": "node scripts/e2e-affected.mjs --check",
         "check:migration-ids": "node scripts/check-migration-ids.mjs",
         "check:mktemp": "node scripts/check-mktemp.mjs",

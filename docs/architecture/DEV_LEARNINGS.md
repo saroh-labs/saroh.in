@@ -3384,3 +3384,18 @@ other app.
 reads `x-real-ip` or `x-vercel-ip-*` without the Cloudflare header beside it.
 **Rule**: when a platform moves, grep for every header the old one wrote.
 **Category**: web · `apps/saroh.in/lib/waitlist-forward.ts`
+
+## Security — the websites sent no browser security headers
+
+**Symptom**: none reported. Found 8 Oct 2026 in a security review: the API
+sent the full set (Helmet), but www.saroh.in, app, accounts, admin and the
+merchant sites sent no HSTS, no framing rule and no `nosniff`, on Vercel and
+then on Cloudflare, and announced `X-Powered-By: Next.js`.
+**Root cause**: nothing set them. Next.js sends none by default, and each app
+only added headers for its own special pages.
+**Fix**: `SECURITY_HEADERS` on every path in each app's next.config, and
+`poweredByHeader: false`. Frames: `'self'` only (the editor's previews are
+same-origin). Merchant sites' HSTS has no `includeSubDomains`: on a merchant's
+own domain it would reach subdomains Saroh doesn't serve.
+**Check**: `pnpm run check:security-headers` (prepush and CI).
+**Category**: security · `apps/*/next.config.*`
