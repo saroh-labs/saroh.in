@@ -11,7 +11,7 @@ import {
  * The API refuses both routes without a valid signed `x-saroh-relay`
  * (401), so nobody can call it directly and skip this site. The relay is
  * therefore ALWAYS sent: the visitor's address from the platform's header
- * (`x-real-ip`, which Vercel's edge always writes), or, where there is
+ * (`cf-connecting-ip`, which Cloudflare always writes), or, where there is
  * none — a local or browser-test stack with no edge in front — a fixed
  * stand-in, so those visitors share one limit. Without a secret the
  * routes can't sign anything, and answer `unavailable` (503) with a logged

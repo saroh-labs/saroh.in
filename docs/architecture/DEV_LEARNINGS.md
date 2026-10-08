@@ -3365,3 +3365,22 @@ cannot make its log directory.
 check CI runs. `pnpm run check:mktemp` (prepush and CI) fails on any `mktemp
 -t` without X's in `scripts/` and `.husky/`.
 **Category**: tooling · `scripts/prepush.sh`, `scripts/check-mktemp.mjs`
+
+## Marketing site — on Cloudflare, the waitlist lost the visitor's address and country
+
+**Symptom**: none reported. Found 8 Oct 2026 while removing what was left of
+Vercel, a day after www.saroh.in moved to a Cloudflare Worker.
+**Root cause**: `visitorAddress` and `visitorCountry`
+(`apps/saroh.in/lib/waitlist-forward.ts`) read `x-real-ip` and
+`x-vercel-ip-country`, which only Vercel's edge writes. On a Worker neither
+arrives, so a waitlist join carried no relay (the API counted every join
+against the Worker's address) and no country, and every link-preview call
+was counted against one stand-in address. The same miss as "Sites — behind
+Cloudflare, every visitor had Cloudflare's address" a day earlier, in the
+other app.
+**Fix**: read `cf-connecting-ip` and `cf-ipcountry` first (Cloudflare's
+`XX` and `T1` aren't countries); the Vercel headers stay as fallbacks.
+**Check**: `pnpm run check:edge-headers` (prepush and CI) fails when a file
+reads `x-real-ip` or `x-vercel-ip-*` without the Cloudflare header beside it.
+**Rule**: when a platform moves, grep for every header the old one wrote.
+**Category**: web · `apps/saroh.in/lib/waitlist-forward.ts`

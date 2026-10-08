@@ -170,6 +170,10 @@ jobs:
       - name: Catalog pins match the lockfile
         run: pnpm run check:catalog-lock
 
+      # The visitor's address and country come from Cloudflare's headers.
+      - name: Visitor headers read Cloudflare's
+        run: pnpm run check:edge-headers
+
       # Merchant sites render off the --site-* layer only, and there is exactly
       # one renderer — gates G2 and G6 (#252).
       - name: Site blocks gate

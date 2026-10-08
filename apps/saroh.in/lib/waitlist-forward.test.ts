@@ -90,6 +90,20 @@ describe("forwardHeaders", () => {
         ).toEqual({ "Content-Type": "application/json" });
     });
 
+    it("reads Cloudflare's address first: behind it, x-real-ip isn't the visitor", () => {
+        expect(
+            visitorAddress(
+                new Headers({
+                    "cf-connecting-ip": "203.0.113.4",
+                    "x-real-ip": "172.70.1.1",
+                }),
+            ),
+        ).toBe("203.0.113.4");
+        expect(
+            visitorAddress(new Headers({ "cf-connecting-ip": "2001:db8::1" })),
+        ).toBe("2001:db8::1");
+    });
+
     it("ignores an address header that is not an address", () => {
         expect(
             visitorAddress(new Headers({ "x-real-ip": "<script>" })),
@@ -190,6 +204,26 @@ describe("visitorCountry", () => {
     it("reads the two letters Vercel's edge sets", () => {
         expect(visitorCountry(h("IN"))).toBe("IN");
         expect(visitorCountry(h(" us "))).toBe("US");
+    });
+
+    it("reads Cloudflare's country first", () => {
+        expect(
+            visitorCountry(
+                new Headers({
+                    "cf-ipcountry": "AE",
+                    "x-vercel-ip-country": "IN",
+                }),
+            ),
+        ).toBe("AE");
+    });
+
+    it("is unknown for Cloudflare's unknown and Tor codes", () => {
+        expect(
+            visitorCountry(new Headers({ "cf-ipcountry": "XX" })),
+        ).toBeUndefined();
+        expect(
+            visitorCountry(new Headers({ "cf-ipcountry": "T1" })),
+        ).toBeUndefined();
     });
 
     it("is unknown without the header, or with anything else in it", () => {
