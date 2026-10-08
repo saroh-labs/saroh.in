@@ -28,11 +28,24 @@ Signing in needs a staff grant or an address on the API's `ADMIN_ALLOWLIST`
   anything that takes one down, and mints one idempotency key per attempt.
   Bulk retries and replays use `BulkAction`, which always shows the dry run
   first.
+- **Deployments (`/deployments`, #886, DEC-107) are Platform Owners' only**,
+  through `deployments:run`, which no other role carries. A row per
+  Cloudflare app and environment shows the last successful deploy and the
+  latest run, read from GitHub Actions (the API holds no Cloudflare read
+  token, so the Worker's own `BUILD_FINGERPRINT` is not shown). Deploy is
+  the one write without an `OperatorDialog` for dev: it starts at once
+  (owner, 8 Oct). Production opens one that names the app and asks for its
+  Worker's name (`saroh-web`), which the API checks too. The API starts
+  `deploy-frontends.yml` with `SITE_DEPLOY_GITHUB_TOKEN`, rate-limits it per
+  app and environment and per operator, and writes `deployment.start` to the
+  audit trail for every start, and for every one the rate limit or GitHub
+  refused. A console deploy
+  always builds; merges still deploy only what changed.
 - **Server-only modules stay server-only.** `lib/control-plane.ts` and the
   modules that read through it (`businesses`, `staff`, `people`, `machinery`,
-  `waitlist`) import `next/headers`; a client component takes types from them,
+  `waitlist`, `deployments`) import `next/headers`; a client component takes types from them,
   never values. Client-safe words live in `lib/roles.ts`, `lib/modules.ts`,
-  `lib/format.ts`.
+  `lib/format.ts`, `lib/deployment-words.ts`.
 - **A business's details need a support session.** The session id lives in an
   httpOnly cookie per business (`accessCookieName`) and is sent as
   `x-admin-access-session`; without one the page shows the directory row and

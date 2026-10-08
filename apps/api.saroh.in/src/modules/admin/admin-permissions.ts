@@ -57,6 +57,10 @@ export const AdminPermission = {
     // Switch a site's trackers off, or back on, when a connected tool is
     // misused or a tag breaks the site (#897). Only staff turn them back on.
     OrganizationTrackersWrite: "organization:trackers:write",
+    // See and start deploys of the Cloudflare apps, dev and production
+    // (#886, DEC-107). Platform Owners only (owner, 8 Oct): no other role
+    // carries it.
+    DeploymentsRun: "deployments:run",
 } as const;
 
 export type AdminPermission =
