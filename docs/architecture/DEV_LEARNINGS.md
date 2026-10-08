@@ -12,6 +12,14 @@ mistaken for bureaucracy and removed.
 
 ---
 
+## Secrets scan — a fake key in a test fails the gate, and fixing the file isn't enough
+
+**Symptom** (8 Oct, batch-2026-10-08-6): `pnpm prepush`'s `secrets` step failed twice on test data: a fake `sk_live_…` in a validator test (stripe-access-token), then a test idempotency key and a fake `phx_…` (generic-api-key).
+**Cause**: gitleaks scans every commit of the batch, not the working tree. A fake key that looks real trips a rule, and a later commit that changes the line doesn't clear the commit that added it.
+**Fix**: rebuilt the local, unpushed commits with the line changed: built at run time (joined from parts), or kept as one constant carrying `// gitleaks:allow (why)` on the same line. Never `--no-verify` past it.
+**Rule**: A test that needs a key-shaped value (to prove it's refused, say) builds it at run time or marks its one line `// gitleaks:allow (reason)` in the commit that adds it. Run `pnpm prepush` before stacking more commits on a unit, so a flag is fixed in its own commit.
+**Category**: security · `scripts/prepush.sh` (gitleaks), test data
+
 ## Local dev — sign-in from an app refused, nothing in the API log
 
 **Problem**: An app started with `next dev -p <port>` could not sign in, and the
