@@ -49,12 +49,12 @@
         "DEV_ACCESS_COOKIE_DOMAIN": ".saroh.io",
         "DEV_REDIRECT_ORIGIN": "https://app.saroh.in",
         "API_URL": "https://api.saroh.io",
-        "ROOT_DOMAIN": "saroh.io",
+        "ROOT_DOMAIN": "saroh.dev",
         "NEXT_PUBLIC_ACCOUNTS_URL": "https://accounts.saroh.io",
         "NEXT_PUBLIC_API_URL": "https://api.saroh.io",
         "NEXT_PUBLIC_BETTER_AUTH_URL": "https://api.saroh.io",
         "NEXT_PUBLIC_CUSTOM_DOMAIN_TARGET": "sites.saroh.io",
-        "NEXT_PUBLIC_ROOT_DOMAIN": "saroh.io",
+        "NEXT_PUBLIC_ROOT_DOMAIN": "saroh.dev",
     },
     "env": {
         "production": {

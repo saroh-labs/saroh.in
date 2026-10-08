@@ -1,6 +1,6 @@
 // Cloudflare Worker for the merchant-site renderer, built by OpenNext
 // (`pnpm cf:build`). The top level is dev: `saroh-sites-dev` serves dev
-// businesses on <address>.saroh.io against the dev API. `env.production`
+// businesses on <address>.saroh.dev against the dev API. `env.production`
 // below is saroh.app's Worker.
 // The account comes from CLOUDFLARE_ACCOUNT_ID (a repository variable in CI;
 // set it locally to Saroh labs' id before `wrangler deploy`).
@@ -38,17 +38,20 @@
     // (it would copy the site onto a foreign domain and skip zone rules).
     "workers_dev": false,
     "preview_urls": false,
-    // Dev merchant sites: every <address>.saroh.io (one label, so the
-    // universal certificate covers it). The zone's own hosts (api, media)
-    // have "no Worker" routes and the other apps their own routes, which are
-    // more specific, so the wildcard never reaches them.
-    "routes": [{ "pattern": "*.saroh.io/*", "zone_name": "saroh.io" }],
+    // Dev merchant sites: <address>.saroh.dev, and the renderer's own apex
+    // saroh.dev (preview and review links), as saroh.app is in production
+    // (DEC-081, amended 8 Oct). Both one level deep, so the universal
+    // certificate covers them.
+    "routes": [
+        { "pattern": "saroh.dev/*", "zone_name": "saroh.dev" },
+        { "pattern": "*.saroh.dev/*", "zone_name": "saroh.dev" },
+    ],
     // Settings that aren't secret; the build reads them too (scripts/cf-env.mjs).
     // SITE_RELAY_SECRET is a Worker secret, from GitHub.
     "vars": {
         "API_URL": "https://api.saroh.io",
         "NEXT_PUBLIC_API_URL": "https://api.saroh.io",
-        "NEXT_PUBLIC_ROOT_DOMAIN": "saroh.io",
+        "NEXT_PUBLIC_ROOT_DOMAIN": "saroh.dev",
     },
     "env": {
         // Production (`wrangler deploy --env production`, from main):
