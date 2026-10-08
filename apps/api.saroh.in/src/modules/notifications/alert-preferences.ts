@@ -1,3 +1,4 @@
+import { isDiaryScoped } from "../bookings/own-diary";
 import { isLocationScoped } from "../orders/order-location";
 import type { OrgAction } from "../organizations/organization-actions";
 
@@ -115,7 +116,10 @@ export function alertEventOfType(type: string): AlertEvent | null {
  * A location's team (`roleKey`, DEC-074) reads only its own storefronts'
  * orders, and a New order alert goes to the whole business, whichever
  * storefront it came in at — so it isn't offered to them, and their
- * orders reach them on Orders and Home instead.
+ * orders reach them on Orders and Home instead. Calendar only (#868)
+ * reads only its own diary, and a booking alert names whoever booked with
+ * anyone, so the same holds for bookings: theirs reach them on the
+ * calendar and Home.
  */
 export function mayHearAbout(
     event: AlertEvent,
@@ -123,6 +127,7 @@ export function mayHearAbout(
     roleKey?: string | null,
 ): boolean {
     if (event === "order" && isLocationScoped(roleKey)) return false;
+    if (event === "booking" && isDiaryScoped(roleKey)) return false;
     return ALERT_READS[event].some(has);
 }
 

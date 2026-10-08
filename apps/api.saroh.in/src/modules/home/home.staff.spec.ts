@@ -8,6 +8,7 @@ import {
     isStaffView,
     onOneStore,
     readStaffNarrow,
+    seesBusinessBookings,
     storeSql,
     storeWhere,
 } from "./home-staff";
@@ -204,6 +205,22 @@ describe("readStaffNarrow", () => {
         const read = await readStaffNarrow(db as never, member());
         expect(read.narrow.staff).toBeNull();
         expect(read.staff.ownDiary).toBe(false);
+    });
+
+    it("never gives Calendar only the whole diary off it (#868)", async () => {
+        const { db } = fakeDb({ staffMember: null });
+        const calendarOnly = {
+            ...member(),
+            organizationRoleKey: "calendar-only",
+        };
+        const read = await readStaffNarrow(db as never, calendarOnly);
+        // A diary nobody's booking is on: none, never everyone's.
+        expect(read.narrow.staff).toEqual({ id: "", serviceIds: [] });
+        expect(diaryWhere(read.narrow.staff)).toEqual({ staffId: "" });
+        expect(read.staff.ownDiary).toBe(false);
+        // And no count of the business's bookings this week.
+        expect(seesBusinessBookings(calendarOnly)).toBe(false);
+        expect(seesBusinessBookings(member())).toBe(true);
     });
 });
 

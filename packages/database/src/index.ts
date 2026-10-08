@@ -41,6 +41,9 @@ export * from "./backfill/classes-per-period";
 // integration suite can run it twice, and for the API's storefront invite
 // accept, which runs its per-person rule (`joinTeamFromStorefront`).
 export * from "./backfill/store-members-to-memberships";
+// The "Calendar only" role (#868): what a diary person given a login holds
+// by default, made on first use like Storefront team.
+export * from "./calendar-only-role";
 // The F10b business-type backfill (`company` → `pvt`), exported so the API's
 // integration suite can run it twice and check what it did.
 export * from "./backfill/business-type-pvt";

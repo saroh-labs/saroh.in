@@ -33,9 +33,16 @@ jest.mock("@saroh/database", () => {
         merchantPaymentProvider: { findFirst: jest.fn() },
         businessProfile: { findUnique: jest.fn() },
         service: { findFirst: jest.fn(), count: jest.fn() },
-        membership: { findFirst: jest.fn(), findMany: jest.fn() },
-        // The business's own roles: what a linked member's seat reads (DEC-105).
-        organizationRole: { findMany: jest.fn() },
+        membership: {
+            findFirst: jest.fn(),
+            findMany: jest.fn(),
+            // Whose diary a Calendar only person is (#868).
+            findUnique: jest.fn(),
+        },
+        // The business's own roles: what a linked member's seat reads
+        // (DEC-105), and the Calendar only role a first diary person makes
+        // (#868).
+        organizationRole: { findMany: jest.fn(), upsert: jest.fn() },
         booking: { findMany: jest.fn() },
         // No hours saved: opening hours cut nothing (DEC-087, DEC-096).
         store: {
@@ -406,6 +413,23 @@ describe("StaffService — who a person is", () => {
         ).rejects.toBeInstanceOf(NotFoundException);
     });
 
+    it("makes the business's Calendar only role with its first diary person (#868)", async () => {
+        db.staffMember!.create!.mockResolvedValue({ id: "staff_1" });
+        await service.create(ctx(), { name: "Asha" });
+        expect(db.organizationRole!.upsert).toHaveBeenCalledWith(
+            expect.objectContaining({
+                where: {
+                    organizationId_key: {
+                        organizationId: "org_1",
+                        key: "calendar-only",
+                    },
+                },
+                // A role that is there is left as the owner has it.
+                update: {},
+            }),
+        );
+    });
+
     it("maps a racing second link to a 409 on the field", async () => {
         db.membership!.findFirst!.mockResolvedValue({
             id: "m_1",
@@ -417,6 +441,49 @@ describe("StaffService — who a person is", () => {
         await expect(
             service.create(ctx(), { name: "Asha", membershipId: "m_1" }),
         ).rejects.toBeInstanceOf(ConflictException);
+    });
+});
+
+describe("StaffService — Calendar only sees its own diary (#868)", () => {
+    const calendarOnly = ctx({ role: "MEMBER", roleKey: "calendar-only" });
+
+    it("lists only themselves, never the team's hours or time off", async () => {
+        db.membership!.findUnique!.mockResolvedValue({
+            staffMember: { id: "staff_1", services: [] },
+        });
+        await service.list(calendarOnly);
+        expect(db.staffMember!.findMany).toHaveBeenCalledWith(
+            expect.objectContaining({
+                where: { organizationId: "org_1", id: "staff_1" },
+            }),
+        );
+    });
+
+    it("lists nobody when they aren't on the diary", async () => {
+        db.membership!.findUnique!.mockResolvedValue({ staffMember: null });
+        await service.list(calendarOnly);
+        expect(db.staffMember!.findMany).toHaveBeenCalledWith(
+            expect.objectContaining({
+                where: { organizationId: "org_1", id: { in: [] } },
+            }),
+        );
+    });
+
+    it("404s someone else on the diary", async () => {
+        db.membership!.findUnique!.mockResolvedValue({
+            staffMember: { id: "staff_1", services: [] },
+        });
+        await expect(
+            service.get(calendarOnly, "staff_2"),
+        ).rejects.toBeInstanceOf(NotFoundException);
+    });
+
+    it("leaves everyone else's list whole", async () => {
+        await service.list(member);
+        expect(db.membership!.findUnique).not.toHaveBeenCalled();
+        expect(db.staffMember!.findMany).toHaveBeenCalledWith(
+            expect.objectContaining({ where: { organizationId: "org_1" } }),
+        );
     });
 });
 

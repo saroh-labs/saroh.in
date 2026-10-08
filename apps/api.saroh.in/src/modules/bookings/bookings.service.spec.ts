@@ -72,6 +72,8 @@ jest.mock("@saroh/database", () => {
         businessProfile: {
             findUnique: jest.fn().mockResolvedValue({ timezone: "UTC" }),
         },
+        // Whose diary a Calendar only person is (#868); nobody else reads it.
+        membership: { findUnique: jest.fn() },
         $queryRaw: jest.fn(),
     };
     return {
@@ -2862,5 +2864,176 @@ describe("the bookings calendar in one read (U4)", () => {
                 RANGE,
             ),
         ).rejects.toBeInstanceOf(ForbiddenException);
+    });
+
+    describe("Calendar only: their own diary, no money (#868)", () => {
+        const membershipFindUnique = (
+            prisma as unknown as { membership: { findUnique: jest.Mock } }
+        ).membership.findUnique;
+        /** As the API resolves the role: its own list, never Member's. */
+        const calendarOnly = ctx({
+            role: "MEMBER",
+            roleKey: "calendar-only",
+            actions: new Set([
+                "org:read",
+                "module:read",
+                "booking:read",
+                "booking:write",
+                "service:read",
+            ]),
+        });
+
+        beforeEach(() => {
+            membershipFindUnique.mockResolvedValue({
+                staffMember: { id: "st_1", services: [{ serviceId: "svc_1" }] },
+            });
+        });
+
+        it("reads only their column and their bookings, without prices", async () => {
+            staffFindMany.mockResolvedValue([PT]);
+            bookingFindMany.mockResolvedValue([row()]);
+
+            const res = await new BookingsService().calendarBookings(
+                calendarOnly,
+                RANGE,
+            );
+
+            expect(staffFindMany).toHaveBeenCalledWith(
+                expect.objectContaining({
+                    where: { id: "st_1", organizationId: "org_SVC" },
+                }),
+            );
+            expect(bookingFindMany).toHaveBeenCalledWith(
+                expect.objectContaining({
+                    where: {
+                        organizationId: "org_SVC",
+                        startAt: { lt: new Date(RANGE.to) },
+                        endAt: { gt: new Date(RANGE.from) },
+                        AND: [
+                            {
+                                OR: [
+                                    { staffId: "st_1" },
+                                    {
+                                        staffId: null,
+                                        serviceId: { in: ["svc_1"] },
+                                    },
+                                ],
+                            },
+                        ],
+                    },
+                }),
+            );
+            // No money: no price, no currency, nothing to take.
+            expect(res.money).toBe(false);
+            const [booking] = res.diaries[0].bookings;
+            expect(booking.service).not.toHaveProperty("priceCents");
+            expect(booking.service).not.toHaveProperty("currency");
+        });
+
+        it("asking for someone else's column is a 404", async () => {
+            await expect(
+                new BookingsService().calendarBookings(calendarOnly, {
+                    ...RANGE,
+                    staffId: "st_2",
+                }),
+            ).rejects.toBeInstanceOf(NotFoundException);
+            expect(bookingFindMany).not.toHaveBeenCalled();
+        });
+
+        it("off the diary, they read no bookings at all, never everyone's", async () => {
+            membershipFindUnique.mockResolvedValue({ staffMember: null });
+            bookingFindMany.mockResolvedValue([]);
+            const res = await new BookingsService().calendarBookings(
+                calendarOnly,
+                RANGE,
+            );
+            expect(staffFindMany).not.toHaveBeenCalled();
+            expect(bookingFindMany).toHaveBeenCalledWith(
+                expect.objectContaining({
+                    where: expect.objectContaining({
+                        AND: [{ id: { in: [] } }],
+                    }),
+                }),
+            );
+            expect(res.diaries.flatMap((d) => d.bookings)).toEqual([]);
+        });
+
+        it("the bookings list is narrowed to theirs", async () => {
+            bookingFindMany.mockResolvedValue([]);
+            await new BookingsService().listBookings(calendarOnly);
+            expect(bookingFindMany).toHaveBeenCalledWith(
+                expect.objectContaining({
+                    where: expect.objectContaining({
+                        organizationId: "org_SVC",
+                        AND: [
+                            {
+                                OR: [
+                                    { staffId: "st_1" },
+                                    {
+                                        staffId: null,
+                                        serviceId: { in: ["svc_1"] },
+                                    },
+                                ],
+                            },
+                        ],
+                    }),
+                }),
+            );
+        });
+
+        it("someone else's booking is a 404 to read and a 403 to change", async () => {
+            bookingFindUnique.mockResolvedValue({
+                id: "bk_9",
+                organizationId: "org_SVC",
+                serviceId: "svc_1",
+                staffId: "st_2",
+                status: "CONFIRMED",
+            });
+            const service = new BookingsService();
+            await expect(
+                service.getBooking(calendarOnly, "bk_9"),
+            ).rejects.toBeInstanceOf(NotFoundException);
+            await expect(
+                service.cancelBooking(calendarOnly, "bk_9"),
+            ).rejects.toThrow("Your role changes only your own bookings.");
+            await expect(
+                service.recordOutcome(calendarOnly, "bk_9", "ATTENDED"),
+            ).rejects.toBeInstanceOf(ForbiddenException);
+            await expect(
+                service.rescheduleBooking(calendarOnly, "bk_9", {
+                    startAt: "2026-07-21T09:00:00Z",
+                }),
+            ).rejects.toBeInstanceOf(ForbiddenException);
+        });
+
+        it("takes no payment and sends no pay link for their own", async () => {
+            bookingFindUnique.mockResolvedValue({
+                id: "bk_1",
+                organizationId: "org_SVC",
+                serviceId: "svc_1",
+                staffId: "st_1",
+                status: "CONFIRMED",
+            });
+            const service = new BookingsService();
+            await expect(
+                service.payLink(calendarOnly, "bk_1"),
+            ).rejects.toBeInstanceOf(ForbiddenException);
+            await expect(
+                service.takeDeskPayment(calendarOnly, "bk_1", {
+                    method: "CASH",
+                    amountCents: 1000,
+                } as never),
+            ).rejects.toBeInstanceOf(ForbiddenException);
+        });
+
+        it("a Member still reads everyone's, without asking whose diary they are", async () => {
+            staffFindMany.mockResolvedValue([PT]);
+            bookingFindMany.mockResolvedValue([row()]);
+            await new BookingsService().calendarBookings(
+                ctx({ role: "MEMBER" }),
+                RANGE,
+            );
+            expect(membershipFindUnique).not.toHaveBeenCalled();
+        });
     });
 });

@@ -32,8 +32,16 @@ jest.mock("@saroh/database", () => ({
         user: { findUnique: jest.fn() },
         organization: { findUnique: jest.fn() },
         organizationRole: { findUnique: jest.fn(), findMany: jest.fn() },
+        // Someone on the diary given a login (#868).
+        staffMember: {
+            findFirst: jest.fn(),
+            findUnique: jest.fn(),
+            updateMany: jest.fn(),
+        },
         $transaction: jest.fn(),
     },
+    // The Calendar only role, made on first use (#868).
+    ensureCalendarOnlyRole: jest.fn(),
 }));
 
 // The team's "Someone joins the team" alert (F14): only that it is queued.
@@ -77,6 +85,7 @@ const db = prisma as unknown as {
     user: Record<string, jest.Mock>;
     organization: Record<string, jest.Mock>;
     organizationRole: Record<string, jest.Mock>;
+    staffMember: Record<string, jest.Mock>;
     $transaction: jest.Mock;
 };
 

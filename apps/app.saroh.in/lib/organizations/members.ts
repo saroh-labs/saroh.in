@@ -81,6 +81,13 @@ export interface OrganizationInvitation {
      * only looks. Absent from an older API.
      */
     usesSeat?: boolean;
+    /** The person on the diary it gives a login to (#868), if any. */
+    staff?: { id: string; name: string } | null;
+    /**
+     * Already counted as that diary person, who takes bookings with no
+     * login and holds a seat (#868): Team doesn't count the invite again.
+     */
+    countedOnDiary?: boolean;
 }
 
 export interface InviteMemberInput {
@@ -88,6 +95,8 @@ export interface InviteMemberInput {
     /** Any role this business has, built-in or invented. */
     role: string;
     siteIds?: string[];
+    /** The person on the diary this gives a login to (#868). */
+    staffId?: string;
 }
 
 /** Everyone in the active organization. */

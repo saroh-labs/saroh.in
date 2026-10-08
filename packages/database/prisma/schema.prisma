@@ -594,6 +594,13 @@ model OrganizationInvitation {
   // Held here rather than as rows because the invitee has no User row yet.
   siteIds String[]
 
+  // The person on the diary this invite gives a login to (#868): someone
+  // taking bookings with no login (DEC-105). Accepting links them to the new
+  // membership; while it is open they are counted once, as that diary
+  // person. SetNull: a diary person deleted leaves an ordinary invite.
+  staffId     String?
+  staffMember StaffMember? @relation(fields: [staffId], references: [id], onDelete: SetNull)
+
   tokenHash String @unique // sha256 of the token carried in the accept link
   status    String @default("PENDING") // PENDING, ACCEPTED, EXPIRED, REVOKED
 
@@ -608,6 +615,7 @@ model OrganizationInvitation {
 
   @@unique([organizationId, email]) // one live invite per email per org
   @@index([organizationId])
+  @@index([staffId])
 }
 
 // ============================================================================
@@ -4413,6 +4421,8 @@ model StaffMember {
   timeOff    StaffTimeOff[]
   extraHours StaffExtraHours[]
   bookings   Booking[]
+  // Invites that would give them a login (#868).
+  invitations OrganizationInvitation[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt

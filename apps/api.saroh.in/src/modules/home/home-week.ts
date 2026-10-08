@@ -17,7 +17,7 @@ import type {
     HomeWeekTakings,
 } from "./home-model";
 import { holds } from "./home-model";
-import { onOneStore, storeWhere } from "./home-staff";
+import { onOneStore, seesBusinessBookings, storeWhere } from "./home-staff";
 
 /**
  * Home's "This week" (round 2, F7): the week's money and work in a few
@@ -81,7 +81,7 @@ export function weekScope(
     const takings = payments && holds(input, "payment:read");
     const scope: WeekScope = {
         takings,
-        bookings: available.has("APPOINTMENTS") && holds(input, "booking:read"),
+        bookings: available.has("APPOINTMENTS") && seesBusinessBookings(input),
         orders:
             available.has("COMMERCE") &&
             (holds(input, "order:read") || holds(input, "order:stage")),
