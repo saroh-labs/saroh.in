@@ -27,7 +27,10 @@
     "observability": {
         "enabled": true,
     },
-    "workers_dev": true,
+    // Only our own domains: no second public address on *.workers.dev
+    // (it would copy the site onto a foreign domain and skip zone rules).
+    "workers_dev": false,
+    "preview_urls": false,
     "routes": [{ "pattern": "www.saroh.io/*", "zone_name": "saroh.io" }],
     // Settings that aren't secret. GitHub Actions builds with these too
     // (scripts/cf-env.mjs), so the build and the Worker can't disagree.
@@ -45,7 +48,8 @@
     "env": {
         "production": {
             "name": "saroh-web",
-            "workers_dev": true,
+            "workers_dev": false,
+            "preview_urls": false,
             "routes": [
                 { "pattern": "www.saroh.in/*", "zone_name": "saroh.in" },
                 { "pattern": "help.saroh.in/*", "zone_name": "saroh.in" },

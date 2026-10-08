@@ -34,7 +34,10 @@
     "observability": {
         "enabled": true,
     },
-    "workers_dev": true,
+    // Only our own domains: no second public address on *.workers.dev
+    // (it would copy the site onto a foreign domain and skip zone rules).
+    "workers_dev": false,
+    "preview_urls": false,
     // Dev merchant sites: every <address>.saroh.io (one label, so the
     // universal certificate covers it). The zone's own hosts (api, app,
     // admin, accounts, www, media) have "no Worker" routes, so the wildcard
@@ -54,7 +57,8 @@
         // Bindings and vars are not inherited, so each is repeated.
         "production": {
             "name": "saroh-sites",
-            "workers_dev": true,
+            "workers_dev": false,
+            "preview_urls": false,
             "placement": { "region": "aws:ap-south-1" },
             "routes": [
                 { "pattern": "saroh.app/*", "zone_name": "saroh.app" },
