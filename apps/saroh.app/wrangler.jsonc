@@ -26,6 +26,11 @@
     "images": {
         "binding": "IMAGES",
     },
+    // Run the Worker next to the API (Mumbai, where api.saroh.in is), not
+    // where the visitor connected: each page calls the API several times,
+    // and India's traffic often arrives through Singapore or Hong Kong.
+    // AWS ap-south-1 is the cloud region nearest that server.
+    "placement": { "region": "aws:ap-south-1" },
     "observability": {
         "enabled": true,
     },
@@ -50,6 +55,7 @@
         "production": {
             "name": "saroh-sites",
             "workers_dev": true,
+            "placement": { "region": "aws:ap-south-1" },
             "routes": [
                 { "pattern": "saroh.app/*", "zone_name": "saroh.app" },
                 { "pattern": "*.saroh.app/*", "zone_name": "saroh.app" },
