@@ -21,15 +21,15 @@
  * has a draft Shop page when that location delivers or ships. Only what is
  * missing is added: a site keeps the Sells from and the pages it has.
  */
-import { ForbiddenException, HttpException } from "@nestjs/common";
+import { HttpException } from "@nestjs/common";
 import { prisma } from "@saroh/database";
 
 import { toMinor } from "../../../common/money";
 import type { OrganizationContext } from "../../../common/types/organization-context";
 import type { EntitlementService } from "../../billing/entitlement.service";
+import { assertLegacyLocationRoom } from "../../billing/legacy-location-floor";
 import { planMeter } from "../../billing/metering.service";
 import { STOREFRONT_FULFILMENT_TYPES } from "../../orders/fulfilment";
-import { storefrontLimit } from "../../organizations/business-limits";
 import { authorize } from "../../organizations/organization-policy";
 import { DEFAULT_STAGES } from "../../pipelines/pipelines.service";
 import { addModulePageIfMissing } from "../../sites/module-page-create";
@@ -125,27 +125,6 @@ export function firstStorefront(
     });
 }
 
-/** The old `storefronts` floor, in the merchant's words when it refuses. */
-async function storefrontFloor(
-    ctx: OrganizationContext,
-    entitlements: Entitlements,
-): Promise<void> {
-    try {
-        await entitlements.check(ctx.organizationId, "storefronts", 0);
-    } catch (err) {
-        if (!(err instanceof ForbiddenException)) throw err;
-        const limit = storefrontLimit(
-            await entitlements.getEntitlements(ctx.organizationId),
-        );
-        throw new ForbiddenException({
-            message:
-                limit < 1
-                    ? "Your plan doesn't include a location. A bigger plan adds one."
-                    : `Your plan includes ${limit === 1 ? "one location" : `${limit} locations`}. A bigger plan adds more.`,
-        });
-    }
-}
-
 async function prepareCommerce(
     ctx: OrganizationContext,
     setup: CommerceSetupDto,
@@ -155,24 +134,19 @@ async function prepareCommerce(
     if (existing) {
         authorize(ctx, "store:write");
     } else {
+        // A new storefront is online, 0 locations (owner, 8 Oct): the plan
+        // is asked only if it starts as a place customers visit
+        // (`seededPlace`), as creating one by hand asks nothing.
         authorize(ctx, "store:create");
-        // The plan's `storefronts` floor, as creating one by hand checks it
-        // (StoresService.createForUser), in the merchant's words — only
-        // where the catalogue doesn't govern locations: where it does, a
-        // new storefront is online and adds no place customers visit.
-        const governed = await planMeter.enforcedRow(
-            ctx.organizationId,
-            "locations",
-        );
-        if (!governed) await storefrontFloor(ctx, entitlements);
     }
-    return (tx) => writeCommerce(tx, ctx, setup);
+    return (tx) => writeCommerce(tx, ctx, setup, entitlements);
 }
 
 async function writeCommerce(
     tx: ModuleTransaction,
     ctx: OrganizationContext,
     setup: CommerceSetupDto,
+    entitlements: Entitlements,
 ): Promise<SetupCreated> {
     // In table order, with the two old toggles in step (B17's rule 3):
     // collection is Pick-up, delivery any way that sends the order.
@@ -208,7 +182,7 @@ async function writeCommerce(
     // Pick-up needs a place customers visit, with its address (UX-025):
     // a business that gave its registered address starts from it.
     const place = fulfilmentTypes.includes("PICKUP")
-        ? await seededPlace(tx, ctx.organizationId)
+        ? await seededPlace(tx, ctx.organizationId, entitlements)
         : null;
     const store = await tx.store.create({
         data: {
@@ -232,12 +206,14 @@ async function writeCommerce(
 /**
  * The first location's address, from the business's registered address,
  * when it has one and the plan has room for a place customers visit (the
- * `locations` meter, checked as becoming one is); else null, and the
- * location starts with no counter, as it always has.
+ * `locations` meter where the catalogue governs it, else the old
+ * `storefronts` floor: checked as becoming one is); else null, and the
+ * location starts online with no counter, as it always has.
  */
 async function seededPlace(
     tx: ModuleTransaction,
     organizationId: string,
+    entitlements: Entitlements,
 ): Promise<string | null> {
     const profile = await tx.businessProfile.findUnique({
         where: { organizationId },
@@ -250,8 +226,15 @@ async function seededPlace(
     });
     const address = registeredAddressText(profile);
     if (!address) return null;
+    const locations = await planMeter.enforcedRow(organizationId, "locations");
     try {
-        await planMeter.roomInTx(tx, organizationId, "locations");
+        if (locations) {
+            await planMeter.roomInTx(tx, organizationId, "locations", {
+                row: locations,
+            });
+        } else {
+            await assertLegacyLocationRoom(tx, organizationId, entitlements);
+        }
     } catch (error) {
         // No room on the plan: a refusal, not a failure. Nothing was
         // written, so the transaction carries on.

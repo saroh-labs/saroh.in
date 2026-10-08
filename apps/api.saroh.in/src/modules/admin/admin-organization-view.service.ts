@@ -548,12 +548,14 @@ export class AdminOrganizationViewService {
 
         // Usage the instance can count. A limit whose usage nobody measures
         // says so (null) rather than showing zero.
-        // `storefronts` is the old floor's, which counts every storefront;
-        // the catalogue's locations row counts only places customers visit.
+        // `storefronts` is the old floor's, which counts places customers
+        // visit as the catalogue's locations row does (owner, 8 Oct):
+        // metering's count (every catalogue row is asked for above), an
+        // online-only storefront never in it.
         const keyUsage: Record<string, number> = {
             sites: counts.sites,
             teamMembers: counts.members,
-            storefronts,
+            storefronts: usage.locations,
         };
 
         let catalogue: OrganizationCatalogue | null = null;

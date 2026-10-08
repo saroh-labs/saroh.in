@@ -10,7 +10,7 @@ export type UsageNote =
 export interface CatalogueUsage {
     /** Metering's count by catalogue row id, for the metered rows asked for. */
     usage: Record<string, number>;
-    /** Storefronts not deleted, of either kind: what the old floor counts. */
+    /** Storefronts not deleted, of either kind: what says "online-only". */
     storefronts: number;
 }
 

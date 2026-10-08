@@ -446,9 +446,17 @@ describe("business overrides (DB, U11)", () => {
         await service.setPlan(
             cmd(o.id, { planKey: "pro", expiresAt: until.toISOString() }),
         );
-        // One storefront with no kind of its own: the old floor counts it.
+        // One storefront with no kind of its own, and one shop: the old
+        // floor counts places customers visit, as metering does (8 Oct).
         await prisma.store.create({
             data: { organizationId: o.id, name: "Online" },
+        });
+        await prisma.store.create({
+            data: {
+                organizationId: o.id,
+                name: "Hill Road",
+                settings: { create: { kind: "SHOP" } },
+            },
         });
 
         const page = await view.view(o.id, { canReadPii: false });

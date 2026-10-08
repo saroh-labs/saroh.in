@@ -16,6 +16,7 @@ import {
     AuditService,
 } from "../audit/audit.service";
 import { EntitlementService } from "../billing/entitlement.service";
+import { assertLegacyLocationRoom } from "../billing/legacy-location-floor";
 import { planMeter } from "../billing/metering.service";
 import { planTakesOnlinePayment } from "../billing/online-payments-plan";
 import type {
@@ -25,7 +26,7 @@ import type {
 import { NEW_STOREFRONT_TYPES, storefrontTypesOf } from "../orders/fulfilment";
 import { lateThresholdsOf } from "../orders/late-thresholds";
 import { UNFULFILLED_STATUSES } from "../orders/order-standing";
-import { storefrontLimit } from "../organizations/business-limits";
+import { MAX_STOREFRONTS_PER_BUSINESS } from "../organizations/business-limits";
 import { lockStockLevels } from "../products/stock-levels";
 import { shopRolloutOn } from "../sites/sells-from";
 import { openingHoursText } from "./opening-hours-text";
@@ -168,18 +169,18 @@ export class StorefrontsService {
     ) {}
 
     /**
-     * How many storefronts the business has and may have — the plan's
-     * `storefronts` entitlement under the product's ceiling — so the
-     * workspace offers "New storefront" only where creating one would
-     * succeed. For rendering; `StoresService.createForUser` still decides.
+     * How many storefronts the business has and may have — the product's
+     * ceiling, as a new one is online and no plan caps those (owner, 8 Oct)
+     * — so the workspace offers "New storefront" only where creating one
+     * would succeed. For rendering; `StoresService.createForUser` still
+     * decides. The plan's places customers visit are asked when a kind
+     * becomes SHOP ({@link update}).
      */
     async allowance(organizationId: string): Promise<StorefrontAllowance> {
-        const [used, entitlements, governed] = await Promise.all([
-            prisma.store.count({ where: { organizationId, deletedAt: null } }),
-            this.entitlements.getEntitlements(organizationId),
-            planMeter.enforcedRow(organizationId, "locations"),
-        ]);
-        return { used, limit: storefrontLimit(entitlements, !!governed) };
+        const used = await prisma.store.count({
+            where: { organizationId, deletedAt: null },
+        });
+        return { used, limit: MAX_STOREFRONTS_PER_BUSINESS };
     }
 
     async list(organizationId: string): Promise<StorefrontSummary[]> {
@@ -465,12 +466,28 @@ export class StorefrontsService {
             ...fulfilmentPatch(dto),
         };
 
+        // Becoming a place customers visit is one more of the plan's
+        // locations (`shopLocations`): the catalogue's `locations` row where
+        // it governs, else the old `storefronts` floor, which counts the same
+        // places. Going online, or staying a shop, adds none.
+        const becomesShop = dto.kind === "SHOP" && current.kind !== "SHOP";
+        const locations = becomesShop
+            ? await planMeter.enforcedRow(organizationId, "locations")
+            : null;
         await prisma.$transaction(async (tx) => {
-            // Becoming a place customers visit is one more of the plan's
-            // locations (`shopLocations`): checked first, as it takes the
-            // meter's lock. Going online, or staying a shop, adds none.
-            if (dto.kind === "SHOP" && current.kind !== "SHOP") {
-                await planMeter.roomInTx(tx, organizationId, "locations");
+            // Checked first, as it takes the meter's lock.
+            if (becomesShop) {
+                if (locations) {
+                    await planMeter.roomInTx(tx, organizationId, "locations", {
+                        row: locations,
+                    });
+                } else {
+                    await assertLegacyLocationRoom(
+                        tx,
+                        organizationId,
+                        this.entitlements,
+                    );
+                }
             }
             if (dto.name !== undefined) {
                 await tx.store.update({

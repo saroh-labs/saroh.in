@@ -11,11 +11,12 @@ jest.mock("../capabilities/module-enforcement.guard", () => ({
 }));
 jest.mock("@saroh/database", () => {
     const tx = {
-        store: { update: jest.fn() },
+        store: { update: jest.fn(), count: jest.fn() },
         site: { updateMany: jest.fn() },
         storeSettings: { upsert: jest.fn() },
         stockLevel: { findMany: jest.fn(), count: jest.fn() },
         $queryRaw: jest.fn(),
+        $executeRaw: jest.fn(),
     };
     return {
         prisma: {
@@ -70,6 +71,7 @@ const db = prisma as unknown as {
         storeSettings: Record<string, jest.Mock>;
         stockLevel: Record<string, jest.Mock>;
         $queryRaw: jest.Mock;
+        $executeRaw: jest.Mock;
     };
 };
 
@@ -401,38 +403,46 @@ describe("StorefrontsService", () => {
         expect(s.stock).toEqual({ onHand: 3, promised: 1 });
     });
 
-    it("reads how many storefronts the plan allows", async () => {
-        db.store.count!.mockResolvedValue(2);
-        await expect(service.allowance("org_1")).resolves.toEqual({
-            used: 2,
-            limit: 5,
+    it("allows storefronts up to the ceiling: a new one is online, never a plan's location", async () => {
+        const enforcedRow = jest.spyOn(planMeter, "enforcedRow");
+        db.store.count!.mockResolvedValue(7);
+        db.subscription.findUnique!.mockResolvedValue({
+            status: "ACTIVE",
+            plan: { key: "custom", entitlements: { storefronts: 2 } },
         });
-    });
-
-    it("allows up to the ceiling where the catalogue governs locations", async () => {
-        const enforcedRow = jest
-            .spyOn(planMeter, "enforcedRow")
-            .mockResolvedValue({ moduleId: "locations" } as never);
-        db.store.count!.mockResolvedValue(2);
         await expect(service.allowance("org_1")).resolves.toEqual({
-            used: 2,
+            used: 7,
             limit: 25,
         });
+        expect(enforcedRow).not.toHaveBeenCalledWith("org_1", "locations");
         enforcedRow.mockRestore();
     });
 });
 
 describe("a place customers visit is one of the plan's locations (U13)", () => {
     const service = new StorefrontsService();
+    const ROW = { moduleId: "locations" } as never;
     let roomInTx: jest.SpyInstance;
+    let enforcedRow: jest.SpyInstance;
     beforeEach(() => {
         roomInTx = jest.spyOn(planMeter, "roomInTx").mockResolvedValue(null);
+        enforcedRow = jest
+            .spyOn(planMeter, "enforcedRow")
+            .mockResolvedValue(ROW);
     });
-    afterEach(() => roomInTx.mockRestore());
+    afterEach(() => {
+        roomInTx.mockRestore();
+        enforcedRow.mockRestore();
+    });
 
     it("meters an online storefront becoming a shop, on the save's transaction", async () => {
         await service.update("org_1", "st_1", { kind: "SHOP" });
-        expect(roomInTx).toHaveBeenCalledWith(db.__tx, "org_1", "locations");
+        expect(enforcedRow).toHaveBeenCalledWith("org_1", "locations");
+        expect(roomInTx).toHaveBeenCalledWith(db.__tx, "org_1", "locations", {
+            row: ROW,
+        });
+        // The catalogue governs: the old floor isn't counted.
+        expect(db.__tx.store.count).not.toHaveBeenCalled();
     });
 
     it("a refusal saves nothing", async () => {
@@ -452,6 +462,82 @@ describe("a place customers visit is one of the plan's locations (U13)", () => {
         await service.update("org_1", "st_1", { kind: "SHOP" });
         await service.update("org_1", "st_1", { kind: "ONLINE" });
         expect(roomInTx).not.toHaveBeenCalled();
+        expect(enforcedRow).not.toHaveBeenCalledWith("org_1", "locations");
+    });
+});
+
+describe("the old storefronts floor counts only shops (owner, 8 Oct)", () => {
+    // Where the catalogue doesn't govern locations: the switch off, or a
+    // business it doesn't reach yet.
+    const entitlements = {
+        getEntitlements: jest.fn(),
+    };
+    const service = new StorefrontsService(undefined, entitlements as never);
+    let roomInTx: jest.SpyInstance;
+    let enforcedRow: jest.SpyInstance;
+    beforeEach(() => {
+        entitlements.getEntitlements.mockResolvedValue({ storefronts: 2 });
+        roomInTx = jest.spyOn(planMeter, "roomInTx");
+        enforcedRow = jest
+            .spyOn(planMeter, "enforcedRow")
+            .mockResolvedValue(null);
+    });
+    afterEach(() => {
+        roomInTx.mockRestore();
+        enforcedRow.mockRestore();
+    });
+
+    it("lets an online-only storefront save whatever the floor, without counting", async () => {
+        db.__tx.store.count!.mockResolvedValue(2);
+        await service.update("org_1", "st_1", { kind: "ONLINE" });
+        await service.update("org_1", "st_1", { name: "Web shop" });
+        expect(db.__tx.store.count).not.toHaveBeenCalled();
+        expect(entitlements.getEntitlements).not.toHaveBeenCalled();
+        expect(db.__tx.storeSettings.upsert).toHaveBeenCalled();
+    });
+
+    it("lets a storefront become a shop under the floor, counting as metering does", async () => {
+        db.__tx.store.count!.mockResolvedValue(1);
+        await service.update("org_1", "st_1", { kind: "SHOP" });
+        expect(db.__tx.store.count).toHaveBeenCalledWith({
+            where: {
+                organizationId: "org_1",
+                deletedAt: null,
+                settings: { kind: "SHOP" },
+            },
+        });
+        expect(roomInTx).not.toHaveBeenCalled();
+        expect(db.__tx.storeSettings.upsert).toHaveBeenCalledWith(
+            expect.objectContaining({
+                update: expect.objectContaining({ kind: "SHOP" }),
+            }),
+        );
+    });
+
+    it("refuses a kind change to SHOP over the floor, in the merchant's words, and saves nothing", async () => {
+        db.__tx.store.count!.mockResolvedValue(2);
+        const p = service.update("org_1", "st_1", { kind: "SHOP" });
+        await expect(p).rejects.toThrow(ForbiddenException);
+        await expect(p).rejects.toMatchObject({
+            response: {
+                message:
+                    "Your plan includes 2 places customers visit. A bigger plan adds more.",
+            },
+        });
+        expect(db.__tx.storeSettings.upsert).not.toHaveBeenCalled();
+    });
+
+    it("asks nothing of a shop staying one", async () => {
+        db.storeSettings.findUnique!.mockResolvedValue({
+            kind: "SHOP",
+            fulfilmentTypes: [],
+            taxRate: "0",
+        });
+        db.__tx.store.count!.mockResolvedValue(9);
+        await expect(
+            service.update("org_1", "st_1", { kind: "SHOP" }),
+        ).resolves.toBeDefined();
+        expect(db.__tx.store.count).not.toHaveBeenCalled();
     });
 });
 

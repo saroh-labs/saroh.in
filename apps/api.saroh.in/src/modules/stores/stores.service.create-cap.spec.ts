@@ -1,8 +1,9 @@
 /**
- * ADR-010 — several storefronts, up to the plan. Pure unit test with a mocked
- * Prisma: the product's ceiling is checked first (409), the plan's
- * `storefronts` entitlement second (403), and both refusals come before
- * anything is written.
+ * ADR-010 — several storefronts, up to the product's ceiling. Pure unit test
+ * with a mocked Prisma: the ceiling is checked first (409) and before
+ * anything is written. A new storefront is online, 0 places customers visit
+ * (owner, 8 Oct), so no plan is asked on create: the plan's locations are
+ * asked when its kind becomes SHOP (`storefronts.spec.ts`).
  */
 jest.mock("@saroh/database", () => ({
     isRlsEnforcementEnabled: () => false,
@@ -24,7 +25,6 @@ jest.mock("@saroh/database", () => ({
 
 import { prisma } from "@saroh/database";
 
-import { EntitlementService } from "../billing/entitlement.service";
 import { planMeter } from "../billing/metering.service";
 import type { FeatureFlagService } from "../feature-flags/feature-flags.service";
 import { MAX_STOREFRONTS_PER_BUSINESS } from "../organizations/business-limits";
@@ -45,11 +45,9 @@ const onPlan = (entitlements: Record<string, number | boolean>) =>
         plan: { key: "custom", entitlements },
     });
 
-describe("StoresService.createForUser — storefronts up to the plan", () => {
-    const service = new StoresService(
-        {} as FeatureFlagService,
-        new EntitlementService(),
-    );
+describe("StoresService.createForUser — storefronts up to the ceiling", () => {
+    const service = new StoresService({} as FeatureFlagService);
+    let enforcedRow: jest.SpyInstance;
 
     beforeEach(() => {
         jest.clearAllMocks();
@@ -57,7 +55,9 @@ describe("StoresService.createForUser — storefronts up to the plan", () => {
         storeCreate.mockResolvedValue({ id: "store_1" });
         subFindUnique.mockResolvedValue(null);
         overrides.mockResolvedValue([]);
+        enforcedRow = jest.spyOn(planMeter, "enforcedRow");
     });
+    afterEach(() => enforcedRow.mockRestore());
 
     it("creates the first storefront", async () => {
         storeCount.mockResolvedValue(0);
@@ -69,41 +69,25 @@ describe("StoresService.createForUser — storefronts up to the plan", () => {
         });
     });
 
-    it("creates a second on a plan allowing 5", async () => {
-        onPlan({ storefronts: 5 });
-        storeCount.mockResolvedValue(1);
+    it("never refuses an online storefront for the old floor, past what the plan allows", async () => {
+        // The floor caps places customers visit; a new storefront is online.
+        onPlan({ storefronts: 2 });
+        storeCount.mockResolvedValue(7);
+        await expect(
+            service.createForUser("user_1", "org_1", { name: "Eighth" }),
+        ).resolves.toEqual({ id: "store_1" });
+        expect(storeCreate).toHaveBeenCalledTimes(1);
+        // Neither the plan nor the catalogue is asked on create.
+        expect(subFindUnique).not.toHaveBeenCalled();
+        expect(enforcedRow).not.toHaveBeenCalledWith("org_1", "locations");
+    });
+
+    it("never refuses one on a plan with no place customers visit", async () => {
+        onPlan({ storefronts: 0 });
+        storeCount.mockResolvedValue(0);
         await expect(
             service.createForUser("user_1", "org_1", { name: "Online" }),
         ).resolves.toEqual({ id: "store_1" });
-        expect(storeCreate).toHaveBeenCalledTimes(1);
-    });
-
-    it("lets a business with no plan have five (the free floor)", async () => {
-        storeCount.mockResolvedValue(4);
-        await expect(
-            service.createForUser("user_1", "org_1", { name: "Fifth" }),
-        ).resolves.toEqual({ id: "store_1" });
-
-        storeCount.mockResolvedValue(5);
-        await expect(
-            service.createForUser("user_1", "org_1", { name: "Sixth" }),
-        ).rejects.toMatchObject({ status: 403 });
-    });
-
-    it("refuses one past the plan with a 403 in plain words, and writes nothing", async () => {
-        onPlan({ storefronts: 2 });
-        storeCount.mockResolvedValue(2);
-        await expect(
-            service.createForUser("user_1", "org_1", { name: "Third" }),
-        ).rejects.toMatchObject({
-            status: 403,
-            response: {
-                message:
-                    "Your plan includes 2 locations. A bigger plan adds more.",
-            },
-        });
-        expect(storeFindUnique).not.toHaveBeenCalled();
-        expect(storeCreate).not.toHaveBeenCalled();
     });
 
     it("refuses one past the product's ceiling with a 409, whatever the plan says", async () => {
@@ -117,30 +101,12 @@ describe("StoresService.createForUser — storefronts up to the plan", () => {
                 message: expect.stringMatching(/as many as Saroh allows/),
             },
         });
-        // The ceiling is checked before the plan is read.
         expect(subFindUnique).not.toHaveBeenCalled();
         expect(storeCreate).not.toHaveBeenCalled();
     });
 
-    it("asks only the ceiling where the catalogue governs locations (U13)", async () => {
-        // A new storefront is online: the plan's locations cap places
-        // customers visit, metered when its kind changes.
-        const enforcedRow = jest
-            .spyOn(planMeter, "enforcedRow")
-            .mockResolvedValue({ moduleId: "locations" } as never);
-        onPlan({ storefronts: 2 });
-        storeCount.mockResolvedValue(7);
-        await expect(
-            service.createForUser("user_1", "org_1", { name: "Eighth" }),
-        ).resolves.toEqual({ id: "store_1" });
-        expect(enforcedRow).toHaveBeenCalledWith("org_1", "locations");
-        expect(subFindUnique).not.toHaveBeenCalled();
-        enforcedRow.mockRestore();
-    });
-
-    it("counts only live storefronts: a closed one frees its place", async () => {
-        onPlan({ storefronts: 2 });
-        storeCount.mockResolvedValue(1);
+    it("counts only live storefronts against the ceiling: a closed one frees its place", async () => {
+        storeCount.mockResolvedValue(MAX_STOREFRONTS_PER_BUSINESS - 1);
         await service.createForUser("user_1", "org_1", { name: "Again" });
         expect(storeCount).toHaveBeenCalledWith({
             where: { organizationId: "org_1", deletedAt: null },
