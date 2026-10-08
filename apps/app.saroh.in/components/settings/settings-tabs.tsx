@@ -1,8 +1,10 @@
 "use client";
 
 import { cn } from "@saroh/ui/lib/utils";
+import { useEdgeFade } from "@saroh/ui/scroll-x";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useRef } from "react";
 
 import { SETTINGS_PAGES } from "@/components/shared/nav-items";
 import { settingsPageLabel } from "@/lib/settings/search";
@@ -17,7 +19,9 @@ import { settingsPageLabel } from "@/lib/settings/search";
  *
  * Below 1100px the lines of description drop, as the design has it: the page
  * needs the room more than the labels need glossing. Below 760px the column
- * becomes a row above the page that scrolls sideways.
+ * becomes a row above the page that scrolls sideways, and says so (UX-079):
+ * the row fades on the side with more tabs, and the open tab is scrolled
+ * into view, so "Your p" cut off at the edge reads as more, not as broken.
  *
  * Links, not a client tab state: each tab is its own route, so the address,
  * Back and a shared link all land on the same tab. The layout passes only the
@@ -42,9 +46,17 @@ export function SettingsTabs({
 }) {
     const pathname = usePathname();
     const pages = SETTINGS_PAGES.filter((page) => hrefs.includes(page.href));
+    const strip = useRef<HTMLElement>(null);
+    const fade = useEdgeFade(strip, {
+        current: '[aria-current="page"]',
+        revealKey: pathname,
+    });
     return (
         <nav
+            ref={strip}
             aria-label="Settings"
+            data-scroll-x=""
+            style={fade}
             className={cn(
                 "flex gap-1 overflow-x-auto border-b border-border bg-background px-3 py-2.5",
                 "min-[760px]:w-[232px] min-[760px]:shrink-0 min-[760px]:flex-col min-[760px]:gap-0.5 min-[760px]:overflow-y-auto min-[760px]:border-b-0 min-[760px]:border-r min-[760px]:px-2.5 min-[760px]:py-3.5",
