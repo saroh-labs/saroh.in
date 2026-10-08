@@ -3288,6 +3288,41 @@ takes the client address from (the API's version is
 `common/trust-proxy.ts`).
 **Category**: sites · `apps/saroh.app/lib/site-relay.ts`
 
+## Sites — every template thumbnail but Starter was a broken image
+
+**Symptom**: on Create a site, the template cards that have a picture
+(Blogs, Bakery, Gym…) showed a broken image; only Starter, which is drawn
+rather than pictured, looked right. Found while filming the site demo
+(8 Oct 2026).
+**Root cause**: `apps/app.saroh.in/middleware.ts` gated every path except
+`_next/static`, `_next/image` and `favicon.ico`, so `/templates/blogs.webp`
+answered 307 to sign-in. `next/image` fetches the file itself, without the
+visitor's cookies, got the redirect, and failed with "isn't a valid image".
+**Fix**: the matcher also skips paths ending in an image extension
+(png, jpg, gif, webp, avif, svg, ico).
+**Rule**: a middleware matcher skips the files `public/` serves.
+`lib/middleware-matcher.test.ts` runs every image under `public/` through
+the matcher and fails if one is gated.
+**Category**: frontend · `apps/app.saroh.in/middleware.ts`
+
+## Flags — two first overrides at once answered 500
+
+**Symptom**: forcing a flag on for two businesses at the same moment, on a
+database where the flag had never been set, failed one of them with 500
+(`Unique constraint failed on the fields: (key)`). Found when two demo films
+set `SITE_SHOP` in parallel on a freshly seeded database (8 Oct 2026).
+**Root cause**: `setOverride` registers a never-configured flag off for
+everyone before writing the override (the override's foreign key needs the
+row). It looked the row up, then created it: both requests saw none, and the
+second create hit the key's unique index.
+**Fix**: register with `createMany({ skipDuplicates: true })`, which waits for
+the other transaction and inserts nothing, and audit the registration only
+when this request made it.
+**Rule**: "find, then create if missing" inside a transaction is not safe
+against a concurrent twin; insert-or-skip on the unique key instead.
+`feature-flags.service.db.spec.ts` forces two businesses on at once.
+**Category**: backend · `apps/api.saroh.in/src/modules/feature-flags/feature-flags.service.ts`
+
 ## Security — CodeQL stopped the 8 Oct release on six alerts
 
 **Symptom**: the release PR (#881) failed CodeQL with 1 critical and 5 high
@@ -3314,3 +3349,19 @@ alerts in code it changed.
   `no-super-linear-move` catch the regex cases; they flag 53 existing places,
   so turning them on is its own task.
   **Category**: security · CodeQL on PRs (`.github` code scanning)
+
+## Tooling — prepush failed every step on Linux again
+
+**Symptom**: `pnpm prepush` printed `mktemp: too few X's in template
+'prepush'`, then FAIL for every step in about five seconds, none of them run
+(8 Oct 2026).
+**Root cause**: the 3 Oct fix (`mktemp -d "${TMPDIR:-/tmp}/prepush.XXXXXX"`)
+was undone by two branch merges (`34fb8004`, `59dc3265`) that kept the
+branch's older `mktemp -d -t prepush`. BSD mktemp takes `-t prefix`; GNU
+needs the X's. Nothing ran prepush on Linux to notice: CI runs its own steps.
+**Fix**: the X template again, and prepush stops with one clear line when it
+cannot make its log directory.
+**Rule**: a fix that only a developer's own machine would notice needs a
+check CI runs. `pnpm run check:mktemp` (prepush and CI) fails on any `mktemp
+-t` without X's in `scripts/` and `.husky/`.
+**Category**: tooling · `scripts/prepush.sh`, `scripts/check-mktemp.mjs`
