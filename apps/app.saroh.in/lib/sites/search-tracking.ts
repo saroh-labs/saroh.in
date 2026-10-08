@@ -12,7 +12,12 @@ import {
     extractVerificationCode,
 } from "@saroh/block-contract";
 
-import { HELP_TOPICS, helpUrl } from "@/lib/help/links";
+import {
+    HELP_TOPICS,
+    helpArticleUrl,
+    helpHasMoved,
+    helpUrl,
+} from "@/lib/help/links";
 
 /**
  * A site's "Search and tracking" section (DEC-108, U7): its verification
@@ -216,9 +221,25 @@ export const POSTHOG_REGION_WORDS: Record<PosthogRegion, string> = {
     eu: "EU cloud",
 };
 
-/** Where Help explains finding a tool's id (anchors written in U8). */
-export function trackerHelpHref(kind: TrackerKind): string {
-    return `${helpUrl(HELP_TOPICS.website)}#trackers-${kind}`;
+/** The Help article on this section (saroh.in/help, once Help has moved). */
+export const SEARCH_TRACKING_ARTICLE = "verify-your-site-and-add-analytics";
+
+/** The article's step "Choose your analytics tool": `stepId` on saroh.in. */
+const TRACKER_STEP = "step-4";
+
+/**
+ * Where Help explains finding a tool's id: the old site's anchor for that
+ * tool (written in U8) until Help moves, then the article's step on choosing
+ * the tool, which says each row names where its ID is.
+ */
+export function trackerHelpHref(
+    kind: TrackerKind,
+    now: Date = new Date(),
+): string {
+    if (helpHasMoved(now)) {
+        return `${helpArticleUrl(SEARCH_TRACKING_ARTICLE)}#${TRACKER_STEP}`;
+    }
+    return `${helpUrl(HELP_TOPICS.website, now)}#trackers-${kind}`;
 }
 
 export function needsConsent(kind: TrackerKind): boolean {

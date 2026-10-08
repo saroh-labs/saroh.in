@@ -296,6 +296,18 @@ const DOMAIN = 'section:has(h2:text-is("Your own domain"))';
 const SHARE = 'section:has(h2:text-is("Social share image"))';
 const SEARCH = 'section:has(h2:text-is("Search"))';
 
+/* "Verify your site and add analytics": Search and tracking, at the foot of
+ * Northwind's site settings (DEC-108), with the API's RENDERER_URL set to
+ * https://saroh.app as for help-own-domain-1. The Google field and the
+ * Google Analytics dialog are typed into and never saved. */
+const ST = '[data-section="search-and-tracking"]';
+const ST_VERIFY = `${ST} .wk-surface:has(h3:text-is("Verify your site"))`;
+const ST_TRACKERS = `${ST} .wk-surface:has(h3:text-is("Your trackers"))`;
+/** Tall enough that the section, near the page's foot, is laid out in view. */
+const ST_DESK: Viewport = { width: 1280, height: 4800 };
+/** A merchant's site at a desk, its cookie notice at the foot. */
+const HELP_DESK_SITE: Viewport = { width: 1024, height: 640 };
+
 const HELP_SHOTS_B: Shot[] = [
     // ── Set your team's hours (Kavi Dental) ───────────────────────────
     {
@@ -643,6 +655,99 @@ const HELP_SHOTS_B: Shot[] = [
         mark: 'a:has-text("Review and publish")',
         alt: "The website of Northwind Supply (demo store), with changes waiting to be published and Review and publish",
         caption: "Northwind Supply's changes, waiting to be published",
+    },
+
+    // ── Verify your site and add analytics (Northwind) ────────────────
+    {
+        key: "help-verify-analytics-1",
+        business: "northwind",
+        role: "owner",
+        route: NW_SETTINGS,
+        viewport: ST_DESK,
+        clip: {
+            selector: `${ST} > div:first-child`,
+            until: ST_VERIFY,
+            pad: 12,
+        },
+        mark: "#search-tracking-title",
+        alt: "Search and tracking in the website settings of Northwind Supply (demo store): its live address, its sitemap and the verification fields",
+        caption: "Search and tracking at Northwind Supply",
+    },
+    {
+        key: "help-verify-analytics-2",
+        business: "northwind",
+        role: "owner",
+        route: NW_SETTINGS,
+        viewport: ST_DESK,
+        steps: [
+            {
+                fill: '[data-verification="google"] input',
+                value: '<meta name="google-site-verification" content="northwind-demo-search-console-code" />',
+            },
+            { click: `${ST_VERIFY} h3` },
+        ],
+        clip: { selector: '[data-verification="google"]', pad: 12 },
+        mark: '[data-verification="google"] button:text-is("Save")',
+        alt: "The Google Search Console field at Northwind Supply (demo store), with Google's HTML tag pasted and the code found in it",
+        caption: "Google's tag pasted in at Northwind Supply",
+    },
+    {
+        key: "help-verify-analytics-3",
+        business: "northwind",
+        role: "owner",
+        route: NW_SETTINGS,
+        viewport: ST_DESK,
+        clip: {
+            selector: `${ST_VERIFY} div.grid:has([data-live-address])`,
+            until: `${ST_VERIFY} div.grid:has([data-sitemap])`,
+            pad: 12,
+        },
+        mark: 'button[aria-label="Copy sitemap address"]',
+        alt: "The live address and sitemap of Northwind Supply's site (demo store), each with Copy",
+        caption: "Northwind Supply's sitemap address",
+    },
+    {
+        key: "help-verify-analytics-4",
+        business: "northwind",
+        role: "owner",
+        route: NW_SETTINGS,
+        viewport: ST_DESK,
+        clip: { selector: ST_TRACKERS, pad: 12 },
+        mark: '[data-tracker="ga4"] button:text-is("Set up")',
+        alt: "Your trackers at Northwind Supply (demo store): Google Analytics, Google Ads, Meta Pixel, PostHog, Microsoft Clarity, Plausible and Umami Cloud, each with Set up",
+        caption: "Your trackers at Northwind Supply, none connected yet",
+    },
+    {
+        key: "help-verify-analytics-5",
+        business: "northwind",
+        role: "owner",
+        route: NW_SETTINGS,
+        viewport: { width: 1280, height: 900 },
+        steps: [
+            { click: '[data-tracker="ga4"] button:text-is("Set up")' },
+            { waitFor: '[role="dialog"] textarea' },
+            { fill: '[role="dialog"] textarea', value: "G-NWDEMO2026" },
+            { click: '[role="dialog"] h2' },
+        ],
+        clip: { selector: '[role="dialog"]' },
+        mark: '[role="dialog"] button:has-text("Add to your site")',
+        alt: "Connect Google Analytics at Northwind Supply (demo store): a Measurement ID typed in, the ID to save shown, and Add to your site",
+        caption: "Connecting Google Analytics at Northwind Supply",
+    },
+    {
+        // Needs Google Analytics connected on Northwind first (the banner
+        // shows only while a tool that asks is on the site): connect
+        // G-NWDEMO2026 through the API on the throwaway database, capture,
+        // then remove it. help-verify-analytics-4 needs it removed.
+        key: "help-verify-analytics-6",
+        business: "northwind",
+        role: "visitor",
+        route: "site:/",
+        viewport: HELP_DESK_SITE,
+        steps: [{ waitFor: "[data-site-consent]" }],
+        mark: '[data-site-consent] a:text-is("What they do")',
+        alt: "The site of Northwind Supply (demo store) as a new visitor sees it, with the cookie notice at the foot: Reject, Accept and What they do",
+        caption: "The cookie notice on Northwind Supply's site",
     },
 ];
 
