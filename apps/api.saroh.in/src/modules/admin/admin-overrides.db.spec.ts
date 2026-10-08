@@ -438,4 +438,46 @@ describe("business overrides (DB, U11)", () => {
         expect(keys).not.toContain("invoicing");
         expect(plan.overrides.map((x) => x.kind)).toEqual(["grant"]);
     });
+
+    it("shows the plan an override puts it on, its base beside it, and the live plans (UX-087)", async () => {
+        const o = await org("Pro for a while");
+        await subscribe(o.id, "free");
+        const until = new Date(Date.now() + 30 * DAY);
+        await service.setPlan(
+            cmd(o.id, { planKey: "pro", expiresAt: until.toISOString() }),
+        );
+        // One storefront with no kind of its own: the old floor counts it.
+        await prisma.store.create({
+            data: { organizationId: o.id, name: "Online" },
+        });
+
+        const page = await view.view(o.id, { canReadPii: false });
+        if (page.plan.status !== "ok") throw new Error("plan panel failed");
+        const plan = page.plan.data;
+        expect(plan.effective).toMatchObject({
+            id: "pro",
+            name: "Plan C",
+            basePlanId: "free",
+            basePlanName: "Plan A",
+        });
+        expect(plan.effective?.override?.expiresAt).toBeInstanceOf(Date);
+        expect(plan.liveCatalogue).toEqual({
+            version: V2,
+            plans: [
+                { id: "free", name: "Plan A" },
+                { id: "grow", name: "Plan B" },
+                { id: "pro", name: "Plan C" },
+            ],
+        });
+        expect(plan.limits.find((l) => l.key === "storefronts")?.usage).toBe(1);
+    });
+
+    it("offers the live plans to a business the catalogue doesn't reach yet", async () => {
+        const o = await org("No plan row");
+        const page = await view.view(o.id, { canReadPii: false });
+        if (page.plan.status !== "ok") throw new Error("plan panel failed");
+        expect(page.plan.data.catalogue).toBeNull();
+        expect(page.plan.data.effective).toBeNull();
+        expect(page.plan.data.liveCatalogue?.version).toBe(V2);
+    });
 });

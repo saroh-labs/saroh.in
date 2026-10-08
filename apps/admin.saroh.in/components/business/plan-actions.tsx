@@ -11,6 +11,7 @@ import {
 } from "@/lib/business-actions";
 import type { PlanOption } from "@/lib/businesses";
 import { formatDate } from "@/lib/format";
+import { legacyPickerBlocked } from "@/lib/plan-words";
 
 import { OperatorDialog } from "../operator-dialog";
 
@@ -49,7 +50,9 @@ function PlanSelect({
 /**
  * Plan, trial and limits for one business. A plan a billing provider
  * manages is changed with the provider, not here — the API refuses and says
- * so, and the dialog shows that reason.
+ * so, and the dialog shows that reason. With a catalogue version live, its
+ * plans are put on from the catalogue's own action ("Put on a plan"), so
+ * the old picker isn't offered empty (UX-087).
  */
 export function PlanActions({
     organizationId,
@@ -57,40 +60,47 @@ export function PlanActions({
     currentPlanId,
     subscriptionStatus,
     numericLimits,
+    catalogueLive,
 }: {
     organizationId: string;
+    /** The old plans (`/admin/plans`); catalogue plans are never in it. */
     plans: PlanOption[];
     currentPlanId: string | null;
     subscriptionStatus: string | null;
     numericLimits: { key: string; label: string; planValue: number }[];
+    /** A catalogue version is live on this instance. */
+    catalogueLive: boolean;
 }) {
+    const blocked = legacyPickerBlocked(plans.length, catalogueLive);
     const trialing = subscriptionStatus === "TRIALING";
     const needsPlanForTrial =
         !subscriptionStatus || subscriptionStatus === "CANCELLED";
 
     return (
         <div className="flex flex-wrap gap-2">
-            <OperatorDialog
-                trigger="Change plan"
-                title="Change plan"
-                effect="The business moves to the plan you choose now. Its limits follow the new plan from the next request."
-                fields={
-                    <PlanSelect
-                        plans={plans}
-                        defaultValue={currentPlanId ?? undefined}
-                    />
-                }
-                submitLabel="Change plan"
-                disabled={plans.length === 0}
-                disabledReason="No plan is offered on this instance yet."
-                onSubmit={({ reason, idempotencyKey, values }) =>
-                    changePlanAction(organizationId, {
-                        reason,
-                        idempotencyKey,
-                        planId: values.planId ?? "",
-                    })
-                }
-            />
+            {blocked !== "catalogue" && (
+                <OperatorDialog
+                    trigger="Change plan"
+                    title="Change plan"
+                    effect="The business moves to the plan you choose now. Its limits follow the new plan from the next request."
+                    fields={
+                        <PlanSelect
+                            plans={plans}
+                            defaultValue={currentPlanId ?? undefined}
+                        />
+                    }
+                    submitLabel="Change plan"
+                    disabled={blocked === "none"}
+                    disabledReason="No plan is offered on this instance yet."
+                    onSubmit={({ reason, idempotencyKey, values }) =>
+                        changePlanAction(organizationId, {
+                            reason,
+                            idempotencyKey,
+                            planId: values.planId ?? "",
+                        })
+                    }
+                />
+            )}
             {(trialing || needsPlanForTrial) && (
                 <OperatorDialog
                     trigger={trialing ? "Extend trial" : "Start trial"}

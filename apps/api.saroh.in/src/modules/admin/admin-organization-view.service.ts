@@ -1,16 +1,24 @@
 import { Injectable, Logger, NotFoundException } from "@nestjs/common";
 import { liveCatalogueVersion, prisma } from "@saroh/database";
-import type { AccessState, LimitPeriod } from "@saroh/pricing-catalog";
-import { resolveAllAccess } from "@saroh/pricing-catalog";
+import type { AccessState, Catalog, LimitPeriod } from "@saroh/pricing-catalog";
+import {
+    MODULE_MAP,
+    resolveAllAccess,
+    validateCatalog,
+} from "@saroh/pricing-catalog";
 
 import { mapEntry } from "../billing/catalogue-access";
+import type { BusinessAccess } from "../billing/catalogue-access.service";
 import { CatalogueAccessService } from "../billing/catalogue-access.service";
 import type { EntitlementMap } from "../billing/entitlement.service";
 import { EntitlementService } from "../billing/entitlement.service";
 import { MODULES } from "../capabilities/module-registry";
 import type { SiteTrackersRow } from "./admin-site-trackers.service";
 import { siteTrackerStates } from "./admin-site-trackers.service";
-import { catalogueUsage } from "./catalogue-usage";
+import type { UsageNote } from "./catalogue-usage";
+import { catalogueUsage, usageNote } from "./catalogue-usage";
+import type { EffectivePlan } from "./effective-plan";
+import { effectivePlan } from "./effective-plan";
 
 const PANEL_ROWS = 20;
 
@@ -78,13 +86,17 @@ export interface CatalogueModuleRow {
     /** The cap now, null for none or when off. */
     limit: number | null;
     per: LimitPeriod;
+    /** A soft cap: counted and told, never refused (storage, visits). */
+    soft: boolean;
     /** Its plan's own cell, before any override or add-on. */
     planState: AccessState;
     planLimit: number | null;
     /** Why it differs from the plan, in the design's words; empty if not. */
     override: string;
-    /** How many are in use, where the page can count them; else null. */
+    /** How many are in use, where metering counts them; else null. */
     usage: number | null;
+    /** Why the count reads as it does, where a bare number would mislead. */
+    usageNote: UsageNote | null;
     /** Whether the row has a limit to set (`MODULE_MAP.limitKey`). */
     limitable: boolean;
 }
@@ -127,6 +139,20 @@ export interface OrganizationCatalogue {
 }
 
 export interface OrganizationPlan {
+    /**
+     * The plan it is on now, a plan override winning (UX-087); null off the
+     * catalogue, where `subscription` is the plan.
+     */
+    effective: EffectivePlan | null;
+    /**
+     * The live catalogue version and its plans, whether or not the business
+     * is read through it: a business off the catalogue can still be put on
+     * one of them. Null while no valid version is live.
+     */
+    liveCatalogue: {
+        version: number;
+        plans: { id: string; name: string }[];
+    } | null;
     subscription: {
         status: string;
         plan: {
@@ -469,7 +495,7 @@ export class AdminOrganizationViewService {
         counts: OrganizationFacts["counts"],
     ): Promise<OrganizationPlan> {
         const now = new Date();
-        const [subscription, access, raises, overrides, usage, live] =
+        const [subscription, access, raises, overrides, metered, live] =
             await Promise.all([
                 prisma.subscription.findUnique({
                     where: { organizationId },
@@ -510,17 +536,24 @@ export class AdminOrganizationViewService {
                     },
                     orderBy: [{ createdAt: "desc" }, { id: "desc" }],
                 }),
-                catalogueUsage(organizationId),
+                // Every row metering counts (`MODULE_MAP`), by the rules
+                // enforcement uses; a row it doesn't count reads as not
+                // measured.
+                catalogueUsage(organizationId, Object.keys(MODULE_MAP), now),
                 liveCatalogueVersion(prisma, now),
             ]);
+        const { usage, storefronts } = metered;
         const planValues = access.planEntitlements;
         const effective = access.entitlements;
 
         // Usage the instance can count. A limit whose usage nobody measures
         // says so (null) rather than showing zero.
+        // `storefronts` is the old floor's, which counts every storefront;
+        // the catalogue's locations row counts only places customers visit.
         const keyUsage: Record<string, number> = {
             sites: counts.sites,
             teamMembers: counts.members,
+            storefronts,
         };
 
         let catalogue: OrganizationCatalogue | null = null;
@@ -559,11 +592,17 @@ export class AdminOrganizationViewService {
                         state: a.state,
                         limit: a.state === "on" ? a.limit : null,
                         per: a.per,
+                        soft: a.soft,
                         planState: plan?.state ?? a.state,
                         planLimit:
                             plan?.state === "on" ? (plan.limit ?? null) : null,
                         override: a.override,
                         usage: usage[a.moduleId] ?? null,
+                        usageNote: usageNote(
+                            a.moduleId,
+                            usage[a.moduleId] ?? null,
+                            storefronts,
+                        ),
                         limitable: Boolean(mapEntry(a.moduleId)?.limitKey),
                     };
                 }),
@@ -577,6 +616,8 @@ export class AdminOrganizationViewService {
         );
 
         return {
+            effective: effectivePlan(access),
+            liveCatalogue: liveCataloguePlans(access, live),
             subscription,
             catalogue,
             legacyReason: access.source === "legacy" ? access.reason : null,
@@ -650,6 +691,30 @@ export class AdminOrganizationViewService {
             take: PANEL_ROWS,
         });
     }
+}
+
+/**
+ * The live version's plans: the business's own catalogue when it is on the
+ * live version, else the live row's snapshot. Null when none is live or it
+ * doesn't validate (the resolver logs that).
+ */
+function liveCataloguePlans(
+    access: BusinessAccess,
+    live: { version: number; catalog: unknown } | null,
+): OrganizationPlan["liveCatalogue"] {
+    if (!live) return null;
+    let catalog: Catalog;
+    if (access.source === "catalogue" && access.version === live.version) {
+        catalog = access.catalog;
+    } else {
+        const r = validateCatalog(live.catalog);
+        if (!r.ok) return null;
+        catalog = r.catalog;
+    }
+    return {
+        version: live.version,
+        plans: catalog.plans.map((p) => ({ id: p.id, name: p.name })),
+    };
 }
 
 function pick(map: EntitlementMap, key: string): number | boolean | null {

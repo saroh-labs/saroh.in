@@ -1,12 +1,16 @@
 import {
     ForbiddenException,
     Injectable,
+    Logger,
     NotFoundException,
 } from "@nestjs/common";
 import type { Prisma } from "@saroh/database";
 import { prisma } from "@saroh/database";
 
+import { CatalogueAccessService } from "../billing/catalogue-access.service";
 import { OPERATOR_LIFECYCLE_ACTIONS } from "./admin-lifecycle.service";
+import type { EffectivePlan } from "./effective-plan";
+import { effectivePlan } from "./effective-plan";
 
 const DEFAULT_PAGE_SIZE = 25;
 const MAX_PAGE_SIZE = 100;
@@ -34,7 +38,14 @@ export interface OrganizationDirectoryRow {
     createdAt: Date;
     members: number;
     enabledModules: string[];
+    /** Its subscription's plan row, which the directory's filter matches. */
     plan: { key: string; name: string } | null;
+    /**
+     * The plan it is on now, a live plan override winning (UX-087), as
+     * `CatalogueAccessService.resolve` reads it. Null off the catalogue, or
+     * when it couldn't be read (logged): the screen falls back to `plan`.
+     */
+    effectivePlan: EffectivePlan | null;
     subscriptionStatus: string | null;
     /** The business's own latest recorded action, or null if it never acted. */
     lastActiveAt: Date | null;
@@ -81,6 +92,10 @@ type RowRecord = Prisma.OrganizationGetPayload<{ select: typeof ROW_SELECT }>;
  */
 @Injectable()
 export class AdminOrganizationsService {
+    private readonly logger = new Logger(AdminOrganizationsService.name);
+
+    constructor(private readonly access: CatalogueAccessService) {}
+
     async directory(
         query: OrganizationDirectoryQuery,
         caller: { canReadPii: boolean },
@@ -128,6 +143,23 @@ export class AdminOrganizationsService {
             select: { id: true, name: true, slug: true },
             orderBy: { name: "asc" },
         });
+    }
+
+    /** One business's {@link EffectivePlan}; null (logged) if unreadable. */
+    private async effective(
+        organizationId: string,
+        now: Date,
+    ): Promise<EffectivePlan | null> {
+        try {
+            return effectivePlan(
+                await this.access.resolve(organizationId, now),
+            );
+        } catch (err) {
+            this.logger.warn(
+                `admin_effective_plan_unread org=${organizationId} error=${err instanceof Error ? err.message : "unknown"}`,
+            );
+            return null;
+        }
     }
 
     private where(
@@ -219,35 +251,43 @@ export class AdminOrganizationsService {
         if (ids.length === 0) return [];
         const since = new Date(Date.now() - ATTENTION_WINDOW_MS);
 
-        const [activity, failedJobs, failedWebhooks] = await Promise.all([
-            prisma.auditEvent.groupBy({
-                by: ["organizationId"],
-                where: {
-                    organizationId: { in: ids },
-                    // What the business did, not what an operator did to it.
-                    action: { notIn: [...OPERATOR_LIFECYCLE_ACTIONS] },
-                },
-                _max: { createdAt: true },
-            }),
-            prisma.job.groupBy({
-                by: ["organizationId"],
-                where: {
-                    organizationId: { in: ids },
-                    status: "FAILED",
-                    updatedAt: { gte: since },
-                },
-                _count: { _all: true },
-            }),
-            prisma.webhookEvent.groupBy({
-                by: ["organizationId"],
-                where: {
-                    organizationId: { in: ids },
-                    status: "FAILED",
-                    createdAt: { gte: since },
-                },
-                _count: { _all: true },
-            }),
-        ]);
+        const now = new Date();
+        const [activity, failedJobs, failedWebhooks, plans] = await Promise.all(
+            [
+                prisma.auditEvent.groupBy({
+                    by: ["organizationId"],
+                    where: {
+                        organizationId: { in: ids },
+                        // What the business did, not what an operator did to it.
+                        action: { notIn: [...OPERATOR_LIFECYCLE_ACTIONS] },
+                    },
+                    _max: { createdAt: true },
+                }),
+                prisma.job.groupBy({
+                    by: ["organizationId"],
+                    where: {
+                        organizationId: { in: ids },
+                        status: "FAILED",
+                        updatedAt: { gte: since },
+                    },
+                    _count: { _all: true },
+                }),
+                prisma.webhookEvent.groupBy({
+                    by: ["organizationId"],
+                    where: {
+                        organizationId: { in: ids },
+                        status: "FAILED",
+                        createdAt: { gte: since },
+                    },
+                    _count: { _all: true },
+                }),
+                // The resolver, once a business (a page is at most 100): a plan
+                // override can't be read in a grouped query without deciding
+                // again here what wins, which only the resolver may do.
+                Promise.all(ids.map((id) => this.effective(id, now))),
+            ],
+        );
+        const effective = new Map(ids.map((id, i) => [id, plans[i]]));
 
         const lastActive = new Map(
             activity.map((row) => [row.organizationId, row._max.createdAt]),
@@ -280,6 +320,7 @@ export class AdminOrganizationsService {
                     (row) => row.moduleKey,
                 ),
                 plan: record.subscription?.plan ?? null,
+                effectivePlan: effective.get(record.id) ?? null,
                 subscriptionStatus: record.subscription?.status ?? null,
                 lastActiveAt: lastActive.get(record.id) ?? null,
                 attention,

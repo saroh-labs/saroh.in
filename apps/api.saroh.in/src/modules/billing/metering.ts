@@ -2,8 +2,9 @@
  * What the plans catalogue's limits count, and how (plans catalogue U13,
  * KTD-9). Every count reads the tables the product already writes; nothing
  * is stored to be metered. `MeteringService` (enforcement), `GET
- * …/billing/access` (usage) and the admin's `ImpactService` (usage lines and
- * impact) all count through here, so the three can't disagree.
+ * …/billing/access` (usage), the admin's `ImpactService` (usage lines and
+ * impact) and the console's business page (`admin/catalogue-usage.ts`, #875)
+ * all count through here, so none can disagree.
  *
  * The limit keys are `MODULE_MAP.limitKey` (`@saroh/pricing-catalog`):
  *
