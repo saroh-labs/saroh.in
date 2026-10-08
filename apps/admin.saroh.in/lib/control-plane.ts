@@ -130,7 +130,8 @@ export type AdminPermission =
     | "pricing:edit"
     | "pricing:publish"
     | "coupons:manage"
-    | "pricing:override";
+    | "pricing:override"
+    | "organization:trackers:write";
 
 export type ControlPlaneResult<T> =
     | { ok: true; data: T }
