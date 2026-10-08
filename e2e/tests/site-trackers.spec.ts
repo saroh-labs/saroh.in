@@ -29,6 +29,24 @@ const PLAUSIBLE = "pa-e2etest_northwind";
 const THIRD_PARTY =
     /googletagmanager\.com|connect\.facebook\.net|posthog\.com|clarity\.ms|plausible\.io|umami\.is/;
 
+/** A requested URL's host and path, parsed, never matched as a substring. */
+function parsed(u: string): URL | null {
+    try {
+        return new URL(u);
+    } catch {
+        return null;
+    }
+}
+
+/** Google's tag host itself or a subdomain of it, never a look-alike. */
+const isGoogleTagHost = (u: string) => {
+    const host = parsed(u)?.hostname;
+    return (
+        host === "googletagmanager.com" ||
+        host?.endsWith(".googletagmanager.com") === true
+    );
+};
+
 async function northwindSite(request: APIRequestContext): Promise<string> {
     const sites =
         await northwind(request).get<
@@ -85,11 +103,17 @@ test.describe("a merchant's own trackers (DEC-108)", { tag: "@serial" }, () => {
             await expect(banner).toBeVisible();
             await expect
                 .poll(() =>
-                    asked.some((u) => u.includes(`/js/${PLAUSIBLE}.js`)),
+                    asked.some((u) => {
+                        const url = parsed(u);
+                        return (
+                            url?.hostname === "plausible.io" &&
+                            url.pathname === `/js/${PLAUSIBLE}.js`
+                        );
+                    }),
                 )
                 .toBe(true);
             expect(
-                asked.filter((u) => u.includes("googletagmanager.com")),
+                asked.filter(isGoogleTagHost),
                 "nothing from Google before Accept",
             ).toEqual([]);
             // The notice it links to lists the tools.
@@ -101,8 +125,11 @@ test.describe("a merchant's own trackers (DEC-108)", { tag: "@serial" }, () => {
             await expect(banner).toBeHidden();
             await expect
                 .poll(() =>
-                    asked.some((u) =>
-                        u.includes(`googletagmanager.com/gtag/js?id=${GA4}`),
+                    asked.some(
+                        (u) =>
+                            isGoogleTagHost(u) &&
+                            parsed(u)?.pathname === "/gtag/js" &&
+                            parsed(u)?.searchParams.get("id") === GA4,
                     ),
                 )
                 .toBe(true);
