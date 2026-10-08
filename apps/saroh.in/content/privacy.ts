@@ -1,6 +1,6 @@
 /**
  * The Privacy Policy, as the owner agreed it (Claude Doc "Saroh Privacy
- * Policy and Terms", settled 4 Oct 2026, rev 32; email provider rev 42, 6 Oct; merchants' own trackers, owner's wording 8 Oct). Published VERBATIM at
+ * Policy and Terms", settled 4 Oct 2026, rev 32; email provider rev 42, 6 Oct; merchants' own trackers, owner's wording 8 Oct, rev 44). Published VERBATIM at
  * /privacy: do not reword it here. A change comes from the owner's text,
  * and moves `publishOn`, which is the "Last updated" date the page shows.
  *
