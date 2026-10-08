@@ -22,18 +22,18 @@ import { customerReader } from "@/lib/customer-reader";
 import { getSignedInCustomer } from "@/lib/customer-session";
 import { headerAction } from "@/lib/header-action";
 import { liveMenu } from "@/lib/in-page-menu";
-import {
-    getMovedTo,
-    getPublicationForHost,
-    getSiteForHost,
-    shareImages,
-} from "@/lib/publication";
+import { getMovedTo, getSiteForHost, shareImages } from "@/lib/publication";
 import { movedLocation, REQUEST_PATH_HEADER } from "@/lib/request-path";
 import { getCheckoutOptions } from "@/lib/shop-checkout";
 import { getSignInOptions } from "@/lib/sign-in";
 import { getFooterFacts } from "@/lib/site-footer";
+import { getSiteHead, NO_HEAD } from "@/lib/site-head";
 import { classifySiteHost } from "@/lib/site-host-mode";
 import { relayFor } from "@/lib/site-relay";
+import {
+    isPlatformAddress,
+    verificationMetadata,
+} from "@/lib/site-verification";
 import { shareable } from "@/lib/test-metadata";
 import { getTestRelease, rootDomain } from "@/lib/test-release";
 import { HEADER_BELOW_BAR } from "@/lib/test-release-chrome";
@@ -65,7 +65,8 @@ export async function generateMetadata({
 }): Promise<Metadata | null> {
     const { domain } = await params;
     const mode = classifySiteHost(domain, rootDomain()).mode;
-    const snapshot = await getPublicationForHost(domain);
+    const resolved = await getSiteForHost(domain);
+    const snapshot = resolved?.snapshot ?? null;
     if (!snapshot) {
         // A test host whose link opens nothing still says what it is, and
         // is never indexed (DEC-071, R3).
@@ -90,6 +91,16 @@ export async function generateMetadata({
     const title = seoTitle?.trim() ? seoTitle : name;
     const description = seoDescription?.trim() ? seoDescription : undefined;
     const images = shareImages(snapshot.site);
+    // Search engines' verification codes, read live (DEC-108). Never on a
+    // test host: `shareable` keeps only the title and noindex there.
+    const head =
+        mode === "live" && resolved?.siteId
+            ? await getSiteHead(resolved.siteId)
+            : NO_HEAD;
+    const verification = verificationMetadata(
+        head.verifications,
+        isPlatformAddress(domain, rootDomain()),
+    );
 
     // A test release's host has no share card and is never indexed (R3).
     return shareable(
@@ -116,6 +127,7 @@ export async function generateMetadata({
                 images,
             },
             metadataBase: new URL(`https://${domain}`),
+            ...(verification ? { verification } : {}),
         },
     );
 }

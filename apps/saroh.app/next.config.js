@@ -48,8 +48,27 @@ const SECURITY_HEADERS = [
     { key: "X-Content-Type-Options", value: "nosniff" },
 ];
 
+/**
+ * Crawlers that get the page's metadata in `<head>`, rendered before the body
+ * rather than streamed after it (DEC-108, #894). Search Console, Bing, Meta
+ * and Pinterest verify a site by reading a `<meta>` tag in the head, and they
+ * keep checking. Next 16's own list (`html-bots.ts`) is kept whole here and
+ * extended with the crawlers it leaves out: Googlebot itself, and Pinterest's
+ * verifier. Everyone else still gets streamed metadata.
+ */
+const HTML_LIMITED_BOTS = new RegExp(
+    [
+        // Next 16.3's default list.
+        "[\\w-]+-Google|Google-[\\w-]+|Chrome-Lighthouse|Slurp|DuckDuckBot|baiduspider|yandex|sogou|bitlybot|tumblr|vkShare|quora link preview|redditbot|ia_archiver|Bingbot|BingPreview|applebot|facebookexternalhit|facebookcatalog|Twitterbot|LinkedInBot|Slackbot|Discordbot|WhatsApp|SkypeUriPreview|Yeti|googleweblight",
+        // Added for site verification.
+        "Googlebot|Pinterest",
+    ].join("|"),
+    "i",
+);
+
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+    htmlLimitedBots: HTML_LIMITED_BOTS,
     // Development logs every server action's arguments by default, and some
     // carry secrets: provider keys, sign-in codes (UX-005, 7 Oct). Production
     // never logs them; this keeps local logs clean too.
