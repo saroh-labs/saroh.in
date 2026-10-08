@@ -121,9 +121,14 @@ jobs:
               with:
                   ref: ${{ matrix.ref }}
 
+            # Each app and environment keeps its own Turbo and Next.js build
+            # caches (they build differently), so unchanged packages replay and
+            # Next.js only recompiles what changed.
             - uses: ./.github/actions/setup
               with:
                   prisma: "false"
+                  turbo-cache: cf-${{ matrix.pkg }}-${{ matrix.env }}
+                  next-cache: "true"
 
             - name: Settings from wrangler.jsonc
               run: node scripts/cf-env.mjs "${{ matrix.dir }}" "${{ matrix.env }}" >> "$GITHUB_ENV"
