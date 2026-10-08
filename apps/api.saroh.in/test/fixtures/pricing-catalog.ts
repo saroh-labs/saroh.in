@@ -310,6 +310,7 @@ export function fakeMeteredCatalog(edit?: (c: Catalog) => void): Catalog {
             switched("roles", "Own roles", "hidden", "pro"),
             switched("themes", "Looks", "hidden", "pro"),
             switched("review", "Second look", "locked", "grow"),
+            switched("site-trackers", "Own tracking", "locked", "grow"),
         ],
         yearly: { on: false, paid: 10 },
         gst: { show: "excl" },
