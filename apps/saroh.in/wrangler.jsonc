@@ -25,11 +25,31 @@
     },
     "workers_dev": true,
     "routes": [],
+    // Settings that aren't secret. GitHub Actions builds with these too
+    // (scripts/cf-env.mjs), so the build and the Worker can't disagree.
+    // VERCEL_ENV / VERCEL_GIT_COMMIT_REF keep the names Vercel used: the
+    // apps' checks read them. Secrets come from GitHub (deploy workflow).
+    "vars": {
+        "VERCEL_ENV": "preview",
+        "VERCEL_GIT_COMMIT_REF": "development",
+        "API_URL": "https://api.saroh.io",
+        "DEV_ACCESS_COOKIE_DOMAIN": ".saroh.io",
+        "DEV_REDIRECT_ORIGIN": "https://saroh.in",
+        "NEXT_PUBLIC_ACCOUNTS_URL": "https://accounts.saroh.io",
+        "RESOURCES_PREVIEW": "1",
+    },
     "env": {
         "production": {
             "name": "saroh-web",
             "workers_dev": true,
             "routes": [],
+            "vars": {
+                "VERCEL_ENV": "production",
+                "VERCEL_GIT_COMMIT_REF": "main",
+                "API_URL": "https://api.saroh.in",
+                "NEXT_PUBLIC_ACCOUNTS_URL": "https://accounts.saroh.in",
+                "NEXT_PUBLIC_GA_MEASUREMENT_ID": "G-7KKPRQXCJX",
+            },
             "services": [
                 {
                     "binding": "WORKER_SELF_REFERENCE",

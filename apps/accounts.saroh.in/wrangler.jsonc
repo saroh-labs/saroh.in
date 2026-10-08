@@ -23,11 +23,33 @@
     },
     "workers_dev": true,
     "routes": [],
+    // Settings that aren't secret. GitHub Actions builds with these too
+    // (scripts/cf-env.mjs), so the build and the Worker can't disagree.
+    // VERCEL_ENV / VERCEL_GIT_COMMIT_REF keep the names Vercel used: the
+    // apps' checks read them. Secrets come from GitHub (deploy workflow).
+    "vars": {
+        "VERCEL_ENV": "preview",
+        "VERCEL_GIT_COMMIT_REF": "development",
+        "AUTH_COOKIE_PREFIX": "saroh-dev",
+        "BETTER_AUTH_TRUSTED_ORIGINS": "https://api.saroh.io,https://app.saroh.io,https://accounts.saroh.io,https://admin.saroh.io,https://saroh.io,https://www.saroh.io",
+        "DEV_ACCESS_COOKIE_DOMAIN": ".saroh.io",
+        "DEV_REDIRECT_ORIGIN": "https://accounts.saroh.in",
+        "NEXT_PUBLIC_ACCOUNTS_URL": "https://accounts.saroh.io",
+        "NEXT_PUBLIC_APP_URL": "https://app.saroh.io",
+        "NEXT_PUBLIC_BETTER_AUTH_URL": "https://api.saroh.io",
+    },
     "env": {
         "production": {
             "name": "saroh-accounts",
             "workers_dev": true,
             "routes": [],
+            "vars": {
+                "VERCEL_ENV": "production",
+                "VERCEL_GIT_COMMIT_REF": "main",
+                "NEXT_PUBLIC_ACCOUNTS_URL": "https://accounts.saroh.in",
+                "NEXT_PUBLIC_APP_URL": "https://app.saroh.in",
+                "NEXT_PUBLIC_BETTER_AUTH_URL": "https://api.saroh.in",
+            },
             "services": [
                 {
                     "binding": "WORKER_SELF_REFERENCE",
