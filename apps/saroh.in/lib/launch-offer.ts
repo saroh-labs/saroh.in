@@ -14,9 +14,6 @@ import { env } from "@/env";
  * at launch". An offer that can't be read is never shown half right.
  */
 
-/** Seconds an offer is served before it is read again. */
-export const OFFER_REVALIDATE_SECONDS = 300;
-
 /** How long a read may take before the page gives up on it. */
 const TIMEOUT_MS = 3000;
 
@@ -46,7 +43,8 @@ export async function readLaunchOffer(
     try {
         const res = await fetcher(`${api}/public/waitlist/offer`, {
             headers: { accept: "application/json" },
-            next: { revalidate: OFFER_REVALIDATE_SECONDS },
+            // Read once, when the page is built (the site is static).
+            cache: "force-cache",
             signal: AbortSignal.timeout(TIMEOUT_MS),
         });
         if (res.status === 404) return null;
@@ -56,6 +54,11 @@ export async function readLaunchOffer(
         if (!offer) throw new Error("The launch offer answer is malformed");
         return offer;
     } catch (err) {
+        // A deployment's build fails rather than publish the placeholder over
+        // a real offer (the site is static; see `readLivePricing`).
+        if (env.NEXT_PHASE === "phase-production-build" && env.VERCEL_ENV) {
+            throw err;
+        }
         console.warn(
             "[waitlist] the launch offer could not be read; showing the placeholder",
             err instanceof Error ? err.message : err,

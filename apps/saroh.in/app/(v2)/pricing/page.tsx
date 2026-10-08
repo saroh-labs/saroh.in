@@ -10,12 +10,10 @@ import { softwareApplicationLd } from "@/lib/structured-data";
 
 /**
  * `/pricing` (plans catalogue U24): the Pricing design, drawn from the
- * published catalogue. Static, regenerated every five minutes and at once
- * when the API calls `/api/revalidate` after a publish (KTD-10). With no
- * catalogue to read, every price is the "Pricing announced at launch"
- * placeholder.
+ * published catalogue. Static, built from the catalogue when the site is
+ * built; a publish starts a build (KTD-10). With no catalogue to read, every
+ * price is the "Pricing announced at launch" placeholder.
  */
-export const revalidate = 300;
 
 export const metadata: Metadata = pageMetadata({
     title: `Pricing — ${PRICING_COPY.title} · Saroh`,

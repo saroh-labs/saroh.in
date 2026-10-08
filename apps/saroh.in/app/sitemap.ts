@@ -5,11 +5,8 @@ import { resourcesContext } from "@/lib/resources-context";
 import { SITE_URL } from "@/lib/seo";
 import { indexedPaths } from "@/lib/site-pages";
 
-/**
- * Re-read every five minutes, so a page dated today joins the sitemap on its
- * day with no deploy (plan KTD-2).
- */
-export const revalidate = 300;
+// Static: a page dated today joins the sitemap through the nightly rebuild
+// at 00:00 IST (plan KTD-2).
 
 /**
  * Every page worth indexing (plan U26, `lib/site-pages.ts`), with the

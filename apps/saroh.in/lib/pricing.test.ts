@@ -7,7 +7,12 @@ import { readLivePricing, readPreviewPricing } from "./pricing";
 import { fakeCatalogInput } from "./pricing.fixture";
 
 const env = vi.hoisted(() => {
-    const e: { API_URL?: string; NODE_ENV?: string; NEXT_PHASE?: string } = {
+    const e: {
+        API_URL?: string;
+        NODE_ENV?: string;
+        NEXT_PHASE?: string;
+        VERCEL_ENV?: string;
+    } = {
         API_URL: "https://api.test",
         NODE_ENV: "test",
     };
@@ -15,7 +20,7 @@ const env = vi.hoisted(() => {
 });
 vi.mock("@/env", () => ({ env }));
 
-type FetchInit = RequestInit & { next?: { revalidate?: number } };
+type FetchInit = RequestInit;
 
 /** A fetch that answers `body` with `status`, recording its calls. */
 function answering(body: unknown, status = 200) {
@@ -42,11 +47,12 @@ afterEach(() => {
     env.API_URL = "https://api.test";
     env.NODE_ENV = "test";
     env.NEXT_PHASE = undefined;
+    env.VERCEL_ENV = undefined;
 });
 
 /** Reading the published catalogue (plans catalogue U24, KTD-10). */
 describe("readLivePricing", () => {
-    it("reads /public/pricing with a five-minute revalidation", async () => {
+    it("reads /public/pricing once, when the site is built", async () => {
         const fetcher = answering(live);
         const c = await readLivePricing(asFetch(fetcher));
         expect(c?.plans.map((p) => p.name)).toEqual([
@@ -56,7 +62,7 @@ describe("readLivePricing", () => {
         ]);
         const [url, init] = fetcher.mock.calls[0];
         expect(url).toBe("https://api.test/public/pricing");
-        expect(init?.next?.revalidate).toBe(300);
+        expect(init?.cache).toBe("force-cache");
     });
 
     it("no version published (404): null, the placeholder", async () => {
@@ -70,7 +76,7 @@ describe("readLivePricing", () => {
         expect(fetcher).not.toHaveBeenCalled();
     });
 
-    it("API down on a first build: null, never a failed build", async () => {
+    it("API down on a local build: null, the placeholder", async () => {
         env.NODE_ENV = "production";
         env.NEXT_PHASE = "phase-production-build";
         vi.spyOn(console, "warn").mockImplementation(() => undefined);
@@ -78,8 +84,10 @@ describe("readLivePricing", () => {
         expect(await readLivePricing(asFetch(down))).toBeNull();
     });
 
-    it("API down while serving: throws, so ISR keeps the last good page", async () => {
+    it("API down on a deployment's build: throws, so the last good site keeps serving", async () => {
         env.NODE_ENV = "production";
+        env.NEXT_PHASE = "phase-production-build";
+        env.VERCEL_ENV = "production";
         await expect(
             readLivePricing(asFetch(answering({}, 503))),
         ).rejects.toThrow();

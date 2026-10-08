@@ -81,13 +81,12 @@ export const metadata: Metadata = {
 };
 
 /**
- * Every page is rendered again at most this often (ISR, seconds), so a
- * Resources page, changelog entry or legal page dated today appears within
- * five minutes of midnight in India, with no deploy (plan KTD-2,
- * `PUBLISH_REVALIDATE_SECONDS`). A literal: Next reads it without running
- * the file.
+ * The site is static: every page is built at deploy time and served as a
+ * file, with no regeneration at request time (Cloudflare Workers can neither
+ * read `content/` nor compile MDX while serving). A page dated today appears
+ * through the nightly rebuild at 00:00 IST (plan KTD-2), and published pricing
+ * or a launch offer through the build a publish starts (KTD-10).
  */
-export const revalidate = 300;
 
 /**
  * The shell every page shares: fonts, GA and the light-only scheme. Pages

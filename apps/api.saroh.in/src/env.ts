@@ -143,6 +143,17 @@ const envSchema = z.object({
     // The secret is byte-identical in saroh.in. Never logged.
     PRICING_SITE_URL: z.string().url().optional(),
     PRICING_REVALIDATE_SECRET: z.string().min(32).optional(),
+    // saroh.in is static: a publish starts its build instead (plans catalogue
+    // KTD-10). A fine-grained GitHub token allowed only to run this repo's
+    // Actions, and which environment to build (`main` for production,
+    // `development` for development). Both set, they win over the hook above.
+    // The token is never logged.
+    SITE_DEPLOY_GITHUB_TOKEN: z.string().min(20).optional(),
+    SITE_DEPLOY_ENVIRONMENT: z.enum(["development", "production"]).optional(),
+    SITE_DEPLOY_GITHUB_REPO: z
+        .string()
+        .regex(/^[\w.-]+\/[\w.-]+$/)
+        .optional(),
     // Cloudflare Turnstile, the bot challenge a code needs past a shared
     // ceiling. Unset: no challenge is ever asked (and an ERROR says when one
     // would have been), so a customer is never stuck on a widget that can't load.

@@ -7,6 +7,12 @@ import { env } from "../../env";
  * Tell saroh.in that the published pricing changed (plans catalogue KTD-10):
  * after a publish commits, and again at a scheduled version's go-live.
  *
+ * saroh.in is static (it reads the catalogue when it is built), so the usual
+ * way is to start its build: a `workflow_dispatch` of the frontends' deploy
+ * workflow for the marketing site, in this API's environment
+ * (`SITE_DEPLOY_GITHUB_TOKEN`, `SITE_DEPLOY_ENVIRONMENT`). The older hook,
+ * `POST <PRICING_SITE_URL>/api/revalidate`, is used only when that isn't set.
+ *
  * The job row is written in the publish's own transaction (the outbox), so
  * it exists exactly when the version does, and the worker only sees it once
  * that transaction has committed: "after commit" without a post-commit hook.
@@ -27,6 +33,12 @@ export const REVALIDATE_SECRET_HEADER = "x-saroh-revalidate";
 /** saroh.in's hook, under its base URL. */
 export const REVALIDATE_PATH = "/api/revalidate";
 
+/** The workflow that builds and deploys the frontends, saroh.in among them. */
+export const SITE_DEPLOY_WORKFLOW = "deploy-frontends.yml";
+
+/** The repository it lives in, unless `SITE_DEPLOY_GITHUB_REPO` says otherwise. */
+export const SITE_DEPLOY_REPO = "saroh-labs/saroh.in";
+
 /** How long one call may take before it counts as failed (and is retried). */
 const CALL_TIMEOUT_MS = 10_000;
 
@@ -36,18 +48,61 @@ export interface RevalidatePayload {
     cause: "publish" | "go-live";
 }
 
-/** Where to call and with what, or null when the hook isn't configured. */
-export function revalidateHook(): { url: string; secret: string } | null {
+export type SiteRefresh =
+    | { kind: "deploy"; url: string; token: string; body: string }
+    | { kind: "revalidate"; url: string; secret: string };
+
+/** Where to call and with what, or null when neither way is configured. */
+export function revalidateHook(): SiteRefresh | null {
+    const token = env.SITE_DEPLOY_GITHUB_TOKEN;
+    const environment = env.SITE_DEPLOY_ENVIRONMENT;
+    if (token && environment) {
+        const repo = env.SITE_DEPLOY_GITHUB_REPO ?? SITE_DEPLOY_REPO;
+        return {
+            kind: "deploy",
+            url: `https://api.github.com/repos/${repo}/actions/workflows/${SITE_DEPLOY_WORKFLOW}/dispatches`,
+            token,
+            body: JSON.stringify({
+                ref: environment === "production" ? "main" : "development",
+                inputs: { app: "web", environment },
+            }),
+        };
+    }
     const base = env.PRICING_SITE_URL;
     const secret = env.PRICING_REVALIDATE_SECRET;
     if (!base || !secret) return null;
-    return { url: new URL(REVALIDATE_PATH, base).toString(), secret };
+    return {
+        kind: "revalidate",
+        url: new URL(REVALIDATE_PATH, base).toString(),
+        secret,
+    };
+}
+
+function requestFor(hook: SiteRefresh): RequestInit {
+    if (hook.kind === "deploy") {
+        return {
+            method: "POST",
+            headers: {
+                accept: "application/vnd.github+json",
+                authorization: `Bearer ${hook.token}`,
+                "content-type": "application/json",
+                "x-github-api-version": "2022-11-28",
+            },
+            body: hook.body,
+            signal: AbortSignal.timeout(CALL_TIMEOUT_MS),
+        };
+    }
+    return {
+        method: "POST",
+        headers: { [REVALIDATE_SECRET_HEADER]: hook.secret },
+        signal: AbortSignal.timeout(CALL_TIMEOUT_MS),
+    };
 }
 
 /**
  * Queue a revalidation on the caller's transaction. Writes nothing when the
  * hook isn't configured: a job that could only no-op is never queued
- * (backend-jobs.md), and saroh.in then refreshes on its ISR timer.
+ * (backend-jobs.md), and saroh.in then shows the change at its nightly build.
  */
 export async function enqueueSiteRevalidation(
     tx: Pick<Prisma.TransactionClient, "job">,
@@ -85,11 +140,7 @@ export class RevalidateSiteHandler {
         let res: Response | null = null;
         let failure = "";
         try {
-            res = await this.fetchFn(hook.url, {
-                method: "POST",
-                headers: { [REVALIDATE_SECRET_HEADER]: hook.secret },
-                signal: AbortSignal.timeout(CALL_TIMEOUT_MS),
-            });
+            res = await this.fetchFn(hook.url, requestFor(hook));
         } catch (error) {
             failure = error instanceof Error ? error.name : "unknown";
         }
@@ -106,7 +157,7 @@ export class RevalidateSiteHandler {
             throw new Error(`saroh.in revalidation answered ${res.status}`);
         }
         this.logger.log(
-            `pricing_revalidated job=${job.id} version=${version ?? "?"}`,
+            `pricing_revalidated job=${job.id} version=${version ?? "?"} via=${hook.kind}`,
         );
     };
 }

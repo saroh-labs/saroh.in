@@ -57,11 +57,8 @@ const HERO: [string, string][] = [
     ["H", "andled."],
 ];
 
-/**
- * Static, refreshed every five minutes (ISR), the window the launch offer
- * is cached for, and at once when the API calls `/api/revalidate`.
- */
-export const revalidate = 300;
+// Static: the launch offer is read when the site is built, and publishing a
+// new one starts a build.
 
 /**
  * The waitlist (Waitlist design, plan U30): the site's one ask until

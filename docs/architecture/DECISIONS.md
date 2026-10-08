@@ -260,7 +260,7 @@ Unless an entry says otherwise, its status is **Proposed — requires audit revi
 
 ## DEC-025 Vercel for Saroh-managed multi-tenant sites
 
-**Status: Accepted — 2026-09-24; implementation pending** — see [ADR-009](./adr/ADR-009-vercel-managed-multi-tenant-sites.md)
+**Status: Superseded by DEC-107 — 2026-10-08** (was Accepted 2026-09-24) — see [ADR-009](./adr/ADR-009-vercel-managed-multi-tenant-sites.md)
 
 - Context: businesses need customer-facing sites using Saroh modules without managing hosting accounts or repositories.
 - Decision: one Saroh-owned Vercel project serves `*.saroh.app` and verified custom domains from the shared Next.js application. Customer-facing server routes call the Saroh business API; only that API accesses the database. R2 remains the storage integration.
@@ -1208,3 +1208,15 @@ Unless an entry says otherwise, its status is **Proposed — requires audit revi
 - Context: DEC-048 let a storefront's Admin, Manager or Editor take and change that storefront's orders, recording payment included, because of their storefront role name.
 - Decision: on a storefront too, seeing amounts and recording or taking payment depend only on the permissions the person's roles carry. No storefront role name grants money.
 - Consequences: the storefront role checks in the stores service give way to permissions. A storefront role that should take payments needs a role carrying the payment permission.
+
+## DEC-107 Every Saroh web app runs on Cloudflare Workers, deployed from GitHub Actions
+
+**Status: Accepted — 2026-10-08** · owner · supersedes DEC-025 · epic #864
+
+- Context: merchant sites render per request, and Vercel bills that traffic by data sent, requests and origin transfer; the account's daily build limit also stopped deploys on 7 Oct. The merchant sites moved to a Worker on 7 Oct (`saroh.app` production, `<address>.saroh.io` dev).
+- Decision:
+    - **The marketing site, workspace, accounts and admin move too.** Each app is one Worker per environment (`saroh-<app>` and `saroh-<app>-dev`), built with OpenNext. Vercel is no longer used once the move is done.
+    - **GitHub Actions builds and deploys** (`deploy-sites.yml`, `deploy-frontends.yml`): `development` → the dev Workers, `main` → production, only the apps whose code or packages changed. Settings that aren't secret live in each app's `wrangler.jsonc` and feed the build too; secrets live in the GitHub environments `cloudflare-development` (branch `development` only) and `cloudflare-production` (`main` only) and are copied onto the Worker on every deploy, never printed.
+    - **Dev stays private.** The dev apps keep the access-key gate (DEC-081): without the key a visitor lands on the same page in production. A dev app without its key is never deployed.
+    - **The marketing site is fully static.** Every page is built at deploy time and served from the build; nothing regenerates at request time (a Worker can't read `content/` or compile MDX while serving). Pricing and the launch offer are read when the site is built, and a deployment's build fails rather than publish the placeholder. Dated pages appear through a nightly rebuild at 00:00 IST; a pricing publish starts a build (`SITE_DEPLOY_GITHUB_TOKEN` on the API).
+- Consequences: the visitor's address comes from `cf-connecting-ip` behind Cloudflare. Routes are set to fail open, so a failing Worker falls through to the origin while Vercel is still there. `VERCEL_ENV` / `VERCEL_GIT_COMMIT_REF` keep their names for now: the apps' checks read them and the deploy sets them.

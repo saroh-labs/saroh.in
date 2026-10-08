@@ -6,10 +6,10 @@ import { SITE_URL } from "@/lib/seo";
 
 /**
  * `/llms.txt` (Resources plan U7): the Resources pages shown now, for
- * language models (`lib/llms.ts`). Re-read every five minutes, so a page
- * dated today joins it on its day with no deploy (KTD-2), as the sitemap does.
+ * language models (`lib/llms.ts`). Static: a page dated today joins it
+ * through the nightly rebuild at 00:00 IST (KTD-2), as the sitemap does.
  */
-export const revalidate = 300;
+export const dynamic = "force-static";
 
 export function GET(): Response {
     const articles = helpArticles().map((fm) => ({

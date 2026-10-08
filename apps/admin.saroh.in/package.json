@@ -9,7 +9,10 @@
         "start": "next start",
         "lint": "eslint .",
         "typecheck": "tsc --noEmit",
-        "test": "vitest run"
+        "test": "vitest run",
+        "cf:build": "opennextjs-cloudflare build",
+        "cf:preview": "opennextjs-cloudflare preview",
+        "cf:deploy": "opennextjs-cloudflare deploy"
     },
     "portless": "admin.saroh",
     "dependencies": {
@@ -24,6 +27,7 @@
         "zod": "catalog:"
     },
     "devDependencies": {
+        "@opennextjs/cloudflare": "1.20.9",
         "@saroh/eslint-config": "workspace:*",
         "@saroh/tailwind-config": "workspace:*",
         "@testing-library/react": "^16.1.0",
@@ -36,6 +40,7 @@
         "postcss": "catalog:",
         "tailwindcss": "catalog:",
         "typescript": "catalog:",
-        "vitest": "^4.1.11"
+        "vitest": "^4.1.11",
+        "wrangler": "4.148.0"
     }
 }

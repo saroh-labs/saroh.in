@@ -34,10 +34,9 @@ import { organizationLd, softwareApplicationLd } from "@/lib/structured-data";
  * pricing teaser (`#pricing`), Questions (`#faq`) and the dark CTA band.
  *
  * Prices, plan lines and the free-plan line come from the published pricing
- * catalogue, refreshed every five minutes and at once on publish (KTD-10);
+ * catalogue, read when the site is built (a publish starts a build, KTD-10);
  * with none, the "announced at launch" placeholders.
  */
-export const revalidate = 300;
 
 export const metadata: Metadata = pageMetadata({
     title: home.metaTitle,

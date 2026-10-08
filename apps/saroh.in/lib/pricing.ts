@@ -10,14 +10,11 @@ import { env } from "@/env";
  * returns, and the "Pricing announced at launch" placeholder when there is
  * nothing to draw.
  *
- * - The published catalogue is cached for five minutes (ISR), the API's own
- *   `max-age`, and refreshed at once by the API's call to `/api/revalidate`.
+ * - The published catalogue is read when the site is built (the site is
+ *   static); a publish starts a new build.
  * - A draft preview is never cached.
  * - The bundled seed is never a fallback here: the placeholder is.
  */
-
-/** Seconds a published catalogue is served before it is read again. */
-export const PRICING_REVALIDATE_SECONDS = 300;
 
 /** How long a read may take before the page gives up on it. */
 const TIMEOUT_MS = 5000;
@@ -48,13 +45,15 @@ function building(): boolean {
 }
 
 /**
- * The published catalogue, or null when there is none to show.
+ * The published catalogue, or null when there is none to show. Read when the
+ * page is built: the marketing site is static, rebuilt on every deploy, every
+ * night and whenever pricing is published.
  *
  * - No `API_URL`, or a 404 (no version installed): null, the placeholder.
- * - The API down, an error answer or a snapshot that doesn't validate:
- *   while building, null (the first build never fails or publishes an empty
- *   page for it); while serving, it throws, so the ISR regeneration fails and
- *   the last good page keeps serving (KTD-10). In development, null.
+ * - The API down, an error answer or a snapshot that doesn't validate: a
+ *   deployment's build (`VERCEL_ENV` set, by Vercel or the deploy workflow)
+ *   fails, so the last good site keeps serving instead of a placeholder; a
+ *   local build or development shows the placeholder.
  */
 export async function readLivePricing(
     fetcher: typeof fetch = fetch,
@@ -64,14 +63,16 @@ export async function readLivePricing(
     try {
         const res = await fetcher(`${api}/public/pricing`, {
             headers: { accept: "application/json" },
-            next: { revalidate: PRICING_REVALIDATE_SECONDS },
+            // Read once, when the page is built: the site is static, and a
+            // publish in admin starts a new build (no ISR).
+            cache: "force-cache",
             signal: AbortSignal.timeout(TIMEOUT_MS),
         });
         if (res.status === 404) return null;
         if (!res.ok) throw new Error(`GET /public/pricing: ${res.status}`);
         return parsePricingResponse(await res.json()).catalog;
     } catch (err) {
-        if (building() || env.NODE_ENV !== "production") {
+        if (!(building() && env.VERCEL_ENV)) {
             console.warn(
                 "[pricing] the catalogue could not be read; showing the placeholder",
                 err instanceof Error ? err.message : err,

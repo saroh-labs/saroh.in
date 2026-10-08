@@ -87,6 +87,62 @@ describe("saroh.in revalidation (KTD-10)", () => {
         await expect(handler.handle(job())).rejects.toThrow(/503/);
     });
 
+    it("starts saroh.in's build when a deploy token and environment are set", async () => {
+        configure(true);
+        mockEnv.SITE_DEPLOY_GITHUB_TOKEN = "github_pat_only-for-this-test-0123";
+        mockEnv.SITE_DEPLOY_ENVIRONMENT = "production";
+        try {
+            const handler = new RevalidateSiteHandler();
+            const fetchFn = jest
+                .fn()
+                .mockResolvedValue(new Response(null, { status: 204 }));
+            handler.fetchFn = fetchFn;
+
+            await handler.handle(job());
+
+            const [url, init] = fetchFn.mock.calls[0] as [string, RequestInit];
+            expect(url).toBe(
+                "https://api.github.com/repos/saroh-labs/saroh.in/actions/workflows/deploy-frontends.yml/dispatches",
+            );
+            const headers = init.headers as Record<string, string>;
+            expect(headers.authorization).toBe(
+                "Bearer github_pat_only-for-this-test-0123",
+            );
+            expect(headers[REVALIDATE_SECRET_HEADER]).toBeUndefined();
+            expect(JSON.parse(init.body as string)).toEqual({
+                ref: "main",
+                inputs: { app: "web", environment: "production" },
+            });
+
+            // Development builds the development branch.
+            mockEnv.SITE_DEPLOY_ENVIRONMENT = "development";
+            await handler.handle(job());
+            const [, devInit] = fetchFn.mock.calls[1] as [string, RequestInit];
+            expect(JSON.parse(devInit.body as string).ref).toBe("development");
+        } finally {
+            mockEnv.SITE_DEPLOY_GITHUB_TOKEN = undefined;
+            mockEnv.SITE_DEPLOY_ENVIRONMENT = undefined;
+        }
+    });
+
+    it("queues a build with only the deploy token set (no old hook)", async () => {
+        mockEnv.SITE_DEPLOY_GITHUB_TOKEN = "github_pat_only-for-this-test-0123";
+        mockEnv.SITE_DEPLOY_ENVIRONMENT = "development";
+        try {
+            const tx = { job: { create: jest.fn().mockResolvedValue({}) } };
+            expect(
+                await enqueueSiteRevalidation(
+                    tx as never,
+                    { version: 3, cause: "publish" },
+                    new Date(),
+                ),
+            ).toBe(true);
+        } finally {
+            mockEnv.SITE_DEPLOY_GITHUB_TOKEN = undefined;
+            mockEnv.SITE_DEPLOY_ENVIRONMENT = undefined;
+        }
+    });
+
     it("does nothing, without failing, when the hook was unset since", async () => {
         configure(false);
         const handler = new RevalidateSiteHandler();
