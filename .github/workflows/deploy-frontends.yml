@@ -182,3 +182,23 @@ jobs:
             - name: Deploy
               working-directory: ${{ matrix.dir }}
               run: pnpm exec opennextjs-cloudflare deploy ${{ matrix.env == 'production' && '--env production' || '' }}
+
+            # A deploy recreates the routes in wrangler.jsonc "fail closed";
+            # Wrangler can't say otherwise. Set them to fail open, so a failing
+            # Worker falls through to the origin instead of an error page. Only
+            # warns: the deploy itself has already succeeded.
+            - name: Routes fail open
+              continue-on-error: true
+              run: |
+                  set -euo pipefail
+                  api=https://api.cloudflare.com/client/v4
+                  auth=(-H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" -H "Content-Type: application/json")
+                  node scripts/cf-env.mjs --routes "${{ matrix.dir }}" "${{ matrix.env }}" | while read -r zone pattern; do
+                    zone_id=$(curl -fsS "${auth[@]}" "$api/zones?name=$zone" | jq -r '.result[0].id')
+                    route=$(curl -fsS "${auth[@]}" "$api/zones/$zone_id/workers/routes" | jq -c --arg p "$pattern" '.result[] | select(.pattern == $p)')
+                    [ -n "$route" ] || { echo "::warning::no route $pattern on $zone"; continue; }
+                    id=$(jq -r .id <<<"$route")
+                    body=$(jq -c '{pattern, script, request_limit_fail_open: true}' <<<"$route")
+                    curl -fsS -X PUT "${auth[@]}" "$api/zones/$zone_id/workers/routes/$id" -d "$body" > /dev/null
+                    echo "fail open: $pattern"
+                  done

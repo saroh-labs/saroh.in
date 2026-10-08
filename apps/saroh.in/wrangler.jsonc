@@ -1,6 +1,7 @@
 // Cloudflare Worker for the marketing site, Help and Resources, built by OpenNext (`pnpm cf:build`).
-// The top level is dev; `env.production` is production. Neither has routes
-// until its cutover. The account comes from CLOUDFLARE_ACCOUNT_ID.
+// The top level is dev; `env.production` is production. A deploy replaces
+// the Worker's routes with these and the deploy workflow sets them to fail
+// open. The account comes from CLOUDFLARE_ACCOUNT_ID.
 {
     "$schema": "node_modules/wrangler/config-schema.json",
     "name": "saroh-web-dev",
@@ -27,7 +28,7 @@
         "enabled": true,
     },
     "workers_dev": true,
-    "routes": [],
+    "routes": [{ "pattern": "www.saroh.io/*", "zone_name": "saroh.io" }],
     // Settings that aren't secret. GitHub Actions builds with these too
     // (scripts/cf-env.mjs), so the build and the Worker can't disagree.
     // VERCEL_ENV / VERCEL_GIT_COMMIT_REF keep the names Vercel used: the
@@ -45,7 +46,10 @@
         "production": {
             "name": "saroh-web",
             "workers_dev": true,
-            "routes": [],
+            "routes": [
+                { "pattern": "www.saroh.in/*", "zone_name": "saroh.in" },
+                { "pattern": "help.saroh.in/*", "zone_name": "saroh.in" },
+            ],
             "vars": {
                 "VERCEL_ENV": "production",
                 "VERCEL_GIT_COMMIT_REF": "main",
