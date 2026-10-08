@@ -307,23 +307,26 @@ export class PublicCatalogueService {
             const p = listing.product;
             const tracked = p.stockTracked && businessTracks;
             const markedSoldOut = listing.soldOutAt !== null;
-            const words =
+            const stocks =
                 offered.length > 0
-                    ? offered.map(
-                          (v) =>
-                              publicStock({
-                                  tracked,
-                                  markedSoldOut,
-                                  row: shelfFor(rows, p.id, v.id),
-                              }).word,
+                    ? offered.map((v) =>
+                          publicStock({
+                              tracked,
+                              markedSoldOut,
+                              row: shelfFor(rows, p.id, v.id),
+                          }),
                       )
                     : [
                           publicStock({
                               tracked,
                               markedSoldOut,
                               row: shelfFor(rows, p.id, null),
-                          }).word,
+                          }),
                       ];
+            const words = stocks.map((s) => s.word);
+            // The option the card's Add to bag adds: the first that can be
+            // sold now (or the product itself, without options).
+            const bagAt = words.findIndex((w) => w !== "SOLD_OUT");
             const base = {
                 price: money(p.price) ?? "0.00",
                 mrp: money(p.mrp),
@@ -356,7 +359,13 @@ export class PublicCatalogueService {
                 // shop card): the first option on offer that can be sold
                 // now, or null for a product without options.
                 bagVariantId:
-                    offered.find((_, i) => words[i] !== "SOLD_OUT")?.id ?? null,
+                    bagAt >= 0 && offered.length > 0
+                        ? (offered[bagAt]?.id ?? null)
+                        : null,
+                // How many of it can go in the bag, when the page would say
+                // "Only N left" (UX-058, #874): the card's Add another stops
+                // there, as the product page's does. Null: not counted out.
+                bagLeft: bagAt >= 0 ? (stocks[bagAt]?.left ?? null) : null,
             };
         });
     }

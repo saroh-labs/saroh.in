@@ -8,6 +8,7 @@ import { CatalogueScreen } from "@/components/stores/catalogue-screen";
 import type { ProductsTab } from "@/components/stores/products-tabs";
 import { ProductsTabs } from "@/components/stores/products-tabs";
 import { ReviewsView } from "@/components/stores/reviews-view";
+import { rowNotice } from "@/lib/billing/access";
 import { planMeter } from "@/lib/billing/meter";
 import { listCollections } from "@/lib/collections/service";
 import { resolveActiveOrganization } from "@/lib/organizations/service";
@@ -220,6 +221,9 @@ export default async function CataloguePage({
                 choices={choices}
                 canWrite={canWrite}
                 meter={canWrite ? planMeter(access, "products") : null}
+                // The banner below the tabs says the limit from 80%; the
+                // header then doesn't say it again (#874).
+                limitBannerShown={rowNotice(access, "products").on}
                 canStock={canStockProducts(organization)}
                 collectionCount={collections ? collections.length : null}
                 collectionsPanel={

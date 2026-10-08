@@ -55,7 +55,11 @@ function isCard(v: unknown): v is ShopListingCard {
         typeof v.soldOut === "boolean" &&
         // What the card's Add to bag holds (an older API sends neither).
         (v.listingId === undefined || isString(v.listingId)) &&
-        (v.bagVariantId === undefined || isStringOrNull(v.bagVariantId))
+        (v.bagVariantId === undefined || isStringOrNull(v.bagVariantId)) &&
+        // Where Add another stops (UX-058); an older API sends none.
+        (v.bagLeft === undefined ||
+            v.bagLeft === null ||
+            typeof v.bagLeft === "number")
     );
 }
 
