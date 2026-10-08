@@ -15,6 +15,7 @@ import { getTemplate, listTemplates } from "../registry";
 import {
     STUDIO_PROJECT_BRIEFS,
     STUDIO_TEMPLATE_ID,
+    studioHasEmail,
     studioTemplate,
 } from "./studio";
 
@@ -312,5 +313,36 @@ describe("studio@1, the gallery's Portfolio (U10)", () => {
             .toLowerCase();
         expect(copy).not.toMatch(/\bwe('ll|'re|ve)?\b|\bour\b|\bus\b/);
         expect(copy).not.toMatch(/award|trusted|years of|best/);
+    });
+});
+
+describe("studioHasEmail", () => {
+    const has = (contactEmail: unknown) =>
+        studioHasEmail({ contactEmail } as unknown as TemplateContext);
+
+    it("is true for one plain address", () => {
+        expect(has("hello@studio.example.com")).toBe(true);
+        expect(has("  hello@studio.example.com ")).toBe(true);
+    });
+
+    it("is false for anything else", () => {
+        for (const value of [
+            undefined,
+            3,
+            "",
+            "hello",
+            "a@b",
+            "a b@c.d",
+            "a@b..c",
+            "a@@b.c",
+        ]) {
+            expect(has(value)).toBe(false);
+        }
+    });
+
+    it("answers quickly on a long hostile value", () => {
+        const start = performance.now();
+        expect(has(`!@!${".!".repeat(50_000)}`)).toBe(false);
+        expect(performance.now() - start).toBeLessThan(200);
     });
 });

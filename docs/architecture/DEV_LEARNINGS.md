@@ -3250,6 +3250,7 @@ the authorise prompt, worded for a new price on the same plan.
 changes", compare the target with the plan the business moves from, and
 let a live plan override speak first.
 **Category**: billing · `apps/app.saroh.in/lib/saroh-billing/plan-view.ts`
+
 ## Dependencies — a catalog bump that changed nothing
 
 **Symptom**: the `next16` catalog in `pnpm-workspace.yaml` moved from
@@ -3286,3 +3287,30 @@ When a proxy or CDN is added in front of an app, check which header the app
 takes the client address from (the API's version is
 `common/trust-proxy.ts`).
 **Category**: sites · `apps/saroh.app/lib/site-relay.ts`
+
+## Security — CodeQL stopped the 8 Oct release on six alerts
+
+**Symptom**: the release PR (#881) failed CodeQL with 1 critical and 5 high
+alerts in code it changed.
+**Root cause**, one by one:
+
+- `verifyPreviewToken` took the `?preview=` query as a string; a repeated
+  parameter arrives as an array (type confusion).
+- `domainOf` (email provider) and `studioHasEmail` (templates) used regexes
+  that backtrack: quadratic or worse on a long hostile value (ReDoS).
+- `site-flags.ts` `words()` and `content/templates.ts` `plain()` decoded
+  `&amp;` before other entities, so `&amp;nbsp;` was decoded twice.
+- A test stripped tags with a regex to read text (flagged as incomplete
+  sanitisation).
+  **Fix**: the token check refuses anything but a string; `domainOf` cuts at
+  `indexOf(">")`; the email pattern has one way to match (labels without dots)
+  and a 254-character cap; `&amp;` is decoded last; the test reads text through
+  the DOM. Each has a test, including hostile inputs that must answer in
+  under 200 ms.
+  **Rule**: a value from a request is `unknown` until checked (a query can be
+  an array). A regex on outside input has no two quantifiers that can match
+  the same characters; when in doubt, use `indexOf`/`split`. Decode `&amp;`
+  last. `eslint-plugin-regexp`'s `no-super-linear-backtracking` and
+  `no-super-linear-move` catch the regex cases; they flag 53 existing places,
+  so turning them on is its own task.
+  **Category**: security · CodeQL on PRs (`.github` code scanning)

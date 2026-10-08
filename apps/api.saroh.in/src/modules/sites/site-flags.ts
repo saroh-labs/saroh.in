@@ -850,12 +850,15 @@ export function untouchedTemplateFooter(
 
 /** Text compared as its words: entities read, spacing collapsed. */
 function words(value: string): string {
-    return value
-        .replace(/&mdash;/g, "—")
-        .replace(/&amp;/g, "&")
-        .replace(/&nbsp;/g, " ")
-        .replace(/\s+/g, " ")
-        .trim();
+    return (
+        value
+            .replace(/&mdash;/g, "—")
+            .replace(/&nbsp;/g, " ")
+            // Last, so an escaped entity ("&amp;nbsp;") isn't decoded twice.
+            .replace(/&amp;/g, "&")
+            .replace(/\s+/g, " ")
+            .trim()
+    );
 }
 
 /** Flags on one page's sections, for the rail dots and per-field markers. */

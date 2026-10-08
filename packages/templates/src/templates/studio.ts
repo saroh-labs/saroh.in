@@ -110,9 +110,12 @@ const ENQUIRY_FIELDS = [
  */
 export function studioHasEmail(ctx: TemplateContext): boolean {
     const { contactEmail } = ctx as { contactEmail?: unknown };
+    if (typeof contactEmail !== "string") return false;
+    const email = contactEmail.trim();
+    // Labels can't contain dots, so the pattern has one way to match and
+    // runs in linear time (the old one backtracked on "a@a.a.a.a…").
     return (
-        typeof contactEmail === "string" &&
-        /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(contactEmail.trim())
+        email.length <= 254 && /^[^\s@]+@[^\s@.]+(?:\.[^\s@.]+)+$/.test(email)
     );
 }
 

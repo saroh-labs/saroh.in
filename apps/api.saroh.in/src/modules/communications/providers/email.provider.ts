@@ -182,10 +182,11 @@ async function readJson(
 export function domainOf(address?: string | null): string | null {
     const at = address?.lastIndexOf("@") ?? -1;
     if (!address || at < 0) return null;
-    // "Name <hello@shop.in>" as well as "hello@shop.in".
-    const domain = address
-        .slice(at + 1)
-        .replace(/>.*$/, "")
+    // "Name <hello@shop.in>" as well as "hello@shop.in". Cut at the first
+    // ">" by index: a regex here ran in quadratic time on a string of ">".
+    const rest = address.slice(at + 1);
+    const close = rest.indexOf(">");
+    const domain = (close < 0 ? rest : rest.slice(0, close))
         .trim()
         .toLowerCase();
     return domain || null;
