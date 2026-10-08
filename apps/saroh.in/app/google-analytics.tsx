@@ -13,9 +13,14 @@ import {
     subscribeConsent,
     writeConsent,
 } from "@/lib/consent";
+import { isTeamBrowser } from "@/lib/team-browser";
 
 /** Before the browser has been asked (the server's render): show nothing. */
 const UNREAD = "unread";
+
+/** The team cookie is set by a page load, never while a page is open. */
+const NO_CHANGES = () => () => undefined;
+const teamBrowser = () => isTeamBrowser(document.cookie);
 
 import { isPreviewPath } from "@/lib/pricing-preview";
 
@@ -32,6 +37,9 @@ import { isPreviewPath } from "@/lib/pricing-preview";
  * behind it). Refusing keeps GA off and clears any GA cookies; the answer is
  * remembered (`lib/consent.ts`), and "Cookie choices" in the footer asks
  * again.
+ *
+ * Never in a Saroh team browser (`lib/team-browser.ts`): our own visits
+ * aren't visitors.
  */
 export function GoogleAnalytics({
     id,
@@ -47,7 +55,9 @@ export function GoogleAnalytics({
         readConsent,
         () => UNREAD,
     );
-    if (!id || isPreviewPath(pathname) || choice === UNREAD) return null;
+    const team = useSyncExternalStore(NO_CHANGES, teamBrowser, () => false);
+    if (!id || isPreviewPath(pathname) || choice === UNREAD || team)
+        return null;
     if (choice === "granted") return <GaTag id={id} />;
     if (choice === "refused") return null;
     return <CookieNotice privacyHref={privacyHref} />;
