@@ -6,6 +6,7 @@ import { showError } from "@saroh/ui/toast";
 import Link from "next/link";
 import { useState } from "react";
 
+import { personHref } from "@/lib/contacts/person-href";
 import type { ChargeRow, CollectionRow } from "@/lib/subscriptions/view";
 
 import { Pill } from "../pill";
@@ -193,7 +194,7 @@ export function CustomerCard({
                 </span>
                 <div className="min-w-0">
                     <Link
-                        href={`/customers/${contactId}`}
+                        href={personHref(contactId)}
                         className="text-[14px] font-semibold text-foreground hover:underline"
                     >
                         {name}

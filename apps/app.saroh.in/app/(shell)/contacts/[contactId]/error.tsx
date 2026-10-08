@@ -2,7 +2,7 @@
 
 import { SectionError } from "@/components/shared/section-error";
 
-/** A read that failed is not a missing customer: nothing about them changed. */
+/** A read that failed is not a missing person: nothing about them changed. */
 export default function Error({
     error,
     reset,
@@ -14,7 +14,7 @@ export default function Error({
         <SectionError
             error={error}
             reset={reset}
-            title="Couldn't load this customer"
+            title="Couldn't load this person"
             description="The connection dropped. Nothing about them has changed."
             backHref="/contacts"
             backLabel="Back to contacts"

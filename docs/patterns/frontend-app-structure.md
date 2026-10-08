@@ -61,6 +61,15 @@ components/shared/             app shell, navigation, command menu
   module is off, so a deep link is covered once), and nav groups carry a
   `moduleKey`. Both fail open when availability is unknown; the API enforces.
   See `saroh-product.md` and `.agents/skills/saroh-module-capability/SKILL.md`.
+- **Current** — **One person, one page** (UX-050, #869). Everyone the
+  business knows opens at `/contacts/<contactId>`: Customer Detail's screen
+  (`components/customers/detail/`) plus the page's own Leads, Enquiries and
+  Courses tabs, gated by `lib/contacts/person.ts` (module readiness and the
+  role's permissions, never its name). Build every link to a person with
+  `personHref` (`lib/contacts/person-href.ts`); `/customers/<id>` only
+  redirects, resolving a linked store customer's id to its contact. The
+  Contacts list's CRM gate sits on the `(list)` route group, so the person
+  page opens with CRM off and drops only the CRM tabs.
 - **Adopted** — **Every app has `app/error.tsx` and `app/loading.tsx`,** and a
   route group that can fail on its own gets its own boundary. Gap: templates,
   saroh.in and ui have neither.

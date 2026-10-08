@@ -12,6 +12,7 @@ import { RescheduleBooking } from "@/components/bookings/reschedule-booking";
 import { TakePayment } from "@/components/bookings/take-payment";
 import { TakePaymentLocked } from "@/components/bookings/take-payment-locked";
 import { TreatmentVisits } from "@/components/bookings/treatment-visits";
+import { personHref } from "@/lib/contacts/person-href";
 import { formatDayLabel, formatTimeRange } from "@/lib/format/datetime";
 import { formatMoney } from "@/lib/format/money";
 import { formatStatus } from "@/lib/format/status";
@@ -306,9 +307,7 @@ export function BookingDetailView({
                             size="sm"
                             className="mt-4"
                         >
-                            <Link
-                                href={`/customers/${encodeURIComponent(contact.id)}`}
-                            >
+                            <Link href={personHref(contact.id)}>
                                 Open {firstName(bookerLabel(booking))}&apos;s
                                 page
                             </Link>

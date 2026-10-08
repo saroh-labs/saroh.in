@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 
+import { personHref } from "@/lib/contacts/person-href";
 import { setConsent } from "@/lib/messages/service";
 
 import type { AttentionInput, SuggestionInput } from "./attention";
@@ -50,7 +51,7 @@ export async function linkCustomerAction(
     customerId: string,
 ): Promise<WorkspaceResult> {
     const result = await linkCustomer(contactId, customerId);
-    if (result.ok) revalidatePath(`/customers/${contactId}`);
+    if (result.ok) revalidatePath(personHref(contactId));
     return result;
 }
 
@@ -60,19 +61,19 @@ export async function saveDetailsAction(
     input: Record<string, string>,
 ) {
     const result = await updateDetails(contactId, input);
-    if (result.ok) revalidatePath(`/customers/${contactId}`);
+    if (result.ok) revalidatePath(personHref(contactId));
     return result;
 }
 
 export async function addNoteAction(contactId: string, input: NoteInput) {
     const result = await createNote(contactId, input);
-    if (result.ok) revalidatePath(`/customers/${contactId}`);
+    if (result.ok) revalidatePath(personHref(contactId));
     return result;
 }
 
 export async function deleteNoteAction(contactId: string, noteId: string) {
     const result = await deleteNote(contactId, noteId);
-    if (result.ok) revalidatePath(`/customers/${contactId}`);
+    if (result.ok) revalidatePath(personHref(contactId));
     return result;
 }
 
@@ -82,7 +83,7 @@ export async function addAttentionAction(
     input: AttentionInput,
 ) {
     const result = await createAttention(contactId, input);
-    if (result.ok) revalidatePath(`/customers/${contactId}`);
+    if (result.ok) revalidatePath(personHref(contactId));
     return result;
 }
 
@@ -92,7 +93,7 @@ export async function updateAttentionAction(
     input: AttentionInput,
 ) {
     const result = await updateAttention(contactId, entryId, input);
-    if (result.ok) revalidatePath(`/customers/${contactId}`);
+    if (result.ok) revalidatePath(personHref(contactId));
     return result;
 }
 
@@ -103,7 +104,7 @@ export async function confirmAttentionAction(
     input: SuggestionInput,
 ) {
     const result = await confirmAttention(contactId, entryId, input);
-    if (result.ok) revalidatePath(`/customers/${contactId}`);
+    if (result.ok) revalidatePath(personHref(contactId));
     return result;
 }
 
@@ -116,7 +117,7 @@ export async function removeAttentionAction(
     entryId: string,
 ) {
     const result = await removeAttention(contactId, entryId);
-    if (result.ok) revalidatePath(`/customers/${contactId}`);
+    if (result.ok) revalidatePath(personHref(contactId));
     return result;
 }
 
@@ -130,7 +131,7 @@ export async function stopOffersAction(contactId: string) {
         channel: "EMAIL",
         status: "REVOKED",
     });
-    if (result.ok) revalidatePath(`/customers/${contactId}`);
+    if (result.ok) revalidatePath(personHref(contactId));
     return result;
 }
 
@@ -144,7 +145,7 @@ export async function restoreOffersAction(contactId: string) {
         channel: "EMAIL",
         status: "GRANTED",
     });
-    if (result.ok) revalidatePath(`/customers/${contactId}`);
+    if (result.ok) revalidatePath(personHref(contactId));
     return result;
 }
 
@@ -160,8 +161,8 @@ export async function unlinkPreviewAction(contactId: string) {
 export async function unlinkAccountAction(contactId: string) {
     const result = await unlinkAccount(contactId);
     if (result.ok) {
-        revalidatePath(`/customers/${contactId}`);
-        revalidatePath(`/customers/${result.data.contactId}`);
+        revalidatePath(personHref(contactId));
+        revalidatePath(personHref(result.data.contactId));
     }
     return result;
 }
@@ -209,8 +210,8 @@ export async function mergeAction(
 ) {
     const result = await mergeContacts(contactId, otherId, body);
     if (result.ok) {
-        revalidatePath(`/customers/${contactId}`);
-        revalidatePath(`/customers/${otherId}`);
+        revalidatePath(personHref(contactId));
+        revalidatePath(personHref(otherId));
     }
     return result;
 }
@@ -223,6 +224,6 @@ export async function markThreadReadAction(contactId: string) {
 /** Answer the customer in their thread (A13). */
 export async function replyAction(contactId: string, text: string) {
     const result = await replyToThread(contactId, text);
-    if (result.ok) revalidatePath(`/customers/${contactId}`);
+    if (result.ok) revalidatePath(personHref(contactId));
     return result;
 }

@@ -41,8 +41,23 @@ export function kindOf(d: Pick<CustomerDetail, "orders" | "bookings">): Kind {
         : "commerce";
 }
 
+/**
+ * A tab's key in `?tab=`. Leads, Enquiries and Courses are the person
+ * page's own (`lib/contacts/person.ts`, #869), not in this read.
+ */
 export type TabKey =
-    "over" | "ord" | "bk" | "pk" | "sub" | "inv" | "rev" | "msg" | "notes";
+    | "over"
+    | "lead"
+    | "enq"
+    | "ord"
+    | "bk"
+    | "pk"
+    | "crs"
+    | "sub"
+    | "inv"
+    | "rev"
+    | "msg"
+    | "notes";
 
 export interface Tab {
     key: TabKey;

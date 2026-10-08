@@ -8,6 +8,7 @@ import { DeleteCustomerMenu } from "@/components/customers/delete-customer-menu"
 import { PageContainer } from "@/components/shared/page-container";
 import { ViewerDate } from "@/components/shared/viewer-date";
 import { CustomerForm } from "@/components/stores/customer-form";
+import { personHref } from "@/lib/contacts/person-href";
 import { contactForCustomer } from "@/lib/customer-workspace/detail";
 import { customerHref } from "@/lib/customers/links";
 import type { Customer, CustomerListItem } from "@/lib/customers/service";
@@ -56,7 +57,7 @@ export default async function CustomerPage({
     // Linked to a contact: the person's page is Customer Detail (U18), which
     // reads this record's orders through the link. Unlinked, this page stands.
     const contactId = await contactForCustomer(customerId);
-    if (contactId) redirect(`/customers/${encodeURIComponent(contactId)}`);
+    if (contactId) redirect(personHref(contactId));
     const stores = await listBusinessStores();
     const found = await findCustomer(stores, customerId, storefront);
     if (!found) notFound();

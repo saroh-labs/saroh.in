@@ -115,7 +115,7 @@ describe("OrderQuickView — close (DEC-073)", () => {
 describe("QuickViewBody — the customer (DEC-073)", () => {
     it("names them as a Saffron link to Customer Detail", () => {
         const html = renderToStaticMarkup(<QuickViewBody order={order()} />);
-        const link = /<a[^>]*href="\/customers\/ct_1"[^>]*>([^<]*)<\/a>/.exec(
+        const link = /<a[^>]*href="\/contacts\/ct_1"[^>]*>([^<]*)<\/a>/.exec(
             html,
         );
         expect(link?.[1]).toBe("Priya Raman");

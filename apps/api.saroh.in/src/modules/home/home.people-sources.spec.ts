@@ -287,7 +287,7 @@ describe("bookingPageNotes", () => {
                 "info",
             ],
         ]);
-        expect(needs[0].href).toBe("/customers/c_rahul");
+        expect(needs[0].href).toBe("/contacts/c_rahul");
     });
 
     it("never names a placeholder address, and says 'A customer' instead", async () => {
@@ -356,7 +356,7 @@ describe("unansweredMessages", () => {
         expect(action).toMatchObject({
             code: "CRM_UNANSWERED_MESSAGES",
             title: "Reply to 1 customer",
-            href: "/customers/c_farah?tab=msg",
+            href: "/contacts/c_farah?tab=msg",
         });
         const { needs } = flattenNeeds([action!], ZONE);
         expect(needs).toEqual([
@@ -365,7 +365,7 @@ describe("unansweredMessages", () => {
                 sub: "“Can I move my cleaning to Friday?”",
                 tag: "Waiting · 3 h",
                 tone: "due",
-                href: "/customers/c_farah?tab=msg",
+                href: "/contacts/c_farah?tab=msg",
             }),
         ]);
     });

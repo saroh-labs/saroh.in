@@ -18,6 +18,7 @@ import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 
+import { personHref } from "@/lib/contacts/person-href";
 import { addCustomerAction } from "@/lib/customer-workspace/actions";
 import type { EmailHolder } from "@/lib/customer-workspace/service";
 import { trimmedOr } from "@/lib/forms/values";
@@ -70,7 +71,7 @@ export function AddCustomerForm() {
             .filter(Boolean)
             .join(" ");
         showSuccess(`${name || input.email} added`);
-        router.push(`/customers/${encodeURIComponent(res.contactId)}`);
+        router.push(personHref(res.contactId));
     }
 
     return (
@@ -93,7 +94,7 @@ export function AddCustomerForm() {
                             <FormMessage />
                             {holder ? (
                                 <Link
-                                    href={`/customers/${encodeURIComponent(holder.contactId)}`}
+                                    href={personHref(holder.contactId)}
                                     className="w-fit rounded-[4px] text-[13px] font-semibold text-brand transition-colors duration-fast hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 active:opacity-70"
                                 >
                                     {holder.name

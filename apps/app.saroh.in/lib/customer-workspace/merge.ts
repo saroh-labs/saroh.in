@@ -1,3 +1,5 @@
+import { personHref } from "@/lib/contacts/person-href";
+
 /**
  * Merging two customers (DEC-042, C10), as Customer Detail's dialog draws
  * it: two columns — this record and the other — with a pick per row for the
@@ -349,8 +351,7 @@ export function mergedToast(mergedName: string): string {
  * survivor's page, on the same tab.
  */
 export function mergedRedirectPath(mergedInto: string, tab?: string): string {
-    const path = `/customers/${encodeURIComponent(mergedInto)}`;
-    return tab ? `${path}?tab=${encodeURIComponent(tab)}` : path;
+    return personHref(mergedInto, tab);
 }
 
 /** The detail read's answer for a merged-away record. */

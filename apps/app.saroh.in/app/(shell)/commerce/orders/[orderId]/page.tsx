@@ -4,6 +4,7 @@ import { OrderDetail } from "@/components/commerce/order-detail/order-detail";
 import { OrderLocked } from "@/components/commerce/orders/orders-states";
 import { OrderReviews } from "@/components/stores/order-reviews";
 import { ownAccountsRoom, takesOnlinePayment } from "@/lib/billing/access";
+import { personHref } from "@/lib/contacts/person-href";
 import { customerHref } from "@/lib/customers/links";
 import { hasPaymentProvider } from "@/lib/invoices/tax";
 import {
@@ -152,7 +153,7 @@ export default async function OrderPage({
             }}
             customerHref={
                 contactId
-                    ? `/customers/${encodeURIComponent(contactId)}`
+                    ? personHref(contactId)
                     : order.customer
                       ? customerHref(order.store.id, order.customer.id)
                       : null

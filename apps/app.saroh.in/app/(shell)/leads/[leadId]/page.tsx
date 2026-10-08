@@ -16,6 +16,7 @@ import { TaskForm } from "@/components/crm/task-form";
 import { DeleteLeadMenu } from "@/components/leads/delete-lead-menu";
 import { EditLeadDialog } from "@/components/leads/edit-lead-dialog";
 import { PageContainer } from "@/components/shared/page-container";
+import { personHref } from "@/lib/contacts/person-href";
 import { contactName, formatValue, LEAD_STATUS } from "@/lib/crm/format";
 import { getLead } from "@/lib/leads/service";
 import { composerGate } from "@/lib/messages/composer-gate";
@@ -112,7 +113,7 @@ export default async function LeadDetailPage({
                     lead.contact ? (
                         <>
                             <Link
-                                href={`/contacts/${lead.contact.id}`}
+                                href={personHref(lead.contact.id)}
                                 className="hover:underline"
                             >
                                 {contactName(lead.contact)}
