@@ -3250,6 +3250,7 @@ the authorise prompt, worded for a new price on the same plan.
 changes", compare the target with the plan the business moves from, and
 let a live plan override speak first.
 **Category**: billing · `apps/app.saroh.in/lib/saroh-billing/plan-view.ts`
+
 ## Dependencies — a catalog bump that changed nothing
 
 **Symptom**: the `next16` catalog in `pnpm-workspace.yaml` moved from
@@ -3286,3 +3287,20 @@ When a proxy or CDN is added in front of an app, check which header the app
 takes the client address from (the API's version is
 `common/trust-proxy.ts`).
 **Category**: sites · `apps/saroh.app/lib/site-relay.ts`
+
+## Sites — every template thumbnail but Starter was a broken image
+
+**Symptom**: on Create a site, the template cards that have a picture
+(Blogs, Bakery, Gym…) showed a broken image; only Starter, which is drawn
+rather than pictured, looked right. Found while filming the site demo
+(8 Oct 2026).
+**Root cause**: `apps/app.saroh.in/middleware.ts` gated every path except
+`_next/static`, `_next/image` and `favicon.ico`, so `/templates/blogs.webp`
+answered 307 to sign-in. `next/image` fetches the file itself, without the
+visitor's cookies, got the redirect, and failed with "isn't a valid image".
+**Fix**: the matcher also skips paths ending in an image extension
+(png, jpg, gif, webp, avif, svg, ico).
+**Rule**: a middleware matcher skips the files `public/` serves.
+`lib/middleware-matcher.test.ts` runs every image under `public/` through
+the matcher and fails if one is gated.
+**Category**: frontend · `apps/app.saroh.in/middleware.ts`
