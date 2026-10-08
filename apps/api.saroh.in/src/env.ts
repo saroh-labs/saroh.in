@@ -170,6 +170,16 @@ const envSchema = z.object({
     // host on that zone. Optional; set, the domain read carries the CNAME
     // record to show. Not a secret.
     CLOUDFLARE_HOSTNAMES_CNAME_TARGET: z.string().optional(),
+    // TEST ONLY. `1`: custom domains run on fakes instead of DNS and
+    // Cloudflare (#861's browser tests): a hostname under `.example.com`
+    // verifies without a TXT record (any other is still looked up in DNS),
+    // and hosting is an in-memory fake that puts each hostname in the state
+    // its first label names — `live-…` ACTIVE, `problem-…` FAILED, anything
+    // else PENDING. It wins over the CLOUDFLARE_HOSTNAMES_* set. Refused at
+    // boot under NODE_ENV=production (below), and honoured only in a test
+    // run — NODE_ENV declared `test`, or `CI` set — never under a declared
+    // production (`domains/domain-fakes.ts`).
+    DOMAIN_HOSTING_FAKE: z.enum(["1"]).optional(),
     // Cloudflare Turnstile, the bot challenge a code needs past a shared
     // ceiling. Unset: no challenge is ever asked (and an ERROR says when one
     // would have been), so a customer is never stuck on a widget that can't load.
@@ -305,14 +315,22 @@ const REQUIRED_IN_PRODUCTION = [
     "EMAIL_FROM",
 ] as const;
 
+/**
+ * Test-only switches: a deployed API refuses to boot with any of them set,
+ * and each is honoured only in a test run besides (`common/test-run.ts`).
+ */
+const TEST_ONLY = ["LINK_PREVIEW_TEST_HOSTS", "DOMAIN_HOSTING_FAKE"] as const;
+
 const checkedSchema = envSchema.superRefine((value, ctx) => {
     if (value.NODE_ENV !== "production") return;
-    if (value.LINK_PREVIEW_TEST_HOSTS) {
-        ctx.addIssue({
-            code: z.ZodIssueCode.custom,
-            path: ["LINK_PREVIEW_TEST_HOSTS"],
-            message: "test only: never set when NODE_ENV=production",
-        });
+    for (const key of TEST_ONLY) {
+        if (value[key]) {
+            ctx.addIssue({
+                code: z.ZodIssueCode.custom,
+                path: [key],
+                message: "test only: never set when NODE_ENV=production",
+            });
+        }
     }
     for (const key of REQUIRED_IN_PRODUCTION) {
         if (!value[key]) {

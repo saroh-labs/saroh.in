@@ -7,12 +7,36 @@ import type {
 import { HostingCallError } from "../domain-hosting";
 
 /**
+ * Where the labelled fake puts a hostname (`DOMAIN_HOSTING_FAKE`, #861's
+ * browser tests): the state its first label names. `live-…` is ACTIVE, the
+ * certificate issued; `problem-…` is FAILED, no certificate; anything else
+ * waits, PENDING.
+ */
+export function stateFromLabel(hostname: string): {
+    state: HostedState;
+    problem: HostedProblem | null;
+} {
+    const label = hostname.trim().toLowerCase().split(".")[0] ?? "";
+    if (label.startsWith("live-")) return { state: "ACTIVE", problem: null };
+    if (label.startsWith("problem-")) {
+        return { state: "FAILED", problem: "CERTIFICATE" };
+    }
+    return { state: "PENDING", problem: null };
+}
+
+/**
  * In-memory {@link DomainHosting} for tests (#859). Registers hostnames as
  * PENDING with ids `ch_<n>`, lets a test move one to ACTIVE or FAILED, and
  * can be told to fail the next calls of a kind — to drive "a failed
  * Cloudflare call keeps the verification" and the retry without a network.
+ *
+ * With `byLabel`, a hostname is registered in the state its first label
+ * names ({@link stateFromLabel}) — how the browser-test stack's API runs
+ * under `DOMAIN_HOSTING_FAKE`, where no test can reach in to move it.
  */
 export class FakeDomainHosting implements DomainHosting {
+    constructor(private readonly options: { byLabel?: boolean } = {}) {}
+
     private next = 1;
     /** Registered hostnames by id. */
     readonly hostnames = new Map<
@@ -59,7 +83,13 @@ export class FakeDomainHosting implements DomainHosting {
             if (h.hostname === hostname) return Promise.resolve(strip(h));
         }
         const id = `ch_${this.next++}`;
-        const made = { id, hostname, state: "PENDING" as const, problem: null };
+        const made = {
+            id,
+            hostname,
+            ...(this.options.byLabel
+                ? stateFromLabel(hostname)
+                : { state: "PENDING" as const, problem: null }),
+        };
         this.hostnames.set(id, made);
         return Promise.resolve(strip(made));
     }

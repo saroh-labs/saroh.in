@@ -325,6 +325,11 @@ e2e_stack() {
     # the API's SSRF guard refuses; this test-only list lets it reach them.
     # The API won't boot with it under NODE_ENV=production.
     export LINK_PREVIEW_TEST_HOSTS=127.0.0.1
+    # Custom domains on fakes (#861): `.example.com` verifies without DNS and
+    # hosting puts a hostname in the state its first label names, so the
+    # own-domain spec's hosting states run. Test only, as above; the spec
+    # runs them when E2E_DOMAIN_HOSTING says the API has them.
+    export DOMAIN_HOSTING_FAKE=1 E2E_DOMAIN_HOSTING=fake
     export PAYMENTS_ENC_KEY=0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef # gitleaks:allow (test key, as in the API specs)
 
     # The run's database is a copy of a seeded template, "<name>-template",
