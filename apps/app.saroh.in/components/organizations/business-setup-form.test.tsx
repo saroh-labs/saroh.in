@@ -158,6 +158,27 @@ describe("What are you setting up? (DEC-070)", () => {
         expect(text()).not.toContain("Choose what you're setting up");
     });
 
+    it("shows the fields that appear without errors before anything is typed (#874)", async () => {
+        await submit();
+        act(() => radio("A business").click());
+        await settle();
+        expect(text()).not.toContain("It needs a name");
+        expect(text()).not.toContain("An address needs at least 3 characters");
+        // Changing the answer is not typing either.
+        act(() => radio("Just me").click());
+        await settle();
+        expect(text()).not.toContain("It needs a name");
+        expect(text()).not.toContain("An address needs at least 3 characters");
+    });
+
+    it("still refuses an empty name when they press the button again", async () => {
+        await submit();
+        act(() => radio("A business").click());
+        await submit();
+        expect(text()).toContain("It needs a name");
+        expect(createOrganization).not.toHaveBeenCalled();
+    });
+
     it("names a business as today, and sends BUSINESS", async () => {
         act(() => radio("A business").click());
         const name = labelled("What is it called?");

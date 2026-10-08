@@ -133,6 +133,8 @@ export type { OpenState, OpeningHoursDay, Weekday } from "./lib/opening-hours";
 
 // A price as the site shows it; no directive, so server pages can call it.
 export { formatAmount } from "./lib/money";
+// A business's public phone as a visitor reads it (DEC-053).
+export { phoneText } from "./lib/phone";
 
 // Not a page block: a product as its shop page shows it (#465) — the
 // workspace's Customer view today, the storefront product page later.

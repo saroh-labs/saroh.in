@@ -395,6 +395,11 @@ async function wordOrder(
         path: `/commerce/orders/${order.id}`,
         skipUserId: p.actorUserId ?? null,
         orderId: order.id,
+        // Taken by someone on the team (the counter, New order): no bell
+        // notice (#874). The bell is one notice for everyone, so it rang
+        // for the person who just made the sale; whoever chose email for
+        // New order is still emailed, never the one who took it.
+        ...(!order.placedOnline && p.actorUserId ? { noBell: true } : {}),
         // A website order comes in while nobody is watching: the owners and
         // admins are emailed unless they turned it off, as of an enquiry
         // (UX-042). One taken at the counter has someone there already.
