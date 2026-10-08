@@ -19,6 +19,7 @@ import { businessTimezone } from "../bookings/staff-availability";
 import { FeatureFlagService } from "../feature-flags/feature-flags.service";
 import { FlagKey } from "../feature-flags/flags";
 import { modulePageState } from "../sites/module-pages";
+import { enqueuePageRevalidation } from "../sites/page-cache-revalidate";
 import { effectiveStorefront } from "../sites/sells-from";
 import {
     addressProblem,
@@ -323,6 +324,12 @@ export class WebAddressService {
             await tx.site.update({
                 where: { id: site.id },
                 data: { subdomain: address },
+            });
+            // The old address's kept pages must give way to its forward
+            // (#863): stop serving them once this commits.
+            await enqueuePageRevalidation(tx, {
+                cause: "address",
+                siteIds: [site.id],
             });
         }
         await tx.auditEvent.create({

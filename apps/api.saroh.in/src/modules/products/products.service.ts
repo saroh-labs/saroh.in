@@ -23,6 +23,7 @@ import {
 } from "../catalogue/fields.service";
 import { isGstRate } from "../invoices/gst";
 import { productTypesOf } from "../orders/fulfilment";
+import { enqueuePageRevalidation } from "../sites/page-cache-revalidate";
 import { PRODUCT_HAS_STOCK_HISTORY } from "../stock/stock-words";
 import { COUNTING_ROWS } from "../stock/tracking";
 import {
@@ -575,6 +576,7 @@ export class ProductsService {
                         : {}),
                 },
             });
+            await this.productChanged(organizationId, productId);
             return { id: productId };
         } catch (error) {
             if (!isSlugClash(error)) throw error;
@@ -775,6 +777,9 @@ export class ProductsService {
                 });
             }
         }
+        // Custom fields and allergens save on their own; any section can
+        // change what the product's page or cards say (#863).
+        await this.productChanged(organizationId, productId);
         return this.getIn(scope, productId);
     }
 
@@ -870,6 +875,13 @@ export class ProductsService {
                 await tx.productListing.deleteMany({ where: { productId } });
                 await tx.stockLevel.deleteMany({ where: { productId } });
                 await tx.product.delete({ where: { id: productId } });
+                // Gone from the shop: its business is named, since the
+                // product won't be there to ask by the time this runs (#863).
+                await enqueuePageRevalidation(tx, {
+                    cause: "product",
+                    productIds: [productId],
+                    organizationId: scope.organizationId,
+                });
             });
         } catch (error) {
             // An order line written for it right now can still meet the
@@ -880,6 +892,21 @@ export class ProductsService {
             );
         }
         return { id: productId };
+    }
+
+    /**
+     * Tell the merchant sites' page cache a product's page and cards may
+     * read differently now (#863). After the write, which has committed.
+     */
+    private async productChanged(
+        organizationId: string,
+        productId: string,
+    ): Promise<void> {
+        await enqueuePageRevalidation(prisma, {
+            cause: "product",
+            productIds: [productId],
+            organizationId,
+        });
     }
 
     /**
