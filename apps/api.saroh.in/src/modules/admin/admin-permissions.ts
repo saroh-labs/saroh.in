@@ -54,6 +54,9 @@ export const AdminPermission = {
     // limit a row, put it on a plan, move it to the live version. A custom
     // price needs this and pricing:publish.
     PricingOverride: "pricing:override",
+    // Switch a site's trackers off, or back on, when a connected tool is
+    // misused or a tag breaks the site (#897). Only staff turn them back on.
+    OrganizationTrackersWrite: "organization:trackers:write",
 } as const;
 
 export type AdminPermission =
@@ -73,6 +76,8 @@ const ROLE_PERMISSIONS = {
         AdminPermission.OrganizationPeopleWrite,
         AdminPermission.OrganizationViewAs,
         AdminPermission.WaitlistInvite,
+        // Support takes the misuse report and already opens the business.
+        AdminPermission.OrganizationTrackersWrite,
     ],
     [AdminRole.Operations]: [
         AdminPermission.PlatformRead,

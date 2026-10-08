@@ -334,6 +334,21 @@ const input: CatalogInput = {
                 pro: C("Included", "Your own email and payment accounts"),
             },
         },
+        {
+            // Hidden from the pricing table until the workspace section and
+            // the consent banner ship (#895, #896); the cells already gate
+            // saving (DEC-108).
+            id: "site-trackers",
+            name: "Your own analytics and ad tracking",
+            group: "site",
+            pricing: "hidden",
+            what: "Connect your own Google Analytics, Google Ads, Meta Pixel, PostHog, Clarity, Plausible or Umami to your website.",
+            cells: {
+                free: X("locked"),
+                grow: C("Included", "Your own analytics and ad tracking"),
+                pro: C("Included", "Your own analytics and ad tracking"),
+            },
+        },
     ],
     yearly: { on: true, paid: 10 },
     gst: { show: "excl" },

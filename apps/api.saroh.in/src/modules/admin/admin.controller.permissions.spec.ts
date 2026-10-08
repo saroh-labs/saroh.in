@@ -176,6 +176,15 @@ describe("Admin console permission assignments", () => {
         },
     );
 
+    it.each(["switchTrackersOff", "switchTrackersOn"] as const)(
+        "protects %s with its own trackers permission",
+        (method) => {
+            expect(perms(method)).toEqual([
+                AdminPermission.OrganizationTrackersWrite,
+            ]);
+        },
+    );
+
     it("keeps the business page behind view-as", () => {
         expect(perms("viewOrganization")).toEqual([
             AdminPermission.OrganizationViewAs,

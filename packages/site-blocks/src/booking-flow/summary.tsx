@@ -168,7 +168,7 @@ export function PhoneBar({
     barLabel: string;
 }) {
     return (
-        <div className="bg-site-fg text-site-bg fixed inset-x-0 bottom-0 z-50 px-4 pb-[calc(12px+env(safe-area-inset-bottom))] pt-3 shadow-[0_-8px_24px_hsl(var(--site-fg)/0.22)]">
+        <div className="bg-site-fg text-site-bg fixed inset-x-0 bottom-[var(--site-consent-offset,0px)] z-50 px-4 pb-[calc(12px+env(safe-area-inset-bottom))] pt-3 shadow-[0_-8px_24px_hsl(var(--site-fg)/0.22)]">
             {hasService ? (
                 <p
                     role="status"

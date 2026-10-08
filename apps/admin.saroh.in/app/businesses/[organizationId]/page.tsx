@@ -21,6 +21,7 @@ import {
 import { NotesPanel } from "@/components/business/notes-panel";
 import { OpenAccess } from "@/components/business/open-access";
 import { PlanActions, RevokeLimit } from "@/components/business/plan-actions";
+import { SiteTrackers } from "@/components/business/site-trackers";
 import { Facts, Panel } from "@/components/panel";
 import {
     ChangeRole,
@@ -169,6 +170,7 @@ function Business({
     const modulesWrite = can(staff, "organization:modules:write");
     const pricingOverride = can(staff, "pricing:override");
     const pricingPrice = pricingOverride && can(staff, "pricing:publish");
+    const trackersWrite = can(staff, "organization:trackers:write");
     const peopleWrite =
         can(staff, "organization:people:write") &&
         can(staff, "organization:pii:read");
@@ -625,6 +627,22 @@ function Business({
                         </div>
                     )}
                 </Panel>
+
+                {view.sites && (
+                    <Panel
+                        title="Trackers"
+                        description="Each site's own trackers. Switched off, none load, whatever the plan, until Saroh switches them back on."
+                        data={view.sites}
+                    >
+                        {(sites) => (
+                            <SiteTrackers
+                                organizationId={id}
+                                sites={sites}
+                                canSwitch={trackersWrite}
+                            />
+                        )}
+                    </Panel>
+                )}
 
                 <Panel
                     title="Notes"

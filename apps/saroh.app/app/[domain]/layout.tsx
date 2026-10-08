@@ -11,6 +11,7 @@ import {
     TestReleaseProvider,
 } from "@saroh/site-blocks";
 
+import { SiteTrackers } from "@/components/site-trackers";
 import { SiteViewBeacon } from "@/components/site-view-beacon";
 import { TestReleaseBar } from "@/components/test-release-bar";
 import { TestReleaseGate } from "@/components/test-release-gate";
@@ -22,21 +23,22 @@ import { customerReader } from "@/lib/customer-reader";
 import { getSignedInCustomer } from "@/lib/customer-session";
 import { headerAction } from "@/lib/header-action";
 import { liveMenu } from "@/lib/in-page-menu";
-import {
-    getMovedTo,
-    getPublicationForHost,
-    getSiteForHost,
-    shareImages,
-} from "@/lib/publication";
+import { getMovedTo, getSiteForHost, shareImages } from "@/lib/publication";
 import { movedLocation, REQUEST_PATH_HEADER } from "@/lib/request-path";
 import { getCheckoutOptions } from "@/lib/shop-checkout";
 import { getSignInOptions } from "@/lib/sign-in";
 import { getFooterFacts } from "@/lib/site-footer";
+import { getSiteHead, NO_HEAD } from "@/lib/site-head";
 import { classifySiteHost } from "@/lib/site-host-mode";
 import { relayFor } from "@/lib/site-relay";
+import {
+    isPlatformAddress,
+    verificationMetadata,
+} from "@/lib/site-verification";
 import { shareable } from "@/lib/test-metadata";
 import { getTestRelease, rootDomain } from "@/lib/test-release";
 import { HEADER_BELOW_BAR } from "@/lib/test-release-chrome";
+import { needsConsent } from "@/lib/trackers";
 import { SiteFooter, SiteHeader } from "@saroh/site-blocks";
 
 import { SITE_FACES } from "@/lib/site-fonts";
@@ -65,7 +67,8 @@ export async function generateMetadata({
 }): Promise<Metadata | null> {
     const { domain } = await params;
     const mode = classifySiteHost(domain, rootDomain()).mode;
-    const snapshot = await getPublicationForHost(domain);
+    const resolved = await getSiteForHost(domain);
+    const snapshot = resolved?.snapshot ?? null;
     if (!snapshot) {
         // A test host whose link opens nothing still says what it is, and
         // is never indexed (DEC-071, R3).
@@ -90,6 +93,16 @@ export async function generateMetadata({
     const title = seoTitle?.trim() ? seoTitle : name;
     const description = seoDescription?.trim() ? seoDescription : undefined;
     const images = shareImages(snapshot.site);
+    // Search engines' verification codes, read live (DEC-108). Never on a
+    // test host: `shareable` keeps only the title and noindex there.
+    const head =
+        mode === "live" && resolved?.siteId
+            ? await getSiteHead(resolved.siteId)
+            : NO_HEAD;
+    const verification = verificationMetadata(
+        head.verifications,
+        isPlatformAddress(domain, rootDomain()),
+    );
 
     // A test release's host has no share card and is never indexed (R3).
     return shareable(
@@ -116,6 +129,7 @@ export async function generateMetadata({
                 images,
             },
             metadataBase: new URL(`https://${domain}`),
+            ...(verification ? { verification } : {}),
         },
     );
 }
@@ -185,7 +199,7 @@ export default async function SiteLayout({
      * from the catalogue's answer, and waiting for it would add a round
      * trip to every page of a site that sells.
      */
-    const [booking, catalogue, checkout, visit, footerFacts, navigation] =
+    const [booking, catalogue, checkout, visit, footerFacts, navigation, head] =
         await Promise.all([
             siteId ? getBookingPage(siteId) : null,
             siteId ? getCatalogue(siteId) : null,
@@ -199,7 +213,13 @@ export default async function SiteLayout({
             // now (a Journal with no posts, Plans with none on sale): read
             // beside the rest, not after it.
             liveMenu(snapshot, siteId),
+            // The merchant's own trackers (DEC-108): live hosts only. Shared
+            // with generateMetadata's read of the codes through `cache`.
+            siteId && test.mode !== "test" && !resolved.release
+                ? getSiteHead(siteId)
+                : NO_HEAD,
         ]);
+    const asksConsent = head.trackers.some((t) => needsConsent(t.kind));
     const shopServes = catalogue?.ok ?? false;
     const action = headerAction({ booking, shopServes });
 
@@ -300,6 +320,17 @@ export default async function SiteLayout({
                 {siteId && test.mode !== "test" && !resolved.release ? (
                     <SiteViewBeacon siteId={siteId} apiUrl={publicApiUrl()} />
                 ) : null}
+                {/* The merchant's own trackers and the banner that asks first
+                (DEC-108): the same live hosts, never a release. */}
+                {siteId &&
+                test.mode !== "test" &&
+                !resolved.release &&
+                head.trackers.length > 0 ? (
+                    <SiteTrackers
+                        trackers={head.trackers}
+                        noticeHref={head.privacyUrl ?? "/cookie-notice"}
+                    />
+                ) : null}
                 {/* The account area draws its own compact header and no
                 footer (DEC-073 #10): the frame leaves these out there. */}
                 <SiteChromeFrame
@@ -329,6 +360,8 @@ export default async function SiteLayout({
                             }}
                             // "Made with Saroh" on Free only (DEC-102).
                             credit={footerFacts?.credit ?? null}
+                            // "Cookie choices" while a tracker asks (DEC-108).
+                            cookieChoices={asksConsent}
                         />
                     }
                 >

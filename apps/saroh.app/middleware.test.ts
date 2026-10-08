@@ -255,3 +255,40 @@ describe("middleware: a test release's host (DEC-071, T5)", () => {
         );
     });
 });
+
+describe("middleware: a site's crawl files (#890)", () => {
+    it("lists robots.txt and sitemap.xml in the matcher, past the dotted-path rule", async () => {
+        const { config } = await import("./middleware");
+        expect(config.matcher).toContain("/robots.txt");
+        expect(config.matcher).toContain("/sitemap.xml");
+    });
+
+    it("rewrites a live host's sitemap.xml and robots.txt to the tenant routes", () => {
+        expect(
+            rewrittenTo(
+                middleware(request("https://rye.saroh.app/sitemap.xml")),
+            ),
+        ).toBe("https://rye.saroh.app/rye.saroh.app/sitemap.xml");
+        expect(
+            rewrittenTo(middleware(request("https://shop.rye.in/robots.txt"))),
+        ).toBe("https://shop.rye.in/shop.rye.in/robots.txt");
+    });
+
+    it("answers a test host's robots.txt itself: disallow everything", async () => {
+        const res = middleware(
+            request("https://test--northwind.saroh.app/robots.txt"),
+        );
+        expect(rewrittenTo(res)).toBeNull();
+        expect(res.status).toBe(200);
+        expect(await res.text()).toBe("User-agent: *\nDisallow: /\n");
+        expect(res.headers.get("x-robots-tag")).toBe("noindex");
+    });
+
+    it("404s a test host's sitemap.xml", () => {
+        const res = middleware(
+            request("https://test--northwind.saroh.app/sitemap.xml"),
+        );
+        expect(res.status).toBe(404);
+        expect(rewrittenTo(res)).toBeNull();
+    });
+});

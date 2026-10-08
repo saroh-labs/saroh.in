@@ -316,6 +316,9 @@ importers:
       '@saroh/auth':
         specifier: workspace:*
         version: link:../../packages/auth
+      '@saroh/block-contract':
+        specifier: workspace:*
+        version: link:../../packages/block-contract
       '@saroh/database':
         specifier: workspace:*
         version: link:../../packages/database

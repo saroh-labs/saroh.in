@@ -30,6 +30,7 @@ import { AdminOrganizationsService } from "./admin-organizations.service";
 import { AdminOverridesService } from "./admin-overrides.service";
 import { AdminPeopleController } from "./admin-people.controller";
 import { AdminPeopleService } from "./admin-people.service";
+import { AdminSiteTrackersService } from "./admin-site-trackers.service";
 import { AdminStaffController } from "./admin-staff.controller";
 import { AdminStaffService } from "./admin-staff.service";
 import { AdminWaitlistController } from "./admin-waitlist.controller";
@@ -73,6 +74,7 @@ import { OrganizationAccessSessionGuard } from "./organization-access-session.gu
         AdminOrganizationsService,
         AdminLifecycleService,
         AdminOverridesService,
+        AdminSiteTrackersService,
         AdminStaffService,
         AdminPeopleService,
         AdminMachineryService,

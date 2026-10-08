@@ -456,6 +456,9 @@ export {
 } from "./test-release/test-release-stop";
 export type { TestReleaseVerb } from "./test-release/test-release-stop";
 // Server-safe: the site's server actions refuse in these words.
+export { ConsentBanner, CookieChoicesButton, listOf } from "./consent-banner";
+export { SITE_CONSENT_OFFSET, SITE_CONSENT_OPEN_EVENT } from "./consent-events";
+export { CookieNotice } from "./cookie-notice";
 export {
     SIGN_IN_OFF_TEXT,
     TEST_RELEASE_CODE,

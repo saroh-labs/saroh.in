@@ -36,3 +36,83 @@ anyone seeing a half-finished page.
 Your website does not carry Saroh's branding. The workspace you work in and the
 site your customers see are styled separately on purpose — your customers should
 see your business, not the tool behind it.
+
+## Search engines and your own analytics [#search-and-tracking]
+
+In **Website › Settings › Search and tracking** you can prove to search engines
+that the site is yours, and connect the analytics and ad tools you already use.
+What you save there is on your live site at once. You don't need to publish.
+
+Every site also has a **sitemap** at `/sitemap.xml` on its address, listing your
+pages, posts and (while your shop is open) your products. Search engines find
+it on their own; Search and tracking shows the address so you can submit it too.
+
+### Google Search Console [#search-console]
+
+1. In Search Console, add a property and choose **URL prefix**.
+2. Enter your site's address exactly as Search and tracking shows it.
+3. Choose **HTML tag** and copy the tag Google gives you.
+4. Paste it into the Google field in Search and tracking and save.
+5. Go back to Search Console and press **Verify**.
+
+Keep the code saved: Google checks it again from time to time. After
+verifying, submit your sitemap in Search Console's **Sitemaps** page.
+
+### Bing, Meta and Pinterest [#verify-others]
+
+Each gives you a `<meta>` tag the same way. Paste the whole tag or just the code
+into its field. Meta and Pinterest verify a whole domain, so they work once your
+site is on your own domain; on a Saroh address only Google and Bing can verify.
+
+### Your own analytics and ad tools [#trackers]
+
+On a paid plan you can connect Google Analytics, Google Ads, Meta Pixel,
+PostHog, Microsoft Clarity, Plausible and Umami Cloud. You enter only the
+tool's ID, or paste the snippet the tool gives you and we take the ID from it.
+Saroh adds the tool to your pages for you.
+
+- **Visitors are asked first.** Every tool except Plausible and Umami sets
+  cookies, so your site shows a short cookie notice and a tool runs only after
+  the visitor accepts. Plausible and Umami use no cookies and run without asking.
+- **Never on private pages.** Checkout, payment, order and account pages never
+  load any of these tools, and what customers type into your forms is hidden
+  from session recordings.
+- **Never paste a password or key.** Only the public ID goes here. Anything that
+  looks like a private key is refused and not saved.
+- **No other scripts.** Google Tag Manager and pasted code aren't supported:
+  they could run anything on your site. If you need another tool, ask us.
+
+These tools collect data about your visitors for you, so you are responsible
+for how it is used, as with your customers' other data. If your site has its
+own privacy page, add its address in Search and tracking and the cookie notice
+links to it; otherwise it links to a short page listing your tools.
+
+#### Where to find each ID
+
+##### Google Analytics [#trackers-ga4]
+
+Admin › Data streams › your web stream › **Measurement ID**, starting `G-`.
+
+##### Google Ads [#trackers-google-ads]
+
+Tools › Conversions › your conversion › Tag setup › the **conversion ID**, starting `AW-`.
+
+##### Meta Pixel [#trackers-meta-pixel]
+
+Events Manager › Data sources › your pixel › the **Pixel ID**, a long number.
+
+##### PostHog [#trackers-posthog]
+
+Project settings › **Project API key**, starting `phc_`, and whether your project is in the US or EU. Never the personal API key (`phx_`).
+
+##### Microsoft Clarity [#trackers-clarity]
+
+Settings › Overview › **Project ID**.
+
+##### Plausible [#trackers-plausible]
+
+Site settings › your site's script; the ID is the part that starts `pa-`.
+
+##### Umami Cloud [#trackers-umami]
+
+Websites › your site › Edit › **Website ID**.

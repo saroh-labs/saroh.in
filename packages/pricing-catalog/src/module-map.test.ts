@@ -47,6 +47,13 @@ describe("module map (KTD-8)", () => {
             legacyEntitlementKey: null,
         });
         expect(catalogueModulesFor("COMMUNICATIONS")).toEqual([]);
+        // A merchant's own trackers (DEC-108) are a switch under no module.
+        expect(MODULE_MAP["site-trackers"]).toEqual({
+            registry: null,
+            limitKey: null,
+            legacyEntitlementKey: null,
+        });
+        expect(catalogueModulesFor("WEBSITE")).not.toContain("site-trackers");
     });
 
     it("reads a legacy raise's key as its row", () => {

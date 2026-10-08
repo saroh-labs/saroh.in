@@ -84,6 +84,7 @@ describe("plan keys", () => {
                 "reviews",
                 "roles",
                 "saroh-emails",
+                "site-trackers",
                 "sites",
                 "storage",
                 "subscriptions",

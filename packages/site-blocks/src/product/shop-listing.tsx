@@ -214,7 +214,7 @@ export default function ShopListing({
             {bagSite ? (
                 <div
                     role="status"
-                    className="pointer-events-none fixed inset-x-0 bottom-4 z-40 flex justify-center px-4"
+                    className="pointer-events-none fixed inset-x-0 bottom-[calc(1rem+var(--site-consent-offset,0px))] z-40 flex justify-center px-4"
                 >
                     {notice ? (
                         <p className="bg-site-fg text-site-bg pointer-events-auto flex max-w-[min(100%,420px)] flex-wrap items-center gap-x-3 gap-y-1 rounded-[calc(var(--site-radius,2px)*2)] px-4 py-2.5 text-sm shadow-lg">

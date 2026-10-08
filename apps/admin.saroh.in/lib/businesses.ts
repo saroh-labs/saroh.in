@@ -201,6 +201,24 @@ export interface BusinessView {
             createdAt: string;
         }[]
     >;
+    /** Each site's tracker switch (#897). Absent from an older API. */
+    sites?: Panel<SiteTrackersRow[]>;
+}
+
+/** One site and whether Saroh has switched its trackers off. */
+export interface SiteTrackersRow {
+    id: string;
+    name: string;
+    subdomain: string | null;
+    /** Trackers the business has on. */
+    trackersOn: number;
+    switchedOff: {
+        at: string;
+        reason: string | null;
+        byUserId: string | null;
+    } | null;
+    /** Who switched it off, in words, when the console may name them. */
+    switchedOffBy: string | null;
 }
 
 export interface PlanOption {

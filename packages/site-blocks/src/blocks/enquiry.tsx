@@ -3,6 +3,7 @@
 import { useEffect, useId, useState } from "react";
 
 import type { RenderedEnquiry } from "@saroh/block-contract";
+import { NO_CAPTURE_ATTRS, NO_CAPTURE_CLASS } from "../consent-events";
 import { cn } from "../lib/utils";
 
 import type { SignedInCustomer } from "../account/api";
@@ -282,7 +283,8 @@ function EnquiryForm({
             ) : null}
 
             <form
-                className="mt-8 grid gap-[var(--site-grid-gap)]"
+                {...NO_CAPTURE_ATTRS}
+                className={`mt-8 grid gap-[var(--site-grid-gap)] ${NO_CAPTURE_CLASS}`}
                 onSubmit={onSubmit}
                 noValidate
             >
@@ -485,7 +487,8 @@ function ThreadForm({
             ) : null}
 
             <form
-                className="mt-8 grid gap-[var(--site-grid-gap)]"
+                {...NO_CAPTURE_ATTRS}
+                className={`mt-8 grid gap-[var(--site-grid-gap)] ${NO_CAPTURE_CLASS}`}
                 onSubmit={(e) => void onSubmit(e)}
                 noValidate
             >
