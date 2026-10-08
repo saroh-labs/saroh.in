@@ -284,6 +284,18 @@ organizations/:org/customers`: everyone who has paid (an order through a
 
 ## Websites
 
+- **Current** (DEC-108) — **A site's verification codes and the merchant's own
+  trackers are read live, beside the snapshot**, never inside it
+  (`GET /public/sites/:siteId/head`): saving one is never an unpublished change
+  and never enters `SITE_CHANGE_KINDS`. Only public ids from a fixed list of
+  tools are stored (`@saroh/block-contract` `site-tracking.ts`); Saroh writes
+  every loader on fixed hosts, and nothing a merchant enters can run code: no
+  code box, no Google Tag Manager, PostHog's site apps, web experiments and
+  surveys forced off. The tracker read fails closed on the plan. Trackers never
+  load on private paths (`apps/saroh.app/lib/private-paths.ts`, shared with
+  `robots.txt`), only after consent unless cookieless, and customer-data forms
+  carry `NO_CAPTURE_ATTRS`/`NO_CAPTURE_CLASS` (`site-blocks/consent-events.ts`).
+  A new form that takes a customer's details carries them too.
 - **Current** — `draft → publish → immutable snapshot` (ADR-002). Drafts are
   private; the public renderer reads only `Publication` snapshots; rollback
   repoints `Site.currentPublicationId`. Rich fields are sanitised at publish, so
