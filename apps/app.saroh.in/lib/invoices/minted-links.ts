@@ -10,16 +10,86 @@
  * it, and then a new link is the only way, said honestly on the button.
  */
 
-const minted = new Map<string, string>();
-
-/** The address made for this invoice in this tab, or null. */
-export function mintedLink(invoiceId: string): string | null {
-    return minted.get(invoiceId) ?? null;
+/**
+ * A link this tab made, and how the invoice stood around it: `before` is
+ * the invoice's `updatedAt` as this tab knew it when the link was made, and
+ * `seen` the first one read after. Making a link changes the invoice, so
+ * that first later read is the link's own; any later change means
+ * something else may have replaced the token (UX-048, #870).
+ */
+interface Held {
+    url: string;
+    before: number | null;
+    seen: number | null;
 }
 
-/** Keep the address just made; it replaces any made before. */
-export function rememberLink(invoiceId: string, url: string): void {
-    minted.set(invoiceId, url);
+const minted = new Map<string, Held>();
+
+/** Only an unpaid invoice's link takes payment; paid or void, it is gone. */
+const LIVE = new Set(["ISSUED", "OVERDUE"]);
+
+/** How the invoice stands now, from the latest read of it. */
+export interface LinkState {
+    standing?: string | null;
+    updatedAt?: string | null;
+}
+
+function time(iso: string | null | undefined): number | null {
+    if (!iso) return null;
+    const t = Date.parse(iso);
+    return Number.isNaN(t) ? null : t;
+}
+
+/**
+ * The address made for this invoice in this tab, or null. Given how the
+ * invoice stands now, it is forgotten once it can't be the link that is
+ * out: the invoice is paid, void or cancelled, or it changed after the
+ * link was made — a send, a reminder, a view link, or the customer's own
+ * "Pay now" on their account each make a new one and end this one.
+ */
+export function mintedLink(invoiceId: string, now?: LinkState): string | null {
+    const held = minted.get(invoiceId);
+    if (!held) return null;
+    if (!now) return held.url;
+    if (now.standing && !LIVE.has(now.standing)) {
+        minted.delete(invoiceId);
+        return null;
+    }
+    const at = time(now.updatedAt);
+    // Read from before the link was made, or nothing to compare.
+    if (at === null || (held.before !== null && at <= held.before)) {
+        return held.url;
+    }
+    // The first read after it was made: the change was the link itself.
+    if (held.seen === null) {
+        held.seen = at;
+        return held.url;
+    }
+    if (at > held.seen) {
+        minted.delete(invoiceId);
+        return null;
+    }
+    return held.url;
+}
+
+/**
+ * Keep the address just made; it replaces any made before. `updatedAt` is
+ * the invoice's as this tab knew it before the link was made.
+ */
+export function rememberLink(
+    invoiceId: string,
+    url: string,
+    updatedAt?: string | null,
+): void {
+    minted.set(invoiceId, { url, before: time(updatedAt), seen: null });
+}
+
+/**
+ * Something replaced this invoice's link (a send, a reminder, a view link):
+ * the address kept here no longer works, so it isn't shown again.
+ */
+export function forgetLink(invoiceId: string): void {
+    minted.delete(invoiceId);
 }
 
 /** For tests: start with nothing remembered. */

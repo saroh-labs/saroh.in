@@ -26,7 +26,6 @@ import { ViewerDate } from "@/components/shared/viewer-date";
 import { formatMoneyMajor } from "@/lib/format/money";
 import {
     createInvoice,
-    createPayLink,
     issueInvoice,
     updateInvoice,
 } from "@/lib/invoices/actions";
@@ -38,6 +37,7 @@ import {
     isHsnSac,
     rateOption,
 } from "@/lib/invoices/gst";
+import { newPayLink } from "@/lib/invoices/link-actions";
 import type { Invoice } from "@/lib/invoices/service";
 import type { DetailsOnFile } from "@/lib/organizations/business-details";
 
@@ -331,7 +331,7 @@ export function InvoiceForm({
             router.push(to);
             return;
         }
-        const link = await createPayLink(id);
+        const link = await newPayLink(id, issued.data.updatedAt);
         if (!link.ok) {
             if (link.plan) {
                 // Issued; only the pay link is the plan's to refuse.

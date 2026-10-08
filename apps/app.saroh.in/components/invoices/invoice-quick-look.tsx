@@ -15,13 +15,13 @@ import {
 import { QuickLook, QuickLookCard } from "@/components/shared/quick-look";
 import { ViewerDate } from "@/components/shared/viewer-date";
 import { formatMoneyMajor } from "@/lib/format/money";
-import { createPayLink, readInvoice } from "@/lib/invoices/actions";
+import { readInvoice } from "@/lib/invoices/actions";
+import { newPayLink } from "@/lib/invoices/link-actions";
 import { customerHref, invoiceHref, sourceHref } from "@/lib/invoices/links";
 import {
     copyLinkLabel,
     linkSight,
     mintedLink,
-    rememberLink,
 } from "@/lib/invoices/minted-links";
 import {
     isExemptPaper,
@@ -139,8 +139,14 @@ export function InvoiceQuickLook({
     const firstName = who.name.split(" ")[0] ?? who.name;
 
     // A link made for this invoice earlier in this tab: shown again as it
-    // is, never replaced by a new one.
-    const remembered = canLink ? mintedLink(i.id) : null;
+    // is, never replaced by a new one — unless the full read says it can't
+    // be the one out any more: paid or void, or changed since (#870).
+    const remembered = canLink
+        ? mintedLink(i.id, {
+              standing: full?.standing,
+              updatedAt: full?.updatedAt,
+          })
+        : null;
     // One out that this tab didn't make (after a reload, or on another
     // device): it can't be shown, only replaced (UX-048, owner 8 Oct).
     const unseen =
@@ -165,10 +171,9 @@ export function InvoiceQuickLook({
         if (!i) return;
         if (shown) return copyText(shown, false);
         setBusy(true);
-        const res = await createPayLink(i.id);
+        const res = await newPayLink(i.id, full?.updatedAt);
         setBusy(false);
         if (!res.ok) return reportFailure(res);
-        rememberLink(i.id, res.data.url);
         setShown(res.data.url);
         await copyText(res.data.url, true);
     }

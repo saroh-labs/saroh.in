@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it } from "vitest";
 
 import {
     copyLinkLabel,
+    forgetLink,
     forgetLinks,
     linkSight,
     mintedLink,
@@ -28,6 +29,73 @@ describe("minted pay links", () => {
         rememberLink("inv_2", "https://rye.saroh.app/pay/c");
         expect(mintedLink("inv_1")).toBe("https://rye.saroh.app/pay/b");
         expect(mintedLink("inv_2")).toBe("https://rye.saroh.app/pay/c");
+    });
+});
+
+/**
+ * #870: a remembered link is forgotten once it can't be the one out, so
+ * "Show link again" never shows a dead link.
+ */
+describe("a remembered link that was replaced or ended", () => {
+    beforeEach(() => forgetLinks());
+    const url = "https://rye.saroh.app/pay/a";
+    const T0 = "2026-10-08T10:00:00.000Z";
+    const T1 = "2026-10-08T10:00:05.000Z";
+    const T2 = "2026-10-08T10:30:00.000Z";
+
+    it("forgetLink drops it for that invoice only", () => {
+        rememberLink("inv_1", url);
+        rememberLink("inv_2", url);
+        forgetLink("inv_1");
+        expect(mintedLink("inv_1")).toBeNull();
+        expect(mintedLink("inv_2")).toBe(url);
+    });
+
+    it.each(["PAID", "VOID", "CREDITED"])(
+        "on a %s invoice there is nothing to show again",
+        (standing) => {
+            rememberLink("inv_1", url, T0);
+            expect(mintedLink("inv_1", { standing, updatedAt: T0 })).toBeNull();
+            // Gone for good, not hidden for this read.
+            expect(mintedLink("inv_1")).toBeNull();
+        },
+    );
+
+    it.each(["ISSUED", "OVERDUE"])(
+        "on an %s invoice it is shown again",
+        (standing) => {
+            rememberLink("inv_1", url, T0);
+            expect(mintedLink("inv_1", { standing, updatedAt: T0 })).toBe(url);
+        },
+    );
+
+    it("survives the change its own making caused", () => {
+        rememberLink("inv_1", url, T0);
+        // The read from before it was made, then the first one after.
+        expect(mintedLink("inv_1", { standing: "ISSUED", updatedAt: T0 })).toBe(
+            url,
+        );
+        expect(mintedLink("inv_1", { standing: "ISSUED", updatedAt: T1 })).toBe(
+            url,
+        );
+        expect(mintedLink("inv_1", { standing: "ISSUED", updatedAt: T1 })).toBe(
+            url,
+        );
+    });
+
+    it("is forgotten when the invoice changes again: something may have replaced it", () => {
+        // The customer's own "Pay now" on their account, say.
+        rememberLink("inv_1", url, T0);
+        mintedLink("inv_1", { standing: "ISSUED", updatedAt: T1 });
+        expect(
+            mintedLink("inv_1", { standing: "OVERDUE", updatedAt: T2 }),
+        ).toBeNull();
+        expect(mintedLink("inv_1")).toBeNull();
+    });
+
+    it("keeps it when a read has no time to compare", () => {
+        rememberLink("inv_1", url);
+        expect(mintedLink("inv_1", { standing: "ISSUED" })).toBe(url);
     });
 });
 
