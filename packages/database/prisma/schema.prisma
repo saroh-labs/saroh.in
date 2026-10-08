@@ -3690,6 +3690,18 @@ model Domain {
   lastCheckedAt   DateTime?
   lastCheckResult String?
 
+  // Hosting (#859): once VERIFIED, the hostname is registered as a custom
+  // hostname on the merchant-sites zone (Cloudflare for SaaS). `hostingId` is
+  // Cloudflare's custom-hostname id; `hostingStatus` is PENDING (registered,
+  // waiting for the CNAME and certificate), ACTIVE (serving), FAILED
+  // (Cloudflare reports a problem) or REGISTER_FAILED (the call failed; the
+  // next check retries). `hostingError` says in words what last went wrong,
+  // null once a call works. A failure here never undoes the verification.
+  hostingId        String?
+  hostingStatus    String?
+  hostingError     String?
+  hostingCheckedAt DateTime?
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 

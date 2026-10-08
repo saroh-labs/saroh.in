@@ -154,6 +154,22 @@ const envSchema = z.object({
         .string()
         .regex(/^[\w.-]+\/[\w.-]+$/)
         .optional(),
+    // Custom domains' hosting (#859): a verified domain is registered as a
+    // custom hostname (Cloudflare for SaaS) on the merchant-sites zone —
+    // `saroh.app` in production. The token is its OWN Cloudflare API token,
+    // allowed only to edit custom hostnames on that one zone (never the
+    // sites' deploy token); the zone id is that zone's. Both unset (or
+    // either), hosting is off: domains still verify, the read says hosting
+    // isn't set up, and a WARN says so at boot. The token is never logged.
+    CLOUDFLARE_HOSTNAMES_TOKEN: z.string().min(20).optional(),
+    CLOUDFLARE_HOSTNAMES_ZONE_ID: z
+        .string()
+        .regex(/^[0-9a-f]{32}$/, "a 32-character Cloudflare zone id")
+        .optional(),
+    // The host a merchant's CNAME points at: the zone's fallback origin, a
+    // host on that zone. Optional; set, the domain read carries the CNAME
+    // record to show. Not a secret.
+    CLOUDFLARE_HOSTNAMES_CNAME_TARGET: z.string().optional(),
     // Cloudflare Turnstile, the bot challenge a code needs past a shared
     // ceiling. Unset: no challenge is ever asked (and an ERROR says when one
     // would have been), so a customer is never stuck on a widget that can't load.

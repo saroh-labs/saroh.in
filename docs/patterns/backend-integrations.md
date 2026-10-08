@@ -17,6 +17,16 @@ Every provider sits behind a port, with adapters under the module's
 | `WebhookProvider`  | `modules/webhooks`        | Signed inbound events                                           |
 | `CommsProvider`    | `modules/communications`  | Email and WhatsApp adapters, chosen by a factory per channel    |
 | `ObjectStorage`    | `packages/object-storage` | Media, with an R2 adapter and an in-memory adapter              |
+| `DomainHosting`    | `modules/domains`         | A verified custom domain's hostname on Cloudflare for SaaS      |
+
+`DomainHosting` (#859) registers a domain's hostname as a custom hostname on
+the merchant-sites zone once its TXT check passes, and deletes it there
+before the Domain row goes (a failed delete is a 503 and removes nothing). A
+failed call never undoes the verification: the row stays VERIFIED with
+`hostingStatus` and `hostingError` in words, and the next check retries.
+With `CLOUDFLARE_HOSTNAMES_TOKEN` or `CLOUDFLARE_HOSTNAMES_ZONE_ID` unset the
+port is null, a WARN says so at boot, and the read says `hosting.state: "OFF"`
+(`domain-hosting-sync.ts`).
 
 DEC-011 describes separate `EmailProvider` and `WhatsAppProvider` ports; the
 code has one `CommsProvider` port with per-channel adapters. DECISIONS.md carries
