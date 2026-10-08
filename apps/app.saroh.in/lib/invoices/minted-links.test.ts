@@ -3,8 +3,12 @@ import { beforeEach, describe, expect, it } from "vitest";
 import {
     copyLinkLabel,
     forgetLinks,
+    linkSight,
     mintedLink,
+    newLinkWarning,
     rememberLink,
+    UNSEEN_LINK,
+    unseenLinkLine,
 } from "./minted-links";
 
 /**
@@ -34,9 +38,9 @@ describe("copyLinkLabel", () => {
         expect(copyLinkLabel(base)).toBe("Copy pay link");
     });
 
-    it("says a new link retires the one already out", () => {
+    it("offers a new link, not a copy, when the one out can't be shown", () => {
         expect(copyLinkLabel({ ...base, linkOut: true })).toBe(
-            "Copy new link (the old one stops working)",
+            "Make a new link",
         );
     });
 
@@ -48,5 +52,46 @@ describe("copyLinkLabel", () => {
 
     it("says it is working while the link is made", () => {
         expect(copyLinkLabel({ ...base, busy: true })).toBe("Making a link…");
+    });
+});
+
+/**
+ * After a reload or on another device (UX-048, owner 8 Oct: hash-only):
+ * a link that is out can't be shown, only replaced, and the screen says so.
+ */
+describe("linkSight", () => {
+    it("has no link when none is out", () => {
+        expect(linkSight({ linkOut: false, held: false })).toBe("none");
+    });
+
+    it("shows again a link this tab made", () => {
+        expect(linkSight({ linkOut: true, held: true })).toBe("held");
+    });
+
+    it("can't show one out that this tab didn't make", () => {
+        expect(linkSight({ linkOut: true, held: false })).toBe("unseen");
+    });
+});
+
+describe("the unseen link's words", () => {
+    it("says why the address isn't shown, and that a new link ends the old one", () => {
+        expect(unseenLinkLine({ sendable: false })).toBe(
+            "A pay link is out and still works. Its full address is shown only once, when it's made, so it can't be shown again here or on another device. Making a new link ends the old one.",
+        );
+    });
+
+    it("says sending ends it too where the invoice can be sent", () => {
+        expect(unseenLinkLine({ sendable: true })).toContain(
+            "Making a new link, or sending the invoice, ends the old one.",
+        );
+    });
+
+    it("asks before replacing it, naming who gets the new one", () => {
+        expect(UNSEEN_LINK.confirmTitle).toBe("Make a new pay link?");
+        expect(UNSEEN_LINK.confirmLabel).toBe("Make a new link");
+        expect(UNSEEN_LINK.cancelLabel).toBe("Keep the old one");
+        expect(newLinkWarning("Farah Khan")).toBe(
+            "The link that's out stops working straight away, for anyone who has it. Send Farah Khan the new one.",
+        );
     });
 });

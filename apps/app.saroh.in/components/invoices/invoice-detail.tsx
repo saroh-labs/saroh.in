@@ -21,6 +21,10 @@ import { InvoiceCrumbs } from "@/components/invoices/invoice-crumbs";
 import { InvoicePill } from "@/components/invoices/invoice-pill";
 import { OfflinePayHint } from "@/components/invoices/offline-pay-hint";
 import { SendDialog } from "@/components/invoices/send-dialog";
+import {
+    NewLinkConfirm,
+    UnseenLinkNote,
+} from "@/components/invoices/unseen-link";
 import { useBusinessDetailsStep } from "@/components/organizations/use-business-details-step";
 import { ConfirmDialog } from "@/components/shared/confirm-dialog";
 import { ReadOnlyNote } from "@/components/shared/read-only-note";
@@ -271,6 +275,9 @@ export function InvoiceDetail({
         charging: !!charging,
         hasPdf: hasPdf(invoice),
         linkBusy: busy,
+        // A link is out that this tab can't show: the button makes a new
+        // one, confirmed first (UX-048).
+        linkUnseen: !!online?.payLinkActive && !(url && urlKind === "pay"),
         pdfBusy: downloading,
     }).map((a) => ({ ...a, ...does[a.id] }));
 
@@ -397,12 +404,12 @@ export function InvoiceDetail({
                                     who={invoice.who}
                                 />
                             ) : online?.payLinkActive ? (
-                                <p className="mt-2 text-[12.5px] leading-[1.5] text-muted-foreground">
-                                    A pay link is out. Its address was shown
-                                    once, when it was copied — copying it again
-                                    {sendable ? " or sending it" : ""} makes a
-                                    new one, and the old one stops working.
-                                </p>
+                                // Out, but not made in this tab: it can't
+                                // be shown, only replaced (UX-048).
+                                <UnseenLinkNote
+                                    sendable={sendable}
+                                    className="mt-2"
+                                />
                             ) : null
                         ) : null}
                         {owed && sendable && reminding && nextReminderAt ? (
@@ -488,13 +495,10 @@ export function InvoiceDetail({
                 registered={registered}
                 refund
             />
-            <ConfirmDialog
+            <NewLinkConfirm
                 open={open === "newLink"}
                 onOpenChange={dialog("newLink")}
-                title="Make a new pay link?"
-                description={`The link you shared before stops working straight away. Send ${invoice.who} the new one.`}
-                confirmLabel="Make a new link"
-                cancelLabel="Keep the old one"
+                who={invoice.who}
                 onConfirm={() => void makeLink()}
             />
             <ConfirmDialog
