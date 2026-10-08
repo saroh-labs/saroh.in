@@ -65,8 +65,11 @@ what the API allows.
   of which reaches it, and Commerce takes `order:read` or `order:stage`, so a
   Member reaches Sell → Orders (the list comes back without totals or emails)
   and Order Detail (`GET organizations/:org/orders/:id`). The older
-  store-scoped order list and read send totals, so they refuse a role with
-  `order:stage` but no `order:read`. A new read inside Commerce must ask for
+  store-scoped order list and read send totals (and the store-scoped
+  customer list each customer's spend), so they take `order:read`
+  (`requireOrderRead`): a role with `order:stage` but no `order:read` is
+  refused, and so is store access alone (#868) — `store:read` shows the
+  storefront, never what it has sold. A new read inside Commerce must ask for
   its own action; the module gate no longer implies `order:read`.
 - **Current** (B16, DEC-039) — **Each order endpoint asks its own power.**
   `order:create` takes a new order (store-scoped `POST stores/:id/orders`

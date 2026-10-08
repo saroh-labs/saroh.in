@@ -15,6 +15,11 @@
  * check. What a storefront role still grants that isn't money (taking and
  * changing its storefront's orders, DEC-048) stays there.
  *
+ * Nor does store access (#868): the store-scoped reads that send amounts
+ * (a storefront's orders with their totals, its customers with what they
+ * spent) ask `order:read` through `requireOrderRead`, never `store:read`,
+ * which a Member and a role made with only "See locations" hold.
+ *
  * Not covered, by design: who is NOTIFIED (owners and admins hear of a new
  * enquiry) is not who may do something. The app's half is
  * `apps/app.saroh.in/lib/organizations/money-by-permission.test.ts`.
@@ -161,5 +166,144 @@ describe("no storefront role grants money (DEC-106)", () => {
                 `stores.moneyAllows(storeId, userId, "order:read")`,
             ),
         ).toBe(false);
+    });
+});
+
+/** Store access asked as a grant: `store:read` or `store:write` (#868). */
+const STORE_ACCESS = /["']store:(?:read|write)["']/;
+
+/**
+ * A store-scoped service method that sends amounts: it serializes an order's
+ * totals or a customer's spend. (A write that reads a total to settle a
+ * refund asks its own money power, `requireOrderWrite`.)
+ */
+const SENDS_AMOUNTS =
+    /\bserialize(?:OrderSummary|OrderDetail|CustomerListItem)\b/;
+
+/** The services behind the store-scoped routes (`stores/:storeId/…`) that hold amounts. */
+const STORE_SCOPED_MONEY = [
+    "orders/orders.service.ts",
+    "customers/customers.service.ts",
+];
+
+/**
+ * Each method of a class in `source`, by name, with its body: from one
+ * four-space-indented signature to the next.
+ */
+function methods(source: string): { name: string; body: string }[] {
+    const signature = /^ {4}(?:private |public )?(?:async )?(\w+)\(/;
+    const out: { name: string; body: string }[] = [];
+    for (const line of source.split("\n")) {
+        const m = signature.exec(line);
+        if (m) out.push({ name: m[1], body: "" });
+        const last = out[out.length - 1];
+        if (last) last.body += `${line}\n`;
+    }
+    return out;
+}
+
+/**
+ * The store-scoped methods in `source` that read or send amounts without
+ * asking `requireOrderRead` before their first database read.
+ */
+function unaskedAmountReads(source: string): string[] {
+    return methods(source)
+        .filter(
+            ({ name, body }) =>
+                name !== "requireOrderRead" &&
+                /\bstoreId: string\b/.test(body.slice(0, body.indexOf("{"))) &&
+                SENDS_AMOUNTS.test(body),
+        )
+        .filter(({ body }) => {
+            const asked = body.search(/\brequireOrderRead\(/);
+            const read = body.search(/\bprisma\./);
+            return asked < 0 || (read >= 0 && read < asked);
+        })
+        .map(({ name }) => `${name}()`);
+}
+
+describe("store access grants no amounts (#868)", () => {
+    it("the store-scoped money read asks a money permission, never store access", () => {
+        const offenders = STOREFRONT_MONEY.flatMap((f) =>
+            readFileSync(join(MODULES, f), "utf8")
+                .split("\n")
+                .map((line, i) => ({ line, at: i + 1 }))
+                .filter(({ line }) => STORE_ACCESS.test(line))
+                .map(({ line, at }) => `${f}:${at} ${line.trim()}`),
+        );
+        expect(offenders).toEqual([]);
+        const read = readFileSync(
+            join(MODULES, "stores", "order-read-access.ts"),
+            "utf8",
+        );
+        expect(read).toContain(`moneyAllows(storeId, userId, "order:read")`);
+    });
+
+    it("every store-scoped read that sends amounts asks requireOrderRead first", () => {
+        const offenders = STORE_SCOPED_MONEY.flatMap((f) =>
+            unaskedAmountReads(readFileSync(join(MODULES, f), "utf8")).map(
+                (m) => `${f} ${m}`,
+            ),
+        );
+        expect(offenders).toEqual([]);
+        // And the scan sees them: each file has its list and read.
+        for (const f of STORE_SCOPED_MONEY) {
+            const names = methods(readFileSync(join(MODULES, f), "utf8"))
+                .filter(({ body }) => SENDS_AMOUNTS.test(body))
+                .map(({ name }) => name);
+            expect(names).toContain("list");
+        }
+    });
+
+    it("the guard catches store access read as a grant for amounts", () => {
+        expect(
+            STORE_ACCESS.test(
+                `stores.memberAllows(storeId, userId, "store:read"),`,
+            ),
+        ).toBe(true);
+        expect(
+            STORE_ACCESS.test(
+                `stores.moneyAllows(storeId, userId, "order:read")`,
+            ),
+        ).toBe(false);
+        // A store-scoped list that sends totals on store access alone, or
+        // reads them before asking, is found; one that asks first is not.
+        const service = (...body: string[]) =>
+            [
+                "export class OrdersService {",
+                "    async list(",
+                "        storeId: string,",
+                "        userId: string,",
+                "    ) {",
+                ...body,
+                "        return orders.map(serializeOrderSummary);",
+                "    }",
+                "}",
+            ].join("\n");
+        const read = "        const orders = await prisma.order.findMany({});";
+        expect(
+            unaskedAmountReads(
+                service(
+                    "        await this.stores.getForUser(storeId, userId);",
+                    read,
+                ),
+            ),
+        ).toEqual(["list()"]);
+        expect(
+            unaskedAmountReads(
+                service(
+                    read,
+                    "        await this.requireOrderRead(storeId, userId);",
+                ),
+            ),
+        ).toEqual(["list()"]);
+        expect(
+            unaskedAmountReads(
+                service(
+                    "        await this.requireOrderRead(storeId, userId);",
+                    read,
+                ),
+            ),
+        ).toEqual([]);
     });
 });
