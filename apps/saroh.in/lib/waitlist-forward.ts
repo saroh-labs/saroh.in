@@ -14,10 +14,11 @@ import { isIP } from "node:net";
  * with `sig` = HMAC-SHA256 over `v1\n<seconds>\n<address>\n<host>`, the
  * same as `apps/saroh.app/lib/site-relay.ts` and the API's `signSiteRelay`.
  *
- * The address comes only from the platform's own header (`x-real-ip`, which
- * Vercel's edge writes over whatever a visitor sent). A client-sent
- * `X-Forwarded-For` is never read or passed on: anyone can write one, and
- * it would let them pick the key their limit is counted by.
+ * The address comes only from the platform's own header (`cf-connecting-ip`,
+ * which Cloudflare writes over whatever a visitor sent; `x-real-ip` where
+ * Vercel served the site). A client-sent `X-Forwarded-For` is never read or
+ * passed on: anyone can write one, and it would let them pick the key their
+ * limit is counted by.
  */
 export const RELAY_HEADER = "x-saroh-relay";
 const VERSION = "v1";
@@ -60,7 +61,9 @@ export function signRelay(
  * `X-Forwarded-For`.
  */
 export function visitorAddress(headers: Headers): string | null {
-    const raw = headers.get("x-real-ip")?.trim();
+    const raw = (
+        headers.get("cf-connecting-ip") ?? headers.get("x-real-ip")
+    )?.trim();
     return raw && isIP(raw) !== 0 ? raw : null;
 }
 
@@ -112,14 +115,19 @@ export function joinBody(posted: unknown): JoinBody | null {
 }
 
 /**
- * The visitor's country as Vercel's edge saw their connection
- * (`x-vercel-ip-country`, two letters), or undefined anywhere it isn't set:
- * local dev, the browser tests, a request that didn't come through Vercel.
- * Never asked of the visitor.
+ * The visitor's country as the edge saw their connection (Cloudflare's
+ * `cf-ipcountry`, or Vercel's `x-vercel-ip-country`; two letters), or
+ * undefined anywhere it isn't set: local dev, the browser tests, a request
+ * that came through neither. Cloudflare's `XX` (unknown) and `T1` (Tor)
+ * aren't countries. Never asked of the visitor.
  */
 export function visitorCountry(headers: Headers): string | undefined {
-    const raw = headers.get("x-vercel-ip-country")?.trim().toUpperCase();
-    return raw && /^[A-Z]{2}$/.test(raw) ? raw : undefined;
+    const raw = (
+        headers.get("cf-ipcountry") ?? headers.get("x-vercel-ip-country")
+    )
+        ?.trim()
+        .toUpperCase();
+    return raw && /^[A-Z]{2}$/.test(raw) && raw !== "XX" ? raw : undefined;
 }
 
 /** The headers for the API call: JSON, and the relay when it can be signed. */

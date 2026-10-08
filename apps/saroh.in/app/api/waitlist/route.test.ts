@@ -34,7 +34,7 @@ function join(country?: string) {
         method: "POST",
         headers: {
             "Content-Type": "application/json",
-            ...(country ? { "x-vercel-ip-country": country } : {}),
+            ...(country ? { "cf-ipcountry": country } : {}),
         },
         body: JSON.stringify({
             email: "a@shop.in",

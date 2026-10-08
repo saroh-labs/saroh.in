@@ -50,7 +50,7 @@ const post = (path: string, body: unknown, headers: HeadersInit = {}) =>
         method: "POST",
         headers: {
             "Content-Type": "application/json",
-            "x-real-ip": "203.0.113.9",
+            "cf-connecting-ip": "203.0.113.9",
             ...headers,
         },
         body: JSON.stringify(body),

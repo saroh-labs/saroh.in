@@ -30,6 +30,20 @@ if (missing.length > 0) {
     );
 }
 
+// Every response: HTTPS only from the first visit on, never shown inside
+// another site's frame (so a sign-in or a button can't be dressed up and
+// clicked through from elsewhere), and no guessing a file's type. The app's
+// own previews are same-origin, so 'self' may still frame it.
+const SECURITY_HEADERS = [
+    {
+        key: "Strict-Transport-Security",
+        value: "max-age=31536000; includeSubDomains",
+    },
+    { key: "X-Frame-Options", value: "SAMEORIGIN" },
+    { key: "Content-Security-Policy", value: "frame-ancestors 'self'" },
+    { key: "X-Content-Type-Options", value: "nosniff" },
+];
+
 /** @type {import('next').NextConfig} */
 const nextConfig = {
     // @saroh/ui ships its entries as source, so Next must compile it.
@@ -49,9 +63,13 @@ const nextConfig = {
         SAROH_BUILT_ROUTES: JSON.stringify(builtRoutes()),
     },
 
+    // No `X-Powered-By: Next.js`: it only tells scanners what to try.
+    poweredByHeader: false,
+
     /*
-     * A pricing draft preview (plans catalogue U24, KTD-10) is never cached,
-     * indexed or passed on as a referrer, whatever the page itself sends.
+     * Every response gets SECURITY_HEADERS. A pricing draft preview (plans
+     * catalogue U24, KTD-10) is never cached, indexed or passed on as a
+     * referrer, whatever the page itself sends.
      */
     async headers() {
         const preview = [
@@ -60,6 +78,7 @@ const nextConfig = {
             { key: "Referrer-Policy", value: "no-referrer" },
         ];
         return [
+            { source: "/:path*", headers: SECURITY_HEADERS },
             { source: "/pricing/draft", headers: preview },
             { source: "/pricing/preview", headers: preview },
         ];

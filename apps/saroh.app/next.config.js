@@ -34,6 +34,20 @@ if (missing.length > 0) {
  */
 const TEST_HOST_PATTERNS = ["test--.+", "test\\..+\\..+"];
 
+// Every response: HTTPS only from the first visit on, never shown inside
+// another site's frame (so a sign-in or a button can't be dressed up and
+// clicked through from elsewhere), and no guessing a file's type. The app's
+// own previews are same-origin, so 'self' may still frame it.
+//
+// No includeSubDomains here: on a merchant's own domain it would force HTTPS
+// on every subdomain of their business, including ones Saroh doesn't serve.
+const SECURITY_HEADERS = [
+    { key: "Strict-Transport-Security", value: "max-age=31536000" },
+    { key: "X-Frame-Options", value: "SAMEORIGIN" },
+    { key: "Content-Security-Policy", value: "frame-ancestors 'self'" },
+    { key: "X-Content-Type-Options", value: "nosniff" },
+];
+
 /** @type {import('next').NextConfig} */
 const nextConfig = {
     // Development logs every server action's arguments by default, and some
@@ -46,10 +60,15 @@ const nextConfig = {
     // No database here — saroh.app renders via api.saroh.in (single backend).
     reactStrictMode: false,
 
-    // An invoice pay link's token is its credential (ADR-007, U13): the page
-    // sends no referrer and is never indexed, as headers as well as meta tags.
+    // No `X-Powered-By: Next.js`: it only tells scanners what to try.
+    poweredByHeader: false,
+
+    // Every response gets SECURITY_HEADERS. An invoice pay link's token is its
+    // credential (ADR-007, U13): the page sends no referrer and is never
+    // indexed, as headers as well as meta tags.
     async headers() {
         return [
+            { source: "/:path*", headers: SECURITY_HEADERS },
             {
                 source: "/pay/:token*",
                 headers: [
