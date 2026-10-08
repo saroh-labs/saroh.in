@@ -46,6 +46,8 @@ const CLASS_LEVEL: Record<string, string> = {
     "sites/sites.controller.ts": "WEBSITE",
     // DEC-071 T2: a site's test releases and their links.
     "sites/test-releases.controller.ts": "WEBSITE",
+    // A site's Search and tracking section (DEC-108).
+    "sites/site-tracking.controller.ts": "WEBSITE",
     "forms/forms.controller.ts": "WEBSITE",
     "domains/domains.controller.ts": "WEBSITE",
     "content/posts.controller.ts": "WEBSITE",
