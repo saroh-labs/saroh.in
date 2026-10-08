@@ -11,7 +11,15 @@ import { openAccessAction } from "@/lib/business-actions";
  * Opening a business's page means opening a support session: read-only,
  * thirty minutes, bound to a written reason, and on the record. Nothing about
  * the business beyond its directory row is shown until it is open.
+ *
+ * The common reasons are one tap away; the reason still goes on the record
+ * exactly as it reads in the field, so an operator can add detail first.
  */
+const QUICK_REASONS = [
+    "Support request from the business",
+    "Checking a setting",
+    "Testing on a test business",
+] as const;
 export function OpenAccess({ organizationId }: { organizationId: string }) {
     const [reason, setReason] = useState("");
     const [error, setError] = useState<string | null>(null);
@@ -35,13 +43,27 @@ export function OpenAccess({ organizationId }: { organizationId: string }) {
         >
             <div className="grid gap-1.5">
                 <Label htmlFor="access-reason">
-                    Why are you opening this business?
+                    Your reason, kept with your name in the audit trail
                 </Label>
+                <div className="flex flex-wrap gap-2">
+                    {QUICK_REASONS.map((quick) => (
+                        <Button
+                            key={quick}
+                            type="button"
+                            size="sm"
+                            variant={reason === quick ? "secondary" : "outline"}
+                            disabled={pending}
+                            onClick={() => setReason(quick)}
+                        >
+                            {quick}
+                        </Button>
+                    ))}
+                </div>
                 <Textarea
                     id="access-reason"
                     value={reason}
                     onChange={(e) => setReason(e.target.value)}
-                    placeholder="e.g. Owner emailed: bookings page shows no slots"
+                    placeholder="Or write your own, e.g. Owner emailed: bookings page shows no slots"
                     rows={3}
                     minLength={4}
                     maxLength={500}
