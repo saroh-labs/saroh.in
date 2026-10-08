@@ -29,6 +29,8 @@ jest.mock("@saroh/database", () => {
         currentOrgContext: () => undefined,
         isRlsEnforcementEnabled: () => false,
         outsideOrgContext: <T>(fn: () => T) => fn(),
+        // Every business starts on the catalogue's Free plan (U12, OQ-2).
+        startOnFreePlan: jest.fn().mockResolvedValue("started"),
         prisma: {
             ...client,
             $transaction: jest.fn((cb: (tx: typeof client) => unknown) =>
@@ -38,7 +40,7 @@ jest.mock("@saroh/database", () => {
     };
 });
 
-import { prisma } from "@saroh/database";
+import { prisma, startOnFreePlan as startOnFreePlanFn } from "@saroh/database";
 
 import type { AuditService } from "../audit/audit.service";
 import { AuditAction, AuditOutcome } from "../audit/audit.service";
@@ -56,6 +58,7 @@ const heldFindUnique = (
 const profileCreate = prisma.businessProfile.create as jest.Mock;
 const membershipCreate = prisma.membership.create as jest.Mock;
 const transaction = prisma.$transaction as jest.Mock;
+const startOnFreePlan = startOnFreePlanFn as unknown as jest.Mock;
 
 describe("OrganizationOnboardingService.onboard", () => {
     // AuditService.record is fire-and-forget (never throws); a jest mock stands
@@ -103,11 +106,30 @@ describe("OrganizationOnboardingService.onboard", () => {
                 taxId: undefined,
                 contactEmail: undefined,
                 website: undefined,
+                // No zone sent, and the US keeps several: India's (UX-008).
+                timezone: "Asia/Kolkata",
             },
         });
         expect(membershipCreate).toHaveBeenCalledWith({
             data: { organizationId: "org_1", userId: "user_1", role: "OWNER" },
         });
+    });
+
+    it("starts the business on the catalogue's Free plan in the same transaction (U12, OQ-2)", async () => {
+        await service.onboard("user_1", { name: "Acme" });
+
+        expect(startOnFreePlan).toHaveBeenCalledTimes(1);
+        const [tx, organizationId, options] = startOnFreePlan.mock.calls[0] as [
+            unknown,
+            string,
+            { planId: string },
+        ];
+        // The transaction's client (the mock hands its callback the inner
+        // delegates), not the bare one.
+        expect(tx).not.toBe(prisma);
+        expect(tx).toHaveProperty("membership");
+        expect(organizationId).toBe("org_1");
+        expect(options).toEqual({ planId: "free" });
     });
 
     it("stores a private limited company as pvt, and takes a new type as sent (F10b)", async () => {
@@ -125,6 +147,44 @@ describe("OrganizationOnboardingService.onboard", () => {
         });
         expect(profileCreate).toHaveBeenLastCalledWith({
             data: expect.objectContaining({ type: "partnership" }),
+        });
+    });
+
+    describe('setup\'s "Is it registered?" (prelaunch)', () => {
+        it("keeps Registered, which sends no type, so go-live can ask for the real one", async () => {
+            await service.onboard("user_1", {
+                name: "Acme",
+                profile: { registered: true, country: "IN" },
+            });
+            const { data } = profileCreate.mock.lastCall?.[0] as {
+                data: Record<string, unknown>;
+            };
+            expect(data.legallyRegistered).toBe(true);
+            expect(data.type).toBeUndefined();
+        });
+
+        it("reads Not registered (the individual type) as not registered", async () => {
+            await service.onboard("user_1", {
+                name: "Acme",
+                profile: { type: "individual" },
+            });
+            expect(profileCreate).toHaveBeenLastCalledWith({
+                data: expect.objectContaining({
+                    type: "individual",
+                    legallyRegistered: false,
+                }),
+            });
+        });
+
+        it("leaves it unasked when setup didn't ask", async () => {
+            await service.onboard("user_1", {
+                name: "Acme",
+                profile: { country: "IN" },
+            });
+            const { data } = profileCreate.mock.lastCall?.[0] as {
+                data: Record<string, unknown>;
+            };
+            expect(data.legallyRegistered).toBeUndefined();
         });
     });
 
@@ -196,15 +256,58 @@ describe("OrganizationOnboardingService.onboard", () => {
         expect(membershipArg.role).toBe("OWNER");
     });
 
-    it("skips the BusinessProfile when no profile fields are supplied", async () => {
-        await service.onboard("user_1", { name: "Acme" });
-        expect(profileCreate).not.toHaveBeenCalled();
-        expect(membershipCreate).toHaveBeenCalledTimes(1);
-    });
+    describe("the business's time zone (UX-008)", () => {
+        const zoneOf = () =>
+            (
+                profileCreate.mock.lastCall?.[0] as {
+                    data: { timezone?: string };
+                }
+            ).data.timezone;
 
-    it("skips the BusinessProfile when the profile object is empty", async () => {
-        await service.onboard("user_1", { name: "Acme", profile: {} });
-        expect(profileCreate).not.toHaveBeenCalled();
+        it("gives a business with no profile fields India's zone", async () => {
+            await service.onboard("user_1", { name: "Acme" });
+            expect(profileCreate).toHaveBeenCalledWith({
+                data: { organizationId: "org_1", timezone: "Asia/Kolkata" },
+            });
+            expect(membershipCreate).toHaveBeenCalledTimes(1);
+        });
+
+        it("gives an empty profile India's zone too", async () => {
+            await service.onboard("user_1", { name: "Acme", profile: {} });
+            expect(zoneOf()).toBe("Asia/Kolkata");
+        });
+
+        it("keeps the zone setup sent (the browser's) where the country keeps several", async () => {
+            await service.onboard("user_1", {
+                name: "Acme",
+                profile: { country: "US", timezone: "America/Chicago" },
+            });
+            expect(zoneOf()).toBe("America/Chicago");
+        });
+
+        it("gives an Indian business India's zone wherever its owner signs up from", async () => {
+            await service.onboard("user_1", {
+                name: "Acme",
+                profile: { country: "IN", timezone: "Asia/Dubai" },
+            });
+            expect(zoneOf()).toBe("Asia/Kolkata");
+        });
+
+        it("reads a one-zone country's zone when none was sent", async () => {
+            await service.onboard("user_1", {
+                name: "Acme",
+                profile: { country: "ae" },
+            });
+            expect(zoneOf()).toBe("Asia/Dubai");
+        });
+
+        it("falls back past a zone the tz database doesn't know", async () => {
+            await service.onboard("user_1", {
+                name: "Acme",
+                profile: { timezone: "Mars/Olympus" },
+            });
+            expect(zoneOf()).toBe("Asia/Kolkata");
+        });
     });
 
     it("throws Conflict on a slug collision and creates nothing", async () => {

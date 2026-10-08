@@ -1,5 +1,7 @@
 import { z } from "zod";
 
+import { parseSectionFrame } from "./section-frame";
+
 /**
  * Versioned section contract (Stage 2 — S2-001).
  *
@@ -237,6 +239,29 @@ const imageSchema = z.object({
     height: z.number().int().positive().optional(),
 });
 
+/** How long an image brief may run (KTD-5). */
+export const IMAGE_BRIEF_MAX = 200;
+
+/**
+ * What photograph belongs in an image slot that has none yet (KTD-5,
+ * industry templates U2): "Morning light on the counter, loaves stacked".
+ *
+ * A SIBLING of the block's image, not a field inside it. `imageSchema`
+ * requires a `src` — every image published so far has one, and the media
+ * library's "on a published site" guard reads it — so a slot with only a
+ * brief cannot be an image. Making `src` optional instead would loosen every
+ * image in every block, and every renderer would have to learn that an
+ * image may have nowhere to load from. A sibling string touches only the
+ * blocks that take one, is optional (so it extends each block's current
+ * version in place) and is plain text.
+ *
+ * A template ships the slot as this brief and no image. The live site draws
+ * nothing for the slot — a brief is a note to the owner, never something a
+ * visitor reads — and the editor shows it as the empty slot's text. Once a
+ * photo is chosen the brief is simply not drawn; it can stay.
+ */
+const imageBrief = z.string().trim().max(IMAGE_BRIEF_MAX).optional();
+
 // ---------------------------------------------------------------------------
 // Section content schemas (per type + version)
 // ---------------------------------------------------------------------------
@@ -258,7 +283,16 @@ const heroV1 = z.object({
     subheading: z.string().optional(),
     cta: ctaSchema.optional(),
     image: imageSchema.optional(),
+    /** The photo this hero wants, until it has one (KTD-5). */
+    imageBrief,
     onToday: z.boolean().optional(),
+    /**
+     * `false` keeps the heading for screen readers and search engines only
+     * (the `none` look): a page whose header already shows the business's
+     * name still has its one h1 without printing the name twice. Absent is
+     * shown, as every hero has been.
+     */
+    titleVisible: z.boolean().optional(),
 });
 
 /**
@@ -279,8 +313,23 @@ const heroV1 = z.object({
  * would lose the photo. The pre-publish check flags a photo with no
  * description instead (`site-flags.ts`), as it does every other gap.
  */
-export const TEXT_IMAGE_SIDES = ["left", "right"] as const;
+/**
+ * `above` (template polish) puts the photo over the text at 16:9, as the
+ * developer design opens its case study; the text keeps its own column.
+ */
+export const TEXT_IMAGE_SIDES = ["left", "right", "above"] as const;
 export type TextImageSide = (typeof TEXT_IMAGE_SIDES)[number];
+
+/** How a text block's own headings are set. See `richTextV1.headingStyle`. */
+export const TEXT_HEADING_STYLES = ["heading", "label"] as const;
+/** How a text block's facts list is set. See `richTextV1.factsStyle`. */
+export const TEXT_FACTS_STYLES = ["plain", "labels"] as const;
+
+/** How long a text block's label may run. */
+export const TEXT_LABEL_MAX = 60;
+
+/** How long a text block's callout may run. */
+export const TEXT_CALLOUT_MAX = 600;
 
 const richTextV1 = z.object({
     variant,
@@ -288,7 +337,49 @@ const richTextV1 = z.object({
     format: z.enum(["html", "markdown"]).default("html"),
     value: z.string(),
     image: imageSchema.optional(),
+    /** The photo beside the text, until it has one (KTD-5). */
+    imageBrief,
     imageSide: z.enum(TEXT_IMAGE_SIDES).optional(),
+    /**
+     * A boxed line after the text, ruled on its left in the accent — "What
+     * changed: …" (template polish). Plain text, so it is not sanitized and
+     * cannot carry markup; ABSENT draws nothing.
+     */
+    callout: z
+        .object({
+            label: z.string().trim().max(60).optional(),
+            text: z.string().trim().min(1).max(TEXT_CALLOUT_MAX),
+        })
+        .optional(),
+    /**
+     * Sets the text's `h3`s as small capitals labels, the way a case study
+     * names its parts ("The problem", "What I decided"). ABSENT keeps them
+     * as headings.
+     */
+    partLabels: z.boolean().optional(),
+    /**
+     * `label` (template round 2): the text's `h2`s and `h3`s are set as the
+     * site's section titles are — an eyebrow while the type scale's
+     * `labelStyle` is one, today's headings under `plain`. For a text block
+     * that opens on a label ("The studio", "The starter") the way the
+     * sections around it do. ABSENT keeps them as headings.
+     */
+    headingStyle: z.enum(TEXT_HEADING_STYLES).optional(),
+    /**
+     * A small label over the text (template round 2): "The starter" above
+     * the story's own heading, the bakery design's eyebrow. Plain text, set
+     * small, uppercase and wide-tracked — in the accent, or as the site's
+     * section titles are while the type scale sets them as an eyebrow. It
+     * is not a heading: the text's own `h2` is. ABSENT draws nothing.
+     */
+    label: z.string().trim().max(TEXT_LABEL_MAX).optional(),
+    /**
+     * `labels` (template round 2): a definition list's terms as small
+     * uppercase labels in the quiet text colour, its values in the text
+     * colour — "STUDIO / Koregaon Park". ABSENT keeps terms in the heading
+     * face.
+     */
+    factsStyle: z.enum(TEXT_FACTS_STYLES).optional(),
 });
 
 /** cta v1 — a standalone call-to-action button. */
@@ -341,11 +432,48 @@ const galleryV1 = z.object({
  * `grid` is first because it is the least demanding look and therefore the
  * default an unrecognised variant falls back to (#254).
  */
-const galleryV2 = z.object({
-    variant,
-    padding: paddingOverride,
-    images: z.array(imageSchema).min(1),
+/**
+ * One gallery image, with an optional line under it (industry templates U2).
+ *
+ * The caption is the gallery's own, not the shared `imageSchema`'s: a hero's
+ * photo has no line under it, and extending the shared shape would offer one
+ * everywhere a photo is. Plain text; an empty caption draws nothing.
+ * Added to v2 only, as an optional field: every gallery@2 section and
+ * publication validates as before, and v1 stays untouched (see above).
+ */
+export const GALLERY_CAPTION_MAX = 200;
+/**
+ * Where a photo's caption sits (DEC-090): `below` the photo, as captions
+ * always have, or `over` it on a bounded band — a fixed height, its lines
+ * clipped — as the studio and ceramics designs draw them. ABSENT is below.
+ */
+export const CAPTION_PLACEMENTS = ["below", "over"] as const;
+const captionPlacement = z.enum(CAPTION_PLACEMENTS).optional();
+
+const galleryImageSchema = imageSchema.extend({
+    caption: z.string().trim().max(GALLERY_CAPTION_MAX).optional(),
 });
+
+const galleryV2 = z
+    .object({
+        variant,
+        padding: paddingOverride,
+        images: z.array(galleryImageSchema),
+        captionPlacement,
+        /**
+         * What photographs belong here, when there are none yet (KTD-5). A
+         * template ships a gallery as this brief and no images; see
+         * `imageBrief` above. No images and a brief: the live site draws
+         * nothing, the editor shows the brief in the empty slot.
+         */
+        imageBrief,
+    })
+    .refine((g) => g.images.length > 0 || Boolean(g.imageBrief), {
+        // Loosened from `.min(1)` only for a slot that says what it wants:
+        // every gallery that validated before still does.
+        message: "Add at least one image",
+        path: ["images"],
+    });
 
 /**
  * features v1 — a heading over a set of short, titled points.
@@ -367,9 +495,20 @@ const galleryV2 = z.object({
  * media dependency. An added optional field is not a breaking change, so either
  * can arrive without a v2.
  */
+/** How long a point's figure ("₹42,000", "14 years") may run. */
+export const FEATURE_VALUE_MAX = 60;
+
 const featureItemSchema = z.object({
     title: z.string().min(1).max(120),
     body: z.string().max(600).optional(),
+    /**
+     * A figure the point stands on — a rate, a count, a span ("₹42,000",
+     * "14 years") — set large in the heading face (template polish). The
+     * merchant's own words, never read from anywhere: a rate here is the
+     * owner's to write, not a price the platform knows. Optional, so it
+     * extends v1 in place.
+     */
+    value: z.string().trim().max(FEATURE_VALUE_MAX).optional(),
 });
 
 const featuresV1 = z.object({
@@ -378,6 +517,20 @@ const featuresV1 = z.object({
     heading: z.string().max(160).optional(),
     intro: z.string().max(600).optional(),
     items: z.array(featureItemSchema).min(1).max(12),
+    /**
+     * The `list` and `steps` looks in two columns from the tablet width up
+     * (one on a phone). ABSENT is one column, as before. The grid has its
+     * own columns and ignores it.
+     */
+    columns: z.union([z.literal(1), z.literal(2)]).optional(),
+    /** A muted line under the points — a disclaimer, a caveat. Plain text. */
+    note: z.string().trim().max(600).optional(),
+    /**
+     * `display` (template round 2): the intro set as one large line in the
+     * heading face under the heading — the ceramics design's "Material"
+     * sentence. ABSENT is today's quiet paragraph.
+     */
+    introStyle: z.enum(["plain", "display"]).optional(),
 });
 
 /**
@@ -503,6 +656,11 @@ const buttonLabel = z.string().trim().max(40).optional();
  * Display options (G16): `layout` (ABSENT: `list`, the rows it has always
  * drawn), `showDescriptions` (ABSENT: shown) and `buttonLabel`, the words on
  * each service's own button (ABSENT: "Book").
+ *
+ * The `priceCard` look (template polish) is for a practice with one
+ * appointment: the first service still offered as a card — its name, its
+ * price set large and its duration, read live like every service here —
+ * beside the heading, the intro and what it includes.
  */
 const servicesListV1 = z.object({
     variant,
@@ -526,6 +684,18 @@ const servicesListV1 = z.object({
     layout: listLayout,
     showDescriptions: z.boolean().optional(),
     buttonLabel,
+    /**
+     * The `priceCard` look's own words (template polish), around a price and
+     * a duration that are ALWAYS the service's: `modeLine` under the price
+     * ("In person in Pune, or by video"), `followUpLine` under the button
+     * ("Follow-ups are … and usually six weeks apart"), and beside the card
+     * what the appointment includes, under `includesLabel`. Plain text, the
+     * merchant's own; a figure typed here is theirs, never read as a price.
+     */
+    modeLine: z.string().trim().max(160).optional(),
+    followUpLine: z.string().trim().max(300).optional(),
+    includesLabel: z.string().trim().max(60).optional(),
+    includes: z.array(z.string().trim().min(1).max(200)).max(12).optional(),
 });
 
 /**
@@ -540,9 +710,12 @@ const servicesListV1 = z.object({
  * `storeId` names one `SHOP` storefront — a place with an address and hours.
  * It is the block's own and NOT the site's "sells from" storefront, because a
  * site that sells from an `ONLINE` storefront still has a shop to visit.
- * Optional, like `booking.serviceId`: a just-added block has none until the
- * editor picks one, and the live site then renders nothing rather than a
- * card with no place in it.
+ * ABSENT, the block shows the business's own place (template polish), as
+ * `hours` does (`GET public/sites/:siteId/visit`): its first open shop, else
+ * the business profile's address and hours — so a template can lay the block
+ * down for a business with one place and nothing to choose. With no place
+ * at all the live site renders nothing rather than a card with no place in
+ * it.
  *
  * `showMap` is the Get directions link (a maps search for the address, not an
  * embedded map); `showHours` the week and "Open now". Both default to on, so
@@ -573,6 +746,18 @@ const visitUsV1 = z.object({
  * such as "Read" at the foot of each post's card (ABSENT: none, the card
  * itself is the link). Photos are `showImages` and descriptions
  * `showExcerpts`.
+ *
+ * The `archive` look (industry templates U2) lists EVERY published post as
+ * a dated list — the date in a column, the title and its line beside it —
+ * and so ignores `count`, `layout`, `showImages` and `buttonLabel`. A look
+ * rather than `count: "all"`, so `count` keeps meaning one thing and a
+ * section switched back to cards keeps the count it had.
+ *
+ * The `lead` look (template polish) opens on the newest post in depth: its
+ * date, title, own excerpt, a reading time worked out from its length, its
+ * opening paragraphs as plain text and "Continue reading". The paragraphs
+ * come from the post's body the feed already carries, so nothing new is
+ * read. A section under it sets `afterLead` so the newest is not shown twice.
  */
 const journalV1 = z.object({
     variant,
@@ -584,6 +769,25 @@ const journalV1 = z.object({
     /** Display options (G16): ABSENT, cards and no button of their own. */
     layout: listLayout,
     buttonLabel,
+    /**
+     * Leave out the newest post (template polish), for a section under a
+     * `lead` one that already opens on it. ABSENT, every post.
+     */
+    afterLead: z.boolean().optional(),
+    /** The archive look's posts under their year (template polish). */
+    groupByYear: z.boolean().optional(),
+    /**
+     * "{n} pieces in all" beside the title, counted from every post the
+     * site has live, not only the ones shown (template polish).
+     */
+    showTotal: z.boolean().optional(),
+    /**
+     * The archive look's newest few, with "All {n} entries" beside the title
+     * to the posts index (template polish). ABSENT, every post.
+     */
+    archiveLimit: z.number().int().min(1).max(24).optional(),
+    /** Dates in this year without the year: "2 Apr" (template polish). */
+    shortDates: z.boolean().optional(),
 });
 
 /**
@@ -604,6 +808,11 @@ const plansV1 = z.object({
     variant,
     padding: paddingOverride,
     title: z.string().trim().max(160).optional(),
+    /**
+     * A line under the title — "Three ways in. No joining fee." (template
+     * polish). The merchant's own words; drawn only over plans on sale.
+     */
+    intro: z.string().trim().max(600).optional(),
     highlight: z.enum(["first", "none"]).optional(),
     buttonLabel,
     showDescriptions: z.boolean().optional(),
@@ -657,14 +866,33 @@ export const PROJECTS_MAX = 24;
  * is chosen first and the draft saves in between.
  *
  * `link` is a `linkHref`, so `javascript:` is refused when it is authored.
- * Looks are `cards` and `list` (`LIST_LAYOUTS`), in `BLOCK_META`.
+ * Looks are `cards` and `list` (`LIST_LAYOUTS`), and the template polish's
+ * `rhythm` (a wide lead, then a pair, then a portrait beside a landscape)
+ * and `rows` (hairline rows: year | the work | role), in `BLOCK_META`.
  * Up to {@link PROJECTS_MAX}: past that it is a page of its own.
  */
 const projectItemSchema = z.object({
     image: imageSchema.optional(),
+    /** The photo this project wants, until it has one (KTD-5). */
+    imageBrief,
+    /**
+     * A line under the photo — who took it, where, when (industry templates
+     * U2). Drawn only beside a photo. Optional, so it extends v1 in place.
+     */
+    caption: z.string().trim().max(GALLERY_CAPTION_MAX).optional(),
     title: z.string().trim().min(1).max(120),
     summary: z.string().max(600).optional(),
     link: linkHref.optional(),
+    /**
+     * When, who and with what (template polish), for the `rows` look's
+     * columns: `year` ("2026", "2019–2022") in the first, `role` ("Sole
+     * engineer") in the last, `meta` (a stack, a medium) under the summary.
+     * Plain text, each optional; the other looks draw `meta` under the
+     * summary and leave the rest.
+     */
+    year: z.string().trim().max(20).optional(),
+    role: z.string().trim().max(80).optional(),
+    meta: z.string().trim().max(160).optional(),
 });
 
 const projectsV1 = z.object({
@@ -672,6 +900,17 @@ const projectsV1 = z.object({
     padding: paddingOverride,
     title: z.string().trim().max(160).optional(),
     items: z.array(projectItemSchema).min(1).max(PROJECTS_MAX),
+    /**
+     * A line beside the title counted from the projects shown — "5 projects
+     * across 8 years", the span read from their years (template polish).
+     * Derived, never typed. ABSENT, not shown.
+     */
+    showCount: z.boolean().optional(),
+    /**
+     * `over`: in the cards look, a project's title and caption sit on a
+     * bounded band over its photo (DEC-090). Absent is below, as before.
+     */
+    captionPlacement,
 });
 
 /** How many products a Product grid shows, at most, and when it isn't set. */
@@ -695,6 +934,12 @@ export const PRODUCT_GRID_DEFAULT_COUNT = 4;
  * - `picked`: `productIds`, in the merchant's order.
  * - `count` ABSENT means {@link PRODUCT_GRID_DEFAULT_COUNT}.
  * - `showPrices` defaults to on, so ABSENT means shown.
+ *
+ * The `lead` look (industry templates U2) gives the first product twice the
+ * room — two columns and two rows from the tablet width up, one column on a
+ * phone — with tall photos and the price set large. It ignores `layout`.
+ * The `plates` look (DEC-090) puts each product in a fixed-height cell, the
+ * first twice the room, with its words on a bounded band over the photo.
  *
  * A just-added block, or one whose collection or products are still to be
  * chosen, saves: a draft is saved as it is typed. It renders nothing live
@@ -726,6 +971,202 @@ const productGridV1 = z.object({
     showPhotos: z.boolean().optional(),
     showDescriptions: z.boolean().optional(),
     buttonLabel,
+    /**
+     * A line beside the title counted from the products shown — "3 of 5
+     * available", "All sold out" (template polish). Derived, never typed,
+     * so it is a switch. ABSENT, not shown.
+     */
+    showAvailability: z.boolean().optional(),
+    /** A short line under the grid, the merchant's own. Plain text. */
+    note: z.string().trim().max(400).optional(),
+    /**
+     * `bare` (template polish): the even grid's products without a card —
+     * a tall 4:5 photo, the name and price beside each other in the
+     * heading face, sold out as a label on the photo's corner. ABSENT is
+     * the card. The other looks ignore it.
+     */
+    cardStyle: z.enum(["card", "bare"]).optional(),
+    /**
+     * How many products across at the desk for the `bare` cards (template
+     * round 2): five breads in a row, as the bakery design has them. The
+     * grid steps down to three on a tablet and two (one on the narrowest
+     * phone) on a phone. ABSENT, the cards fill the row by their own width,
+     * as before. The other looks ignore it.
+     */
+    columns: z.union([z.literal(3), z.literal(4), z.literal(5)]).optional(),
+});
+
+/** How many classes a Timetable may be limited to (U2). */
+export const TIMETABLE_MAX_SERVICES = 24;
+
+/**
+ * timetable v1 — the week's class sessions, read live (industry templates U2).
+ *
+ * A bound block like `booking` (ADR-004, KTD-4): it stores which classes and
+ * how they show, never a session. The sessions are read when the page is
+ * viewed (`GET public/sites/:siteId/timetable`), the booking page's own
+ * starts for the next seven days, so a time here is always one the booking
+ * page offers, and a session's places left are right without a republish.
+ *
+ * - `serviceIds` ABSENT or empty: every class the booking page offers. Set:
+ *   only those, and only while they are classes on offer. Ids, never names.
+ * - `showTrainer` and `showPlacesLeft` default to on, so ABSENT means shown.
+ *   Full is always said in words, whatever `showPlacesLeft` is.
+ * - The week is always seven days from today: a field for it would be a
+ *   number with one right answer.
+ *
+ * Looks are `grid` (days across, times down; a list on a phone), `list`
+ * (day by day) and the template polish's `accent` (the grid with the
+ * sessions that fill set on the accent, times in the mono face), in
+ * `BLOCK_META`. With no class sessions in the week the
+ * block renders nothing on the site; the editor's canvas says why.
+ */
+const timetableV1 = z.object({
+    variant,
+    padding: paddingOverride,
+    title: z.string().trim().max(160).optional(),
+    intro: z.string().trim().max(600).optional(),
+    serviceIds: z
+        .array(z.string().trim().min(1).max(64))
+        .max(TIMETABLE_MAX_SERVICES)
+        .refine(
+            (ids) => new Set(ids).size === ids.length,
+            "A class is listed twice",
+        )
+        .optional(),
+    showTrainer: z.boolean().optional(),
+    showPlacesLeft: z.boolean().optional(),
+    /**
+     * Monday to Friday only (template polish), for a business whose week is
+     * the working week; the weekend's sessions are left off. ABSENT, all
+     * seven days.
+     */
+    weekdaysOnly: z.boolean().optional(),
+    /**
+     * A line counted from the week shown — "13 sessions across 5 days" —
+     * before the intro, and in the accent look a key for its filled cells
+     * (template polish). Derived, never typed. ABSENT, not shown.
+     */
+    showCounts: z.boolean().optional(),
+});
+
+/**
+ * hours v1 — opening hours on their own, read live (industry templates U2).
+ *
+ * A bound block like `visitUs`, reading the same public visit read: with a
+ * `storeId`, that SHOP storefront (`GET public/sites/:siteId/visit/:storeId`);
+ * ABSENT, the business's own place (`GET public/sites/:siteId/visit`) — its
+ * first open shop, else the business profile's hours. So a business with one
+ * place needs to choose nothing. The week is Settings › Hours (DEC-034).
+ *
+ * `showClosed` ABSENT means closed days are listed, muted but stated
+ * ("Sunday · Closed"); off, they are left out. With no hours saved the block
+ * renders nothing, never "Closed" every day — a claim the business never
+ * made.
+ */
+const hoursV1 = z.object({
+    variant,
+    padding: paddingOverride,
+    title: z.string().trim().max(160).optional(),
+    storeId: z.string().min(1).optional(),
+    showClosed: z.boolean().optional(),
+    /**
+     * Days in a row with the same hours as one line — "Tuesday to Friday ·
+     * 7:00 – 15:00" (template polish). ABSENT, one row per day, as before.
+     */
+    groupDays: z.boolean().optional(),
+    /**
+     * The place's address under the week, from the same read (template
+     * polish), for a page with no Visit us beside it. ABSENT, not shown.
+     */
+    showAddress: z.boolean().optional(),
+});
+
+/** How many qualifications a Person lists, at most, and how long a bio runs. */
+export const PERSON_CREDENTIALS_MAX = 8;
+export const PERSON_BIO_MAX = 1200;
+
+/**
+ * person v1 — one practitioner: a photo, their name, what they do, their
+ * qualifications and a few lines about them (industry templates U2).
+ *
+ * A STATIC block, like `projects`: what a merchant types is what a visitor
+ * reads. It is not bound to a staff member, because staff carry no photo,
+ * qualifications or bio today, and a site's "about the practitioner" is the
+ * merchant's own words. Only `name` is required; a person with no photo
+ * draws without a gap. `bio` is plain text, its line breaks kept. `cta` is
+ * the usual button (#207), "Book with Anika" pointing at the booking page.
+ *
+ * The photo's description is asked for before publishing, not on save
+ * (`site-flags.ts`), as the text block's is.
+ */
+/**
+ * One qualification (template polish): a line, as v1 always held, or a row —
+ * the title and where or when it came from ("MSc Clinical Nutrition" /
+ * "Manipal University, 2012"). A union rather than a second field, so a
+ * person's qualifications stay one list in one order.
+ */
+const credentialSchema = z.union([
+    z.string().trim().min(1).max(120),
+    z.object({
+        title: z.string().trim().min(1).max(120),
+        detail: z.string().trim().max(160).optional(),
+    }),
+]);
+
+/** How many more people a team carries beside the block's own person. */
+export const PERSON_TEAM_MAX = 11;
+
+/**
+ * Another person in the `team` look (template polish): their photo, name,
+ * what they do and a line about them. Plain text and a photo, as the
+ * block's own person is.
+ */
+const teamMemberSchema = z.object({
+    image: imageSchema.optional(),
+    imageBrief,
+    name: z.string().trim().min(1).max(120),
+    role: z.string().trim().max(160).optional(),
+    bio: z.string().trim().max(600).optional(),
+});
+
+const personV1 = z.object({
+    variant,
+    padding: paddingOverride,
+    image: imageSchema.optional(),
+    /** The photo this person wants, until it has one (KTD-5). */
+    imageBrief,
+    name: z.string().trim().min(1).max(120),
+    role: z.string().trim().max(160).optional(),
+    credentials: z
+        .array(credentialSchema)
+        .max(PERSON_CREDENTIALS_MAX)
+        .optional(),
+    /**
+     * A visible label over the qualifications ("Qualifications", "Training").
+     * ABSENT: the portrait look says "Qualifications"; the default look keeps
+     * its list unlabelled on screen, as before.
+     */
+    credentialsLabel: z.string().trim().max(40).optional(),
+    bio: z.string().trim().max(PERSON_BIO_MAX).optional(),
+    cta: ctaSchemaV2.optional(),
+    /**
+     * The name as the page's `h1` (template polish), for a person who opens
+     * the page — the practitioner's site whose first section is them. ABSENT
+     * is the `h2` every section heading is. Set it only on a section that
+     * opens its page, so the page keeps one `h1`.
+     */
+    asTitle: z.boolean().optional(),
+    /**
+     * The `team` look's heading over the grid ("Who is coaching"). The other
+     * looks have the person's name as their heading and ignore it.
+     */
+    title: z.string().trim().max(160).optional(),
+    /**
+     * The `team` look's other people, after the block's own person, who is
+     * always first. The other looks draw one person and ignore them.
+     */
+    people: z.array(teamMemberSchema).max(PERSON_TEAM_MAX).optional(),
 });
 
 /** The field descriptor types an enquiry form supports (mirrors the forms API). */
@@ -831,6 +1272,9 @@ export const SECTION_TYPES = [
     "productGrid",
     "packs",
     "projects",
+    "timetable",
+    "hours",
+    "person",
 ] as const;
 export type SectionType = (typeof SECTION_TYPES)[number];
 
@@ -994,6 +1438,28 @@ const REGISTRY: Record<string, SectionContract> = {
         schema: projectsV1,
         sanitizedFields: [],
     },
+    [key("timetable", 1)]: {
+        type: "timetable",
+        version: 1,
+        // A title, which classes by id and two switches; the sessions are
+        // read live.
+        schema: timetableV1,
+        sanitizedFields: [],
+    },
+    [key("hours", 1)]: {
+        type: "hours",
+        version: 1,
+        // A title, an id and a switch; the week is read live.
+        schema: hoursV1,
+        sanitizedFields: [],
+    },
+    [key("person", 1)]: {
+        type: "person",
+        version: 1,
+        // Plain text, a photo and a button; nothing here is authored HTML.
+        schema: personV1,
+        sanitizedFields: [],
+    },
 };
 
 // ---------------------------------------------------------------------------
@@ -1014,6 +1480,13 @@ export interface VariantRequirement {
     field: string;
     /** Shown to the author, so it must name the look and the field. */
     message: string;
+    /**
+     * A field that stands in for `field` while it is empty: a split hero's
+     * image brief (KTD-5) says which photo goes there, so a template can
+     * ship the look before the owner has the photo. The live site draws
+     * the hero without one until then, and the pre-publish check names it.
+     */
+    orField?: string;
 }
 
 const VARIANT_REQUIREMENTS: Partial<
@@ -1029,6 +1502,7 @@ const VARIANT_REQUIREMENTS: Partial<
         split: [
             {
                 field: "image",
+                orField: "imageBrief",
                 message:
                     'The "Split" hero shows an image beside the copy — add one, or choose the "Centered" look.',
             },
@@ -1222,10 +1696,13 @@ export function parseSectionContent(
         // is a registered type by construction.
         const unmet = variantRequirements(contract.type, named).filter(
             (req) => {
-                const value = (result.data as Record<string, unknown>)[
-                    req.field
-                ];
-                return value === undefined || value === null || value === "";
+                const data = result.data as Record<string, unknown>;
+                const empty = (value: unknown) =>
+                    value === undefined || value === null || value === "";
+                return (
+                    empty(data[req.field]) &&
+                    (req.orField === undefined || empty(data[req.orField]))
+                );
             },
         );
         if (unmet.length > 0) {
@@ -1246,7 +1723,36 @@ export function parseSectionContent(
         }
     }
 
-    return { success: true, data: result.data, contract };
+    /*
+     * The section's frame — anchor, menu label, band — rides beside every
+     * block's own fields (`section-frame.ts`). Read off the RAW content,
+     * because the block's schema strips keys it does not name, and put back
+     * on the parsed data so a save keeps it.
+     */
+    const frame = parseSectionFrame(content);
+    if (!frame.ok) {
+        return {
+            success: false,
+            error: {
+                code: "INVALID_CONTENT",
+                type,
+                version,
+                issues: frame.issues.map((issue) => ({
+                    code: z.ZodIssueCode.custom,
+                    path: issue.path,
+                    message: issue.message,
+                })),
+                message: frame.issues[0].message,
+            },
+        };
+    }
+    const parsed: unknown = result.data;
+    const data: unknown =
+        Object.keys(frame.frame).length > 0
+            ? { ...(parsed as Record<string, unknown>), ...frame.frame }
+            : parsed;
+
+    return { success: true, data, contract };
 }
 
 /**

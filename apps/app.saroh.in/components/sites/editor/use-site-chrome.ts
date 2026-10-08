@@ -108,7 +108,7 @@ function useAutosavedText({
  * through the site's settings (`site:update`) on their own clock, like the
  * look, and the canvas draws the draft at once. What the canvas draws is
  * what G17's header and footer will draw once published: the name, and the
- * line followed by " · Runs on Saroh".
+ * line (a Free site's "Made with Saroh" credit is the live site's alone).
  *
  * Without `site:update` nothing here saves: the inspector shows both
  * read-only and says who can change them, and the API would refuse anyway.
@@ -182,7 +182,10 @@ export function useSiteChrome({
          */
         footer:
             field.kind === "line"
-                ? footerFromLine(footerText, format)
+                ? withFooterLayout(
+                      footerFromLine(footerText, format),
+                      footerPreview,
+                  )
                 : footerPreview,
         chromeSaving: saving,
         chromeDirty: dirty,
@@ -192,3 +195,19 @@ export function useSiteChrome({
 }
 
 export type SiteChrome = ReturnType<typeof useSiteChrome>;
+
+/**
+ * The typed line in the footer's layout. The line is saved without one, and
+ * the API keeps the stored layout (a template's left-hand row), so the
+ * canvas draws the line the way the live site will: in that row, which
+ * stays — the name — when the line is cleared.
+ */
+export function withFooterLayout(
+    line: SiteFooter | null,
+    stored: SiteFooter | null,
+): SiteFooter | null {
+    if (stored?.layout !== "left") return line;
+    return line
+        ? { ...line, layout: "left" }
+        : { format: stored.format, value: "", layout: "left" };
+}

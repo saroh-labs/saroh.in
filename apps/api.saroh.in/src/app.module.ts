@@ -32,6 +32,7 @@ import { ImportsModule } from "./modules/imports/imports.module";
 import { InvoicesModule } from "./modules/invoices/invoices.module";
 import { JobsModule } from "./modules/jobs/jobs.module";
 import { LeadsModule } from "./modules/leads/leads.module";
+import { LinkPreviewModule } from "./modules/link-preview/link-preview.module";
 import { MediaModule } from "./modules/media/media.module";
 import { MembersModule } from "./modules/members/members.module";
 import { NotificationsModule } from "./modules/notifications/notifications.module";
@@ -39,6 +40,7 @@ import { OrdersModule } from "./modules/orders/orders.module";
 import { OrganizationsModule } from "./modules/organizations/organizations.module";
 import { PaymentsModule } from "./modules/payments/payments.module";
 import { PipelinesModule } from "./modules/pipelines/pipelines.module";
+import { PricingModule } from "./modules/pricing/pricing.module";
 import { ProductReviewsModule } from "./modules/product-reviews/product-reviews.module";
 import { ProductsModule } from "./modules/products/products.module";
 import { ProjectsModule } from "./modules/projects/projects.module";
@@ -82,6 +84,7 @@ import { WebhooksModule } from "./modules/webhooks/webhooks.module";
         HealthModule,
         FeatureFlagModule,
         AdminModule,
+        PricingModule,
         CapabilitiesModule,
         HomeModule,
         CalendarModule,
@@ -129,6 +132,7 @@ import { WebhooksModule } from "./modules/webhooks/webhooks.module";
         AnalyticsModule,
         BillingModule,
         WaitlistModule,
+        LinkPreviewModule,
         SelfTestModule,
     ],
 })

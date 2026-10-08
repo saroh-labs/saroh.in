@@ -25,7 +25,13 @@ jest.mock("../invoices/order-invoicing", () => ({
 jest.mock("@saroh/database", () => {
     const order = {
         findFirst: jest.fn(),
+        // Recording a payment by hand keeps what was taken (`paidByHand`).
+        findUnique: jest.fn().mockResolvedValue({ total: "250.00" }),
         update: jest.fn(),
+        // What a refund by hand hands back is read first (UX-061).
+        findUniqueOrThrow: jest
+            .fn()
+            .mockResolvedValue({ total: "450.00", paidByHand: "450.00" }),
         // Cancelling or refunding retires the order's pay link (B11).
         updateMany: jest.fn().mockResolvedValue({ count: 0 }),
     };
@@ -43,7 +49,11 @@ jest.mock("@saroh/database", () => {
     // Marking paid first asks whether it is being paid online (#622): here
     // no visit is held and no payment is going through.
     const booking = { findFirst: jest.fn().mockResolvedValue(null) };
-    const paymentIntent = { findFirst: jest.fn().mockResolvedValue(null) };
+    const paymentIntent = {
+        findFirst: jest.fn().mockResolvedValue(null),
+        // Nothing was paid online here.
+        findMany: jest.fn().mockResolvedValue([]),
+    };
     return {
         prisma: {
             order,
@@ -212,6 +222,39 @@ describe("OrdersService.updateStatus lifecycle guard (mocked Prisma)", () => {
         });
     });
 
+    it("marked paid with a way (#834): the invoice keeps it and the timeline says it", async () => {
+        const service = makeService();
+        orderFindFirst.mockResolvedValue({
+            id: ORDER,
+            status: "PENDING",
+            paymentStatus: "UNPAID",
+            organizationId: ORG,
+            items: [{ productId: "p1", quantity: 1 }],
+        });
+
+        await service.updateStatus(STORE, ORDER, USER, {
+            paymentStatus: "PAID",
+            paidHow: "UPI",
+        });
+
+        expect(ensureOrderInvoice).toHaveBeenCalledWith(
+            expect.anything(),
+            ORDER,
+            { method: "UPI" },
+        );
+        expect(eventCreate).toHaveBeenCalledWith({
+            data: expect.objectContaining({
+                organizationId: ORG,
+                orderId: ORDER,
+                kind: "STATUS",
+                actorUserId: USER,
+                note: "Marked paid · UPI",
+                // The whole total, nothing having been paid online.
+                amountCents: 25000,
+            }),
+        });
+    });
+
     it("re-recording an order already paid leaves its link alone", async () => {
         const service = makeService();
         orderFindFirst.mockResolvedValue({
@@ -232,12 +275,22 @@ describe("OrdersService.updateStatus lifecycle guard (mocked Prisma)", () => {
         const service = makeService();
         orderFindFirst.mockResolvedValue({
             id: ORDER,
+            organizationId: "org1",
             status: "DELIVERED",
             paymentStatus: "PAID",
             items: [{ productId: "p1", quantity: 1 }],
         });
         await service.updateStatus(STORE, ORDER, USER, {
             paymentStatus: "REFUNDED",
+            refundedHow: "CASH",
+        });
+        // On the timeline: how much went back, and how (UX-061).
+        expect(eventCreate).toHaveBeenCalledWith({
+            data: expect.objectContaining({
+                kind: "REFUND",
+                note: "Handed back in cash",
+                amountCents: 45_000,
+            }),
         });
         expect(creditRestOfOrder).toHaveBeenCalledWith(
             expect.anything(),
@@ -490,10 +543,13 @@ describe("OrdersService.updateStatus — the order power each change asks (B16)"
         await service.updateStatus(STORE, ORDER, USER, {
             paymentStatus: "PAID",
         });
+        // Asked as money: the permissions alone, never a storefront role
+        // (DEC-106).
         expect(stores.orderWriteOrganization).toHaveBeenCalledWith(
             STORE,
             USER,
             "order:edit",
+            { money: true },
         );
         expect(orderUpdate).toHaveBeenCalled();
     });

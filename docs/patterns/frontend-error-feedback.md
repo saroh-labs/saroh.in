@@ -92,9 +92,9 @@ digest })` from `@saroh/ui/lib/report-error` (#103): it logs, and it forwards
 - **Current** — **A failed read is never an empty read**: `getList` throws, and
   `FailedState` exists for the case you catch.
 - **Adopted** — **Never say "No X yet" when the data was never computed or never
-  loaded.** Gap: Insights shows "No views recorded in this range yet" to a
-  real business, whose site sends no view beacon yet (the rollups are
-  scheduled since DEC-075, `backend-jobs.md`). Its takings show "No takings
+  loaded.** Insights' "No views recorded in this range yet" is true since a
+  live site sends a view beacon (UX-032) and the rollups are scheduled
+  (DEC-075, `backend-jobs.md`). Its takings show "No takings
   yet" only when the read came back and the business has never been paid.
 - **Adopted** — **Every important workflow handles** loading, empty, partial,
   error, permission denial, capability off, provider disconnected, provider

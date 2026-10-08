@@ -1,5 +1,7 @@
 import { toFailure } from "@/lib/api/failure";
 import { apiFetch, getActiveOrgId, getJson, getList } from "@/lib/api/http";
+import type { PlanRefusal } from "@/lib/billing/refusal";
+import { planRefusalOf } from "@/lib/billing/refusal";
 import type { SiteStyle, SiteStyleOptions } from "@/lib/sites/style";
 
 // Re-exported so callers keep one import site for "everything about a site",
@@ -83,6 +85,15 @@ export interface HeroContent {
     subheading?: string;
     cta?: CtaValue;
     image?: ImageValue;
+    /**
+     * The photo a template says belongs here, until there is one (KTD-5).
+     * Shown as the empty slot's text in the editor; never on the site.
+     */
+    imageBrief?: string;
+    /** "On today" (G18); on the full-bleed look, the open line alone. */
+    onToday?: boolean;
+    /** `false`: the `none` look's heading is for screen readers only. */
+    titleVisible?: boolean;
 }
 
 export interface RichTextContent {
@@ -90,23 +101,36 @@ export interface RichTextContent {
     value: string;
     /** One photo beside the text (G7). */
     image?: ImageValue;
-    /** Which side the photo sits on; absent is the right. */
-    imageSide?: "left" | "right";
+    /** The photo a template says belongs here (KTD-5). */
+    imageBrief?: string;
+    /** Where the photo sits: a side, or above the text; absent is the right. */
+    imageSide?: "left" | "right" | "above";
+    /** A boxed line after the text, ruled in the accent (template polish). */
+    callout?: { label?: string; text: string };
+    /** The text's h3s as small capitals part labels. */
+    partLabels?: boolean;
 }
 
 export type CtaContent = CtaValue;
 
 export type GalleryLayout = "grid" | "carousel" | "masonry";
 
+/** A gallery photo, with an optional line under it (gallery@2, U2). */
+export type GalleryImage = ImageValue & { caption?: string };
+
 export interface GalleryContent {
-    images: ImageValue[];
+    images: GalleryImage[];
     layout?: GalleryLayout;
+    /** What photographs belong here, until there are some (KTD-5). */
+    imageBrief?: string;
 }
 
 /** One point in a features section (mirror of the section contract). */
 export interface FeatureItem {
     title: string;
     body?: string;
+    /** A figure the point stands on — a rate, a span (template polish). */
+    value?: string;
 }
 
 /** `features` — a heading over a set of short, titled points. */
@@ -114,6 +138,10 @@ export interface FeaturesContent {
     heading?: string;
     intro?: string;
     items: FeatureItem[];
+    /** The list looks in two columns; absent is one. */
+    columns?: 1 | 2;
+    /** A muted line under the points. */
+    note?: string;
 }
 
 /** One question in an FAQ section (mirror of the section contract). */
@@ -145,16 +173,26 @@ export interface TestimonialsContent {
 /** One piece of work in a projects section (mirror of the section contract). */
 export interface ProjectItem {
     image?: ImageValue;
+    /** The photo a template says belongs here (KTD-5). */
+    imageBrief?: string;
+    /** A line under the photo (U2). */
+    caption?: string;
     title: string;
     summary?: string;
     /** A web address, an email or phone link, or a path on this site. */
     link?: string;
+    /** The rows look's year, role and a line of facts (template polish). */
+    year?: string;
+    role?: string;
+    meta?: string;
 }
 
 /** `projects` — the merchant's own work, typed in (K11). Up to 24. */
 export interface ProjectsContent {
     title?: string;
     items: ProjectItem[];
+    /** "5 projects across 8 years" beside the title. */
+    showCount?: boolean;
 }
 
 /** `contact` — where to find the business and how to reach it. */
@@ -183,6 +221,11 @@ export interface ServicesListContent {
     layout?: ListLayout;
     showDescriptions?: boolean;
     buttonLabel?: string;
+    /** The price card's lines around the service's price (template polish). */
+    modeLine?: string;
+    followUpLine?: string;
+    includesLabel?: string;
+    includes?: string[];
 }
 
 /** "Show as" (G16): side by side, or one per row. */
@@ -213,6 +256,16 @@ export interface JournalContent {
     /** Display options (G16). Absent: cards, and no button of their own. */
     layout?: ListLayout;
     buttonLabel?: string;
+    /** Leave out the newest post, shown above by a lead (template polish). */
+    afterLead?: boolean;
+    /** The archive by year. */
+    groupByYear?: boolean;
+    /** "{n} pieces in all" beside the title. */
+    showTotal?: boolean;
+    /** The archive's newest few, and a link to all. */
+    archiveLimit?: number;
+    /** This year's dates without the year. */
+    shortDates?: boolean;
 }
 
 /**
@@ -222,6 +275,8 @@ export interface JournalContent {
  */
 export interface PlansContent {
     title?: string;
+    /** A line under the title (template polish). */
+    intro?: string;
     highlight?: "first" | "none";
     buttonLabel?: string;
     showDescriptions?: boolean;
@@ -251,6 +306,12 @@ export interface ProductGridContent {
     showPhotos?: boolean;
     showDescriptions?: boolean;
     buttonLabel?: string;
+    /** "3 of 5 available" beside the title (template polish). */
+    showAvailability?: boolean;
+    /** A line under the products. */
+    note?: string;
+    /** `bare`: the even grid without a card. Absent: the card. */
+    cardStyle?: "card" | "bare";
 }
 
 /**
@@ -262,6 +323,70 @@ export interface PacksContent {
     title?: string;
     buttonLabel?: string;
     showDescriptions?: boolean;
+}
+
+/**
+ * `timetable` — which classes the week shows (U2). The sessions themselves
+ * are read live by the site. No ids: every class on offer. Both switches
+ * read as on when absent.
+ */
+export interface TimetableContent {
+    title?: string;
+    intro?: string;
+    serviceIds?: string[];
+    showTrainer?: boolean;
+    showPlacesLeft?: boolean;
+    /** Monday to Friday only (template polish). */
+    weekdaysOnly?: boolean;
+    /** "13 sessions across 5 days" under the title. */
+    showCounts?: boolean;
+}
+
+/**
+ * `hours` — opening hours on their own (U2), read live. No `storeId`: the
+ * business's own place. `showClosed` absent means closed days are listed.
+ */
+export interface HoursContent {
+    title?: string;
+    storeId?: string;
+    showClosed?: boolean;
+    /** Days in a row with the same hours on one line (template polish). */
+    groupDays?: boolean;
+    /** The place's address under the week. */
+    showAddress?: boolean;
+}
+
+/** `person` — one practitioner, typed in (U2). */
+export interface PersonContent {
+    image?: ImageValue;
+    /** The photo a template says belongs here (KTD-5). */
+    imageBrief?: string;
+    name: string;
+    role?: string;
+    /** A line, or a row with where it came from (template polish). */
+    credentials?: PersonCredential[];
+    /** A visible label over the qualifications. */
+    credentialsLabel?: string;
+    bio?: string;
+    cta?: CtaValue;
+    /** The name as the page's h1, for a person who opens the page. */
+    asTitle?: boolean;
+    /** The team look's heading. */
+    title?: string;
+    /** The team look's other people. */
+    people?: PersonMember[];
+}
+
+/** One qualification: a line, or a title with where it came from. */
+export type PersonCredential = string | { title: string; detail?: string };
+
+/** Another person in the team look. */
+export interface PersonMember {
+    image?: ImageValue;
+    imageBrief?: string;
+    name: string;
+    role?: string;
+    bio?: string;
 }
 
 /** The field types an enquiry form supports (mirror of the section contract). */
@@ -328,6 +453,9 @@ export interface SectionContentByType {
     packs: PacksContent;
     productGrid: ProductGridContent;
     projects: ProjectsContent;
+    timetable: TimetableContent;
+    hours: HoursContent;
+    person: PersonContent;
 }
 
 /**
@@ -357,6 +485,14 @@ export interface SectionLayout {
      * carousel.
      */
     variant?: string;
+    /**
+     * The section's frame (`section-frame.ts` in the contract), on every
+     * block for the same reason: the link name a menu entry or button jumps
+     * to, the label that lists it in the site's menu, and its band.
+     */
+    anchor?: string;
+    navLabel?: string;
+    band?: "surface" | "inverse" | "accent";
 }
 
 /**
@@ -395,11 +531,38 @@ export type SectionInput = Section;
 // Resource types
 // ---------------------------------------------------------------------------
 
+/** One of a template's colourways, as the picker draws it. */
+export interface TemplateColourway {
+    /** The create request's `styleId`. */
+    id: string;
+    name: string;
+    /** Three HSL triples, page · text · accent, as the page resolves them. */
+    chips: string[];
+}
+
+/**
+ * A template a new site can start from (`GET …/sites/templates`). Every
+ * field after `description` is the picker's (industry templates, U12) and
+ * optional here: an API from before it sends none, and the picker then
+ * shows the name alone.
+ */
 export interface Template {
     id: string;
     version: number;
     name: string;
     description?: string;
+    /** The gallery's URL segment, which `?template=` may name. */
+    slug?: string;
+    /** The waitlist kinds it is for first (`food`, `creator`, …). */
+    kinds?: string[];
+    /** What it is built around (`store`, `services`, …); null: not said. */
+    shape?: string | null;
+    /** Module keys its sections read. */
+    uses?: string[];
+    /** Its colourways, the default first. */
+    colourways?: TemplateColourway[];
+    /** Its pages' titles. */
+    pages?: string[];
 }
 
 export interface SiteSummary {
@@ -455,6 +618,11 @@ export interface SiteNavigation {
 export interface SiteFooter {
     format: "html" | "markdown";
     value: string;
+    /**
+     * `left`: the designs' row (name, line, Saroh credit on Free), set by a template
+     * (industry templates). The API keeps it when a save sends only the line.
+     */
+    layout?: "left";
 }
 
 /**
@@ -569,6 +737,19 @@ export interface SiteDetail extends SiteSummary {
      * and on (DEC-057). Absent from an older API, which reads as not.
      */
     packsBlockOffered?: boolean;
+    /**
+     * The template the site was made from and the style chosen with it
+     * (industry templates, KTD-7). Null for a site made before that was
+     * recorded; absent from an older API.
+     */
+    template?: SiteTemplate | null;
+}
+
+/** Which template a site came from: its id, version and style, if any. */
+export interface SiteTemplate {
+    id: string;
+    version: number;
+    styleId: string | null;
 }
 
 /** The storefront a site sells from, and the open ones with products. */
@@ -618,6 +799,8 @@ export interface PageDraft {
 export interface CreateSiteInput {
     templateId?: string;
     templateVersion?: number;
+    /** One of the template's colourways; its first when absent. */
+    styleId?: string;
     name: string;
     slug?: string;
     subdomain?: string;
@@ -651,6 +834,8 @@ export type SitesResult<T> =
            * is on (DEC-071, T9).
            */
           code?: string;
+          /** Its plan refused it (U13): shown as the notice (U14). */
+          plan?: PlanRefusal;
       };
 
 // ---------------------------------------------------------------------------
@@ -681,7 +866,13 @@ async function sitesBase(): Promise<string | null> {
 function readError(
     data: unknown,
     fallback: string,
-): { error: string; index?: number; suggestion?: string; code?: string } {
+): {
+    error: string;
+    index?: number;
+    suggestion?: string;
+    code?: string;
+    plan?: PlanRefusal;
+} {
     const body = (typeof data === "object" && data !== null ? data : {}) as {
         message?: unknown;
         error?: unknown;
@@ -702,9 +893,12 @@ function readError(
             : {}
     ) as { index?: unknown; suggestion?: unknown; code?: unknown };
 
+    const plan = planRefusalOf(inner?.details, message);
     return {
         error: message ?? fallback,
         index: typeof details.index === "number" ? details.index : undefined,
+        // Its plan refused it (U13): themes, review (U14).
+        ...(plan ? { plan } : {}),
         // `APPROVAL_REQUIRED` (DEC-071, T9): the screen offers the way on.
         ...(typeof details.code === "string" ? { code: details.code } : {}),
         // An address the API offers instead of a refused one (G14).
@@ -1137,7 +1331,13 @@ export interface SiteCommentView {
  * that quietly renders as "asked for changes", or a lookup that throws.
  */
 export type ApprovalOutcome =
-    "REQUESTED" | "APPROVED" | "CHANGES_REQUESTED" | "BYPASSED" | "OVERRIDDEN";
+    | "REQUESTED"
+    | "APPROVED"
+    | "CHANGES_REQUESTED"
+    | "BYPASSED"
+    | "OVERRIDDEN"
+    /** The merchant took the request back (UX-068). */
+    | "WITHDRAWN";
 
 export interface ReviewState {
     /**
@@ -1151,6 +1351,8 @@ export interface ReviewState {
         outcome: ApprovalOutcome;
         at: string;
         by: string;
+        /** What a change request asked for (UX-043). */
+        reason?: string | null;
     } | null;
     /**
      * A review was asked for, or changes were, and neither has been settled
@@ -1165,6 +1367,11 @@ export interface ReviewState {
      * live now: approved, then the work carried on (#278).
      */
     approvalIsStale: boolean;
+    /**
+     * The open request is this person's own (UX-068): they are not offered
+     * Approve or Ask for changes on it.
+     */
+    askedByYou?: boolean;
 }
 
 /**
@@ -1233,6 +1440,7 @@ export async function getReviewState(
         outstanding: data.outstanding === true,
         pending: data.pending === true,
         approvalIsStale: data.approvalIsStale === true,
+        askedByYou: data.askedByYou === true,
     };
 }
 
@@ -1275,7 +1483,7 @@ export async function createComment(
  */
 export type ReviewerVerdict = Exclude<
     ApprovalOutcome,
-    "REQUESTED" | "BYPASSED" | "OVERRIDDEN"
+    "REQUESTED" | "BYPASSED" | "OVERRIDDEN" | "WITHDRAWN"
 >;
 
 /**
@@ -1289,14 +1497,18 @@ export async function createApproval(
     outcome: ReviewerVerdict,
     /** A verdict on a test release's frozen bytes, not the draft (T8, T12). */
     testReleaseId?: string,
+    /** What needs changing: required with CHANGES_REQUESTED (UX-043). */
+    reason?: string,
 ): Promise<SitesResult<{ id: string }>> {
     const base = await sitesBase();
     if (!base) return { ok: false, error: "No active organization." };
     const res = await apiFetch(`${base}/${siteId}/approvals`, {
         method: "POST",
-        body: JSON.stringify(
-            testReleaseId ? { outcome, testReleaseId } : { outcome },
-        ),
+        body: JSON.stringify({
+            outcome,
+            ...(testReleaseId ? { testReleaseId } : {}),
+            ...(outcome === "CHANGES_REQUESTED" && reason ? { reason } : {}),
+        }),
     });
     const data = (await res.json().catch(() => null)) as { id?: string } | null;
     if (res.ok && data?.id) return { ok: true, data: { id: data.id } };
@@ -1355,6 +1567,26 @@ export async function requestReview(
     const data = (await res.json().catch(() => null)) as { id?: string } | null;
     if (res.ok && data?.id) return { ok: true, data: { id: data.id } };
     return { ok: false, ...readError(data, "Could not ask for a review.") };
+}
+
+/**
+ * Take back the draft's open review request (UX-068). Requires
+ * `site:update`, like asking.
+ */
+export async function withdrawReview(
+    siteId: string,
+): Promise<SitesResult<{ id: string }>> {
+    const base = await sitesBase();
+    if (!base) return { ok: false, error: "No active organization." };
+    const res = await apiFetch(`${base}/${siteId}/review/withdraw`, {
+        method: "POST",
+    });
+    const data = (await res.json().catch(() => null)) as { id?: string } | null;
+    if (res.ok && data?.id) return { ok: true, data: { id: data.id } };
+    return {
+        ok: false,
+        ...readError(data, "Could not withdraw the review request."),
+    };
 }
 
 /** Mark a note settled, or reopen it. Requires `section:write` on the api. */

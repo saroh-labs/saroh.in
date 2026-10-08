@@ -37,7 +37,7 @@ export interface TodayView {
     count: string;
     /** Draw the column at all. */
     visible: boolean;
-    /** "Nothing else booked today.": only when bookings were read. */
+    /** "Nothing booked today.": only when bookings were read. */
     empty: boolean;
 }
 

@@ -4,6 +4,11 @@ import {
     cashfreeBaseUrl,
     cashfreeMode,
 } from "../../../common/providers/cashfree-env";
+import type { CredentialCheck } from "../../../common/providers/provider-attention";
+import {
+    ProviderKeysRefusedError,
+    refusesKeys,
+} from "../../../common/providers/provider-attention";
 import { providerCallSignal } from "./provider-call";
 import type {
     CreateOrderIntentInput,
@@ -36,6 +41,30 @@ export class CashfreeProvider implements MerchantProvider {
         return cashfreeBaseUrl();
     }
     private readonly apiVersion = "2023-08-01";
+
+    /**
+     * The keys, checked on connect (UX-012) by looking up an order that
+     * doesn't exist (`GET /orders/{id}`): Cashfree answers 404 to keys it
+     * knows and 401 to keys it doesn't. 2xx or 404 accepts, 401/403
+     * rejects, anything else is unsure. Only the status is ever logged.
+     */
+    async verifyCredentials(
+        credentials: ProviderCredentials,
+    ): Promise<CredentialCheck> {
+        let res: Response;
+        try {
+            res = await fetch(`${this.baseUrl}/orders/saroh-key-check`, {
+                headers: this.headers(credentials),
+                signal: providerCallSignal(),
+            });
+        } catch {
+            return "UNSURE";
+        }
+        if (res.ok || res.status === 404) return "ACCEPTED";
+        if (refusesKeys(res.status)) return "REJECTED";
+        this.logger.warn(`Cashfree key check answered HTTP ${res.status}`);
+        return "UNSURE";
+    }
 
     async createOrderIntent(
         input: CreateOrderIntentInput,
@@ -72,9 +101,11 @@ export class CashfreeProvider implements MerchantProvider {
             this.logger.warn(
                 `Cashfree order creation failed with HTTP ${res.status}`,
             );
-            throw new Error(
-                `Cashfree order creation failed (HTTP ${res.status})`,
-            );
+            const message = `Cashfree order creation failed (HTTP ${res.status})`;
+            if (refusesKeys(res.status)) {
+                throw new ProviderKeysRefusedError(message, res.status);
+            }
+            throw new Error(message);
         }
 
         const body = (await res.json()) as {

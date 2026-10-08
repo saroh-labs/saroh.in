@@ -203,3 +203,37 @@ describe("two rows written in the same millisecond", () => {
         ).toMatchObject({ outstanding: false, route: ReviewRoute.Approved });
     });
 });
+
+describe("closing a review (UX-068)", () => {
+    it("a withdrawal closes the request before it", () => {
+        const r = rows(
+            { outcome: "REQUESTED", by: "owner", fingerprint: DRAFT },
+            { outcome: "WITHDRAWN", by: "owner" },
+        );
+        expect(reviewStanding(r, DRAFT, "owner")).toMatchObject({
+            outstanding: false,
+            route: ReviewRoute.None,
+        });
+    });
+
+    it("going live past a change request closes it, without approving it", () => {
+        const r = rows(
+            { outcome: "CHANGES_REQUESTED" },
+            { outcome: "BYPASSED", by: "owner" },
+        );
+        expect(reviewStanding(r, DRAFT, "owner")).toMatchObject({
+            outstanding: false,
+            route: ReviewRoute.None,
+            approvedBy: null,
+        });
+    });
+
+    it("a request after the close is open again", () => {
+        const r = rows(
+            { outcome: "REQUESTED", by: "owner", fingerprint: OLDER },
+            { outcome: "OVERRIDDEN", by: "owner" },
+            { outcome: "REQUESTED", by: "owner", fingerprint: DRAFT },
+        );
+        expect(reviewStanding(r, DRAFT, "owner").outstanding).toBe(true);
+    });
+});

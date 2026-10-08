@@ -37,6 +37,11 @@ export const siteColors = {
     "cta-fg": "hsl(var(--site-cta-fg))",
     "footer-bg": "hsl(var(--site-footer-bg))",
     "footer-fg": "hsl(var(--site-footer-fg))",
+    // The "open now" dot (template round 2), on the page and over the
+    // page's ink. A palette that names no status leaves both unset, and the
+    // dot is the accent where it is drawn, as it always was.
+    status: "hsl(var(--site-status, var(--site-accent)))",
+    "status-inverse": "hsl(var(--site-status-inverse, var(--site-accent)))",
 } as const;
 
 /**
@@ -65,6 +70,24 @@ export const SITE_FONT_STACK =
 export const siteFontFamily = {
     "site-heading": [`var(--site-font-heading, ${SITE_FONT_STACK})`],
     "site-body": [`var(--site-font-body, ${SITE_FONT_STACK})`],
+    /*
+     * The optional third face, for small machine facts only (a time, a year,
+     * a handle): never paragraphs. A pair without a mono face sets no
+     * `--site-font-mono`, so these facts fall back to the body face and look
+     * like the rest of the page. Never Saroh's `font-mono` (G7).
+     */
+    "site-mono": [
+        `var(--site-font-mono, var(--site-font-body, ${SITE_FONT_STACK}))`,
+    ],
+};
+
+/**
+ * The page's column (`max-w-site-content`): a template's `contentWidth`
+ * (DEC-090 type scale) when it sets one, else 1280px, which is the
+ * `max-w-screen-xl` every section and the header and footer have always had.
+ */
+export const siteMaxWidth = {
+    "site-content": "var(--site-content-width, 1280px)",
 };
 
 /**
@@ -77,7 +100,11 @@ export const siteFontFamily = {
 export const siteBlocksPreset = {
     content: [],
     theme: {
-        extend: { colors: { site: siteColors }, fontFamily: siteFontFamily },
+        extend: {
+            colors: { site: siteColors },
+            fontFamily: siteFontFamily,
+            maxWidth: siteMaxWidth,
+        },
     },
 } satisfies Partial<Config>;
 

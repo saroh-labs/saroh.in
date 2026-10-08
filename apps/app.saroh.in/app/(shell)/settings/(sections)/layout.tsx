@@ -1,5 +1,6 @@
 import { SettingsTabs } from "@/components/settings/settings-tabs";
 import { settingsPagesFor } from "@/components/shared/nav-items";
+import { readEmailSetup } from "@/lib/communications/email-setup-service";
 import { listModules } from "@/lib/modules/service";
 import { resolveActiveOrganization } from "@/lib/organizations/service";
 import { listCommsProviders } from "@/lib/providers/service";
@@ -23,7 +24,8 @@ import { emailAttention, providersTabNote } from "@/lib/settings/ready";
  * When email needs a person, the Providers tab says so in place of its line
  * ("Needs you: email is disconnected"), so it is seen from any tab. Asked only
  * of someone who may manage messaging, and best-effort: a failed read drops
- * the line, never the screen.
+ * the line, never the screen. A plan that can't connect its own email is
+ * never told it has none (DEC-091).
  */
 export default async function SettingsLayout({
     children,
@@ -40,11 +42,20 @@ export default async function SettingsLayout({
         : org?.role === "OWNER" || org?.role === "ADMIN";
     let providersNote: string | null = null;
     if (mayMessaging && pages.some((p) => p.href === "/settings/providers")) {
-        const [modules, messaging] = await Promise.all([
+        const mayPlans = org?.actions
+            ? org.actions.includes("billing:read")
+            : org?.role === "OWNER" || org?.role === "ADMIN";
+        const [modules, messaging, setup] = await Promise.all([
             listModules().catch(() => null),
             listCommsProviders().catch(() => null),
+            // On a plan that can't connect one (DEC-091), the line says a
+            // paid plan brings it rather than asking for a connect.
+            readEmailSetup({ connect: true, plans: mayPlans }),
         ]);
-        providersNote = providersTabNote(emailAttention(modules, messaging));
+        providersNote = providersTabNote(emailAttention(modules, messaging), {
+            setup,
+            mayPlans,
+        });
     }
 
     return (

@@ -38,6 +38,7 @@ export interface OperatorSubmit {
 export function OperatorDialog({
     trigger,
     triggerVariant = "outline",
+    triggerClassName,
     title,
     effect,
     confirmName,
@@ -51,7 +52,14 @@ export function OperatorDialog({
 }: {
     trigger: string;
     triggerVariant?:
-        "outline" | "secondary" | "destructive" | "default" | "ghost";
+        | "outline"
+        | "secondary"
+        | "destructive"
+        | "default"
+        | "ghost"
+        | "highlight";
+    /** Sizing for a trigger that is a screen's main action (Publish). */
+    triggerClassName?: string;
     title: string;
     /** What will change, in a sentence or two. */
     effect: ReactNode;
@@ -120,6 +128,7 @@ export function OperatorDialog({
                         size="sm"
                         variant={triggerVariant}
                         disabled={disabled}
+                        className={triggerClassName}
                     >
                         {trigger}
                     </Button>

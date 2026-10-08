@@ -55,15 +55,44 @@ describe("confirmationView (P4)", () => {
             subtotal: "500.00",
             delivery: null,
             discount: null,
+            discountCode: null,
             total: "500.00",
             fulfilment: {
                 type: "PICKUP",
                 label: "Pick-up",
-                pickup: { name: "Hill Road", address: "12 Hill Road, Bandra" },
+                pickup: {
+                    name: "Hill Road",
+                    address: "12 Hill Road, Bandra",
+                    hours: null,
+                },
                 deliverTo: null,
             },
             refunded: false,
+            toPay: null,
         });
+    });
+
+    it("says what is still to pay on an order paid at the handover", () => {
+        expect(
+            confirmationView(
+                row({ payOnHandover: true, paymentStatus: "UNPAID" }),
+            ).toPay,
+        ).toBe("Pay when you collect");
+        expect(
+            confirmationView(
+                row({
+                    payOnHandover: true,
+                    paymentStatus: "UNPAID",
+                    fulfilment: "LOCAL_DELIVERY",
+                }),
+            ).toPay,
+        ).toBe("Pay on delivery");
+        // Paid at the counter since: nothing left to pay.
+        expect(
+            confirmationView(
+                row({ payOnHandover: true, paymentStatus: "PAID" }),
+            ).toPay,
+        ).toBeNull();
     });
 
     it("reads a delivery: the fee and the address as they typed it", () => {
@@ -103,7 +132,68 @@ describe("confirmationView (P4)", () => {
         expect(noAddress.fulfilment.pickup).toEqual({
             name: "Online",
             address: null,
+            hours: null,
         });
+    });
+
+    it("says when the place is open (UX-025)", () => {
+        const view = confirmationView(
+            row({
+                store: {
+                    name: "Hill Road",
+                    settings: {
+                        address: "12 Hill Road",
+                        openingHours: [
+                            {
+                                day: "MON",
+                                open: "10:00",
+                                close: "19:00",
+                                closed: false,
+                            },
+                            {
+                                day: "TUE",
+                                open: "10:00",
+                                close: "19:00",
+                                closed: false,
+                            },
+                            {
+                                day: "WED",
+                                open: "10:00",
+                                close: "19:00",
+                                closed: false,
+                            },
+                            {
+                                day: "THU",
+                                open: "10:00",
+                                close: "19:00",
+                                closed: false,
+                            },
+                            {
+                                day: "FRI",
+                                open: "10:00",
+                                close: "19:00",
+                                closed: false,
+                            },
+                            {
+                                day: "SAT",
+                                open: "10:00",
+                                close: "19:00",
+                                closed: false,
+                            },
+                            {
+                                day: "SUN",
+                                open: "10:00",
+                                close: "19:00",
+                                closed: true,
+                            },
+                        ],
+                    },
+                },
+            }),
+        );
+        expect(view.fulfilment.pickup?.hours).toBe(
+            "Mon–Sat 10:00–19:00, Sun closed",
+        );
     });
 
     it("falls back to when it was made, and says a later refund", () => {
@@ -113,6 +203,14 @@ describe("confirmationView (P4)", () => {
         expect(view.placedAt).toBe("2026-09-29T08:00:00.000Z");
         expect(view.refunded).toBe(true);
         expect(view.discount).toBe("50.00");
+    });
+
+    it("names the code that took the discount off (DEC-104)", () => {
+        const view = confirmationView(
+            row({ discount: "50", discountRedemption: { code: "SAVE10" } }),
+        );
+        expect(view.discount).toBe("50.00");
+        expect(view.discountCode).toBe("SAVE10");
     });
 
     it("names a line by its product, its service, or plainly", () => {

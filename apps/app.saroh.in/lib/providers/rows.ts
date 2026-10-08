@@ -1,12 +1,16 @@
 import { providerName } from "@/lib/payments/providers";
 import type { ProviderHealth } from "@/lib/provider-health/service";
 
+import type { BookingEmails } from "./booking-emails";
+import { bookingEmailsBlock, sarohRouteOn } from "./booking-emails";
+import type { ConnectLock, ConnectLocks } from "./connect-lock";
 import type {
     CommsChannel,
     ConnectedCommsProvider,
     ConnectedPaymentProvider,
     PaymentProviderName,
     PaymentWebhookSetup,
+    SarohEmailState,
 } from "./service";
 import { lastUpdateLine, webhookFor } from "./webhook";
 
@@ -88,6 +92,12 @@ export interface ProviderEntry {
     setup: ProviderSetup;
     /** What stops when it is disconnected, for the confirmation. */
     consequence: string;
+    /**
+     * One never connected, or disconnected, that the plan won't let the
+     * business connect (DEC-091, UX-006): the plan that has it and See
+     * plans, in place of Connect. `null` or absent: Connect is offered.
+     */
+    lock?: ConnectLock | null;
 }
 
 /** The business's domains, which are added and fixed under Sites. */
@@ -110,8 +120,20 @@ export interface ProvidersView {
     unread: ("payments" | "messaging")[];
     /** `null` when the business has no module that uses a domain. */
     domains: DomainsRow | null;
+    /**
+     * Saroh sending the business's booking emails (DEC-086): a block above
+     * Available, never in Connected; `null` when Saroh doesn't (OFF).
+     */
+    bookingEmails: BookingEmails | null;
+    /**
+     * The Available entry the booking-emails block's Connect jumps to: the
+     * first email provider to connect. `null` when none is offered here.
+     */
+    connectEmailKey: string | null;
     /** Whether any module that uses a provider is on at all. */
     any: boolean;
+    /** The plan holds back connecting a payment provider (UX-006). */
+    paymentsLocked: boolean;
 }
 
 /**
@@ -200,6 +222,10 @@ export interface ProviderRowsInput {
     webhooks?: PaymentWebhookSetup[] | null;
     /** For "2 min ago"; the time of the read by default. */
     now?: Date;
+    /** Saroh sending booking emails (DEC-086); absent or null says nothing. */
+    sarohEmail?: SarohEmailState | null;
+    /** What the plan won't let the business connect (`connectLocksOf`). */
+    locks?: ConnectLocks;
 }
 
 /**
@@ -229,6 +255,17 @@ export function needsPublicKey(p: ConnectedPaymentProvider): boolean {
  * paid stays "Awaiting payment". Setup requires it since then; one saved
  * before needs its keys entered again with the secret.
  */
+/**
+ * A connection still CONNECTED whose provider refused its keys on a live
+ * call (UX-012): nothing goes through it until they are entered again.
+ */
+export function keysRefused(p: {
+    status: string;
+    attention?: { reason: string } | null;
+}): boolean {
+    return p.status === "CONNECTED" && p.attention?.reason === "KEYS_REFUSED";
+}
+
 export function needsWebhookSecret(p: ConnectedPaymentProvider): boolean {
     return p.status === "CONNECTED" && p.webhookSecretMissing === true;
 }
@@ -244,8 +281,14 @@ export function buildProvidersView(input: ProviderRowsInput): ProvidersView {
         available: [],
         unread: [],
         domains: null,
+        bookingEmails: bookingEmailsBlock(input.sarohEmail),
+        connectEmailKey: null,
         any: input.health.length > 0,
+        paymentsLocked: !!input.locks?.payments,
     };
+    // Saroh sends whether or not Messaging is on, so its block alone is
+    // something to show.
+    if (view.bookingEmails) view.any = true;
 
     // Each kind appears only while a module that uses it is on — the
     // health read lists exactly those.
@@ -257,7 +300,10 @@ export function buildProvidersView(input: ProviderRowsInput): ProvidersView {
             for (const provider of CONNECTABLE_PAYMENTS) {
                 if (input.payments.some((p) => p.provider === provider))
                     continue;
-                view.available.push(availablePayment(provider));
+                view.available.push({
+                    ...availablePayment(provider),
+                    lock: input.locks?.payments ?? null,
+                });
             }
         } else view.unread.push("payments");
     }
@@ -268,18 +314,28 @@ export function buildProvidersView(input: ProviderRowsInput): ProvidersView {
                 const own = input.messaging.filter(
                     (c) => c.channel === channel,
                 );
-                for (const c of own) view.connected.push(commsEntry(c));
+                for (const c of own)
+                    view.connected.push(
+                        commsEntry(c, input.sarohEmail, input.locks),
+                    );
                 // A channel sends through one provider at a time: while one
                 // is connected, another would replace it, which is its row's
                 // Change keys — not a second Connect beside it.
                 if (own.some((c) => c.status === "CONNECTED")) continue;
                 for (const provider of CONNECTABLE_COMMS[channel]) {
                     if (own.some((c) => c.provider === provider)) continue;
-                    view.available.push(availableComms(channel, provider));
+                    view.available.push({
+                        ...availableComms(channel, provider),
+                        lock: input.locks?.messaging ?? null,
+                    });
                 }
             }
         } else view.unread.push("messaging");
     }
+
+    // Only one the business can connect: never a jump to a lock.
+    view.connectEmailKey =
+        view.available.find((e) => e.type === "Email" && !e.lock)?.key ?? null;
 
     const domains = has("DOMAINS");
     if (domains) view.domains = domainsRow(domains, input);
@@ -291,9 +347,10 @@ function paymentEntry(
     input: ProviderRowsInput,
 ): ProviderEntry {
     const live = p.status === "CONNECTED";
+    const refused = keysRefused(p);
     const noKey = needsPublicKey(p);
     const noSecret = needsWebhookSecret(p);
-    const attention = noKey || noSecret;
+    const attention = refused || noKey || noSecret;
     // The storefronts whose checkout really charges through it.
     const stores = input.checkout
         .filter((s) => s.provider === p.provider)
@@ -305,14 +362,22 @@ function paymentEntry(
         state: attention ? "ATTENTION" : live ? "CONNECTED" : "DISCONNECTED",
         note: !live
             ? "Disconnected — checkout can't take online payments through it until it is connected again."
+            : refused
+              ? `Needs attention — ${providerName(p.provider)} refused its keys, so no one can pay online through it. Enter the keys again to clear it.`
+              : noKey
+                ? "Needs its key id — checkout can't open the payment window, so no one can pay online through it until you enter the keys again."
+                : noSecret
+                  ? "Needs its webhook signing secret — payments can't be confirmed until you add it."
+                  : stores.length > 0
+                    ? sentence(`Takes online payments at ${words(stores)}`)
+                    : "Ready to take online payments — no location's checkout uses it yet.",
+        fix: refused
+            ? "Enter keys again"
             : noKey
-              ? "Needs its key id — checkout can't open the payment window, so no one can pay online through it until you enter the keys again."
+              ? "Add key id"
               : noSecret
-                ? "Needs its webhook signing secret — payments can't be confirmed until you add it."
-                : stores.length > 0
-                  ? sentence(`Takes online payments at ${words(stores)}`)
-                  : "Ready to take online payments — no location's checkout uses it yet.",
-        fix: noKey ? "Add key id" : noSecret ? "Add webhook secret" : null,
+                ? "Add webhook secret"
+                : null,
         update: live
             ? lastUpdateLine(
                   webhookFor(input.webhooks, p.provider),
@@ -327,6 +392,15 @@ function paymentEntry(
         target: live ? { kind: "payments", provider: p.provider } : null,
         setup: { kind: "payments", provider: p.provider },
         consequence: PAYMENTS_CONSEQUENCE,
+        // Connecting it again is one more of the business's own accounts:
+        // the plan's to allow, as the API asks it (UX-017).
+        lock: live
+            ? null
+            : input.locks
+              ? input.locks.paymentsAgain === undefined
+                  ? input.locks.payments
+                  : input.locks.paymentsAgain
+              : null,
     };
 }
 
@@ -366,16 +440,44 @@ const CHANNEL = {
     },
 } as const;
 
-function commsEntry(c: ConnectedCommsProvider): ProviderEntry {
+/**
+ * Booking emails go through Saroh while the business has no email of its
+ * own (DEC-086): a disconnected email row says so, and so does the warning
+ * before disconnecting one, when Saroh would take over.
+ */
+const SAROH_TAKES_OVER =
+    "Booking emails switch to Saroh's email straight away and count against your plan's monthly allowance. All other email stops being sent. Ones already sent are not affected. Connecting again means entering the keys again — they cannot be read back.";
+
+function disconnectedEmailNote(state: SarohEmailState | null | undefined) {
+    if (!state || !sarohRouteOn(state)) return null;
+    return state.state === "PAUSED"
+        ? `Disconnected — Saroh's booking emails are paused until ${state.resetsOn}; other email isn't sent until a provider is connected again.`
+        : "Disconnected — Saroh sends your booking emails for now, counted against your plan; other email isn't sent until a provider is connected again.";
+}
+
+function commsEntry(
+    c: ConnectedCommsProvider,
+    sarohEmail?: SarohEmailState | null,
+    locks?: ConnectLocks,
+): ProviderEntry {
     const spec = CHANNEL[c.channel];
     const live = c.status === "CONNECTED";
+    const refused = keysRefused(c);
+    const email = c.channel === "EMAIL";
+    const takesOver =
+        email && sarohEmail?.state === "OFF" && sarohEmail.takesOver;
     return {
         key: `${c.channel}:${c.provider}`,
         name: commsProviderName(c.provider),
         type: spec.type,
-        state: live ? "CONNECTED" : "DISCONNECTED",
-        note: live ? spec.purpose : spec.stopped,
-        fix: null,
+        state: refused ? "ATTENTION" : live ? "CONNECTED" : "DISCONNECTED",
+        note: refused
+            ? `Needs attention — ${commsProviderName(c.provider)} refused its keys, so nothing is sent through it. Enter the keys again to clear it.`
+            : live
+              ? spec.purpose
+              : ((email ? disconnectedEmailNote(sarohEmail) : null) ??
+                spec.stopped),
+        fix: refused ? "Enter keys again" : null,
         update: null,
         refs:
             live && c.fromAddress
@@ -384,7 +486,9 @@ function commsEntry(c: ConnectedCommsProvider): ProviderEntry {
         manageHref: live ? dashboardFor(c.provider) : null,
         target: live ? { kind: "messaging", channel: c.channel } : null,
         setup: { kind: "messaging", channel: c.channel, provider: c.provider },
-        consequence: spec.consequence,
+        consequence: takesOver ? SAROH_TAKES_OVER : spec.consequence,
+        // Connecting it again is a new connection: the plan's to allow.
+        lock: live ? null : (locks?.messaging ?? null),
     };
 }
 

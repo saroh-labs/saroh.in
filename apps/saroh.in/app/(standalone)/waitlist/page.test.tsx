@@ -3,7 +3,7 @@ import { cleanup, render, screen } from "@testing-library/react";
 import type { AnchorHTMLAttributes } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { NO_OFFER } from "@/content/waitlist";
+import { NO_OFFER, WAITLIST_MONEY } from "@/content/waitlist";
 
 /**
  * The waitlist page draws the API's launch offer (marketing plan U31): the
@@ -33,11 +33,14 @@ vi.mock("next/font/local", () => ({
 afterEach(() => {
     cleanup();
     readLaunchOffer.mockReset();
+    vi.useRealTimers();
 });
 
 async function renderPage() {
-    const { default: WaitlistPage, revalidate } = await import("./page");
-    expect(revalidate).toBe(300);
+    const page = await import("./page");
+    const WaitlistPage = page.default;
+    // Static, with no regeneration: the site is rebuilt to change it.
+    expect("revalidate" in page).toBe(false);
     // A static page takes no props: no searchParams to make it dynamic.
     expect(WaitlistPage.length).toBe(0);
     return render(await WaitlistPage());
@@ -69,5 +72,29 @@ describe("/waitlist", () => {
         ).toBe(`Get ${NO_OFFER.headline} when we open. ${NO_OFFER.note}`);
         expect(screen.queryByText(/days of/)).toBeNull();
         expect(screen.queryByText(/No card needed/)).toBeNull();
+    });
+
+    it("says the money goes straight to them, and links Integrations once it is shown", async () => {
+        readLaunchOffer.mockResolvedValue(null);
+        vi.useFakeTimers({ toFake: ["Date"] });
+        // 5 Oct, midnight in India: Integrations is published.
+        vi.setSystemTime(new Date("2026-10-04T18:30:00.000Z"));
+        await renderPage();
+        const link = screen.getByRole("link", { name: /See integrations/ });
+        expect(link.getAttribute("href")).toBe("/integrations");
+        expect(link.parentElement?.textContent).toBe(
+            `${WAITLIST_MONEY.line} See integrations`,
+        );
+    });
+
+    it("keeps the line but draws no link before Integrations is published", async () => {
+        readLaunchOffer.mockResolvedValue(null);
+        vi.useFakeTimers({ toFake: ["Date"] });
+        vi.setSystemTime(new Date("2026-10-04T18:29:59.999Z"));
+        await renderPage();
+        expect(screen.getByText(WAITLIST_MONEY.line)).toBeTruthy();
+        expect(
+            screen.queryByRole("link", { name: /See integrations/ }),
+        ).toBeNull();
     });
 });

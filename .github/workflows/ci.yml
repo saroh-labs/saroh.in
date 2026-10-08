@@ -165,10 +165,19 @@ jobs:
       - name: Route destination check
         run: pnpm run check:routes
 
+      # Every exactly pinned catalog version is the one the lockfile resolved
+      # (pnpm 9.9 once kept Next 16.3.6 after the catalog moved to 16.3.8).
+      - name: Catalog pins match the lockfile
+        run: pnpm run check:catalog-lock
+
       # Merchant sites render off the --site-* layer only, and there is exactly
       # one renderer — gates G2 and G6 (#252).
       - name: Site blocks gate
         run: pnpm run check:blocks
+
+      # Each migration folder has its own timestamp, so replay order is chosen.
+      - name: Migration ids
+        run: pnpm run check:migration-ids
 
       # Every browser spec names what it exercises (`// @covers …`), so the
       # local gate can run only the specs a batch reaches. CI still runs all.
@@ -483,7 +492,7 @@ jobs:
       APP_URL: http://localhost:3003
       NEXT_PUBLIC_ACCOUNTS_URL: http://localhost:3000
       # Where accounts sends a new account (onboarding); unset, the production
-      # build falls back to https://app.saroh.in.
+      # build falls back to https://app.saroh.in (signup-from-marketing.spec).
       NEXT_PUBLIC_APP_URL: http://localhost:3003
       NEXT_PUBLIC_API_URL: http://localhost:3333
       NEXT_PUBLIC_BETTER_AUTH_URL: http://localhost:3333
@@ -504,6 +513,10 @@ jobs:
       E2E_RENDERER_URL: http://localhost:3005
       # The marketing site, saroh.in (`web`), for marketing.spec.ts (plan U29).
       E2E_WEB_URL: http://localhost:3002
+      # Resources pages (Help, Privacy, …) before their publish date, so their
+      # specs run instead of skipping. Never production: the site ignores it
+      # there (plan KTD-2).
+      RESOURCES_PREVIEW: "1"
       # The API's links to the renderer (pay links, DEC-069 L6): this
       # stack's, not production's saroh.app, which a pay page opened on a
       # tenant host would otherwise redirect to.
@@ -518,6 +531,10 @@ jobs:
       SITE_RELAY_SECRET: saroh-dev-insecure-site-relay-secret-not-for-production
       SITE_ACCOUNTS_CODE_SECRET: ci-placeholder-site-code-secret-at-least-32-chars
       SITE_CODES_EMAIL_FAKE: log
+      # The link preview spec serves its pages on this runner, which the
+      # API's SSRF guard refuses; this test-only list lets it reach them.
+      # The API refuses to boot with it under NODE_ENV=production.
+      LINK_PREVIEW_TEST_HOSTS: 127.0.0.1
       # Every real environment has a payments key, and sending an invoice
       # seals its pay link with it (D17): without one, Send answered 500 on
       # this stack. The same throwaway key the API specs use; it opens

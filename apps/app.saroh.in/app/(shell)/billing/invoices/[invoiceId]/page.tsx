@@ -10,6 +10,11 @@ import { PaymentsToRefund } from "@/components/invoices/pay-link";
 import { PaymentsLocked } from "@/components/invoices/payments-locked";
 import { PageContainer } from "@/components/shared/page-container";
 import { ViewerDate } from "@/components/shared/viewer-date";
+import {
+    emailRefusalNote,
+    INVOICE_EMAIL_WORDS,
+} from "@/lib/communications/email-setup";
+import { readEmailSetup } from "@/lib/communications/email-setup-service";
 import { formatMoneyMajor } from "@/lib/format/money";
 import { mayRead, paymentsLockedCopy } from "@/lib/invoices/access";
 import { paymentsModuleOn } from "@/lib/invoices/payments-on";
@@ -24,6 +29,8 @@ import {
     whenLine,
 } from "@/lib/invoices/status";
 import { getInvoiceBusiness } from "@/lib/invoices/tax";
+import { invoiceZone } from "@/lib/invoices/zone";
+import { permitsFor } from "@/lib/organizations/permits";
 import { resolveActiveOrganization } from "@/lib/organizations/service";
 import { requireSession } from "@/lib/session";
 
@@ -65,13 +72,31 @@ export default async function InvoicePage({
         ? await listInvoicesFor(invoice.contact.id).catch(() => null)
         : [];
 
-    const canWrite = organization?.actions
-        ? organization.actions.includes("invoice:write")
-        : organization?.role === "OWNER" || organization?.role === "ADMIN";
+    const may = permitsFor(organization);
+    const canWrite = may("invoice:write");
+    // It can't be emailed for want of the business's own email (DEC-011):
+    // why, and Connect or See plans (DEC-091) for whoever may.
+    const emailMay = {
+        connect: may("comms:manage"),
+        plans: may("billing:read"),
+    };
+    const emailNote =
+        canWrite && invoice.send?.reason === "NO_EMAIL_PROVIDER"
+            ? emailRefusalNote(
+                  (await readEmailSetup(emailMay)) ?? {
+                      connected: false,
+                      canConnect: null,
+                  },
+                  emailMay,
+                  INVOICE_EMAIL_WORDS,
+              )
+            : null;
     const businessName = organization?.name ?? "This business";
     const who = billedTo(invoice);
     const money = (a: string) => formatMoneyMajor(a, invoice.currency) ?? a;
     const late = whenLine(invoice);
+    // Its dates in the business's zone, as its paper prints them (#836).
+    const zone = invoiceZone(business);
     // Whether its link takes payment: the API's word (DEC-070).
     const payOnline = paysOnline(invoice.send, invoice.online);
     const again = payOnline ? "Send the pay link again" : "Send it again";
@@ -97,6 +122,7 @@ export default async function InvoicePage({
                                 <ViewerDate
                                     iso={invoice.issuedAt}
                                     variant="dayMonth"
+                                    timeZone={zone}
                                 />
                             </>
                         ) : (
@@ -125,6 +151,7 @@ export default async function InvoicePage({
                             <ViewerDate
                                 iso={invoice.dueAt}
                                 variant="dayMonth"
+                                timeZone={zone}
                             />
                             .{" "}
                             {invoice.source === "SUBSCRIPTION"
@@ -153,6 +180,7 @@ export default async function InvoicePage({
                     </>
                 }
                 paymentsOn={paymentsOn}
+                emailNote={emailNote}
             />
         </PageContainer>
     );

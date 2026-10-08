@@ -6,7 +6,12 @@ import { useState } from "react";
 
 import { Chip } from "@/components/shared/chip";
 import type { CartLine, NewOrderSellable } from "@/lib/orders/new-order";
-import { findSellables, itemCount, roomFor } from "@/lib/orders/new-order";
+import {
+    chipWords,
+    findSellables,
+    itemCount,
+    roomFor,
+} from "@/lib/orders/new-order";
 import type { NewOrderProduct } from "@/lib/orders/new-order-service";
 
 import { FIELD, SMALL_BUTTON } from "./parts";
@@ -173,7 +178,11 @@ export function LinesStep({
                                             }
                                             className="h-[30px] cursor-pointer active:scale-[0.97] disabled:cursor-not-allowed coarse:h-11"
                                         >
-                                            {`${s.variantTitle ?? "Add"} · ${format(s.priceCents)}`}
+                                            {chipWords(
+                                                s.variantTitle,
+                                                format(s.priceCents),
+                                                room,
+                                            )}
                                         </Chip>
                                     );
                                 })}

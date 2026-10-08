@@ -1,9 +1,11 @@
 import { toMoneyString } from "../../common/money";
+import type { PayInstructionsView } from "../organizations/business-pay-instructions";
 import { stateName } from "./gst-states";
 import type { InvoiceStanding } from "./invoice-state";
 import { invoiceStanding } from "./invoice-state";
 import type { InvoiceTitle } from "./invoice-title";
 import { invoiceTitle, isExemptSupply } from "./invoice-title";
+import type { InvoiceOnlineBlocker } from "./pay-online";
 import type { InvoiceSendView, InvoiceSentView } from "./send-view";
 
 interface Money {
@@ -323,6 +325,12 @@ export interface InvoiceViewModel {
     send?: InvoiceSendView;
     /** On `GET /invoices/:id` only: its sends and reminders, newest first. */
     sent?: InvoiceSentView[];
+    /**
+     * On `GET /invoices/:id` of an unpaid invoice only: "How to pay us"
+     * (R32, #833), so the printed paper carries it as the PDF does. Null
+     * when the business set none.
+     */
+    payInstructions?: PayInstructionsView | null;
 }
 
 /** One payment taken online through the invoice's pay link (U13). */
@@ -353,6 +361,12 @@ export interface InvoiceOnlineView {
      * link, Send and Send reminder are held meanwhile. Null: none.
      */
     autopayCharge?: { at: string } | null;
+    /**
+     * Why its link can't take payment, or null when it can (#835): `PLAN`
+     * (the plan has no online payments; connecting a provider changes
+     * nothing), `PAYMENTS_OFF`, or `NO_PROVIDER`.
+     */
+    onlineBlocker: InvoiceOnlineBlocker | null;
 }
 
 /** "Asha Rao", or the email when the contact has no name. */

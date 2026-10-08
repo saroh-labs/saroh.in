@@ -8,10 +8,15 @@ import type { Prisma } from "@saroh/database";
 import { prisma } from "@saroh/database";
 
 import type { OrganizationContext } from "../../common/types/organization-context";
+import { planMeter } from "../billing/metering.service";
+import type { AvailabilityRuleWindow } from "../bookings/availability";
 import { withinIntervals, workingIntervals } from "../bookings/availability";
 import { requireBookingPower } from "../bookings/booking-access";
+import type { BookingPaymentView } from "../bookings/booking-payment";
+import { bookingPaymentView } from "../bookings/booking-payment";
 import type { BookingRulesValue } from "../bookings/booking-rules";
-import { loadBookingRules } from "../bookings/booking-rules";
+import { bookingPaymentOf, loadBookingRules } from "../bookings/booking-rules";
+import { loadOpeningHours } from "../bookings/opening-hours";
 import { businessTimezone, dateOnly } from "../bookings/staff-availability";
 import type { ClosureView } from "./closures.service";
 import { closureViews } from "./closures.service";
@@ -35,6 +40,7 @@ import type { BookingBrief } from "./off-bookings";
 import { bookingsInSpans, MAX_LISTED, upcomingBookings } from "./off-bookings";
 import type { OffSpan } from "./off-range";
 import { offRangeRefusal, offSpans } from "./off-range";
+import { diarySeatsAdded } from "./staff-seats";
 
 const DAY = 86_400_000;
 /** How far back a person's read carries time off and extra hours. */
@@ -80,6 +86,12 @@ export interface StaffList {
     staff: StaffView[];
     /** Current and coming days the whole business is closed (E3). */
     closures: ClosureView[];
+    /**
+     * When the business is open, as weekly windows in `timezone`: every
+     * walk-in storefront's week together, or null with none set. In-person
+     * bookings keep to them (DEC-087).
+     */
+    openingHours: AvailabilityRuleWindow[] | null;
 }
 
 const staffInclude = (since: Date) =>
@@ -175,7 +187,7 @@ export class StaffService {
     async list(ctx: OrganizationContext, now = new Date()): Promise<StaffList> {
         requireBookingPower(ctx, "service:read");
         const since = new Date(now.getTime() - HISTORY_DAYS * DAY);
-        const [rows, timezone, closures] = await Promise.all([
+        const [rows, timezone, closures, opening] = await Promise.all([
             prisma.staffMember.findMany({
                 where: { organizationId: ctx.organizationId },
                 include: staffInclude(since),
@@ -183,8 +195,14 @@ export class StaffService {
             }),
             businessTimezone(prisma, ctx.organizationId),
             closureViews(ctx.organizationId, since),
+            loadOpeningHours(prisma, ctx.organizationId),
         ]);
-        return { timezone, staff: rows.map(toView), closures };
+        return {
+            timezone,
+            staff: rows.map(toView),
+            closures,
+            openingHours: opening?.windows ?? null,
+        };
     }
 
     async get(
@@ -212,6 +230,19 @@ export class StaffService {
 
         const created = await this.guardLink(() =>
             prisma.$transaction(async (tx) => {
+                // Everyone who takes bookings uses a team seat, with a
+                // login or without (DEC-105, UX-053).
+                await planMeter.roomInTx(tx, ctx.organizationId, "members", {
+                    adding: await diarySeatsAdded(
+                        tx,
+                        ctx.organizationId,
+                        null,
+                        {
+                            status: "ACTIVE",
+                            membershipId: dto.membershipId ?? null,
+                        },
+                    ),
+                });
                 const person = await tx.staffMember.create({
                     data: {
                         organizationId: ctx.organizationId,
@@ -259,29 +290,48 @@ export class StaffService {
         }
         const archiving =
             dto.status === "ARCHIVED" && person.status !== "ARCHIVED";
+        const after = {
+            status: dto.status ?? person.status,
+            membershipId:
+                dto.membershipId !== undefined
+                    ? dto.membershipId
+                    : person.membershipId,
+        };
         await this.guardLink(() =>
-            prisma.staffMember.update({
-                where: { id: person.id },
-                data: {
-                    ...(dto.name !== undefined ? { name: dto.name } : {}),
-                    ...(dto.title !== undefined
-                        ? { title: blankToNull(dto.title) }
-                        : {}),
-                    ...(dto.membershipId !== undefined
-                        ? { membershipId: dto.membershipId }
-                        : {}),
-                    ...(dto.status !== undefined
-                        ? {
-                              status: dto.status,
-                              archivedAt: archiving
-                                  ? new Date()
-                                  : dto.status === "ACTIVE"
-                                    ? null
-                                    : undefined,
-                          }
-                        : {}),
-                },
-                select: { id: true },
+            prisma.$transaction(async (tx) => {
+                // Back from archived, or unlinked from a login: a team seat
+                // again (DEC-105, UX-053). Freeing one never asks.
+                await planMeter.roomInTx(tx, ctx.organizationId, "members", {
+                    adding: await diarySeatsAdded(
+                        tx,
+                        ctx.organizationId,
+                        person,
+                        after,
+                    ),
+                });
+                return tx.staffMember.update({
+                    where: { id: person.id },
+                    data: {
+                        ...(dto.name !== undefined ? { name: dto.name } : {}),
+                        ...(dto.title !== undefined
+                            ? { title: blankToNull(dto.title) }
+                            : {}),
+                        ...(dto.membershipId !== undefined
+                            ? { membershipId: dto.membershipId }
+                            : {}),
+                        ...(dto.status !== undefined
+                            ? {
+                                  status: dto.status,
+                                  archivedAt: archiving
+                                      ? new Date()
+                                      : dto.status === "ACTIVE"
+                                        ? null
+                                        : undefined,
+                              }
+                            : {}),
+                    },
+                    select: { id: true },
+                });
             }),
         );
         return this.read(ctx, person.id);
@@ -551,6 +601,14 @@ export class StaffService {
         return loadBookingRules(prisma, ctx.organizationId);
     }
 
+    /** How people pay when they book, and whether online can be taken. */
+    async getBookingPayment(
+        ctx: OrganizationContext,
+    ): Promise<BookingPaymentView> {
+        requireBookingPower(ctx, "service:read");
+        return bookingPaymentView(ctx.organizationId);
+    }
+
     /** Set the business's rules; an absent field is left, `null` clears it. */
     async updateBookingRules(
         ctx: OrganizationContext,
@@ -570,6 +628,9 @@ export class StaffService {
             ...(dto.refundInTimeCancels !== undefined
                 ? { refundInTimeCancels: dto.refundInTimeCancels }
                 : {}),
+            ...(dto.bookingPayment !== undefined
+                ? { bookingPayment: dto.bookingPayment }
+                : {}),
         };
         const row = await prisma.bookingRules.upsert({
             where: { organizationId: ctx.organizationId },
@@ -580,9 +641,10 @@ export class StaffService {
                 latestBookingMinutes: true,
                 freeCancelHours: true,
                 refundInTimeCancels: true,
+                bookingPayment: true,
             },
         });
-        return row;
+        return { ...row, bookingPayment: bookingPaymentOf(row.bookingPayment) };
     }
 
     // ── Internals ──────────────────────────────────────────────────────────
@@ -604,7 +666,12 @@ export class StaffService {
     private async requireStaff(ctx: OrganizationContext, staffId: string) {
         const person = await prisma.staffMember.findFirst({
             where: { id: staffId, organizationId: ctx.organizationId },
-            select: { id: true, name: true, status: true },
+            select: {
+                id: true,
+                name: true,
+                status: true,
+                membershipId: true,
+            },
         });
         if (!person) throw new NotFoundException("Staff member not found");
         return person;

@@ -4,6 +4,7 @@ import { Button } from "@saroh/ui/button";
 import { cn } from "@saroh/ui/lib/utils";
 import { useState } from "react";
 
+import { sentenceStart } from "@/lib/format/sentence";
 import type { EditOrderInput } from "@/lib/orders/kitchen-service";
 import type { DeliveryAddress, OrderReadLine } from "@/lib/orders/read";
 import type { Sellable } from "@/lib/orders/sellables";
@@ -109,7 +110,7 @@ export function EditPanel({
         : addressMissing
           ? "An address needs its first line, town, state and PIN code."
           : diff > 0
-            ? `${first} owes ${money(diff)} more. It shows as due on the order — nothing is sent to ${first}.`
+            ? `${sentenceStart(first)} owes ${money(diff)} more. It shows as due on the order — nothing is sent to ${first}.`
             : diff < 0
               ? `${money(-diff)} goes back to ${refundTo} when you save.`
               : same

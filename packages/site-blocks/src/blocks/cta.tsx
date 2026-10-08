@@ -19,7 +19,7 @@ import { cn } from "../lib/utils";
  * band the button derives from the band's own foreground instead, which cannot
  * collide with the band by construction, whatever either row grows later.
  */
-export type CtaSurface = "page" | "band";
+export type CtaSurface = "page" | "band" | "photo";
 
 /**
  * Tailwind classes for a CTA by visual style and the surface it sits on.
@@ -47,7 +47,38 @@ export function ctaClasses(
     const ring =
         surface === "band"
             ? "focus-visible:ring-site-cta-fg focus-visible:ring-offset-site-cta-bg"
-            : "focus-visible:ring-site-accent focus-visible:ring-offset-site-bg";
+            : surface === "photo"
+              ? "focus-visible:ring-site-bg focus-visible:ring-offset-site-fg"
+              : "focus-visible:ring-site-accent focus-visible:ring-offset-site-bg";
+
+    /*
+     * `photo` — over the full-bleed hero's wash (U2). The wash is the page's
+     * ink, so its words are the page's paper; the accent still fills the
+     * primary button, which the merchant chose to stand out.
+     */
+    if (surface === "photo") {
+        switch (style) {
+            case "secondary":
+                return cn(
+                    base,
+                    ring,
+                    "border-site-bg text-site-bg border px-5 py-2.5 hover:opacity-80",
+                );
+            case "link":
+                return cn(
+                    base,
+                    ring,
+                    "text-site-bg underline underline-offset-4 hover:opacity-80",
+                );
+            case "primary":
+            default:
+                return cn(
+                    base,
+                    ring,
+                    "bg-site-accent text-site-accent-fg px-5 py-2.5 hover:opacity-90",
+                );
+        }
+    }
 
     if (surface === "band") {
         switch (style) {

@@ -9,7 +9,7 @@ jest.mock("@saroh/database", () => ({
 // Nothing a join does may send mail: every sender is a spy that must stay
 // untouched, and nodemailer itself cannot open a connection.
 jest.mock("../../common/email", () => ({
-    sendWaitlistInvitationEmail: jest.fn(),
+    sendWaitlistLaunchInviteEmail: jest.fn(),
     sendEnquiryNotificationEmail: jest.fn(),
     sendVerificationOtpEmail: jest.fn(),
 }));
@@ -42,6 +42,30 @@ describe("WaitlistService", () => {
         create.mockImplementation(
             ({ data }: { data: { refCode: string | null } }) =>
                 Promise.resolve({ position: 312, refCode: data.refCode }),
+        );
+    });
+
+    it("stores a saved gallery template, and drops one it doesn't know", async () => {
+        await service.join({ ...V2, template: "Gym" });
+        expect(create).toHaveBeenLastCalledWith(
+            expect.objectContaining({
+                data: expect.objectContaining({ template: "gym" }),
+            }),
+        );
+
+        await service.join({ ...V2, template: "no-such-template" });
+        expect(create).toHaveBeenLastCalledWith(
+            expect.objectContaining({
+                data: expect.objectContaining({ template: null }),
+            }),
+        );
+
+        // The V1 form (an email alone) saves no template, as it saves no kind.
+        await service.join({ email: "v1@example.test", template: "gym" });
+        expect(create).toHaveBeenLastCalledWith(
+            expect.objectContaining({
+                data: expect.objectContaining({ template: null, kind: null }),
+            }),
         );
     });
 
@@ -232,7 +256,7 @@ describe("WaitlistService", () => {
         await service.join(V2);
 
         expect(logged.join(" ")).not.toContain("founder@example.test");
-        expect(logged.join(" ")).toContain("fo*****@example.test");
+        expect(logged.join(" ")).toContain("f***@example.test");
     });
 
     it("sends no email on join: nothing leaves the process", async () => {

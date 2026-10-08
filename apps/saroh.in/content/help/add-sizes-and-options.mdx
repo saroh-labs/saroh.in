@@ -1,0 +1,73 @@
+---
+# Every label below was checked against the real screens on 6 Oct 2026
+# (R7), in the code and in the captured shots. Sources, from the repo root:
+#   MORE  apps/app.saroh.in/components/stores/catalogue/catalogue-header.tsx
+#         (Products › More › "Product settings")
+#   OPTS  apps/app.saroh.in/components/commerce/product-settings/options-tab.tsx
+#         ("Options", "Add a value, press Enter", "New option, e.g.
+#         Fragrance", "Add option"; a value in use "cannot be removed");
+#         product-settings.tsx (tabs Options, SKUs; changes take effect at
+#         once and offer Undo)
+#   VARI  apps/app.saroh.in/components/commerce/product-editor-v2/variants-section.tsx
+#         ("Sold as itself … Add variants … gets its own stock count",
+#         "Blank price uses the product's …", one option per product:
+#         "Remove the variants first to sell it by …")
+#   ADD   .../product-editor-v2/variant-add-row.tsx ("Customers choose by",
+#         "Manage options", "Add a variant", "Pick a size", "Add to list";
+#         the SKU box suggests one from Product settings › SKUs)
+#   ROW   .../product-editor-v2/variant-row.tsx ("More", "Photo shown when
+#         someone picks it", "Sell it at", "Not sold anywhere — customers
+#         will not see this size.")
+#   SAVE  .../product-editor-v2/section-card.tsx ("Save variants", "Saves
+#         every change in this list.", "Discard")
+# The design called these "sizes and options"; the app calls each one a
+# variant and the list it picks from an option, so the steps use its words.
+# "Sell it at" shows only with more than one location: Rye & Co. has two.
+# Nothing was saved: the rows are added to the list and Save variants is
+# never pressed (Rye is look-only).
+title: Add sizes and options
+slug: add-sizes-and-options
+area: Products
+group: Sell products
+order: 20
+intro: "When a product comes in sizes, colours or packs, add each one as a variant of it. Each has its own SKU, its own price if it needs one, and its own stock count. This takes about two minutes."
+description: "Give a product sizes, colours or packs in Saroh: set up your options, add each variant with its own SKU and price, and choose where each one sells."
+readMinutes: 3
+updated: "2026-10-06"
+publishOn: "2026-10-17"
+steps:
+    # MORE, OPTS.
+    - title: Set up your options
+      body: "An option is what customers choose by, like Size, and its values are the choices, like 400g and 800g. In Saroh, open Sell › Products, press More and choose Product settings, then Options. To add a value, type it in the box at the end of an option's values and press Enter. It's added straight away, with Undo. For a new kind of choice, type its name under New option, e.g. Fragrance, and press Add option."
+      shot: help-add-sizes-1
+      caption: "Options at Rye & Co. (demo bakery): Size, Grind and Pack, with 1kg typed into Size."
+      tip: "A value a product already uses can't be removed. Change that product's variants first."
+      marker: Add a value, press Enter
+    # VARI.
+    - title: Open the product and press Add variants
+      body: "Open the product from Products. Until it has variants it is sold as itself, at its own price. Under Variants, press Add variants."
+      shot: help-add-sizes-2
+      caption: "The Rye & caraway loaf at Rye & Co. (demo bakery), sold as itself, with Add variants."
+      marker: Add variants
+    # ADD. Price left blank uses the product's, as the screen says.
+    - title: Add each size to the list
+      body: "Next to Customers choose by, pick the option this product uses, such as Size. Under Add a variant, pick a value, check the SKU and type a price if this one costs something different. A blank price uses the product's own. Press Add to list, then do the same for the next one. Need a value that isn't there? Manage options takes you back to the list of options."
+      shot: help-add-sizes-3
+      caption: "The Rye & caraway loaf at Rye & Co. (demo bakery): 800g in the list, 400g with its own price about to be added."
+      tip: "If you've set a pattern under Product settings › SKUs, the SKU box suggests one for each variant. Type over it to use your own."
+      marker: Add to list
+    # SAVE.
+    - title: Save variants
+      body: "The list isn't saved until you say so: the section is marked Unsaved, with Discard and Save variants at its foot. Check the sizes, SKUs and prices, then press Save variants. You can change a row in place, or remove it with the bin, and save again."
+      shot: help-add-sizes-4
+      caption: "Two sizes of the Rye & caraway loaf at Rye & Co. (demo bakery), ready to save."
+      marker: Save variants
+    # ROW.
+    - title: Pick a photo and where each one sells
+      body: "Press More under a variant. Under Photo shown when someone picks it, choose one of the product's photos. If you sell at more than one location, Sell it at lists them: turn on each location that sells this size. Press Save variants to keep the change."
+      shot: help-add-sizes-5
+      caption: "The Sourdough loaf at Rye & Co. (demo bakery): the 400g shows its own photo and sells only Online."
+      tip: "Each variant has its own stock count. To count and move it, see Count and move stock."
+      marker: Sell it at
+next: [count-and-move-stock, take-your-first-order]
+---

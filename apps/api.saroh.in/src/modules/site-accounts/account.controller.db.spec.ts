@@ -240,13 +240,15 @@ describe("Me", () => {
             // Home and Me (A5), Appointments (A6) and Messages (A13).
             tabs: [
                 { key: "home", label: "Home" },
-                { key: "bookings", label: "Appointments" },
+                { key: "bookings", label: "Bookings" },
                 { key: "messages", label: "Messages" },
                 { key: "me", label: "Me" },
             ],
             offers: { appointments: true, orders: false, plans: false },
             bookingsLabel: "Appointments",
             healthNotes: true,
+            // Its site records no template: general words (UX-040).
+            notesKind: "general",
             unreadMessages: 0,
         });
 
@@ -662,6 +664,67 @@ describe("receipts", () => {
             token,
         });
         expect(notMine.status).toBe(404);
+    });
+
+    it("downloads the customer's own receipt as its PDF, and no one else's (DEC-083)", async () => {
+        const biz = await business("Kavi Dental", ["APPOINTMENTS"]);
+        const elsewhere = await business("Rye Bakery", ["COMMERCE"]);
+        const { token, account } = await signIn(biz.host);
+        const other = await prisma.contact.create({
+            data: {
+                organizationId: biz.organizationId,
+                email: `other-${next()}@example.in`,
+            },
+        });
+        const paid = await invoice(
+            biz.organizationId,
+            account.contactId,
+            "KD/26-27/0001",
+            "PAID",
+        );
+        const theirs = await invoice(
+            biz.organizationId,
+            other.id,
+            "KD-0004",
+            "PAID",
+        );
+        const otherContact = await prisma.contact.create({
+            data: {
+                organizationId: elsewhere.organizationId,
+                email: `rye-${next()}@example.in`,
+            },
+        });
+        const otherBusiness = await invoice(
+            elsewhere.organizationId,
+            otherContact.id,
+            "RB-0001",
+            "PAID",
+        );
+
+        const pdf = (invoiceId: string) =>
+            fetch(`${url}${ME}/receipts/${invoiceId}/pdf`, {
+                headers: {
+                    [SITE_RELAY_HEADER]: signSiteRelay(
+                        { address: "203.0.113.9", host: biz.host },
+                        siteRelaySecret(),
+                    ),
+                    [CUSTOMER_SESSION_HEADER]: token,
+                },
+            });
+
+        const mine = await pdf(paid.id);
+        expect(mine.status).toBe(200);
+        expect(mine.headers.get("content-type")).toBe("application/pdf");
+        expect(mine.headers.get("content-disposition")).toBe(
+            'attachment; filename="KD-26-27-0001.pdf"',
+        );
+        expect(mine.headers.get("cache-control")).toBe("private, no-store");
+        expect(mine.headers.get("x-content-type-options")).toBe("nosniff");
+        const bytes = Buffer.from(await mine.arrayBuffer());
+        expect(bytes.subarray(0, 5).toString("latin1")).toBe("%PDF-");
+
+        expect((await pdf(theirs.id)).status).toBe(404);
+        expect((await pdf(otherBusiness.id)).status).toBe(404);
     });
 });
 

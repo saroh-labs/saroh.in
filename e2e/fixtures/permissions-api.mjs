@@ -107,6 +107,27 @@ PRODUCT_ROLES.MANAGER = {
     roleLabel: "Manager",
     actions: MANAGER_ACTIONS,
 };
+/**
+ * A built-in Member's permissions, as the API resolves them
+ * (`organization-policy.ts`: the read-only floor and `order:stage`). The app
+ * decides by permissions only (DEC-098), so a business answered without them
+ * would offer a Member nothing; the real API always sends them.
+ */
+const MEMBER_DEFAULT = {
+    actions: [
+        "org:read",
+        "member:read",
+        "store:read",
+        "product-review:read",
+        "site:read",
+        "media:read",
+        "module:read",
+        "booking:read",
+        "service:read",
+        "contact:read",
+        "order:stage",
+    ],
+};
 const invented = (key, label, actions, members = 0) => ({
     key,
     label,
@@ -308,7 +329,8 @@ createServer((req, res) => {
                 name: "Permission tests",
                 slug: "permissions",
                 role: scenario === "REVIEWER" ? "REVIEWER" : "MEMBER",
-                ...(PRODUCT_ROLES[scenario] ?? {}),
+                ...(PRODUCT_ROLES[scenario] ??
+                    (scenario === "REVIEWER" ? {} : MEMBER_DEFAULT)),
             },
         ]);
     // The product editor (#525). An owner's business has two storefronts.

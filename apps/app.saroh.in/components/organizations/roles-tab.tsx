@@ -15,10 +15,12 @@ import { Label } from "@saroh/ui/label";
 import { cn } from "@saroh/ui/lib/utils";
 import { Switch } from "@saroh/ui/switch";
 import { showError, showSuccess } from "@saroh/ui/toast";
-import { Info, Plus } from "lucide-react";
+import { Info, Lock, Plus } from "lucide-react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useMemo, useState, useTransition } from "react";
 
+import { showPlanRefusal } from "@/components/billing/plan-refusal";
 import { ConfirmDialog } from "@/components/shared/confirm-dialog";
 import { CAPABILITY_GROUP_LABEL as GROUP_LABEL } from "@/lib/organizations/capability-groups";
 import {
@@ -31,6 +33,7 @@ import type {
     Role,
     RoleCatalogue,
 } from "@/lib/organizations/roles";
+import type { RolesLock } from "@/lib/organizations/roles-lock";
 
 /** The built-ins a new role may start from. Owner is not offered: see below. */
 const START_FROM = [
@@ -73,6 +76,7 @@ export function RolesTab({
     organizationName,
     builtInBlurb,
     builtInPlain,
+    rolesLock = null,
 }: {
     roles: Role[];
     catalogue: RoleCatalogue | null;
@@ -85,6 +89,11 @@ export function RolesTab({
     builtInBlurb: Record<string, string>;
     /** The same in a few words, under each built-in's name in the list. */
     builtInPlain: Record<string, string>;
+    /**
+     * The plan leaves roles of your own off (UX-030): the way up stands
+     * where New role would, rather than a dialog the API refuses.
+     */
+    rolesLock?: RolesLock | null;
 }) {
     const [activeKey, setActiveKey] = useState<string>(
         roles.find((r) => !r.system)?.key ?? "MEMBER",
@@ -126,7 +135,7 @@ export function RolesTab({
                 <ListSection label={`Made for ${organizationName}`}>
                     {invented.length === 0 ? (
                         <p className="border-t border-border px-[15px] py-3 text-[12px] leading-[1.5] text-muted-foreground">
-                            {canEdit
+                            {canEdit && !rolesLock
                                 ? "None yet. A role of your own grants exactly what you tick — no more."
                                 : "None yet."}
                         </p>
@@ -141,7 +150,23 @@ export function RolesTab({
                         ))
                     )}
                 </ListSection>
-                {canEdit ? (
+                {canEdit && rolesLock ? (
+                    <div className="flex items-start gap-2 border-t border-border px-[15px] py-2.5 text-[12.5px] leading-[1.5] text-muted-foreground">
+                        <Lock
+                            aria-hidden
+                            className="mt-0.5 size-3.5 shrink-0"
+                        />
+                        <p>
+                            {rolesLock.line}{" "}
+                            <Link
+                                href={rolesLock.href}
+                                className="font-medium text-foreground underline underline-offset-4"
+                            >
+                                {rolesLock.cta}
+                            </Link>
+                        </p>
+                    </div>
+                ) : canEdit ? (
                     <button
                         type="button"
                         onClick={() => setCreating(true)}
@@ -169,7 +194,7 @@ export function RolesTab({
                 onRemoved={() => setActiveKey("MEMBER")}
             />
 
-            {canEdit ? (
+            {canEdit && !rolesLock ? (
                 <NewRoleDialog
                     open={creating}
                     onOpenChange={setCreating}
@@ -603,10 +628,14 @@ function NewRoleDialog({
     const [pending, startTransition] = useTransition();
     const [label, setLabel] = useState("");
     const [from, setFrom] = useState<string>("");
+    // Said in the dialog, always (UX-030): a refusal behind an open modal
+    // read as nothing happening.
+    const [error, setError] = useState<string | null>(null);
 
     const reset = () => {
         setLabel("");
         setFrom("");
+        setError(null);
     };
 
     // What the copy takes from the role it starts from: what may be granted
@@ -622,9 +651,22 @@ function NewRoleDialog({
 
     const create = () =>
         startTransition(async () => {
+            setError(null);
             const res = await createRole({ label: label.trim(), actions });
             if (!res.ok) {
-                showError(res.error);
+                // Custom roles aren't in the plan (U13): the way up, from
+                // its own notice once this dialog is out of the way.
+                if (res.plan) {
+                    onOpenChange(false);
+                    reset();
+                    showPlanRefusal(res.plan);
+                    return;
+                }
+                setError(
+                    res.error.trim()
+                        ? res.error
+                        : "The role couldn't be created. Try again.",
+                );
                 return;
             }
             showSuccess(`${res.data.label} created`);
@@ -702,6 +744,14 @@ function NewRoleDialog({
                             </p>
                         ) : null}
                     </fieldset>
+                    {error ? (
+                        <p
+                            role="alert"
+                            className="rounded-[9px] bg-destructive-subtle px-3 py-2 text-[12.5px] text-destructive-subtle-foreground"
+                        >
+                            {error}
+                        </p>
+                    ) : null}
                     <DialogFooter>
                         <Button
                             type="button"

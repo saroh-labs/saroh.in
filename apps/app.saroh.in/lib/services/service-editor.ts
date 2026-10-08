@@ -11,6 +11,7 @@
 
 import { formatMoney } from "@/lib/format/money";
 import { rateOption } from "@/lib/invoices/gst";
+import type { BookingPayment } from "@/lib/staff/types";
 
 import type {
     CreateServiceInput,
@@ -357,22 +358,33 @@ export function statePill(
         : { label: "Not taking bookings", tone: "neutral" };
 }
 
-/** What the Save toast says. */
+/**
+ * What the Save toast says. A new service is bookable only once it has
+ * times (UX-024): a one-to-one someone takes books in their hours; with
+ * nobody, or a class, it needs its own weekly hours first, and stays off
+ * the booking page until then.
+ */
 export function savedMessage({
     isNew,
     name,
     kind,
     comingUp,
+    hasPerson = false,
 }: {
     isNew: boolean;
     name: string;
     kind: ServiceKind;
     comingUp: number | null;
+    /** Someone on the diary takes it. */
+    hasPerson?: boolean;
 }): string {
     if (isNew) {
-        return kind === "class"
-            ? `${name} added. Set its weekly times under More settings.`
-            : `${name} added. It's bookable now.`;
+        if (kind === "class") {
+            return `${name} added. Set its weekly times under More settings so customers can book it.`;
+        }
+        return hasPerson
+            ? `${name} added. Customers can book it in the free time of who takes it.`
+            : `${name} added. Give it hours under More settings so customers can book it.`;
     }
     if (!comingUp) {
         return comingUp === 0
@@ -414,27 +426,44 @@ const DEPOSIT_PERCENT: Record<DepositMode, number> = {
 /**
  * The note under "At booking, they pay" (the design's): what a customer
  * pays when booking and at the visit, worked out from the price as typed,
- * rounded to the paisa as the server rounds it.
+ * rounded to the paisa as the server rounds it. A business that takes
+ * payment at the desk only takes nothing when booking, a deposit or not
+ * (DEC-089).
  */
 export function depositNote(
     deposit: DepositMode,
     price: string,
     currency: string,
     visits = 1,
+    /** How the business takes payment when people book (DEC-088). */
+    way: BookingPayment = "BOTH",
 ): string {
-    if (deposit === "NONE") {
-        return "No card needed to book. No-shows cost you the slot.";
-    }
     const minor = toMinor(price);
     const cents = minor === null || Number.isNaN(minor) ? 0 : minor;
-    const now = Math.round((cents * DEPOSIT_PERCENT[deposit]) / 100);
     const money = (n: number) => formatMoney(n, currency) ?? "";
+    if (deposit === "NONE") {
+        // Online only: nothing at the visit, it is all paid when booking.
+        return way === "ONLINE" && cents > 0
+            ? `They pay ${money(cents)} online when booking: your booking rules take payment online only.`
+            : "No card needed to book. No-shows cost you the slot.";
+    }
+    if (way === "DESK" && cents > 0) {
+        return `They pay ${money(cents)} ${visits > 1 ? "over the visits" : "at the visit"}.`;
+    }
+    const now = Math.round((cents * DEPOSIT_PERCENT[deposit]) / 100);
     const split =
         deposit === "FULL"
             ? `They pay ${money(now)} when booking.`
             : `They pay ${money(now)} when booking, and the rest (${money(cents - now)}) ${visits > 1 ? "over the visits" : "at the visit"}.`;
     return `${split} Refunded if they cancel in time.`;
 }
+
+/**
+ * The note under "At booking, they pay" for a deposit the plan can't take
+ * online: kept, and not taken until it can (6 Oct 2026).
+ */
+export const depositPausedNote =
+    "Paused: customers book and pay at the visit, and nothing is taken when booking.";
 
 /** The note under Where. */
 export function whereNote(where: LocationType): string {
@@ -449,13 +478,34 @@ export function whereNote(where: LocationType): string {
  * The note under "Show on the booking page". Null `hasPage` is "couldn't
  * tell", which says only what the switch does.
  */
-export function bookingPageNote(hasPage: boolean | null, on: boolean): string {
+export function bookingPageNote(
+    hasPage: boolean | null,
+    on: boolean,
+    /** It has times to offer: its own weekly hours, or (one-to-one) someone to take it (UX-024). */
+    hasHours = true,
+): string {
     if (hasPage === false) {
         return "You don't have a booking page yet. Staff can still book it from the calendar.";
+    }
+    if (on && !hasHours) {
+        return "It goes on the booking page once it has weekly hours or someone to take it. Staff can book it from the calendar meanwhile.";
     }
     return on
         ? "Customers can book it themselves."
         : "Only staff can book it, from the calendar.";
+}
+
+/**
+ * Whether a service has times the booking page can offer (UX-024), as the
+ * API keeps it off the page until then: its own weekly hours, or a
+ * one-to-one someone takes. A class's times are always its own hours.
+ */
+export function hasBookableHours(
+    kind: ServiceKind,
+    ruleCount: number,
+    staffCount: number,
+): boolean {
+    return ruleCount > 0 || (kind === "one" && staffCount > 0);
 }
 
 /** The note under Who takes it. */
@@ -514,18 +564,4 @@ export function glance(
         ["Booked this week", counted(usage?.thisWeek)],
         ["Still to come", counted(usage?.comingUp)],
     ];
-}
-
-/**
- * Whether the business runs classes, so the editor shows Kind up front: it
- * has one, it has no services yet, or this one is a class. A business of
- * one-to-one services only (a clinic) finds Kind under More settings.
- */
-export function showKind(
-    services: readonly { id: string; capacity: number }[],
-    editing: { capacity: number } | null,
-): boolean {
-    if (editing && editing.capacity > 1) return true;
-    if (services.length === 0) return true;
-    return services.some((s) => s.capacity > 1);
 }

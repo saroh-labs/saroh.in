@@ -36,6 +36,7 @@ import type {
 } from "@saroh/object-storage";
 
 import type { OrganizationContext } from "../../common/types/organization-context";
+import { planMeter } from "../billing/metering.service";
 import { MediaService, NOT_AN_IMAGE_MESSAGE } from "./media.service";
 
 const create = prisma.media.create as jest.Mock;
@@ -184,6 +185,49 @@ describe("MediaService.completeUpload", () => {
             status: "READY",
             sizeBytes: 2048,
         });
+    });
+
+    it("soft-meters the plan's storage with the file's size in GB (U13)", async () => {
+        const withRoom = jest.spyOn(planMeter, "withRoom");
+        const service = new MediaService(
+            fakeStorage({
+                headObject: jest.fn().mockResolvedValue({
+                    key: SIGNED.key,
+                    contentType: "image/png",
+                    contentLength: 250_000_000,
+                }),
+            }),
+        );
+        findUnique.mockResolvedValue({
+            id: "media_1",
+            organizationId: "org_1",
+            key: SIGNED.key,
+            sizeBytes: 1234,
+            status: "PENDING",
+        });
+        update.mockResolvedValue({
+            id: "media_1",
+            status: "READY",
+            sizeBytes: 250_000_000,
+        });
+        await service.completeUpload(ctx(), "media_1");
+        expect(withRoom).toHaveBeenCalledWith(
+            "org_1",
+            "storage",
+            expect.any(Function),
+            { soft: true, adding: 0.25 },
+        );
+        // Confirming again adds nothing it hadn't counted.
+        findUnique.mockResolvedValue({
+            id: "media_1",
+            organizationId: "org_1",
+            key: SIGNED.key,
+            sizeBytes: 250_000_000,
+            status: "READY",
+        });
+        await service.completeUpload(ctx(), "media_1");
+        expect(withRoom.mock.calls[1][3]).toEqual({ soft: true, adding: 0 });
+        withRoom.mockRestore();
     });
 
     it("rejects a cross-tenant complete with 404 and never updates", async () => {

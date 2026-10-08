@@ -2,6 +2,7 @@ import { Injectable, NotFoundException } from "@nestjs/common";
 import { prisma } from "@saroh/database";
 
 import type { OrganizationContext } from "../../common/types/organization-context";
+import { clearStaleLimitNotices } from "../billing/limit-notice-clear";
 import { allows, authorize } from "../organizations/organization-policy";
 import { hiddenNotificationTypes } from "./alert-preferences";
 
@@ -27,6 +28,10 @@ export interface ListNotificationsOptions {
  * (round-2 F14): a notice for an alert they turned the bell off for, or
  * that their role can't read, is left out of their list and their count,
  * and "Mark all read" leaves it alone.
+ *
+ * A plan limit notice that no longer stands (the team back under its cap,
+ * a new month, a plan move) is cleared before the inbox is read (UX-041,
+ * `billing/limit-notice-clear.ts`).
  */
 @Injectable()
 export class NotificationsService {
@@ -36,6 +41,7 @@ export class NotificationsService {
         options: ListNotificationsOptions = {},
     ) {
         authorize(ctx, "notification:read");
+        await clearStaleLimitNotices(ctx.organizationId);
         return prisma.notification.findMany({
             where: {
                 organizationId: ctx.organizationId,
@@ -49,6 +55,7 @@ export class NotificationsService {
     /** Count the org's unread notifications (for a nav badge). */
     async unreadCount(ctx: OrganizationContext): Promise<{ count: number }> {
         authorize(ctx, "notification:read");
+        await clearStaleLimitNotices(ctx.organizationId);
         const count = await prisma.notification.count({
             where: {
                 organizationId: ctx.organizationId,

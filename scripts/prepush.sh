@@ -5,7 +5,7 @@
 # CI round trip. Every step here exists because CI once caught it first —
 # docs/architecture/DEV_LEARNINGS.md has the stories.
 #
-#   pnpm prepush                 secrets, lint, types, checks, and the unit
+#   pnpm prepush                 secrets, private prices, lint, types, checks, and the unit
 #                                tests and vitest specs the branch's changes
 #                                reach (what .husky/pre-push runs)
 #   pnpm prepush --int           … plus the full unit suites and the API
@@ -134,9 +134,7 @@ if [ -n "$TREE" ]; then
     done
 fi
 
-# A template with its X's works on GNU and BSD mktemp alike; `-t prepush`
-# fails on Linux ("too few X's") and left every step without a log dir.
-W=$(mktemp -d "${TMPDIR:-/tmp}/prepush.XXXXXX")
+W=$(mktemp -d -t prepush)
 LOG=$W/step.log
 FAILED=""
 # cached <step> [<step that also counts>…]
@@ -145,14 +143,14 @@ cached() {
     [ "$USE_CACHE" = 1 ] && [ -n "$TREE" ] || return 1
     # Never cached: a leak lives in history, an advisory is published after
     # the tree passed, and a build is a means.
-    case "$1" in secrets | audit | int-build | deps) return 1 ;; esac
+    case "$1" in secrets | private | audit | int-build | deps) return 1 ;; esac
     for t in $SAME_CODE; do
         for s in "$@"; do [ -f "$PASSES/$t-$s" ] && return 0; done
     done
     return 1
 }
 record() {
-    case "$1" in secrets | audit | int-build | deps) return 0 ;; esac
+    case "$1" in secrets | private | audit | int-build | deps) return 0 ;; esac
     [ -n "$TREE" ] && date +%s >"$PASSES/$TREE-$1"; return 0
 }
 say() { printf '=== %-16s %s\n' "$1" "$2"; }
@@ -290,7 +288,7 @@ e2e_stack() {
     export APP_URL=http://localhost:3003
     export NEXT_PUBLIC_ACCOUNTS_URL=http://localhost:3000
     # Where accounts sends a new account (onboarding); unset, a production
-    # build falls back to https://app.saroh.in.
+    # build falls back to https://app.saroh.in (signup-from-marketing.spec).
     export NEXT_PUBLIC_APP_URL=http://localhost:3003
     export NEXT_PUBLIC_API_URL=http://localhost:3333
     export NEXT_PUBLIC_BETTER_AUTH_URL=http://localhost:3333
@@ -301,17 +299,26 @@ e2e_stack() {
     export E2E_API_URL=http://localhost:3333
     export E2E_RENDERER_URL=http://localhost:3005
     # The marketing site (saroh.in, the `web` package), built and started
-    # only when a spec that opens it runs (marketing.spec.ts, plan U29), as
-    # CI does: its waitlist forwards to this stack's API.
+    # only when a spec that opens it runs (marketing, link-preview, resources,
+    # help and privacy specs; plan U29), as CI does: its waitlist forwards to
+    # this stack's API, and pricing reads the catalogue there (the
+    # placeholder when there is none).
     export E2E_WEB_URL=http://localhost:3002
+    # Resources pages before their publish date, as CI: without it the Help
+    # and Privacy specs skip themselves and test nothing.
+    export RESOURCES_PREVIEW=1
     local web_filter=""
-    case " $(echo $specs) " in *marketing.spec.ts*) web_filter=--filter=web ;; esac
+    case " $(echo $specs) " in *marketing.spec.ts* | *link-preview.spec.ts* | *resources.spec.ts* | *help.spec.ts* | *privacy.spec.ts*) web_filter=--filter=web ;; esac
     # The API's links to the renderer (pay links, DEC-069 L6): this stack's,
     # never production's saroh.app, which a redirect would otherwise leave for.
     export RENDERER_URL=http://localhost:3005
     export SITE_RELAY_SECRET=saroh-dev-insecure-site-relay-secret-not-for-production
     export SITE_ACCOUNTS_CODE_SECRET=ci-placeholder-site-code-secret-at-least-32-chars # gitleaks:allow (CI placeholder)
     export SITE_CODES_EMAIL_FAKE=log
+    # The link preview tool's spec serves its pages on this machine, which
+    # the API's SSRF guard refuses; this test-only list lets it reach them.
+    # The API won't boot with it under NODE_ENV=production.
+    export LINK_PREVIEW_TEST_HOSTS=127.0.0.1
     export PAYMENTS_ENC_KEY=0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef # gitleaks:allow (test key, as in the API specs)
 
     # The run's database is a copy of a seeded template, "<name>-template",
@@ -616,7 +623,7 @@ e2e_start() {
     [ -n "$(git status --porcelain)" ] && \
         echo "    (uncommitted changes are not in the browser run: it tests HEAD)"
     SHA=$(git rev-parse HEAD)
-    E2E_LOGS=$(mktemp -d "${TMPDIR:-/tmp}/prepush-e2e-logs.XXXXXX")
+    E2E_LOGS=$(mktemp -d -t prepush-e2e-logs)
     [ "$E2E_STATUS" = run ] &&
         echo "=== e2e (in the background) $(echo "$specs" | wc -w | tr -d ' ') spec files, desk + phone"
     [ "$PERM_STATUS" = run ] &&
@@ -625,7 +632,7 @@ e2e_start() {
     [ "$E2E_STATUS" = run ] && ports="3333 3000 3003 3005"
     # The marketing site, when its spec is in the run (e2e_stack).
     [ "$E2E_STATUS" = run ] && case " $(echo $specs) " in
-        *marketing.spec.ts*) ports="$ports 3002" ;; esac
+        *marketing.spec.ts* | *link-preview.spec.ts* | *resources.spec.ts* | *help.spec.ts* | *privacy.spec.ts*) ports="$ports 3002" ;; esac
     [ "$PERM_STATUS" = run ] && ports="$ports 3004 3334"
     trap stop_stack EXIT
     # In the background: the lock first (waiting on another run, if one is
@@ -723,6 +730,11 @@ else
     echo "=== secrets          SKIP — install gitleaks (brew install gitleaks); CI runs it"
 fi
 
+# Saroh's real prices and limits never enter the public repo; they live in
+# the database. The values to look for live on the owner's machine only
+# (scripts/check-private-terms.sh says where). Never cached, like secrets.
+step private scripts/check-private-terms.sh "$STEP_SKIP"
+
 # CI's dependency audit (critical only), the same rule: a critical advisory
 # fails; an unreachable registry is a SKIP, which CI runs again. Never cached,
 # because a new advisory fails a tree that passed yesterday (#771, Next.js
@@ -782,9 +794,11 @@ fi
 # packages import (test_deps), then runs with --only, so no two turbo runs
 # ever build the same package at the same time.
 bg_step routes pnpm run check:routes
+bg_step catalog-lock pnpm run check:catalog-lock
 bg_step blocks pnpm run check:blocks
 bg_step cycles pnpm run check:cycles
 bg_step e2e-covers pnpm run check:e2e-covers
+bg_step migration-ids pnpm run check:migration-ids
 
 # Unit tests. The quick run takes only the specs the change reaches; --int and
 # --all run the full suites. As CI: the api's unit tests mock the environment,
@@ -1074,8 +1088,11 @@ if [ "$INT" = 1 ]; then
     if cached "$INT_STEP" int; then say "$INT_STEP" "PASS (cached)"; else INT_NEED=plain; fi
     if cached "$INT_RLS_STEP" int-rls; then say "$INT_RLS_STEP" "PASS (cached)"; else INT_NEED="$INT_NEED rls"; fi
     if [ -n "$INT_NEED" ]; then
-        # The api's workspace packages are consumed built, as in CI.
-        step int-build $TURBO build --filter='@saroh/api^...'
+        # The api's workspace packages are consumed built, as in CI. The
+        # Prisma client is generated into node_modules, outside turbo's
+        # cached outputs, so a cache hit after a schema merge left it stale
+        # (DEV_LEARNINGS, 6 Oct): generate it first, every time (~1s).
+        step int-build sh -c "pnpm --filter @saroh/database exec prisma generate >/dev/null && $TURBO build --filter='@saroh/api^...'"
         if [ "$INT_STEP" = int ] || int_select; then
             say int "$INT_WHY"
             # One mode after the other, never side by side (int_worker).

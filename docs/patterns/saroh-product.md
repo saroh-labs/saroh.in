@@ -59,8 +59,14 @@ pattern files refer back here.
   template: the starter (`starter@2`) for a business, Personal for Just me,
   Portfolio (with the Projects block) for A site for my work. The Turn on
   sheet's Website step says which ("Starts from the Portfolio template"),
-  and `/sites/new` starts its picker there; any registered template can be
-  chosen instead, Writing among them, and an explicit choice always wins.
+  or offers the few suggested for the business with it picked; and
+  `/sites/new` starts its picker there (industry templates U12: cards
+  suggested from the kind and the modules that are on, "All" a click away,
+  `?template=` to start on one, and the chosen template's colourway sent as
+  `styleId`). Any registered template can be chosen instead, and an
+  explicit choice always wins. A card whose sections need a module that is
+  off says so ("Its products show once Sell is on") and is never refused
+  (`lib/sites/template-picker.ts`).
   There is no blank site. The kind only picks the default
   (`sites/site-template.ts`, `KIND_TEMPLATE`), never which templates a
   business may use. No template assumes a business, speaks as "we", or
@@ -306,6 +312,15 @@ organizations/:org/customers`: everyone who has paid (an order through a
   name". Version history says which release a go-live came from, badges
   Approved, Bypassed and "Overridden by ‹owner›", and lists scheduled
   go-lives.
+- **Current** (UX-068, UX-043) — **A review closes.** Withdrawing the
+  request (`WITHDRAWN`) or putting the draft live past it (`BYPASSED`,
+  `OVERRIDDEN`) closes every request and change request before it
+  (`CLOSING_OUTCOMES` in `sites/review-route.ts`); closing never counts as
+  an approval. The person who asked isn't offered Approve or Ask for
+  changes on their own request (`askedByYou`). Ask for changes needs a
+  short reason, kept on the row and shown wherever the verdict is. Share in
+  the editor names its two choices: ask a teammate to review, or make a
+  preview link anyone can open.
 - **Current** — Section content validates against the versioned contract in
   `packages/block-contract/src/section-contract.ts`. A breaking change ships as a
   new version beside the old one, never an in-place edit, so existing
@@ -320,9 +335,29 @@ organizations/:org/customers`: everyone who has paid (an order through a
 ## Communications
 
 - **Current** — Real messages go through the Organization's own connected
-  provider (DEC-011). Saroh-owned email is only for identity and security mail,
-  and for a template test sent to the signed-in user's own verified address.
-  Consent gates every send.
+  provider (DEC-011, reaffirmed 2026-10-07), review invitations included.
+  Saroh sends none of a business's messages to its customers: DEC-086
+  (Saroh sending booking notices) is reversed and its code stays off. With
+  no connected email provider, nothing is emailed, and the customer sees the
+  update in their account. Connecting its own email provider comes with Grow
+  and Pro, not Free (DEC-091), so a Free business's customers get no emails,
+  by design; Settings offers "Connect your email" only where the plan has
+  room for one, and "See plans" otherwise — never a connect the API would
+  refuse. Saroh's own email is for Saroh speaking to its own users (DEC-011,
+  amended 2026-10-07): sign-in and account mail, team invitations, Saroh's
+  billing, the waitlist, alerts to a business's own team (enquiries, and
+  the team alerts — new order, booking, failed payment, someone joining, a
+  go-live — for every business, provider or not, in fixed words with the
+  business's names cleaned; built, #849), a site's customer sign-in codes and the email-changed notice
+  with Saroh's built-in customer accounts (ADR-011), and a template test
+  sent to the signed-in user's own verified address. A business that brings
+  its own login system sends its own codes (not built). With no email
+  provider, owners and admins who can act are asked to connect one — "Your
+  customers get no emails from you", and what they miss — on Home's Needs
+  you and Settings › Providers, with Connect (`comms:manage`), or on a plan
+  that can't connect one, "comes with a paid plan" and See plans
+  (`billing:read`); it goes once one is connected, and the same note says
+  why an invoice or a review invitation can't be emailed (built, #850). Consent gates every send.
 - **Adopted** — A simple WhatsApp deep link with a prefilled message is
   acceptable before any provider integration (§16). None exists yet.
 - **Adopted** (2026-09-26, ADR-011) — A message about a customer's own order,
@@ -367,10 +402,13 @@ organizations/:org/customers`: everyone who has paid (an order through a
   payments, else it says why ("N/A"); flat is "level". The read needs
   `analytics:read` and `payment:read`, and answers before Insights' setup
   is done (`@IgnoreModuleReadiness`).
-- **Adopted** — Insights' website figures reflect real events. The hourly
-  `analytics.rollup` (DEC-075) now builds the rollups, but the renderer still
-  sends no view beacon and nothing emits `enquiry.submitted`, so a real
-  business's views and enquiries read zero (`MARKETING_CLAIMS.md` IN13).
+- **Current** — Insights' website figures reflect real events. The hourly
+  `analytics.rollup` (DEC-075) builds the rollups (the page says "Updated
+  every hour"); a live site sends one cookieless `site.view` per page
+  (`apps/saroh.app/lib/site-view.ts`: path only, the referrer's origin only,
+  nothing when the browser sends Do Not Track or Global Privacy Control,
+  nothing from the account area, never on a test release or preview), and an
+  enquiry writes `enquiry.submitted` in its own transaction (UX-032).
 
 ## Saying what is true
 
@@ -380,9 +418,15 @@ organizations/:org/customers`: everyone who has paid (an order through a
   (claim, what backs it, status); a new claim gets its row first.
 - **Current** — There are no customers, testimonials or case studies. Never
   fabricate them.
-- **Current** — Signup is waitlist-only. Social publishing is not a current
-  priority and must not be exposed as production-ready (§22). AI features are
-  deferred (DEC-015).
+- **Current** — Signup is waitlist-only. Open sign-up is built behind the one
+  launch switch, `NEXT_PUBLIC_LAUNCH_MODE=open` on saroh.in (plan U27): every
+  start button then goes to accounts `/signup?plan=&cycle=`, the plan rides
+  through verification to onboarding, is checked there against the live
+  catalogue, and a paid one goes on to its checkout once the business exists
+  (Free otherwise, and an unknown plan says so). Flipping the switch is
+  launch; until then no CTA points at sign-up. Social publishing is not a
+  current priority and must not be exposed as production-ready (§22). AI
+  features are deferred (DEC-015).
 - **Current** — The name Saroh and its wordmark are fixed; palette, type, shape,
   density and motion are open (confirmed 2026-08-04).
 

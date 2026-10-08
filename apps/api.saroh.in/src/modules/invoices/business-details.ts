@@ -65,6 +65,23 @@ export function missingFrom(
     return missing;
 }
 
+/**
+ * Whether the address is whole but for its state (UX-018): the first line,
+ * city and PIN are in, and an Indian address has no state yet. The refusal
+ * then names the state, not "your registered address", which reads as if
+ * nothing had been saved.
+ */
+export function onlyStateMissing(p: BusinessDetailsColumns | null): boolean {
+    return (
+        !!p &&
+        filled(p.addressLine1) &&
+        filled(p.city) &&
+        filled(p.postalCode) &&
+        !filled(p.gstState) &&
+        missingFrom(p).includes("address")
+    );
+}
+
 export async function missingBusinessDetails(
     db: Pick<Prisma.TransactionClient, "businessProfile">,
     organizationId: string,
@@ -77,9 +94,17 @@ export async function missingBusinessDetails(
 }
 
 /** The refusal's words, for a toast where the app has no step to offer. */
-export function businessDetailsMessage(missing: BusinessDetail[]): string {
+export function businessDetailsMessage(
+    missing: BusinessDetail[],
+    opts: { onlyState?: boolean } = {},
+): string {
     const address = missing.includes("address");
     const gstin = missing.includes("gstin");
+    if (address && opts.onlyState) {
+        return gstin
+            ? "Add your state to your address, and your GSTIN, first. Every invoice prints them."
+            : "Add your state to your address first. It's printed on every invoice, and GST depends on it.";
+    }
     if (address && gstin) {
         return "Add your registered address and GSTIN first. Every invoice prints them.";
     }
@@ -91,10 +116,16 @@ export function businessDetailsMessage(missing: BusinessDetail[]): string {
 
 export function businessDetailsMissing(
     missing: BusinessDetail[],
+    opts: { onlyState?: boolean } = {},
 ): ConflictException {
     return new ConflictException({
-        message: businessDetailsMessage(missing),
-        details: { reason: BUSINESS_DETAILS_MISSING, missing },
+        message: businessDetailsMessage(missing, opts),
+        details: {
+            reason: BUSINESS_DETAILS_MISSING,
+            missing,
+            // The address wants only its state (UX-018): the app can say so.
+            ...(opts.onlyState ? { onlyState: true } : {}),
+        },
     });
 }
 
@@ -107,6 +138,14 @@ export async function assertBusinessDetails(
     db: Pick<Prisma.TransactionClient, "businessProfile">,
     organizationId: string,
 ): Promise<void> {
-    const missing = await missingBusinessDetails(db, organizationId);
-    if (missing.length > 0) throw businessDetailsMissing(missing);
+    const p = await db.businessProfile.findUnique({
+        where: { organizationId },
+        select: BUSINESS_DETAILS_SELECT,
+    });
+    const missing = missingFrom(p);
+    if (missing.length > 0) {
+        throw businessDetailsMissing(missing, {
+            onlyState: onlyStateMissing(p),
+        });
+    }
 }

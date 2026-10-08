@@ -58,6 +58,7 @@ import type {
     OrgRole,
 } from "../../common/types/organization-context";
 import type { AuditService } from "../audit/audit.service";
+import { planMeter } from "../billing/metering.service";
 import { enqueueTeamAlert } from "../notifications/team-alerts";
 import { CAPABILITY_BY_ACTION } from "./capability-catalogue";
 import { hashInviteToken } from "./invite-token";
@@ -494,6 +495,45 @@ describe("accepting", () => {
         expect(db.siteReviewer.upsert).not.toHaveBeenCalled();
         expect(result.siteId).toBeNull();
     });
+
+    // UX-004: a role the business made used to be narrowed to MEMBER here,
+    // so "Front desk" joined with a Member's powers and its own never applied.
+    it("keeps a role the business made, as invited", async () => {
+        db.organizationInvitation.findUnique.mockResolvedValue({
+            ...pending,
+            role: "front-desk",
+            siteIds: [],
+        });
+        db.site.findMany.mockResolvedValue([]);
+        db.organizationRole.findUnique.mockResolvedValue({ key: "front-desk" });
+
+        const result = await service.accept(invitee, "a-token");
+
+        expect(db.organizationRole.findUnique.mock.calls[0][0].where).toEqual({
+            organizationId_key: { organizationId: "org_1", key: "front-desk" },
+        });
+        const upsert = db.membership.upsert.mock.calls[0][0];
+        expect(upsert.create.role).toBe("front-desk");
+        expect(upsert.update.role).toBe("front-desk");
+        expect(result).toMatchObject({ role: "MEMBER", roleKey: "front-desk" });
+    });
+
+    it("joins at the floor when the made role was removed since the invite", async () => {
+        db.organizationInvitation.findUnique.mockResolvedValue({
+            ...pending,
+            role: "front-desk",
+            siteIds: [],
+        });
+        db.site.findMany.mockResolvedValue([]);
+        db.organizationRole.findUnique.mockResolvedValue(null);
+
+        const result = await service.accept(invitee, "a-token");
+
+        expect(db.membership.upsert.mock.calls[0][0].create.role).toBe(
+            "MEMBER",
+        );
+        expect(result.roleKey).toBe("MEMBER");
+    });
 });
 
 describe("the last owner", () => {
@@ -535,6 +575,182 @@ describe("the last owner", () => {
         expect(db.membership.update.mock.calls[0][0].data).toEqual({
             role: "ADMIN",
         });
+    });
+});
+
+describe("the plan's team seats (DEC-105): people who only look use none, and have their own cap", () => {
+    it("inviting a Reviewer checks the view-only cap, never the team's", async () => {
+        const withRoom = jest.spyOn(planMeter, "withRoom");
+        const findFirst = jest.fn().mockResolvedValue(null);
+        await service.invite(ctx(), {
+            email: "reviewer@example.test",
+            role: "REVIEWER",
+            siteIds: ["site_1"],
+        });
+        expect(withRoom.mock.calls[0][1]).toBe("reviewers");
+        const options = withRoom.mock.calls[0][3] as {
+            addingIn: (tx: unknown) => Promise<number>;
+        };
+        const tx = { organizationInvitation: { findFirst } };
+        expect(await options.addingIn(tx)).toBe(1);
+        // Only an open view-only invitation already counts this person.
+        findFirst.mockResolvedValue({ role: "REVIEWER" });
+        expect(await options.addingIn(tx)).toBe(0);
+        findFirst.mockResolvedValue({ role: "MEMBER" });
+        expect(await options.addingIn(tx)).toBe(1);
+        withRoom.mockRestore();
+    });
+
+    it("inviting anyone who can change something adds a seat, unless a seat invite is open", async () => {
+        const withRoom = jest.spyOn(planMeter, "withRoom");
+        const findFirst = jest.fn().mockResolvedValue(null);
+        await service.invite(ctx(), {
+            email: "member@example.test",
+            role: "MEMBER",
+        });
+        expect(withRoom.mock.calls[0][1]).toBe("members");
+        const options = withRoom.mock.calls[0][3] as {
+            addingIn: (tx: unknown) => Promise<number>;
+        };
+        const tx = { organizationInvitation: { findFirst } };
+        expect(await options.addingIn(tx)).toBe(1);
+        // An open invitation as a Reviewer didn't take a seat; this one does.
+        findFirst.mockResolvedValue({ role: "REVIEWER" });
+        expect(await options.addingIn(tx)).toBe(1);
+        findFirst.mockResolvedValue({ role: "ADMIN" });
+        expect(await options.addingIn(tx)).toBe(0);
+        withRoom.mockRestore();
+    });
+
+    it("a view-only role of the business's own uses no seat; one with booking:write does", async () => {
+        const withRoom = jest.spyOn(planMeter, "withRoom");
+        db.organizationRole.findUnique.mockResolvedValue({
+            actions: ["booking:read", "order:read"],
+        });
+        await service.invite(ctx(), {
+            email: "looker@example.test",
+            role: "looker",
+        });
+        expect(withRoom.mock.calls[0][1]).toBe("reviewers");
+        db.organizationRole.findUnique.mockResolvedValue({
+            actions: ["booking:write"],
+        });
+        await service.invite(ctx(), {
+            email: "desk@example.test",
+            role: "front-desk",
+        });
+        expect(withRoom.mock.calls[1][1]).toBe("members");
+        withRoom.mockRestore();
+    });
+
+    it("moving someone off Reviewer is metered, on the role change's transaction", async () => {
+        const roomInTx = jest
+            .spyOn(planMeter, "roomInTx")
+            .mockResolvedValue(null);
+        db.membership.findUnique.mockResolvedValue({
+            role: "REVIEWER",
+            extraActions: [],
+        });
+        await service.updateRole(ctx(), "user_2", { role: "MEMBER" });
+        expect(roomInTx).toHaveBeenCalledWith(prisma, "org_1", "members");
+        roomInTx.mockRestore();
+    });
+
+    it("a refusal stops the role change", async () => {
+        const roomInTx = jest
+            .spyOn(planMeter, "roomInTx")
+            .mockRejectedValue(new ForbiddenException("full"));
+        db.membership.findUnique.mockResolvedValue({
+            role: "REVIEWER",
+            extraActions: [],
+        });
+        await expect(
+            service.updateRole(ctx(), "user_2", { role: "MEMBER" }),
+        ).rejects.toThrow(ForbiddenException);
+        expect(db.membership.update).not.toHaveBeenCalled();
+        roomInTx.mockRestore();
+    });
+
+    it("making someone a Reviewer checks the view-only cap; seat to seat isn't metered", async () => {
+        const roomInTx = jest
+            .spyOn(planMeter, "roomInTx")
+            .mockResolvedValue(null);
+        db.membership.findUnique.mockResolvedValue({
+            role: "MEMBER",
+            extraActions: [],
+        });
+        await service.updateRole(ctx(), "user_2", { role: "ADMIN" });
+        expect(roomInTx).not.toHaveBeenCalled();
+        await service.updateRole(ctx(), "user_2", {
+            role: "REVIEWER",
+            siteIds: ["site_1"],
+        });
+        expect(roomInTx).toHaveBeenCalledTimes(1);
+        expect(roomInTx).toHaveBeenCalledWith(prisma, "org_1", "reviewers");
+        roomInTx.mockRestore();
+    });
+
+    it("someone on the diary keeps their seat at a view-only role", async () => {
+        const roomInTx = jest
+            .spyOn(planMeter, "roomInTx")
+            .mockResolvedValue(null);
+        db.membership.findUnique.mockResolvedValue({
+            role: "MEMBER",
+            extraActions: [],
+            staffMember: { status: "ACTIVE" },
+        });
+        db.organizationRole.findUnique.mockResolvedValue({
+            actions: ["booking:read"],
+        });
+        await service.updateRole(ctx(), "user_2", { role: "looker" });
+        expect(roomInTx).not.toHaveBeenCalled();
+        roomInTx.mockRestore();
+    });
+
+    it("says on the roster and the invitations who uses a seat", async () => {
+        db.membership.findMany.mockResolvedValue([
+            {
+                userId: "u1",
+                role: "OWNER",
+                extraActions: [],
+                user: { name: "Asha", email: "a@example.test" },
+                staffMember: null,
+            },
+            {
+                userId: "u2",
+                role: "looker",
+                extraActions: [],
+                user: { name: "Ravi", email: "r@example.test" },
+                staffMember: null,
+            },
+            {
+                userId: "u3",
+                role: "looker",
+                extraActions: [],
+                user: { name: "Meera", email: "m@example.test" },
+                staffMember: { status: "ACTIVE" },
+            },
+        ]);
+        db.siteReviewer.findMany.mockResolvedValue([]);
+        db.organizationRole.findMany.mockResolvedValue([
+            { key: "looker", actions: ["booking:read"] },
+        ]);
+        const roster = await service.list(ctx());
+        expect(roster.map((m) => [m.userId, m.usesSeat])).toEqual([
+            ["u1", true],
+            ["u2", false],
+            ["u3", true],
+        ]);
+
+        db.organizationInvitation.findMany.mockResolvedValue([
+            { id: "i1", role: "looker", siteIds: [] },
+            { id: "i2", role: "MEMBER", siteIds: [] },
+        ]);
+        const invites = await service.listInvitations(ctx());
+        expect(invites.map((i) => [i.id, i.usesSeat])).toEqual([
+            ["i1", false],
+            ["i2", true],
+        ]);
     });
 });
 
@@ -982,6 +1198,34 @@ describe("extra permissions per person (F17)", () => {
             taken: ["order:refund"],
             takenLabels: [expect.stringMatching(/refund/i)],
         });
+    });
+
+    // UX-030: an extra is a role of one's own, the plan's "Custom roles".
+    it("asks the plan's Custom roles row before giving anything", async () => {
+        person("MEMBER");
+        const included = jest
+            .spyOn(planMeter, "assertIncluded")
+            .mockRejectedValueOnce(new ForbiddenException("MODULE_LOCKED"));
+
+        await expect(
+            service.setExtraActions(admin(), "user_2", {
+                actions: ["payment:manage"],
+            }),
+        ).rejects.toThrow(ForbiddenException);
+        expect(included).toHaveBeenCalledWith("org_1", "roles");
+        expect(db.membership.updateMany).not.toHaveBeenCalled();
+        included.mockRestore();
+    });
+
+    it("never asks the plan to take extras away", async () => {
+        person("MEMBER", ["order:refund"]);
+        const included = jest.spyOn(planMeter, "assertIncluded");
+
+        await service.setExtraActions(admin(), "user_2", { actions: [] });
+
+        expect(included).not.toHaveBeenCalled();
+        expect(db.membership.updateMany).toHaveBeenCalled();
+        included.mockRestore();
     });
 
     it("refuses org:delete as an extra (400), even from an Owner", async () => {

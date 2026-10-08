@@ -1,7 +1,8 @@
 import { ServiceEditorState } from "@/components/services/service-editor/editor-states";
 import { ServiceEditor } from "@/components/services/service-editor/service-editor";
+import { rowLock } from "@/lib/billing/access";
+import { billingAccessOrNull } from "@/lib/saroh-billing/service";
 import { loadEditorContext } from "@/lib/services/editor-data";
-import { showKind } from "@/lib/services/service-editor";
 import { requireSession } from "@/lib/session";
 
 export const metadata = { title: "New service" };
@@ -13,7 +14,11 @@ export const metadata = { title: "New service" };
  */
 export default async function NewServicePage() {
     await requireSession();
-    const read = await loadEditorContext();
+    const [read, access] = await Promise.all([
+        loadEditorContext(),
+        // Deposits are taken online: locked on a plan without it.
+        billingAccessOrNull(),
+    ]);
     if (!read.ok) {
         return (
             <ServiceEditorState
@@ -23,14 +28,21 @@ export default async function NewServicePage() {
         );
     }
     const {
-        services,
         staff,
         hasPage,
         hasStorefront,
+        payment,
         canEdit,
         timezone,
         currency,
     } = read.context;
+    // A role that can't add one is told so, not shown an empty form it
+    // can't fill in (UX-083).
+    if (!canEdit) {
+        return (
+            <ServiceEditorState state="cant-add" retryHref="/services/new" />
+        );
+    }
     return (
         <ServiceEditor
             service={null}
@@ -40,9 +52,10 @@ export default async function NewServicePage() {
             currency={currency}
             timezone={timezone}
             canEdit={canEdit}
-            kindUp={showKind(services, null)}
             hasPage={hasPage}
             hasStorefront={hasStorefront}
+            paymentsLock={rowLock(access, "payments")}
+            payment={payment}
         />
     );
 }

@@ -1,0 +1,73 @@
+---
+# Every label below was checked against the real screens on 6 Oct 2026
+# (R7), in the code and in the captured shots. Sources, from the repo root:
+#   NAV   apps/app.saroh.in/components/shared/nav-items.tsx (Sell › Products)
+#   LIST  apps/app.saroh.in/components/stores/catalogue/catalogue-header.tsx
+#         ("New product"; with several locations, a menu "Add it to")
+#   EMPTY apps/app.saroh.in/lib/products/list-query.ts ("Add product")
+#   NEW   apps/app.saroh.in/app/(shell)/commerce/products/new/page.tsx
+#         ("A product is made at one location, and priced in that
+#         location's currency.")
+#   SHELL apps/app.saroh.in/components/commerce/product-editor-v2/editor-shell.tsx
+#         ("Create draft" / "Create and publish"; you stay on the page)
+#   BASIC .../product-editor-v2/basics-section.tsx (Name, Address on the
+#         shop "Made from the name. You can change it after it is created.",
+#         Price, MRP, Category)
+#   PHOTO .../product-editor-v2/photos-section.tsx ("The first is the
+#         cover, on the shop and in lists."; what each photo shows)
+#   VISIB .../product-editor-v2/visibility-section.tsx (Draft, Published)
+#   VARI  .../product-editor-v2/variants-section.tsx ("Add variants", SKU,
+#         Price; "Blank price uses the product's …", "Save variants")
+#   STOCK .../product-editor-v2/stock-section.tsx, lib/products/tracking.ts
+#         ("Track stock", On hand, Warn at, "Save stock"; untracked "sells
+#         unless you mark it sold out")
+# Where the design said otherwise, the app won: content/help/README.md.
+title: Add your first product
+slug: add-your-first-product
+area: Products
+group: Sell products
+order: 10
+intro: "A product is anything you sell: a loaf, a mug, a shampoo. You add it once, and your site, your orders and your invoices all read it from the same place. This takes about two minutes."
+description: "Add a product in Saroh: its name and price, its photos, draft or published, then its sizes and stock. Five steps, with a picture of each screen."
+readMinutes: 2
+updated: "2026-10-06"
+publishOn: "2026-10-17"
+steps:
+    # NAV, LIST, EMPTY, NEW.
+    - title: Open Products
+      body: "In Saroh, open Sell › Products in the sidebar and press New product at the top right. If you sell at more than one location, it asks which one to add it to: a product is made at one location, and priced in that location's currency. With no products yet, the button in the middle of the page says Add product."
+      shot: help-add-product-1
+      caption: "Products at Rye & Co. (demo bakery), with New product open on its two locations."
+      marker: New product
+    # BASIC.
+    - title: Name and price
+      body: "Give it a name and a price: both are needed before you can create it. Its address on the shop is made from the name, so “Walnut and raisin loaf” becomes /products/walnut-and-raisin-loaf. You can change the address after it's created. Add a category if you'd like it grouped on your site, and an MRP if it sells below the printed price."
+      shot: help-add-product-2
+      caption: "Basics for a new loaf at Rye & Co. (demo bakery): the name, its address on the shop, the price."
+      marker: Address on the shop
+    # PHOTO. The design's "square photos look best" and "when someone shares
+    # the link" are not things the screen says: cut.
+    - title: Photos
+      body: "Further down, under Photos and videos, add your photos. The first one is the cover: it's what customers see on the shop and in lists. On each photo, type what it shows, for people who can't see it."
+      shot: help-add-product-3
+      caption: "The Sourdough loaf's photos at Rye & Co. (demo bakery): the first is the cover."
+      marker: Cover
+    # VISIB, SHELL. The design had "Publish" and "Save it as a draft" as the
+    # last step; the create screen asks first and has one button.
+    - title: Draft or published, then create
+      body: "Under Visibility, choose who sees it once it's created: Draft keeps it to your team, Published puts it on the shop straight away. Then press the button at the top right. It says Create draft, or Create and publish, and you stay on the same page."
+      shot: help-add-product-4
+      caption: "A new loaf at Rye & Co. (demo bakery), Visibility on Draft and Create draft at the top right."
+      tip: "Not ready yet? Leave it as a draft. When you are, set Visibility to Published and press Publish."
+      marker: Create draft
+    # VARI, STOCK. Variants and Stock open only once the product exists, so
+    # this comes after creating it, not before as the design had it.
+    - title: Sizes and stock
+      body: "Once it's created, Variants and Stock open on the right. If it comes in more than one size, press Add variants and add each one with its own SKU and price. Leave a price blank and it uses the product's price. Press Save variants. To count it, turn on Track stock, enter how many you have on hand and the level to warn you at, and press Save stock."
+      shot: help-add-product-5
+      caption: "The Sourdough loaf at Rye & Co. (demo bakery): two sizes with their own SKU and price, and Track stock on."
+      tip: "Something that never runs out, like a gift box? Leave Track stock off. It keeps no count, and sells until you mark it sold out."
+      marker: Track stock
+# The design's three Next links.
+next: [add-sizes-and-options, count-and-move-stock, take-your-first-order]
+---

@@ -1,27 +1,35 @@
-import { NotFoundException } from "@nestjs/common";
+import { Logger, NotFoundException } from "@nestjs/common";
 import { prisma } from "@saroh/database";
 import { DateTime } from "luxon";
 
-import { paymentsOn } from "../invoices/payments-on";
-import { OPENS_CHECKOUT } from "../payments/public-key";
+import { planMeter } from "../billing/metering.service";
 import { APPOINTMENTS_OPEN, appointmentsOpen } from "./appointments-open";
-import type { Slot } from "./availability";
+import type { OpeningHours, Slot } from "./availability";
 import {
     countOverlapping,
     enumerateSlots,
     guarded,
+    insideOpening,
     outsideClosures,
     staffSlots,
 } from "./availability";
+import { HAS_BOOKABLE_HOURS } from "./bookable-hours";
+import { onlinePaymentBlocker } from "./booking-payment";
 import type { BookingRulesValue } from "./booking-rules";
-import { loadBookingRules, withinBookingWindow } from "./booking-rules";
+import {
+    allowsOnline,
+    loadBookingRules,
+    withinBookingWindow,
+} from "./booking-rules";
 import type { Staffing } from "./booking-slots";
 import {
     busyOverlapping,
     loadStaffing,
     toAvailabilityService,
 } from "./booking-slots";
-import type { LocationType } from "./dto";
+import { businessClosedOn } from "./closed-days";
+import type { BookingLocationType, LocationType } from "./dto";
+import { openingFor } from "./opening-hours";
 import { loadBookableService } from "./reservation";
 import { depositCents } from "./service-fields";
 import {
@@ -35,6 +43,8 @@ import {
  * services, days and starts, the services list, and a booking as its booker
  * sees it. Only fields a visitor is meant to see leave here.
  */
+
+const pageLogger = new Logger("PublicBookingPage");
 
 /** A service as a website visitor sees it (#255). No internal fields. */
 export interface PublicService {
@@ -56,12 +66,23 @@ export interface PublicStart {
     staffId: string | null;
     staffName: string | null;
     placesLeft: number | null;
+    /**
+     * A service offered either way (DEC-087): set when this start can be
+     * had only one way — online outside opening hours.
+     */
+    only?: BookingLocationType;
 }
 
 export interface PublicDay {
     /** `YYYY-MM-DD` in the business's zone. */
     date: string;
     open: boolean;
+    /**
+     * The business itself is closed that day (UX-054): a closure covers
+     * it, or its opening hours have none that day. A day it is open but
+     * this service has no times is not closed ("No times" on the page).
+     */
+    closed: boolean;
     starts: PublicStart[];
 }
 
@@ -78,8 +99,18 @@ export interface PublicBookingPage {
     businessName: string;
     /** False when the business has Appointments switched off. */
     open: boolean;
+    /**
+     * True when the business has had all the online bookings its plan
+     * takes this month (DEC-095): the page says so before the form, and
+     * names no plan. Its own team still books by hand.
+     */
+    paused: boolean;
     timezone: string;
-    /** Whether pay now is on offer: Payments on and a provider connected. */
+    /**
+     * Whether pay now is on offer: the business lets people pay online
+     * (its booking rules, DEC-088), Payments is on and a provider is
+     * connected. Whether the desk is on offer is `rules.bookingPayment`.
+     */
     payOnline: boolean;
     rules: BookingRulesValue;
     services: {
@@ -94,8 +125,9 @@ export interface PublicBookingPage {
         /**
          * What is paid online at booking when the booker pays the deposit
          * (E8): the service's share of its price, worked out here, or null
-         * when it takes none. A service with a deposit is never paid at the
-         * desk; one whose deposit is the full price is paid now.
+         * when it takes none. A service with a deposit is paid at the desk
+         * only when online can't take it and the business allows the desk
+         * (DEC-089); one whose deposit is the full price is paid now.
          */
         depositCents: number | null;
         /**
@@ -156,62 +188,75 @@ export async function publicDays(
     // A day the business is closed is closed on the page, not Full (E3):
     // closures are public, unlike a person's time off.
     const closed = await loadClosures(prisma, service.organizationId, from, to);
-    let hours: Slot[];
-    let starts: PublicStart[];
-    if (staffing.perPerson && staffing.zone) {
-        const people = await loadPeople(
-            prisma,
-            service.organizationId,
-            staffing.people.map((p) => p.id),
-            from,
-            to,
-        );
-        hours = outsideClosures(
-            staffSlots(
+    const people =
+        staffing.perPerson && staffing.zone
+            ? await loadPeople(
+                  prisma,
+                  service.organizationId,
+                  staffing.people.map((p) => p.id),
+                  from,
+                  to,
+              )
+            : [];
+    // The buffers' width beyond the range too (DEC-052).
+    const reach = guarded({ startAt: from, endAt: to }, availService);
+    const busy =
+        staffing.perPerson && staffing.zone
+            ? []
+            : await busyOverlapping(service.id, reach.startAt, reach.endAt);
+
+    /** The open-day hours and the starts, kept to `opening` when given. */
+    const offer = (
+        opening: OpeningHours | null,
+    ): { hours: Slot[]; starts: PublicStart[] } => {
+        if (staffing.perPerson && staffing.zone) {
+            const hours = outsideClosures(
+                staffSlots(
+                    availService,
+                    rules,
+                    people.map((p) => ({ ...p, busy: [], timeOff: [] })),
+                    staffing.zone,
+                    from,
+                    to,
+                    opening,
+                ),
+                closed,
+            );
+            const starts = staffSlots(
                 availService,
                 rules,
-                people.map((p) => ({ ...p, busy: [], timeOff: [] })),
+                people,
                 staffing.zone,
                 from,
                 to,
+                opening,
+            )
+                .filter((slot) => bookable(slot.startAt))
+                .map((slot) => {
+                    const staffId = slot.staffIds[0] ?? null;
+                    return {
+                        startAt: slot.startAt.toISOString(),
+                        endAt: slot.endAt.toISOString(),
+                        staffId,
+                        staffName: staffId
+                            ? (names.get(staffId) ?? null)
+                            : null,
+                        placesLeft: null,
+                    };
+                });
+            return { hours, starts };
+        }
+        const hours = insideOpening(
+            outsideClosures(
+                enumerateSlots(availService, rules, from, to),
+                closed,
             ),
-            closed,
-        );
-        starts = staffSlots(
-            availService,
-            rules,
-            people,
-            staffing.zone,
-            from,
-            to,
-        )
-            .filter((slot) => bookable(slot.startAt))
-            .map((slot) => {
-                const staffId = slot.staffIds[0] ?? null;
-                return {
-                    startAt: slot.startAt.toISOString(),
-                    endAt: slot.endAt.toISOString(),
-                    staffId,
-                    staffName: staffId ? (names.get(staffId) ?? null) : null,
-                    placesLeft: null,
-                };
-            });
-    } else {
-        hours = outsideClosures(
-            enumerateSlots(availService, rules, from, to),
-            closed,
-        );
-        // The buffers' width beyond the range too (DEC-052).
-        const reach = guarded({ startAt: from, endAt: to }, availService);
-        const busy = await busyOverlapping(
-            service.id,
-            reach.startAt,
-            reach.endAt,
+            opening,
         );
         const [instructor] = staffing.people as (
             Staffing["people"][number] | undefined
         )[];
-        starts = hours
+        const starts = hours
             .filter((slot) => bookable(slot.startAt))
             .map((slot) => {
                 const left =
@@ -229,7 +274,16 @@ export async function publicDays(
             // A one-to-one lists only what is free; a class, every session.
             .filter((start) => kind === "class" || start.free)
             .map(({ free: _free, ...start }) => start);
-    }
+        return { hours, starts };
+    };
+
+    // In person keeps to opening hours (DEC-087). A service offered either
+    // way lists both, and a start only one way can have says which.
+    const opening = await openingFor(service, "IN_PERSON");
+    const { hours, starts } =
+        service.locationType === "EITHER" && opening
+            ? eitherWay(offer(opening), offer(null))
+            : offer(opening);
 
     const aheadEnd =
         bookingRules.bookAheadDays === null
@@ -249,10 +303,48 @@ export async function publicDays(
             open:
                 hours.some((slot) => inDay(slot.startAt)) &&
                 (aheadEnd === null || dayFrom <= aheadEnd),
+            closed: businessClosedOn(
+                {
+                    startAt: new Date(dayFrom),
+                    endAt: new Date(dayTo),
+                },
+                opening,
+                closed,
+            ),
             starts: starts.filter((start) => inDay(start.startAt)),
         });
     }
     return { timezone: zone, kind, capacity: service.capacity, days };
+}
+
+/**
+ * A service offered either way (DEC-087): its starts in person (kept to
+ * opening hours) and online, as one list. A start both ways can have is
+ * listed once, as in person; one only one way can have says which, so the
+ * page asks Where no further.
+ */
+export function eitherWay(
+    inPerson: { hours: Slot[]; starts: PublicStart[] },
+    online: { hours: Slot[]; starts: PublicStart[] },
+): { hours: Slot[]; starts: PublicStart[] } {
+    const byStart = new Map<string, PublicStart>();
+    for (const start of online.starts) {
+        byStart.set(start.startAt, { ...start, only: "ONLINE" });
+    }
+    for (const start of inPerson.starts) {
+        byStart.set(
+            start.startAt,
+            byStart.has(start.startAt)
+                ? start
+                : { ...start, only: "IN_PERSON" },
+        );
+    }
+    return {
+        hours: [...online.hours, ...inPerson.hours],
+        starts: [...byStart.values()].sort((a, b) =>
+            a.startAt.localeCompare(b.startAt),
+        ),
+    };
 }
 
 /**
@@ -273,9 +365,11 @@ export function offeredOnSite(organizationId: string, siteId: string) {
 
 /**
  * What a site's booking page opens with (U19): the business, the services
- * it may offer (active, of this site or of no site, Appointments on), who
- * takes each — names only — the booking rules and whether it can take
- * payment online. A site that is not published is a 404, like its pages.
+ * it may offer (active, of this site or of no site, Appointments on, with
+ * times to offer — UX-024), who takes each — names only — the booking
+ * rules (how people pay among them, DEC-088), whether it can take payment
+ * online, and whether online booking is paused at the plan's monthly cap
+ * (DEC-095). A site that is not published is a 404, like its pages.
  */
 export async function publicBookingPage(
     siteId: string,
@@ -294,10 +388,15 @@ export async function publicBookingPage(
     if (!site) throw new NotFoundException("Site not found");
     const organizationId = site.organizationId;
     const open = await appointmentsOpen(organizationId);
-    const [services, rules, zone, online] = await Promise.all([
+    const [services, rules, zone, online, paused] = await Promise.all([
         open
             ? prisma.service.findMany({
-                  where: offeredOnSite(organizationId, siteId),
+                  where: {
+                      AND: [
+                          offeredOnSite(organizationId, siteId),
+                          HAS_BOOKABLE_HOURS,
+                      ],
+                  },
                   orderBy: [{ createdAt: "asc" }, { id: "asc" }],
                   select: {
                       id: true,
@@ -320,12 +419,14 @@ export async function publicBookingPage(
         loadBookingRules(prisma, organizationId),
         businessTimezone(prisma, organizationId),
         takesOnlinePayment(organizationId),
+        open ? onlineBookingsPaused(organizationId) : Promise.resolve(false),
     ]);
     return {
         businessName: site.organization.name,
         open,
+        paused,
         timezone: zone,
-        payOnline: online,
+        payOnline: online && allowsOnline(rules),
         rules,
         services: services.map((svc) => ({
             id: svc.id,
@@ -336,7 +437,13 @@ export async function publicBookingPage(
             capacity: svc.capacity,
             priceCents: svc.priceCents,
             currency: svc.currency,
-            depositCents: depositCents(svc.priceCents, svc.depositMode),
+            // A deposit the business can't take online (its plan, Payments
+            // off, no provider) isn't served: the service books as one
+            // without, at the desk, as `bookOnline` books it — the page
+            // never shows a deposit it can't take (`deposit-plan.ts`).
+            depositCents: online
+                ? depositCents(svc.priceCents, svc.depositMode)
+                : null,
             visits: svc.visits,
             online: svc.locationType === "ONLINE",
             // The page asks Where for EITHER (E7); anything unknown reads
@@ -353,6 +460,25 @@ export async function publicBookingPage(
 }
 
 /**
+ * Whether the plan's monthly cap on online bookings is reached (DEC-095),
+ * read the way the booking's own write decides (`planMeter.hasRoom`). A
+ * plan that can't be read is not paused: the write lets a booking through
+ * then too, so the page never turns customers away on a guess.
+ */
+export async function onlineBookingsPaused(
+    organizationId: string,
+): Promise<boolean> {
+    try {
+        return !(await planMeter.hasRoom(organizationId, "bookings"));
+    } catch (err) {
+        pageLogger.warn(
+            `plan_meter_unresolved org=${organizationId} module=bookings read=booking-page error=${err instanceof Error ? err.name : "unknown"}`,
+        );
+        return false;
+    }
+}
+
+/**
  * The public view of a merchant's chosen services, for the website's
  * services list (#255). Guardless like availability: the ids come from a
  * published section, and only fields a visitor is meant to see leave here.
@@ -361,6 +487,7 @@ export async function publicBookingPage(
  * is right on the next page view. Filtered to what may be offered:
  * - not deleted, and ACTIVE (an archived service is not on offer);
  * - shown on the booking page (E1): a hidden service is booked by staff;
+ * - with times to offer (UX-024): its own hours, or someone to take it;
  * - its Organization has not DISABLED Appointments. A missing module row
  *   counts as on: enforcement is still dark (#117) and the backfill may not
  *   have written one, and hiding a merchant's services over an absent row
@@ -380,6 +507,8 @@ export async function publicServices(ids: string[]): Promise<PublicService[]> {
             // The same rule public booking closes on (#327), so a list
             // never offers a service its booking block would refuse.
             organization: APPOINTMENTS_OPEN,
+            // Nothing to book yet (UX-024): no hours, nobody to take it.
+            ...HAS_BOOKABLE_HOURS,
         },
         select: {
             id: true,
@@ -400,19 +529,13 @@ export async function publicServices(ids: string[]): Promise<PublicService[]> {
 /**
  * Payments on, and a provider connected to take the money — one whose
  * checkout window can open: a Razorpay connection still missing its public
- * key id is not (DEC-054).
+ * key id is not (DEC-054). Whether the business lets people pay online is
+ * its booking rules' (DEC-088), read beside this.
  */
 export async function takesOnlinePayment(
     organizationId: string,
 ): Promise<boolean> {
-    const [on, provider] = await Promise.all([
-        paymentsOn(prisma, organizationId),
-        prisma.merchantPaymentProvider.findFirst({
-            where: { organizationId, status: "CONNECTED", ...OPENS_CHECKOUT },
-            select: { id: true },
-        }),
-    ]);
-    return on && provider !== null;
+    return (await onlinePaymentBlocker(organizationId)) === null;
 }
 
 /**

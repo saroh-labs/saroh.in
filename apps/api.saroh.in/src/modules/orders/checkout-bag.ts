@@ -1,13 +1,24 @@
 import { prisma } from "@saroh/database";
 
+import { fromMinor } from "../../common/money";
+import type {
+    AppliedDiscount,
+    CodeCheck,
+} from "../discounts/discounts.service";
+import type { OrderView } from "../discounts/redeem";
+import { customerRefusalMessage } from "../discounts/redeem";
 import { businessTracksStock } from "../stock/tracking";
+import type { PickupPlace } from "../stores/pickup-place";
+import { pickupPlaceOf, waysWithPlace } from "../stores/pickup-place";
 import type {
     BagLine,
     CheckoutQuote,
     DeliveryFees,
+    QuoteDiscount,
     QuotedLine,
 } from "./checkout-quote";
-import { buildQuote, quoteLines } from "./checkout-quote";
+import { buildQuote, discountLines, quoteLines } from "./checkout-quote";
+import { payableWays } from "./checkout-readiness";
 import type { StorefrontFulfilmentType } from "./fulfilment";
 import { NEW_STOREFRONT_TYPES, storefrontTypesOf } from "./fulfilment";
 
@@ -28,8 +39,11 @@ export interface ShopScope {
 /** What the checkout reads from the storefront's settings. */
 export interface ShopSettings {
     currency: string;
+    /** Pick-up only when `pickup` is a place to collect from (UX-025). */
     ways: StorefrontFulfilmentType[];
     fees: DeliveryFees;
+    /** Where a pick-up is collected: the address and hours; else null. */
+    pickup: PickupPlace | null;
 }
 
 export async function shopSettings(scope: ShopScope): Promise<ShopSettings> {
@@ -42,13 +56,21 @@ export async function shopSettings(scope: ShopScope): Promise<ShopSettings> {
             shippingEnabled: true,
             localDeliveryFee: true,
             shippingFee: true,
+            kind: true,
+            address: true,
+            openingHours: true,
         },
     });
+    const pickup = pickupPlaceOf(row);
     return {
         currency: row?.currency ?? "INR",
-        ways: row
-            ? storefrontTypesOf(row.fulfilmentTypes, row)
-            : NEW_STOREFRONT_TYPES,
+        ways: waysWithPlace(
+            row
+                ? storefrontTypesOf(row.fulfilmentTypes, row)
+                : NEW_STOREFRONT_TYPES,
+            pickup,
+        ),
+        pickup,
         fees: {
             localDeliveryFee: row?.localDeliveryFee ?? null,
             shippingFee: row?.shippingFee ?? null,
@@ -56,15 +78,34 @@ export async function shopSettings(scope: ShopScope): Promise<ShopSettings> {
     };
 }
 
-/** The bag priced from the storefront's listings and shelves. */
+/**
+ * A code typed in the bag, and the one discount evaluation to judge it by
+ * (`DiscountsService.checkForOrder`, bound to the site's business): the
+ * counter's rules, never a copy of them (DEC-104).
+ */
+export interface BagCode {
+    code: string;
+    check: (order: OrderView) => Promise<CodeCheck>;
+}
+
+/**
+ * The bag priced from the storefront's listings and shelves. With how the
+ * storefront can be paid (`pays`), only the ways an order can be paid for
+ * are offered: paying on handover alone can't pay for a shipment. With a
+ * code, it is judged against the priced lines and what it takes off comes
+ * off the total; `applied` is what an order placed now would record.
+ */
 export async function priceBag(
     scope: ShopScope,
     bag: BagLine[],
     asked: StorefrontFulfilmentType | null,
+    pays?: { online: boolean; onHandover: boolean },
+    code?: BagCode | null,
 ): Promise<{
     quote: CheckoutQuote;
     lines: QuotedLine[];
     settings: ShopSettings;
+    applied: AppliedDiscount | null;
 }> {
     const ids = [...new Set(bag.map((l) => l.listingId))];
     const [rows, settings, businessTracks] = await Promise.all([
@@ -87,6 +128,7 @@ export async function priceBag(
                               name: true,
                               status: true,
                               price: true,
+                              categoryId: true,
                               stockTracked: true,
                               fulfilmentTypes: true,
                               images: {
@@ -155,12 +197,56 @@ export async function priceBag(
         shelves,
         businessTracks,
     );
+    const discount = code
+        ? judgeCode(
+              await code.check({
+                  storeId: scope.storefront.id,
+                  currency: settings.currency,
+                  lines: discountLines(lines),
+              }),
+          )
+        : null;
     const quote = buildQuote({
         currency: settings.currency,
         lines,
-        storefrontWays: settings.ways,
+        storefrontWays: pays ? payableWays(pays, settings.ways) : settings.ways,
         fees: settings.fees,
         asked,
+        discount,
     });
-    return { quote, lines, settings };
+    return {
+        quote,
+        lines,
+        settings,
+        applied: discount?.applied ?? null,
+    };
+}
+
+/** The evaluation's answer, as the bag shows it and an order records it. */
+function judgeCode(check: CodeCheck): {
+    view: QuoteDiscount;
+    cents: number;
+    applied: AppliedDiscount | null;
+} {
+    if (!check.ok) {
+        return {
+            view: {
+                code: check.code,
+                applied: false,
+                reason: check.reason,
+                message: customerRefusalMessage(check.code, check.reason),
+            },
+            cents: 0,
+            applied: null,
+        };
+    }
+    return {
+        view: {
+            code: check.applied.code,
+            applied: true,
+            amount: fromMinor(check.applied.amountCents),
+        },
+        cents: check.applied.amountCents,
+        applied: check.applied,
+    };
 }

@@ -7,6 +7,7 @@ import {
 import { prisma } from "@saroh/database";
 
 import type { OrganizationContext } from "../../common/types/organization-context";
+import { planMeter } from "../billing/metering.service";
 import { authorize } from "../organizations/organization-policy";
 import { sanitizeRichHtml } from "../sites/sanitize";
 import { assertSiteInOrg, reviewerScope } from "../sites/site-access";
@@ -132,7 +133,9 @@ export class PostsService {
             return { id: post.id };
         } catch {
             throw new ConflictException({
-                message: "That slug is already taken",
+                // In words (UX-066): the merchant set an address, not a slug.
+                message:
+                    "Another post already uses that address. Change the post's path in Details.",
                 field: "slug",
             });
         }
@@ -184,7 +187,9 @@ export class PostsService {
             return { id: postId };
         } catch {
             throw new ConflictException({
-                message: "That slug is already taken",
+                // In words (UX-066): the merchant set an address, not a slug.
+                message:
+                    "Another post already uses that address. Change the post's path in Details.",
                 field: "slug",
             });
         }
@@ -237,6 +242,7 @@ export class PostsService {
                 image: true,
                 featured: true,
                 publishedAt: true,
+                currentPublicationId: true,
                 category: { select: { name: true, slug: true } },
                 author: { select: { name: true } },
             },
@@ -268,6 +274,10 @@ export class PostsService {
         };
 
         return prisma.$transaction(async (tx) => {
+            // The plan's blog posts cap counts posts that are live (U13):
+            // putting one live is checked, republishing a live one isn't.
+            if (post.currentPublicationId === null)
+                await planMeter.roomInTx(tx, ctx.organizationId, "blog");
             const publication = await tx.publication.create({
                 data: {
                     siteId,
@@ -360,7 +370,9 @@ export class PostsService {
         });
         if (existing) {
             throw new ConflictException({
-                message: "That slug is already taken",
+                // In words (UX-066): the merchant set an address, not a slug.
+                message:
+                    "Another post already uses that address. Change the post's path in Details.",
                 field: "slug",
             });
         }

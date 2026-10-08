@@ -130,6 +130,8 @@ export class SubscriptionsService {
             where: { organizationId: ctx.organizationId },
             data: {
                 cancelAtPeriodEnd: true,
+                // The owner's own choice (DEC-100): its term's end says so.
+                freeChosenAt: new Date(),
                 ...(immediate ? { status: "CANCELLED" } : {}),
             },
             include: { plan: true },
@@ -156,6 +158,7 @@ export class SubscriptionsService {
                 providerSubscriptionId: null,
                 providerCustomerId: null,
                 cancelAtPeriodEnd: false,
+                freeChosenAt: null,
             },
             include: { plan: true },
         });
@@ -202,6 +205,7 @@ export class SubscriptionsService {
                 providerCustomerId: result.providerCustomerId ?? null,
                 currentPeriodEnd: result.currentPeriodEnd ?? null,
                 cancelAtPeriodEnd: false,
+                freeChosenAt: null,
             },
             include: { plan: true },
         });

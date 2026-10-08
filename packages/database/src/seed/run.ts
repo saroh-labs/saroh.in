@@ -21,7 +21,6 @@ import {
     OWNER_EMAIL,
     OWNER_PASSWORD,
     PIPELINE_STAGES,
-    PLAN,
     POSTS,
     PRODUCTS,
     REVIEWER_EMAIL,
@@ -33,6 +32,7 @@ import {
     SITES,
     SUBMISSIONS,
 } from "./data";
+import { seedEmailPromptBusinesses } from "./email-prompt";
 import { seedFounder } from "./founder";
 import type { Db } from "./helpers";
 import {
@@ -50,7 +50,10 @@ import {
     syncStorefrontFulfilmentTypes,
     writeSite,
 } from "./helpers";
+import { seedPlanEndingBusiness } from "./plan-ending";
 import { seedPreviousAddress } from "./previous-address";
+import { seedPlanId } from "./pricing";
+import { seedSarohEmailBusinesses } from "./saroh-email";
 import { seedStorefrontTeammate } from "./storefront-teammate";
 
 /**
@@ -313,7 +316,16 @@ export async function seed(): Promise<void> {
     // An old address of Northwind's that still forwards to its site (L3).
     await seedPreviousAddress(prisma, org.id, siteIds[0], now);
     await seedStorefrontTeammate(prisma, org.id, storeId);
-    await seedFounder(prisma);
+    const founderId = await seedFounder(prisma);
+    // Two of Asha's that Saroh sends booking emails for, flags on for them
+    // alone (DEC-086; `providers-saroh-email.spec.ts`).
+    await seedSarohEmailBusinesses(prisma, founderId, now);
+    // Three with no email of their own, Communications rolled out for them
+    // alone, one on an enforced entry plan (#850; `email-setup-prompt.spec.ts`).
+    await seedEmailPromptBusinesses(prisma, founderId, now);
+    // One of Asha's on a plan that ends in ten days (#805;
+    // `plan-ending.spec.ts`).
+    await seedPlanEndingBusiness(prisma, founderId, now);
     // Content after the website: a post belongs to the site it is published on
     // (ADR-004), so there has to be a site first.
     await seedContent(prisma, org.id, siteIds[0] ?? "", user.id);
@@ -957,36 +969,22 @@ async function seedContent(
 // --- Billing ------------------------------------------------------------
 
 /**
- * Put the org on a paid plan.
+ * Put the org on a paid plan: the catalogue's top plan (`pricing.ts`).
  *
- * This is not scenery. `EntitlementService` caps an unsubscribed org at one
+ * This is not scenery. `EntitlementService` caps a business on no plan at one
  * site and refuses a custom-domain claim outright, so without a subscription
  * the website fixture below describes an organization the product would never
  * have allowed to exist.
  */
 async function seedBilling(prisma: Db, orgId: string, now: Date) {
-    const plan = await prisma.plan.upsert({
-        where: { id: id("plan") },
-        update: { name: PLAN.name, entitlements: PLAN.entitlements },
-        create: {
-            id: id("plan"),
-            key: PLAN.key,
-            version: PLAN.version,
-            name: PLAN.name,
-            priceCents: PLAN.priceCents,
-            currency: CURRENCY,
-            interval: PLAN.interval,
-            entitlements: PLAN.entitlements,
-        },
-    });
-
+    const planId = await seedPlanId(prisma, now);
     await prisma.subscription.upsert({
         where: { organizationId: orgId },
-        update: { planId: plan.id, status: "ACTIVE" },
+        update: { planId, status: "ACTIVE" },
         create: {
             id: id("subscription"),
             organizationId: orgId,
-            planId: plan.id,
+            planId,
             status: "ACTIVE",
             currentPeriodEnd: at(now, 19, 9),
         },

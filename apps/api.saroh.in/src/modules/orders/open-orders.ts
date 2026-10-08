@@ -23,7 +23,9 @@ export const OPEN_ORDER_STATUSES = [
 
 /**
  * Not an abandoned checkout: a `placedOnline` order still UNPAID that no
- * money ever reached. A checkout whose payment came in but was refused —
+ * money ever reached, and that wasn't placed to be paid on handover ("Pay
+ * when you collect", "Pay on delivery" — a real order from the start, as a
+ * staff pay-later order is). A checkout whose payment came in but was refused —
  * the last unit sold meanwhile, or it had closed (DEC-032) — stays UNPAID
  * and closed, yet the customer's money is owed back: it is a real order,
  * so staff find it in Orders and can see or retry its refund.
@@ -32,6 +34,7 @@ export function realOrderWhere(): Prisma.OrderWhereInput {
     return {
         NOT: {
             placedOnline: true,
+            payOnHandover: false,
             paymentStatus: "UNPAID",
             paymentIntents: { none: { status: "SUCCEEDED" } },
         },
@@ -40,7 +43,7 @@ export function realOrderWhere(): Prisma.OrderWhereInput {
 
 /** {@link realOrderWhere} in SQL, over the list's `o` alias. */
 export function realOrderSql(): Prisma.Sql {
-    return Prisma.sql`NOT (o."placedOnline" AND o."paymentStatus" = 'UNPAID' AND NOT EXISTS (SELECT 1 FROM "PaymentIntent" pi WHERE pi."orderId" = o.id AND pi.status = 'SUCCEEDED'))`;
+    return Prisma.sql`NOT (o."placedOnline" AND NOT o."payOnHandover" AND o."paymentStatus" = 'UNPAID' AND NOT EXISTS (SELECT 1 FROM "PaymentIntent" pi WHERE pi."orderId" = o.id AND pi.status = 'SUCCEEDED'))`;
 }
 
 /**

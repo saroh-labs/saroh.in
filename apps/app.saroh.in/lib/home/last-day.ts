@@ -1,4 +1,5 @@
 import { formatMoney } from "@/lib/format/money";
+import { kindOf } from "@/lib/organizations/kind";
 
 import type { HomeLastDay, HomeSinceItem } from "./service";
 
@@ -41,17 +42,20 @@ export function greeting(
 
 /**
  * "Friday 18 September · Rye & Co.", the business's date; for a new
- * business, what the first job is. A staff member's Home narrowed to their
- * storefronts adds them (F11): "… · Rye & Co. · Hill Road only".
+ * business, what the first job is, in its kind's words (DEC-070, UX-074):
+ * a site for someone's work is got online, not ready to take money. A staff
+ * member's Home narrowed to their storefronts adds them (F11): "… · Rye &
+ * Co. · Hill Road only".
  */
 export function dateLine(
     lastDay: HomeLastDay | null,
     businessName: string,
     only: string | null = null,
+    kind: unknown = "BUSINESS",
 ): string {
     const where = only ? `${businessName} · ${only}` : businessName;
     if (!lastDay) return where;
-    if (lastDay.fresh) return `Let's get ${businessName} ready to take money.`;
+    if (lastDay.fresh) return firstRunLine(businessName, kind);
     // The date is already the business's; read it as a calendar day.
     const day = new Intl.DateTimeFormat("en-GB", {
         timeZone: "UTC",
@@ -64,6 +68,18 @@ export function dateLine(
         // "Friday, 18 September"; the design has no comma.
         .replace(",", "");
     return `${day} · ${where}`;
+}
+
+/** What a new business, person or site is getting ready for. */
+function firstRunLine(name: string, kind: unknown): string {
+    switch (kindOf(kind)) {
+        case "WORK":
+            return `Let's get ${name} online.`;
+        case "SOLO":
+            return `Let's get ${name} ready for clients.`;
+        default:
+            return `Let's get ${name} ready to take money.`;
+    }
 }
 
 const plural = (n: number, one: string, many: string) =>

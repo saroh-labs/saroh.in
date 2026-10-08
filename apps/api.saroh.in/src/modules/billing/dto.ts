@@ -2,12 +2,17 @@ import { Transform } from "class-transformer";
 import {
     IsBoolean,
     IsIn,
+    IsInt,
     IsOptional,
     IsString,
+    Matches,
+    Max,
     MaxLength,
+    Min,
     MinLength,
 } from "class-validator";
 
+import { MAX_ADDON_QUANTITY } from "./offers";
 import { SUPPORTED_BILLING_PROVIDERS } from "./providers/billing-provider.port";
 
 const trim = ({ value }: { value: unknown }) =>
@@ -48,4 +53,60 @@ export class CancelSubscriptionDto {
     @IsOptional()
     @IsBoolean()
     immediate?: boolean;
+}
+
+/**
+ * Change the business's catalogue plan (pricing catalogue U15): the plan's id
+ * in the catalogue (`grow`, …) and the billing cycle. Nothing else — every
+ * amount is worked out on the server (KTD-18), so a body carrying a price is
+ * refused by the validation pipe.
+ */
+export class ChangePlanDto {
+    @Transform(trim)
+    @IsString()
+    @MinLength(1)
+    @MaxLength(64)
+    plan!: string;
+
+    @IsIn(["month", "year"], { message: "cycle must be month or year" })
+    cycle!: "month" | "year";
+
+    /**
+     * Who Saroh's invoice is billed to (U17): the state the business is
+     * registered in (a GST state code or name), which sets the place of
+     * supply. Optional: unset, the business profile's.
+     */
+    @IsOptional()
+    @Transform(trim)
+    @IsString()
+    @MaxLength(64)
+    billingState?: string;
+
+    /** The business's GSTIN for Saroh's invoice, when it has one (U17). */
+    @IsOptional()
+    @Transform(upper)
+    @IsString()
+    @Matches(/^[0-9A-Z]{15}$/, { message: "A GSTIN is 15 characters." })
+    gstin?: string;
+
+    /**
+     * A coupon code (U16), upper-cased. Checked on the server against the
+     * coupon, the plan and the business; the discount is the server's.
+     */
+    @IsOptional()
+    @Transform(upper)
+    @IsString()
+    @MaxLength(32, { message: "That isn't a coupon code." })
+    coupon?: string;
+}
+
+/** `GET …/billing/change-plan?plan=&cycle=`: the same two, to quote. */
+export class ChangePlanQuery extends ChangePlanDto {}
+
+/** `PUT …/billing/addons/:addonId`: how many to hold; zero removes it (U16). */
+export class SetAddonDto {
+    @IsInt()
+    @Min(0)
+    @Max(MAX_ADDON_QUANTITY)
+    quantity!: number;
 }

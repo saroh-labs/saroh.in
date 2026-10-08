@@ -13,6 +13,7 @@ import {
     WEEK,
 } from "@/lib/services/availability-rules";
 import { clock } from "@/lib/services/diary";
+import { openingNote, whollyOutside } from "@/lib/services/in-person-hours";
 import type { WeeklyRange } from "@/lib/staff/types";
 
 import { ClockSelect } from "./clock-select";
@@ -21,17 +22,22 @@ import { ClockSelect } from "./clock-select";
  * One person's week (the design's "Weekly hours"): each day's ranges as
  * chips, "+ Hours" to add one (an end before the start, or an overlap, is
  * refused on the spot), Monday copied to the weekdays, and — under any day —
- * the bookings the new hours would leave outside. They stay booked.
+ * the bookings the new hours would leave outside. They stay booked. With
+ * opening hours set, hours outside them are drawn as not bookable in
+ * person, and the day says why (DEC-087).
  */
 export function WeeklyHours({
     staffId,
     hours,
+    opening = null,
     kept,
     canEdit,
     onChange,
 }: {
     staffId: string;
     hours: WeeklyRange[];
+    /** When the business is open, or null: nothing is cut. */
+    opening?: WeeklyRange[] | null;
     /** Bookings this week, or null when they could not be read. */
     kept: KeptBooking[] | null;
     canEdit: boolean;
@@ -91,6 +97,7 @@ export function WeeklyHours({
                     const out = kept
                         ? outsideHours(kept, staffId, hours, day)
                         : [];
+                    const closedNote = openingNote(ranges, opening, day);
                     return (
                         <li
                             key={day}
@@ -109,7 +116,12 @@ export function WeeklyHours({
                                     <span
                                         key={`${r.startMinute}`}
                                         className={cn(
-                                            "inline-flex h-[30px] items-center gap-1 rounded-full bg-success-subtle text-[12.5px] font-semibold tabular-nums text-success-subtle-foreground",
+                                            "inline-flex h-[30px] items-center gap-1 rounded-full text-[12.5px] font-semibold tabular-nums",
+                                            // Wholly outside opening hours:
+                                            // not bookable in person.
+                                            whollyOutside(r, opening, day)
+                                                ? "border border-dashed border-border-strong bg-muted text-muted-foreground"
+                                                : "bg-success-subtle text-success-subtle-foreground",
                                             canEdit
                                                 ? "pl-[11px] pr-1"
                                                 : "px-[11px]",
@@ -221,6 +233,11 @@ export function WeeklyHours({
                                     className="basis-full text-[12px] text-destructive-subtle-foreground"
                                 >
                                     {bad}
+                                </p>
+                            ) : null}
+                            {closedNote ? (
+                                <p className="basis-full text-[12px] text-muted-foreground">
+                                    {closedNote}
                                 </p>
                             ) : null}
                             {out.length ? (

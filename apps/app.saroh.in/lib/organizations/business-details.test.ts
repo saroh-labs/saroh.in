@@ -8,6 +8,7 @@ import {
     detailsWhy,
     inIndia,
     missingDetailsOf,
+    missingOnFile,
 } from "./business-details";
 
 const filled: BusinessDetailsValues = {
@@ -201,5 +202,59 @@ describe("inIndia", () => {
         expect(inIndia("")).toBe(true);
         expect(inIndia("in")).toBe(true);
         expect(inIndia("GB")).toBe(false);
+    });
+});
+
+describe("missingOnFile: the API's rule, read off the page's read (#838)", () => {
+    const ready = (values: Partial<BusinessDetailsValues>, india = true) =>
+        ({
+            state: "ready",
+            values: { ...filled, ...values },
+            inIndia: india,
+            kind: undefined,
+        }) as const;
+
+    it("asks nothing when the address is whole", () => {
+        expect(missingOnFile(ready({}))).toEqual([]);
+    });
+
+    it("asks for the address when a line, the city, the PIN or an Indian state is empty", () => {
+        for (const gap of [
+            { addressLine1: " " },
+            { city: "" },
+            { postalCode: "" },
+            { gstState: "" },
+        ]) {
+            expect(missingOnFile(ready(gap))).toEqual(["address"]);
+        }
+    });
+
+    it("needs no state outside India, unless registered", () => {
+        expect(missingOnFile(ready({ gstState: "" }, false))).toEqual([]);
+        expect(
+            missingOnFile(
+                ready(
+                    {
+                        gstState: "",
+                        gstRegistered: true,
+                        taxId: "29AAGCR4375J1ZU",
+                    },
+                    false,
+                ),
+            ),
+        ).toEqual(["address"]);
+    });
+
+    it("asks a registered business for its GSTIN, after the address", () => {
+        expect(missingOnFile(ready({ city: "", gstRegistered: true }))).toEqual(
+            ["address", "gstin"],
+        );
+    });
+
+    it("leaves it to the API when the read failed or never happened", () => {
+        expect(missingOnFile(null)).toEqual([]);
+        expect(
+            missingOnFile({ state: "failed", message: "No", forbidden: true }),
+        ).toEqual([]);
     });
 });

@@ -28,9 +28,10 @@ vi.mock("@/lib/organizations/settings-actions", () => ({
 }));
 
 const showUndo = vi.fn();
+const showError = vi.fn();
 vi.mock("@saroh/ui/toast", () => ({
     showUndo: (...args: unknown[]) => showUndo(...args) as unknown,
-    showError: vi.fn(),
+    showError: (...args: unknown[]) => showError(...args) as unknown,
     showInfo: vi.fn(),
     showSuccess: vi.fn(),
     dismissToast: vi.fn(),
@@ -249,5 +250,133 @@ describe("the addresses named apart (DEC-069, L12)", () => {
         );
         expect(labels).toContain("Registered address");
         expect(labels).not.toContain("Address");
+    });
+});
+
+describe("the business type a business that said Registered still owes (prelaunch)", () => {
+    const typeField = () => host.querySelector("#business-type");
+    const said = (type: string | null, registered: boolean | null) =>
+        settings({
+            profile: {
+                legalName: null,
+                type,
+                country: "IN",
+                taxId: null,
+                contactEmail: "hello@northwind.in",
+                website: null,
+                timezone: "Asia/Kolkata",
+                phone: null,
+                registered,
+            },
+        });
+
+    it("says why on the row, and at the field the checklist lands on", async () => {
+        draw(said(null, true));
+        expect(card()?.textContent).toContain(
+            "Not chosen yet — you said it's registered",
+        );
+        await click(button("Edit identity"));
+        expect(typeField()?.textContent).toContain(
+            "You said at setup that the business is registered. Choose which kind before you take money.",
+        );
+    });
+
+    it("goes back to the plain words once a type is chosen", async () => {
+        draw(said("llp", true));
+        expect(card()?.textContent).toContain("LLP");
+        await click(button("Edit identity"));
+        expect(typeField()?.textContent).not.toContain("You said at setup");
+        expect(typeField()?.textContent).toContain(
+            "An individual trades in their own name",
+        );
+    });
+
+    it("never says it to a business that didn't say Registered", async () => {
+        draw(said(null, null));
+        expect(card()?.textContent).not.toContain("you said it's registered");
+        await click(button("Edit identity"));
+        expect(typeField()?.textContent).not.toContain("You said at setup");
+    });
+});
+
+describe("How to pay us (R32)", () => {
+    it("is a tab of its own, after Tax, with its own preview in place of the invoice's", () => {
+        params = new URLSearchParams("section=pay");
+        draw(
+            settings({
+                payInstructions: {
+                    upiId: "northwind.supply@okexample",
+                    bankAccountName: null,
+                    bankAccountNumber: null,
+                    bankIfsc: null,
+                    bankName: null,
+                    note: null,
+                },
+            }),
+        );
+        const tabs = Array.from(host.querySelectorAll('[role="tab"]')).map(
+            (t) => t.textContent.trim(),
+        );
+        expect(tabs.indexOf("How to pay us")).toBe(
+            tabs.indexOf("Tax and invoices") + 1,
+        );
+        const panel = host.querySelector<HTMLElement>("#business-pay-panel");
+        expect(panel?.closest(".hidden")).toBeNull();
+        expect(panel?.textContent).toContain("northwind.supply@okexample");
+        expect(
+            host
+                .querySelector('aside[aria-label="How it prints"]')
+                ?.classList.contains("hidden"),
+        ).toBe(true);
+        // Another tab: the card is kept, out of sight.
+        expect(host.querySelector("#business-panel")).toBeNull();
+    });
+});
+
+describe("an Indian address isn't saved without its state (UX-018)", () => {
+    const noState = () =>
+        settings({
+            tax: {
+                registered: false,
+                state: null,
+                stateName: null,
+                invoicePrefix: null,
+                deliveryRate: "18",
+                deliverySac: null,
+            },
+            registeredAddress: {
+                line1: "12 Hill Road",
+                line2: null,
+                city: "Bengaluru",
+                postalCode: "560001",
+                state: null,
+                stateName: null,
+            },
+        });
+
+    const type = async (el: HTMLInputElement, value: string) => {
+        await act(async () => {
+            Object.getOwnPropertyDescriptor(
+                HTMLInputElement.prototype,
+                "value",
+            )?.set?.call(el, value);
+            el.dispatchEvent(new Event("input", { bubbles: true }));
+            await Promise.resolve();
+        });
+        await settle();
+    };
+
+    it("asks for the state on the address card's save, and sends nothing", async () => {
+        params = new URLSearchParams("section=address");
+        draw(noState());
+        await click(button("Edit registered address"));
+        const city = host.querySelector<HTMLInputElement>('input[name="city"]');
+        if (!city) throw new Error("No city field");
+        await type(city, "Bengaluru North");
+        await click(button("Save"));
+        expect(save).not.toHaveBeenCalled();
+        expect(host.textContent).toContain(
+            "Choose your state. It's printed on your invoices, and GST depends on it.",
+        );
     });
 });

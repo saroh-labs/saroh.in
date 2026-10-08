@@ -6,6 +6,7 @@ import type {
 } from "@/lib/invoices/invoice-number";
 
 import type { OrganizationKind } from "./kind";
+import type { PayInstructionsSettings, PayValues } from "./pay-instructions";
 
 /**
  * Organization settings access (name + business profile).
@@ -32,6 +33,13 @@ export interface OrganizationProfile {
      * ("+919845012345"); null when none is set. Absent from an older API.
      */
     phone?: string | null;
+    /**
+     * Setup's answer to "Is it registered?": true for Registered, which saves
+     * no type, so the take-money checklist asks for the real one before the
+     * business goes live; false for Not registered; null when it wasn't
+     * asked. Absent from an older API, and read as not asked.
+     */
+    registered?: boolean | null;
 }
 
 /** GST (ADR-008). The GSTIN is the profile's `taxId`. */
@@ -83,6 +91,12 @@ export interface SetupFacts {
      * alone.
      */
     invoices?: number;
+    /**
+     * The plan takes new online payments (#835). False: the checklist says
+     * online payment comes with a paid plan instead of "Connect payments".
+     * Absent from an older API: asked as before.
+     */
+    onlinePaymentsInPlan?: boolean;
 }
 
 export interface OrganizationSettings {
@@ -113,6 +127,12 @@ export interface OrganizationSettings {
      * is set, absent from an API older than it.
      */
     logo?: BusinessLogo | null;
+    /**
+     * "How to pay us" (R32): the UPI ID, bank details and note customers
+     * see on their own unpaid invoices, orders and desk bookings. Absent
+     * from an API older than it: none set.
+     */
+    payInstructions?: PayInstructionsSettings;
 }
 
 export interface BusinessLogo {
@@ -143,6 +163,8 @@ export interface OrganizationSettingsInput {
     registeredAddress?: Partial<
         Record<"line1" | "line2" | "city" | "postalCode", string>
     >;
+    /** How to pay us (R32): only the fields changed; "" clears one. */
+    payInstructions?: Partial<PayValues>;
 }
 
 /** A refusal names the field it is about when the API says which. */

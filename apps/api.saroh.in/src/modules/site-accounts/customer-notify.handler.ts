@@ -2,14 +2,18 @@ import { Injectable, Logger } from "@nestjs/common";
 import type { Job, Prisma } from "@saroh/database";
 import { prisma, runInOrgContext } from "@saroh/database";
 
+import { lockMeter } from "../billing/metering.service";
 import { CommunicationsService } from "../communications/communications.service";
+import { SAROH_EMAILS_KEY } from "../communications/saroh-delivery";
+import { emailRoute } from "../communications/saroh-may-send";
 import { isNoticeTemplate } from "../communications/transactional";
 import { resolveContact } from "../customer-workspace/resolve-contact";
+import { holdsOnPayment } from "../orders/online-checkout";
 import type { CustomerNotifyPayload } from "./customer-notify-queue";
 import { CUSTOMER_NOTIFY_TYPE } from "./customer-notify-queue";
-import { hasLiveAccount, noticeChannels } from "./notice-reach";
+import { hasLiveAccount, threadLive } from "./notice-reach";
 import type { NoticeVars } from "./notify-templates";
-import { noticeSentence, renderNotice } from "./notify-templates";
+import { noticeSentence } from "./notify-templates";
 import { appendMessage } from "./thread-store";
 import { loadWaitlistOffer } from "./waitlist-notice";
 
@@ -59,7 +63,11 @@ const NOTHING: NoticeOutcome = {
  *     email provider is connected, is also emailed through D17's one
  *     transactional path (`CommunicationsService.queueTransactional`): a
  *     `Message` and `Delivery` sent by `message.send`, which retries a
- *     failed send and leaves the thread message standing.
+ *     failed send and leaves the thread message standing. A booking notice
+ *     at a business with no provider goes through Saroh instead when
+ *     the one rule says so (`emailRoute`, DEC-086). Who emails is decided
+ *     here, once and first, and handed to the call, so the path's "connect
+ *     an email provider" 409 can never roll this transaction back.
  *
  * Nothing goes by SMS or WhatsApp: there is no verified phone this round.
  */
@@ -74,6 +82,15 @@ export class CustomerNotifyService {
         payload: CustomerNotifyPayload,
         now: Date,
     ): Promise<NoticeOutcome> {
+        // Who would email it, decided once (DEC-086). Saroh's route is
+        // counted against its email allowance, so only then is the
+        // plan-meter lock taken — here, the one place it is, before any
+        // row this transaction writes (`backend-jobs.md`, advisory lock
+        // registry; `booking.notify` writes nothing before calling this).
+        const route = await emailRoute(tx, organizationId, payload.kind, now);
+        if (route.route === "SAROH") {
+            await lockMeter(tx, organizationId, SAROH_EMAILS_KEY);
+        }
         const claimed = await tx.customerNotice.createMany({
             data: [
                 {
@@ -97,13 +114,13 @@ export class CustomerNotifyService {
         );
         if (!contact || contact.removed) return NOTHING;
 
-        const [channels, account] = await Promise.all([
-            noticeChannels(tx, organizationId),
+        const [thread, account] = await Promise.all([
+            threadLive(organizationId),
             hasLiveAccount(tx, organizationId, contact.id),
         ]);
 
         let threadMessageId: string | null = null;
-        if (channels.thread) {
+        if (thread) {
             const message = await appendMessage(tx, {
                 organizationId,
                 contactId: contact.id,
@@ -116,13 +133,18 @@ export class CustomerNotifyService {
         }
 
         let messageId: string | null = null;
-        if (account && channels.email) {
+        if (account && route.route !== null) {
             const queued = await this.comms.queueTransactional(
                 tx,
                 organizationId,
                 {
                     template: payload.kind,
-                    rendered: renderNotice(subject.vars),
+                    notice: subject.vars,
+                    route,
+                    // Saroh's cap per booking counts by it (DEC-086).
+                    ...(subject.bookingId
+                        ? { bookingId: subject.bookingId }
+                        : {}),
                     recipient: { kind: "SITE_ACCOUNT", contactId: contact.id },
                     createdByUserId: null,
                 },
@@ -197,6 +219,8 @@ export async function loadSubject(
         case "BOOKING_MOVED":
         case "BOOKING_CANCELLED":
             return loadBooking(tx, organizationId, payload.kind, payload);
+        case "ORDER_PLACED":
+            return loadPlacedOrder(tx, organizationId, payload);
         case "ORDER_READY":
         case "ORDER_HANDED_OVER":
             return loadOrderStep(tx, organizationId, payload.kind, payload);
@@ -350,6 +374,51 @@ async function loadOrderStep(
                 courier: order.courierName,
                 trackingNumber: order.trackingNumber,
                 trackingUrl: order.trackingUrl,
+            },
+        },
+    };
+}
+
+/**
+ * A website order just placed (UX-042), while it still stands: not
+ * cancelled, and an online checkout only once it is paid (G13).
+ */
+async function loadPlacedOrder(
+    tx: Tx,
+    organizationId: string,
+    payload: CustomerNotifyPayload,
+): Promise<NoticeSubject | null> {
+    if (!payload.orderId) return null;
+    const order = await tx.order.findFirst({
+        where: { id: payload.orderId, organizationId },
+        select: {
+            id: true,
+            orderId: true,
+            status: true,
+            paymentStatus: true,
+            placedOnline: true,
+            payOnHandover: true,
+            fulfilment: true,
+            customerId: true,
+            customerAccountId: true,
+            customer: { select: { firstName: true } },
+        },
+    });
+    if (!order?.placedOnline || order.status === "CANCELLED") return null;
+    if (holdsOnPayment(order) && order.paymentStatus !== "PAID") return null;
+    const contactId = await orderContactId(tx, organizationId, order);
+    if (!contactId) return null;
+    return {
+        contactId,
+        orderId: order.id,
+        vars: {
+            kind: "ORDER_PLACED",
+            placed: {
+                business: await businessName(tx, organizationId),
+                firstName: firstWord(order.customer?.firstName ?? null),
+                number: order.orderId,
+                fulfilment: order.fulfilment,
+                payOnHandover: order.payOnHandover,
             },
         },
     };

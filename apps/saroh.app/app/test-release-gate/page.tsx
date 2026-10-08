@@ -3,7 +3,10 @@ import { headers } from "next/headers";
 import { notFound } from "next/navigation";
 
 import { TestReleaseGate } from "@/components/test-release-gate";
+import { servedHost } from "@/lib/origin";
+import { liveHostOf } from "@/lib/site-host-mode";
 import { TEST_GATE_HEADER } from "@/lib/test-host";
+import { rootDomain } from "@/lib/test-release";
 
 /**
  * A test release's host with no link in hand (DEC-071, T5).
@@ -20,6 +23,16 @@ export const metadata: Metadata = {
 };
 
 export default async function TestReleaseGatePage() {
-    if (!(await headers()).get(TEST_GATE_HEADER)) notFound();
-    return <TestReleaseGate reason="missing" />;
+    const requestHeaders = await headers();
+    if (!requestHeaders.get(TEST_GATE_HEADER)) notFound();
+    // The live site beside this test host, so a visitor without the link
+    // has somewhere to go (UX-081).
+    const host = servedHost(requestHeaders);
+    const live = host ? liveHostOf(host, rootDomain()) : null;
+    return (
+        <TestReleaseGate
+            reason="missing"
+            liveUrl={live ? `https://${live}/` : null}
+        />
+    );
 }

@@ -11,6 +11,7 @@ import type {
     DeliveryAddress,
     QuoteLine,
     ShopCheckoutApi,
+    ShopPayment,
     ShopProblem,
     ShopWay,
     StartCheckout,
@@ -18,6 +19,7 @@ import type {
 import { checkoutKey, SHOP_OFFLINE } from "./api";
 import type { BagItem } from "./bag-store";
 import { MAX_ITEM_QUANTITY, setQuantity } from "./bag-store";
+import { cleanCode, CodeField, codeSettled } from "./code-field";
 import { sheetButton, SheetFrame } from "./sheet-frame";
 
 /**
@@ -30,8 +32,13 @@ import { sheetButton, SheetFrame } from "./sheet-frame";
  * Every amount is the server's quote, fetched again whenever the bag or the
  * way changes: a price that moved since the item was added shows before
  * paying, and a line that can't be sold now says so and holds the button.
- * There is no "Pay with" choice: the provider's window shows the ways the
- * business takes (DEC-059).
+ *
+ * How to pay comes with the quote: online, or at the handover — "Pay when
+ * you collect", "Pay on delivery" — where the shop takes it (always on a
+ * plan without online payments; beside online where the shop turns it on).
+ * With both, the customer picks; with one, the sheet says which. Online
+ * never names a method: the provider's window shows the ways the business
+ * takes (DEC-059).
  */
 
 type Load =
@@ -84,6 +91,80 @@ export function lineNote(line: QuoteLine): string | null {
     return null;
 }
 
+/** A bag line's key: its listing and variant. */
+const lineKey = (l: Pick<QuoteLine, "listingId" | "variantId">) =>
+    `${l.listingId}:${l.variantId ?? ""}`;
+
+/**
+ * The lines asking for more than is left, and how many each can have
+ * (UX-058): the bag is set to that, and says so, rather than holding the
+ * button with no reason.
+ */
+export function overStock(
+    lines: readonly QuoteLine[],
+): { line: QuoteLine; left: number }[] {
+    return lines.flatMap((line) =>
+        line.state === "short" &&
+        typeof line.available === "number" &&
+        line.available > 0 &&
+        line.quantity > line.available
+            ? [{ line, left: line.available }]
+            : [],
+    );
+}
+
+/** "Only 1 left — we've set your bag to 1." */
+export function stockNotice(
+    capped: readonly { line: QuoteLine; left: number }[],
+): string | null {
+    if (capped.length === 0) return null;
+    if (capped.length === 1) {
+        const { left } = capped[0];
+        return `Only ${left} left — we've set your bag to ${left}.`;
+    }
+    const each = capped
+        .map(({ line, left }) => {
+            const name = line.variantTitle
+                ? `${line.name} (${line.variantTitle})`
+                : line.name;
+            return `${name} to ${left}`;
+        })
+        .join(", ");
+    return `Fewer are left than you asked for — we've set ${each}.`;
+}
+
+/**
+ * Why the button is held, in a sentence beside it (UX-058): never a grey
+ * button with no reason. Null when it can be placed, or while the quote
+ * is still on its way.
+ */
+export function holdReason(input: {
+    quote: CheckoutQuote | null;
+    way: ShopWay | null;
+    addressOk: boolean;
+    payable: boolean;
+}): string | null {
+    const { quote, way } = input;
+    if (!quote) return null;
+    if (quote.lines.some((l) => l.state === "gone")) {
+        return "Take out what's no longer sold to continue.";
+    }
+    if (quote.lines.some((l) => l.state === "sold-out")) {
+        return "Take out what's sold out to continue.";
+    }
+    if (quote.lines.some((l) => l.state === "short")) {
+        return "Fewer are left than you asked for. Lower the amount to continue.";
+    }
+    if (quote.ways.length === 0) return null; // said above the button already
+    if (!way || quote.fulfilment !== way) {
+        return "Choose how your order reaches you.";
+    }
+    if (!input.addressOk) return "Add the address to deliver to.";
+    if (!input.payable)
+        return "This can't be paid for this way. Choose another.";
+    return null;
+}
+
 const field = cn(
     "border-site-border text-site-fg mt-1 block h-11 w-full rounded-[calc(var(--site-radius)+8px)] border px-3 text-[15px]",
     inputFill,
@@ -104,7 +185,14 @@ const stepper = cn(
  */
 export interface BagDraft {
     way: ShopWay | null;
+    /** How they'll pay; null until picked (the first offered then). */
+    pay: ShopPayment | null;
     address: DeliveryAddress;
+    /**
+     * The discount code applied in the bag (DEC-104), as typed and tidied;
+     * null for none. The quote judges it every time it prices the bag.
+     */
+    code: string | null;
     /** One key per request: the same bag placed again is the same order. */
     checkout: { print: string; key: string } | null;
 }
@@ -117,7 +205,9 @@ export interface BagPriced {
 
 export const EMPTY_DRAFT: BagDraft = {
     way: null,
+    pay: null,
     address: EMPTY_ADDRESS,
+    code: null,
     checkout: null,
 };
 
@@ -153,10 +243,40 @@ export function BagSheet({
 }) {
     const { way, address } = draft;
     const setWay = (next: ShopWay) => onDraft((d) => ({ ...d, way: next }));
+    const setPay = (next: ShopPayment) => onDraft((d) => ({ ...d, pay: next }));
     const setAddress = (change: (a: DeliveryAddress) => DeliveryAddress) =>
         onDraft((d) => ({ ...d, address: change(d.address) }));
+    const setCode = (next: string | null) =>
+        onDraft((d) => ({ ...d, code: next }));
+    // "Have a code?" opens the field; one applied already keeps it open.
+    const [codeOpen, setCodeOpen] = useState(draft.code !== null);
+    const [codeInput, setCodeInput] = useState(draft.code ?? "");
+    const [codeError, setCodeError] = useState<string | null>(null);
     const [load, setLoad] = useState<Load>({ kind: "loading" });
     const [round, setRound] = useState(0);
+    // What each line was capped at once the quote said fewer are left
+    // (UX-058): "+" stops there, and the bag says why.
+    const [caps, setCaps] = useState<Readonly<Record<string, number>>>({});
+    const [notice, setNotice] = useState<string | null>(null);
+
+    // Asking for more than is left: set the bag to what is, and say so.
+    function capOverStock(lines: readonly QuoteLine[]) {
+        const over = overStock(lines);
+        if (over.length === 0) return;
+        setCaps((c) => {
+            const next = { ...c };
+            for (const { line, left } of over) next[lineKey(line)] = left;
+            return next;
+        });
+        setNotice(stockNotice(over));
+        for (const { line, left } of over) {
+            setQuantity(
+                site,
+                { listingId: line.listingId, variantId: line.variantId },
+                left,
+            );
+        }
+    }
 
     // The quote, again whenever the bag or the way changes.
     const bagPrint = JSON.stringify(items);
@@ -168,12 +288,14 @@ export function BagSheet({
                 .quote({
                     lines: [...items],
                     ...(way ? { fulfilment: way } : {}),
+                    ...(draft.code ? { discountCode: draft.code } : {}),
                 })
                 .catch(() => null)
                 .then((result) => {
                     if (!live) return;
                     if (result?.ok) {
                         setLoad({ kind: "ready", quote: result.data });
+                        capOverStock(result.data.lines);
                         if (!way && result.data.fulfilment) {
                             setWay(result.data.fulfilment);
                         }
@@ -192,7 +314,7 @@ export function BagSheet({
         // A start refused because the bag changed (`problem`) prices it
         // again too.
         // eslint-disable-next-line react-hooks/exhaustive-deps -- the bag's contents, by value
-    }, [bagPrint, way, api, round, problem]);
+    }, [bagPrint, way, api, round, problem, draft.code]);
 
     if (items.length === 0) {
         return (
@@ -208,15 +330,30 @@ export function BagSheet({
     }
 
     const quote = load.kind === "ready" ? load.quote : null;
+    const discount = quote?.discount ?? null;
+    // The code applied and the quote that judged it agree; until then the
+    // total on the button is the old one, and the button waits.
+    const settled = draft.code === null || codeSettled(quote, draft.code);
+    const applied =
+        settled && discount?.applied === true ? discount.code : null;
     const chosen = quote?.ways.find((w) => w.type === way) ?? null;
     const addressOk = !needsAddress(way) || addressReady(address);
+    const pays = paysOf(quote);
+    const pay = payChosen(pays, draft.pay);
+    const payNote = payWords(pay);
     const canPlace =
         !!quote &&
         quote.ready &&
         quote.fulfilment === way &&
         addressOk &&
+        pay !== null &&
+        settled &&
         !busy;
     const total = quote ? formatAmount(quote.total, quote.currency) : "";
+    const held = busy
+        ? null
+        : holdReason({ quote, way, addressOk, payable: pay !== null });
+    const pickup = way === "PICKUP" ? (quote?.pickup ?? null) : null;
 
     function place() {
         if (!canPlace || !way) return;
@@ -224,6 +361,9 @@ export function BagSheet({
             lines: [...items],
             fulfilment: way,
             ...(needsAddress(way) ? { address: trimmed(address) } : {}),
+            ...(pay.type === "ON_HANDOVER" ? { payment: pay.type } : {}),
+            // Only a code the quote applied: a refused one is never sent.
+            ...(applied ? { discountCode: applied } : {}),
         };
         const print = JSON.stringify(body);
         const checkout =
@@ -244,6 +384,33 @@ export function BagSheet({
 
     const setField = (name: keyof DeliveryAddress) => (value: string) =>
         setAddress((a) => ({ ...a, [name]: value }));
+
+    function applyCode() {
+        const next = cleanCode(codeInput);
+        if (!next) {
+            setCodeError(
+                codeInput.trim()
+                    ? "That isn't a code this shop has. Check it and try again."
+                    : "Type your code first.",
+            );
+            return;
+        }
+        setCodeError(null);
+        setCodeInput(next);
+        setCode(next);
+    }
+
+    function removeCode() {
+        setCode(null);
+        setCodeInput("");
+        setCodeError(null);
+    }
+
+    // What the field says under it: the shop's refusal for the applied
+    // code, or a code that couldn't be one.
+    const codeNote =
+        codeError ??
+        (settled && discount && !discount.applied ? discount.message : null);
 
     return (
         <SheetFrame title="Your bag" onClose={onClose}>
@@ -328,7 +495,11 @@ export function BagSheet({
                                         }
                                         disabled={
                                             line.state !== "ok" ||
-                                            line.quantity >= MAX_ITEM_QUANTITY
+                                            line.quantity >=
+                                                MAX_ITEM_QUANTITY ||
+                                            line.quantity >=
+                                                (caps[lineKey(line)] ??
+                                                    Infinity)
                                         }
                                         aria-label={`One more ${name}`}
                                         className={stepper}
@@ -354,12 +525,48 @@ export function BagSheet({
                                 : "—"}
                         </span>
                     </div>
+                    {applied && discount?.applied ? (
+                        <div className="border-site-border flex items-center gap-2.5 border-t py-2.5 text-sm">
+                            <span className="min-w-0 flex-1">
+                                Code {discount.code}
+                            </span>
+                            <button
+                                type="button"
+                                onClick={removeCode}
+                                aria-label={`Remove code ${discount.code}`}
+                                className={cn(
+                                    "text-site-muted cursor-pointer text-[12.5px] underline",
+                                    focusRing,
+                                )}
+                            >
+                                Remove
+                            </button>
+                            <span className="font-semibold tabular-nums">
+                                −{formatAmount(discount.amount, quote.currency)}
+                            </span>
+                        </div>
+                    ) : null}
                     <div className="border-site-border flex gap-2.5 border-t py-2.5 text-sm">
                         <span className="flex-1 font-semibold">Total</span>
                         <span className="font-semibold tabular-nums">
                             {total}
                         </span>
                     </div>
+
+                    <CodeField
+                        site={site}
+                        open={codeOpen}
+                        onOpen={() => setCodeOpen(true)}
+                        value={codeInput}
+                        onChange={(v) => {
+                            setCodeInput(v);
+                            setCodeError(null);
+                        }}
+                        onApply={applyCode}
+                        checking={!settled}
+                        applied={applied}
+                        note={codeNote}
+                    />
 
                     {quote.ways.length > 0 ? (
                         <>
@@ -409,6 +616,51 @@ export function BagSheet({
                         </p>
                     )}
 
+                    {pays.length > 1 ? (
+                        <>
+                            <p
+                                id={`${site}-pay`}
+                                className="text-site-muted mb-1.5 mt-3.5 text-xs font-bold uppercase tracking-[0.08em]"
+                            >
+                                Pay
+                            </p>
+                            <div
+                                role="radiogroup"
+                                aria-labelledby={`${site}-pay`}
+                                className="grid gap-1.5"
+                            >
+                                {pays.map((p) => (
+                                    <button
+                                        key={p.type}
+                                        type="button"
+                                        role="radio"
+                                        aria-checked={pay?.type === p.type}
+                                        onClick={() => setPay(p.type)}
+                                        className={optionClasses(
+                                            pay?.type === p.type,
+                                        )}
+                                    >
+                                        <span className="text-[14.5px] font-semibold">
+                                            {p.label}
+                                        </span>
+                                    </button>
+                                ))}
+                            </div>
+                        </>
+                    ) : null}
+
+                    {pickup ? (
+                        <p className="text-site-body mt-2.5 text-[13.5px] leading-normal">
+                            <span className="font-semibold">Collect from</span>{" "}
+                            {pickup.address}
+                            {pickup.hours ? (
+                                <span className="text-site-muted block text-[12.5px]">
+                                    {pickup.hours}
+                                </span>
+                            ) : null}
+                        </p>
+                    ) : null}
+
                     {needsAddress(way) ? (
                         <fieldset className="mt-3.5">
                             <legend className="text-site-muted mb-1 text-xs font-bold uppercase tracking-[0.08em]">
@@ -429,14 +681,32 @@ export function BagSheet({
                 </p>
             ) : null}
 
-            <p className="text-site-muted mt-2.5 text-[12.5px] leading-normal">
-                You pay online in a secure window. Your order is placed once the
-                payment goes through.
-            </p>
+            {notice ? (
+                <p
+                    role="status"
+                    className="text-site-fg mt-3 text-[13.5px] font-semibold"
+                >
+                    {notice}
+                </p>
+            ) : null}
+            {held && !problem ? (
+                <p
+                    id={`${site}-held`}
+                    className="text-site-body mt-2.5 text-[13px] leading-normal"
+                >
+                    {held}
+                </p>
+            ) : null}
+            {payNote ? (
+                <p className="text-site-muted mt-2.5 text-[12.5px] leading-normal">
+                    {payNote}
+                </p>
+            ) : null}
             <button
                 type="button"
                 onClick={place}
                 disabled={!canPlace}
+                aria-describedby={held && !problem ? `${site}-held` : undefined}
                 className={sheetButton(!canPlace)}
             >
                 {busy
@@ -445,6 +715,39 @@ export function BagSheet({
             </button>
         </SheetFrame>
     );
+}
+
+/** How the quote's chosen way can be paid; online for an older API. */
+function paysOf(
+    quote: CheckoutQuote | null,
+): { type: ShopPayment; label: string }[] {
+    if (!quote) return [];
+    return quote.payments ?? [{ type: "ONLINE", label: "Pay online" }];
+}
+
+/** The way to pay picked, if still offered; else the first offered. */
+export function payChosen(
+    pays: readonly { type: ShopPayment; label: string }[],
+    picked: ShopPayment | null,
+): { type: ShopPayment; label: string } | null {
+    return pays.find((p) => p.type === picked) ?? pays.at(0) ?? null;
+}
+
+/**
+ * What the customer is told about paying, above the button. Nothing until
+ * the quote is back: how to pay comes with it, and a shop that only takes
+ * money at the handover must not first claim "You pay online" (#837).
+ */
+export function payWords(
+    pay: { type: ShopPayment; label: string } | null,
+): string | null {
+    if (!pay) return null;
+    if (pay.type === "ON_HANDOVER") {
+        return pay.label === "Pay on delivery"
+            ? "You'll pay when your order is delivered. Your order is placed now."
+            : "You'll pay when you collect your order. Your order is placed now.";
+    }
+    return "You pay online in a secure window. Your order is placed once the payment goes through.";
 }
 
 function AddressFields({

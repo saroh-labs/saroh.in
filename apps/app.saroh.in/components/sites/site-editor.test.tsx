@@ -40,6 +40,8 @@ const actions = vi.hoisted(() => ({
     listComments: vi.fn(),
     publishSite: vi.fn(),
     requestReview: vi.fn(),
+    withdrawReview: vi.fn(),
+    listPreviewLinks: vi.fn(() => Promise.resolve([])),
     saveDraftSections: vi.fn(),
     updateSiteStyle: vi.fn(),
     updateSiteSettings: vi.fn(),
@@ -49,6 +51,71 @@ const actions = vi.hoisted(() => ({
     updatePage: vi.fn(),
 }));
 vi.mock("@/lib/sites/actions", () => actions);
+/*
+ * A plain popover: Radix's, once opened in the bar, never let an async
+ * `act` settle under jsdom (the Share menu, UX-068). What is tested is what
+ * the menus offer, not how they float.
+ */
+vi.mock("@saroh/ui/popover", async () => {
+    const React = await import("react");
+    interface Ctx {
+        open: boolean;
+        setOpen: (next: boolean) => void;
+    }
+    const PopoverCtx = React.createContext<Ctx>({
+        open: false,
+        setOpen: () => undefined,
+    });
+    function Popover({
+        open,
+        onOpenChange,
+        children,
+    }: {
+        open?: boolean;
+        onOpenChange?: (next: boolean) => void;
+        children: React.ReactNode;
+    }) {
+        const [own, setOwn] = React.useState(false);
+        const value = open ?? own;
+        const setOpen = (next: boolean) => {
+            setOwn(next);
+            onOpenChange?.(next);
+        };
+        return React.createElement(
+            PopoverCtx.Provider,
+            { value: { open: value, setOpen } },
+            children,
+        );
+    }
+    function PopoverTrigger({ children }: { children: React.ReactElement }) {
+        const { open, setOpen } = React.useContext(PopoverCtx);
+        return React.cloneElement(
+            children as React.ReactElement<Record<string, unknown>>,
+            {
+                "aria-expanded": open,
+                "data-state": open ? "open" : "closed",
+                onClick: () => setOpen(!open),
+            },
+        );
+    }
+    function PopoverContent({
+        children,
+        className,
+    }: {
+        children: React.ReactNode;
+        className?: string;
+    }) {
+        const { open } = React.useContext(PopoverCtx);
+        return open
+            ? React.createElement(
+                  "div",
+                  { className, role: "dialog" },
+                  children,
+              )
+            : null;
+    }
+    return { Popover, PopoverTrigger, PopoverContent };
+});
 /*
  * Server-only: other panels' actions reach the API client, which reads server
  * environment variables at import. Nothing here may call it for real.
@@ -120,7 +187,14 @@ function hero(key: string, heading: string): Section {
 
 const SECTIONS: Section[] = [hero("s1", "Welcome in"), hero("s2", "Our story")];
 
-const STYLE_OPTIONS: SiteStyleOptions = { rows: [], scalars: [] };
+const STYLE_OPTIONS: SiteStyleOptions = {
+    rows: [],
+    scalars: [],
+    fontPairs: [
+        { key: "system", name: "Your visitor's system font" },
+        { key: "newsreader", name: "Newsreader" },
+    ],
+};
 const NO_FLAGS: SiteFlags = { flags: [], awaitingNavigation: [] };
 const REVIEW: ReviewState = {
     openNotes: 0,
@@ -170,7 +244,12 @@ function render(overrides: Partial<Props> = {}) {
 const $ = (sel: string) => host.querySelector<HTMLElement>(sel);
 const $$ = (sel: string) => Array.from(host.querySelectorAll<HTMLElement>(sel));
 
-function button(name: string | RegExp): HTMLButtonElement {
+function button(name: string | RegExp): HTMLButtonElement;
+function button(name: string | RegExp, maybe: true): HTMLButtonElement | null;
+function button(
+    name: string | RegExp,
+    maybe = false,
+): HTMLButtonElement | null {
     const all = Array.from(
         document.querySelectorAll<HTMLButtonElement>("button,[role=tab]"),
     );
@@ -180,8 +259,13 @@ function button(name: string | RegExp): HTMLButtonElement {
             ? label.trim() === name
             : name.test(label.trim());
     });
-    if (!hit) throw new Error(`No button ${String(name)}`);
-    return hit;
+    if (!hit && !maybe) throw new Error(`No button ${String(name)}`);
+    return hit ?? null;
+}
+
+/** Narrow (UX-035): Preview, Feedback and Test release sit in "More". */
+function openMore() {
+    click(button(/^More: preview, feedback/));
 }
 
 function click(el: HTMLElement) {
@@ -360,7 +444,12 @@ describe("SiteEditor shell", () => {
         expect(button("Preview")).toBeTruthy();
         // G2: Style is the rail's Brand tab, not a button in the bar.
         expect(() => button("Style")).toThrow();
-        expect(button("Share for review").disabled).toBe(false);
+        // Share (UX-068): one button, two named choices.
+        expect(button("Share").disabled).toBe(false);
+        click(button("Share"));
+        expect(button(/^Ask a teammate to review/)).toBeTruthy();
+        expect(button(/^Share a preview link/)).toBeTruthy();
+        click(button("Share"));
         // Nothing waiting, and it still publishes: that makes a new version.
         expect(button("Publish").disabled).toBe(false);
         expect(button("Publish").title).toBe(
@@ -560,13 +649,31 @@ describe("SiteEditor shell", () => {
         const { siteId } = render();
         click(button("Brand"));
         expect(button("Brand").getAttribute("aria-selected")).toBe("true");
-        expect(host.textContent).toContain("plain system font");
+        // The typeface choice (KTD-2), the default chosen.
+        expect(host.textContent).toContain("Typeface");
+        expect(
+            host.querySelector('[role="radio"][aria-checked="true"]')
+                ?.textContent,
+        ).toBe("Your visitor's system font");
         expect(() => button("Header")).toThrow();
         // Remembered, so a reload comes back to it as it did to Style.
         expect(prefs.getPlace(siteId, SECTIONS.length).rail).toBe("style");
         click(button("Page"));
         expect(button("Page").getAttribute("aria-selected")).toBe("true");
         expect(button("Header")).toBeTruthy();
+    });
+
+    it("saves a typeface chosen in the Brand tab through the style save", async () => {
+        actions.updateSiteStyle.mockResolvedValue({ ok: true });
+        render();
+        click(button("Brand"));
+        click(button("Newsreader"));
+        expect(button("Newsreader").getAttribute("aria-checked")).toBe("true");
+        await wait(700);
+        expect(actions.updateSiteStyle).toHaveBeenCalledWith(
+            expect.any(String),
+            expect.objectContaining({ fontPair: "newsreader" }),
+        );
     });
 
     it("shows the Add tab and adds a block after the selected one", () => {
@@ -1052,9 +1159,30 @@ describe("SiteEditor shell", () => {
     it("asks for a review and reads the state back", async () => {
         actions.getReviewState.mockResolvedValue({ ...REVIEW, pending: true });
         render();
-        await press(button("Share for review"));
+        click(button("Share"));
+        click(button(/^Ask a teammate to review/));
+        await wait(0);
         expect(actions.requestReview).toHaveBeenCalledTimes(1);
-        expect(button("In review").disabled).toBe(true);
+        // In review now, and it can be taken back (UX-068).
+        click(button("In review"));
+        expect(button(/^Ask a teammate to review/, true)).toBeNull();
+        actions.withdrawReview.mockResolvedValue({ ok: true, data: {} });
+        actions.getReviewState.mockResolvedValue(REVIEW);
+        click(button(/^Withdraw the review request/));
+        await wait(0);
+        await wait(0);
+        expect(actions.withdrawReview).toHaveBeenCalledTimes(1);
+        expect(button("Share")).toBeTruthy();
+    });
+
+    it("opens the whole site's Feedback for a preview link (UX-068)", () => {
+        render();
+        click(button("Share"));
+        click(button(/^Share a preview link/));
+        const tab = $(
+            "aside[aria-label=Inspector] [role=tab][aria-selected=true]",
+        );
+        expect(tab?.textContent).toContain("Feedback");
     });
 
     it("opens a block's notes in the inspector", () => {
@@ -1143,22 +1271,20 @@ describe("SiteEditor header and footer text (G6)", () => {
         expect(actions.updateSiteSettings).not.toHaveBeenCalled();
     });
 
-    it("edits the footer line; the canvas draws it before Runs on Saroh, and it saves as the footer", async () => {
+    it("edits the footer line; the canvas draws it, and it saves as the footer", async () => {
         const { siteId } = render();
         // Nothing written yet: the site's name stands in, as G17 draws it.
-        expect(canvasFooter()?.textContent).toBe(
-            "Flour & Ferment · Runs on Saroh",
-        );
+        expect(canvasFooter()?.textContent).toBe("Flour & Ferment");
         click(button("Footer"));
         expect(host.textContent).toContain(
             "Nothing is written at the foot of this site yet",
         );
         type(field("Footer line"), "Hill Road, Bandra");
 
-        expect(canvasFooter()?.textContent).toBe(
-            "Hill Road, Bandra · Runs on Saroh",
+        expect(canvasFooter()?.textContent).toBe("Hill Road, Bandra");
+        expect(host.textContent).toContain(
+            "On the Free plan, “Made with Saroh” follows it on your site.",
         );
-        expect(host.textContent).toContain("“Runs on Saroh” follows it.");
 
         await wait(700);
         await wait(0);
@@ -1173,14 +1299,12 @@ describe("SiteEditor header and footer text (G6)", () => {
         const { siteId } = render({
             footerPreview: { format: "html", value: "<p>Old line</p>" },
         });
-        expect(canvasFooter()?.textContent).toBe("Old line · Runs on Saroh");
+        expect(canvasFooter()?.textContent).toBe("Old line");
         click(button("Footer"));
         expect(field("Footer line").value).toBe("Old line");
         type(field("Footer line"), "");
 
-        expect(canvasFooter()?.textContent).toBe(
-            "Flour & Ferment · Runs on Saroh",
-        );
+        expect(canvasFooter()?.textContent).toBe("Flour & Ferment");
         await wait(700);
         await wait(0);
         expect(actions.updateSiteFooter).toHaveBeenCalledWith(siteId, null);
@@ -1378,9 +1502,13 @@ describe("SiteEditor narrow and phone (G4)", () => {
         expect(button("Welcome in").getAttribute("aria-current")).toBe("true");
         expect(sheet()).toBeNull();
         expect($("aside[aria-label=Inspector]")).toBeNull();
-        // The bar keeps every action, and the whole review has a way in.
+        // Publish stays on the bar (UX-035); the rest fold into More, and
+        // the whole review still has a way in.
         expect(button("Publish")).toBeTruthy();
+        expect(button("Feedback", true)).toBeNull();
+        openMore();
         expect(button("Feedback")).toBeTruthy();
+        expect(button("Preview")).toBeTruthy();
     });
 
     it("opens the inspector over the page when a block is chosen, and Close hands focus back to it", async () => {
@@ -1468,6 +1596,7 @@ describe("SiteEditor narrow and phone (G4)", () => {
     it("opens the whole site's feedback from the bar", () => {
         atWidth(1000);
         render({ initialReview: { ...REVIEW, openNotes: 2 } });
+        openMore();
         click(button(/^Feedback/));
         const tab = sheet()?.querySelector("[role=tab][aria-selected=true]");
         expect(tab?.textContent).toContain("Feedback");
@@ -1479,6 +1608,7 @@ describe("SiteEditor narrow and phone (G4)", () => {
         render();
         click(button("Our story"));
         expect(sheet()).not.toBeNull();
+        openMore();
         click(button("Preview"));
         expect(sheet()).toBeNull();
         expect($("[data-previewing]")).not.toBeNull();
@@ -1520,7 +1650,7 @@ describe("SiteEditor narrow and phone (G4)", () => {
         for (const d of ["desktop", "tablet", "phone"]) {
             expect(button(`Show at ${d} width`)).toBeTruthy();
         }
-        expect(button("Share for review")).toBeTruthy();
+        expect(button(/^Ask a teammate to review/)).toBeTruthy();
 
         // The rail is a bar at the foot, not a column.
         expect($("[aria-label='Resize the block list']")).toBeNull();

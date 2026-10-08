@@ -46,6 +46,12 @@ const site = instantiateTemplate(template!, {
 - **`starter` (v1)** — kept for the sites built from it: company copy and a
   gallery of `/templates/starter/*.jpg` paths that no app serves. Not listed
   for new sites; `getTemplate("starter", 1)` still resolves it.
+- **`gym` (v1)** — industry template (plan U6), Services shape: Home (the
+  name as a page title → the week's timetable → plans and packs → first
+  visit → hours), Timetable, Membership and Trainers. Bound blocks only while
+  their module is on; a page whose every section needs one module (Timetable,
+  Membership) is laid down only with it (a page's `when`). Coaches are
+  Person placeholders with photo briefs; no member quote is invented.
 
 `listTemplates()` returns the latest version of each template (the picker and
 the public catalogue); `getTemplate(id, version)` resolves any registered one.

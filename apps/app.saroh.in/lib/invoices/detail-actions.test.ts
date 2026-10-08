@@ -50,9 +50,10 @@ describe("detailActions", () => {
         expect(primary({ payOnline: false })).toBe("Send invoice");
     });
 
-    it("payOnline false and nothing to send it by: Mark paid leads", () => {
+    it("payOnline false and nothing to send it by: Mark paid leads, and Copy view link hands over the invoice (#833)", () => {
         const got = labels({ payOnline: false, sendable: false });
         expect(got).toEqual([
+            "Copy view link",
             "Mark paid",
             "Print",
             "Download PDF",
@@ -92,6 +93,23 @@ describe("detailActions", () => {
 
     it("no pay link while autopay is charging it (D13)", () => {
         expect(labels({ charging: true })).not.toContain("Copy pay link");
+        expect(labels({ charging: true, payOnline: false })).not.toContain(
+            "Copy view link",
+        );
+    });
+
+    it("Copy view link only where no pay link can be made (#833)", () => {
+        expect(labels({})).not.toContain("Copy view link");
+        expect(labels({ payOnline: false })).toContain("Copy view link");
+        expect(labels({ payOnline: false, canWrite: false })).not.toContain(
+            "Copy view link",
+        );
+        expect(labels({ payOnline: false, standing: "PAID" })).not.toContain(
+            "Copy view link",
+        );
+        expect(labels({ payOnline: false, linkBusy: true })).toContain(
+            "Making a link…",
+        );
     });
 
     it("paid: Print and Refund, or Refund on the order", () => {
@@ -109,7 +127,25 @@ describe("detailActions", () => {
         ]);
     });
 
-    it("a role that only reads it gets Print and the PDF", () => {
-        expect(labels({ canWrite: false })).toEqual(["Print", "Download PDF"]);
+    it("a role that only reads an owed invoice sees Mark paid disabled, with why (FB-1, DEC-098)", () => {
+        expect(labels({ canWrite: false })).toEqual([
+            "Mark paid",
+            "Print",
+            "Download PDF",
+        ]);
+        const pay = detailActions({ ...base, canWrite: false }).find(
+            (a) => a.id === "pay",
+        );
+        expect(pay).toMatchObject({
+            disabled: true,
+            reason: "Your role can read this invoice but can't mark it paid.",
+        });
+    });
+
+    it("a role that only reads a paid invoice gets Print and the PDF", () => {
+        expect(labels({ canWrite: false, standing: "PAID" })).toEqual([
+            "Print",
+            "Download PDF",
+        ]);
     });
 });

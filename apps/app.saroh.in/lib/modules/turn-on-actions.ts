@@ -2,6 +2,11 @@
 
 import { revalidatePath } from "next/cache";
 
+import { readMyEmailSetup } from "@/lib/communications/email-setup-service";
+import type { ConnectLocks } from "@/lib/providers/connect-lock";
+import { connectLocksOf } from "@/lib/providers/connect-lock";
+import { billingAccessOrNull } from "@/lib/saroh-billing/service";
+
 import type { SetupDefaults } from "./turn-on-schema";
 import type { EnableResult } from "./turn-on-service";
 import { enableModule, getSetupDefaults } from "./turn-on-service";
@@ -31,4 +36,18 @@ export async function enableModuleAction(
     const result = await enableModule(key, setup);
     if (result.ok) revalidatePath("/", "layout");
     return result;
+}
+
+/**
+ * What the plan won't let the business connect (DEC-091, UX-006), so the
+ * sheet says it in place of "Connect now" rather than send the merchant to
+ * a key form the API refuses. Email's is the email setup's own answer
+ * (`connectLocksOf`). Best-effort: unread locks nothing.
+ */
+export async function readConnectLocksAction(): Promise<ConnectLocks> {
+    const [access, emailSetup] = await Promise.all([
+        billingAccessOrNull().catch(() => null),
+        readMyEmailSetup().catch(() => null),
+    ]);
+    return connectLocksOf(access, emailSetup);
 }

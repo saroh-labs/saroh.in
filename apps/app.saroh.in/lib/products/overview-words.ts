@@ -162,14 +162,43 @@ export function collectionsSummary(placement: ProductPlacement): {
 }
 
 /**
- * "Shown on 2 pages" and each page — or, until the website has a block
- * that shows products (#473), that it doesn't yet.
+ * The product's own page on the online shop, while both are live: the
+ * shop's link (`web-address`'s `links.shop`, null until the shop is live)
+ * and the product published. Null otherwise.
  */
-export function websiteSummary(placement: ProductPlacement): {
+export function shopProductUrl(
+    shop: string | null | undefined,
+    product: { status: string; slug?: string | null },
+): string | null {
+    if (!shop || product.status !== "PUBLISHED" || !product.slug) return null;
+    return `${shop}/${encodeURIComponent(product.slug)}`;
+}
+
+/**
+ * "Shown on 2 pages" and each page — or, until the website has a block
+ * that shows products (#473), that it doesn't yet. A product live on the
+ * online shop says so first (UX-082): it is on the website there, whatever
+ * its pages show.
+ */
+export function websiteSummary(
+    placement: ProductPlacement,
+    onShop = false,
+): {
     headline: string;
     lines: string[];
 } {
     const { showsProducts, pages } = placement.website;
+    if (onShop) {
+        return pages.length === 0 || !showsProducts
+            ? {
+                  headline: "On the online shop",
+                  lines: ["No other page of the website shows it."],
+              }
+            : {
+                  headline: `On the online shop and ${plural(pages.length, "page")}`,
+                  lines: pages.map((p) => p.title || p.path),
+              };
+    }
     if (!showsProducts) {
         return {
             headline: "Not on the website",

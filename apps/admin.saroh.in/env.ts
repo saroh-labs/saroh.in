@@ -4,7 +4,8 @@ import { z } from "zod";
 /**
  * Typed, validated environment for admin.saroh.in.
  *
- * This app has no server-only env: it decides nothing about access. /admin/*
+ * Its one server-only variable is where the public site lives
+ * (`MARKETING_SITE_URL`); it decides nothing about access. /admin/*
  * authorization lives entirely in api.saroh.in (`PlatformAdminGuard` requires
  * an active, non-revoked grant; `PlatformPermissionGuard` fails closed). Admin
  * forwards the session cookie and renders whatever the API allows.
@@ -24,6 +25,11 @@ import { z } from "zod";
  * `process.env`.
  */
 export const env = createEnv({
+    server: {
+        // The public site, for Plans & modules' pricing page and its draft
+        // preview. Absent: the console's own domain without `admin.`.
+        MARKETING_SITE_URL: z.string().url().optional(),
+    },
     client: {
         NEXT_PUBLIC_ACCOUNTS_URL: z.string().url().optional(),
         // api.saroh.in origin — admin reads the control plane (/admin/*) over
@@ -32,6 +38,7 @@ export const env = createEnv({
         NEXT_PUBLIC_BETTER_AUTH_URL: z.string().url().optional(),
     },
     runtimeEnv: {
+        MARKETING_SITE_URL: process.env.MARKETING_SITE_URL,
         NEXT_PUBLIC_ACCOUNTS_URL: process.env.NEXT_PUBLIC_ACCOUNTS_URL,
         NEXT_PUBLIC_API_URL: process.env.NEXT_PUBLIC_API_URL,
         NEXT_PUBLIC_BETTER_AUTH_URL: process.env.NEXT_PUBLIC_BETTER_AUTH_URL,

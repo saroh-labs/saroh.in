@@ -162,6 +162,8 @@ beforeAll(async () => {
         },
     });
     siteId = site.id;
+    // Razorpay answers the key check on connect (UX-012).
+    routes["GET /payments"] = { items: [] };
     await payments.connectProvider(owner, {
         provider: "RAZORPAY",
         publicKey: "rzp_test_D12B",

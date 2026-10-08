@@ -1,26 +1,51 @@
-import { PermissionDeniedState } from "@saroh/ui/data-state";
+import { formatInr, offeredPlans } from "@saroh/pricing-catalog";
+import { PartialNotice, PermissionDeniedState } from "@saroh/ui/data-state";
 
-import { PlanBilling } from "@/components/settings/plan-billing";
+import { AddonsCard } from "@/components/settings/plan-billing/addons-card";
+import { PlanChooser } from "@/components/settings/plan-billing/plan-chooser";
+import { SarohInvoices } from "@/components/settings/plan-billing/saroh-invoices";
+import type { YourPlanProps } from "@/components/settings/plan-billing/your-plan";
+import { YourPlan } from "@/components/settings/plan-billing/your-plan";
 import {
     SettingsPanel,
     SettingsPanelHeader,
 } from "@/components/settings/settings-panel";
 import { resolveActiveOrganization } from "@/lib/organizations/service";
-import { planOptions, planSummary } from "@/lib/saroh-billing/plan";
+import { planSummary, usageLine } from "@/lib/saroh-billing/plan";
+import type { Cycle } from "@/lib/saroh-billing/plan-view";
 import {
-    canChangePlanHere,
+    addonRows,
+    billedCycle,
+    billedPlanId,
+    pickerRows,
+    yearlyOffer,
+    yourPlan,
+} from "@/lib/saroh-billing/plan-view";
+import {
+    getBillingAccess,
+    getCheckouts,
     getPlanUsage,
     getSarohSubscription,
+    listAddons,
     listSarohInvoices,
-    listSarohPlans,
+    livePricing,
+    quotePlan,
 } from "@/lib/saroh-billing/service";
 import { requireSession } from "@/lib/session";
 
 /**
- * Settings → Plan and billing: what Saroh charges this business. The owner's
- * alone, as the design has it — the tab is offered only to them
- * (`SETTINGS_PAGES`), and this page refuses anyone else who types the
- * address. The API's own `billing:read` (Owner and Admin) is the backstop.
+ * Settings → Plan and billing ("Saroh Settings" design; plans catalogue
+ * U14): the plan this business is on and what it pays, the plans it could
+ * be on (changed through a quote, a confirm and the payment page), add-ons,
+ * a coupon, and Saroh's invoices to it.
+ *
+ * The owner's alone, as the design has it — the tab is offered only to
+ * them (`SETTINGS_PAGES`), and this page refuses anyone else who types the
+ * address. The API's own `billing:read` / `billing:manage` is the backstop.
+ *
+ * Reads degrade per source: the plan and access are the page (a failure is
+ * the section's boundary); the price list, invoices, add-ons and checkouts
+ * each say when they couldn't be read, and the rest still shows.
  */
 export const metadata = { title: "Plan and billing" };
 
@@ -32,6 +57,16 @@ const DENIED = (
     />
 );
 
+/** A side read: its value, or null when it couldn't be had (said on the page). */
+async function settle<T>(p: Promise<T>): Promise<T | null> {
+    try {
+        return await p;
+    } catch {
+        // Named on the page as missing, never drawn as empty.
+        return null;
+    }
+}
+
 export default async function PlanBillingPage() {
     await requireSession();
     const org = await resolveActiveOrganization();
@@ -42,30 +77,134 @@ export default async function PlanBillingPage() {
         return <SettingsPanel header={header}>{DENIED}</SettingsPanel>;
     }
 
-    const [read, plans, invoices, usage] = await Promise.all([
-        getSarohSubscription(),
-        listSarohPlans(),
-        listSarohInvoices(),
-        getPlanUsage(),
-    ]);
-    if (read.status === "denied") {
+    const [read, accessRead, pricing, invoices, addons, checkouts, usage] =
+        await Promise.all([
+            getSarohSubscription(),
+            getBillingAccess(),
+            livePricing(),
+            settle(listSarohInvoices()),
+            settle(listAddons()),
+            settle(getCheckouts()),
+            getPlanUsage(),
+        ]);
+    if (read.status === "denied" || accessRead.status === "denied") {
         return <SettingsPanel header={header}>{DENIED}</SettingsPanel>;
     }
 
+    const subscription = read.subscription;
+    const access = accessRead.data;
+    const catalog = pricing?.catalog ?? null;
     const businessName = org?.name ?? "this business";
+    // No summary exists yet: the line is left out rather than promised
+    // (UX-080).
+    const footnote =
+        usage.status === "ok" ? usageLine(usage.usage, businessName) : "";
+
+    const addonsView = addons?.status === "ok" ? addons.data : null;
+    const checkoutsView = checkouts?.status === "ok" ? checkouts.data : null;
+
+    const plan: YourPlanProps =
+        access?.source === "catalogue"
+            ? {
+                  ...yourPlan({
+                      access,
+                      subscription,
+                      catalog,
+                      liveVersion: pricing?.version ?? null,
+                      checkouts: checkoutsView,
+                      addonsHeld: (addonsView?.heldPaise ?? 0) > 0,
+                  }),
+                  footnote,
+              }
+            : planSummary(
+                  subscription,
+                  businessName,
+                  usage.status === "ok" ? usage.usage : null,
+              );
+
+    // "Start N-day trial" only where this business would get one: ask.
+    const billed = billedPlanId(catalog, subscription);
+    const trialIds = catalog
+        ? offeredPlans(catalog).filter(
+              (p) => p.trial?.on && p.pricePaise > 0 && p.id !== billed,
+          )
+        : [];
+    const trials = new Set(
+        (
+            await Promise.all(
+                trialIds.map(async (p) => {
+                    const q = await quotePlan(p.id, "month");
+                    return q?.kind === "TRIAL" ? p.id : null;
+                }),
+            )
+        ).filter((id): id is string => id !== null),
+    );
+
+    // A plan given for a while (a launch offer) is the one it's on (UX-044).
+    const override =
+        access?.source === "catalogue" ? access.planOverride : null;
+    const given = override
+        ? { planId: override.planKey, until: override.expiresAt ?? null }
+        : null;
+    const rows = catalog
+        ? (Object.fromEntries(
+              (["month", "year"] as const).map((cycle) => [
+                  cycle,
+                  pickerRows({ catalog, subscription, cycle, trials, given }),
+              ]),
+          ) as Record<Cycle, ReturnType<typeof pickerRows>>)
+        : null;
+
+    const addonList = addonsView ? addonRows(addonsView) : [];
+    const missing = [
+        addons === null ? "Your add-ons" : null,
+        checkouts === null
+            ? addons === null
+                ? "a plan change waiting for payment"
+                : "A plan change waiting for payment"
+            : null,
+    ].filter((m): m is string => m !== null);
+    const partial =
+        missing.length === 0
+            ? null
+            : `${missing.join(" and any ")} couldn't be read just now, so ${
+                  addons === null ? "they aren't" : "it isn't"
+              } shown here. Nothing has changed.`;
+
     return (
         <SettingsPanel header={header}>
-            <PlanBilling
-                summary={planSummary(
-                    read.subscription,
-                    businessName,
-                    usage.status === "ok" ? usage.usage : null,
-                )}
-                options={planOptions(plans, read.subscription)}
-                canChange={canChangePlanHere()}
-                invoices={invoices.status === "ok" ? invoices.invoices : null}
-                neverBilled={read.subscription === null}
-            />
+            <div className="grid max-w-[760px] gap-4">
+                {partial ? <PartialNotice>{partial}</PartialNotice> : null}
+                <YourPlan {...plan} />
+                <PlanChooser
+                    rows={rows}
+                    yearly={yearlyOffer(catalog)}
+                    initialCycle={billedCycle(subscription)}
+                    currentPlan={
+                        access?.source === "catalogue"
+                            ? (access.plan?.name ?? "Free")
+                            : (subscription?.plan.name ?? "Free")
+                    }
+                    canChange
+                    addons={
+                        addonList.length > 0 ? (
+                            <AddonsCard
+                                rows={addonList}
+                                sum={
+                                    addonsView && addonsView.heldPaise > 0
+                                        ? `${formatInr(addonsView.heldPaise)} a month in add-ons`
+                                        : ""
+                                }
+                                max={addonsView?.max ?? 0}
+                                canChange={addonsView?.canBuy ?? false}
+                            />
+                        ) : null
+                    }
+                />
+                <SarohInvoices
+                    invoices={invoices?.status === "ok" ? invoices.data : null}
+                />
+            </div>
         </SettingsPanel>
     );
 }

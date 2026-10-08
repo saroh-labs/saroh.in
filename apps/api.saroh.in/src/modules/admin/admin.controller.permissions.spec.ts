@@ -227,6 +227,71 @@ describe("Waitlist permissions", () => {
     );
 });
 
+describe("Pricing permissions", () => {
+    const perms = (name: string) => {
+        const route = routeHandlers().find((r) => r.name === name);
+        return route ? permissionsOf(route.handler) : undefined;
+    };
+
+    it.each([
+        "pricingOverview",
+        "pricingImpact",
+        "pricingPreviewToken",
+        "listCoupons",
+    ] as const)("protects %s with pricing read", (method) => {
+        expect(perms(method)).toEqual([AdminPermission.PricingRead]);
+    });
+
+    it.each(["saveDraft", "discardDraft"] as const)(
+        "needs pricing read and pricing edit to %s",
+        (method) => {
+            expect(perms(method)).toEqual([
+                AdminPermission.PricingRead,
+                AdminPermission.PricingEdit,
+            ]);
+        },
+    );
+
+    // A roll back republishes a snapshot, so it needs publish like publishing
+    // does: it never bypasses review.
+    it.each(["publish", "cancelVersion", "rollback"] as const)(
+        "needs pricing read and pricing publish to %s",
+        (method) => {
+            expect(perms(method)).toEqual([
+                AdminPermission.PricingRead,
+                AdminPermission.PricingPublish,
+            ]);
+        },
+    );
+
+    it.each([
+        "setModuleOverride",
+        "setPlanOverride",
+        "removeOverride",
+        "moveToLive",
+    ] as const)("needs pricing override to %s", (method) => {
+        expect(perms(method)).toEqual([AdminPermission.PricingOverride]);
+    });
+
+    // A custom price is a price change too: override alone is refused.
+    it("needs pricing override and pricing publish to set a custom price", () => {
+        expect(perms("setPriceOverride")).toEqual([
+            AdminPermission.PricingOverride,
+            AdminPermission.PricingPublish,
+        ]);
+    });
+
+    it.each(["createCoupon", "updateCoupon", "deleteCoupon"] as const)(
+        "needs pricing read and coupons manage to %s",
+        (method) => {
+            expect(perms(method)).toEqual([
+                AdminPermission.PricingRead,
+                AdminPermission.CouponsManage,
+            ]);
+        },
+    );
+});
+
 describe("AdminController staff identity", () => {
     it("returns the server-resolved roles and permissions to the admin shell", () => {
         const controller = new AdminController(

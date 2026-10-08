@@ -7,7 +7,7 @@ import type { Prisma } from "@saroh/database";
 import { DateTime } from "luxon";
 
 import { readVerdicts } from "./live-pointer";
-import { approvalRequired } from "./publish-approval";
+import { approvalApplies, approvalRequired } from "./publish-approval";
 import { ADDRESS_MISSING_MESSAGE } from "./site-flags";
 import {
     RELEASE_DISCARDED_MESSAGE,
@@ -186,7 +186,9 @@ export async function scheduleGoLive(
     }
 
     let override = false;
-    if (site.publishNeedsApproval) {
+    if (
+        await approvalApplies(input.organizationId, site.publishNeedsApproval)
+    ) {
         // Asked of `tx`, as `putLive` asks it, so both give the same answer.
         const approved = releaseApproved(
             await readVerdicts(tx, input),

@@ -6,11 +6,13 @@
  * `activity-detail.ts` the sheet.
  */
 
+import { moduleName as railName } from "@/lib/modules/turn-on";
 import { businessTypeLabel } from "@/lib/organizations/business-types";
 import { KIND_CHOICES } from "@/lib/organizations/kind";
 
 /** The Business settings tab a field is on. */
-export type BusinessTab = "identity" | "contact" | "tax" | "hours" | "address";
+export type BusinessTab =
+    "identity" | "contact" | "tax" | "hours" | "pay" | "address";
 
 /**
  * Every field a settings save records: how a sentence names it, how the
@@ -88,6 +90,33 @@ export const FIELD_PHRASES: Partial<
         phrase: "the opening hours",
         label: "Opening hours",
         tab: "hours",
+    },
+    // How to pay us (R32); recorded by name only.
+    payUpiId: { phrase: "the UPI ID", label: "UPI ID", tab: "pay" },
+    payBankAccountName: {
+        phrase: "the bank details",
+        label: "Bank details",
+        tab: "pay",
+    },
+    payBankAccountNumber: {
+        phrase: "the bank details",
+        label: "Bank details",
+        tab: "pay",
+    },
+    payBankIfsc: {
+        phrase: "the bank details",
+        label: "Bank details",
+        tab: "pay",
+    },
+    payBankName: {
+        phrase: "the bank details",
+        label: "Bank details",
+        tab: "pay",
+    },
+    payNote: {
+        phrase: "the note on how to pay",
+        label: "Note on how to pay",
+        tab: "pay",
     },
     registeredAddress: {
         phrase: "the registered address",
@@ -287,11 +316,18 @@ export function profileChange(
     return { what: `updated ${named.join(", ")} and ${others}`, tab };
 }
 
-/** A module's name as recorded, else its key in words ("PAYMENTS" → "Payments"). */
+/**
+ * A module's name as the rail says it ("COMMERCE" → "Sell", UX-078), else as
+ * recorded, else its key in words ("PAYMENTS" → "Payments").
+ */
 export function moduleName(
     meta: Record<string, unknown>,
     key: string | null,
 ): string {
+    if (key) {
+        const rail = railName(key);
+        if (rail !== key) return rail;
+    }
     const named = text(meta.module);
     if (named) return named;
     if (!key) return "a module";

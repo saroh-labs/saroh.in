@@ -328,6 +328,35 @@ describe("sending", () => {
     });
 });
 
+describe("the invoice PDF goes with the email (DEC-083)", () => {
+    it.each([
+        ["a send", "INVOICE_SENT", false],
+        ["a reminder", "INVOICE_REMINDER", true],
+    ] as const)(
+        "%s asks for the invoice's PDF to be attached",
+        async (_label, template, reminder) => {
+            comms.queueTransactional.mockResolvedValue({
+                id: "m_1",
+                status: "QUEUED",
+                toAddress: "asha@example.com",
+            });
+            db.organization!.findUnique!.mockResolvedValue({
+                name: "Rye & Co.",
+            });
+            if (reminder) {
+                await service().remind(owner, "inv_1");
+            } else {
+                await service().send(owner, "inv_1");
+            }
+            expect(comms.queueTransactional.mock.calls[0][2]).toMatchObject({
+                template,
+                invoiceId: "inv_1",
+                attachInvoicePdf: true,
+            });
+        },
+    );
+});
+
 describe("the link on the business's own address (DEC-069, L7)", () => {
     it("puts the emailed link on the business's site, read on the send's transaction", async () => {
         payLinkOnSite.mockResolvedValue(true);

@@ -3,16 +3,21 @@ import type { Metadata } from "next";
 import localFont from "next/font/local";
 import Link from "next/link";
 
+import { Arrow } from "@/components/v2/arrow";
 import { WaitlistForm } from "@/components/v2/waitlist/waitlist-form";
+import { linkShown } from "@/content/resources";
 import { SAROH_HANDLE, SAROH_SOCIAL } from "@/content/social";
+import { galleryTemplates } from "@/content/templates";
 import type { WaitlistContent } from "@/content/waitlist";
 import {
     HERO_KINDS,
     launchOfferLines,
     WAITLIST,
     WAITLIST_FOOTER,
+    WAITLIST_MONEY,
 } from "@/content/waitlist";
 import { readLaunchOffer } from "@/lib/launch-offer";
+import { resourcesContext } from "@/lib/resources-context";
 import { pageMetadata } from "@/lib/seo";
 import { openingShort } from "@/lib/waitlist";
 
@@ -52,19 +57,17 @@ const HERO: [string, string][] = [
     ["H", "andled."],
 ];
 
-/**
- * Static, refreshed every five minutes (ISR), the window the launch offer
- * is cached for.
- */
-export const revalidate = 300;
+// Static: the launch offer is read when the site is built, and publishing a
+// new one starts a build.
 
 /**
  * The waitlist (Waitlist design, plan U30): the site's one ask until
  * launch. It has its own header and footer, as the design draws them, so it
- * sits outside the `(v2)` chrome. The launch offer is the API's
- * (`GET /public/waitlist/offer`); with none, the form says it is announced at launch. The page reads no query, so
+ * sits outside the `(v2)` chrome. The launch offer is the API's (U31); with
+ * none, the form says it is announced at launch. The page reads no query, so
  * it stays static: the form reads `?plan=`, `?src=` (the CTA builder,
- * `lib/links.ts`) and `?ref=` (a referral link) in the browser as it sends.
+ * `lib/links.ts`), `?ref=` (a referral link) and `?template=` (a gallery
+ * template's "Save … for early access") in the browser.
  */
 export default async function WaitlistPage() {
     const offer = await readLaunchOffer();
@@ -72,6 +75,10 @@ export default async function WaitlistPage() {
         ...WAITLIST,
         offer: offer ? launchOfferLines(offer) : WAITLIST.offer,
     };
+    const integrations = linkShown(
+        WAITLIST_MONEY.link.href,
+        resourcesContext(),
+    );
     const opening = content.openingDate
         ? `Opens ${openingShort(content.openingDate)}`
         : "Opening soon";
@@ -129,10 +136,31 @@ export default async function WaitlistPage() {
                             ))}
                         </ul>
                     </div>
+                    <p className="m-0 max-w-[46ch] text-[14px] leading-[1.5] text-muted-foreground [text-wrap:pretty]">
+                        {WAITLIST_MONEY.line}
+                        {integrations ? (
+                            <>
+                                {" "}
+                                <Link
+                                    href={WAITLIST_MONEY.link.href}
+                                    className="cursor-pointer whitespace-nowrap rounded-sm font-semibold text-brand-700 no-underline hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-foreground focus-visible:[outline-style:solid]"
+                                >
+                                    {WAITLIST_MONEY.link.label}
+                                    <Arrow />
+                                </Link>
+                            </>
+                        ) : null}
+                    </p>
                 </div>
 
                 <div className="flex flex-col gap-5 rounded-mk-card border border-border bg-white p-[clamp(20px,3vw,32px)] shadow-[0_4px_12px_rgba(28,28,26,0.10)]">
-                    <WaitlistForm content={content} />
+                    <WaitlistForm
+                        content={content}
+                        templates={galleryTemplates().map((t) => ({
+                            slug: t.slug,
+                            name: t.name,
+                        }))}
+                    />
                 </div>
             </main>
 

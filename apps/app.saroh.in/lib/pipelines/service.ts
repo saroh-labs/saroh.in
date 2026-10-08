@@ -1,4 +1,6 @@
 import type { CrmResult } from "@/lib/api/http";
+import { forbidden } from "next/navigation";
+
 import { apiFetch, destroy, mutate, orgBase } from "@/lib/api/http";
 
 /**
@@ -28,11 +30,16 @@ export interface CreatePipelineInput {
     stages?: { name: string }[];
 }
 
-/** The org's pipelines, each with ordered stages. Empty on any failure. */
+/**
+ * The org's pipelines, each with ordered stages. A 403 is the role's answer
+ * (`forbidden()`, UX-027) — "No pipeline yet" told staff the business had
+ * none. Empty on any other failure.
+ */
 export async function listPipelines(): Promise<Pipeline[]> {
     const base = await orgBase();
     if (!base) return [];
     const res = await apiFetch(`${base}/pipelines`);
+    if (res.status === 403) forbidden();
     if (!res.ok) return [];
     return (await res.json()) as Pipeline[];
 }

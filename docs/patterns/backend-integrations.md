@@ -32,15 +32,54 @@ a note saying so.
   decrypt throw and take Subscription Detail down
   (`mandate-setup.service.ts`, DEV_LEARNINGS "Subscription Detail could not be
   loaded").
+- **Current** — **An email a stranger can trigger carries only our words.**
+  When anyone on the internet can make Saroh send an email to an address
+  they type (a public tool, a "send me a copy" box), the email quotes
+  nothing they or a page they control chose: no titles, descriptions,
+  names, links or values from the request — not even a domain in the
+  subject. Say what happened in our own fixed text and link to our own
+  page, which shows the details. Its caps are durable (counted in the
+  database, per address and per day in all), the route is server-to-server
+  behind the signed relay, and no consent is taken from an unverified
+  address (`link-preview/report-email.ts`, DEV_LEARNINGS "a public tool
+  that emails stranger-supplied text is a relay").
+- **Current** — **A stranger's host name is resolved off the thread pool.**
+  Never `dns.lookup` (getaddrinfo on libuv's four threads) for an address a
+  visitor typed: use `dns.promises.Resolver` with a short timeout and one
+  try, cap how many such fetches run at once, and answer a typed "busy"
+  past it (`link-preview/ssrf-guard.ts`).
 - **Current** — **Merchant payments and Saroh billing never share** records,
   credentials, webhooks or contracts (DEC-010).
 - **Current** — **The Organization connects its own messaging provider** for real
   sends; Saroh-owned email is only for identity mail and a template test to the
-  signed-in user's own verified address (DEC-011).
+  signed-in user's own verified address (DEC-011) — and, while a business has
+  no email provider, its booking notices, sent from `notify.saroh.in` under
+  one rule (`emailRoute` → `sarohDecision`) and counted against its plan's
+  `sarohEmailsPerMonth`, failing closed (DEC-086).
 - **Current** — **Settings → Providers is one row per provider, connected
   first** (DEC-036): a disconnected one stays listed as theirs, only what the
   API can connect is offered, and a row shows only what the API sends as
   public (a checkout's public key, a sending address), never a credential.
+- **Current** (UX-012) — **Keys are checked before they are kept, and
+  watched after.** Connecting a provider asks it one cheap authenticated
+  read with the typed keys (`verifyCredentials` on the port: Razorpay
+  `GET /payments?count=1`, Cashfree an order look-up that should 404,
+  Resend `GET /domains`, whose list must hold the sending address's domain
+  as verified; a sending-only Resend key is accepted on its
+  `restricted_api_key` answer). A refusal is a 400 under the field
+  (`keySecret`, `apiKey` or `fromAddress`); no answer is a deliberate 503
+  (`provider-unreachable`) — nothing is stored either way. Relays (SMTP,
+  SendGrid, a Resend `baseUrl`) aren't checked. Later, an adapter that gets
+  a 401 or 403 on a live call throws `ProviderKeysRefusedError`
+  (`common/providers/provider-attention.ts`); the caller marks the row
+  (`attentionReason` `KEYS_REFUSED`, `attentionAt`), which the redacted
+  view sends as `attention: { reason, since } | null` and provider health
+  reads as FAILED, and queues the team's `provider` alert on the same
+  transaction, only when the row wasn't flagged already. Entering keys
+  again clears it. A provider order that fails at checkout is a deliberate
+  503 in the customer's words (`provider-keys-refused` or
+  `provider-unavailable`), never an unhandled 500
+  (`payments/provider-keys.ts`).
 - **Current** — **Credentials are encrypted at rest** (AES-256-GCM,
   `payments/crypto.ts`) and never returned; reads are redacted views.
 - **Current** — **Adapters sanitise errors:** never surface an auth header, a
@@ -117,7 +156,8 @@ a note saying so.
   transaction: fixed templates (`communications/transactional.ts`), only to
   the bill-to email or a verified site-account email (never a typed
   address, never a DEC-049 placeholder), only through the business's own
-  EMAIL provider (409 otherwise), no marketing opt-in, and a revoked email
+  EMAIL provider (409 otherwise; a booking notice given as its values may go
+  through Saroh instead, DEC-086), no marketing opt-in, and a revoked email
   consent still suppresses it. A secret link in it (a pay link) is sealed
   into the `message.send` job with the credentials' key and filled in only
   as the email goes to the provider; the stored body keeps a slot, so
@@ -263,6 +303,46 @@ a note saying so.
 - **Adopted** — **No fallback that can produce a plausible wrong answer.** When a
   wrong result is costly, fail loudly. Not audited across adapters.
 
+## Saroh billing on Razorpay Subscriptions (U15) — **Current**, unverified
+
+Saroh charging a business for its plan goes through `BillingProvider`
+(`modules/billing/providers`), never the merchant port. U15 adds an optional
+`plans` capability (provider plan objects, made once per catalogue row ×
+cycle and looked up by Saroh's reference before a retry makes another),
+subscriptions on a provider plan with `start_at` and an upfront charge, and
+cancel now or at the cycle's end. Adapters throw `BillingProviderError`
+(`REFUSED` a 4xx, `UNKNOWN` anything that may have worked) and keep only the
+HTTP status. The fake (`providers/fake.provider.ts`) implements all of it.
+**Not yet run against Razorpay test mode**: the open questions and the
+assumptions made are listed in `docs/architecture/PRICING_ROLLOUT.md` →
+"Razorpay test-mode spike". The webhook inbox applies an event in the same
+transaction as its row and ignores one older than the last applied
+(`Subscription.providerEventAt`).
+
+**DEC-093 adds** (`checkout.service.ts`, `checkout-confirm.service.ts`):
+
+- **Terms.** A monthly subscription is made with `totalCount` 12 (the
+  adapter's open-ended 120 is only a fallback). A yearly plan is a one-time
+  Razorpay **order** (`orders` capability, `POST /orders`), stored where a
+  subscription id would be, with `providerPlanId` `"one-time"`; its
+  `order.paid` webhook reads as the charge. **Saroh's Razorpay webhook must
+  subscribe to `order.paid`** as well as the `subscription.*` events. An
+  order has nothing to cancel: the adapter asks Razorpay nothing for one.
+- **Razorpay's own window, not its hosted page.** The checkout answers a
+  `handoff` (the key id — public — the subscription or order id, and the
+  owner's email, business name and phone pre-filled); the app opens
+  Checkout over the page (`razorpay-window.ts`). The hosted page link stays
+  as the fallback when the window can't open.
+- **Back from paying, ask the provider.** `POST …/billing/checkout/confirm`
+  reads the OPEN checkout's subscription or order (`statuses` capability:
+  `GET /subscriptions/:id`, `GET /orders/:id` and its payments) and
+  reconciles it by the webhook's own rule
+  (`BillingWebhookService.reconcileCheckout`), under the subscription's and
+  the checkout's row locks — so the plan moves without the webhook, and
+  whichever of the two lands second changes nothing (the invoice is keyed
+  once per charge). Rate-limited per business; an unanswered call is
+  "still waiting", never a reason to pay again.
+
 ## Media storage — **Current**
 
 One R2 bucket per environment in the Saroh labs Cloudflare account:
@@ -288,6 +368,12 @@ admin health page says so; a deployed API must not run that way.
   shown with plain `<img>` and fetched server-side by Next, so no GET rule.
   An app that starts uploading gets its origin added then.
 - `r2.dev` access stays off; the custom domain is the only public way in.
+- **Same parent domain, for now (5 Oct 2026).** Media is served from
+  `media.saroh.in` rather than a separate domain (the way Google uses
+  `googleusercontent.com`). With images and videos only, signed types, byte
+  checks and the sandbox headers, a separate domain adds little. Revisit it
+  if Saroh ever accepts other file types. Stored URLs (`logoUrl`, site
+  content) would then need rewriting, so it is cheapest early.
 - **The media domains can't run a page.** A Cloudflare response-header rule
   on `media.saroh.in` and `media.saroh.io` sets `Content-Security-Policy:
 default-src 'none'; img-src 'self'; media-src 'self'; sandbox` and

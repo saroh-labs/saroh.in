@@ -10,12 +10,13 @@ import {
     parseSectionContent,
     Prisma,
     prisma,
+    repeatedAnchor,
 } from "@saroh/database";
-import { starterTemplate } from "@saroh/templates";
 import { isDeepStrictEqual } from "node:util";
 
 import type { OrganizationContext } from "../../common/types/organization-context";
 import { EntitlementService } from "../billing/entitlement.service";
+import { planMeter } from "../billing/metering.service";
 import { parsePostsPrefix } from "../content/posts-prefix";
 import {
     checkoutReadiness,
@@ -53,6 +54,7 @@ import { assertGridRefsOwned, productGridFlags } from "./product-grid-checks";
 import type { Renderability } from "./publication-renderability";
 import { checkRenderability } from "./publication-renderability";
 import {
+    approvalApplies,
     assertOverrideAllowed,
     isOwner,
     setPublishNeedsApproval,
@@ -62,6 +64,7 @@ import {
     isOnFrozenPage,
     releaseUnderReview,
 } from "./release-under-review";
+import { queueReviewAlert } from "./review-alert-queue";
 import type { ReviewRoute } from "./review-route";
 import { draftFingerprint } from "./review-route";
 import { sanitizeRichHtml, sanitizeSectionContent } from "./sanitize";
@@ -100,20 +103,35 @@ import {
     FLAGS_AWAITING_NAVIGATION,
 } from "./site-flags";
 import type { SiteFooter } from "./site-footer";
-import { parseSiteFooter } from "./site-footer";
+import { footerAfterUpdate, parseSiteFooter } from "./site-footer";
 import {
     isTestShapedHost,
     siteHostMode,
     siteRootDomain,
 } from "./site-host-mode";
 import type { SiteNavigation } from "./site-navigation";
-import { parseSiteNavigation, resolveSiteNavigation } from "./site-navigation";
+import {
+    parseSiteNavigation,
+    resolveSiteNavigation,
+    withInPageNavigation,
+} from "./site-navigation";
 import type { SiteStyle, SiteStyleOptions } from "./site-style";
 import {
     parseSiteStyle,
     siteStyleOptions,
     siteStyleVariables,
 } from "./site-style";
+import {
+    assertSiteLookOffered,
+    recordedTemplate,
+    templateColourways,
+} from "./site-style-offer";
+import type { SiteTemplateRecord } from "./site-template-record";
+import {
+    publicationTemplate,
+    siteTemplate,
+    templateFooterLine,
+} from "./site-template-record";
 
 /**
  * Take the key a section claims, unless something earlier in the list already
@@ -165,7 +183,13 @@ export interface ReviewState {
      * The latest event of any kind — a reviewer's verdict, or a BYPASSED row
      * publish wrote (#199). What the badge shows.
      */
-    latestApproval: { outcome: string; at: Date; by: string } | null;
+    latestApproval: {
+        outcome: string;
+        at: Date;
+        by: string;
+        /** What a change request asked for (UX-043); null otherwise. */
+        reason: string | null;
+    } | null;
     /**
      * True while a reviewer's most recent VERDICT is CHANGES_REQUESTED and no
      * approval has followed it (#199). Publishing then still succeeds, and is
@@ -173,6 +197,12 @@ export interface ReviewState {
      * it is unreviewed, which is the normal state and must not nag.
      */
     outstanding: boolean;
+    /**
+     * The open request is the caller's own (UX-068): the workspace hides
+     * Approve and Ask for changes from them — approving your own request is
+     * not a second pair of eyes, and would not settle it anyway.
+     */
+    askedByYou: boolean;
 }
 
 /** A page as returned by the page endpoints and by getSite. */
@@ -428,6 +458,11 @@ export interface SiteDetailView {
      * image, style, menu, footer, page list. Null before the first publish.
      */
     pendingSiteChanges: SiteChangeKind[] | null;
+    /**
+     * The template the site was made from and the style chosen with it
+     * (KTD-7). Null for a site made before that was recorded.
+     */
+    template: SiteTemplateRecord | null;
     /** Always complete — absent choices are filled from the defaults. */
     style: SiteStyle;
     /**
@@ -552,6 +587,9 @@ const draftSiteSelect = {
     socialImageBytes: true,
     footer: true,
     navigation: true,
+    // Not part of the snapshot: what a Publication is stamped with (KTD-7).
+    templateId: true,
+    templateVersion: true,
     pages: {
         // A hidden page does not travel, for the same reason a
         // hidden section does not: a Publication is immutable once
@@ -646,7 +684,12 @@ async function storedDraftSectionsByKey(
  */
 function sanitizedFooter(footer: SiteFooter | null): SiteFooter | null {
     return footer
-        ? { format: footer.format, value: sanitizeRichHtml(footer.value) }
+        ? {
+              format: footer.format,
+              value: sanitizeRichHtml(footer.value),
+              // How it is laid out travels with it; nothing to clean.
+              ...(footer.layout === "left" ? { layout: footer.layout } : {}),
+          }
         : null;
 }
 
@@ -858,6 +901,9 @@ export class SitesService {
                 navigation: true,
                 storefrontId: true,
                 publishNeedsApproval: true,
+                templateId: true,
+                templateVersion: true,
+                templateStyleId: true,
                 createdAt: true,
                 updatedAt: true,
                 // When the site last went live. Read through the current
@@ -888,7 +934,16 @@ export class SitesService {
         // client filling gaps itself is how the preview and the published site
         // drift apart. The footer is normalized here for the same reason — the
         // editor reads back exactly what publish would write.
-        const { style, footer, navigation, storefrontId, ...rest } = site;
+        const {
+            style,
+            footer,
+            navigation,
+            storefrontId,
+            templateId,
+            templateVersion,
+            templateStyleId,
+            ...rest
+        } = site;
         const pending = await this.pendingSectionChanges([site.id]);
         const sellsFrom = (await shopRolloutOn(ctx.organizationId))
             ? await sellsFromView(prisma, {
@@ -898,6 +953,12 @@ export class SitesService {
             : null;
         return {
             ...rest,
+            // As it applies now (DEC-103): switched on under a plan without
+            // the approval row, it reads as off, as publishing treats it.
+            publishNeedsApproval: await approvalApplies(
+                ctx.organizationId,
+                rest.publishNeedsApproval,
+            ),
             canEdit: allows(ctx, "section:write"),
             // Only an owner goes live past "Publishing needs approval", and
             // only an owner changes it (DEC-071, KTD-11).
@@ -919,8 +980,19 @@ export class SitesService {
             pendingSectionChanges: pending.get(site.id)?.sections ?? null,
             // The settings that travel into the snapshot too (#282).
             pendingSiteChanges: pending.get(site.id)?.site ?? null,
+            template: siteTemplate({
+                templateId,
+                templateVersion,
+                templateStyleId,
+            }),
             style: parseSiteStyle(style),
-            styleOptions: siteStyleOptions(),
+            // The template's colourways join the choices (DEC-090).
+            styleOptions: siteStyleOptions(
+                templateColourways(
+                    recordedTemplate({ templateId, templateVersion }),
+                ),
+                templateStyleId,
+            ),
             footer: parseSiteFooter(footer),
             footerPreview: sanitizedFooter(parseSiteFooter(footer)),
             navigation: parseSiteNavigation(navigation),
@@ -1047,7 +1119,13 @@ export class SitesService {
                 postsPrefix: true,
             },
         });
-        return site;
+        return {
+            ...site,
+            publishNeedsApproval: await approvalApplies(
+                ctx.organizationId,
+                site.publishNeedsApproval,
+            ),
+        };
     }
 
     /**
@@ -1071,6 +1149,12 @@ export class SitesService {
         // Validate BEFORE writing: an unknown colour key or a non-numeric
         // slider must be a 400, not a site that renders wrong later.
         const style = parseSiteStyle(input);
+        // A palette or type scale only as one of the template's colourways
+        // (DEC-090): never colours a merchant typed.
+        await assertSiteLookOffered(ctx.organizationId, siteId, style);
+        // Changing the theme and fonts is a plan row (U13); a site keeps the
+        // look it has where the plan leaves it off.
+        await planMeter.assertIncluded(ctx.organizationId, "themes");
 
         await prisma.site.update({
             where: { id: siteId },
@@ -1104,13 +1188,18 @@ export class SitesService {
 
         // Validate BEFORE writing, for the same reason style does: a malformed
         // body is a 400 now rather than a footer that fails to render later.
-        const parsed = parseSiteFooter(input);
+        // An update that sends only the line keeps the stored layout (a
+        // template's left-hand row), so it is read first.
+        parseSiteFooter(input);
+        const stored = await prisma.site.findFirst({
+            where: { id: siteId, organizationId: ctx.organizationId },
+            select: { footer: true },
+        });
+        const parsed = footerAfterUpdate(input, stored?.footer ?? null);
         // Sanitized on the way IN as well as at publish (#280). Publish is not
         // the only reader of what is stored here, and "safe because publish
         // cleans it" left every other reader trusting HTML nobody had cleaned.
-        const footer: SiteFooter | null = parsed
-            ? { format: parsed.format, value: sanitizeRichHtml(parsed.value) }
-            : null;
+        const footer: SiteFooter | null = sanitizedFooter(parsed);
 
         await prisma.site.update({
             where: { id: siteId },
@@ -1572,6 +1661,17 @@ export class SitesService {
             };
         });
 
+        // A section's anchor is an element id on its page, so a page holds
+        // each one once (`section-frame.ts`). Refused with the second use's
+        // index, so the editor points at the block that repeats it.
+        const repeated = repeatedAnchor(validated);
+        if (repeated) {
+            throw new BadRequestException({
+                message: `Section at index ${repeated.index} is invalid: another section on this page already uses the link name "${repeated.anchor}"`,
+                details: { index: repeated.index, field: "anchor" },
+            });
+        }
+
         // A Product grid names only this business's collection and products
         // (G12). An id its stored self already named passes, so a deleted
         // product never blocks the page's later saves; the flag says so.
@@ -1825,9 +1925,14 @@ export class SitesService {
                  * page's entry is simply absent. Same reason style and button
                  * actions resolve here: the snapshot is the site as served.
                  */
-                navigation: resolveSiteNavigation(
-                    parseSiteNavigation(site.navigation),
-                    site.pages,
+                navigation: withInPageNavigation(
+                    resolveSiteNavigation(
+                        parseSiteNavigation(site.navigation),
+                        site.pages,
+                    ),
+                    // The home page's own sections, as this publish writes
+                    // them: each one with a menu label leads the menu.
+                    pages.find((p) => p.isHome)?.sections ?? [],
                 ),
             },
             pages,
@@ -1910,9 +2015,9 @@ export class SitesService {
              * asks the review standing INSIDE this transaction (#278): a
              * verdict posted while a publish is in flight is not missed.
              *
-             * The Site does not track which template produced it; default
-             * the Publication's required (non-null) template stamp to the
-             * starter template's identity/version.
+             * The Publication's required template stamp is the site's own
+             * template (KTD-7); a site made before that was recorded
+             * stamps the starter, as every publish did until then.
              */
             const live = await putLive(tx, {
                 site: { id: site.id, organizationId: ctx.organizationId },
@@ -1921,10 +2026,7 @@ export class SitesService {
                 actor: { userId: ctx.userId, owner: isOwner(ctx) },
                 override: options.override,
                 fingerprint,
-                template: {
-                    id: starterTemplate.id,
-                    version: starterTemplate.version,
-                },
+                template: publicationTemplate(site),
                 publishedAt,
             });
             return {
@@ -2342,21 +2444,32 @@ export class SitesService {
             }
         }
 
-        const comment = await prisma.siteComment.create({
-            data: {
-                siteId,
-                pageId: dto.pageId,
-                // Where the note was, for when the page itself is gone (#277).
-                pageTitle: page?.title ?? null,
-                organizationId: ctx.organizationId,
-                sectionKey: dto.sectionKey,
-                authorUserId: ctx.userId,
-                body: dto.body,
-                ...(release ? { testReleaseId: release.id } : {}),
-            },
-            select: { id: true },
+        return prisma.$transaction(async (tx) => {
+            const comment = await tx.siteComment.create({
+                data: {
+                    siteId,
+                    pageId: dto.pageId,
+                    // Where the note was, for when the page itself is gone (#277).
+                    pageTitle: page?.title ?? null,
+                    organizationId: ctx.organizationId,
+                    sectionKey: dto.sectionKey,
+                    authorUserId: ctx.userId,
+                    body: dto.body,
+                    ...(release ? { testReleaseId: release.id } : {}),
+                },
+                select: { id: true },
+            });
+            // A reviewer's note tells the people who publish (UX-043); one
+            // by them is the team talking to itself.
+            if (!allows(ctx, "site:publish")) {
+                await queueReviewAlert(tx, ctx.organizationId, {
+                    event: "review",
+                    about: "note",
+                    commentId: comment.id,
+                });
+            }
+            return comment;
         });
-        return comment;
     }
 
     /**
@@ -2423,34 +2536,54 @@ export class SitesService {
                 dto.testReleaseId,
                 { open: true },
             );
-            return prisma.siteApproval.create({
-                data: {
-                    siteId,
-                    organizationId: ctx.organizationId,
-                    byUserId: ctx.userId,
-                    outcome: dto.outcome,
-                    draftFingerprint: release.fingerprint,
-                    testReleaseId: release.id,
-                },
-                select: { id: true },
-            });
-        }
-
-        return prisma.siteApproval.create({
-            data: {
+            return this.approvalWithAlert(ctx, {
                 siteId,
                 organizationId: ctx.organizationId,
                 byUserId: ctx.userId,
                 outcome: dto.outcome,
-                // An approval names the draft it approved (#278), so later
-                // edits do not inherit it. A change request does not: it is
-                // about the work as a whole and stands until it is answered.
-                draftFingerprint:
-                    dto.outcome === "APPROVED"
-                        ? await this.currentDraftFingerprint(ctx, siteId)
-                        : null,
-            },
-            select: { id: true },
+                reason: reasonOf(dto),
+                draftFingerprint: release.fingerprint,
+                testReleaseId: release.id,
+            });
+        }
+
+        return this.approvalWithAlert(ctx, {
+            siteId,
+            organizationId: ctx.organizationId,
+            byUserId: ctx.userId,
+            outcome: dto.outcome,
+            reason: reasonOf(dto),
+            // An approval names the draft it approved (#278), so later
+            // edits do not inherit it. A change request does not: it is
+            // about the work as a whole and stands until it is answered.
+            draftFingerprint:
+                dto.outcome === "APPROVED"
+                    ? await this.currentDraftFingerprint(ctx, siteId)
+                    : null,
+        });
+    }
+
+    /**
+     * Write a review row and, on its transaction, tell the other side
+     * (UX-043): a request goes to the site's reviewers, a verdict to the
+     * people who publish (`notifications/review-alerts.ts`).
+     */
+    private approvalWithAlert(
+        ctx: OrganizationContext,
+        data: Prisma.SiteApprovalUncheckedCreateInput,
+    ): Promise<{ id: string }> {
+        return prisma.$transaction(async (tx) => {
+            const approval = await tx.siteApproval.create({
+                data,
+                select: { id: true },
+            });
+            await queueReviewAlert(
+                tx,
+                ctx.organizationId,
+                { event: "review", about: "approval", approvalId: approval.id },
+                data.outcome === "REQUESTED" ? data.siteId : undefined,
+            );
+            return approval;
         });
     }
 
@@ -2477,31 +2610,32 @@ export class SitesService {
               })
             : null;
 
-        const [latest, standing, openNotes] = await Promise.all([
+        // A release's verdicts (by fingerprint, as the standing reads them)
+        // and its go-live's own record; or the draft's.
+        const scope = release
+            ? {
+                  OR: [
+                      {
+                          testReleaseId: { not: null },
+                          draftFingerprint: release.fingerprint,
+                      },
+                      { testReleaseId: release.id },
+                  ],
+              }
+            : { testReleaseId: null };
+        const [latest, standing, openNotes, newestAsk] = await Promise.all([
             prisma.siteApproval.findFirst({
                 where: {
                     siteId,
                     organizationId: ctx.organizationId,
-                    ...(release
-                        ? {
-                              // Its verdicts (by fingerprint, as the
-                              // standing reads them), and its go-live's
-                              // own record.
-                              OR: [
-                                  {
-                                      testReleaseId: { not: null },
-                                      draftFingerprint: release.fingerprint,
-                                  },
-                                  { testReleaseId: release.id },
-                              ],
-                          }
-                        : { testReleaseId: null }),
+                    ...scope,
                 },
                 // Two reviews can share a millisecond; the id (a cuid, which grows)
                 // keeps "newest" deterministic.
                 orderBy: [{ createdAt: "desc" }, { id: "desc" }],
                 select: {
                     outcome: true,
+                    reason: true,
                     createdAt: true,
                     by: { select: { name: true, email: true } },
                 },
@@ -2535,7 +2669,19 @@ export class SitesService {
                     testReleaseId: release?.id ?? null,
                 },
             }),
+            prisma.siteApproval.findFirst({
+                where: {
+                    siteId,
+                    organizationId: ctx.organizationId,
+                    outcome: "REQUESTED",
+                    ...scope,
+                },
+                orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+                select: { byUserId: true },
+            }),
         ]);
+        const pending =
+            standing.outstanding && latest?.outcome !== "CHANGES_REQUESTED";
 
         return {
             testRelease: release
@@ -2543,10 +2689,10 @@ export class SitesService {
                 : null,
             openNotes,
             outstanding: standing.outstanding,
-            // "In review" is the state a REQUESTED row creates and only a
-            // verdict clears (#278).
-            pending:
-                standing.outstanding && latest?.outcome !== "CHANGES_REQUESTED",
+            // "In review" is the state a REQUESTED row creates and a
+            // verdict, a withdrawal or going live clears (#278, UX-068).
+            pending,
+            askedByYou: pending && newestAsk?.byUserId === ctx.userId,
             approvalIsStale: standing.approvalIsStale,
             latestApproval:
                 latest === null
@@ -2555,6 +2701,7 @@ export class SitesService {
                           outcome: latest.outcome,
                           at: latest.createdAt,
                           by: latest.by.name ?? latest.by.email,
+                          reason: latest.reason ?? null,
                       },
         };
     }
@@ -2589,31 +2736,58 @@ export class SitesService {
                 testReleaseId,
                 { open: true },
             );
-            return prisma.siteApproval.create({
-                data: {
-                    siteId,
-                    organizationId: ctx.organizationId,
-                    byUserId: ctx.userId,
-                    outcome: "REQUESTED",
-                    draftFingerprint: release.fingerprint,
-                    testReleaseId: release.id,
-                },
-                select: { id: true },
+            return this.approvalWithAlert(ctx, {
+                siteId,
+                organizationId: ctx.organizationId,
+                byUserId: ctx.userId,
+                outcome: "REQUESTED",
+                draftFingerprint: release.fingerprint,
+                testReleaseId: release.id,
             });
         }
 
+        return this.approvalWithAlert(ctx, {
+            siteId,
+            organizationId: ctx.organizationId,
+            byUserId: ctx.userId,
+            outcome: "REQUESTED",
+            // Which draft is being put up for review, so "approved" can
+            // later be checked against the same work.
+            draftFingerprint: await this.currentDraftFingerprint(ctx, siteId),
+        });
+    }
+
+    /**
+     * Take back the draft's open review request (UX-068): `site:update`,
+     * like asking. Refused with 409 when nothing is open. Writes WITHDRAWN,
+     * which closes the request (`CLOSING_OUTCOMES`); asking again opens a
+     * new one.
+     */
+    async withdrawReview(
+        ctx: OrganizationContext,
+        siteId: string,
+    ): Promise<{ id: string }> {
+        authorize(ctx, "site:update");
+        await assertSiteInOrg(ctx, siteId);
+        const standing = await this.reviewStandingFor(
+            prisma,
+            siteId,
+            ctx.organizationId,
+            await this.currentDraftFingerprint(ctx, siteId),
+            ctx.userId,
+        );
+        if (!standing.outstanding) {
+            throw new ConflictException({
+                code: "NO_OPEN_REVIEW",
+                message: "There's no open review request to withdraw.",
+            });
+        }
         return prisma.siteApproval.create({
             data: {
                 siteId,
                 organizationId: ctx.organizationId,
                 byUserId: ctx.userId,
-                outcome: "REQUESTED",
-                // Which draft is being put up for review, so "approved" can
-                // later be checked against the same work.
-                draftFingerprint: await this.currentDraftFingerprint(
-                    ctx,
-                    siteId,
-                ),
+                outcome: "WITHDRAWN",
             },
             select: { id: true },
         });
@@ -2710,6 +2884,9 @@ export class SitesService {
                 navigation: true,
                 storefrontId: true,
                 subdomain: true,
+                footer: true,
+                templateId: true,
+                templateVersion: true,
                 pages: {
                     select: {
                         id: true,
@@ -2776,6 +2953,9 @@ export class SitesService {
             seoDescription: site.seoDescription,
             published: site.currentPublicationId !== null,
             hasUnpublishedChanges,
+            // The footer still in its template's words (round 2).
+            footer: parseSiteFooter(site.footer),
+            templateFooterLine: templateFooterLine(site),
             pages: site.pages.map((page) => ({
                 id: page.id,
                 path: page.path,
@@ -3047,4 +3227,9 @@ function sectionLabel(content: unknown): string | null {
         }
     }
     return null;
+}
+
+/** A change request's reason (UX-043); nothing on an approval. */
+function reasonOf(dto: CreateApprovalDto): string | null {
+    return dto.outcome === "CHANGES_REQUESTED" ? (dto.reason ?? null) : null;
 }

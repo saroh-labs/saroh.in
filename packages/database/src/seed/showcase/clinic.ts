@@ -1,15 +1,17 @@
 import type { Prisma } from "@prisma/client";
 
-import { PLAN } from "../data";
 import type { Db } from "../helpers";
 import { writeSite } from "../helpers";
+import { seedPlanId } from "../pricing";
 import {
     KAVI,
     KAVI_ADDRESS,
     KAVI_ADDRESS_PRINTED,
+    KAVI_CONTACT_EMAIL,
     KAVI_DENTISTS,
     KAVI_GST,
     KAVI_GSTIN,
+    KAVI_LEGAL_NAME,
     KAVI_MODULES,
     KAVI_NAME,
     KAVI_OPENING_HOURS,
@@ -78,10 +80,10 @@ export async function seedClinic(
         create: { id: orgId, name: KAVI_NAME, slug: KAVI.slug, createdAt },
     });
     const profile = {
-        legalName: "Kavi Dental Care LLP",
+        legalName: KAVI_LEGAL_NAME,
         country: "India",
         taxId: KAVI_GSTIN,
-        contactEmail: "desk@kavidental.example.in",
+        contactEmail: KAVI_CONTACT_EMAIL,
         timezone: TIMEZONE,
         gstRegistered: true,
         gstState: KAVI_GST.state,
@@ -140,10 +142,7 @@ export async function seedClinic(
             },
         });
     }
-    const plan = await prisma.plan.findUniqueOrThrow({
-        where: { key_version: { key: PLAN.key, version: PLAN.version } },
-        select: { id: true },
-    });
+    const plan = { id: await seedPlanId(prisma, now) };
     await prisma.subscription.upsert({
         where: { organizationId: orgId },
         update: { planId: plan.id, status: "ACTIVE" },
@@ -545,6 +544,11 @@ async function writeInvoices(
             sellerGstin: KAVI_GSTIN,
             sellerState: KAVI_GST.state,
             sellerAddress: KAVI_ADDRESS_PRINTED,
+            // Every Kavi paper is issued: it names the seller as the API
+            // freezes it at issue (DEC-082).
+            sellerName: KAVI_NAME,
+            sellerLegalName: KAVI_LEGAL_NAME,
+            sellerEmail: KAVI_CONTACT_EMAIL,
             placeOfSupply: KAVI_GST.state,
             taxType: "INTRA",
             cgst: "0.00",

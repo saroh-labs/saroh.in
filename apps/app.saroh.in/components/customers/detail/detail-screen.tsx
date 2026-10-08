@@ -9,6 +9,7 @@ import {
     stopOffersAction,
 } from "@/lib/customer-workspace/actions";
 import type { CustomerDetail } from "@/lib/customer-workspace/detail";
+import { shownDuplicates } from "@/lib/customer-workspace/merge";
 import { pageMissing } from "@/lib/customer-workspace/packs";
 import type {
     DuplicateSuggestion,
@@ -23,6 +24,7 @@ import type {
 } from "@/lib/customer-workspace/view";
 import {
     canStopOffers,
+    crumbsUnderSell,
     initials,
     kindOf,
     owedLine,
@@ -298,7 +300,7 @@ export function CustomerDetailScreen({
     return (
         <>
             <div className="px-[26px] pt-5">
-                <Crumbs here={name} sells={sells} />
+                <Crumbs here={name} sells={crumbsUnderSell(sells, d)} />
                 <Header
                     name={name}
                     initials={initials(name)}
@@ -316,7 +318,11 @@ export function CustomerDetailScreen({
                     menu={more.menu}
                 />
                 <DuplicateNotice
-                    duplicates={duplicates}
+                    // A same email is offered to whoever edits contacts
+                    // (DEC-097); a phone pair as before (C2).
+                    duplicates={shownDuplicates(duplicates, {
+                        canEdit: canWrite,
+                    })}
                     onMerge={more.mergeDuplicate}
                 />
                 {canWrite && d.attention?.suggestions?.length ? (

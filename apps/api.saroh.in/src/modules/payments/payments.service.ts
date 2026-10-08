@@ -11,9 +11,20 @@ import {
 import type { MerchantPaymentProvider } from "@saroh/database";
 import { Prisma, prisma } from "@saroh/database";
 
+import type { ProviderAttention } from "../../common/providers/provider-attention";
+import {
+    attentionOf,
+    NO_ATTENTION,
+} from "../../common/providers/provider-attention";
 import type { OrganizationContext } from "../../common/types/organization-context";
+import { planMeter } from "../billing/metering.service";
+import {
+    assertPlanTakesOnlinePayment,
+    planTakesOnlinePayment,
+} from "../billing/online-payments-plan";
 import { assertBusinessDetails } from "../invoices/business-details";
 import { creditNoteForRefund } from "../invoices/order-invoicing";
+import { NOT_PAID_ONLINE } from "../invoices/pay-online";
 import { finishCancelInTx, isCancelRefundKey } from "../orders/order-cancel";
 import type {
     LineRefundRequest,
@@ -34,7 +45,9 @@ import { authorize } from "../organizations/organization-policy";
 import { assertPutBack, returnablePlan, STOCK_HELD } from "../stock/reserve";
 import { decryptSecret, encryptSecret } from "./crypto";
 import { businessPayLinkProvider, payLinkProvider } from "./pay-link-provider";
+import { assertKeysAccepted, providerOrderFailed } from "./provider-keys";
 import type {
+    CreateOrderIntentResult,
     MerchantProvider,
     ProviderCredentials,
     ProviderFactory,
@@ -288,6 +301,12 @@ export interface RedactedProvider {
      * no — never the secret.
      */
     webhookSecretMissing: boolean;
+    /**
+     * Null while it works; else the provider refused these keys on a live
+     * call (UX-012) — `{ reason: "KEYS_REFUSED", since }` — and Providers
+     * shows it as Needs attention until the keys are entered again.
+     */
+    attention: ProviderAttention | null;
     createdAt: Date;
     updatedAt: Date;
 }
@@ -389,6 +408,7 @@ function redact(row: MerchantPaymentProvider): RedactedProvider {
         status: row.status,
         publicKey: row.publicKey ?? null,
         webhookSecretMissing: lacksWebhookSecret(row),
+        attention: attentionOf(row),
         createdAt: row.createdAt,
         updatedAt: row.updatedAt,
     };
@@ -409,6 +429,21 @@ function redact(row: MerchantPaymentProvider): RedactedProvider {
  *     client input. Credentials are decrypted in-memory only at the instant of
  *     the provider call.
  */
+/**
+ * A customer's online payment on a plan that takes none
+ * (`billing/online-payments-plan.ts`): 409 in the pay page's own words,
+ * naming no plan — the business hears why from its own screens.
+ */
+async function assertCustomerCanPayOnline(
+    organizationId: string,
+): Promise<void> {
+    if (await planTakesOnlinePayment(organizationId)) return;
+    throw new ConflictException({
+        message: NOT_PAID_ONLINE,
+        details: { reason: "not-paid-online" },
+    });
+}
+
 @Injectable()
 export class PaymentsService {
     private readonly logger = new Logger(PaymentsService.name);
@@ -441,9 +476,33 @@ export class PaymentsService {
         // (DEC-054). Throws 400 before any write.
         const publicKey = publicKeyFor({ ...input, provider });
 
+        // A first connection starts taking money online, which the plan
+        // must include (403 MODULE_LOCKED), and connects one of the
+        // business's own accounts (`integrations`, DEC-091). Re-entering the
+        // keys of one already made is never refused: renewals the business
+        // already has are charged through it (ADR-003). Asked before the
+        // business details, so a plan without it hears about the plan, not
+        // an address it would add for nothing (UX-006).
+        const known = await prisma.merchantPaymentProvider.count({
+            where: { organizationId: ctx.organizationId, provider },
+        });
+        if (known === 0) {
+            if (!(await planTakesOnlinePayment(ctx.organizationId))) {
+                await assertPlanTakesOnlinePayment(ctx.organizationId);
+            }
+            await planMeter.assertIncluded(ctx.organizationId, "integrations");
+        }
+
         // Taking money online starts here, and every payment it takes is
         // invoiced: the business details before the keys are kept (DEC-068).
         await assertBusinessDetails(prisma, ctx.organizationId);
+
+        // The keys must work before they are kept (UX-012): one cheap
+        // authenticated read at the provider. 400 when it refuses them.
+        await assertKeysAccepted(this.factory.get(provider), provider, {
+            keyId: input.keyId,
+            keySecret: input.keySecret,
+        });
 
         // Seal { keyId, keySecret, webhookSecret? } as one blob. Plaintext
         // (incl. the webhook secret) is NEVER persisted or logged.
@@ -457,30 +516,51 @@ export class PaymentsService {
             }),
         );
 
-        const row = await prisma.merchantPaymentProvider.upsert({
-            where: {
-                organizationId_provider: {
-                    organizationId: ctx.organizationId,
-                    provider,
-                },
+        // The plan's integrations cap (U13): a new connection is checked;
+        // changing the keys of a connected one adds nothing.
+        const row = await planMeter.withRoom(
+            ctx.organizationId,
+            "integrations",
+            (tx) =>
+                tx.merchantPaymentProvider.upsert({
+                    where: {
+                        organizationId_provider: {
+                            organizationId: ctx.organizationId,
+                            provider,
+                        },
+                    },
+                    create: {
+                        organizationId: ctx.organizationId,
+                        provider,
+                        status: "CONNECTED",
+                        publicKey,
+                        encryptedCredentials: sealed.ciphertext,
+                        credentialsIv: sealed.iv,
+                        credentialsAuthTag: sealed.authTag,
+                    },
+                    update: {
+                        status: "CONNECTED",
+                        publicKey,
+                        encryptedCredentials: sealed.ciphertext,
+                        credentialsIv: sealed.iv,
+                        credentialsAuthTag: sealed.authTag,
+                        // Keys that just passed the check need no attention.
+                        ...NO_ATTENTION,
+                    },
+                }),
+            {
+                addingIn: async (tx) =>
+                    (await tx.merchantPaymentProvider.count({
+                        where: {
+                            organizationId: ctx.organizationId,
+                            provider,
+                            status: "CONNECTED",
+                        },
+                    })) > 0
+                        ? 0
+                        : 1,
             },
-            create: {
-                organizationId: ctx.organizationId,
-                provider,
-                status: "CONNECTED",
-                publicKey,
-                encryptedCredentials: sealed.ciphertext,
-                credentialsIv: sealed.iv,
-                credentialsAuthTag: sealed.authTag,
-            },
-            update: {
-                status: "CONNECTED",
-                publicKey,
-                encryptedCredentials: sealed.ciphertext,
-                credentialsIv: sealed.iv,
-                credentialsAuthTag: sealed.authTag,
-            },
-        });
+        );
 
         return redact(row);
     }
@@ -757,6 +837,8 @@ export class PaymentsService {
         if (amountCents <= 0) {
             throw new BadRequestException("Nothing more to take on this order");
         }
+        // A new online payment: the plan must take one (403 MODULE_LOCKED).
+        await assertPlanTakesOnlinePayment(ctx.organizationId);
         return this.createIntentFor(
             ctx.organizationId,
             {
@@ -1375,6 +1457,7 @@ export class PaymentsService {
     ): Promise<CreateIntentResult> {
         authorize(ctx, "payment:manage");
         const order = await this.requireOwnedOrder(ctx, orderId);
+        await assertPlanTakesOnlinePayment(ctx.organizationId);
         return this.createIntentInternal(ctx.organizationId, order, options);
     }
 
@@ -1395,6 +1478,7 @@ export class PaymentsService {
     ): Promise<CreateIntentResult> {
         const order = await this.requirePayableOrder(orderId);
         await assertOrganizationOpen(order.organizationId);
+        await assertCustomerCanPayOnline(order.organizationId);
         return this.createIntentInternal(order.organizationId, order, options);
     }
 
@@ -1511,6 +1595,8 @@ export class PaymentsService {
         },
         options: { idempotencyKey?: string } = {},
     ): Promise<CreateIntentResult> {
+        // A pay link that charges is a new online payment (the plan's).
+        await assertCustomerCanPayOnline(order.organizationId);
         return this.createIntentFor(
             order.organizationId,
             {
@@ -1663,12 +1749,20 @@ export class PaymentsService {
         // Decrypt in-memory ONLY here, at the moment of the provider call.
         const credentials = this.openCredentials(providerRow);
         const provider = this.factory.get(providerRow.provider);
-        const intent = await provider.createOrderIntent({
-            amountCents,
-            currency,
-            orderId: target.id,
-            credentials,
-        });
+        let intent: CreateOrderIntentResult;
+        try {
+            intent = await provider.createOrderIntent({
+                amountCents,
+                currency,
+                orderId: target.id,
+                credentials,
+            });
+        } catch (err) {
+            // A handled 503 in the customer's words, never an unhandled
+            // 500; refused keys also flag the connection and tell the
+            // team (UX-012).
+            throw await providerOrderFailed(providerRow, err);
+        }
 
         // Persist intent + first attempt atomically. rawResponse holds only the
         // non-secret client params — never any credential.

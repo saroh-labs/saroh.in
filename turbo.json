@@ -30,10 +30,18 @@
         "NEXT_PUBLIC_BETTER_AUTH_URL",
         "NEXT_PUBLIC_ROOT_DOMAIN",
         "NEXT_PUBLIC_VERCEL_ENV",
-        "NEXT_PUBLIC_VERCEL_URL"
+        "NEXT_PUBLIC_VERCEL_URL",
+        // saroh.in: shows Resources pages before their publish date on a
+        // preview deployment; ignored on production (plan KTD-2). Hashed, not
+        // passed through: a build without it pre-renders /help as a 404, and
+        // a cache hit reused that build with the flag on.
+        "RESOURCES_PREVIEW"
     ],
     "globalPassThroughEnv": [
         "PORT",
+        // help.saroh.in: where its proxy sends people once Help moves to
+        // saroh.in/help (17 Oct 2026). Read per request, never at build.
+        "MARKETING_URL",
         "APP_URL",
         "ACCOUNTS_URL",
         "CORS_ORIGIN",
@@ -45,6 +53,8 @@
         "SMTP_SECURE",
         "SMTP_USER",
         "SMTP_PASS",
+        // Where the admin console opens the pricing page and its preview.
+        "MARKETING_SITE_URL",
         "USER_ACCOUNT",
         "USER_PASSWORD",
         "TEST_DATABASE_URL",
@@ -62,6 +72,10 @@
         "R2_PUBLIC_BASE_URL",
         // Signs saroh.app's calls to the api's site sign-in routes (ADR-011).
         "SITE_RELAY_SECRET",
+        // saroh.in's pricing revalidation hook (plans catalogue U24, KTD-10).
+        "PRICING_REVALIDATE_SECRET",
+        // Set by Next itself while building; saroh.in's pricing read checks it.
+        "NEXT_PHASE",
         "VERCEL_ENV",
         "AUTH_COOKIE_PREFIX",
         "DEV_ACCESS_KEY",
@@ -69,9 +83,20 @@
         "DEV_REDIRECT_ORIGIN",
         "VERCEL_GIT_COMMIT_REF",
         "NEXT_PUBLIC_GA_MEASUREMENT_ID",
+        // saroh.in's launch switch (plan KTD-16): Pricing, its links and the
+        // plan sections appear once it is "open"; read at build.
+        "NEXT_PUBLIC_LAUNCH_MODE",
+        // saroh.in: the build's page routes, written by its next.config.js
+        // (routes.config.js), never set by hand.
+        "SAROH_BUILT_ROUTES",
         // The customer account area's release switch, in the api and saroh.app
         // (round-2 A5): off until A6-A8 and A13 ship.
         "SITE_ACCOUNT_AREA",
+        // saroh.app's template renders for the gallery's captures (industry
+        // templates U14): off unless "on", never on a production deployment.
+        "TEMPLATE_RENDERS",
+        // Where e2e's template captures find those renders (U14).
+        "TEMPLATE_RENDER_URL",
         // The api's fake site-code transport writes to os.tmpdir(), which the
         // e2e runner reads (`e2e/tests/site-codes.ts`). Strict env mode drops
         // TMPDIR, so on macOS the api fell back to /tmp while the runner read

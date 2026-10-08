@@ -3,12 +3,15 @@
 import { Button } from "@saroh/ui/button";
 import { EmptyState, FailedState } from "@saroh/ui/data-state";
 import { cn } from "@saroh/ui/lib/utils";
-import { dismissToasts, showError, showUndo } from "@saroh/ui/toast";
+import { dismissToasts, showSuccess, showUndo } from "@saroh/ui/toast";
 import { Repeat } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 
+import { LimitNoticeBlock } from "@/components/billing/limit-notice";
+import { reportFailure } from "@/components/billing/plan-refusal";
+import type { OnlinePaymentsLock } from "@/lib/billing/access";
 import { HOLD_UNDO_MS } from "@/lib/hold-undo";
 
 import { setPlanArchived } from "@/lib/subscriptions/actions";
@@ -34,6 +37,11 @@ const NEW_PLAN_HREF = "/billing/plans/new";
  *
  * `plans` is null when the read failed: the tab says so and the
  * subscriptions beside it are untouched.
+ *
+ * `locked` (6 Oct 2026): the business's plan leaves memberships off. The
+ * notice says so, with the way up, where "New plan" was; the plans stay
+ * listed to open, edit and archive, but nothing new goes on sale ("New
+ * plan" and "Sell again" are gone; the API refuses them too).
  */
 export function PlansTab({
     plans,
@@ -41,6 +49,7 @@ export function PlansTab({
     showClasses,
     settings = null,
     nowIso,
+    locked = null,
 }: {
     plans: Plan[] | null;
     canWrite: boolean;
@@ -53,6 +62,8 @@ export function PlansTab({
     settings?: SubscriptionSettings | null;
     /** Now, from the server: the timing previews' sample renewal. */
     nowIso?: string;
+    /** Memberships aren't on the business's plan: say so, sell nothing new. */
+    locked?: OnlinePaymentsLock | null;
 }) {
     const router = useRouter();
     const [busyId, setBusyId] = useState<string | null>(null);
@@ -64,19 +75,26 @@ export function PlansTab({
             const res = await setPlanArchived(plan.id, archived);
             setBusyId(null);
             if (!res.ok) {
-                showError(res.error);
+                // A plan without memberships refuses Sell again: its notice.
+                reportFailure(res);
                 return;
             }
             router.refresh();
             // One Undo on screen at a time: an older one would undo the
             // wrong plan.
             dismissToasts();
+            // Undo would sell it again, which the plan doesn't allow now:
+            // offering it would be a button that only fails.
+            if (locked && archived) {
+                showSuccess(archiveToast(plan, archived));
+                return;
+            }
             showUndo(
                 archiveToast(plan, archived),
                 () =>
                     start(async () => {
                         const back = await setPlanArchived(plan.id, !archived);
-                        if (!back.ok) showError(back.error);
+                        if (!back.ok) reportFailure(back);
                         router.refresh();
                     }),
                 { duration: HOLD_UNDO_MS },
@@ -118,12 +136,22 @@ export function PlansTab({
                     Changing a price only changes what&apos;s sold next.
                     Everyone already on a plan keeps what they agreed to.
                 </p>
-                {canWrite ? (
+                {canWrite && !locked ? (
                     <Button asChild className={BUTTON}>
                         <Link href={NEW_PLAN_HREF}>New plan</Link>
                     </Button>
                 ) : null}
             </div>
+            {locked ? (
+                <LimitNoticeBlock
+                    full={false}
+                    title={locked.title}
+                    body={locked.body}
+                    cta={locked.cta}
+                    href={locked.href}
+                    className="mb-3"
+                />
+            ) : null}
 
             {plans.length === 0 ? (
                 <EmptyState
@@ -131,7 +159,7 @@ export function PlansTab({
                     title="No plans yet"
                     description="A plan is what you sell on repeat — a monthly membership, a weekly loaf. Make one, then put people on it."
                     action={
-                        canWrite ? (
+                        canWrite && !locked ? (
                             <Button asChild>
                                 <Link href={NEW_PLAN_HREF}>Make a plan</Link>
                             </Button>
@@ -145,6 +173,7 @@ export function PlansTab({
                             <PlanCard
                                 card={planCard(p, showClasses)}
                                 canWrite={canWrite}
+                                sellsAgain={!locked}
                                 busy={busyId === p.id}
                                 onArchive={() =>
                                     setArchived(p, p.status !== "ARCHIVED")
@@ -161,11 +190,14 @@ export function PlansTab({
 function PlanCard({
     card,
     canWrite,
+    sellsAgain,
     busy,
     onArchive,
 }: {
     card: PlanCardView;
     canWrite: boolean;
+    /** False while the plan leaves memberships off: no "Sell again". */
+    sellsAgain: boolean;
     busy: boolean;
     onArchive: () => void;
 }) {
@@ -223,7 +255,7 @@ function PlanCard({
                             Edit
                         </Link>
                     </Button>
-                    {card.canArchive ? (
+                    {card.canArchive && (sellsAgain || !card.archived) ? (
                         <Button
                             variant="outline"
                             className={cn(BUTTON, "coarse:h-11")}

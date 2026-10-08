@@ -6,17 +6,23 @@ import {
 } from "@nestjs/common";
 import type { Prisma } from "@saroh/database";
 import { prisma } from "@saroh/database";
+import type { TemplateManifest } from "@saroh/templates";
 import {
     getTemplate,
     instantiateTemplate,
     TemplateInstantiationError,
+    templateStylePreset,
 } from "@saroh/templates";
 import { randomUUID } from "node:crypto";
 
 import { prismaErrorCode } from "../../common/prisma-errors";
 import type { OrganizationContext } from "../../common/types/organization-context";
 import type { EntitlementService } from "../billing/entitlement.service";
-import { MAX_WEBSITES_PER_BUSINESS } from "../organizations/business-limits";
+import { planMeter } from "../billing/metering.service";
+import {
+    LEGACY_WEBSITES_PER_BUSINESS,
+    MAX_WEBSITES_PER_BUSINESS,
+} from "../organizations/business-limits";
 import { organizationKind } from "../organizations/organization-kind";
 import { authorize } from "../organizations/organization-policy";
 import { automaticStorefront } from "./sells-from";
@@ -26,11 +32,18 @@ import {
     freeAddress,
     releaseExpired,
 } from "./site-address";
+import type { SiteFooter } from "./site-footer";
+import { parseSiteFooter } from "./site-footer";
+import type { SiteNavigation } from "./site-navigation";
+import { NAVIGATION_MAX_ITEMS } from "./site-navigation";
+import type { SiteStyle } from "./site-style";
+import { parseSiteStyle } from "./site-style";
 import {
     buildTemplateContext,
     KIND_TEMPLATE,
     withEnquiryForms,
 } from "./site-template";
+import type { SiteTemplateRecord } from "./site-template-record";
 
 /**
  * Creating a website from a template (S2-003), in two halves so a caller
@@ -61,6 +74,20 @@ export interface SitePlan {
     name: string;
     slug: string;
     pages: ReturnType<typeof instantiateTemplate>["pages"];
+    /** The template it is made from, recorded on the Site (KTD-7). */
+    template: SiteTemplateRecord;
+    /**
+     * The look the site starts in: the template's colourway, validated as a
+     * saved style is. Absent when the template has none — the site keeps the
+     * default look, as every site did before templates carried styles.
+     */
+    style?: { id: string; value: SiteStyle };
+    /**
+     * The footer the site starts with: the template's line and layout
+     * (`TemplateManifest.footer`), as plain text. Absent when the template
+     * sets none — the site ends in its name, as every site did.
+     */
+    footer?: SiteFooter;
 }
 
 /** What a caller asks for: the `/sites/new` body's fields. */
@@ -70,6 +97,67 @@ export interface SiteRequest {
     subdomain?: string;
     templateId?: string;
     templateVersion?: number;
+    /** One of the template's colourways; its first when absent. */
+    styleId?: string;
+}
+
+/**
+ * The colourway a site made from `template` starts in (plan KTD-1), parsed
+ * through the same rules as a style the merchant saves, so a template can
+ * only choose what Website › Style could have.
+ *
+ * - No `styleId`: the template's first colourway, or none if it has none.
+ * - A `styleId` the template has: that one.
+ * - A `styleId` it does not have: a 400 on the field, rather than a site in a
+ *   look nobody asked for.
+ *
+ * A shipped template whose colourway fails the style rules is a server bug
+ * (a template unit's spec catches it first), reported as one.
+ */
+export function planTemplateStyle(
+    template: Pick<TemplateManifest, "id" | "version" | "styles">,
+    styleId?: string,
+): SitePlan["style"] {
+    const preset = templateStylePreset(template, styleId);
+    if (preset === null) {
+        throw new BadRequestException({
+            message: `"${styleId}" is not one of this template's colourways`,
+            details: { field: "styleId" },
+        });
+    }
+    if (!preset) return undefined;
+    try {
+        return { id: preset.id, value: parseSiteStyle(preset.style) };
+    } catch {
+        throw new InternalServerErrorException(
+            `Template "${template.id}" v${template.version} has an invalid style "${preset.id}"`,
+        );
+    }
+}
+
+/**
+ * The footer a site made from `template` starts with: its line as plain
+ * text, laid out as it says, through the same parser as a footer the
+ * merchant saves. Undefined when the template sets no footer, or sets
+ * nothing a footer would keep (a centred footer with no line).
+ */
+export function planTemplateFooter(
+    template: Pick<TemplateManifest, "id" | "version" | "footer">,
+): SiteFooter | undefined {
+    if (!template.footer) return undefined;
+    try {
+        return (
+            parseSiteFooter({
+                format: "markdown",
+                value: template.footer.line ?? "",
+                layout: template.footer.layout ?? "centre",
+            }) ?? undefined
+        );
+    } catch {
+        throw new InternalServerErrorException(
+            `Template "${template.id}" v${template.version} has an invalid footer`,
+        );
+    }
 }
 
 /**
@@ -115,22 +203,30 @@ export async function planSiteFromTemplate(
 ): Promise<SitePlan> {
     authorize(ctx, "site:create");
 
-    // Two caps on the org's live sites (soft-deleted excluded). The
-    // product's comes first (ADR-006): one website per business for now,
-    // whatever the plan says, and upgrading would not help — so it is a
-    // 409 in plain words, not "upgrade to add more". Then the
-    // subscription's `sites` entitlement (S7-005), a 403 at the plan
-    // limit. The lower of the two wins.
+    // Caps on the org's live sites (soft-deleted excluded). The product's
+    // comes first, whatever the plan says: upgrading would not help, so it
+    // is a 409 in plain words, not "upgrade to add more". Then the plan's:
+    // where the catalogue governs websites (its `sites` row, behind
+    // PLAN_ENFORCEMENT), metering counts them on the write's transaction
+    // (`writeSiteFromTemplate`); elsewhere one website per business as
+    // before (ADR-006), and the `sites` floor (S7-005), a 403.
     const siteCount = await prisma.site.count({
         where: { organizationId: ctx.organizationId, deletedAt: null },
     });
     if (siteCount >= MAX_WEBSITES_PER_BUSINESS) {
         throw new ConflictException({
-            message:
-                "This business already has its website. Change its pages, look and address from Website.",
+            message: `This business has ${siteCount} websites, as many as Saroh allows. Delete one it no longer uses to add another.`,
         });
     }
-    await entitlements.check(ctx.organizationId, "sites", siteCount);
+    if (!(await planMeter.enforcedRow(ctx.organizationId, "sites"))) {
+        if (siteCount >= LEGACY_WEBSITES_PER_BUSINESS) {
+            throw new ConflictException({
+                message:
+                    "This business already has its website. Change its pages, look and address from Website.",
+            });
+        }
+        await entitlements.check(ctx.organizationId, "sites", siteCount);
+    }
 
     // The kind picks a default only; an explicit choice always wins.
     const templateId =
@@ -144,6 +240,10 @@ export async function planSiteFromTemplate(
                 : `Unknown template "${templateId}" v${dto.templateVersion}`,
         );
     }
+
+    // Before any read: a colourway the template lacks is the caller's error.
+    const style = planTemplateStyle(template, dto.styleId);
+    const footer = planTemplateFooter(template);
 
     const slug = slugify(dto.slug ?? dto.name);
     if (!slug) {
@@ -159,6 +259,14 @@ export async function planSiteFromTemplate(
             name: dto.name,
             slug,
             pages: instantiateTemplate(template, context).pages,
+            template: {
+                id: template.id,
+                version: template.version,
+                // The colourway the site starts in (U1), or none.
+                styleId: style?.id ?? null,
+            },
+            ...(style ? { style } : {}),
+            ...(footer ? { footer } : {}),
         };
     } catch (error) {
         if (error instanceof TemplateInstantiationError) {
@@ -277,6 +385,10 @@ export async function writeSiteFromTemplate(
 ): Promise<CreatedSite> {
     const field = options.addressField ?? "subdomain";
 
+    // The plan's websites, first on the transaction (it takes the meter's
+    // lock): nothing where the catalogue doesn't govern them.
+    await planMeter.roomInTx(tx, ctx.organizationId, "sites");
+
     // Fail fast on a taken slug with a clear 409 (the unique is
     // [organizationId, slug]); the check + create share the txn.
     const existing = await tx.site.findFirst({
@@ -308,9 +420,26 @@ export async function writeSiteFromTemplate(
                 name: plan.name,
                 slug: plan.slug,
                 subdomain,
+                templateId: plan.template.id,
+                templateVersion: plan.template.version,
+                templateStyleId: plan.template.styleId,
                 // Where it sells from (G11): set only when there is
                 // exactly one candidate, and the settings say so.
                 storefrontId: await automaticStorefront(tx, ctx.organizationId),
+                // The template's colourway (KTD-1), if it has one.
+                ...(plan.style
+                    ? {
+                          style: plan.style
+                              .value as unknown as Prisma.InputJsonValue,
+                      }
+                    : {}),
+                // Its footer line and layout, if it sets them: the
+                // merchant's to rewrite in Site settings.
+                ...(plan.footer
+                    ? {
+                          footer: plan.footer as unknown as Prisma.InputJsonValue,
+                      }
+                    : {}),
             },
             select: { id: true, slug: true },
         });
@@ -339,8 +468,17 @@ export async function writeSiteFromTemplate(
         plan.pages,
     );
 
+    // The template's menu, in page order: the pages it puts there
+    // (`inMenu`, UX-070: the starter names Home and About), else every page
+    // but the home page (industry templates), whose link is the site name.
+    // The menu lists only what `Site.navigation` names, so a Timetable or
+    // Trainers page would otherwise be unreachable from the header; and
+    // Settings › Menu, the pre-publish check and the live header name the
+    // same one from the first draft.
+    const menuPageIds: string[] = [];
     for (const page of pages) {
-        await tx.page.create({
+        const created = await tx.page.create({
+            select: { id: true },
             data: {
                 siteId: site.id,
                 organizationId: ctx.organizationId,
@@ -367,6 +505,20 @@ export async function writeSiteFromTemplate(
                         },
                     },
                 },
+            },
+        });
+        if (page.inMenu ?? !page.isHome) menuPageIds.push(created.id);
+    }
+    if (menuPageIds.length > 0) {
+        const navigation: SiteNavigation = {
+            items: menuPageIds
+                .slice(0, NAVIGATION_MAX_ITEMS)
+                .map((pageId) => ({ pageId })),
+        };
+        await tx.site.update({
+            where: { id: site.id },
+            data: {
+                navigation: navigation as unknown as Prisma.InputJsonValue,
             },
         });
     }

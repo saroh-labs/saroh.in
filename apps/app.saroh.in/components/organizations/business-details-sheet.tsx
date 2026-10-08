@@ -30,16 +30,15 @@ import { GSTIN_EXAMPLE } from "@/lib/invoices/gstin";
 import type {
     BusinessDetail,
     BusinessDetailsValues,
+    DetailsOnFile,
 } from "@/lib/organizations/business-details";
 import {
     detailsInput,
+    detailsOnFileOf,
     detailsProblems,
     detailsTitle,
-    detailsValuesOf,
     detailsWhy,
-    inIndia,
 } from "@/lib/organizations/business-details";
-import type { OrganizationKind } from "@/lib/organizations/kind";
 import {
     readBusinessDetails,
     saveOrganizationSettings,
@@ -54,16 +53,7 @@ const FIELDS = [
     "taxId",
 ] as const;
 
-/** What is on file, read before the sheet opens — or why it couldn't be. */
-export type DetailsOnFile =
-    | { state: "failed"; message: string; forbidden: boolean }
-    | {
-          state: "ready";
-          values: BusinessDetailsValues;
-          inIndia: boolean;
-          /** Picks the sheet's words (DEC-070); absent from an older API. */
-          kind: OrganizationKind | undefined;
-      };
+export type { DetailsOnFile };
 
 /**
  * Read what is on file for the step. It is read before the sheet opens, so
@@ -72,15 +62,7 @@ export type DetailsOnFile =
  * them once the read lands.
  */
 export async function readDetailsOnFile(): Promise<DetailsOnFile> {
-    const res = await readBusinessDetails();
-    return res.ok
-        ? {
-              state: "ready",
-              values: detailsValuesOf(res.data),
-              inIndia: inIndia(res.data.profile?.country),
-              kind: res.data.kind,
-          }
-        : { state: "failed", message: res.error, forbidden: res.forbidden };
+    return detailsOnFileOf(await readBusinessDetails());
 }
 
 /**

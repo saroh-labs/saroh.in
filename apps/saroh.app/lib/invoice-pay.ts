@@ -1,4 +1,5 @@
 import type { AutopayDoneState, AutopayStartResult } from "@saroh/site-blocks";
+import { payInstructionsOf } from "@saroh/site-blocks";
 
 import { serverApiUrl } from "./api-url";
 import { autopayDoneAnswer, autopayStartAnswer } from "./autopay-shape";
@@ -9,9 +10,11 @@ import {
     isPayInvoice,
     payAutopayOf,
     payChargingOf,
+    payContactOf,
     payOnlineOf,
     payUrlOf,
 } from "./invoice-pay-shape";
+import { withRelay } from "./relay-headers";
 
 export type { PayInvoice, PayInvoiceLine } from "./invoice-pay-shape";
 
@@ -36,7 +39,10 @@ export async function getPayInvoice(token: string): Promise<PayLookup> {
     try {
         res = await fetch(
             `${API_URL}/public/invoices/${encodeURIComponent(token)}`,
-            { cache: "no-store", headers: { accept: "application/json" } },
+            {
+                cache: "no-store",
+                headers: await withRelay({ accept: "application/json" }),
+            },
         );
     } catch {
         return { ok: false, reason: "unavailable" };
@@ -58,6 +64,10 @@ export async function getPayInvoice(token: string): Promise<PayLookup> {
                       payUrl: payUrlOf(body.payUrl),
                       // Whether Pay is offered at all (DEC-070).
                       payOnline: payOnlineOf(body.payOnline),
+                      // How to pay offline (R32), checked field by field.
+                      payInstructions: payInstructionsOf(body.payInstructions),
+                      // A way to reach them when none is set (UX-007).
+                      businessContact: payContactOf(body.businessContact),
                   },
               }
             : { ok: false, reason: "unavailable" };
@@ -86,10 +96,10 @@ export async function startInvoicePayment(
             {
                 method: "POST",
                 cache: "no-store",
-                headers: {
+                headers: await withRelay({
                     accept: "application/json",
                     "content-type": "application/json",
-                },
+                }),
                 body: JSON.stringify({ idempotencyKey }),
             },
         );
@@ -156,10 +166,10 @@ export async function startInvoiceAutopay(
             {
                 method: "POST",
                 cache: "no-store",
-                headers: {
+                headers: await withRelay({
                     accept: "application/json",
                     "content-type": "application/json",
-                },
+                }),
                 body: JSON.stringify({ method, idempotencyKey }),
             },
         );
@@ -185,7 +195,10 @@ export async function getInvoiceAutopay(
     try {
         res = await fetch(
             `${API_URL}/public/invoices/${encodeURIComponent(token)}/autopay`,
-            { cache: "no-store", headers: { accept: "application/json" } },
+            {
+                cache: "no-store",
+                headers: await withRelay({ accept: "application/json" }),
+            },
         );
     } catch {
         return { state: { kind: "error" }, payUrl: null };

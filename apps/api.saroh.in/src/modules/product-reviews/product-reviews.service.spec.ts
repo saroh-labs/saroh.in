@@ -1,16 +1,24 @@
-// Product reviews, the business's side: who may be invited, that nothing is
-// recorded until the email has left, that consent is honoured, and that the
-// raw token is never stored. Prisma, the email sender and env are mocked.
+// Product reviews, the business's side: who may be invited, that an
+// invitation goes only through the business's own email provider (D11) and
+// is recorded as it is queued, that consent is honoured, and that the raw
+// token is never stored. Prisma, the send path and env are mocked.
 jest.mock("../../env", () => ({
     env: { NODE_ENV: "test", RENDERER_URL: "https://renderer.test" },
 }));
-jest.mock("../../common/email", () => ({
-    sendReviewInvitationEmail: jest.fn(),
+jest.mock("../communications/communications.service", () => ({
+    CommunicationsService: class {},
+}));
+jest.mock("../billing/metering.service", () => ({ planMeter: {} }));
+jest.mock("../communications/message-send.handler", () => ({
+    CANCELLED_DELIVERY: "CANCELLED",
 }));
 jest.mock("@saroh/database", () => ({
     prisma: {
+        $transaction: jest.fn(),
         order: { findFirst: jest.fn(), findMany: jest.fn() },
         reviewInvitation: { upsert: jest.fn() },
+        delivery: { updateMany: jest.fn() },
+        message: { updateMany: jest.fn(), update: jest.fn() },
         customerIdentityLink: { findMany: jest.fn() },
         contact: { findMany: jest.fn(), findFirst: jest.fn() },
         consent: { findFirst: jest.fn() },
@@ -24,12 +32,13 @@ jest.mock("@saroh/database", () => ({
     },
 }));
 
-import { NotFoundException } from "@nestjs/common";
+import { ConflictException, NotFoundException } from "@nestjs/common";
 import { prisma } from "@saroh/database";
 
-import { sendReviewInvitationEmail } from "../../common/email";
 import type { OrganizationContext } from "../../common/types/organization-context";
 import type { AuditService } from "../audit/audit.service";
+import type { CommunicationsService } from "../communications/communications.service";
+import { SECRET_LINK_SLOT } from "../communications/transactional";
 import { FixedWindowRateLimiter } from "../enquiry/rate-limiter";
 import {
     ProductReviewsService,
@@ -38,7 +47,18 @@ import {
 import { hashReviewToken } from "./token";
 
 const db = prisma as unknown as Record<string, Record<string, jest.Mock>>;
-const send = sendReviewInvitationEmail as jest.Mock;
+const comms = {
+    emailConnected: jest.fn(),
+    queueTransactional: jest.fn(),
+};
+/** The secret link the last queued invitation would carry. */
+async function queuedLink(call = 0): Promise<string> {
+    const input = comms.queueTransactional.mock.calls[call][2] as {
+        secretLink: () => Promise<string>;
+    };
+    return input.secretLink();
+}
+const send = comms.queueTransactional;
 const audit = { record: jest.fn() } as unknown as AuditService;
 
 const ctx: OrganizationContext = {
@@ -60,8 +80,37 @@ const order = (over: Record<string, unknown> = {}) => ({
     ...over,
 });
 
-const make = (limit = 100) =>
-    new ProductReviewsService(audit, new FixedWindowRateLimiter(limit, 60_000));
+const ownEmailRoom = jest.fn();
+const make = (limit = 100) => {
+    const service = new ProductReviewsService(
+        comms as unknown as CommunicationsService,
+        audit,
+        new FixedWindowRateLimiter(limit, 60_000),
+    );
+    service.ownEmailRoom = ownEmailRoom;
+    return service;
+};
+
+/** An order's invitation as the service reads it. */
+const invitation = (
+    over: {
+        completedAt?: Date | null;
+        sendCount?: number;
+        latest?: string | null;
+        accepted?: number;
+        reviews?: number;
+    } = {},
+) => ({
+    completedAt: over.completedAt ?? null,
+    expiresAt: new Date(Date.now() + 1e9),
+    lastSentAt: new Date(),
+    sendCount: over.sendCount ?? 0,
+    messages:
+        over.latest === undefined || over.latest === null
+            ? []
+            : [{ status: "QUEUED", deliveries: [{ status: over.latest }] }],
+    _count: { reviews: over.reviews ?? 0, messages: over.accepted ?? 0 },
+});
 
 beforeEach(() => {
     jest.clearAllMocks();
@@ -69,22 +118,52 @@ beforeEach(() => {
     db.customerIdentityLink!.findMany!.mockResolvedValue([]);
     db.contact!.findMany!.mockResolvedValue([{ id: "ct_1" }]);
     db.consent!.findFirst!.mockResolvedValue(null);
-    send.mockResolvedValue("sent");
+    db.$transaction!.mockImplementation((fn: (tx: unknown) => unknown) =>
+        fn(prisma),
+    );
+    comms.emailConnected.mockResolvedValue(true);
+    ownEmailRoom.mockResolvedValue(true);
+    db.reviewInvitation!.upsert!.mockResolvedValue({ id: "inv_1" });
+    send.mockResolvedValue({
+        id: "m_1",
+        status: "QUEUED",
+        toAddress: "ananya@example.com",
+        route: "PROVIDER",
+    });
 });
 
 describe("invite", () => {
-    it("emails a link whose token is stored only as its hash", async () => {
+    it("queues the invitation through the business's provider, to the order's customer", async () => {
         const [result] = await make().invite(ctx, ["o_1"]);
-        expect(result).toEqual({ orderId: "o_1", status: "sent" });
+        expect(result).toEqual({ orderId: "o_1", status: "queued" });
+        const [tx, org, input] = send.mock.calls[0];
+        expect(tx).toBe(prisma);
+        expect(org).toBe("org_1");
+        expect(input).toMatchObject({
+            template: "REVIEW_INVITATION",
+            recipient: { kind: "ORDER_CUSTOMER", orderId: "o_1" },
+            createdByUserId: "u_1",
+        });
+        expect(input.rendered.subject).toBe(
+            "How was your order from High Street?",
+        );
+        // The stored body holds the slot, never the link.
+        expect(input.rendered.body).toContain(SECRET_LINK_SLOT);
+        expect(input.rendered.body).not.toContain("/review/");
+        expect(audit.record).toHaveBeenCalledWith(
+            expect.objectContaining({ action: "product-review.invite" }),
+        );
+    });
 
-        const [to, url, store] = send.mock.calls[0] as [string, string, string];
-        expect(to).toBe("ananya@example.com");
-        expect(store).toBe("High Street");
+    it("sends a link whose token is stored only as its hash", async () => {
+        const [result] = await make().invite(ctx, ["o_1"]);
+        const url = await queuedLink();
         const token = url.split("/review/")[1]!;
         expect(url.startsWith("https://renderer.test/review/")).toBe(true);
 
         const written = db.reviewInvitation!.upsert!.mock.calls[0][0];
         expect(written.create.tokenHash).toBe(hashReviewToken(token));
+        expect(written.create.toAddress).toBe("ananya@example.com");
         // The raw token is in the email, and nowhere in what was stored.
         expect(JSON.stringify(written)).not.toContain(token);
         expect(JSON.stringify(result)).not.toContain(token);
@@ -150,55 +229,128 @@ describe("invite", () => {
         const [result] = await make().invite(ctx, ["o_1"]);
         expect(result).toEqual({
             orderId: "o_1",
-            status: "sent",
+            status: "queued",
             note: "consent-not-checked",
         });
     });
 
+    it("sends nothing without a connected email provider, and says where to connect one", async () => {
+        comms.emailConnected.mockResolvedValue(false);
+        const [result] = await make().invite(ctx, ["o_1"]);
+        expect(result).toEqual({
+            orderId: "o_1",
+            status: "skipped",
+            reason: "no-email-provider",
+            message:
+                "Review invitations go from your own email. Connect an email provider in Settings › Providers to send them.",
+        });
+        expect(send).not.toHaveBeenCalled();
+        expect(db.reviewInvitation!.upsert).not.toHaveBeenCalled();
+    });
+
+    it("on a plan that can't connect its own email, says it needs a paid plan", async () => {
+        comms.emailConnected.mockResolvedValue(false);
+        ownEmailRoom.mockResolvedValue(false);
+        const [result] = await make().invite(ctx, ["o_1"]);
+        expect(result).toMatchObject({
+            reason: "no-email-provider",
+            message:
+                "Review invitations go from your own email, and connecting your own email needs a paid plan.",
+        });
+    });
+
+    it("a plan it couldn't read still offers connecting", async () => {
+        comms.emailConnected.mockResolvedValue(false);
+        ownEmailRoom.mockRejectedValue(new Error("catalogue down"));
+        const [result] = await make().invite(ctx, ["o_1"]);
+        expect((result as { message: string }).message).toContain(
+            "Connect an email provider",
+        );
+    });
+
+    it("never counts a skip for no provider against the daily cap", async () => {
+        comms.emailConnected.mockResolvedValueOnce(false);
+        const results = await make(1).invite(ctx, ["o_1", "o_2"]);
+        expect(results.map((r) => r.status)).toEqual(["skipped", "queued"]);
+    });
+
+    it("records nothing when the send path's consent gate suppressed it", async () => {
+        send.mockResolvedValue({
+            id: "m_1",
+            status: "SUPPRESSED",
+            toAddress: "ananya@example.com",
+        });
+        const [result] = await make().invite(ctx, ["o_1"]);
+        expect(result).toMatchObject({
+            status: "skipped",
+            reason: "unsubscribed",
+        });
+        expect(db.reviewInvitation!.upsert).not.toHaveBeenCalled();
+        expect(audit.record).not.toHaveBeenCalled();
+    });
+
     it.each([
-        ["not-configured", "email-unavailable"],
-        ["failed", "email-failed"],
+        [true, "no-email"],
+        [false, "no-email-provider"],
     ] as const)(
-        "records nothing when the email was %s",
-        async (outcome, reason) => {
-            send.mockResolvedValue(outcome);
+        "turns the send path's 409 into a skip (provider still connected: %s)",
+        async (connected, reason) => {
+            send.mockRejectedValue(new ConflictException("no"));
+            comms.emailConnected
+                .mockResolvedValueOnce(true)
+                .mockResolvedValueOnce(connected);
             const [result] = await make().invite(ctx, ["o_1"]);
             expect(result).toMatchObject({ status: "skipped", reason });
             expect(db.reviewInvitation!.upsert).not.toHaveBeenCalled();
         },
     );
 
-    it("resends by rotating the hash and counting the send", async () => {
+    it("lets any other failure through", async () => {
+        send.mockRejectedValue(new Error("db down"));
+        await expect(make().invite(ctx, ["o_1"])).rejects.toThrow("db down");
+    });
+
+    it("a new invitation counts no send until its provider accepts it", async () => {
+        await make().invite(ctx, ["o_1"]);
+        const written = db.reviewInvitation!.upsert!.mock.calls[0][0];
+        expect(written.create.sendCount).toBe(0);
+        expect(written.update).not.toHaveProperty("sendCount");
+        // The message is tied to the invitation, so its delivery can say.
+        expect(db.message!.update).toHaveBeenCalledWith({
+            where: { id: "m_1" },
+            data: { reviewInvitationId: "inv_1" },
+        });
+    });
+
+    it("resends by rotating the hash and withdrawing the earlier sends that haven't gone", async () => {
         db.order!.findFirst!.mockResolvedValue(
-            order({
-                reviewInvitation: {
-                    completedAt: null,
-                    expiresAt: new Date(Date.now() + 1e9),
-                    lastSentAt: new Date(),
-                    sendCount: 1,
-                    _count: { reviews: 0 },
-                },
-            }),
+            order({ reviewInvitation: invitation({ latest: "FAILED" }) }),
         );
         await make().invite(ctx, ["o_1"]);
         const update = db.reviewInvitation!.upsert!.mock.calls[0][0].update;
-        expect(update.tokenHash).toMatch(/^[0-9a-f]{64}$/);
-        expect(update.sendCount).toEqual({ increment: 1 });
+        const token = (await queuedLink()).split("/review/")[1]!;
+        expect(update.tokenHash).toBe(hashReviewToken(token));
+        expect(db.delivery!.updateMany).toHaveBeenCalledWith({
+            where: {
+                message: { reviewInvitationId: "inv_1" },
+                status: { in: ["QUEUED", "FAILED"] },
+            },
+            data: { status: "CANCELLED" },
+        });
+        // Withdrawn before the new message is tied on, so it never is.
+        expect(
+            db.delivery!.updateMany!.mock.invocationCallOrder[0]!,
+        ).toBeLessThan(db.message!.update!.mock.invocationCallOrder[0]!);
     });
 
     it.each([
-        ["send-limit", { completedAt: null, sendCount: 3 }],
-        ["completed", { completedAt: new Date(), sendCount: 1 }],
+        ["send-limit", invitation({ accepted: 3 })],
+        ["send-limit", invitation({ sendCount: 1, accepted: 2 })],
+        ["completed", invitation({ completedAt: new Date(), accepted: 1 })],
+        ["sending", invitation({ latest: "QUEUED" })],
     ] as const)("refuses to send again when %s", async (reason, inv) => {
         db.order!.findFirst!.mockResolvedValue(
-            order({
-                reviewInvitation: {
-                    ...inv,
-                    expiresAt: new Date(Date.now() + 1e9),
-                    lastSentAt: new Date(),
-                    _count: { reviews: 2 },
-                },
-            }),
+            order({ reviewInvitation: inv }),
         );
         const [result] = await make().invite(ctx, ["o_1"]);
         expect(result).toMatchObject({ status: "skipped", reason });
@@ -228,6 +380,32 @@ describe("invite", () => {
         expect(result).toMatchObject({ status: "skipped", reason: "no-email" });
         expect(send).not.toHaveBeenCalled();
         expect(db.reviewInvitation!.upsert).not.toHaveBeenCalled();
+    });
+
+    it("offers orders never asked, or whose every send failed", async () => {
+        db.order!.findMany!.mockResolvedValue([]);
+        await make().invitableOrders("org_1");
+        const where = db.order!.findMany!.mock.calls[0][0].where;
+        expect(where.OR).toEqual([
+            { reviewInvitation: null },
+            {
+                reviewInvitation: {
+                    completedAt: null,
+                    sendCount: 0,
+                    messages: {
+                        none: {
+                            deliveries: {
+                                some: {
+                                    status: {
+                                        in: ["SENT", "DELIVERED", "QUEUED"],
+                                    },
+                                },
+                            },
+                        },
+                    },
+                },
+            },
+        ]);
     });
 
     it("leaves walk-ins out of the orders it offers to invite", async () => {
@@ -266,7 +444,7 @@ describe("invite", () => {
 
     it("stops at the business's daily cap", async () => {
         const results = await make(1).invite(ctx, ["o_1", "o_2"]);
-        expect(results.map((r) => r.status)).toEqual(["sent", "skipped"]);
+        expect(results.map((r) => r.status)).toEqual(["queued", "skipped"]);
         expect(results[1]).toMatchObject({ reason: "daily-limit" });
         expect(send).toHaveBeenCalledTimes(1);
     });
@@ -277,10 +455,70 @@ describe("invite", () => {
             .mockResolvedValueOnce(order());
         const results = await make().invite(ctx, ["a", "b", "c"]);
         expect(results.map((r) => [r.orderId, r.status])).toEqual([
-            ["a", "sent"],
+            ["a", "queued"],
             ["b", "skipped"],
-            ["c", "sent"],
+            ["c", "queued"],
         ]);
+    });
+});
+
+describe("invitationState", () => {
+    it.each([
+        ["sending", invitation({ latest: "QUEUED" }), 0],
+        ["failed", invitation({ latest: "FAILED" }), 0],
+        ["failed", invitation({ latest: "BOUNCED", accepted: 1 }), 1],
+        ["sent", invitation({ latest: "SENT", accepted: 1 }), 1],
+        ["sent", invitation({ latest: "DELIVERED", accepted: 2 }), 2],
+        // Saroh's sender, before D11: recorded only once it had left.
+        ["sent", invitation({ sendCount: 1 }), 1],
+    ] as const)(
+        "reads %s from the latest send's delivery",
+        async (state, inv, sends) => {
+            db.order!.findFirst!.mockResolvedValue(
+                order({ reviewInvitation: inv }),
+            );
+            const read = await make().invitationState("org_1", "o_1");
+            expect(read.state).toBe(state);
+            expect(read.sendCount).toBe(sends);
+        },
+    );
+
+    it("a failed send leaves the order open to resend", async () => {
+        db.order!.findFirst!.mockResolvedValue(
+            order({ reviewInvitation: invitation({ latest: "FAILED" }) }),
+        );
+        const read = await make().invitationState("org_1", "o_1");
+        expect(read.blocked).toBeNull();
+        expect(read.email).toEqual({ connected: true, canConnect: null });
+    });
+
+    it("says it needs a paid plan where the plan can't connect email", async () => {
+        comms.emailConnected.mockResolvedValue(false);
+        ownEmailRoom.mockResolvedValue(false);
+        const read = await make().invitationState("org_1", "o_1");
+        expect(read.email).toEqual({ connected: false, canConnect: false });
+        expect(read.blocked?.message).toBe(
+            "Review invitations go from your own email, and connecting your own email needs a paid plan.",
+        );
+    });
+
+    it("blocks an invitable order when the business has no email provider", async () => {
+        comms.emailConnected.mockResolvedValue(false);
+        const state = await make().invitationState("org_1", "o_1");
+        expect(state.state).toBe("none");
+        expect(state.blocked).toMatchObject({ reason: "no-email-provider" });
+    });
+
+    it("leaves it open when the provider is connected", async () => {
+        const state = await make().invitationState("org_1", "o_1");
+        expect(state.blocked).toBeNull();
+    });
+
+    it("names the order's own reason first", async () => {
+        comms.emailConnected.mockResolvedValue(false);
+        db.order!.findFirst!.mockResolvedValue(order({ status: "PENDING" }));
+        const state = await make().invitationState("org_1", "o_1");
+        expect(state.blocked).toMatchObject({ reason: "not-shipped" });
     });
 });
 

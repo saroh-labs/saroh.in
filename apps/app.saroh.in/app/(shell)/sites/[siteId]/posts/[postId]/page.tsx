@@ -5,6 +5,9 @@ import { getPost, listPostCategories } from "@/lib/content/service";
 import { requireSession } from "@/lib/session";
 import { getSite } from "@/lib/sites/service";
 
+/** The tab's title (UX-081): without one it read the bare "Saroh". */
+export const metadata = { title: "Post · Website" };
+
 /*
  * The editor is document-shaped and owns the whole area (#232) — it carries
  * its own header with the state and the publish control, so a PageHeader above

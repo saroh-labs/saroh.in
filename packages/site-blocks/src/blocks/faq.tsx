@@ -13,7 +13,10 @@ export default function FaqSection({ content }: { content: RenderedFaq }) {
     return (
         <section className="mx-auto w-full max-w-3xl px-5 py-[var(--site-section-padding)] sm:px-[var(--site-page-margin)]">
             {content.heading ? (
-                <h2 className="text-site-fg text-[calc(1.875rem*var(--site-heading-scale))] font-bold tracking-tight">
+                <h2
+                    data-site-title=""
+                    className="font-site-heading text-site-fg text-[calc(1.875rem*var(--site-heading-scale))] font-bold tracking-tight"
+                >
                     {content.heading}
                 </h2>
             ) : null}
@@ -38,7 +41,7 @@ export default function FaqSection({ content }: { content: RenderedFaq }) {
                                 +
                             </span>
                         </summary>
-                        <p className="text-site-body whitespace-pre-line pb-5 leading-relaxed">
+                        <p className="text-site-body whitespace-pre-line pb-5 text-[length:var(--site-body-size,1rem)] leading-relaxed">
                             {item.answer}
                         </p>
                     </details>

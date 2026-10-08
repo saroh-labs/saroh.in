@@ -22,9 +22,12 @@ jest.mock("@saroh/database", () => {
             findMany: jest.fn(),
             count: jest.fn(),
             create: jest.fn(),
+            // The template's menu (UX-070; a template's other pages when it
+            // names none), written after the pages.
+            update: jest.fn(async () => ({ id: "site_1" })),
         },
         page: {
-            create: jest.fn(),
+            create: jest.fn(async () => ({ id: "page_1" })),
         },
         // Addresses held after a change (DEC-069, L1): none here.
         addressReservation: {
@@ -63,6 +66,8 @@ import { STARTER_TEMPLATE_ID } from "@saroh/templates";
 
 import type { OrganizationContext } from "../../common/types/organization-context";
 import type { EntitlementService } from "../billing/entitlement.service";
+import { planMeter } from "../billing/metering.service";
+import { MAX_WEBSITES_PER_BUSINESS } from "../organizations/business-limits";
 import type { CreateSiteFromTemplateDto } from "./dto";
 import { SitesService } from "./sites.service";
 
@@ -149,6 +154,50 @@ describe("SitesService.createFromTemplate", () => {
         expect(transaction).not.toHaveBeenCalled();
         expect(siteCount).toHaveBeenCalledWith({
             where: { organizationId: "org_1", deletedAt: null },
+        });
+    });
+
+    describe("where the catalogue governs websites (its `sites` row, U13)", () => {
+        let enforcedRow: jest.SpyInstance;
+        let roomInTx: jest.SpyInstance;
+        beforeEach(() => {
+            enforcedRow = jest
+                .spyOn(planMeter, "enforcedRow")
+                .mockResolvedValue({ moduleId: "sites" } as never);
+            roomInTx = jest
+                .spyOn(planMeter, "roomInTx")
+                .mockResolvedValue(null);
+        });
+        afterEach(() => {
+            enforcedRow.mockRestore();
+            roomInTx.mockRestore();
+        });
+
+        it("lets a second website be made, metered on the write's transaction", async () => {
+            siteCount.mockResolvedValue(1);
+            await expect(
+                service.createFromTemplate(ctx(), { name: "Acme" }),
+            ).resolves.toHaveProperty("siteId", "site_1");
+            // The old one-website floor and entitlement aren't asked.
+            expect(entCheck).not.toHaveBeenCalled();
+            expect(roomInTx).toHaveBeenCalledWith(
+                expect.anything(),
+                "org_1",
+                "sites",
+            );
+        });
+
+        it("stops at the product's ceiling first, whatever the plan sells", async () => {
+            siteCount.mockResolvedValue(MAX_WEBSITES_PER_BUSINESS);
+            await expect(
+                service.createFromTemplate(ctx(), { name: "Acme" }),
+            ).rejects.toMatchObject({
+                status: 409,
+                response: {
+                    message: expect.stringMatching(/as many as Saroh allows/),
+                },
+            });
+            expect(transaction).not.toHaveBeenCalled();
         });
     });
 
@@ -282,6 +331,21 @@ describe("SitesService.createFromTemplate", () => {
         });
     });
 
+    it("records the template a site was asked to be made from (KTD-7)", async () => {
+        // Personal has an enquiry section, which gets its Form.
+        (prisma.form.create as jest.Mock).mockResolvedValue({ id: "form_1" });
+        await service.createFromTemplate(ctx(), {
+            name: "Acme",
+            templateId: "personal",
+        });
+
+        expect(siteCreate.mock.calls[0][0].data).toMatchObject({
+            templateId: "personal",
+            templateVersion: 1,
+            templateStyleId: null,
+        });
+    });
+
     it("creates a Site + Pages + DRAFT PageVersions + Sections in one org-scoped transaction from the real starter template", async () => {
         const dto: CreateSiteFromTemplateDto = { name: "Acme" };
 
@@ -300,6 +364,10 @@ describe("SitesService.createFromTemplate", () => {
                 slug: "acme",
                 // Never without an address (L5): the business's own.
                 subdomain: "acme",
+                // The template it came from (KTD-7): the kind's default.
+                templateId: STARTER_TEMPLATE_ID,
+                templateVersion: 3,
+                templateStyleId: null,
                 storefrontId: null,
             },
             select: { id: true, slug: true },
@@ -356,15 +424,26 @@ describe("SitesService.createFromTemplate", () => {
             }
         }
 
-        // The real starter template's section shape flows through: Home has 4
-        // ordered sections starting with a validated hero.
+        // The real starter template's section shape flows through: Home has 3
+        // ordered sections without a contact email (one About button, UX-070),
+        // starting with a validated hero.
         const homeSections = home.versions.create.sections.create;
-        expect(homeSections).toHaveLength(4);
-        expect(homeSections.map((s) => s.order)).toEqual([0, 1, 2, 3]);
+        expect(homeSections).toHaveLength(3);
+        expect(homeSections.map((s) => s.order)).toEqual([0, 1, 2]);
         expect(homeSections[0].type).toBe("hero");
         // Content is the CONTRACT-NORMALIZED output seeded with the org name.
         expect(homeSections[0].content).toMatchObject({ heading: "Acme" });
         expect(about.versions.create.sections.create).toHaveLength(2);
+
+        // A real menu from the first draft (UX-070): Home, then About.
+        expect(prisma.site.update).toHaveBeenCalledWith({
+            where: { id: "site_1" },
+            data: {
+                navigation: {
+                    items: [{ pageId: "page_x" }, { pageId: "page_x" }],
+                },
+            },
+        });
     });
 
     it("seeds the TemplateContext from the org's business profile", async () => {

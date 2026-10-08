@@ -15,6 +15,7 @@ import { OrgContext } from "../../common/decorators/org-context.decorator";
 import { BetterAuthGuard } from "../../common/guards/better-auth.guard";
 import { OrganizationGuard } from "../../common/guards/organization.guard";
 import type { OrganizationContext } from "../../common/types/organization-context";
+import type { BookingPaymentView } from "../bookings/booking-payment";
 import type { BookingRulesValue } from "../bookings/booking-rules";
 import { ModuleEnforcementGuard } from "../capabilities/module-enforcement.guard";
 import { RequireModule } from "../capabilities/require-module.decorator";
@@ -162,6 +163,18 @@ export class BookingRulesController {
     @Get()
     get(@OrgContext() ctx: OrganizationContext): Promise<BookingRulesValue> {
         return this.staff.getBookingRules(ctx);
+    }
+
+    /**
+     * How people pay when they book, and why online can't be taken now if
+     * it can't (DEC-088): what the Service Editor and the Services list
+     * read to say a service can't be booked online (#821).
+     */
+    @Get("payment")
+    payment(
+        @OrgContext() ctx: OrganizationContext,
+    ): Promise<BookingPaymentView> {
+        return this.staff.getBookingPayment(ctx);
     }
 
     @Put()

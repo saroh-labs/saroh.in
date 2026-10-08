@@ -11,7 +11,7 @@ import type {
     SubscriptionStatus,
     WebhookHeaders,
 } from "./billing-provider.port";
-import { headerValue } from "./billing-provider.port";
+import { BillingProviderError, headerValue } from "./billing-provider.port";
 import {
     CASHFREE_CLIENT_ID,
     CASHFREE_CLIENT_SECRET,
@@ -44,6 +44,14 @@ export class CashfreeBillingProvider implements BillingProvider {
     async createSubscription(
         input: CreateSubscriptionInput,
     ): Promise<CreateSubscriptionResult> {
+        // This adapter can't take a coupon off: refuse, asking nothing,
+        // rather than charge the full amount for a discounted plan.
+        if (input.discount && input.discount.amountPaise > 0) {
+            throw new BillingProviderError(
+                "REFUSED",
+                "Cashfree subscription creation refused: coupons aren't supported",
+            );
+        }
         let res: Response;
         try {
             res = await fetch(`${this.baseUrl}/subscriptions`, {

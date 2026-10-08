@@ -41,6 +41,11 @@ jest.mock("@saroh/database", () => {
         staffExtraHours: { findMany: jest.fn().mockResolvedValue([]) },
         staffTimeOff: { findMany: jest.fn().mockResolvedValue([]) },
         businessClosure: { findMany: jest.fn().mockResolvedValue([]) },
+        // No hours saved: opening hours cut nothing (DEC-087, DEC-096).
+        store: {
+            findMany: jest.fn().mockResolvedValue([]),
+            findFirst: jest.fn().mockResolvedValue(null),
+        },
         businessProfile: {
             findUnique: jest.fn().mockResolvedValue({ timezone: "UTC" }),
         },
@@ -66,7 +71,9 @@ import {
 } from "@nestjs/common";
 import { prisma } from "@saroh/database";
 
+import { fakePaymentsRow } from "../../../test/fixtures/pricing-catalog";
 import { validationPipeOptions } from "../../common/validation";
+import { planMeter } from "../billing/metering.service";
 import { hashPayToken } from "../invoices/pay-token";
 import { BookServiceDto } from "./dto";
 import { PublicBookingsService } from "./public-bookings.service";
@@ -376,7 +383,7 @@ describe("a deposit at booking (E8)", () => {
         );
     });
 
-    it("never books a deposit service to pay at the desk, holding nothing", async () => {
+    it("never books a deposit service to pay at the desk while online can take it, holding nothing", async () => {
         db.service.findUnique.mockResolvedValue(half());
         for (const pay of ["DESK", undefined] as const) {
             await expect(
@@ -426,7 +433,7 @@ describe("a deposit at booking (E8)", () => {
         expect(db.booking.create).not.toHaveBeenCalled();
     });
 
-    it("says the deposit can't be taken when no provider is connected", async () => {
+    it("no provider connected: the deposit isn't taken online, the desk is the way (DEC-089)", async () => {
         db.service.findUnique.mockResolvedValue(half());
         db.merchantPaymentProvider.findFirst.mockResolvedValue(null);
         await expect(
@@ -439,9 +446,55 @@ describe("a deposit at booking (E8)", () => {
         ).rejects.toMatchObject({
             response: {
                 message:
-                    "This business can't take the deposit online right now. Get in touch with them to book.",
+                    "This business isn't taking payment online right now. Book it to pay at the desk.",
             },
         });
+        expect(db.booking.create).not.toHaveBeenCalled();
+    });
+
+    it.each([["DESK" as const], [undefined]])(
+        "no provider connected: books a deposit service to pay at the desk (DEC-089), pay %s",
+        async (pay) => {
+            db.service.findUnique.mockResolvedValue(half());
+            db.merchantPaymentProvider.findFirst.mockResolvedValue(null);
+            const out = await new PublicBookingsService().bookOnline(
+                "svc_1",
+                input({ pay }),
+                "iphash",
+                NOW,
+            );
+            const data = db.booking.create.mock.calls[0][0].data;
+            expect(data).toMatchObject({
+                status: "CONFIRMED",
+                paidWith: "DESK",
+            });
+            expect(data.snapshot.deposit).toBeUndefined();
+            expect(db.invoice.create).not.toHaveBeenCalled();
+            expect(out.payToken).toBeNull();
+        },
+    );
+
+    it("on a plan without online payments: a deposit service books to pay at the desk, a provider connected or not (R28, DEC-089)", async () => {
+        jest.spyOn(planMeter, "enforcedRow").mockImplementation(
+            (_org: string, moduleId: string) =>
+                Promise.resolve(
+                    moduleId === "payments" || moduleId === "subscriptions"
+                        ? fakePaymentsRow("free", moduleId)
+                        : null,
+                ),
+        );
+        db.service.findUnique.mockResolvedValue(half());
+        const out = await new PublicBookingsService().bookOnline(
+            "svc_1",
+            input({ pay: "DESK" }),
+            "iphash",
+            NOW,
+        );
+        const data = db.booking.create.mock.calls[0][0].data;
+        expect(data).toMatchObject({ status: "CONFIRMED", paidWith: "DESK" });
+        expect(db.invoice.create).not.toHaveBeenCalled();
+        expect(out.payToken).toBeNull();
+        jest.restoreAllMocks();
     });
 
     it("fixes the free-cancel deadline when the booking is made", async () => {
@@ -541,6 +594,180 @@ describe("a deposit at booking (E8)", () => {
     });
 });
 
+describe("how people pay when they book (DEC-088)", () => {
+    const rules = (bookingPayment: string) => ({
+        bookAheadDays: null,
+        latestBookingMinutes: null,
+        freeCancelHours: null,
+        refundInTimeCancels: true,
+        bookingPayment,
+    });
+    const book = (over: Partial<BookInput>) =>
+        new PublicBookingsService().bookOnline(
+            "svc_1",
+            input(over),
+            "iphash",
+            NOW,
+        );
+
+    it("Both, the default, takes pay now and the desk as before", async () => {
+        db.bookingRules.findUnique.mockResolvedValue(rules("BOTH"));
+        await book({ pay: "DESK" });
+        await book({ pay: "NOW", idempotencyKey: "key_2" });
+        expect(db.booking.create).toHaveBeenCalledTimes(2);
+    });
+
+    it("at the desk only: refuses pay now, holding nothing", async () => {
+        db.bookingRules.findUnique.mockResolvedValue(rules("DESK"));
+        await expect(book({ pay: "NOW" })).rejects.toMatchObject({
+            status: 409,
+            response: {
+                message:
+                    "This business takes payment at the desk. Book it to pay at the desk.",
+                field: "pay",
+            },
+        });
+        expect(db.booking.create).not.toHaveBeenCalled();
+        expect(db.invoice.create).not.toHaveBeenCalled();
+    });
+
+    it("at the desk only: a deposit isn't taken online, and the desk books it (DEC-089)", async () => {
+        db.bookingRules.findUnique.mockResolvedValue(rules("DESK"));
+        db.service.findUnique.mockResolvedValue(
+            service({ depositMode: "PERCENT_50" }),
+        );
+        await expect(book({ pay: "DEPOSIT" })).rejects.toMatchObject({
+            status: 409,
+            response: {
+                message:
+                    "This business takes payment at the desk. Book it to pay at the desk.",
+            },
+        });
+        expect(db.booking.create).not.toHaveBeenCalled();
+        await book({ pay: "DESK", idempotencyKey: "key_2" });
+        expect(db.booking.create.mock.calls[0][0].data).toMatchObject({
+            status: "CONFIRMED",
+            paidWith: "DESK",
+        });
+        expect(db.invoice.create).not.toHaveBeenCalled();
+    });
+
+    it("Both with a provider: a deposit service is still never at the desk", async () => {
+        db.bookingRules.findUnique.mockResolvedValue(rules("BOTH"));
+        db.service.findUnique.mockResolvedValue(
+            service({ depositMode: "PERCENT_50" }),
+        );
+        await expect(book({ pay: "DESK" })).rejects.toBeInstanceOf(
+            BadRequestException,
+        );
+        expect(db.booking.create).not.toHaveBeenCalled();
+    });
+
+    it("online only with no provider: a deposit service can't be booked, the desk refused too", async () => {
+        db.bookingRules.findUnique.mockResolvedValue(rules("ONLINE"));
+        db.merchantPaymentProvider.findFirst.mockResolvedValue(null);
+        db.service.findUnique.mockResolvedValue(
+            service({ depositMode: "PERCENT_50" }),
+        );
+        await expect(book({ pay: "DEPOSIT" })).rejects.toMatchObject({
+            response: {
+                message:
+                    "This business can't take the deposit online right now. Get in touch with them to book.",
+            },
+        });
+        for (const pay of ["DESK", undefined] as const) {
+            await expect(book({ pay })).rejects.toMatchObject({
+                response: { field: "pay" },
+            });
+        }
+        expect(db.booking.create).not.toHaveBeenCalled();
+    });
+
+    it("at the desk only: books it at the desk", async () => {
+        db.bookingRules.findUnique.mockResolvedValue(rules("DESK"));
+        await book({ pay: "DESK" });
+        expect(db.booking.create.mock.calls[0][0].data).toMatchObject({
+            status: "CONFIRMED",
+            paidWith: "DESK",
+        });
+    });
+
+    it("online only: refuses the desk, and no way given, for a priced service", async () => {
+        db.bookingRules.findUnique.mockResolvedValue(rules("ONLINE"));
+        for (const pay of ["DESK", undefined] as const) {
+            await expect(book({ pay })).rejects.toMatchObject({
+                status: 409,
+                response: {
+                    message:
+                        "This business takes payment online when you book. Pay now to book it.",
+                    field: "pay",
+                },
+            });
+        }
+        expect(db.booking.create).not.toHaveBeenCalled();
+    });
+
+    it("online only: a service with no price books with nothing to pay", async () => {
+        db.bookingRules.findUnique.mockResolvedValue(rules("ONLINE"));
+        db.service.findUnique.mockResolvedValue(service({ priceCents: null }));
+        await book({ pay: "DESK" });
+        expect(db.booking.create).toHaveBeenCalledTimes(1);
+    });
+
+    it("online only: pays now", async () => {
+        db.bookingRules.findUnique.mockResolvedValue(rules("ONLINE"));
+        const out = await book({ pay: "NOW" });
+        expect(out.payToken).toEqual(expect.any(String));
+    });
+
+    it("online only with no provider: says get in touch, not the desk", async () => {
+        db.bookingRules.findUnique.mockResolvedValue(rules("ONLINE"));
+        db.merchantPaymentProvider.findFirst.mockResolvedValue(null);
+        await expect(book({ pay: "NOW" })).rejects.toMatchObject({
+            response: {
+                message:
+                    "This business can't take payment online right now. Get in touch with them to book.",
+            },
+        });
+        expect(db.booking.create).not.toHaveBeenCalled();
+    });
+
+    it.each([
+        ["BOTH", true],
+        ["ONLINE", true],
+        ["DESK", false],
+    ])(
+        "the page offers pay now only when the business allows it: %s",
+        async (way, payOnline) => {
+            db.bookingRules.findUnique.mockResolvedValue(rules(way));
+            db.site.findFirst.mockResolvedValue({
+                organizationId: "org_1",
+                organization: { name: "Kavi Dental" },
+            });
+            db.service.findMany.mockResolvedValue([]);
+            const page = await new PublicBookingsService().publicBookingPage(
+                "site_1",
+            );
+            expect(page.payOnline).toBe(payOnline);
+            expect(page.rules.bookingPayment).toBe(way);
+        },
+    );
+
+    it("the page never offers pay now without a provider, whatever the rule", async () => {
+        db.bookingRules.findUnique.mockResolvedValue(rules("ONLINE"));
+        db.merchantPaymentProvider.findFirst.mockResolvedValue(null);
+        db.site.findFirst.mockResolvedValue({
+            organizationId: "org_1",
+            organization: { name: "Kavi Dental" },
+        });
+        db.service.findMany.mockResolvedValue([]);
+        const page = await new PublicBookingsService().publicBookingPage(
+            "site_1",
+        );
+        expect(page.payOnline).toBe(false);
+    });
+});
+
 describe("pay at the desk (U19)", () => {
     it("books it confirmed, paid at the desk, with no invoice", async () => {
         const out = await new PublicBookingsService().bookOnline(
@@ -597,9 +824,19 @@ describe("the next two weeks (U19)", () => {
             "2026-09-18T10:30:00.000Z",
             "2026-09-18T11:00:00.000Z",
         ]);
-        // Sat and Sun: no hours, so Closed.
-        expect(out.days[1]).toMatchObject({ date: "2026-09-19", open: false });
-        expect(out.days[2]).toMatchObject({ date: "2026-09-20", open: false });
+        // Sat and Sun: the service has no hours, so no times — but the
+        // business isn't closed: it has no opening hours or closure to say
+        // so, and the page reads "No times", not "Closed" (UX-054).
+        expect(out.days[1]).toMatchObject({
+            date: "2026-09-19",
+            open: false,
+            closed: false,
+        });
+        expect(out.days[2]).toMatchObject({
+            date: "2026-09-20",
+            open: false,
+            closed: false,
+        });
         // Mon: open, and nothing free — Full.
         expect(out.days[3]).toMatchObject({
             date: "2026-09-21",
@@ -710,7 +947,124 @@ describe("the next two weeks (U19)", () => {
     });
 });
 
+describe("the next two weeks in opening hours (DEC-087)", () => {
+    const storeFindMany = prisma.store.findMany as jest.Mock;
+    // The shop opens 10:00–18:00 every day; the service's hours are 09:00–12:00.
+    beforeEach(() =>
+        storeFindMany.mockResolvedValue([
+            {
+                settings: {
+                    openingHours: [
+                        "MON",
+                        "TUE",
+                        "WED",
+                        "THU",
+                        "FRI",
+                        "SAT",
+                        "SUN",
+                    ].map((day) => ({
+                        day,
+                        open: "10:00",
+                        close: "18:00",
+                        closed: false,
+                    })),
+                },
+            },
+        ]),
+    );
+    afterEach(() => storeFindMany.mockResolvedValue([]));
+
+    const monday = (out: { days: { starts: unknown[] }[] }) =>
+        out.days[3]!.starts as { startAt: string; only?: string }[];
+
+    it("offers an in-person service only once the shop is open", async () => {
+        const out = await new PublicBookingsService().publicDays("svc_1", NOW);
+        expect(monday(out).map((s) => s.startAt.slice(11, 16))).toEqual([
+            "10:00",
+            "10:30",
+            "11:00",
+        ]);
+        expect(monday(out).every((s) => s.only === undefined)).toBe(true);
+    });
+
+    it("offers an online service its own hours, uncut", async () => {
+        db.service.findUnique.mockResolvedValue(
+            service({ locationType: "ONLINE" }),
+        );
+        const out = await new PublicBookingsService().publicDays("svc_1", NOW);
+        expect(monday(out)).toHaveLength(5);
+        expect(storeFindMany).not.toHaveBeenCalled();
+    });
+
+    it("lists either way's early starts as online only", async () => {
+        db.service.findUnique.mockResolvedValue(
+            service({ locationType: "EITHER" }),
+        );
+        const out = await new PublicBookingsService().publicDays("svc_1", NOW);
+        expect(
+            monday(out).map((s) => [s.startAt.slice(11, 16), s.only ?? null]),
+        ).toEqual([
+            ["09:00", "ONLINE"],
+            ["09:30", "ONLINE"],
+            ["10:00", null],
+            ["10:30", null],
+            ["11:00", null],
+        ]);
+    });
+
+    it("keeps to Settings › Hours with no walk-in storefront (DEC-096)", async () => {
+        // The week the shop above had, saved to an online-only business's
+        // one storefront, as Settings › Hours does.
+        const [shop] = (await storeFindMany()) as unknown[];
+        storeFindMany.mockResolvedValue([]);
+        const storeFindFirst = prisma.store.findFirst as jest.Mock;
+        storeFindFirst.mockResolvedValue(shop);
+        try {
+            const inPerson = await new PublicBookingsService().publicDays(
+                "svc_1",
+                NOW,
+            );
+            expect(
+                monday(inPerson).map((s) => s.startAt.slice(11, 16)),
+            ).toEqual(["10:00", "10:30", "11:00"]);
+
+            db.service.findUnique.mockResolvedValue(
+                service({ locationType: "ONLINE" }),
+            );
+            const online = await new PublicBookingsService().publicDays(
+                "svc_1",
+                NOW,
+            );
+            expect(monday(online)).toHaveLength(5);
+        } finally {
+            storeFindFirst.mockResolvedValue(null);
+        }
+    });
+});
+
 describe("the booking page's read (U19)", () => {
+    it("says online booking is paused before the form at the monthly cap (DEC-095)", async () => {
+        db.site.findFirst.mockResolvedValue({
+            organizationId: "org_1",
+            organization: { name: "Pulse Fitness" },
+        });
+        db.service.findMany.mockResolvedValue([]);
+        const room = jest
+            .spyOn(planMeter, "hasRoom")
+            .mockResolvedValueOnce(false);
+        const page = await new PublicBookingsService().publicBookingPage(
+            "site_1",
+        );
+        expect(room).toHaveBeenCalledWith("org_1", "bookings");
+        expect(page.paused).toBe(true);
+        // A plan that can't be read never pauses the page.
+        room.mockRejectedValueOnce(new Error("catalogue down"));
+        await expect(
+            new PublicBookingsService().publicBookingPage("site_1"),
+        ).resolves.toMatchObject({ paused: false });
+        room.mockRestore();
+    });
+
     it("is a 404 for a site that is not published", async () => {
         db.site.findFirst.mockResolvedValue(null);
         await expect(
@@ -775,13 +1129,28 @@ describe("the booking page's read (U19)", () => {
         });
         expect(page.services[1]).toMatchObject({ kind: "class", capacity: 12 });
         // Only services of this site or of no site.
-        expect(db.service.findMany.mock.calls[0][0].where).toMatchObject({
+        const [offered, withTimes] = db.service.findMany.mock.calls[0][0].where
+            .AND as unknown[];
+        expect(offered).toMatchObject({
             organizationId: "org_1",
             status: "ACTIVE",
             // A service hidden from the booking page is left out (E1).
             showOnBookingPage: true,
             OR: [{ siteId: null }, { siteId: "site_1" }],
         });
+        // …and one with no times to offer (UX-024): no hours of its own,
+        // and no one to take it (a class's instructor gives no hours).
+        expect(withTimes).toEqual({
+            OR: [
+                { availabilityRules: { some: {} } },
+                {
+                    capacity: 1,
+                    staffServices: { some: { staff: { status: "ACTIVE" } } },
+                },
+            ],
+        });
+        // Not paused: online booking has room (DEC-095).
+        expect(page.paused).toBe(false);
         expect(JSON.stringify(page)).not.toMatch(/org_1/);
     });
 

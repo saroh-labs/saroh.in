@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import type { SiteHostClass } from "./site-host-mode";
-import { classifySiteHost } from "./site-host-mode";
+import { classifySiteHost, liveHostOf } from "./site-host-mode";
 
 /**
  * The host classifier (DEC-071, KTD-7). The VECTOR below is shared: the API's
@@ -144,5 +144,21 @@ describe("classifySiteHost (KTD-7)", () => {
             "utf8",
         );
         expect(between(mine)).toBe(between(theirs));
+    });
+});
+
+describe("liveHostOf (UX-081)", () => {
+    it("names the live site a test host stands beside", () => {
+        expect(liveHostOf("test--acme.saroh.app", "saroh.app")).toBe(
+            "acme.saroh.app",
+        );
+        expect(liveHostOf("test.shop.acme.com", "saroh.app")).toBe(
+            "shop.acme.com",
+        );
+    });
+
+    it("names nothing for a live host or a test host without a site", () => {
+        expect(liveHostOf("acme.saroh.app", "saroh.app")).toBeNull();
+        expect(liveHostOf("test--a.b.saroh.app", "saroh.app")).toBeNull();
     });
 });

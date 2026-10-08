@@ -83,6 +83,15 @@ export interface DetailBooking {
     paidWith: PaidWith | null;
     packName: string | null;
     cancelledLate: boolean;
+    /**
+     * What has been paid for it, once anything has (UX-049); the amount is
+     * null for a viewer without `invoice:read`. Absent on an older API.
+     */
+    paid?: {
+        amount: string | null;
+        currency: string | null;
+        method: string | null;
+    } | null;
 }
 
 export interface DetailSubscription {

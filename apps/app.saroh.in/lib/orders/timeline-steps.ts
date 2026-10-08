@@ -48,7 +48,13 @@ export function orderTimelineSteps(
         {
             key: "placed",
             what: order.placedOnline
-                ? `Ordered on your website, from ${order.store.name}`
+                ? `Ordered on your website, from ${order.store.name}${
+                      order.payOnHandover
+                          ? order.fulfilmentType === "PICKUP"
+                              ? " · to pay on collection"
+                              : " · to pay on delivery"
+                          : ""
+                  }`
                 : `Placed at ${order.store.name}`,
             at: order.placedAt,
             // The customer placed it themselves at the site's checkout (G13).

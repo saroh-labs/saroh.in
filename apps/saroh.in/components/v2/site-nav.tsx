@@ -8,14 +8,14 @@ import { usePathname } from "next/navigation";
 import type { KeyboardEvent, RefObject } from "react";
 import { useEffect, useRef, useState } from "react";
 
-import { SIGN_IN_URL } from "@/lib/links";
+import { LAUNCH_MODE, SIGN_IN_URL } from "@/lib/links";
 
 import { CtaLink } from "./cta-link";
 import { MobileMenu } from "./mobile-menu";
 import type { NavItem, NavSection } from "./nav-items";
 import { FEATURE_ITEMS, SOLUTION_ITEMS, sectionOf } from "./nav-items";
 
-type MenuId = "features" | "solutions";
+type MenuId = "features" | "solutions" | "resources";
 
 /** A top-level control: 36px, 9px corners, Paper-dark on hover. */
 const TOP =
@@ -27,22 +27,29 @@ const CURRENT =
 
 /**
  * The site's nav (Nav design, plan U19). From 760px: the logo, Features
- * (a two-column menu with lines), Solutions, then Sign in and the
- * start button. Below 760px: the logo, the start button and a Menu button
- * that opens `MobileMenu`.
+ * (a two-column menu with lines), Solutions, Pricing (once the site's launch
+ * switch is open; before that it would only bounce to the waitlist),
+ * Resources (plan U1; only when some Resources page is live), then Sign in
+ * and the start button. Below 760px: the logo, the start button and a Menu
+ * button that opens `MobileMenu`.
+ *
+ * `resources` is the Resources menu: the server decides which pages are
+ * published and built (`content/resources.ts`) and passes them in, so the
+ * browser never judges a date.
  *
  * The section the page is in is underlined in Saffron, and the page itself
  * carries `aria-current="page"` in its menu. A menu closes on Escape (focus
  * returns to its button), on a click outside, and when focus leaves the nav;
  * arrow keys move within it.
  */
-export function SiteNav() {
+export function SiteNav({ resources = [] }: { resources?: NavItem[] }) {
     const pathname = usePathname();
-    const section = sectionOf(pathname);
+    const section = sectionOf(pathname, resources);
     const [open, setOpen] = useState<MenuId | null>(null);
     const nav = useRef<HTMLElement>(null);
     const featuresButton = useRef<HTMLButtonElement>(null);
     const solutionsButton = useRef<HTMLButtonElement>(null);
+    const resourcesButton = useRef<HTMLButtonElement>(null);
 
     // A new page closes whatever menu was open (state adjusted while
     // rendering, not in an effect: https://react.dev/learn/you-might-not-need-an-effect).
@@ -61,8 +68,11 @@ export function SiteNav() {
         };
         const onKey = (e: globalThis.KeyboardEvent) => {
             if (e.key !== "Escape") return;
-            const button =
-                open === "features" ? featuresButton : solutionsButton;
+            const button = {
+                features: featuresButton,
+                solutions: solutionsButton,
+                resources: resourcesButton,
+            }[open];
             setOpen(null);
             button.current?.focus();
         };
@@ -121,6 +131,32 @@ export function SiteNav() {
                     }
                     buttonRef={solutionsButton}
                 />
+                {LAUNCH_MODE === "open" ? (
+                    <Link
+                        href="/pricing"
+                        aria-current={
+                            section === "pricing" ? "page" : undefined
+                        }
+                        className={cn(TOP, section === "pricing" && CURRENT)}
+                    >
+                        Pricing
+                    </Link>
+                ) : null}
+                {resources.length > 0 ? (
+                    <Menu
+                        id="resources"
+                        label="Resources"
+                        items={resources}
+                        columns={1}
+                        current={section === "resources"}
+                        pathname={pathname}
+                        open={open === "resources"}
+                        onToggle={() =>
+                            setOpen(open === "resources" ? null : "resources")
+                        }
+                        buttonRef={resourcesButton}
+                    />
+                ) : null}
             </div>
             <a
                 href={SIGN_IN_URL}
@@ -141,6 +177,7 @@ export function SiteNav() {
             <MobileMenu
                 section={section}
                 pathname={pathname}
+                resources={resources}
                 className="ml-auto min-[760px]:hidden"
             />
         </nav>

@@ -3,10 +3,10 @@
 import { Button } from "@saroh/ui/button";
 import { cn } from "@saroh/ui/lib/utils";
 import { showError, showUndo, showWarning } from "@saroh/ui/toast";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 
-import { OptionSelect } from "@/components/shared/option-select";
 import { ReadOnlyNote } from "@/components/shared/read-only-note";
 import type {
     AvailabilityDraft,
@@ -16,9 +16,6 @@ import type {
 } from "@/lib/services/availability-rules";
 import {
     draftFrom,
-    REFUND_POLICY,
-    refundsInTime,
-    ruleChoices,
     saveOps,
     weeklyHours,
 } from "@/lib/services/availability-rules";
@@ -40,10 +37,13 @@ import type {
     BookingBrief,
     BookingRules,
     Closure,
+    OnlineBlocker,
     StaffView,
+    WeeklyRange,
 } from "@/lib/staff/types";
 
 import { AddPersonDialog } from "./add-person-dialog";
+import { BookingRulesCard } from "./booking-rules-card";
 import { OffRow, TimeOffCard } from "./time-off-card";
 import { WeeklyHours } from "./weekly-hours";
 
@@ -84,18 +84,42 @@ function rangeOfLine(line: OffLine, closed: boolean): TimeOffInput {
 }
 
 const card = "rounded-[12px] border border-border bg-card px-4 py-[13px]";
+
+/** Only the booking rules changed: no hours, time off or extra hours. */
+function rulesOnly(ops: readonly SaveOp[]): boolean {
+    return ops.length > 0 && ops.every((op) => op.kind === "rules");
+}
+
+/** The save bar's line: what saving will do. */
+export function unsavedText(ops: readonly SaveOp[]): string {
+    return rulesOnly(ops)
+        ? "Unsaved. New bookings follow the rules when you save; bookings already made keep theirs."
+        : "Unsaved. New free times show on the calendar and the booking page when you save; bookings already made don't move.";
+}
+
+/** The toast once saved: never "Hours saved" for a rule (UX-022). */
+export function savedText(ops: readonly SaveOp[]): string {
+    return rulesOnly(ops)
+        ? "Booking rules saved. New bookings follow them now."
+        : "Saved. The calendar and booking page use them now.";
+}
+
+/** Settings › Hours, where the business's opening hours are kept. */
+const HOURS = "/settings/organization?section=hours";
 const cardTitle = "font-display text-[15px] font-semibold tracking-[-0.02em]";
 
 /**
  * Bookings › Availability (U16, the design's `?view=avail`): when each person
  * can be booked. Weekly hours, time off, one-off extra hours and the
- * business's booking rules are a draft until "Save hours"; saving writes
+ * business's booking rules are a draft until "Save changes"; saving writes
  * what changed, and Undo puts it all back. Hours never move a booking — the
- * ones left outside are listed and kept.
+ * ones left outside are listed and kept. The booking rules show with nobody
+ * on the diary too (UX-022): a solo owner sets how people pay and cancel.
  */
 export function AvailabilityEditor({
     staff,
     closures,
+    openingHours,
     rules,
     timezone,
     today,
@@ -103,10 +127,13 @@ export function AvailabilityEditor({
     bookedOn,
     takesClasses,
     canEdit,
+    onlineBlocker,
 }: {
     staff: StaffView[];
     /** When the whole business is closed (E3). */
     closures: Closure[];
+    /** When the business is open (DEC-087, DEC-096), or null with no hours saved. */
+    openingHours: WeeklyRange[] | null;
     rules: BookingRules;
     timezone: string;
     today: LocalDate;
@@ -117,6 +144,11 @@ export function AvailabilityEditor({
     /** Who teaches a class — their dot is the class colour. */
     takesClasses: string[];
     canEdit: boolean;
+    /**
+     * Why the booking page can't take money online now (DEC-088); null
+     * when it can, undefined when it couldn't be told.
+     */
+    onlineBlocker?: OnlineBlocker | null;
 }) {
     const router = useRouter();
     const people = staff.filter((p) => p.status === "ACTIVE");
@@ -200,12 +232,9 @@ export function AvailabilityEditor({
             return;
         }
         setDraft(null);
-        showUndo(
-            "Hours saved. The calendar and booking page use them now.",
-            () => {
-                void undo(done).then(() => router.refresh());
-            },
-        );
+        showUndo(savedText(ops), () => {
+            void undo(done).then(() => router.refresh());
+        });
         if (outside.length) {
             showWarning(
                 `${outside.length} ${outside.length === 1 ? "booking is" : "bookings are"} now outside the hours`,
@@ -255,34 +284,83 @@ export function AvailabilityEditor({
         }
     }
 
+    const saveBar = dirty ? (
+        <div className="sticky bottom-[calc(12px+var(--tab-bar-inset,0px))] z-10 mt-3.5 flex flex-wrap items-center gap-2 rounded-[10px] border border-highlight-border bg-muted/70 px-3.5 py-[11px] backdrop-blur-sm dark:bg-muted">
+            <span
+                role="status"
+                className="flex-[1_1_240px] text-[12.5px] text-foreground"
+            >
+                {unsavedText(ops)}
+            </span>
+            <Button
+                variant="outline"
+                className="h-[38px] rounded-[9px] px-4 text-[14px]"
+                disabled={saving}
+                onClick={() => setDraft(null)}
+            >
+                Discard
+            </Button>
+            <Button
+                className="h-[38px] rounded-[9px] px-4 text-[14px]"
+                disabled={saving}
+                onClick={() => void save()}
+            >
+                {saving ? "Saving…" : "Save changes"}
+            </Button>
+        </div>
+    ) : null;
+
     if (!me) {
+        // Nobody on the diary yet — a solo owner whose services keep their
+        // own hours. The business's booking rules still apply to every
+        // booking, so they are here all the same (UX-022).
         return (
             <>
                 <h1 className="mb-3.5 font-display text-[28px] font-semibold leading-tight tracking-[-0.03em]">
                     Availability
                 </h1>
-                <div className="rounded-[12px] border border-dashed border-border px-5 py-8 text-center">
-                    <p className="text-[14px] font-semibold">
-                        Nobody takes bookings yet
-                    </p>
-                    <p className="mx-auto mt-1 max-w-[52ch] text-[12.5px] text-muted-foreground">
-                        Add the people who can be booked. Each gets weekly
-                        hours, time off and a column on the calendar.
-                    </p>
-                    {canEdit ? (
-                        <Button
-                            className="mt-3 h-[38px] rounded-[9px] px-4 text-[14px]"
-                            onClick={() => setAdding(true)}
-                        >
-                            Add someone
-                        </Button>
-                    ) : null}
-                    <AddPersonDialog
-                        open={adding}
-                        onOpenChange={setAdding}
-                        onAdded={(id) => setWho(id)}
-                    />
+                {canEdit ? null : (
+                    <ReadOnlyNote>
+                        Your role can see these rules but not change them.
+                    </ReadOnlyNote>
+                )}
+                <div className="flex flex-wrap items-start gap-4">
+                    <div className="min-w-0 flex-[3_1_320px] rounded-[12px] border border-dashed border-border px-5 py-8 text-center">
+                        <p className="text-[14px] font-semibold">
+                            Nobody takes bookings yet
+                        </p>
+                        <p className="mx-auto mt-1 max-w-[52ch] text-[12.5px] text-muted-foreground">
+                            Add the people who can be booked. Each gets weekly
+                            hours, time off and a column on the calendar.
+                        </p>
+                        {canEdit ? (
+                            <Button
+                                className="mt-3 h-[38px] rounded-[9px] px-4 text-[14px]"
+                                onClick={() => setAdding(true)}
+                            >
+                                Add someone
+                            </Button>
+                        ) : null}
+                        <p className="mx-auto mt-2 max-w-[52ch] text-[12.5px] text-muted-foreground">
+                            Until then, customers book each service in its own
+                            weekly hours, set on the service.
+                        </p>
+                        <AddPersonDialog
+                            open={adding}
+                            onOpenChange={setAdding}
+                            onAdded={(id) => setWho(id)}
+                        />
+                    </div>
+                    <div className="flex min-w-0 flex-[2_1_280px] flex-col gap-3">
+                        <BookingRulesCard
+                            rules={d.rules}
+                            canEdit={canEdit}
+                            onlineBlocker={onlineBlocker}
+                            onChange={(fn) => edit((x) => fn(x.rules))}
+                        />
+                    </div>
                 </div>
+                {saveBar}
             </>
         );
     }
@@ -307,6 +385,20 @@ export function AvailabilityEditor({
                 times inside these hours, minus bookings and the gap after each.
                 Changing hours never moves a booking that&apos;s already made.
             </p>
+            {openingHours ? (
+                <p className="-mt-2 mb-3.5 max-w-[70ch] text-[12.5px] text-muted-foreground">
+                    In-person bookings are only offered while you&apos;re open,
+                    so hours outside your opening hours aren&apos;t bookable in
+                    person. Opening hours are in{" "}
+                    <Link
+                        href={HOURS}
+                        className="font-medium text-foreground underline underline-offset-2 hover:no-underline"
+                    >
+                        Settings › Hours
+                    </Link>
+                    .
+                </p>
+            ) : null}
             {canEdit ? null : (
                 <ReadOnlyNote>
                     Your role can see these hours but not change them.
@@ -362,6 +454,7 @@ export function AvailabilityEditor({
                 <WeeklyHours
                     staffId={me.id}
                     hours={hours}
+                    opening={openingHours}
                     kept={kept}
                     canEdit={canEdit}
                     onChange={(next) =>
@@ -444,102 +537,16 @@ export function AvailabilityEditor({
                         ) : null}
                     </section>
 
-                    <section aria-labelledby="booking-rules" className={card}>
-                        <h2
-                            id="booking-rules"
-                            className={cn(cardTitle, "mb-2")}
-                        >
-                            Booking rules
-                        </h2>
-                        <p className="mb-2 text-[11.5px] text-muted-foreground">
-                            For the whole business.
-                        </p>
-                        {ruleChoices(d.rules).map((r) => (
-                            <div
-                                key={r.key}
-                                className="flex items-center gap-2 py-1.5"
-                            >
-                                <span className="flex-1 text-[13px]">
-                                    {r.label}
-                                </span>
-                                <OptionSelect
-                                    aria-label={r.label}
-                                    disabled={!canEdit}
-                                    value={
-                                        d.rules[r.key] === null
-                                            ? ""
-                                            : String(d.rules[r.key])
-                                    }
-                                    onValueChange={(v) =>
-                                        edit((x) => {
-                                            x.rules[r.key] =
-                                                v === "" ? null : Number(v);
-                                        })
-                                    }
-                                    className="h-8 w-auto rounded-[8px] text-[12.5px]"
-                                    options={r.options}
-                                />
-                            </div>
-                        ))}
-                        {/* The business's refund policy (E30, DEC-058). */}
-                        <div className="flex items-center gap-2 py-1.5">
-                            <span className="flex-1 text-[13px]">
-                                {REFUND_POLICY.label}
-                            </span>
-                            <OptionSelect
-                                aria-label={REFUND_POLICY.label}
-                                aria-describedby="refund-policy-hint"
-                                disabled={!canEdit}
-                                value={
-                                    refundsInTime(d.rules) ? "refund" : "keep"
-                                }
-                                onValueChange={(v) =>
-                                    edit((x) => {
-                                        x.rules.refundInTimeCancels =
-                                            v === "refund";
-                                    })
-                                }
-                                className="h-8 w-auto rounded-[8px] text-[12.5px]"
-                                options={[...REFUND_POLICY.options]}
-                            />
-                        </div>
-                        <p
-                            id="refund-policy-hint"
-                            className="text-[11.5px] text-muted-foreground"
-                        >
-                            {REFUND_POLICY.hint}
-                        </p>
-                    </section>
+                    <BookingRulesCard
+                        rules={d.rules}
+                        canEdit={canEdit}
+                        onlineBlocker={onlineBlocker}
+                        onChange={(fn) => edit((x) => fn(x.rules))}
+                    />
                 </div>
             </div>
 
-            {dirty ? (
-                <div className="sticky bottom-[calc(12px+var(--tab-bar-inset,0px))] z-10 mt-3.5 flex flex-wrap items-center gap-2 rounded-[10px] border border-highlight-border bg-muted/70 px-3.5 py-[11px] backdrop-blur-sm dark:bg-muted">
-                    <span
-                        role="status"
-                        className="flex-[1_1_240px] text-[12.5px] text-foreground"
-                    >
-                        Unsaved. New free times show on the calendar and the
-                        booking page when you save; bookings already made
-                        don&apos;t move.
-                    </span>
-                    <Button
-                        variant="outline"
-                        className="h-[38px] rounded-[9px] px-4 text-[14px]"
-                        disabled={saving}
-                        onClick={() => setDraft(null)}
-                    >
-                        Discard
-                    </Button>
-                    <Button
-                        className="h-[38px] rounded-[9px] px-4 text-[14px]"
-                        disabled={saving}
-                        onClick={() => void save()}
-                    >
-                        {saving ? "Saving…" : "Save hours"}
-                    </Button>
-                </div>
-            ) : null}
+            {saveBar}
             <AddPersonDialog
                 open={adding}
                 onOpenChange={setAdding}

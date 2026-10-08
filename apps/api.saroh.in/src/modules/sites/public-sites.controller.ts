@@ -9,17 +9,20 @@ import {
     Param,
     Query,
 } from "@nestjs/common";
-import { listTemplates } from "@saroh/templates";
 
 import { hashClientIp } from "../../common/client-ip";
 import { FixedWindowRateLimiter } from "../enquiry/rate-limiter";
 import { SITE_RELAY_HEADER, visitorKey } from "../site-accounts/site-relay";
+import type { PublicFooter } from "./public-footer.service";
+import { PublicFooterService } from "./public-footer.service";
 import type { PublicVisit } from "./public-visit.service";
 import { PublicVisitService } from "./public-visit.service";
 import type { SiteMoved } from "./site-moved";
 import { siteMovedTo } from "./site-moved";
 import { SitePreviewLinksService } from "./site-preview-links.service";
 import { SitesService } from "./sites.service";
+import type { CatalogueTemplate } from "./template-catalogue";
+import { templateCatalogue } from "./template-catalogue";
 import type { TestReleaseView } from "./test-release-lookup";
 import { resolveTestRelease, TEST_TOKEN_HEADER } from "./test-release-lookup";
 
@@ -52,6 +55,7 @@ export class PublicSitesController {
         private readonly sites: SitesService,
         private readonly previewLinks: SitePreviewLinksService,
         private readonly visits: PublicVisitService,
+        private readonly footers: PublicFooterService,
     ) {}
 
     /**
@@ -59,20 +63,13 @@ export class PublicSitesController {
      * (#107). Unauthenticated on purpose: this is what a site can be built
      * from, which is a claim about the product rather than about any tenant.
      *
-     * The org-scoped `GET .../sites/templates` returns the same registry to a
-     * signed-in merchant choosing one. This adds page titles, which a showcase
-     * needs to describe a template and a picker does not, and it carries no
+     * The org-scoped `GET .../sites/templates` returns the same catalogue to a
+     * signed-in merchant choosing one (`template-catalogue.ts`). It carries no
      * Organization, Site, or Publication data of any kind.
      */
     @Get("templates")
-    templates() {
-        return listTemplates().map((template) => ({
-            id: template.id,
-            version: template.version,
-            name: template.name,
-            description: template.description,
-            pages: template.pages.map((page) => page.title),
-        }));
+    templates(): CatalogueTemplate[] {
+        return templateCatalogue();
     }
 
     /** Current publication snapshot for the site on `<subdomain>.saroh.app`. */
@@ -200,6 +197,23 @@ export class PublicSitesController {
         @Headers(SITE_RELAY_HEADER) relay: string | undefined,
     ): Promise<PublicVisit> {
         return this.visits.read(siteId, undefined, visitorKey(ip, relay));
+    }
+
+    /**
+     * What the site's footer shows beside the snapshot (DEC-101, DEC-102):
+     * the business's contact email when it has one, and "Made with Saroh"
+     * with its referral code on Free. Read live, never cached, so a plan
+     * change or a new email shows at once. The visitor is relayed as for
+     * `/visit`.
+     */
+    @Get(":siteId/footer")
+    @Header("Cache-Control", "no-store")
+    footer(
+        @Param("siteId") siteId: string,
+        @Ip() ip: string,
+        @Headers(SITE_RELAY_HEADER) relay: string | undefined,
+    ): Promise<PublicFooter> {
+        return this.footers.read(siteId, visitorKey(ip, relay));
     }
 
     /**

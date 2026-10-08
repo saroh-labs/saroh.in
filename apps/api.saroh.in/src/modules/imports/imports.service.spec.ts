@@ -86,3 +86,32 @@ describe("ImportsService.apply — a refused file", () => {
         });
     });
 });
+
+describe("keepFirstNew (UX-036: import the ones that fit)", () => {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const { keepFirstNew } =
+        require("./imports.service") as typeof import("./imports.service");
+    const row = (n: number, outcome: "CREATE" | "UPDATE") =>
+        ({ row: n, outcome, key: `k${n}`, values: {}, issues: [] }) as never;
+    const adds = (r: { outcome: string }) => r.outcome === "CREATE";
+
+    it("keeps the first N new rows and every update", () => {
+        const rows = [
+            row(1, "CREATE"),
+            row(2, "UPDATE"),
+            row(3, "CREATE"),
+            row(4, "CREATE"),
+        ];
+        const { kept, left } = keepFirstNew(rows, 2, adds);
+        expect(kept.map((r) => r.row)).toEqual([1, 2, 3]);
+        expect(left).toBe(1);
+    });
+
+    it("keeps everything when not asked to stop", () => {
+        const rows = [row(1, "CREATE"), row(2, "CREATE")];
+        expect(keepFirstNew(rows, undefined, adds)).toEqual({
+            kept: rows,
+            left: 0,
+        });
+    });
+});

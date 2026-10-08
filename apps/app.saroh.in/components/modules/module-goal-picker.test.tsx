@@ -190,7 +190,7 @@ describe("ModuleGoalPicker by kind (DEC-070)", () => {
         const bookings = Array.from(
             document.querySelectorAll('[role="checkbox"]'),
         ).find((c) =>
-            c.closest("label")?.textContent.includes("Take appointments"),
+            c.closest("label")?.textContent.includes("Take bookings"),
         );
         act(() => (bookings as HTMLElement).click());
         const go = Array.from(document.querySelectorAll("button")).find((b) =>

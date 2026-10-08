@@ -4,6 +4,13 @@ import { Module } from "@nestjs/common";
 import { env } from "../../env";
 import { JobHandlerRegistry } from "../jobs/job-handler.registry";
 import { JobsModule } from "../jobs/jobs.module";
+import { OrganizationContextModule } from "../organizations/organization-context.module";
+import { WaitlistInvitesService } from "./invites.service";
+import {
+    LaunchOfferController,
+    WaitlistInviteController,
+} from "./launch-offer.controller";
+import { LaunchOfferService } from "./launch-offer.service";
 import { PublicLaunchOfferController } from "./public-offer.controller";
 import {
     WAITLIST_RETENTION_TYPE,
@@ -19,13 +26,26 @@ const CHAIN_CHECK_MS = 6 * 60 * 60 * 1000;
  * PUBLIC waitlist capture. Intentionally guardless and org-agnostic: a signup
  * happens before any Organization or User exists, so there is nothing to scope
  * to and no session to check. Also the retention sweep (U30, KTD-17), and
- * the launch offer saroh.in's waitlist page shows (`PublicLaunchOfferController`).
+ * the opening-day invites (U31): sending them (`WaitlistInvitesService`, run
+ * by the admin console's operations) and the launch offer they carry, which
+ * onboarding reads and takes behind a session (`LaunchOfferController`),
+ * and which saroh.in's waitlist page shows (`PublicLaunchOfferController`).
  */
 @Module({
-    imports: [JobsModule],
-    controllers: [WaitlistController, PublicLaunchOfferController],
-    providers: [WaitlistService, WaitlistRetentionHandler],
-    exports: [WaitlistService],
+    imports: [JobsModule, OrganizationContextModule],
+    controllers: [
+        WaitlistController,
+        WaitlistInviteController,
+        LaunchOfferController,
+        PublicLaunchOfferController,
+    ],
+    providers: [
+        WaitlistService,
+        WaitlistRetentionHandler,
+        WaitlistInvitesService,
+        LaunchOfferService,
+    ],
+    exports: [WaitlistService, WaitlistInvitesService],
 })
 export class WaitlistModule implements OnModuleInit, OnModuleDestroy {
     private chainCheck?: ReturnType<typeof setInterval>;

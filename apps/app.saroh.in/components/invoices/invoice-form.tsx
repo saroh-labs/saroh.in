@@ -16,6 +16,9 @@ import type { FieldErrors } from "react-hook-form";
 import { Controller, useFieldArray, useForm, useWatch } from "react-hook-form";
 import { z } from "zod";
 
+import { reportFailure } from "@/components/billing/plan-refusal";
+import type { AddedContact } from "@/components/contacts/add-contact-dialog";
+import { AddContactDialog } from "@/components/contacts/add-contact-dialog";
 import { useBusinessDetailsStep } from "@/components/organizations/use-business-details-step";
 import { ContactPicker } from "@/components/shared/contact-picker";
 import { OptionSelect } from "@/components/shared/option-select";
@@ -36,6 +39,7 @@ import {
     rateOption,
 } from "@/lib/invoices/gst";
 import type { Invoice } from "@/lib/invoices/service";
+import type { DetailsOnFile } from "@/lib/organizations/business-details";
 
 const MONEY = /^\d{1,9}(\.\d{1,2})?$/;
 
@@ -138,13 +142,14 @@ async function copy(text: string): Promise<boolean> {
  * only sum the browser does, and only to read.
  */
 export function InvoiceForm({
-    contacts,
+    contacts: listed,
     defaultCurrency,
     draft,
     initialContactId,
     registered,
     businessName,
     providerConnected,
+    detailsOnFile = null,
 }: {
     contacts: { id: string; name: string; email: string }[];
     defaultCurrency: string;
@@ -157,19 +162,29 @@ export function InvoiceForm({
     businessName: string;
     /** A pay link can be made (Payments on, a provider connected), so issuing makes one. */
     providerConnected: boolean;
+    /**
+     * The business details on file, read with the page: Issue asks for any
+     * that are missing before it saves anything (#838).
+     */
+    detailsOnFile?: DetailsOnFile | null;
 }) {
     const router = useRouter();
     const details = useBusinessDetailsStep({
         then: "issue it",
         continueLabel: "Save and issue",
+        onFile: detailsOnFile,
     });
     const ids = {
         contact: useId(),
         gstin: useId(),
         state: useId(),
         address: useId(),
+        lines: useId(),
     };
     const [intent, setIntent] = useState<"issue" | "draft">("issue");
+    // Someone added from Who (UX-047) joins the list here, chosen.
+    const [added, setAdded] = useState<AddedContact[]>([]);
+    const contacts = [...added, ...listed];
     const hasBuyerGst = Boolean(
         draft?.billToGst?.gstin ??
         draft?.billToGst?.state ??
@@ -209,6 +224,17 @@ export function InvoiceForm({
         control: form.control,
         name: "lines",
     });
+    // The last line empties rather than goes: an invoice has one.
+    const removeLine = (i: number) =>
+        fields.length > 1
+            ? remove(i)
+            : form.setValue(`lines.0`, {
+                  description: "",
+                  quantity: 1,
+                  unitPrice: "",
+                  gstRate: "",
+                  hsnSac: "",
+              });
     const { isSubmitting, errors } = form.formState;
     const lines = useWatch({ control: form.control, name: "lines" });
     const due = useWatch({ control: form.control, name: "due" });
@@ -230,6 +256,10 @@ export function InvoiceForm({
     const withLink = providerConnected;
 
     async function onSubmit(values: FormValues) {
+        // Missing details are asked for at once, before the save (#838):
+        // asked after it, the sheet waited on a save, a refusal and a read.
+        // Closed without saving, the draft is still kept, as below.
+        const detailsReady = intent === "issue" ? await details.ensure() : true;
         const input = {
             contactId: values.contactId,
             ...(draft ? {} : { currency, tax: "0" }),
@@ -281,7 +311,9 @@ export function InvoiceForm({
             return;
         }
         // No registered address yet (DEC-068): asked here, then it issues.
-        const issued = await details.run(() => issueInvoice(id));
+        const issued = detailsReady
+            ? await details.run(() => issueInvoice(id))
+            : null;
         if (!issued) {
             showSuccess("Saved as a draft. Issue it once your address is in.");
             router.push(to);
@@ -301,9 +333,15 @@ export function InvoiceForm({
         }
         const link = await createPayLink(id);
         if (!link.ok) {
-            showError(
-                `${number} issued, but no pay link was made: ${link.error}`,
-            );
+            if (link.plan) {
+                // Issued; only the pay link is the plan's to refuse.
+                showSuccess(`${number} issued. Its lines are locked.`);
+                reportFailure(link);
+            } else {
+                showError(
+                    `${number} issued, but no pay link was made: ${link.error}`,
+                );
+            }
         } else if (await copy(link.data.url)) {
             showSuccess(
                 `${number} issued and its pay link copied. Send it to ${issued.data.contact?.name ?? "them"}.`,
@@ -323,16 +361,25 @@ export function InvoiceForm({
         }
     }
 
+    function onContactAdded(c: AddedContact) {
+        setAdded((a) => [c, ...a]);
+        form.setValue("contactId", c.id, { shouldValidate: true });
+    }
+
     if (contacts.length === 0 && !draft) {
         return (
             <div className="max-w-xl rounded-[12px] border border-border bg-card p-5 text-[13.5px]">
                 <p className="text-muted-foreground">
                     An invoice is for someone in your contacts, and there is no
-                    one there yet — or Contacts is switched off.
+                    one there yet. Add who it&apos;s for here, then write the
+                    invoice.
                 </p>
-                <Button variant="outline" asChild className="mt-4">
-                    <Link href="/contacts">Go to Contacts</Link>
-                </Button>
+                <div className="mt-4 flex flex-wrap gap-2">
+                    <NewContact onAdded={onContactAdded} solid />
+                    <Button variant="ghost" asChild>
+                        <Link href="/contacts">Go to Contacts</Link>
+                    </Button>
+                </div>
             </div>
         );
     }
@@ -353,7 +400,10 @@ export function InvoiceForm({
                 className="flex flex-wrap items-start gap-4"
                 noValidate
             >
-                <div className="grid min-w-0 flex-[3_1_440px] gap-3">
+                {/* One column that never grows past the form: an auto
+                    track took the picker's whole "name · email" as its
+                    least width, and a long email zoomed a phone out. */}
+                <div className="grid min-w-0 flex-[3_1_440px] grid-cols-[minmax(0,1fr)] gap-3">
                     <Card label="Billed to">
                         <Controller
                             control={form.control}
@@ -374,6 +424,11 @@ export function InvoiceForm({
                             <p className="mt-1.5 text-[12px] text-destructive-subtle-foreground">
                                 {errors.contactId.message}
                             </p>
+                        ) : null}
+                        {!draft ? (
+                            <div className="mt-1.5">
+                                <NewContact onAdded={onContactAdded} />
+                            </div>
                         ) : null}
                         {registered ? (
                             buyerOpen ? (
@@ -466,16 +521,36 @@ export function InvoiceForm({
                     </Card>
 
                     <Card label="Lines">
+                        {/* The desk's column heads (UX-080): a phone labels
+                            each field instead. The fields carry their own
+                            names for a screen reader. */}
+                        <div
+                            aria-hidden
+                            className="hidden gap-1.5 px-0.5 pb-1 text-[12px] text-muted-foreground sm:grid sm:grid-cols-[minmax(0,3fr)_70px_100px_30px]"
+                        >
+                            <span>What it&apos;s for</span>
+                            <span>Qty</span>
+                            <span>Price each</span>
+                        </div>
                         <ul className="grid gap-1.5">
                             {fields.map((line, i) => {
                                 const lineErr = errors.lines?.[i];
                                 return (
                                     <li key={line.id} className="grid gap-1.5">
-                                        <div className="grid grid-cols-[minmax(0,3fr)_70px_100px_30px] gap-1.5">
+                                        {/* A phone stacks the line (T7):
+                                            what it's for beside its remove
+                                            button, then Quantity and Price
+                                            each, labelled, side by side.
+                                            The desk keeps one row. The
+                                            remove button is drawn twice
+                                            (one per layout, the other
+                                            display:none) so the tab order
+                                            follows what is seen. */}
+                                        <div className="grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)_44px] gap-1.5 sm:grid-cols-[minmax(0,3fr)_70px_100px_30px]">
                                             <Input
                                                 aria-label={`Line ${i + 1}: what it's for`}
                                                 placeholder="What it's for"
-                                                className="h-9 rounded-[8px] text-[13px]"
+                                                className="col-span-2 h-9 rounded-[8px] text-[13px] sm:col-span-1"
                                                 disabled={isSubmitting}
                                                 aria-invalid={Boolean(
                                                     lineErr?.description,
@@ -484,60 +559,64 @@ export function InvoiceForm({
                                                     `lines.${i}.description`,
                                                 )}
                                             />
-                                            <Input
-                                                aria-label={`Line ${i + 1}: quantity`}
-                                                inputMode="numeric"
-                                                className="h-9 rounded-[8px] text-[13px] tabular-nums"
+                                            <RemoveLine
+                                                index={i}
+                                                className="grid size-11 sm:hidden"
                                                 disabled={isSubmitting}
-                                                aria-invalid={Boolean(
-                                                    lineErr?.quantity,
-                                                )}
-                                                {...form.register(
-                                                    `lines.${i}.quantity`,
-                                                    {
-                                                        valueAsNumber: true,
-                                                    },
-                                                )}
+                                                onRemove={() => removeLine(i)}
                                             />
-                                            <Input
-                                                aria-label={`Line ${i + 1}: price each, ${currency}`}
-                                                inputMode="decimal"
-                                                placeholder="₹ each"
-                                                className="h-9 rounded-[8px] text-[13px] tabular-nums"
-                                                disabled={isSubmitting}
-                                                aria-invalid={Boolean(
-                                                    lineErr?.unitPrice,
-                                                )}
-                                                {...form.register(
-                                                    `lines.${i}.unitPrice`,
-                                                )}
-                                            />
-                                            <button
-                                                type="button"
-                                                aria-label={`Remove line ${i + 1}`}
-                                                disabled={isSubmitting}
-                                                onClick={() =>
-                                                    fields.length > 1
-                                                        ? remove(i)
-                                                        : form.setValue(
-                                                              `lines.0`,
-                                                              {
-                                                                  description:
-                                                                      "",
-                                                                  quantity: 1,
-                                                                  unitPrice: "",
-                                                                  gstRate: "",
-                                                                  hsnSac: "",
-                                                              },
-                                                          )
-                                                }
-                                                className="grid place-items-center rounded-[8px] text-muted-foreground hover:bg-muted hover:text-foreground active:bg-accent-active"
-                                            >
-                                                <X
-                                                    aria-hidden
-                                                    className="size-4"
+                                            <div className="grid gap-1 sm:contents">
+                                                <Label
+                                                    htmlFor={`${ids.lines}-${i}-qty`}
+                                                    className="text-[12px] text-muted-foreground sm:hidden"
+                                                >
+                                                    Quantity
+                                                </Label>
+                                                <Input
+                                                    id={`${ids.lines}-${i}-qty`}
+                                                    aria-label={`Line ${i + 1}: quantity`}
+                                                    inputMode="numeric"
+                                                    className="h-9 rounded-[8px] text-[13px] tabular-nums"
+                                                    disabled={isSubmitting}
+                                                    aria-invalid={Boolean(
+                                                        lineErr?.quantity,
+                                                    )}
+                                                    {...form.register(
+                                                        `lines.${i}.quantity`,
+                                                        {
+                                                            valueAsNumber: true,
+                                                        },
+                                                    )}
                                                 />
-                                            </button>
+                                            </div>
+                                            <div className="grid gap-1 sm:contents">
+                                                <Label
+                                                    htmlFor={`${ids.lines}-${i}-price`}
+                                                    className="text-[12px] text-muted-foreground sm:hidden"
+                                                >
+                                                    Price each
+                                                </Label>
+                                                <Input
+                                                    id={`${ids.lines}-${i}-price`}
+                                                    aria-label={`Line ${i + 1}: price each, ${currency}`}
+                                                    inputMode="decimal"
+                                                    placeholder="₹ each"
+                                                    className="h-9 rounded-[8px] text-[13px] tabular-nums"
+                                                    disabled={isSubmitting}
+                                                    aria-invalid={Boolean(
+                                                        lineErr?.unitPrice,
+                                                    )}
+                                                    {...form.register(
+                                                        `lines.${i}.unitPrice`,
+                                                    )}
+                                                />
+                                            </div>
+                                            <RemoveLine
+                                                index={i}
+                                                className="hidden sm:grid"
+                                                disabled={isSubmitting}
+                                                onRemove={() => removeLine(i)}
+                                            />
                                         </div>
                                         {registered ? (
                                             <div className="grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)_30px] gap-1.5 sm:grid-cols-[170px_140px_1fr]">
@@ -718,5 +797,63 @@ function Card({ label, children }: { label: string; children: ReactNode }) {
             </h2>
             {children}
         </section>
+    );
+}
+
+/** A line's remove button: 44px on a phone, the desk's 30px column. */
+function RemoveLine({
+    index,
+    className,
+    disabled,
+    onRemove,
+}: {
+    index: number;
+    className: string;
+    disabled: boolean;
+    onRemove: () => void;
+}) {
+    return (
+        <button
+            type="button"
+            aria-label={`Remove line ${index + 1}`}
+            disabled={disabled}
+            onClick={onRemove}
+            className={cn(
+                "place-items-center rounded-[8px] text-muted-foreground hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring active:bg-accent-active",
+                className,
+            )}
+        >
+            <X aria-hidden className="size-4" />
+        </button>
+    );
+}
+
+/**
+ * "New contact" in Who (UX-047): adds someone without leaving the invoice,
+ * and picks them. The API still decides (Contacts off, or no
+ * `contact:write`), and the dialog says why it couldn't.
+ */
+function NewContact({
+    onAdded,
+    solid = false,
+}: {
+    onAdded: (c: AddedContact) => void;
+    solid?: boolean;
+}) {
+    return (
+        <AddContactDialog
+            onAdded={onAdded}
+            description="Who this invoice is for. They're added to your contacts and picked here."
+            trigger={
+                <Button
+                    type="button"
+                    variant={solid ? "default" : "link"}
+                    size="sm"
+                    className={solid ? undefined : "h-auto px-0 text-[12.5px]"}
+                >
+                    New contact
+                </Button>
+            }
+        />
     );
 }

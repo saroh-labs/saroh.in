@@ -23,10 +23,19 @@
 - **Issued paper never changes** (DEC-082): the seller's name, legal name,
   email, GSTIN, state and address are frozen on the invoice by
   `documentColumns` from `loadTaxProfile`, and a correction copies its
-  original's. Anything that draws an issued paper reads the frozen columns
+  original's. Anything against an original — a credit note, a supplementary
+  invoice, a deposit's balance — is built from the original's row
+  (`buildCorrection`, `buildCreditNote`), never `buildManualInvoice` with a
+  patched profile: that recomputes the seller, place of supply and tax
+  split from today's settings. Anything that draws an issued paper reads the frozen columns
   through `printedSeller`, never today's settings; only a draft prints
   today's. The logo is the one live part. A new frozen column needs its
   writer in `documentColumns`, its select in `serialize.ts` and a backfill.
+- **One PDF, never stored** (DEC-083): the merchant's download, the invoice
+  email's attachment and the customer's pay-link and receipt downloads all
+  draw through `drawPaperPdf` / `IssuedInvoicePdf`
+  (`invoices/issued-invoice-pdf.ts`), each behind its own reader's check.
+  A new reader asks for `InvoicePdfModule`, not the invoices module.
 - **Money** is minor units in arithmetic and `Decimal` strings on the wire
   (`backend-data-and-money.md`).
 - **Who sees what:** invoice ids and numbers go only to a role with
@@ -46,6 +55,50 @@ requireProvider: false })`), the email says "view it and download a copy",
   and the pay page's payment-intent and autopay answer 409 "This business
   doesn't take payment online." Automatic invoicing (renewals, packs,
   courses, subscribe) still stops with Payments off (`payments-on.ts`).
+
+## Saroh's own invoices — **Current** (pricing catalogue U17)
+
+Saroh billing a business for its plan is not the business's paper: it is
+`SarohInvoice` (Saroh's series, Saroh as seller from env), never an
+`Invoice` row, and never numbered from a business's `InvoiceSequence`. It
+reuses the pure GST helpers (`invoices/gst.ts`, `gst-states.ts`,
+`numbering.ts`'s financial year) and the D16 PDF renderer through its own
+paper view. Written by the billing webhook with the charge, once per
+charge; rules in `docs/architecture/PRICING_ROLLOUT.md` › "Saroh's own
+invoices (U17)".
+
+**How a plan is paid (DEC-093, #803).** Monthly is autopay for 12 charges
+(`TERM_CHARGES`), yearly one payment for the year (a provider order, never
+autopay, never a trial). The catalogue's trial may carry a nominal first
+month (`trial.firstPaise`), taken as the mandate is authorised and invoiced
+on its own (`first-month:<checkout>`). The term's end is `billing-term.ts`:
+in its last 30 days the same plan quotes as `RENEW` (a SCHEDULED checkout
+from the term's end that cancels nothing), and a term nobody renews runs to
+the end of what was paid and then moves to Free (`term-end.ts`: a monthly
+subscription's `completed`; the hourly sweep for a year paid once). The
+business is asked to pay for the next term, never renewed by itself
+(DEC-100): the hourly sweep sends the request 30, 7 and 1 days before the
+end, in the inbox and by email, once per stage (`term-ending.ts`,
+`term-ending-notice.ts`), and says nothing once a renewal or another plan
+is authorised. A business whose owner chose Free or cancelled for the
+period's end (`Subscription.freeChosenAt`, set by Plan and billing's move
+to Free and by cancel, cleared wherever `cancelAtPeriodEnd` is) is told
+its plan moves to Free then, as it chose, and never asked to pay; the
+term run out (`term-end.ts`) sets `cancelAtPeriodEnd` without it. Rules in `PRICING_ROLLOUT.md` › "Checkout and term
+(DEC-093)".
+
+**First month, not trial (DEC-093).** A TRIAL checkout that took a charge
+is the nominal first month, and its email says "first month" and autopay
+(`firstMonthEndingEmail`); only a trial that cost nothing keeps the trial
+words (`paidFirstMonth` in `offers.ts`). The waitlist's months of a plan
+are a `plan` override with an end date (#805), told as a plan that ends.
+
+Trials, coupons and add-ons (U16) ride the same path: a coupon is
+redeemed and its discount invoiced with the charge it comes off, never at
+checkout, and an add-on is a line on the charge after the period it covers
+(`SubscriptionAddonCharge`). The amount the provider charges and the
+invoice's lines are worked out by one rule each, so they agree. Rules in
+`PRICING_ROLLOUT.md` › "Trials, yearly, coupons and add-ons (U16)".
 
 ## Business details before money — **Current** (DEC-068, M3)
 
@@ -225,7 +278,23 @@ missing: ["address", "gstin"] }` in merchant words, before anything is
 - **Staff orders hold when made**, under the rows' locks with a conditional
   can-sell update; the refusal is the storefront's words from
   `stock/stock-words.ts` — "Sourdough — Sold out", "… — Only 2 left at Hill
-  Road". An online order holds only when paid: `reserveOnPayment` is
+  Road". **A site order paid at the handover holds when made too**
+  (2026-10-06, `Order.payOnHandover`): "Pay when you collect" / "Pay on
+  delivery" at the site's checkout makes the order unpaid and real at once
+  — it holds as a staff pay-later order does (`createCheckoutOrder`), is
+  never replaced or closed as an abandoned checkout (`holdsOnPayment` is
+  false for it, so `closeCheckoutInTx`, the webhook's online-order path and
+  `realOrderWhere` all treat it as a staff order), counts on
+  `ordersPerMonth` from the start (soft at the site), tells the team at
+  once, and is invoiced when staff mark it paid (DEC-023). Its kitchen runs
+  before the money; only the handover (collected, delivered) waits for it
+  (`moveAwaitsPayment`). Nothing releases it on a timer: staff cancel it,
+  as a pay-later order. Three days on, still unpaid and not handed over,
+  Home shows it under Attention and the team is told once (R34,
+  `orders/uncollected.ts`; `backend-jobs.md` → Team alerts). Offered always on a plan without online payments,
+  beside online where the storefront turns it on
+  (`StoreSettings.offerPayOnHandover`, `checkoutReadiness`); never for a
+  shipment. An online order holds only when paid: `reserveOnPayment` is
   idempotent per intent: a payment that held records a `STOCK_HELD`
   attempt, so its webhook repeating reads HELD even after the order
   closed, while any other payment reaching a closed order is refunded
@@ -317,7 +386,8 @@ missing: ["address", "gstin"] }` in merchant words, before anything is
   a new link replaces the old, and voiding the invoice or deleting its contact
   clears it. Never log `/public/invoices/<token>` — the request log redacts it.
 - **The public read is an allow-list** (business name, number, dates, lines,
-  tax, total, currency, status, billed-to name, and `payOnline`) served
+  tax, total, currency, status, billed-to name, `payOnline`, and on an owed
+  view-only invoice `payInstructions`, R32) served
   server-to-server to `saroh.app/pay/<token>`; reads and payment starts are
   rate-limited per link. With `payOnline` false (DEC-070) the page shows the
   invoice with no Pay button, only "Print or save as PDF", and starting a payment or autopay
@@ -331,6 +401,35 @@ missing: ["address", "gstin"] }` in merchant words, before anything is
   PAID (`ONLINE`) under its row lock; success on one already PAID or VOID is
   `CAPTURED_NEEDS_REFUND`, raised on Home until the provider's refund webhook
   clears it. A refund never changes an invoice's status.
+
+## How to pay us: offline payment details — **Current** (R32)
+
+- **Every business, every plan,** can tell customers how to pay it offline:
+  a UPI ID, bank details (name on the account, number, IFSC, bank) and a
+  short note. Six nullable columns on `BusinessProfile` (`payUpiId`,
+  `payBank*`, `payNote`), read and written with the rest of the business's
+  settings (`org:settings:read` / `org:update`, Owner and Admin) as
+  `payInstructions` on the settings PATCH. Rules, normalising and the reads
+  are `organizations/business-pay-instructions.ts`: a UPI ID is
+  `name@handle` (lower-cased), an IFSC `^[A-Z]{4}0[A-Z0-9]{6}$`, an account
+  number 9–18 digits (CHECKs in the migration), and bank details are taken
+  whole or not at all. Never logged; the audit stream names the change, never
+  the value (`NAME_ONLY_FIELDS`).
+- **Shown only on a customer's own record.** The public sees them only
+  inside: the invoice pay link's read (owed, and `payOnline` false), the
+  order pay link's read (while DUE), and a signed-in desk booking's answer
+  (`account-bookings.controller.ts`). Never a standalone endpoint that hands
+  a business's bank details to anyone with its slug.
+  `businessPayInstructionsOf` is the one read, and re-checks every value on
+  the way out.
+- **The invoice email names the ways** ("see how to pay ‹business› by UPI or
+  bank transfer here") on a view link, never the details: a stored message
+  body never carries an account number. The invoice PDF has no payment
+  section and carries none.
+- **Drawn by one block:** `PayInstructionsCard` in `packages/site-blocks`
+  (QR from `uqr`, the UPI deep link `upi://pay?pa=…&pn=…&am=…&cu=INR&tn=…`,
+  copy buttons), used by the invoice and order pay pages, the booking
+  confirmation, and the Settings › Business › How to pay us preview.
 
 ## Paying for a booking online — **Current** (U19, ADR-008)
 
@@ -366,6 +465,18 @@ missing: ["address", "gstin"] }` in merchant words, before anything is
   due at the visit (`booking-money.ts`). A service with a deposit is never
   booked to pay at the desk (`payAtBooking`), and a FULL deposit is paying
   now. The public read serves `depositCents`, never the mode.
+- **The business decides how a booking is paid** (DEC-088, #821, #822):
+  `BookingRules.bookingPayment` is ONLINE, DESK or BOTH (default, as
+  before). The page's `payOnline` is the rule allowing it AND a provider
+  that can take it (`onlinePaymentBlocker`, `bookings/booking-payment.ts`);
+  `bookOnline` refuses a way the rule doesn't allow before anything is
+  held (`refuseDisallowedPay`; a credit and a service with no price are
+  never refused). A priced service nothing allowed can pay for (a deposit,
+  or online only, with nothing online) can't be booked on the page, which
+  says to get in touch and draws no payment line (`unpayableText`). The
+  merchant's screens read `GET booking-rules/payment` and say why
+  (`lib/services/online-booking.ts`). Packs and plans ignore the rule: it
+  is about bookings.
 - **The free-cancel deadline is fixed at booking** (`Booking.freeCancelUntil`,
   DEC-051), written by `reserveInTx` from the rule of that moment. A move
   never changes it; `isLateCancel` reads it, falling back to the start and

@@ -20,6 +20,7 @@ export function CtaLink({
     trialDays,
     cycle,
     mode,
+    template,
     variant = "primary",
     size = "lg",
     className,
@@ -29,13 +30,15 @@ export function CtaLink({
     /** Where on the site this button is, e.g. `nav`, `home-hero`. */
     src: string;
     plan?: string;
-    /** The plan's name and whether it costs anything. */
+    /** The plan's name and whether it costs anything, from the catalogue. */
     planName?: string;
     paid?: boolean;
     trialDays?: number;
     /** The cycle a paid plan's card shows; open mode carries it to sign-up. */
     cycle?: "month" | "year";
     mode?: LaunchMode;
+    /** A gallery template the button saves (`cta`'s `template`). */
+    template?: { slug: string; name: string };
     variant?: ButtonVariant;
     size?: ButtonSize;
     className?: string;
@@ -51,6 +54,7 @@ export function CtaLink({
         trialDays,
         cycle,
         mode,
+        template,
     });
     return (
         <ButtonLink
@@ -59,7 +63,12 @@ export function CtaLink({
             size={size}
             className={className}
             onClick={() => {
-                track("cta_click", { plan, page: src, mode: action.mode });
+                track("cta_click", {
+                    plan,
+                    page: src,
+                    mode: action.mode,
+                    template: template?.slug,
+                });
                 onNavigate?.();
             }}
         >

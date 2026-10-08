@@ -182,6 +182,8 @@ export class FormsService {
      * Update a Form's name/fields/status/pipeline. Authorizes `form:write`,
      * loads the org's own form (404 otherwise). Re-validates `fields` when
      * present, and re-checks a new `pipelineId` belongs to the org (404).
+     * A `siteId` binds a form that has no site yet (an owned site, else 404)
+     * and is ignored for one that has.
      */
     async update(
         ctx: OrganizationContext,
@@ -198,8 +200,17 @@ export class FormsService {
         if (dto.pipelineId) {
             await this.requireOwnedPipeline(ctx, dto.pipelineId);
         }
+        // A form saved without its site takes the one the editor names; one
+        // already on a site is never moved by an editor save (UX-002).
+        const claimSite = !!dto.siteId && form.siteId === null;
+        if (claimSite && dto.siteId) {
+            await this.requireOwnedSite(ctx, dto.siteId);
+        }
 
         const data: Prisma.FormUpdateInput = {};
+        if (claimSite && dto.siteId) {
+            data.site = { connect: { id: dto.siteId } };
+        }
         if (dto.name !== undefined) data.name = dto.name;
         if (dto.fields !== undefined) {
             data.fields = dto.fields as unknown as Prisma.InputJsonValue;

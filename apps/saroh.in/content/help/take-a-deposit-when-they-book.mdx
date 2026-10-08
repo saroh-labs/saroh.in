@@ -1,0 +1,101 @@
+---
+# Every label below was checked against the real screens on 6 Oct 2026
+# (R7), in the code and in the captured shots. Sources, from the repo root:
+#   NAV   apps/app.saroh.in/components/shared/nav-items.tsx (Bookings ›
+#         Services, /services); app/(shell)/services/page.tsx ("Edit")
+#   PRICE apps/app.saroh.in/components/services/service-editor/editor-sections.tsx
+#         ("Price", "Price (₹)"); .../service-editor/deposit-field.tsx ("At
+#         booking, they pay": "Nothing — they pay at the visit", "25%
+#         deposit", "50% deposit", "The full price")
+#   NOTE  apps/app.saroh.in/lib/services/service-editor.ts depositNote ("No
+#         card needed to book. No-shows cost you the slot."; "They pay … when
+#         booking, and the rest (…) at the visit. Refunded if they cancel in
+#         time."; "A deposit is part of the price. Set a price first, or take
+#         nothing at booking.")
+#   SAVE  .../service-editor/service-editor.tsx ("Save changes", "Discard
+#         changes"; "Changes apply to bookings made after you save.")
+#   BOOK  packages/site-blocks/src/booking-flow/ (pay-step.tsx "Paying";
+#         model.ts "Pay … deposit now", "The rest (…) at ‹business›. Refunded
+#         if you cancel in time.", "Pay the full … now", "Pay at the desk";
+#         booking-flow.tsx "Deposit now", "Pay at the desk", "Book — pay at
+#         the desk", "‹business› can't take the deposit online right now.
+#         Get in touch with them to book." (Online only); done-card.tsx
+#         "Paid a … deposit. The rest (…) is paid at ‹business›."); no "Pay
+#         at the desk" choice for a deposit while online can take it; the
+#         desk when it can't and the desk is allowed (DEC-089)
+#   PAY   apps/api.saroh.in/src/modules/bookings/public-booking-page.ts
+#         (payOnline: Payments on and a connected provider that opens the
+#         checkout); MARKETING_CLAIMS BK1, BK8; DEC-051 (refunded once, by
+#         the free-cancel time fixed at booking), DEC-058 (Cancelled in time)
+#   DESK  apps/app.saroh.in/lib/services/booking-money.ts paidLine ("Deposit …
+#         paid · … due at the visit"); components/bookings/take-payment.tsx
+#         ("Take …", "What's left after the deposit … paid online.")
+#   PROV  nav-items.tsx (Settings › Providers)
+#   WARN  apps/app.saroh.in/lib/services/online-booking.ts ("Paid at the
+#         desk for now: no payment provider is connected, so nothing is
+#         taken when people book."; "Paid at the desk: your booking rules
+#         take payment at the desk only, …"; under Online only "People can't
+#         book this online: it takes payment when they book, and …"; "Connect
+#         one in Settings › Providers", "Change it in Booking rules"), shown
+#         under At booking, they pay (deposit-field.tsx); only the Online
+#         only case is marked "Can't be booked online: …" on the Services
+#         card (services-screen.tsx); DEC-088, DEC-089, #821
+#   RULE  apps/app.saroh.in/lib/services/availability-rules.ts PAY_WAY ("How
+#         people pay when they book": Both, Online, At the desk); booking
+#         page shows no payment line when it can't take the deposit under
+#         Online only (#822, DEC-089)
+# Where the design said otherwise, the app won: content/help/README.md.
+# Shots 1, 2, 3 and 5 re-captured on 6 Oct after DEC-089. The demo
+# clinic's Razorpay connection has no key id, so its checkout can't open
+# and the app reads it as no provider connected (WARN). Its booking rules
+# are the default Both, so the root canal's deposit is paid at the desk:
+# shot 1 marks nothing on the root canal, shot 2 shows "Paid at the desk
+# for now" under At booking, they pay, and shot 5's booking page shows
+# the Pay at the desk line. Shot 4 is Northwind,
+# which can take payment online (re-captured, unchanged). A paid deposit
+# on a booking couldn't be captured without a real payment: step 4 says
+# in words how it reads (DESK).
+title: Take a deposit when they book
+slug: take-a-deposit-when-they-book
+area: Bookings
+group: Take bookings
+order: 20
+intro: "A deposit holds the time: the customer pays part of the price, or all of it, when they book on your site, and the rest at the visit. You set it on each service. This takes about two minutes."
+description: "Ask for a deposit, or the full price, when customers book a service on your site, and see what they see when they pay."
+readMinutes: 3
+updated: "2026-10-06"
+publishOn: "2026-10-17"
+steps:
+    # NAV.
+    - title: Open the service
+      body: "In Saroh, open Bookings › Services in the sidebar, and press Edit on the service you want a deposit for."
+      shot: help-take-deposit-1
+      caption: "Services at Kavi Dental (demo clinic), with Edit on the root canal."
+      marker: Edit
+    # PRICE, NOTE.
+    - title: Choose what they pay at booking
+      body: "Under Price, At booking, they pay has four choices: Nothing — they pay at the visit, a 25% deposit, a 50% deposit, or The full price. Under them, Saroh says what that means for this service: what they pay when booking, the rest at the visit, and that it's refunded if they cancel in time. A deposit is part of the price, so the service needs a price first. If it can't be taken online — no payment provider connected, Payments off, or your booking rules taking payment at the desk only — Saroh says right under it that it's paid at the desk instead, with a link to what fixes it. If your booking rules take payment online only, it says people can't book it online."
+      shot: help-take-deposit-2
+      caption: "The root canal's price at Kavi Dental (demo clinic), with a 50% deposit at booking, and the note that it's paid at the desk for now, as no payment provider is connected."
+      tip: "In time means before the free cancellation time in your booking rules, under Bookings › Availability. A late cancel keeps the deposit."
+      marker: 50% deposit
+    # SAVE.
+    - title: Save the service
+      body: "Press Save changes at the top right. It applies to bookings made after you save; bookings already made keep their time and price."
+      shot: help-take-deposit-3
+      caption: "A change to the root canal at Kavi Dental (demo clinic), waiting for Save changes."
+      marker: Save changes
+    # BOOK, DESK.
+    - title: What your customer sees
+      body: "On your booking page, once they've picked a time and given their name, Paying offers the deposit now and the rest at the visit, or the full price now. Paying at the desk isn't offered for a service with a deposit while you can take payment online. On your booking, it then reads Deposit … paid, with what's still due at the visit, and Take takes the rest at the desk."
+      shot: help-take-deposit-4
+      caption: "Paying on the booking page of Northwind Supply (demo store): the deposit, or the full price."
+      marker: Pay the deposit now
+    # PAY, PROV.
+    - title: Connect a payment provider
+      body: "A deposit is paid online, through your own Razorpay or Cashfree account, connected under Settings › Providers, with How people pay when they book, in your booking rules under Bookings › Availability, set to Online or Both. With Payments off, no provider connected, or At the desk chosen, the deposit isn't taken: the booking page books the time to pay at the desk, and the customer pays when they come. If your booking rules take payment online only, it can't do that: the booking page tells the customer to get in touch with you to book, and Bookings › Services marks the service Can't be booked online, with the way to fix it."
+      shot: help-take-deposit-5
+      caption: "The booking page of Kavi Dental (demo clinic), with no payment provider connected: the root canal is paid at the desk."
+      marker: Pay at the desk
+next: [set-your-teams-hours]
+---

@@ -1,5 +1,6 @@
 import { toFailure } from "@/lib/api/failure";
 import { apiFetch, getActiveOrgId } from "@/lib/api/http";
+import { businessZone } from "@/lib/format/business-zone";
 import { shownRoleLabel } from "@/lib/organizations/storefront-team";
 
 import type { OrganizationKind } from "./kind";
@@ -45,6 +46,12 @@ export interface Organization {
      * business.
      */
     kind?: OrganizationKind;
+    /**
+     * The IANA zone the business keeps time in (UX-008). Null when never
+     * set, absent from an older API: read it through `businessZone`, which
+     * calls either India's.
+     */
+    timeZone?: string | null;
 }
 
 export interface OrganizationProfileInput {
@@ -54,6 +61,13 @@ export interface OrganizationProfileInput {
     taxId?: string;
     contactEmail?: string;
     website?: string;
+    /** The IANA zone the business keeps time in (UX-008). */
+    timezone?: string;
+    /**
+     * Setup's "Is it registered?": Registered sends true and no type, so
+     * the real one is asked for before the business goes live.
+     */
+    registered?: boolean;
 }
 
 export interface CreateOrganizationInput {
@@ -112,6 +126,15 @@ export async function resolveActiveOrganization(
     if (orgs.length === 0) return null;
     const activeOrgId = await getActiveOrgId();
     return orgs.find((o) => o.id === activeOrgId) ?? orgs[0];
+}
+
+/**
+ * The active business's time zone, for a server component that writes a
+ * time into a string (UX-008); client components read `useBusinessZone`.
+ * India's when there is no business or it never set one.
+ */
+export async function activeBusinessZone(): Promise<string> {
+    return businessZone(await resolveActiveOrganization());
 }
 
 /** The resolved context for an org (requires membership); null on 403/404. */

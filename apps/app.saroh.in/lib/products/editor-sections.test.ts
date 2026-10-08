@@ -127,14 +127,16 @@ describe("product editor sections", () => {
 describe("the editor's header and Save all", () => {
     it("says what is saved, what is not, and what needs a fix", () => {
         expect(saveHint([], [])).toBe("All changes saved");
-        expect(saveHint(["basics"], [])).toBe("Basics is unsaved");
-        expect(saveHint(["basics", "stock"], [])).toBe("2 sections unsaved");
+        expect(saveHint(["basics"], [])).toBe("Basics not saved yet");
+        expect(saveHint(["basics", "stock"], [])).toBe(
+            "2 sections not saved yet",
+        );
         expect(saveHint(["basics", "stock"], ["stock"])).toBe(
-            "2 sections unsaved · Stock needs a fix",
+            "2 sections not saved yet · Stock needs a fix",
         );
         expect(
             saveHint(["basics", "stock", "photos"], ["basics", "stock"]),
-        ).toBe("3 sections unsaved · Basics and Stock need a fix");
+        ).toBe("3 sections not saved yet · Basics and Stock need a fix");
     });
 
     it("saves the sections that can, in page order, and leaves the rest", () => {

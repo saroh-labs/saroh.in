@@ -137,3 +137,41 @@ describe("QuickViewBody — the customer (DEC-073)", () => {
         expect(html).not.toContain("text-brand");
     });
 });
+
+describe("QuickViewBody — the money (UX-061, UX-010)", () => {
+    const money = {
+        currency: "INR",
+        subtotal: "500.00",
+        tax: "0.00",
+        shipping: "0.00",
+        discount: "50.00",
+        total: "450.00",
+        paid: "450.00",
+        refunded: "0.00",
+        due: "0.00",
+        recordedByHand: false,
+        discountCode: { code: "TEST10", rule: "10% off" },
+        refundsBeingConfirmed: [],
+        refundsOnTheWay: [],
+        owedBack: [],
+    };
+
+    it("lists the discount, so the lines add up to the total", () => {
+        const html = renderToStaticMarkup(
+            <QuickViewBody order={order({ money })} />,
+        );
+        expect(html).toContain("Discount · TEST10");
+        expect(html).toContain("−₹50");
+    });
+
+    it("tells the kitchen whether it is paid, with no figure", () => {
+        const html = renderToStaticMarkup(
+            <QuickViewBody
+                order={order({ paymentStatus: "PAID", money: null })}
+            />,
+        );
+        expect(html).toContain("Payment");
+        expect(html).toContain("Paid");
+        expect(html).not.toContain("₹");
+    });
+});

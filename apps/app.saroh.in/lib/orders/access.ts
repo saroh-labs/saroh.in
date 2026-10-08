@@ -1,3 +1,4 @@
+import { permits, permitsFor } from "@/lib/organizations/permits";
 import type { Organization } from "@/lib/organizations/service";
 
 /**
@@ -11,10 +12,9 @@ import type { Organization } from "@/lib/organizations/service";
  * - `money`: totals and payments, through `order:read`. What someone may
  *   DO to an order is `orderPowers` below (B16).
  *
- * Without resolved actions (an older response) the built-in roles decide:
- * an Owner and an Admin read orders, a Member stages them, and a Reviewer
- * does neither. With no organization at all the API decides, so nothing is
- * locked here.
+ * Only the role's permissions decide, never its name (DEC-098): a response
+ * without them (cached or older) opens nothing. With no organization at all
+ * the API decides, so nothing is locked here.
  */
 export interface OrdersAccess {
     open: boolean;
@@ -25,15 +25,8 @@ export function ordersAccess(
     organization: Pick<Organization, "role" | "actions"> | null,
 ): OrdersAccess {
     if (!organization) return { open: true, money: true };
-    const { actions, role } = organization;
-    if (actions) {
-        const read = actions.includes("order:read");
-        return { open: read || actions.includes("order:stage"), money: read };
-    }
-    return {
-        open: role !== "REVIEWER",
-        money: role === "OWNER" || role === "ADMIN",
-    };
+    const read = permits(organization, "order:read");
+    return { open: read || permits(organization, "order:stage"), money: read };
 }
 
 /**
@@ -53,9 +46,9 @@ export function ordersAccess(
  * (`order:write` → create, edit, export; `payment:manage` → refund), so the
  * umbrellas count here too: an API from before B16 sends only them.
  *
- * Without resolved actions (an older response) the built-in roles decide:
- * an Owner and an Admin may do everything, a Member moves steps. With no
- * organization at all the API decides, so nothing is withheld here.
+ * Only the role's permissions decide, never its name (DEC-098): a response
+ * without them (cached or older) offers nothing. With no organization at
+ * all the API decides, so nothing is withheld here.
  */
 export interface OrderPowers {
     stage: boolean;
@@ -79,19 +72,7 @@ export function orderPowers(
             export: true,
         };
     }
-    const { actions, role } = organization;
-    if (!actions) {
-        const full = role === "OWNER" || role === "ADMIN";
-        return {
-            stage: role !== "REVIEWER",
-            create: full,
-            edit: full,
-            payLink: full,
-            refund: full,
-            export: full,
-        };
-    }
-    const holds = (action: string) => actions.includes(action);
+    const holds = permitsFor(organization);
     const write = holds("order:write");
     const create = holds("order:create") || write;
     const edit = holds("order:edit") || write;

@@ -2,8 +2,8 @@ import Link from "next/link";
 import type { ReactNode } from "react";
 
 import { focusRing } from "../booking-flow/styles";
+import { formatAmount } from "../lib/money";
 import { cn } from "../lib/utils";
-import { formatAmount } from "../product/product-page";
 
 /**
  * The order confirmation on a merchant's site (round-2 P4), at
@@ -34,14 +34,26 @@ export interface OrderConfirmationData {
     subtotal: string;
     delivery: string | null;
     discount: string | null;
+    /** The code that took the discount off, "SAVE10"; absent or null without one. */
+    discountCode?: string | null;
     total: string;
     fulfilment: {
         type: string;
         label: string;
-        pickup: { name: string; address: string | null } | null;
+        /** `hours` (UX-025): when the place is open; absent when not set. */
+        pickup: {
+            name: string;
+            address: string | null;
+            hours?: string | null;
+        } | null;
         deliverTo: { name: string | null; lines: string[] } | null;
     };
     refunded: boolean;
+    /**
+     * Placed to be paid at the handover and not paid yet: "Pay when you
+     * collect" or "Pay on delivery". Null once paid, or paid online.
+     */
+    toPay: string | null;
 }
 
 /**
@@ -116,7 +128,11 @@ function Summary({ order }: { order: OrderConfirmationData }) {
                 </div>
                 {order.discount ? (
                     <div className="flex justify-between gap-3">
-                        <dt className="text-site-body">Discount</dt>
+                        <dt className="text-site-body">
+                            {order.discountCode
+                                ? `Discount (${order.discountCode})`
+                                : "Discount"}
+                        </dt>
                         <dd className="text-site-fg tabular-nums">
                             −{money(order.discount)}
                         </dd>
@@ -134,7 +150,11 @@ function Summary({ order }: { order: OrderConfirmationData }) {
                 ) : null}
                 <div className="flex justify-between gap-3 pt-1.5 text-base font-semibold">
                     <dt className="text-site-fg">
-                        {order.refunded ? "Paid, then refunded" : "Paid"}
+                        {order.refunded
+                            ? "Paid, then refunded"
+                            : order.toPay
+                              ? toPayTotal(order.toPay)
+                              : "Paid"}
                     </dt>
                     <dd className="text-site-fg tabular-nums">
                         {money(order.total)}
@@ -168,6 +188,11 @@ function Handover({ order }: { order: OrderConfirmationData }) {
                     {pickup.address ? (
                         <span className="block whitespace-pre-line break-words">
                             {pickup.address}
+                        </span>
+                    ) : null}
+                    {pickup.hours ? (
+                        <span className="text-site-muted mt-1 block">
+                            Open {pickup.hours}
                         </span>
                     ) : null}
                 </address>
@@ -247,7 +272,9 @@ export function OrderConfirmation({
             <p className="text-site-body mt-2 text-sm">
                 {order.refunded
                     ? `${businessName} has sent your money back.`
-                    : `${businessName} will be in touch when it's ready.`}
+                    : order.toPay
+                      ? `${toPayLead(order.toPay)} ${businessName} will be in touch when it's ready.`
+                      : `${businessName} will be in touch when it's ready.`}
             </p>
             <Summary order={order} />
             <Handover order={order} />
@@ -263,6 +290,20 @@ export function OrderConfirmation({
             </div>
         </Frame>
     );
+}
+
+/** "You'll pay when you collect your order." — said where it is placed. */
+export function toPayLead(toPay: string): string {
+    return toPay === "Pay on delivery"
+        ? "You'll pay when your order is delivered."
+        : "You'll pay when you collect your order.";
+}
+
+/** The total's label on an order still to be paid at the handover. */
+function toPayTotal(toPay: string): string {
+    return toPay === "Pay on delivery"
+        ? "To pay on delivery"
+        : "To pay when you collect";
 }
 
 /** Where a placed order's confirmation lives, on the business's site. */

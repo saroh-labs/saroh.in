@@ -8,11 +8,12 @@ import {
     AuditOutcome,
 } from "../audit/audit.service";
 import {
+    approvalApplies,
     approvalRequired,
     OVERRIDE_OWNER_ONLY_MESSAGE,
 } from "./publish-approval";
 import type { ReviewStanding } from "./review-route";
-import { ReviewRoute, reviewStanding } from "./review-route";
+import { CLOSING_OUTCOMES, ReviewRoute, reviewStanding } from "./review-route";
 import type { VerdictRow } from "./test-release-review";
 import {
     draftVerdicts,
@@ -218,7 +219,13 @@ export async function putLive(
             { fingerprint: input.fingerprint },
             actor.userId,
         );
-    const overridden = settings.publishNeedsApproval && !approved;
+    // Switched on under a plan without the approval row, it stops applying
+    // (DEC-103).
+    const needsApproval = await approvalApplies(
+        site.organizationId,
+        settings.publishNeedsApproval,
+    );
+    const overridden = needsApproval && !approved;
     if (overridden && input.override !== true) throw approvalRequired();
 
     // An override is recorded as itself, not as a bypass as well: one row
@@ -275,9 +282,7 @@ export async function putLive(
                 byUserId: actor.userId,
                 outcome: "BYPASSED",
                 publicationId: publication.id,
-                ...(input.testReleaseId
-                    ? { testReleaseId: input.testReleaseId }
-                    : {}),
+                ...releaseClosing(input),
             },
             select: { id: true },
         });
@@ -290,6 +295,29 @@ export async function putLive(
         overridden,
         route,
     };
+}
+
+/**
+ * What a go-live's own record (BYPASSED, OVERRIDDEN) carries when a test
+ * release went live: the release, and the bytes that went live.
+ *
+ * The fingerprint is what closes the release's open review (DEC-101):
+ * a release's standing reads only rows with its fingerprint
+ * (`releaseVerdicts`), so a record without one left "In review" on a
+ * release that was already live. A closing row never settles anything
+ * (`CLOSING_OUTCOMES`), so stamping it approves nothing. Another release
+ * that froze the same bytes is closed with it: the same content is live.
+ * The draft's record stays unstamped, as before.
+ */
+function releaseClosing(
+    input: PutLiveInput,
+): Partial<{ testReleaseId: string; draftFingerprint: string }> {
+    return input.testReleaseId
+        ? {
+              testReleaseId: input.testReleaseId,
+              draftFingerprint: input.fingerprint,
+          }
+        : {};
 }
 
 /**
@@ -311,9 +339,7 @@ async function recordOverride(
             byUserId: actor.userId,
             outcome: ReviewRoute.Overridden,
             publicationId,
-            ...(input.testReleaseId
-                ? { testReleaseId: input.testReleaseId }
-                : {}),
+            ...releaseClosing(input),
         },
         select: { id: true },
     });
@@ -346,9 +372,12 @@ export type ReviewScope = "draft" | "release";
 
 /**
  * Every verdict on the site, newest first, asked of `client` so a
- * transaction gets its own answer (#278). Verdicts only: BYPASSED and
- * OVERRIDDEN are going live's own records, and must not settle the request
- * they were written about.
+ * transaction gets its own answer (#278), with the rows that close a review
+ * (`CLOSING_OUTCOMES`: WITHDRAWN, BYPASSED, OVERRIDDEN). BYPASSED and
+ * OVERRIDDEN are going live's own records: they close the request they were
+ * written about (UX-068, DEC-101) and never settle it. A release's go-live
+ * rows carry its fingerprint, so its standing reads them and its review
+ * closes (`releaseClosing`).
  */
 export async function readVerdicts(
     client: Pick<Prisma.TransactionClient, "siteApproval">,
@@ -358,7 +387,14 @@ export async function readVerdicts(
         where: {
             siteId: input.siteId,
             organizationId: input.organizationId,
-            outcome: { in: ["REQUESTED", "APPROVED", "CHANGES_REQUESTED"] },
+            outcome: {
+                in: [
+                    "REQUESTED",
+                    "APPROVED",
+                    "CHANGES_REQUESTED",
+                    ...CLOSING_OUTCOMES,
+                ],
+            },
         },
         // Two reviews can share a millisecond; the id (a cuid, which grows)
         // keeps "newest" deterministic.
@@ -369,6 +405,7 @@ export async function readVerdicts(
             draftFingerprint: true,
             createdAt: true,
             testReleaseId: true,
+            reason: true,
         },
     });
 }

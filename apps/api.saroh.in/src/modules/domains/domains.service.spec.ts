@@ -459,3 +459,28 @@ describe("DomainsService.remove", () => {
         expect(domainDelete).not.toHaveBeenCalled();
     });
 });
+
+describe("a pasted address (UX-066)", () => {
+    const pipe = new ValidationPipe(validationPipeOptions);
+    const claimBody = (value: unknown) =>
+        pipe.transform(value, { type: "body", metatype: ClaimDomainDto });
+
+    it("is claimed as its bare domain", async () => {
+        await expect(
+            claimBody({ hostname: "https://www.UXflowers-test.in/" }),
+        ).resolves.toMatchObject({ hostname: "www.uxflowers-test.in" });
+        await expect(
+            claimBody({ hostname: "http://shop.acme.com/about?x=1" }),
+        ).resolves.toMatchObject({ hostname: "shop.acme.com" });
+    });
+
+    it("refuses what still isn't a domain, in words", async () => {
+        const refused = await claimBody({ hostname: "not a domain" }).then(
+            () => null,
+            (error: unknown) => error,
+        );
+        expect(
+            JSON.stringify((refused as BadRequestException).getResponse()),
+        ).toContain("Enter just the domain, like www.yourshop.in");
+    });
+});

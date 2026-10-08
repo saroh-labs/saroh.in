@@ -39,7 +39,11 @@ export const APPROVAL_LINE: Record<
     ApprovalOutcome,
     {
         approved: boolean;
-        text: (approval: NonNullable<ReviewState["latestApproval"]>) => string;
+        /** `zone`: the business's, for the day it was decided (UX-008). */
+        text: (
+            approval: NonNullable<ReviewState["latestApproval"]>,
+            zone: string,
+        ) => string;
     }
 > = {
     // Asked for and not yet answered (#278). Publishing is still allowed from
@@ -49,20 +53,30 @@ export const APPROVAL_LINE: Record<
         text: ({ by }) => `${by} asked for a review, and nobody has replied`,
     },
     APPROVED: { approved: true, text: ({ by }) => `${by} approved this site` },
+    // In their words when they gave a reason (UX-043).
     CHANGES_REQUESTED: {
         approved: false,
-        text: ({ by }) => `${by} asked for changes`,
+        text: ({ by, reason }) =>
+            reason
+                ? `${by} asked for changes: “${reason}”`
+                : `${by} asked for changes`,
     },
     BYPASSED: {
         approved: false,
-        text: ({ by, at }) =>
-            `${by} published without approval on ${shortDate(at)}`,
+        text: ({ by, at }, zone) =>
+            `${by} published without approval on ${shortDate(at, zone)}`,
     },
     // An owner's override of "Publishing needs approval" (DEC-071, T9).
     OVERRIDDEN: {
         approved: false,
-        text: ({ by, at }) =>
-            `${by} went live without approval on ${shortDate(at)}`,
+        text: ({ by, at }, zone) =>
+            `${by} went live without approval on ${shortDate(at, zone)}`,
+    },
+    // The request was taken back (UX-068).
+    WITHDRAWN: {
+        approved: false,
+        text: ({ by, at }, zone) =>
+            `${by} withdrew the review request on ${shortDate(at, zone)}`,
     },
 };
 

@@ -62,6 +62,11 @@ jest.mock("@saroh/database", () => {
         staffExtraHours: { findMany: jest.fn().mockResolvedValue([]) },
         staffTimeOff: { findMany: jest.fn().mockResolvedValue([]) },
         businessClosure: { findMany: jest.fn().mockResolvedValue([]) },
+        // No hours saved: opening hours cut nothing (DEC-087, DEC-096).
+        store: {
+            findMany: jest.fn().mockResolvedValue([]),
+            findFirst: jest.fn().mockResolvedValue(null),
+        },
         businessProfile: {
             findUnique: jest.fn().mockResolvedValue({ timezone: "UTC" }),
         },
@@ -983,5 +988,107 @@ describe("the booking page's Where and intake note (E7)", () => {
         } as Parameters<typeof toPublicBooking>[0]);
         expect(JSON.stringify(answer)).not.toContain("needles");
         expect(answer.meetingUrl).toBe("https://meet.example.com/kavi");
+    });
+});
+
+describe("in person keeps to opening hours (DEC-087)", () => {
+    const storeFindMany = prisma.store.findMany as jest.Mock;
+    // The shop opens at 10:00 on Mondays; START (Mon 09:00) is before it.
+    const SHOP = {
+        settings: {
+            openingHours: ["MON", "TUE", "WED", "THU", "FRI", "SAT", "SUN"].map(
+                (day) => ({
+                    day,
+                    open: "10:00",
+                    close: "18:00",
+                    closed: false,
+                }),
+            ),
+        },
+    };
+
+    beforeEach(() => {
+        jest.clearAllMocks();
+        storeFindMany.mockResolvedValue([SHOP]);
+    });
+    afterEach(() => storeFindMany.mockResolvedValue([]));
+
+    it("refuses an in-person booking before the shop opens, holding nothing", async () => {
+        wireBookHappyPath();
+        serviceFindUnique.mockResolvedValue({
+            ...SERVICE,
+            locationType: "IN_PERSON",
+            availabilityRules: RULES,
+        });
+        await expect(
+            new PublicBookingsService().book("svc_1", baseInput(), "iphash"),
+        ).rejects.toThrow(
+            "That time is outside opening hours. Pick another time.",
+        );
+        expect(transaction).not.toHaveBeenCalled();
+        expect(bookingCreate).not.toHaveBeenCalled();
+    });
+
+    it("lets the same time be booked online on a service offered either way", async () => {
+        wireBookHappyPath();
+        serviceFindUnique.mockResolvedValue({
+            ...SERVICE,
+            locationType: "EITHER",
+            meetingUrl: "https://meet.example.com/kavi",
+            availabilityRules: RULES,
+        });
+        const service = new PublicBookingsService();
+        await expect(
+            service.book("svc_1", baseInput(), "iphash"),
+        ).rejects.toThrow(/choose online/);
+
+        await service.book(
+            "svc_1",
+            baseInput({ locationType: "ONLINE" }),
+            "iphash",
+        );
+        expect(bookingCreate).toHaveBeenCalledTimes(1);
+    });
+
+    it("books as before when the business has no hours saved", async () => {
+        storeFindMany.mockResolvedValue([]);
+        wireBookHappyPath();
+        serviceFindUnique.mockResolvedValue({
+            ...SERVICE,
+            locationType: "IN_PERSON",
+            availabilityRules: RULES,
+        });
+        await new PublicBookingsService().book("svc_1", baseInput(), "iphash");
+        expect(bookingCreate).toHaveBeenCalledTimes(1);
+    });
+
+    it("keeps to Settings › Hours with no walk-in storefront (DEC-096)", async () => {
+        // An online-only business: its one storefront holds the week.
+        storeFindMany.mockResolvedValue([]);
+        const storeFindFirst = prisma.store.findFirst as jest.Mock;
+        storeFindFirst.mockResolvedValue(SHOP);
+        try {
+            wireBookHappyPath();
+            serviceFindUnique.mockResolvedValue({
+                ...SERVICE,
+                locationType: "EITHER",
+                meetingUrl: "https://meet.example.com/kavi",
+                availabilityRules: RULES,
+            });
+            const service = new PublicBookingsService();
+            await expect(
+                service.book("svc_1", baseInput(), "iphash"),
+            ).rejects.toThrow(/outside opening hours/);
+            expect(bookingCreate).not.toHaveBeenCalled();
+            // Online, the same time is not cut.
+            await service.book(
+                "svc_1",
+                baseInput({ locationType: "ONLINE" }),
+                "iphash",
+            );
+            expect(bookingCreate).toHaveBeenCalledTimes(1);
+        } finally {
+            storeFindFirst.mockResolvedValue(null);
+        }
     });
 });

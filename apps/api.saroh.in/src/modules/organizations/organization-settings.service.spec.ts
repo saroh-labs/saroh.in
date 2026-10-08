@@ -35,11 +35,17 @@ jest.mock("@saroh/database", () => {
     };
 });
 
+// The plan's online payments (#835): included unless a test says not.
+jest.mock("../billing/online-payments-plan", () => ({
+    planTakesOnlinePayment: jest.fn().mockResolvedValue(true),
+}));
+
 import { prisma } from "@saroh/database";
 
 import type { OrgRole } from "../../common/types/organization-context";
 import type { AuditService } from "../audit/audit.service";
 import { AuditAction } from "../audit/audit.service";
+import { planTakesOnlinePayment } from "../billing/online-payments-plan";
 import { invoiceSeriesKeys } from "../invoices/numbering";
 import type { MediaService } from "../media/media.service";
 import type { UpdateOrganizationDto } from "./dto";
@@ -96,6 +102,42 @@ describe("OrganizationSettingsService", () => {
             expect(settings.profile?.legalName).toBe("Acme Inc");
         });
 
+        it("says whether setup was told the business is registered (prelaunch)", async () => {
+            orgFindUnique.mockResolvedValue({
+                id: "org_1",
+                name: "Acme",
+                slug: "acme",
+                businessProfile: {
+                    legalName: null,
+                    type: null,
+                    country: "IN",
+                    taxId: null,
+                    contactEmail: null,
+                    website: null,
+                    legallyRegistered: true,
+                },
+            });
+            const settings = await service.get(ctx());
+            expect(settings.profile?.registered).toBe(true);
+            expect(settings.profile).not.toHaveProperty("legallyRegistered");
+            expect(orgFindUnique).toHaveBeenCalledWith(
+                expect.objectContaining({
+                    select: expect.objectContaining({
+                        businessProfile: {
+                            select: expect.objectContaining({
+                                legallyRegistered: true,
+                            }),
+                        },
+                    }),
+                }),
+            );
+        });
+
+        it("reads a business set up before the answer was kept as not asked", async () => {
+            const settings = await service.get(ctx());
+            expect(settings.profile?.registered).toBeNull();
+        });
+
         it("returns the business's time zone with its profile", async () => {
             orgFindUnique.mockResolvedValue({
                 id: "org_1",
@@ -126,6 +168,14 @@ describe("OrganizationSettingsService", () => {
             );
         });
 
+        it("says when the plan takes no online payment (#835)", async () => {
+            (planTakesOnlinePayment as jest.Mock).mockResolvedValueOnce(false);
+            expect((await service.get(ctx())).setup.onlinePaymentsInPlan).toBe(
+                false,
+            );
+            expect(planTakesOnlinePayment).toHaveBeenCalledWith("org_1");
+        });
+
         it("sends the checklist's facts: products, services, sites, those not live and invoices (H-5, H-6, DEC-070)", async () => {
             (prisma.product.count as jest.Mock).mockResolvedValueOnce(0);
             (prisma.service.count as jest.Mock).mockResolvedValueOnce(2);
@@ -139,6 +189,7 @@ describe("OrganizationSettingsService", () => {
                 sites: 2,
                 sitesNotLive: 1,
                 invoices: 3,
+                onlinePaymentsInPlan: true,
             });
             // A void invoice never counts: drafts and issued paper do.
             expect(prisma.invoice.count).toHaveBeenLastCalledWith({

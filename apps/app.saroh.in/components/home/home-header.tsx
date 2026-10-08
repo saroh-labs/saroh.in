@@ -18,6 +18,7 @@ export function HomeHeader({
     name,
     businessName,
     only = null,
+    kind,
 }: {
     lastDay: HomeLastDay | null;
     /** The viewer's own name, from their session. */
@@ -25,6 +26,8 @@ export function HomeHeader({
     businessName: string;
     /** A staff member's storefronts, "Hill Road only" (F11); else null. */
     only?: string | null;
+    /** What is being set up (DEC-070); its words for a new business. */
+    kind?: unknown;
 }) {
     const links = sinceLinks(lastDay);
 
@@ -34,7 +37,7 @@ export function HomeHeader({
                 {greeting(lastDay, name)}
             </h1>
             <p className="text-[13.5px] text-muted-foreground">
-                {dateLine(lastDay, businessName, only)}
+                {dateLine(lastDay, businessName, only, kind)}
             </p>
             {links.length > 0 ? (
                 <div

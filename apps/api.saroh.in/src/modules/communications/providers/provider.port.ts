@@ -9,6 +9,8 @@
  * retained by the port or logged.
  */
 
+import type { CredentialCheck } from "../../../common/providers/provider-attention";
+
 /** The channels an org can message a contact on. */
 export const COMMS_CHANNELS = ["EMAIL", "WHATSAPP"] as const;
 export type CommsChannel = (typeof COMMS_CHANNELS)[number];
@@ -46,6 +48,17 @@ export function isSupportedComms(
  */
 export type CommsCredentials = Record<string, string>;
 
+/**
+ * A file sent with an email (DEC-083: the invoice's PDF). Drawn for the
+ * one send and never stored; only an adapter whose provider says it takes
+ * attachments ({@link CommsProvider.takesAttachments}) is given one.
+ */
+export interface CommsAttachment {
+    fileName: string;
+    contentType: string;
+    content: Buffer;
+}
+
 /** The single message an adapter is asked to hand to its provider. */
 export interface CommsSendInput {
     to: string;
@@ -53,6 +66,15 @@ export interface CommsSendInput {
     subject?: string;
     body: string;
     credentials: CommsCredentials;
+    /** Files to send with it; absent or empty, the message alone. */
+    attachments?: CommsAttachment[];
+}
+
+/** The keys to check on connect, and the address they will send from. */
+export interface CommsVerifyInput {
+    provider: string;
+    credentials: CommsCredentials;
+    fromAddress?: string | null;
 }
 
 /** The provider's accepted-for-delivery receipt. */
@@ -70,6 +92,26 @@ export interface CommsSendResult {
 export interface CommsProvider {
     readonly channel: CommsChannel;
     supports(provider: string): boolean;
+    /**
+     * Whether this provider is known to take attachments. An adapter
+     * without it, or one answering false, is never given any: the message
+     * goes as it is, never failed for a file it can't carry.
+     */
+    takesAttachments?(provider: string): boolean;
+    /**
+     * Check a business's keys with one cheap authenticated read before they
+     * are stored (UX-012), and, where the provider can say, that the
+     * sending address's domain is verified. Never throws, never logs a
+     * credential. Absent, or answering null for a provider it can't
+     * check, and the keys are not checked.
+     */
+    verifyCredentials?(
+        input: CommsVerifyInput,
+    ): Promise<CredentialCheck | null>;
+    /**
+     * Hand one message over. A 401 or 403 throws
+     * `ProviderKeysRefusedError` (`common/providers/provider-attention.ts`).
+     */
     send(input: CommsSendInput): Promise<CommsSendResult>;
 }
 

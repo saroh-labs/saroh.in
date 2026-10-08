@@ -51,6 +51,7 @@ import type {
 
 import { FulfilmentSection } from "./fulfilment-section";
 import { LocationSellingLine } from "./location-selling-line";
+import { PayOnHandoverRow } from "./pay-on-handover-row";
 import { SameEmailSection } from "./same-email-section";
 import { Note, Section, ToggleRow } from "./storefront-section";
 
@@ -99,6 +100,11 @@ type Saver = (
     input: StorefrontInput,
     said: string,
     onFail?: () => void,
+    /**
+     * Say a refusal beside the control instead of in a toast (UX-036):
+     * the location limit, by the radio it stopped.
+     */
+    inline?: (error: string) => void,
 ) => void;
 
 /**
@@ -303,12 +309,13 @@ function StorefrontDetail({
      * returned, not what was asked for — so a value the server normalised
      * ("18" → "18.00") or refused is what the merchant sees afterwards.
      */
-    const save: Saver = (input, said, onFail) => {
+    const save: Saver = (input, said, onFail, inline) => {
         startTransition(async () => {
             const res = await updateStorefront(store.id, input);
             if (!res.ok) {
                 onFail?.();
-                showError(res.error);
+                if (inline) inline(res.error);
+                else showError(res.error);
                 return;
             }
             setStore(res.data);
@@ -381,9 +388,13 @@ function BasicsSection({
     const trimmed = name.trim();
     const dirty = trimmed !== store.name;
 
+    // A refused change of kind (the plan's places customers visit, UX-036)
+    // is said by the radio it stopped, which stays where it was.
+    const [kindError, setKindError] = useState<string | null>(null);
     const setKind = (kind: StorefrontKind) => {
         if (kind === store.kind) return;
         const before = store.kind;
+        setKindError(null);
         setStore((s) => ({ ...s, kind }));
         save(
             { kind },
@@ -391,6 +402,7 @@ function BasicsSection({
                 ? "Customers visit this location now"
                 : "This location has no counter now",
             () => setStore((s) => ({ ...s, kind: before })),
+            setKindError,
         );
     };
 
@@ -434,7 +446,7 @@ function BasicsSection({
             </form>
 
             <div className="grid gap-2">
-                <p id="storefront-kind-label" className="text-sm font-medium">
+                <p id="location-kind-label" className="text-sm font-medium">
                     Do customers come here?
                 </p>
                 <ToggleGroup
@@ -446,8 +458,12 @@ function BasicsSection({
                         if (v === "SHOP" || v === "ONLINE") setKind(v);
                     }}
                     disabled={!canEdit || pending}
-                    aria-labelledby="storefront-kind-label"
-                    aria-describedby="storefront-kind-note"
+                    aria-labelledby="location-kind-label"
+                    aria-describedby={
+                        kindError
+                            ? "location-kind-error location-kind-note"
+                            : "location-kind-note"
+                    }
                     className={SEGMENTED}
                 >
                     <ToggleGroupItem value="SHOP" className={SEGMENT}>
@@ -457,7 +473,16 @@ function BasicsSection({
                         {KIND_LABEL.ONLINE}
                     </ToggleGroupItem>
                 </ToggleGroup>
-                <Note id="storefront-kind-note">
+                {kindError ? (
+                    <p
+                        id="location-kind-error"
+                        role="alert"
+                        className="text-pretty text-[12.5px] font-medium leading-[1.5] text-destructive-subtle-foreground"
+                    >
+                        {kindError}
+                    </p>
+                ) : null}
+                <Note id="location-kind-note">
                     Customers visit: it has an address, opening hours and
                     collection. No counter: stock kept for online orders, with
                     no address or hours.
@@ -1035,6 +1060,13 @@ function CheckoutSection({
                 pending={pending}
                 save={save}
             />
+            <PayOnHandoverRow
+                store={store}
+                canEdit={canEdit}
+                pending={pending}
+                save={save}
+                setStore={setStore}
+            />
         </Section>
     );
 }
@@ -1125,8 +1157,7 @@ function Payments({
     );
 }
 
-type BehaviourKey =
-    "shippingEnabled" | "collectionEnabled" | "tipsEnabled" | "guestCheckout";
+type BehaviourKey = "shippingEnabled" | "collectionEnabled";
 
 function BehaviourSection({
     store,
@@ -1158,6 +1189,10 @@ function BehaviourSection({
             });
         };
 
+    // Tips and guest checkout aren't offered anywhere yet (UX-082), so no
+    // switch claims them; with the chips and no delivery, nothing is left.
+    if (chips && !store.shippingEnabled) return null;
+
     return (
         <Section title="Behaviour">
             {store.kind === "SHOP" && !chips ? (
@@ -1165,7 +1200,6 @@ function BehaviourSection({
                     id="storefront-collection"
                     label="Collection from this location"
                     note="Customers choose a slot and pick up in person."
-                    later
                     checked={store.collectionEnabled}
                     disabled={!canEdit || pending}
                     onChange={flip(
@@ -1242,37 +1276,6 @@ function BehaviourSection({
                     </Note>
                 </form>
             ) : null}
-            <ToggleRow
-                id="storefront-tips"
-                label="Ask for a tip at checkout"
-                note="A single optional line, never pre-selected."
-                later
-                checked={store.tipsEnabled}
-                disabled={!canEdit || pending}
-                onChange={flip(
-                    "tipsEnabled",
-                    "Tips turned on",
-                    "Tips turned off",
-                )}
-            />
-            <ToggleRow
-                id="storefront-guest"
-                label="Allow guest checkout"
-                note="Off means someone must make an account before they can pay."
-                later
-                checked={store.guestCheckout}
-                disabled={!canEdit || pending}
-                onChange={flip(
-                    "guestCheckout",
-                    "Guest checkout turned on",
-                    "Guest checkout turned off",
-                )}
-            />
-            <Note>
-                Settings marked “Not live yet” are saved now and take effect
-                when customers can check out on their own. Today an order is
-                keyed in here and paid by link.
-            </Note>
         </Section>
     );
 }

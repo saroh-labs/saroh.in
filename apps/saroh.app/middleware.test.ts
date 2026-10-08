@@ -39,6 +39,15 @@ describe("middleware: pay links on a business's address", () => {
         expect(passedOn(res, TENANT_HOST_HEADER)).toBe("northwind.saroh.app");
     });
 
+    it("rewrites a tenant /pay/<token>/pdf to the apex route too (DEC-083)", () => {
+        const res = middleware(
+            request("https://northwind.saroh.app/pay/abc/pdf"),
+        );
+        expect(rewrittenTo(res)).toBe(
+            "https://northwind.saroh.app/pay/abc/pdf",
+        );
+    });
+
     it("rewrites a tenant /pay/o/<token> likewise", () => {
         const res = middleware(request("https://rye.saroh.app/pay/o/abc"));
         expect(rewrittenTo(res)).toBe("https://rye.saroh.app/pay/o/abc");

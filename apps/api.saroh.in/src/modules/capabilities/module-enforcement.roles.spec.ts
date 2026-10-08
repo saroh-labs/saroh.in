@@ -1,6 +1,5 @@
-jest.mock("@saroh/database", () => ({
-    ...jest.requireActual("@saroh/database"),
-    prisma: {
+jest.mock("@saroh/database", () => {
+    const db: Record<string, unknown> = {
         store: { findFirst: jest.fn() },
         site: { findFirst: jest.fn().mockResolvedValue({ id: "site_1" }) },
         page: {
@@ -24,8 +23,13 @@ jest.mock("@saroh/database", () => ({
             // #278 reads every verdict to decide where the site stands.
             findMany: jest.fn().mockResolvedValue([]),
         },
-    },
-}));
+        // A review write queues its alert on its own transaction (UX-043).
+        job: { create: jest.fn() },
+        siteReviewer: { count: jest.fn().mockResolvedValue(0) },
+    };
+    db.$transaction = jest.fn((fn: (tx: unknown) => unknown) => fn(db));
+    return { ...jest.requireActual("@saroh/database"), prisma: db };
+});
 
 import type { ExecutionContext } from "@nestjs/common";
 import { ForbiddenException, NotFoundException } from "@nestjs/common";
@@ -63,6 +67,7 @@ function guardFor(moduleKey: ModuleKey): ModuleEnforcementGuard {
         } as unknown as FeatureFlagService,
         {
             can: jest.fn().mockResolvedValue(true),
+            moduleIncluded: jest.fn().mockResolvedValue(true),
         } as unknown as EntitlementService,
         {
             evaluate: jest

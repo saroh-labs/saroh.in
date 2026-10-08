@@ -1,5 +1,9 @@
 import { Button } from "@saroh/ui/button";
 import { cn } from "@saroh/ui/lib/utils";
+import { useId } from "react";
+
+import { sentenceStart } from "@/lib/format/sentence";
+import { uncollectedHeading } from "@/lib/orders/pay-on-handover";
 
 import { actionClass, Panel, PanelTitle } from "./parts";
 
@@ -119,10 +123,28 @@ export function ChangeCard({
 }
 
 /**
+ * For someone who moves orders but can't record a payment (UX-010): who
+ * to ask, so an unpaid order isn't handed over. Whether they may record a
+ * counter payment is their role's permission (`order:edit`), set by the
+ * owner or an admin — never its name (DEC-098). Mark paid is shown
+ * disabled beside this.
+ */
+const NO_RECORD =
+    "Your role can't record payments — ask the owner or an admin to mark it paid.";
+
+/**
  * The order is not paid, so the kitchen is blocked (the API offers no next
  * step). Saroh sends no messages, so this says nothing was sent — and offers
  * what the counter can do: record cash taken for it, or, when a payment
  * didn't go through, a pay link to copy and send (B11).
+ *
+ * An order the customer chose to pay at the handover on the website
+ * (`handover`) isn't blocked: it is made and brought as usual, and only its
+ * handover waits for the money. The banner says so, without alarm, and
+ * offers to mark it paid. Once nobody has come for it in three days (R34,
+ * `uncollectedDays`), it says how long it has waited and offers to cancel
+ * it — which puts its stock back — beside Mark paid; nothing cancels on
+ * its own, so keeping it waiting is simply doing neither.
  */
 export function PaymentBanner({
     failed,
@@ -131,6 +153,9 @@ export function PaymentBanner({
     onCash,
     onSendLink,
     sending = false,
+    handover,
+    uncollectedDays,
+    onCancel,
 }: {
     failed: boolean;
     first: string;
@@ -139,7 +164,118 @@ export function PaymentBanner({
     /** Make (or replace) the pay link — only when one can be made. */
     onSendLink?: () => void;
     sending?: boolean;
+    /** Paid at the handover: how ("collection" or "delivery"). */
+    handover?: "collection" | "delivery";
+    /** Days nobody has come for it, from the third on (R34); else none. */
+    uncollectedDays?: number | null;
+    /** Open "Cancel order…", when this person may cancel it now. */
+    onCancel?: () => void;
 }) {
+    const why = useId();
+    const waited = handover
+        ? uncollectedHeading(handover, uncollectedDays)
+        : null;
+    if (handover && !failed && waited) {
+        return (
+            <div
+                role="alert"
+                className="flex flex-wrap items-center gap-3 rounded-xl border border-destructive-subtle-foreground bg-destructive-subtle px-4 py-[13px]"
+            >
+                <div className="min-w-0 flex-[1_1_260px]">
+                    <div className="text-[13.5px] font-bold text-destructive-subtle-foreground">
+                        {waited}
+                    </div>
+                    <p
+                        id={why}
+                        className="mt-[3px] text-pretty text-[12.5px] leading-[1.5] text-foreground"
+                    >
+                        {handover === "collection"
+                            ? `${sentenceStart(first)} chose to pay when they collect it and hasn't come for it.`
+                            : `${sentenceStart(first)} chose to pay on delivery and it hasn't been delivered.`}{" "}
+                        Cancel it to put the stock back, or keep waiting —
+                        nothing cancels on its own.
+                        {canRecord ? "" : ` ${NO_RECORD}`}
+                    </p>
+                </div>
+                {canRecord ? (
+                    <Button
+                        type="button"
+                        className={actionClass("primary")}
+                        onClick={onCash}
+                    >
+                        Mark paid
+                    </Button>
+                ) : (
+                    // Shown, disabled, with why (FB-1, DEC-098).
+                    <Button
+                        type="button"
+                        className={actionClass("primary")}
+                        disabled
+                        aria-describedby={why}
+                    >
+                        Mark paid
+                    </Button>
+                )}
+                {onCancel ? (
+                    <Button
+                        type="button"
+                        variant="outline"
+                        className={cn(
+                            actionClass("ghost"),
+                            "text-destructive-subtle-foreground hover:text-destructive-subtle-foreground",
+                        )}
+                        onClick={onCancel}
+                    >
+                        Cancel order…
+                    </Button>
+                ) : null}
+            </div>
+        );
+    }
+    if (handover && !failed) {
+        return (
+            <div
+                role="status"
+                className="flex flex-wrap items-center gap-3 rounded-xl border border-border bg-muted px-4 py-[13px]"
+            >
+                <div className="min-w-0 flex-[1_1_260px]">
+                    <div className="text-[13.5px] font-bold">
+                        {handover === "collection"
+                            ? "Pay on collection"
+                            : "Pay on delivery"}
+                    </div>
+                    <p
+                        id={why}
+                        className="mt-[3px] text-pretty text-[12.5px] leading-[1.5] text-muted-foreground"
+                    >
+                        {handover === "collection"
+                            ? `${sentenceStart(first)} chose to pay when they collect it. Prepare it as usual, take the money at the counter, then mark it paid before marking it collected.`
+                            : `${sentenceStart(first)} chose to pay on delivery. Prepare and send it as usual, take the money at the door, then mark it paid before marking it delivered.`}
+                        {canRecord ? "" : ` ${NO_RECORD}`}
+                    </p>
+                </div>
+                {canRecord ? (
+                    <Button
+                        type="button"
+                        className={actionClass("primary")}
+                        onClick={onCash}
+                    >
+                        Mark paid
+                    </Button>
+                ) : (
+                    // Shown, disabled, with why (FB-1, DEC-098).
+                    <Button
+                        type="button"
+                        className={actionClass("primary")}
+                        disabled
+                        aria-describedby={why}
+                    >
+                        Mark paid
+                    </Button>
+                )}
+            </div>
+        );
+    }
     const link = failed && onSendLink !== undefined;
     return (
         <div
@@ -150,10 +286,15 @@ export function PaymentBanner({
                 <div className="text-[13.5px] font-bold text-destructive-subtle-foreground">
                     {failed ? "Payment didn't go through" : "Not paid yet"}
                 </div>
-                <p className="mt-[3px] text-pretty text-[12.5px] leading-[1.5] text-neutral-700 dark:text-muted-foreground">
+                <p
+                    id={why}
+                    className="mt-[3px] text-pretty text-[12.5px] leading-[1.5] text-neutral-700 dark:text-muted-foreground"
+                >
                     {failed
                         ? `Nothing was taken. Don't start it until it's paid. Nothing has been sent to ${first} — ${link ? "send them a pay link" : "ask them to pay again"}, or take it in cash.`
-                        : `It waits for ${first}'s payment. Don't start it until it's paid — or take it in cash at the counter.`}
+                        : canRecord
+                          ? `It waits for ${first}'s payment. Don't start it until it's paid — or take it in cash at the counter.`
+                          : `It waits for ${first}'s payment. Don't start it until it's paid. ${NO_RECORD}`}
                 </p>
             </div>
             {link ? (
@@ -175,7 +316,18 @@ export function PaymentBanner({
                 >
                     Paid in cash
                 </Button>
-            ) : null}
+            ) : (
+                // Shown, disabled, with why (FB-1, DEC-098).
+                <Button
+                    type="button"
+                    variant={link ? "outline" : "default"}
+                    className={actionClass(link ? "ghost" : "primary")}
+                    disabled
+                    aria-describedby={why}
+                >
+                    Paid in cash
+                </Button>
+            )}
         </div>
     );
 }

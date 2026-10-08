@@ -4,9 +4,12 @@ import {
     isRemovedStoreCustomer,
     REMOVED_CUSTOMER_NAME,
 } from "../customers/anonymise-customer";
+import type { PaymentMethod } from "../invoices/invoice-state";
+import { PAYMENT_METHODS } from "../invoices/invoice-state";
 import type { InvoiceTitle } from "../invoices/invoice-title";
 import type { FulfilmentView, LateThresholds, LateView } from "./fulfilment";
 import { fulfilmentView, lateOf } from "./fulfilment";
+import { handPaidCents } from "./hand-payments";
 import type { OrderAttention } from "./order-attention";
 import type { ChangeOptions } from "./order-change-types";
 import type { RawOrderInvoice } from "./order-invoice-title";
@@ -117,7 +120,10 @@ export interface OrderMoneyDto {
     shipping: string;
     discount: string;
     total: string;
-    /** Taken from the customer, across every successful payment. */
+    /**
+     * Taken from the customer, across every successful payment and every
+     * payment recorded by hand (`hand-payments.ts`).
+     */
     paid: string;
     /** Handed back (pending or settled). */
     refunded: string;
@@ -126,9 +132,15 @@ export interface OrderMoneyDto {
     /**
      * Paid, with no payment taken through a provider: the money moved
      * outside Saroh (cash at the counter, a transfer) and was recorded by
-     * hand, so `paid` is the order's total rather than the provider sum.
+     * hand, so `paid` is what was recorded rather than a provider sum.
      */
     recordedByHand: boolean;
+    /**
+     * Recorded by hand, how (#834): CASH, UPI, BANK_TRANSFER, CARD or
+     * OTHER, from the order's invoice. Null when it was paid online, or
+     * marked paid before the way was asked.
+     */
+    paidHow: PaymentMethod | null;
     discountCode: { code: string; rule: string } | null;
     /**
      * Refunds whose provider answer was lost (#508): the money is held, and
@@ -158,6 +170,18 @@ export interface OrderReadDto extends FulfilmentView, LateView {
     placedAt: Date;
     /** Placed by the customer at the site's checkout (G13). */
     placedOnline: boolean;
+    /**
+     * Placed at the site's checkout to be paid when it is collected or
+     * delivered ("Pay when you collect", "Pay on delivery"): staff take the
+     * money at the handover and mark it paid.
+     */
+    payOnHandover: boolean;
+    /**
+     * Days a pay-on-handover order has waited, unpaid and not handed over,
+     * from the third on in the business's zone (R34, `uncollected.ts`);
+     * null otherwise. Set by Order Detail's read only.
+     */
+    uncollectedDays?: number | null;
     updatedAt: Date;
     store: { id: string; name: string };
     status: string;
@@ -257,6 +281,7 @@ export interface RawOrderRead {
     orderId: string;
     createdAt: Date;
     placedOnline?: boolean;
+    payOnHandover?: boolean;
     updatedAt: Date;
     status: string;
     paymentStatus: string;
@@ -268,6 +293,8 @@ export interface RawOrderRead {
     shipping: DecimalLike;
     discount: DecimalLike;
     total: DecimalLike;
+    /** Taken outside Saroh and recorded on it (`hand-payments.ts`). */
+    paidByHand?: DecimalLike | null;
     notes: string | null;
     trackingUrl: string | null;
     courierName: string | null;
@@ -477,6 +504,7 @@ export function serializeOrderRead(
         orderId: order.orderId,
         placedAt: order.createdAt,
         placedOnline: order.placedOnline ?? false,
+        payOnHandover: order.payOnHandover ?? false,
         updatedAt: order.updatedAt,
         // Only who it is: the settings row the late rule read stays here.
         store: { id: order.store.id, name: order.store.name },
@@ -587,6 +615,7 @@ export function serializeOrderRead(
                 status: order.status,
                 paymentStatus: order.paymentStatus,
                 fulfilment: order.fulfilment as OrderFulfilment,
+                payOnHandover: order.payOnHandover ?? false,
             }),
             undo: undoableStep(order.events, opts.now),
             // A treatment's order changes through its visits (E9).
@@ -615,15 +644,13 @@ export function serializeOrderRead(
                   shipping: toMoneyString(order.shipping),
                   discount: toMoneyString(order.discount),
                   total: toMoneyString(order.total),
-                  paid:
-                      byHand || order.balanceByHand
-                          ? toMoneyString(order.total)
-                          : money(capturedCents),
+                  paid: order.balanceByHand
+                      ? toMoneyString(order.total)
+                      : money(capturedCents + handPaidCents(order)),
                   refunded: money(refundedCents),
-                  due: byHand
-                      ? "0.00"
-                      : money(amountDueCents(order, capturedCents)),
+                  due: money(amountDueCents(order, capturedCents)),
                   recordedByHand: byHand,
+                  paidHow: byHand ? handPaidHow(order.invoices) : null,
                   refundsBeingConfirmed: order.paymentIntents.flatMap((p) =>
                       p.refunds.flatMap((r) =>
                           r.status === "PENDING" && !r.providerRefundId
@@ -655,16 +682,18 @@ export function serializeOrderRead(
 }
 
 /**
- * What is still to collect on an order: its total less what was taken, where
- * money handed back because the order was edited DOWN counts as never taken
- * (the total already dropped by it). A line refund does not make money due —
- * the customer is not asked to pay again for what was refunded.
+ * What is still to collect on an order: its total less what was taken —
+ * online or recorded by hand (`hand-payments.ts`) — where money handed back
+ * because the order was edited DOWN counts as never taken (the total
+ * already dropped by it). A line refund does not make money due — the
+ * customer is not asked to pay again for what was refunded.
  */
 export function amountDueCents(
     order: {
         total: DecimalLike;
         paymentStatus: string;
         status: string;
+        paidByHand?: DecimalLike | null;
         paymentIntents: {
             amountCents: number;
             refunds: { amountCents: number; forEdit?: boolean }[];
@@ -692,5 +721,22 @@ export function amountDueCents(
                 .reduce((t, r) => t + r.amountCents, 0),
         0,
     );
-    return Math.max(0, cents(order.total) - (captured - editRefunds));
+    return Math.max(
+        0,
+        cents(order.total) - (captured - editRefunds) - handPaidCents(order),
+    );
+}
+
+/**
+ * How an order paid by hand was paid (#834): the way its invoice records,
+ * when it is one a business picks. "RECORDED" (marked paid before the way
+ * was asked) and "ORDER" say nothing more than "by hand".
+ */
+export function handPaidHow(
+    invoices: readonly { kind: string; paymentMethod?: string | null }[] = [],
+): PaymentMethod | null {
+    const method = invoices.find((i) => i.kind === "INVOICE")?.paymentMethod;
+    return method && (PAYMENT_METHODS as readonly string[]).includes(method)
+        ? (method as PaymentMethod)
+        : null;
 }

@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 
+import { resolveVariant } from "@saroh/block-contract";
 import { Button } from "@saroh/ui/button";
 import { Input } from "@saroh/ui/input";
 import {
@@ -281,6 +282,114 @@ export function ServicesListFields({
                     }
                 />
             ) : null}
+
+            {resolveVariant("servicesList", c) === "priceCard" ? (
+                <PriceCardFields content={c} patch={patch} />
+            ) : null}
         </div>
+    );
+}
+
+/**
+ * The price card's own words (template polish). The price and how long it
+ * takes are the service's, set in Services; these are the lines around them.
+ */
+function PriceCardFields({
+    content: c,
+    patch,
+}: {
+    content: ServicesListContent;
+    patch: (next: Partial<ServicesListContent>) => void;
+}) {
+    const includes = c.includes ?? [];
+    const setIncludes = (next: string[]) =>
+        patch({ includes: next.length > 0 ? next : undefined });
+    return (
+        <>
+            <p className="text-sm text-muted-foreground">
+                The card shows the first service here, with its price and how
+                long it takes from Services.
+            </p>
+            <Field label="Under the price">
+                <Input
+                    value={c.modeLine ?? ""}
+                    onChange={(e) =>
+                        patch({ modeLine: e.target.value || undefined })
+                    }
+                    maxLength={160}
+                    placeholder="In person, or by video"
+                />
+            </Field>
+            <Field label="Under the button">
+                <Textarea
+                    value={c.followUpLine ?? ""}
+                    onChange={(e) =>
+                        patch({ followUpLine: e.target.value || undefined })
+                    }
+                    rows={2}
+                    maxLength={300}
+                    placeholder="Optional. What a follow-up costs, and how often."
+                />
+            </Field>
+            <Field label="What it includes">
+                <div className="grid gap-2">
+                    {includes.map((line, i) => (
+                        <div key={i} className="flex items-center gap-2">
+                            <Input
+                                value={line}
+                                aria-label={`Included ${i + 1}`}
+                                maxLength={200}
+                                onChange={(e) =>
+                                    setIncludes(
+                                        includes.map((v, j) =>
+                                            j === i ? e.target.value : v,
+                                        ),
+                                    )
+                                }
+                                placeholder="A written plan afterwards"
+                            />
+                            <Button
+                                type="button"
+                                variant="ghost"
+                                size="sm"
+                                aria-label={`Remove included ${i + 1}`}
+                                onClick={() =>
+                                    setIncludes(
+                                        includes.filter((_, j) => j !== i),
+                                    )
+                                }
+                            >
+                                Remove
+                            </Button>
+                        </div>
+                    ))}
+                    {includes.length < 12 ? (
+                        <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            className="justify-self-start"
+                            onClick={() => setIncludes([...includes, ""])}
+                        >
+                            Add a line
+                        </Button>
+                    ) : null}
+                </div>
+            </Field>
+            {includes.length > 0 ? (
+                <Field label="Label over them">
+                    <Input
+                        value={c.includesLabel ?? ""}
+                        onChange={(e) =>
+                            patch({
+                                includesLabel: e.target.value || undefined,
+                            })
+                        }
+                        maxLength={60}
+                        placeholder="What it includes"
+                    />
+                </Field>
+            ) : null}
+        </>
     );
 }

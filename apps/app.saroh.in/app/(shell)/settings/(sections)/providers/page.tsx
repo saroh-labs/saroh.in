@@ -1,18 +1,28 @@
 import { EmptyState, PermissionDeniedState } from "@saroh/ui/data-state";
 
+import { OnlinePaymentsLockNotice } from "@/components/billing/online-payments-lock";
+import { PlanLimitNotice } from "@/components/billing/plan-limit-notice";
+import { EmailPromptBlock } from "@/components/communications/email-prompt";
 import { ProviderList } from "@/components/providers/provider-list";
 import {
     SettingsPanel,
     SettingsPanelHeader,
 } from "@/components/settings/settings-panel";
+import { emailPrompt } from "@/lib/communications/email-setup";
+import { readEmailSetup } from "@/lib/communications/email-setup-service";
 import { listOrgDomains } from "@/lib/domains/service";
+import { resolveActiveOrganization } from "@/lib/organizations/service";
 import { listProviderHealth } from "@/lib/provider-health/service";
+import { CONNECT_EMAIL_ANCHOR } from "@/lib/providers/booking-emails";
+import { connectLocksOf } from "@/lib/providers/connect-lock";
 import { buildProvidersView } from "@/lib/providers/rows";
 import {
+    getSarohEmail,
     listCommsProviders,
     listPaymentProviders,
     listPaymentWebhooks,
 } from "@/lib/providers/service";
+import { billingAccessOrNull } from "@/lib/saroh-billing/service";
 import { requireSession } from "@/lib/session";
 import { listCheckoutProviders } from "@/lib/stores/storefronts";
 
@@ -28,12 +38,32 @@ export const metadata = { title: "Providers" };
 
 export default async function ProvidersSettingsPage() {
     await requireSession();
-    const result = await listProviderHealth();
+    const [result, org] = await Promise.all([
+        listProviderHealth(),
+        resolveActiveOrganization(),
+    ]);
+    const may = (action: string) =>
+        org?.actions
+            ? org.actions.includes(action)
+            : org?.role === "OWNER" || org?.role === "ADMIN";
+    const emailMay = {
+        connect: may("comms:manage"),
+        plans: may("billing:read"),
+    };
     // Everything else is only read once the health read has shown this
     // person may manage providers.
-    const [payments, messaging, domains, checkout, webhooks] =
+    const [
+        payments,
+        messaging,
+        domains,
+        checkout,
+        webhooks,
+        sarohEmail,
+        access,
+        emailSetup,
+    ] =
         result.status === "denied"
-            ? [null, null, null, [], null]
+            ? [null, null, null, [], null, null, null, null]
             : await Promise.all([
                   listPaymentProviders(),
                   listCommsProviders(),
@@ -42,6 +72,17 @@ export default async function ProvidersSettingsPage() {
                   // The address to register and the last payment update
                   // (DEC-063). Best-effort: it never fails the page.
                   listPaymentWebhooks(),
+                  // Saroh sending booking emails (DEC-086). Never throws:
+                  // a failed read is UNREAD, said in its own notice.
+                  getSarohEmail(),
+                  // What the plan lets the business connect (DEC-091):
+                  // locked payment rows offer See plans in place of
+                  // Connect, before any key form opens. Best-effort.
+                  billingAccessOrNull(),
+                  // Whether customers get emails at all (DEC-011), and
+                  // whether the plan lets it connect its own: the prompt
+                  // and the email rows' lock read it. Null when unread.
+                  readEmailSetup(emailMay),
               ]);
     const view =
         result.status === "denied"
@@ -53,7 +94,15 @@ export default async function ProvidersSettingsPage() {
                   domains,
                   checkout,
                   webhooks,
+                  sarohEmail,
+                  locks: connectLocksOf(access, emailSetup),
               });
+    // Connect jumps to the first email provider to connect on this page.
+    const prompt = emailPrompt(
+        emailSetup,
+        emailMay,
+        view?.connectEmailKey ? `#${CONNECT_EMAIL_ANCHOR}` : null,
+    );
 
     return (
         <SettingsPanel
@@ -65,6 +114,12 @@ export default async function ProvidersSettingsPage() {
                 />
             }
         >
+            {/* No email of its own: its customers get no emails (DEC-011). */}
+            {prompt ? <EmailPromptBlock prompt={prompt} /> : null}
+            <PlanLimitNotice moduleId="integrations" />
+            {/* A plan without online payments: no first connection, no
+                pay links, no checkout — said here, before Connect. */}
+            <OnlinePaymentsLockNotice what="payments" />
             {/* Three outcomes, three states. "Nothing to show" was previously
                 rendered for both a denial and an empty list, which are
                 different facts about the same screen (#177, §30). */}

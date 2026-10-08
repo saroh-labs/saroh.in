@@ -70,14 +70,25 @@ describe("orderPowers — each the power its endpoint asks (B16)", () => {
         ).toEqual(all);
     });
 
-    it("falls back to the built-in roles without resolved actions", () => {
-        expect(orderPowers({ role: "OWNER" })).toEqual(all);
-        expect(orderPowers({ role: "ADMIN" })).toEqual(all);
-        expect(orderPowers({ role: "MEMBER" })).toEqual({
-            ...none,
-            stage: true,
-        });
-        expect(orderPowers({ role: "REVIEWER" })).toEqual(none);
+    it("never reads the role's name: without resolved actions nothing is offered (DEC-098)", () => {
+        for (const role of ["OWNER", "ADMIN", "MEMBER", "REVIEWER"] as const) {
+            expect(orderPowers({ role })).toEqual(none);
+        }
+    });
+
+    it("a Member given the order powers may do what an Owner may", () => {
+        expect(
+            orderPowers({
+                role: "MEMBER",
+                actions: [
+                    "order:stage",
+                    "order:create",
+                    "order:edit",
+                    "order:refund",
+                    "order:export",
+                ],
+            }),
+        ).toEqual(all);
     });
 
     it("leaves it to the API when there is no organization", () => {
@@ -112,23 +123,13 @@ describe("ordersAccess", () => {
         ).toEqual({ open: false, money: false });
     });
 
-    it("falls back to the built-in roles without resolved actions", () => {
-        expect(ordersAccess({ role: "OWNER" })).toEqual({
-            open: true,
-            money: true,
-        });
-        expect(ordersAccess({ role: "ADMIN" })).toEqual({
-            open: true,
-            money: true,
-        });
-        expect(ordersAccess({ role: "MEMBER" })).toEqual({
-            open: true,
-            money: false,
-        });
-        expect(ordersAccess({ role: "REVIEWER" })).toEqual({
-            open: false,
-            money: false,
-        });
+    it("never reads the role's name: without resolved actions no money (DEC-098)", () => {
+        for (const role of ["OWNER", "ADMIN", "MEMBER", "REVIEWER"] as const) {
+            expect(ordersAccess({ role })).toEqual({
+                open: false,
+                money: false,
+            });
+        }
     });
 
     it("leaves it to the API when there is no organization", () => {

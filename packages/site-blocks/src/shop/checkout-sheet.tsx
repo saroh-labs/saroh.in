@@ -5,12 +5,18 @@ import { useEffect, useRef, useState } from "react";
 
 import type { SignedInCustomer } from "../account/api";
 import { destructiveAlertClasses } from "../alert";
+import type { PaymentHandoff } from "../booking-flow/api";
 import type { CheckoutOutcome, OpenCheckout } from "../booking-flow/checkout";
 import { openProviderCheckout } from "../booking-flow/checkout";
 import { cn } from "../lib/utils";
 import { formatAmount } from "../product/product-page";
-import type { CheckoutStanding, CheckoutStarted, ShopCheckoutApi } from "./api";
-import { orderConfirmationHref } from "./order-confirmation";
+import type {
+    CheckoutStanding,
+    CheckoutStarted,
+    DeliveryAddress,
+    ShopCheckoutApi,
+} from "./api";
+import { orderConfirmationHref, toPayLead } from "./order-confirmation";
 import { SheetFrame, sheetAltButton, sheetButton } from "./sheet-frame";
 
 /**
@@ -36,11 +42,56 @@ type Phase =
     | { kind: "confirming"; tries: number }
     | { kind: "done"; standing: CheckoutStanding };
 
+/** A started checkout paid online: its provider window to open. */
+export type OnlineStarted = CheckoutStarted & { payment: PaymentHandoff };
+
+/**
+ * An order placed to be paid at the handover ("Pay when you collect", "Pay
+ * on delivery"): nothing to pay now, so the sheet says it is placed and
+ * still to be paid, and leads to its confirmation page.
+ */
+export function OrderPlacedToPay({
+    started,
+    businessName,
+    toPay,
+    onClose,
+}: {
+    started: CheckoutStarted;
+    businessName: string;
+    /** "Pay when you collect" or "Pay on delivery", as the bag offered it. */
+    toPay: string;
+    onClose: () => void;
+}) {
+    const total = formatAmount(started.total, started.currency);
+    return (
+        <SheetFrame
+            title="Order placed"
+            lead={`Order ${started.orderNumber} · ${total}. ${toPayLead(toPay)} ${businessName} will be in touch when it's ready.`}
+            onClose={onClose}
+        >
+            <Link
+                href={orderConfirmationHref(started.orderId)}
+                onClick={onClose}
+                className={cn(
+                    sheetButton(false),
+                    "flex items-center justify-center",
+                )}
+            >
+                See your order
+            </Link>
+            <button type="button" onClick={onClose} className={sheetAltButton}>
+                Done
+            </button>
+        </SheetFrame>
+    );
+}
+
 export function CheckoutPay({
     started,
     api,
     businessName,
     customer,
+    delivery,
     onPlaced,
     onConfirming,
     onSettled,
@@ -49,10 +100,15 @@ export function CheckoutPay({
     openCheckout = openProviderCheckout,
     apiUrl,
 }: {
-    started: CheckoutStarted;
+    started: OnlineStarted;
     api: ShopCheckoutApi;
     businessName: string;
     customer: SignedInCustomer;
+    /**
+     * Where it goes, as typed in the bag: its name and phone fill the
+     * window's, so the customer isn't asked for them twice.
+     */
+    delivery?: DeliveryAddress;
     /** The order is placed: empty the bag. */
     onPlaced: () => void;
     /**
@@ -77,13 +133,23 @@ export function CheckoutPay({
     const session = useRef<{ close: () => void } | null>(null);
     const total = formatAmount(started.total, started.currency);
 
+    const phone = delivery?.phone?.replace(/[\s()-]/g, "") ?? "";
+
     function launch() {
         session.current?.close();
         const opened = openCheckout({
             handoff: started.payment,
             business: businessName,
             description: `Order ${started.orderNumber}`,
-            booker: { name: customer.name ?? "", email: customer.email },
+            booker: {
+                name:
+                    [customer.name, delivery?.name]
+                        .map((n) => n?.trim() ?? "")
+                        .find((n) => n !== "") ?? "",
+                email: customer.email,
+                // "98450 12345" as typed; the window wants the digits.
+                ...(phone ? { phone } : {}),
+            },
             apiUrl,
         });
         session.current = opened;

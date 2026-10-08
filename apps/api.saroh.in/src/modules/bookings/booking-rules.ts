@@ -15,20 +15,57 @@ import type { Prisma } from "@saroh/database";
  * whether money paid online goes back automatically when a booking is
  * cancelled in time. On by default — what E8 shipped — so a business that
  * never set it, or has no rules row, keeps refunding.
+ *
+ * `bookingPayment` is how people pay when they book on the booking page
+ * (DEC-088): online, at the desk, or both. Both by default — what every
+ * business had before — so nothing changes until a merchant chooses.
  */
 export interface BookingRulesValue {
     bookAheadDays: number | null;
     latestBookingMinutes: number | null;
     freeCancelHours: number | null;
     refundInTimeCancels: boolean;
+    bookingPayment: BookingPayment;
 }
+
+/**
+ * How people pay when they book (DEC-088): ONLINE only, at the DESK only,
+ * or BOTH. Online still needs a provider that can take it
+ * (`takesOnlinePayment`); a deposit or full price at booking is paid
+ * online, or at the desk when online can't take it and the desk is allowed
+ * (DEC-089).
+ */
+export const BOOKING_PAYMENTS = ["ONLINE", "DESK", "BOTH"] as const;
+export type BookingPayment = (typeof BOOKING_PAYMENTS)[number];
 
 export const NO_BOOKING_RULES: BookingRulesValue = {
     bookAheadDays: null,
     latestBookingMinutes: null,
     freeCancelHours: null,
     refundInTimeCancels: true,
+    bookingPayment: "BOTH",
 };
+
+/** A stored value read as a way to pay; anything unknown reads as BOTH. */
+export function bookingPaymentOf(value: unknown): BookingPayment {
+    return (BOOKING_PAYMENTS as readonly unknown[]).includes(value)
+        ? (value as BookingPayment)
+        : "BOTH";
+}
+
+/** Whether the business lets people pay online when they book. */
+export function allowsOnline(
+    rules: Pick<BookingRulesValue, "bookingPayment">,
+): boolean {
+    return rules.bookingPayment !== "DESK";
+}
+
+/** Whether the business lets people book to pay at the desk. */
+export function allowsDesk(
+    rules: Pick<BookingRulesValue, "bookingPayment">,
+): boolean {
+    return rules.bookingPayment !== "ONLINE";
+}
 
 /**
  * Whether a cancel refunds what was paid online on its own (DEC-058): only
@@ -151,7 +188,9 @@ export async function loadBookingRules(
             latestBookingMinutes: true,
             freeCancelHours: true,
             refundInTimeCancels: true,
+            bookingPayment: true,
         },
     });
-    return row ?? NO_BOOKING_RULES;
+    if (!row) return NO_BOOKING_RULES;
+    return { ...row, bookingPayment: bookingPaymentOf(row.bookingPayment) };
 }

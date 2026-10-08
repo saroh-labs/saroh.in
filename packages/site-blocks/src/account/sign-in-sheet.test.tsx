@@ -15,7 +15,7 @@ import type {
     VerifyResult,
 } from "./api";
 import { callLine, codeDigits, retryText } from "./api";
-import { SignInSheet } from "./sign-in-sheet";
+import { resendDelayMs, resendWait, SignInSheet } from "./sign-in-sheet";
 
 vi.mock("./challenge", () => ({
     ChallengeWidget: ({
@@ -195,6 +195,37 @@ describe("SignInSheet: the email step", () => {
             screen.getByRole("button", { name: "I'm not a robot" }),
         ).toBeInTheDocument();
     });
+
+    it("keeps what was typed and shows the challenge when the options land late (#838)", () => {
+        const api: SignInApi = {
+            requestCode: vi.fn<SignInApi["requestCode"]>(),
+            verifyCode: vi.fn<SignInApi["verifyCode"]>(),
+        };
+        const sheet = (options: SignInOptions) => (
+            <SignInSheet
+                open
+                onClose={vi.fn()}
+                options={options}
+                api={api}
+                onSignedIn={vi.fn()}
+            />
+        );
+        const { rerender } = render(sheet(OPTIONS));
+        fireEvent.change(emailField(), {
+            target: { value: "farah@example.in" },
+        });
+        rerender(
+            sheet({
+                ...OPTIONS,
+                challenge: { required: true, siteKey: "0x4AAA" },
+            }),
+        );
+        expect(emailField()).toHaveValue("farah@example.in");
+        expect(
+            screen.getByRole("button", { name: "I'm not a robot" }),
+        ).toBeInTheDocument();
+        expect(sendButton()).toBeDisabled();
+    });
 });
 
 describe("SignInSheet: the code step", () => {
@@ -261,6 +292,29 @@ describe("SignInSheet: the code step", () => {
         expect(screen.getByRole("alert")).toHaveTextContent(
             "This email now signs in as f•••@example.in. Use that email instead.",
         );
+    });
+
+    it("offers Resend once the API's wait has passed (UX-075)", async () => {
+        vi.useFakeTimers({
+            shouldAdvanceTime: false,
+            toFake: ["Date", "setInterval", "clearInterval"],
+        });
+        try {
+            const { requestCode } = await toCode();
+            const wait = screen.getByRole("button", {
+                name: /Resend code in \d+s/,
+            });
+            expect(wait).toBeDisabled();
+            act(() => {
+                vi.advanceTimersByTime(31_000);
+            });
+            const resend = screen.getByRole("button", { name: "Resend code" });
+            expect(resend).toBeEnabled();
+            await press(resend);
+            expect(requestCode).toHaveBeenCalledTimes(2);
+        } finally {
+            vi.useRealTimers();
+        }
     });
 
     it("goes back to change the email", async () => {
@@ -354,6 +408,21 @@ describe("SignInSheet: focus and keys", () => {
             />,
         );
         expect(screen.queryByRole("dialog")).toBeNull();
+    });
+});
+
+describe("the resend wait", () => {
+    it("counts whole seconds down to zero", () => {
+        expect(resendWait(null, 5_000)).toBe(0);
+        expect(resendWait(30_000, 0)).toBe(30);
+        expect(resendWait(30_000, 29_100)).toBe(1);
+        expect(resendWait(30_000, 31_000)).toBe(0);
+    });
+
+    it("takes the API's wait, else its own limit's", () => {
+        expect(resendDelayMs(60)).toBe(60_000);
+        expect(resendDelayMs(undefined)).toBe(30_000);
+        expect(resendDelayMs(0)).toBe(30_000);
     });
 });
 

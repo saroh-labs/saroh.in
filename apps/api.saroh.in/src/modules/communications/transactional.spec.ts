@@ -6,6 +6,7 @@ import {
     fillSecretLink,
     renderAutopayCancelled,
     renderAutopaySetupLink,
+    renderReviewInvitation,
     renderTransactional,
     SECRET_LINK_SLOT,
 } from "./transactional";
@@ -73,6 +74,34 @@ describe("renderTransactional", () => {
         );
         expect(view.body).not.toContain("UPI or card");
         expect(view.body).toContain(`href="${SECRET_LINK_SLOT}"`);
+    });
+
+    it("says a view link shows how to pay offline, never the details (R32)", () => {
+        const { body } = renderTransactional("INVOICE_SENT", {
+            ...vars,
+            payOnline: false,
+            payWays: "by UPI or bank transfer",
+        });
+        expect(body).toContain(
+            "You can view it, download a copy and see how to pay Rye &amp; Co. by UPI or bank transfer here:",
+        );
+        expect(body).toContain(`href="${SECRET_LINK_SLOT}"`);
+        // A pay link keeps its own words, whatever is set.
+        const pay = renderTransactional("INVOICE_SENT", {
+            ...vars,
+            payOnline: true,
+            payWays: "by UPI",
+        });
+        expect(pay.body).toContain("You can pay it by UPI or card here:");
+        // Nothing (or only a note) set: the plain view line.
+        const plain = renderTransactional("INVOICE_SENT", {
+            ...vars,
+            payOnline: false,
+            payWays: null,
+        });
+        expect(plain.body).toContain(
+            "You can view it and download a copy here:",
+        );
     });
 
     it("escapes what a person or business typed", () => {
@@ -172,5 +201,37 @@ describe("the autopay-cancelled note (D14)", () => {
         expect(autopayCancelledSentence(vars)).toBe(
             "Pulse & Co. turned off autopay for Monthly unlimited. Nothing more is taken automatically — your next renewal comes as an invoice with a link to pay.",
         );
+    });
+});
+
+describe("renderReviewInvitation (D11)", () => {
+    it("asks how the order was, in the store's name, with the link as a slot", () => {
+        const { subject, body } = renderReviewInvitation({
+            store: "High Street",
+            days: 30,
+        });
+        expect(subject).toBe("How was your order from High Street?");
+        expect(body).toContain("<p>How was your order?</p>");
+        expect(body).toContain(
+            "High Street would like to hear what you thought of what you bought. It takes a minute, and you can review each item. The link works for 30 days.",
+        );
+        expect(body).toContain(`href="${SECRET_LINK_SLOT}"`);
+        expect(body).not.toContain("/review/");
+    });
+
+    it("escapes the store's name in the body", () => {
+        const { body } = renderReviewInvitation({
+            store: "<b>Rye</b> & Co.",
+            days: 30,
+        });
+        expect(body).toContain("&lt;b&gt;Rye&lt;/b&gt; &amp; Co.");
+        expect(body).not.toContain("<b>Rye</b>");
+    });
+
+    it("takes its link only at send time", () => {
+        const { body } = renderReviewInvitation({ store: "Rye", days: 30 });
+        expect(
+            fillSecretLink(body, "https://x.test/review/t?a=1&b=2"),
+        ).toContain('href="https://x.test/review/t?a=1&amp;b=2"');
     });
 });

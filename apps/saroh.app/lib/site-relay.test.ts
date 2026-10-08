@@ -134,6 +134,23 @@ describe("visitorAddress", () => {
         ).toBe("198.51.100.4");
     });
 
+    it("prefers Cloudflare's cf-connecting-ip over both", () => {
+        // Behind Cloudflare, x-real-ip is Cloudflare's edge and the first
+        // x-forwarded-for entry is whatever the visitor sent.
+        expect(
+            visitorAddress(
+                h({
+                    "cf-connecting-ip": "203.0.113.7",
+                    "x-real-ip": "162.158.1.1",
+                    "x-forwarded-for": "6.6.6.6, 162.158.1.1",
+                }),
+            ),
+        ).toBe("203.0.113.7");
+        expect(visitorAddress(h({ "cf-connecting-ip": "2001:db8::7" }))).toBe(
+            "2001:db8::7",
+        );
+    });
+
     it("ignores anything that isn't an address", () => {
         fakeEnv.NEXT_PUBLIC_VERCEL_ENV = "production";
         expect(visitorAddress(h({ "x-forwarded-for": "evil.example" }))).toBe(

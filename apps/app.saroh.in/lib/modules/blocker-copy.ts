@@ -10,10 +10,13 @@
  * API's capabilities module and fails when a code it can send has no line
  * here, and scans the app for a code rendered directly.
  */
+/** Said when a role doesn't reach a module, or may not change one. */
+export const ROLE_REFUSAL =
+    "Your role doesn't include this. An owner or admin can change what you can reach.";
+
 export const BLOCKER_COPY: Readonly<Record<string, string>> = {
     // The gates, in the API's order.
-    UNAUTHORIZED:
-        "Your role doesn't include this. An owner or admin can change what you can reach.",
+    UNAUTHORIZED: ROLE_REFUSAL,
     ROLLOUT_DISABLED: "This isn't available for your business yet.",
     ORG_MODULE_DISABLED:
         "This is turned off for your business. Nothing it holds has been deleted.",
@@ -41,7 +44,11 @@ export const BLOCKER_COPY: Readonly<Record<string, string>> = {
         "A connected provider is switched off. Switch it back on to take payments.",
     PAYMENTS_WEBHOOK_SECRET_MISSING:
         "Payments can't be confirmed. Add the webhook signing secret to your payment provider's connection.",
+    PAYMENTS_KEYS_REFUSED:
+        "Your payment provider refused its keys. Enter them again to take payments.",
     COMMUNICATIONS_NO_PROVIDER: "Connect a provider to send messages.",
+    COMMUNICATIONS_KEYS_REFUSED:
+        "Your messaging provider refused its keys. Enter them again to send messages.",
     COMMUNICATIONS_PROVIDER_DISABLED:
         "A connected provider is switched off. Switch it back on to send messages.",
     AUTOMATIONS_NO_RULE: "Create a rule to automate follow-up.",
@@ -87,4 +94,47 @@ export function blockerSentence(blocker: {
     const said = blocker.message?.trim();
     if (said) return said;
     return BLOCKER_COPY[blocker.code] ?? BLOCKER_FALLBACK;
+}
+
+/** A bare code, such as `ROLLOUT_DISABLED` or `MODULE_DEACTIVATION_BLOCKED`. */
+const BARE_CODE = /^[A-Z][A-Z0-9_]{2,}$/;
+
+/**
+ * Words the API means for a developer: a role and a permission key
+ * (`Role "MEMBER" may not perform "module:manage"`), a registry key, a
+ * request's path and status.
+ */
+const FOR_DEVELOPERS =
+    /may not perform|unknown module|\bfailed:\s*\d{3}\b|"[a-z_]+:[a-z_]+"|internal server error/i;
+
+/**
+ * The words for a refused module write's message (DEC-057): the API's
+ * sentence when it is one a merchant can read, the words for a bare code,
+ * the role line for a permission key, and otherwise the plain fallback.
+ * Never a code, a key or a status.
+ */
+export function moduleErrorSentence(
+    message: string | null | undefined,
+    fallback: string = BLOCKER_FALLBACK,
+): string {
+    const said = message?.trim();
+    if (!said) return fallback;
+    if (BARE_CODE.test(said)) return BLOCKER_COPY[said] ?? fallback;
+    if (/may not perform/i.test(said)) return ROLE_REFUSAL;
+    if (FOR_DEVELOPERS.test(said)) return fallback;
+    return said;
+}
+
+/**
+ * What a refused module write says: its first blocker's words, else its
+ * message's (`moduleErrorSentence`). The one way a toast reads a refusal.
+ */
+export function refusalSentence(result: {
+    error: string;
+    blockers?: readonly { code: string; message?: string | null }[];
+}): string {
+    const refused = result.blockers?.[0];
+    return refused
+        ? blockerSentence(refused)
+        : moduleErrorSentence(result.error);
 }

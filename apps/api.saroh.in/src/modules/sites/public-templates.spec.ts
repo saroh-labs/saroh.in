@@ -1,8 +1,19 @@
+// The org-scoped controller pulls in better-auth's ESM through its guards,
+// which ts-jest cannot transform; stubbed as `sites.controller.spec.ts` does.
+jest.mock("../../common/guards/better-auth.guard", () => ({
+    BetterAuthGuard: class BetterAuthGuard {},
+}));
+jest.mock("../../common/guards/organization.guard", () => ({
+    OrganizationGuard: class OrganizationGuard {},
+}));
+
 import { listTemplates } from "@saroh/templates";
 
+import type { PublicFooterService } from "./public-footer.service";
 import { PublicSitesController } from "./public-sites.controller";
 import type { PublicVisitService } from "./public-visit.service";
 import type { SitePreviewLinksService } from "./site-preview-links.service";
+import { SitesController } from "./sites.controller";
 import type { SitesService } from "./sites.service";
 
 /**
@@ -18,6 +29,7 @@ describe("GET /public/sites/templates", () => {
         {} as unknown as SitesService,
         {} as unknown as SitePreviewLinksService,
         {} as unknown as PublicVisitService,
+        {} as unknown as PublicFooterService,
     );
 
     it("returns every registered template", () => {
@@ -33,8 +45,56 @@ describe("GET /public/sites/templates", () => {
             version: expect.any(Number),
             name: expect.any(String),
             description: expect.any(String),
+            slug: expect.any(String),
+            kinds: expect.any(Array),
+            shape: null,
+            uses: expect.any(Array),
+            colourways: expect.any(Array),
             pages: expect.arrayContaining([expect.any(String)]),
         });
+    });
+
+    // What the picker (U12) and the gallery read: who it is for, what it
+    // is built around, the modules it needs and its colourways as chips.
+    it("carries the picker's metadata, from the manifest", () => {
+        const bakery = controller.templates().find((t) => t.id === "bakery");
+        expect(bakery).toMatchObject({
+            slug: "bakery",
+            kinds: ["food"],
+            shape: "store",
+            uses: ["COMMERCE"],
+        });
+        expect(bakery?.colourways.length).toBeGreaterThan(0);
+        for (const colourway of bakery?.colourways ?? []) {
+            expect(Object.keys(colourway).sort()).toEqual([
+                "chips",
+                "id",
+                "name",
+            ]);
+            expect(colourway.chips).toHaveLength(3);
+            for (const chip of colourway.chips) {
+                // An HSL triple, as Website › Style draws its chips.
+                expect(chip).toMatch(/^\d+(\.\d+)? \d+(\.\d+)?% \d+(\.\d+)?%$/);
+            }
+        }
+    });
+
+    it("offers every colourway create accepts as a styleId, default first", () => {
+        for (const template of controller.templates()) {
+            const source = listTemplates().find((t) => t.id === template.id);
+            expect(template.colourways.map((c) => c.id)).toEqual(
+                (source?.styles ?? []).map((s) => s.id),
+            );
+            expect(template.slug).toBe(source?.slug ?? source?.id);
+        }
+    });
+
+    it("is the catalogue the org-scoped picker route returns", () => {
+        const scoped = new SitesController(
+            {} as unknown as SitesService,
+            {} as unknown as SitePreviewLinksService,
+        );
+        expect(scoped.templates()).toEqual(controller.templates());
     });
 
     // The route has no BetterAuthGuard and no OrganizationGuard, so anything

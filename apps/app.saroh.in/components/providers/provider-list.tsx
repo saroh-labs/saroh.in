@@ -3,6 +3,7 @@
 import { PartialNotice } from "@saroh/ui/data-state";
 import { useId } from "react";
 
+import { CONNECT_EMAIL_ANCHOR } from "@/lib/providers/booking-emails";
 import type { ProvidersView } from "@/lib/providers/rows";
 import type {
     ConnectedCommsProvider,
@@ -10,6 +11,7 @@ import type {
     PaymentWebhookSetup,
 } from "@/lib/providers/service";
 
+import { BookingEmailsBlock } from "./booking-emails-block";
 import { DomainsRowView, ProviderRowView } from "./provider-row";
 
 const UNREAD = {
@@ -66,12 +68,23 @@ export function ProviderList({
                         ))
                     ) : (
                         <p className="text-pretty px-4 py-[13px] text-[13px] leading-[1.45] text-muted-foreground min-[760px]:px-[18px]">
-                            {offersPayments
+                            {offersPayments && !view.paymentsLocked
                                 ? "Nothing connected yet — connect a payment provider to take payments online."
                                 : "Nothing connected yet."}
                         </p>
                     )}
                 </Group>
+            ) : null}
+
+            {/* Saroh sending booking emails (DEC-086): its own block, never
+                in Connected — Saroh is not a provider the business added. */}
+            {view.bookingEmails ? (
+                <BookingEmailsBlock
+                    emails={view.bookingEmails}
+                    connectHref={
+                        view.connectEmailKey ? `#${CONNECT_EMAIL_ANCHOR}` : null
+                    }
+                />
             ) : null}
 
             {view.available.length > 0 ? (
@@ -80,6 +93,11 @@ export function ProviderList({
                         <ProviderRowView
                             key={entry.key}
                             entry={entry}
+                            anchorId={
+                                entry.key === view.connectEmailKey
+                                    ? CONNECT_EMAIL_ANCHOR
+                                    : undefined
+                            }
                             {...dialogs}
                         />
                     ))}

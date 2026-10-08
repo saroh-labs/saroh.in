@@ -75,7 +75,13 @@ export function InvoicesScreen({
     scope = null,
     paidSince = null,
     paidSinceInvoices = null,
+    timeZone,
 }: {
+    /**
+     * The business's zone, which the invoice's dates are written in
+     * (#836), as on the paper the customer gets. Absent, the viewer's.
+     */
+    timeZone?: string;
     businessName: string;
     invoices: Invoice[];
     /** The newest read hit its cap: older paid and void ones are not here. */
@@ -307,6 +313,7 @@ export function InvoicesScreen({
                                     invoice={i}
                                     selected={peek?.id === i.id}
                                     onOpen={() => setPeek(i)}
+                                    timeZone={timeZone}
                                 />
                             </li>
                         ))}
@@ -326,6 +333,7 @@ export function InvoicesScreen({
                 invoice={peek}
                 canWrite={canWrite}
                 businessName={businessName}
+                timeZone={timeZone}
                 onOpenChange={(open) => {
                     if (!open) setPeek(null);
                 }}

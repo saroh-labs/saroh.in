@@ -43,6 +43,7 @@ export function ProductOverviewTab({
     tracking,
     stock,
     now,
+    onShop = false,
 }: {
     overview: ProductOverview;
     storeId: string;
@@ -52,6 +53,8 @@ export function ProductOverviewTab({
     /** Its shelves at every storefront; null when that read failed. */
     stock: ProductStock | null;
     now: Date;
+    /** Live on the online shop (UX-082): the Website card says so. */
+    onShop?: boolean;
 }) {
     const { product, orders, reviews, discounts, placement } = overview;
     const money = (amount: string) =>
@@ -187,10 +190,15 @@ export function ProductOverviewTab({
                     {placement?.status === "ok" ? (
                         <>
                             <LinkedHeadline>
-                                {websiteSummary(placement.data).headline}
+                                {
+                                    websiteSummary(placement.data, onShop)
+                                        .headline
+                                }
                             </LinkedHeadline>
                             <LinkedLines
-                                lines={websiteSummary(placement.data).lines}
+                                lines={
+                                    websiteSummary(placement.data, onShop).lines
+                                }
                             />
                         </>
                     ) : (

@@ -89,6 +89,18 @@ describe("the Product grid on a served page (G12)", () => {
         ).toBe("/shop");
     });
 
+    it("on the Shop page itself, offers no Shop → link back to it (UX-082)", () => {
+        render(
+            <ProductGridSection
+                content={content}
+                feed={{ products: BREADS, basePath: "/shop", atShop: true }}
+            />,
+        );
+        expect(cards()).toHaveLength(4);
+        expect(screen.queryByRole("link", { name: "Shop" })).toBeNull();
+        expect(screen.queryByText("Shop")).toBeNull();
+    });
+
     it("draws the photo, the options, the name, one line and the price", () => {
         render(
             <ProductGridSection

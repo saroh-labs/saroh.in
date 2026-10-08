@@ -91,6 +91,31 @@ const envSchema = z.object({
     SMTP_PASS: z.string().optional(),
     USER_ACCOUNT: z.string().optional(),
     USER_PASSWORD: z.string().optional(),
+    // Saroh's sender for a business's email while it has no provider of its
+    // own (DEC-086): its own address on the notify subdomain, and the SES
+    // configuration set its bounces and complaints are measured on. The
+    // credentials are the SMTP_* set above.
+    SAROH_BUSINESS_EMAIL_FROM: z.string().email().optional(),
+    SAROH_BUSINESS_EMAIL_CONFIG_SET: z
+        .string()
+        .regex(/^[A-Za-z0-9_-]{1,64}$/)
+        .optional(),
+    // The global stop for that route: "true" stops every business's Saroh
+    // email at once, queued and retrying ones included, whatever each
+    // business's SAROH_BUSINESS_EMAIL flag says (the complaint alarm's
+    // runbook step). Checked on every send and queued job
+    // (`communications/saroh-may-send.ts`), but env is read at boot, so it
+    // takes effect once the API and workers restart with it set; for an
+    // instant stop, turn off the business's SAROH_BUSINESS_EMAIL flag.
+    SAROH_BUSINESS_EMAIL_STOP: z.enum(["true", "false"]).optional(),
+    // At most this many Saroh-sent business emails in any 24 hours, for
+    // every business together, so sign-in codes keep their room on the SES
+    // account. Unset: `SAROH_DAILY_CEILING_DEFAULT` (1,000).
+    SAROH_BUSINESS_EMAIL_DAILY_CEILING: z.coerce
+        .number()
+        .int()
+        .positive()
+        .optional(),
 
     // Sign-in codes for a business's customers on its own site (ADR-011,
     // round-2 plan A, A2). Every one is optional in the schema so dev and
@@ -104,6 +129,31 @@ const envSchema = z.object({
     // The key the destination email and the code are HMAC'd under, so a
     // database read reveals neither who asked nor the code.
     SITE_ACCOUNTS_CODE_SECRET: z.string().min(32).optional(),
+    // Signs the pricing draft-preview token staff mint in the admin console
+    // (plans catalogue KTD-10): at most 15 minutes, bound to one draft
+    // revision. API only — saroh.in passes the token through, never checks
+    // it. Read at use (`pricing/pricing-secrets.ts`): development and test
+    // fall back to a fixed public value, anywhere else preview is refused
+    // until it is set. Never logged.
+    PRICING_PREVIEW_SECRET: z.string().min(32).optional(),
+    // saroh.in's on-demand revalidation hook (plans catalogue KTD-10): after
+    // a publish commits, and at a scheduled version's go-live, a job POSTs to
+    // `<PRICING_SITE_URL>/api/revalidate` with the secret in `x-saroh-revalidate`. Both unset:
+    // nothing is queued, and saroh.in picks the change up on its ISR timer.
+    // The secret is byte-identical in saroh.in. Never logged.
+    PRICING_SITE_URL: z.string().url().optional(),
+    PRICING_REVALIDATE_SECRET: z.string().min(32).optional(),
+    // saroh.in is static: a publish starts its build instead (plans catalogue
+    // KTD-10). A fine-grained GitHub token allowed only to run this repo's
+    // Actions, and which environment to build (`main` for production,
+    // `development` for development). Both set, they win over the hook above.
+    // The token is never logged.
+    SITE_DEPLOY_GITHUB_TOKEN: z.string().min(20).optional(),
+    SITE_DEPLOY_ENVIRONMENT: z.enum(["development", "production"]).optional(),
+    SITE_DEPLOY_GITHUB_REPO: z
+        .string()
+        .regex(/^[\w.-]+\/[\w.-]+$/)
+        .optional(),
     // Cloudflare Turnstile, the bot challenge a code needs past a shared
     // ceiling. Unset: no challenge is ever asked (and an ERROR says when one
     // would have been), so a customer is never stuck on a widget that can't load.
@@ -124,12 +174,15 @@ const envSchema = z.object({
     // to see the "couldn't send" path and alert. Development, or named
     // outright off production (the CI browser stack); never in production.
     SITE_CODES_EMAIL_FAKE: z.enum(["log", "fail"]).optional(),
-    // The opening-day launch offer (marketing plan, Gate W): how many days of
-    // the offer plan saroh.in's waitlist page promises
-    // (`GET /public/waitlist/offer`). The owner's number, set per instance,
-    // never committed. Unset, the endpoint answers 404 and the page says the
-    // offer is announced at launch.
+    // The opening-day launch offer (marketing plan U31, OQ-1): how many days
+    // of the offer plan a business made through a waitlist invite gets, from
+    // the moment it is made. The owner's number, set per instance, never
+    // committed. Unset, no invite can be sent and none grants an offer.
     LAUNCH_OFFER_DAYS: z.coerce.number().int().min(1).max(366).optional(),
+    // Web addresses kept for Saroh beyond the built-in list in
+    // `sites/site-address.ts`: comma-separated, set per instance. People's
+    // names (the founders' own sites) live here, not in the public repo.
+    RESERVED_ADDRESSES_EXTRA: z.string().optional(),
     // The customer account area on merchant sites (round-2 plan A, A5):
     // `on` serves `public/site-accounts/me`, home and receipts; anything else
     // (unset included) answers 404, so the area stays dark until A6–A8 and
@@ -137,6 +190,18 @@ const envSchema = z.object({
     // own `SITE_ACCOUNT_AREA`, which hides the header entry and the pages;
     // this one is the server half that keeps it private.
     SITE_ACCOUNT_AREA: z.enum(["on", "off"]).optional(),
+    // TEST ONLY. Hosts the link preview tool may fetch although they resolve
+    // to loopback (comma-separated, e.g. `localhost`): the browser tests
+    // point it at a page served on the test machine, which the SSRF guard
+    // refuses otherwise. Loopback only, never a private range. Refused at
+    // boot under NODE_ENV=production (below), and honoured by the tool only
+    // in a test run — NODE_ENV declared `test`, or `CI` set — never under a
+    // declared production (`link-preview/ssrf-guard.ts`, `testHostsFrom`).
+    LINK_PREVIEW_TEST_HOSTS: z.string().optional(),
+    // Set by CI runners (GitHub sets `true`) and by `scripts/prepush.sh`'s
+    // browser-test stack (`1`). Read only to mark a test run for test-only
+    // switches; never set it on a deployed host.
+    CI: z.string().optional(),
 
     // Payments (S5-002 — org merchant credential encryption at rest).
     // A 32-byte AES-256-GCM key, supplied as base64 or 64-hex. OPTIONAL in the
@@ -150,6 +215,37 @@ const envSchema = z.object({
     // for live ones. The API sends the mode with every checkout's client
     // parameters, so the browser drop-in opens where the order was made.
     CASHFREE_ENV: z.enum(["production", "sandbox"]).default("production"),
+
+    // Saroh's own invoices to businesses for their plan (pricing catalogue
+    // U17), read at use by `billing/saroh-seller.ts`. All optional so dev and
+    // test boot without them; never hard-coded. Unset GSTIN: the paper is an
+    // "Invoice", not a tax invoice, and `saroh_invoice_seller_incomplete` is
+    // logged. Unset state: the GSTIN's first two digits.
+    SAROH_LEGAL_NAME: z.string().optional(),
+    SAROH_GSTIN: z
+        .string()
+        .regex(/^[0-9]{2}[A-Z0-9]{13}$/, "a 15-character GSTIN")
+        .optional(),
+    // GST state code of Saroh's registration ("29"): CGST + SGST for a
+    // business in the same state, IGST otherwise.
+    SAROH_GST_STATE: z
+        .string()
+        .regex(/^[0-9]{2}$/, "a two-digit GST state code")
+        .optional(),
+    // The registered address printed on the paper, one line.
+    SAROH_REGISTERED_ADDRESS: z.string().optional(),
+    // The contact address printed on the paper and the billing email's reply-to.
+    SAROH_BILLING_EMAIL: z.string().email().optional(),
+    // The SAC printed against each line.
+    SAROH_INVOICE_SAC: z
+        .string()
+        .regex(/^[0-9]{4,8}$/, "a 4–8 digit SAC")
+        .optional(),
+    // The series prefix: 1–3 capitals or digits (SRH → SRH/26-27/00001).
+    SAROH_INVOICE_PREFIX: z
+        .string()
+        .regex(/^[A-Z0-9]{1,3}$/, "1–3 capitals or digits")
+        .optional(),
 
     // Saroh STAFF break-glass bootstrap (S1-012 admin). Comma-separated emails
     // that are treated as platform admins even with no PlatformAdmin row. This
@@ -195,6 +291,13 @@ const REQUIRED_IN_PRODUCTION = [
 
 const checkedSchema = envSchema.superRefine((value, ctx) => {
     if (value.NODE_ENV !== "production") return;
+    if (value.LINK_PREVIEW_TEST_HOSTS) {
+        ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            path: ["LINK_PREVIEW_TEST_HOSTS"],
+            message: "test only: never set when NODE_ENV=production",
+        });
+    }
     for (const key of REQUIRED_IN_PRODUCTION) {
         if (!value[key]) {
             ctx.addIssue({

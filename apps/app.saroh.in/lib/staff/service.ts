@@ -4,6 +4,7 @@ import { apiFetch, getJson, orgBase } from "@/lib/api/http";
 
 import type {
     BookingBrief,
+    BookingPaymentView,
     BookingRules,
     Closure,
     OffRangeInput,
@@ -32,6 +33,40 @@ export async function getBookingRules(): Promise<BookingRules | null> {
     const base = await orgBase();
     if (!base) return null;
     return getJson<BookingRules>(`${base}/booking-rules`);
+}
+
+/**
+ * How people pay when they book and whether online can be taken (DEC-088),
+ * or null when it couldn't be told — an API older than it, a role that
+ * can't read services, or the API down. Read with a bare fetch: a 403 here
+ * is "couldn't tell", never the page's own forbidden.
+ */
+export async function readBookingPayment(): Promise<BookingPaymentView | null> {
+    try {
+        const base = await orgBase();
+        if (!base) return null;
+        const res = await apiFetch(`${base}/booking-rules/payment`);
+        if (!res.ok) return null;
+        return asBookingPayment(await res.json());
+    } catch {
+        return null;
+    }
+}
+
+const WAYS: readonly unknown[] = ["ONLINE", "DESK", "BOTH"];
+const BLOCKERS: readonly unknown[] = [
+    "PLAN",
+    "PAYMENTS_OFF",
+    "NO_PROVIDER",
+    null,
+];
+
+function asBookingPayment(v: unknown): BookingPaymentView | null {
+    if (typeof v !== "object" || v === null) return null;
+    const { bookingPayment, onlineBlocker } = v as Record<string, unknown>;
+    return WAYS.includes(bookingPayment) && BLOCKERS.includes(onlineBlocker)
+        ? (v as BookingPaymentView)
+        : null;
 }
 
 async function send<T>(

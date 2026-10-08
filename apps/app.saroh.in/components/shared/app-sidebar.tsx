@@ -2,7 +2,7 @@
 
 import { cn } from "@saroh/ui/lib/utils";
 import { Popover, PopoverAnchor, PopoverContent } from "@saroh/ui/popover";
-import { PanelLeftClose, PanelLeftOpen } from "lucide-react";
+import { Lock, PanelLeftClose, PanelLeftOpen } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Fragment, useCallback, useState, useSyncExternalStore } from "react";
@@ -68,13 +68,19 @@ export function AppSidebar({
     roleKey = null,
     actions = null,
     counts,
+    locked = [],
     storefronts = null,
     stockTracked = null,
     collapsed: collapsedAtLoad = false,
+    kind,
 }: {
+    /** What is being set up (DEC-070); see `navFor`. */
+    kind?: string | null;
+    /** Rows the business's plan locks (U14): drawn with a lock. */
+    locked?: readonly string[];
     /** The role as stored; see `navFor`. */
     roleKey?: string | null;
-    /** How many storefronts; with several the row reads "Storefronts". */
+    /** How many storefronts; with several the row reads "Locations". */
     storefronts?: number | null;
     /** The business tracks stock; off, Sell › Stock is not offered. */
     stockTracked?: boolean | null;
@@ -100,6 +106,7 @@ export function AppSidebar({
         moduleKeys,
         storefronts,
         stockTracked,
+        kind,
     });
     const pathname = navPathname(usePathname(), groups);
     const [collapsed, setCollapsed] = useState(collapsedAtLoad);
@@ -312,6 +319,15 @@ export function AppSidebar({
                                                     <span className="flex-1 group-data-[collapsed=true]/rail:w-full group-data-[collapsed=true]/rail:flex-none group-data-[collapsed=true]/rail:text-center group-data-[collapsed=true]/rail:text-[10.5px] group-data-[collapsed=true]/rail:leading-[1.2] max-[1100px]:w-full max-[1100px]:flex-none max-[1100px]:text-center max-[1100px]:text-[10.5px] max-[1100px]:leading-[1.2]">
                                                         {item.label}
                                                     </span>
+                                                    {locked.includes(
+                                                        item.href,
+                                                    ) ? (
+                                                        <Lock
+                                                            role="img"
+                                                            aria-label="Not in your plan"
+                                                            className="size-3.5 shrink-0 text-muted-foreground group-data-[collapsed=true]/rail:hidden max-[1100px]:hidden"
+                                                        />
+                                                    ) : null}
                                                     {waiting > 0 ? (
                                                         /* The brand file's waiting count: a
                                                Saffron-tinted pill with 700 text.

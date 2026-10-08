@@ -41,7 +41,7 @@ const GRID_COLS: Record<number, string> = {
  * the save refreshes the page, so there is no copy of it to drift.
  *
  * Only what can deliver can be switched on (`alertGrid`): a channel with no
- * provider is off and fixed, with the line that says how to fix it.
+ * provider (WhatsApp) is off and fixed, with the line that says why.
  */
 export function AlertsGrid({ read }: { read: AlertPreferencesRead }) {
     const [pending, startTransition] = useTransition();

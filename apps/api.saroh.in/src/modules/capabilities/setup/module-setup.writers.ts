@@ -21,12 +21,13 @@
  * has a draft Shop page when that location delivers or ships. Only what is
  * missing is added: a site keeps the Sells from and the pages it has.
  */
-import { ForbiddenException } from "@nestjs/common";
+import { ForbiddenException, HttpException } from "@nestjs/common";
 import { prisma } from "@saroh/database";
 
 import { toMinor } from "../../../common/money";
 import type { OrganizationContext } from "../../../common/types/organization-context";
 import type { EntitlementService } from "../../billing/entitlement.service";
+import { planMeter } from "../../billing/metering.service";
 import { STOREFRONT_FULFILMENT_TYPES } from "../../orders/fulfilment";
 import { storefrontLimit } from "../../organizations/business-limits";
 import { authorize } from "../../organizations/organization-policy";
@@ -39,6 +40,7 @@ import {
     writeSiteFromTemplate,
 } from "../../sites/site-create";
 import { businessCurrency } from "../../stores/currency";
+import { registeredAddressText } from "../../stores/pickup-place";
 import type { ModuleTransaction } from "../module-lifecycle.service";
 import type { ModuleKey } from "../module-registry";
 import type {
@@ -123,6 +125,27 @@ export function firstStorefront(
     });
 }
 
+/** The old `storefronts` floor, in the merchant's words when it refuses. */
+async function storefrontFloor(
+    ctx: OrganizationContext,
+    entitlements: Entitlements,
+): Promise<void> {
+    try {
+        await entitlements.check(ctx.organizationId, "storefronts", 0);
+    } catch (err) {
+        if (!(err instanceof ForbiddenException)) throw err;
+        const limit = storefrontLimit(
+            await entitlements.getEntitlements(ctx.organizationId),
+        );
+        throw new ForbiddenException({
+            message:
+                limit < 1
+                    ? "Your plan doesn't include a location. A bigger plan adds one."
+                    : `Your plan includes ${limit === 1 ? "one location" : `${limit} locations`}. A bigger plan adds more.`,
+        });
+    }
+}
+
 async function prepareCommerce(
     ctx: OrganizationContext,
     setup: CommerceSetupDto,
@@ -133,22 +156,15 @@ async function prepareCommerce(
         authorize(ctx, "store:write");
     } else {
         authorize(ctx, "store:create");
-        // The plan's `storefronts` limit, as creating one by hand checks it
-        // (StoresService.createForUser), in the merchant's words.
-        try {
-            await entitlements.check(ctx.organizationId, "storefronts", 0);
-        } catch (err) {
-            if (!(err instanceof ForbiddenException)) throw err;
-            const limit = storefrontLimit(
-                await entitlements.getEntitlements(ctx.organizationId),
-            );
-            throw new ForbiddenException({
-                message:
-                    limit < 1
-                        ? "Your plan doesn't include a location. A bigger plan adds one."
-                        : `Your plan includes ${limit === 1 ? "one location" : `${limit} locations`}. A bigger plan adds more.`,
-            });
-        }
+        // The plan's `storefronts` floor, as creating one by hand checks it
+        // (StoresService.createForUser), in the merchant's words — only
+        // where the catalogue doesn't govern locations: where it does, a
+        // new storefront is online and adds no place customers visit.
+        const governed = await planMeter.enforcedRow(
+            ctx.organizationId,
+            "locations",
+        );
+        if (!governed) await storefrontFloor(ctx, entitlements);
     }
     return (tx) => writeCommerce(tx, ctx, setup);
 }
@@ -189,17 +205,60 @@ async function writeCommerce(
         return { storefrontId: existing.id };
     }
 
+    // Pick-up needs a place customers visit, with its address (UX-025):
+    // a business that gave its registered address starts from it.
+    const place = fulfilmentTypes.includes("PICKUP")
+        ? await seededPlace(tx, ctx.organizationId)
+        : null;
     const store = await tx.store.create({
         data: {
             name: setup.storefrontName,
             organization: { connect: { id: ctx.organizationId } },
             owners: { create: { userId: ctx.userId, role: "OWNER" } },
-            settings: { create: { currency, ...ways } },
+            settings: {
+                create: {
+                    currency,
+                    ...ways,
+                    ...(place ? { kind: "SHOP", address: place } : {}),
+                },
+            },
         },
         select: { id: true },
     });
     await shopForSell(tx, ctx, store.id, fulfilmentTypes);
     return { storefrontId: store.id };
+}
+
+/**
+ * The first location's address, from the business's registered address,
+ * when it has one and the plan has room for a place customers visit (the
+ * `locations` meter, checked as becoming one is); else null, and the
+ * location starts with no counter, as it always has.
+ */
+async function seededPlace(
+    tx: ModuleTransaction,
+    organizationId: string,
+): Promise<string | null> {
+    const profile = await tx.businessProfile.findUnique({
+        where: { organizationId },
+        select: {
+            addressLine1: true,
+            addressLine2: true,
+            city: true,
+            postalCode: true,
+        },
+    });
+    const address = registeredAddressText(profile);
+    if (!address) return null;
+    try {
+        await planMeter.roomInTx(tx, organizationId, "locations");
+    } catch (error) {
+        // No room on the plan: a refusal, not a failure. Nothing was
+        // written, so the transaction carries on.
+        if (error instanceof HttpException) return null;
+        throw error;
+    }
+    return address;
 }
 
 // --- Bookings --------------------------------------------------------------
@@ -327,10 +386,14 @@ async function prepareWebsite(
             return { siteId: site.id, siteAddress: site.subdomain };
         };
     }
-    // The `/sites/new` flow and its starter template, caps included.
+    // The `/sites/new` flow and its template, caps included.
     const plan: SitePlan = await planSiteFromTemplate(
         ctx,
-        { name: setup.siteName },
+        {
+            name: setup.siteName,
+            // The sheet's choice; absent, the kind's (planSiteFromTemplate).
+            ...(setup.templateId ? { templateId: setup.templateId } : {}),
+        },
         entitlements,
     );
     return async (tx) => {

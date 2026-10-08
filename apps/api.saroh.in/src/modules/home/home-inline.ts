@@ -167,6 +167,7 @@ export class HomeInlineService {
                 stage: true,
                 status: true,
                 paymentStatus: true,
+                payOnHandover: true,
                 fulfilment: true,
                 customerId: true,
                 customerAccountId: true,
@@ -419,12 +420,14 @@ export function handoverOf(order: {
     status: string;
     paymentStatus: string;
     fulfilment: string;
+    payOnHandover?: boolean;
 }): OrderStage | null {
     const next = nextStages({
         stage: order.stage as OrderStage,
         status: order.status,
         paymentStatus: order.paymentStatus,
         fulfilment: order.fulfilment as never,
+        payOnHandover: order.payOnHandover,
     });
     return next.find((s) => SENT_STAGES.includes(s)) ?? null;
 }

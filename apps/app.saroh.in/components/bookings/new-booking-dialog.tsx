@@ -18,6 +18,7 @@ import { Plus } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useEffect, useId, useState } from "react";
 
+import { showPlanRefusal } from "@/components/billing/plan-refusal";
 import type { PayLinkResult } from "@/components/bookings/pay-link-panel";
 import {
     makePayLink,
@@ -199,6 +200,13 @@ export function NewBookingDialog({
             startAt: picked,
         });
         setSaving(false);
+        if (!res.ok && res.plan) {
+            // At the plan's bookings-a-month limit (U13): its notice, and
+            // the time stays picked for when there's room.
+            showPlanRefusal(res.plan);
+            setAttempt(crypto.randomUUID());
+            return;
+        }
         if (!res.ok) {
             showError(res.error);
             // Most likely the time went while this was open: read again.
@@ -324,7 +332,7 @@ export function NewBookingDialog({
                     <DialogDescription>
                         {visit
                             ? `${service?.name ?? "The treatment"} for ${visit.who}. It's paid for on order #${visit.orderNumber}, so there's only the time to choose.`
-                            : "Choosing the service sets how long it takes, so there are really two things to decide: who, and when."}
+                            : "Pick the service, then who and when."}
                     </DialogDescription>
                 </DialogHeader>
 

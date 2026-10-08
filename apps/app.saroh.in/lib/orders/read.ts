@@ -2,6 +2,7 @@ import type {
     AttentionKind,
     AttentionSource,
 } from "@/lib/customer-workspace/attention";
+import type { PaymentMethod } from "@/lib/invoices/service";
 import type { NoticeReach } from "@/lib/messages/notice-reach";
 
 /**
@@ -143,6 +144,11 @@ export interface OrderReadMoney {
     due: string;
     /** Paid outside a provider — cash, a transfer — and recorded by hand. */
     recordedByHand: boolean;
+    /**
+     * Recorded by hand, how (#834). Null when paid online or marked paid
+     * before the way was asked; absent from an API before it.
+     */
+    paidHow?: PaymentMethod | null;
     discountCode: { code: string; rule: string } | null;
     /**
      * Refunds the provider hasn't answered for yet: the money is held (and
@@ -230,6 +236,18 @@ export interface OrderRead extends FulfilmentFields {
      * from before it sends none.
      */
     placedOnline?: boolean;
+    /**
+     * Placed on the website to be paid when it is collected or delivered
+     * ("Pay when you collect", "Pay on delivery"): it is made and brought
+     * first, and handed over once marked paid. Absent from an older API.
+     */
+    payOnHandover?: boolean;
+    /**
+     * Days a pay-on-handover order has waited, unpaid and not handed over,
+     * from the third on in the business's zone (R34); null otherwise.
+     * Absent from an older API.
+     */
+    uncollectedDays?: number | null;
     updatedAt: string;
     store: { id: string; name: string };
     status: "PENDING" | "PROCESSING" | "SHIPPED" | "DELIVERED" | "CANCELLED";

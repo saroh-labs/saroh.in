@@ -1,5 +1,8 @@
 import type { CrmResult } from "@/lib/api/http";
+import { forbidden } from "next/navigation";
+
 import { apiFetch, destroy, mutate, orgBase } from "@/lib/api/http";
+import type { EnquiryEntry } from "@/lib/crm/enquiries";
 
 /**
  * CRM Leads data access for app.saroh.in (S3-005). Org-scoped list / detail /
@@ -61,6 +64,8 @@ export interface LeadDetail {
     stage: LeadStage | null;
     pipeline: { id: string; name: string; stages: LeadStage[] } | null;
     activities: LeadActivity[];
+    /** What they wrote through a form, newest first (UX-002); empty for a hand-made lead. */
+    enquiries?: EnquiryEntry[];
 }
 
 export interface CreateLeadInput {
@@ -96,6 +101,10 @@ export async function listLeads(filter?: {
     if (filter?.stageId) qs.set("stageId", filter.stageId);
     const suffix = qs.toString() ? `?${qs.toString()}` : "";
     const res = await apiFetch(`${base}/leads${suffix}`);
+    // A role without leads is refused, not empty (UX-027): the shell's
+    // "You do not have access", never "Leads appear here as enquiries come
+    // in" beside an Add a lead it can't use. Outside any try, so it lands.
+    if (res.status === 403) forbidden();
     if (!res.ok) return [];
     return (await res.json()) as LeadListItem[];
 }

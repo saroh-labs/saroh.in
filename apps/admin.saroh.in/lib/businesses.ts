@@ -43,6 +43,84 @@ export interface BusinessQuery {
 
 export type Panel<T> = { status: "ok"; data: T } | { status: "failed" };
 
+/** One catalogue row as the business gets it (pricing U11). */
+export interface CatalogueModuleRow {
+    moduleId: string;
+    name: string;
+    /** What applies now: on, or how it shows when off. */
+    state: "on" | "locked" | "hidden";
+    limit: number | null;
+    per: "" | "month";
+    /** Its plan's own cell, before overrides and add-ons. */
+    planState: "on" | "locked" | "hidden";
+    planLimit: number | null;
+    /** Why it differs from the plan, in words; empty when it doesn't. */
+    override: string;
+    usage: number | null;
+    /** Whether it has a limit an operator can set. */
+    limitable: boolean;
+}
+
+export interface BusinessOverride {
+    id: string;
+    /** raise, grant, remove, limit, price or plan. */
+    kind: string;
+    key: string;
+    moduleKey: string | null;
+    planKey: string | null;
+    value: number | null;
+    expiresAt: string | null;
+    reason: string;
+    createdAt: string;
+}
+
+export interface BusinessCatalogue {
+    version: number;
+    liveVersion: number | null;
+    planId: string;
+    planName: string;
+    basePlanId: string;
+    pricePaise: number;
+    planPricePaise: number;
+    planOverride: {
+        id: string;
+        planKey: string;
+        expiresAt: string | null;
+    } | null;
+    pendingMove: { planId: string; version: number; from: string } | null;
+    plans: { id: string; name: string }[];
+    modules: CatalogueModuleRow[];
+}
+
+export interface BusinessPlan {
+    subscription: {
+        status: string;
+        plan: {
+            id: string;
+            key: string;
+            name: string;
+            version: number;
+            interval: string;
+        };
+        provider: string | null;
+        currentPeriodEnd: string | null;
+        cancelAtPeriodEnd: boolean;
+    } | null;
+    /** Null while the catalogue doesn't reach the business. */
+    catalogue: BusinessCatalogue | null;
+    legacyReason: string | null;
+    /** Every live override, newest first. */
+    overrides: BusinessOverride[];
+    /** Limits no catalogue row covers, or every key off the catalogue. */
+    limits: {
+        key: string;
+        planValue: number | boolean | null;
+        effective: number | boolean | null;
+        usage: number | null;
+        override: { id: string; value: number; expiresAt: string } | null;
+    }[];
+}
+
 export interface BusinessView {
     facts: {
         id: string;
@@ -91,21 +169,7 @@ export interface BusinessView {
             dependencies: string[];
         }[]
     >;
-    plan: Panel<{
-        subscription: {
-            status: string;
-            plan: { id: string; key: string; name: string; version: number };
-            currentPeriodEnd: string | null;
-            cancelAtPeriodEnd: boolean;
-        } | null;
-        limits: {
-            key: string;
-            planValue: number | boolean | null;
-            effective: number | boolean | null;
-            usage: number | null;
-            override: { id: string; value: number; expiresAt: string } | null;
-        }[];
-    }>;
+    plan: Panel<BusinessPlan>;
     activity: Panel<
         {
             id: string;

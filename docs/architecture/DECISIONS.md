@@ -121,6 +121,9 @@ Unless an entry says otherwise, its status is **Proposed — requires audit revi
 - Consequences: sender cost, reputation and compliance stay with each Organization while users can preview/test templates before provider setup. The test-send path requires strict recipient, rate-limit and labeling controls.
 - Migration: retain the identity email sender, add the restricted self-test flow, then add Organization provider connections and business delivery records.
 - Amended 2026-09-26 by [DEC-037](#dec-037-a-businesss-customers-sign-in-on-its-own-site-with-a-code-one-account-per-business): **Saroh's identity email also sends the sign-in codes for a business's customer accounts**, in the business's name. That is still identity mail. Every other message to a business's customers goes through the business's own provider, as before.
+- Amended 2026-10-06 by [DEC-086](#dec-086-saroh-sends-a-businesss-customer-notifications-until-it-connects-its-own-email): **until a business connects its own email provider, Saroh's email sends its customer notifications** (booking confirmations and the like). Once it connects one, its provider sends them, as above.
+- Reaffirmed 2026-10-07 (owner): **a business's messages to its customers go only through its own connected email provider**, review invitations included; Saroh's identity email keeps only sign-in codes and the email-changed notice (ADR-011). DEC-086 is reversed and its code stays off.
+- Amended 2026-10-07 (owner) — **who sends what: whoever is speaking sends it.** (A) Saroh to its own users — sign-in, verification, password and email changes, account deletion, team invitations, Saroh's own billing mail, the waitlist — and (B) Saroh to a business about the business — enquiry alerts and the team alerts (new order, booking, failed payment, someone joined), which move from the business's provider to Saroh — go from **Saroh**. (C) A customer's sign-in on a business's site: with Saroh's built-in customer accounts, **Saroh** sends the codes (‹Business› via Saroh, ADR-011); a business that brings its own login system (Firebase, Auth0, Google or GitHub sign-in, phone OTP) has that system send its own, and Saroh sends nothing — a later feature. (D) A business to its customers — invoices, booking and order notices, waitlist offers, autopay mail, review invitations, marketing — only through **the business's own connected provider**; with none, nothing is emailed. The workspace asks owners and admins to connect their email provider so their customers get emails. Both are built: team alerts from Saroh (#849: `sendTeamAlertEmail`, fixed words and cleaned names only), and that prompt (#850: Home's Needs you and Settings › Providers, from `GET …/comms-providers/email-setup`; Connect for `comms:manage`, or on a plan that can't connect one, DEC-091, See plans for `billing:read`; gone once one is connected), whose note also says why an invoice or a review invitation can't be emailed.
 
 ## DEC-012 Analytics event model
 
@@ -257,7 +260,7 @@ Unless an entry says otherwise, its status is **Proposed — requires audit revi
 
 ## DEC-025 Vercel for Saroh-managed multi-tenant sites
 
-**Status: Accepted — 2026-09-24; implementation pending** — see [ADR-009](./adr/ADR-009-vercel-managed-multi-tenant-sites.md)
+**Status: Superseded by DEC-107 — 2026-10-08** (was Accepted 2026-09-24) — see [ADR-009](./adr/ADR-009-vercel-managed-multi-tenant-sites.md)
 
 - Context: businesses need customer-facing sites using Saroh modules without managing hosting accounts or repositories.
 - Decision: one Saroh-owned Vercel project serves `*.saroh.app` and verified custom domains from the shared Next.js application. Customer-facing server routes call the Saroh business API; only that API accesses the database. R2 remains the storage integration.
@@ -330,6 +333,8 @@ Unless an entry says otherwise, its status is **Proposed — requires audit revi
 - Consequences: sold entries come from orders only; a fulfilled refund puts nothing back unless a return is recorded.
 - Amended 2026-09-25 (plan U2): **when stock is promised** — an order made by staff (pay later, on collection, payment link) promises its units when it is made; an online checkout promises only when it is paid, and a cart or unpaid checkout holds nothing. If two online payments race for the last unit, the loser is refunded in full automatically ("Sorry, it sold out while you were paying — your money is on its way back."). A refund releases units only once the provider confirms it, per line and never more than the line holds. A refund after fulfilment can "Put N back in stock" (off by default), writing a Returned entry. **Count and move stock** is held by Owner and Admin (and anyone with `store:write`); custom roles may be given it.
 - Amended 2026-09-25 (U6, user): **stock tracking can be switched off per product and for the business** (Owner/Admin, `store:write`); an untracked product has no count and sells **unless it is marked Sold out by hand**. The hand-marked Sold out is set per storefront on the product's listing, refuses new shop and staff orders there until it is marked available again, leaves open orders alone, writes no stock entry, and may be set by anyone with `inventory:write`. Turning tracking on clears it.
+- Amended 2026-10-06 (owner: "Online needs a paid plan; Free takes money offline"): **an order placed at the site's checkout to be paid at the handover** — "Pay when you collect" for a pick-up, "Pay on delivery" for a local delivery, never a shipment — **is made as a staff pay-later order is**: unpaid, its units promised when it is made, real at once (Orders, the month's orders count, the team's New order alert), never closed as an abandoned checkout, and invoiced when staff mark it paid (DEC-023). Its kitchen runs before the money; only the handover waits for it. A plan without online payments always offers it, as the only way to pay; a plan with them offers it beside online only where the location turns it on (off by default). Like a pay-later order, nothing releases its units on a timer: staff cancel it. An account has at most three waiting at once.
+- Amended 2026-10-06 (owner, R34): **such an order still unpaid and not collected or delivered three days after it was placed** — whole days in the business's zone (DEC-033), so from the start of the third day after — **shows on Home under Attention** ("Not collected: 3 days", the order and the customer, a link to it; the days count up) **and the team is told once** (the New order alert row: the bell, and email to whoever chose it, through the business's own provider). **Nothing cancels on its own**: staff cancel it (the usual cancel, which puts the stock back) or keep waiting, and the Home row stays until it is paid, handed over or cancelled; the alert is never repeated. Order Detail's banner says "Not collected for N days" with Mark paid and Cancel order…. Code: `orders/uncollected.ts`, `home/home-uncollected.ts`, `notifications/uncollected-alert.ts`.
 - Migration: `StockEntry` and a small check-resolutions table (F4, F5).
 
 ## DEC-033 A business keeps time in its own zone, offered from the browser, India until set
@@ -982,6 +987,7 @@ Unless an entry says otherwise, its status is **Proposed — requires audit revi
 - Context: the dev API answered on `dev-api.saroh.in`, so its session cookie was set for `.saroh.in` — the same name and domain as production's, sent to both. Two-level names (`app.dev.saroh.in`) fail TLS on Cloudflare's free certificate, and the dev environment was open to anyone who found it.
 - Decision:
     - `development` deploys to **saroh.io** (`app.`, `accounts.`, `admin.`, `api.` and the apex); merchant sites stay on `*.dev.saroh.app`. saroh.io may later give way to a dedicated domain such as saroh.dev.
+    - **Amended 2026-10-07 (owner):** `saroh.app` moved to Cloudflare DNS, whose free certificate covers one level, so dev merchant sites moved from `*.dev.saroh.app` to **`<address>.saroh.io`**, served by the Cloudflare Worker `saroh-sites-dev` (deployed from `development` by `deploy-sites.yml`). The zone's own hosts (`api`, `app`, `admin`, `accounts`, `www`, `media`) have no-Worker routes; the apex stays dev's marketing site, so the renderer's apex pages (preview and review links) have no dev host until the dedicated dev domain arrives. `RENDERER_URL` on the dev API is `https://saroh.io`; `media` is reserved there. `saroh.app` serves production only.
     - Dev's session cookie has its own prefix (`AUTH_COOKIE_PREFIX`); production's is unchanged.
     - The dev apps admit only browsers that opened a page with `?access=<key>` (`DEV_ACCESS_KEY`); everyone else lands on the same page in production.
     - A `development`-branch build refuses to start without the dev environment's variables, as a production build does without production's.
@@ -1000,3 +1006,217 @@ Unless an entry says otherwise, its status is **Proposed — requires audit revi
     - Migration `20261022110000_invoice_seller_frozen` backfilled every invoice that is not a draft from today's settings — what its paper printed until then. A row still without them (written outside the API, like a seed) falls back to today's rather than print no seller.
     - **The logo stays live**: it is branding, not a particular rule 46 asks a tax invoice to carry, and a business replacing its logo expects its paper to follow.
 - Consequences: what is sent _now_ still names the business as it is now — the invoice email's sender line, an order's pay link and the booking page are not issued paper. `printedSeller` (API `invoices/invoice-paper-view.ts`, app `lib/invoices/seller.ts`) is the one rule.
+
+## DEC-083 Customers get the invoice PDF: attached to its email and downloadable from the pay link and receipts
+
+**Status: Accepted — 2026-10-05** · user · supersedes round-2 default 106 (the pay page keeps no PDF)
+
+- Context: only the merchant could download an issued invoice's PDF (D16, default 37). The customer got a link by email, and a pay page or receipt with the browser's print. Default 106 had dropped the pay page's PDF.
+- Decision:
+    - **One PDF.** The customer gets the same PDF the merchant downloads: the issued paper, the seller as at issue (DEC-082), the business's own name and logo, no Saroh brand. Drawn on request and never stored (`invoices/issued-invoice-pdf.ts`).
+    - **Attached to the invoice email**, the send and every reminder. The send job draws it as it hands the email to the business's own provider (Saroh's email is still never used). Resend takes attachments; the SendGrid and SMTP relays, reached through the same Resend-shaped request, are not given one. Where the provider can't carry it, or the PDF can't be drawn or is over 5 MB, the email goes with its link alone, as before. A send is never failed for its attachment.
+    - **Download PDF on the pay link** (`GET /public/invoices/:token/pdf`): the token alone, found by its hash as the pay read is; a replaced or revoked link, a draft and a void invoice are a 404. Limited per caller as the pay read is, and to 10 drawings per invoice per 10 minutes. `Content-Disposition: attachment`, named as the merchant's (`pdfFileName`), `Cache-Control: private, no-store`, `nosniff`. saroh.app asks it server to server from `/pay/<token>/pdf`, so the token never goes from the browser to the API.
+    - **Download PDF on a receipt** (`GET /public/site-accounts/me/receipts/:id/pdf`): the customer's session and the site's relay, exactly as the receipt's read; anyone else's invoice is a 404.
+    - On saroh.app it sits beside Print where the page offers a copy (a business that doesn't take payment online, and receipts), and as a quiet line under the pay page's own actions otherwise, in the business's `--site-*` tokens.
+    - **Order pay links** (`/pay/o/<token>`) get none: the page is the order, not a paper, the link retires once the order is paid online, and an order can carry an invoice, a supplementary invoice and credit notes. The customer's order invoices are in their receipts, with the PDF.
+- Consequences: the invoice email's words are unchanged — they don't promise an attachment a provider may not carry. A provider adapter that learns to carry attachments says so (`takesAttachments`) and starts sending it.
+
+## DEC-084 A business that said it is registered names its type before it goes live
+
+**Status: Accepted — 2026-10-05** · user · from the pre-launch list (2026-09-28)
+
+- Context: setup's "Registered" chip saved nothing, so a registered business could go live with no legal type (Pvt Ltd, LLP, partnership, …) and the checklist could not tell it from one never asked.
+- Decision: setup stores the answer (`BusinessProfile.legallyRegistered`). A business that said Registered and takes money or invoices gets a "Choose your business type" step on its go-live checklist (Settings and Home) until it picks one. Every other business gets a gentle suggestion in Settings, never a block.
+- Consequences: businesses set up before this release read as "not asked" (the old answer was never saved), so they get the suggestion only. The API must deploy before the app: an older API refuses the new field.
+
+## DEC-085 The API sends its email through Amazon SES in Mumbai
+
+**Status: Accepted — 2026-10-06** · user · in conversation
+
+- Context: the API sent identity mail and site sign-in codes through a Google Workspace account over SMTP. A personal mailbox is the wrong sender for a product's transactional mail (sending limits, one person's credentials).
+- Decision: the `SMTP_*` set points at Amazon SES in `ap-south-1`, next to the API's servers in India. `saroh.in` sends with SES's DKIM and a `mail.saroh.in` MAIL FROM domain; account-level suppression stops mail to addresses that bounced or complained. The credentials can only send, only from `@saroh.in`. Google Workspace stays the mailbox people write to. The code transport is pooled (two connections at most), so a burst of codes reuses an open connection. No code path changed: the switch was configuration.
+- Consequences: the privacy page lists Amazon Web Services (SES) for sending and Google Workspace for our mailboxes (dated 6 Oct). Bounce and complaint notices go to SES, not to a webhook: nothing in Saroh marks an address undeliverable yet, which is fine at today's volume and is the next step if bounces grow. Rolling back is a configuration change on the host.
+
+## DEC-086 Saroh sends a business's customer notifications until it connects its own email
+
+**Status: Reversed — 2026-10-07 (owner)** · was Accepted 2026-10-06 · user · in conversation · built 6 Oct for the booking notices (U1–U4), behind the `SAROH_BUSINESS_EMAIL` flag, off by default, and left off
+
+- Context: DEC-011 sends a business's messages to its customers only through a provider the business connects. Most new businesses connect none, so their customers get no booking confirmation or order update by email at all.
+- Decision: while a business has no connected email provider, Saroh's own email (Amazon SES, DEC-085) sends its customer notifications: booking confirmations and the other transactional messages the business would send through its provider. When the business connects a provider, its provider sends them and Saroh stops. Marketing and broadcasts never go through Saroh.
+- Settled with the owner the same day: the booking notices (confirmed, moved, cancelled) come first. Each email Saroh sends counts against a monthly plan allowance; Free gets a small allowance and Grow and Pro more, with the numbers kept only in the plans catalogue. At the allowance, or when it can't be read, Saroh does not send (the customer's account message still stands). Mail goes from its own subdomain (`bookings@notify.saroh.in`, own DKIM and MAIL FROM) as "‹Business› via Saroh", replies to the business. A separate AWS account comes only if volume grows, since SES judges reputation per account.
+- Settled with the owner after the code review (6 Oct): Saroh sends at most 3 emails about one booking in any 24 hours, so a customer moving a booking again and again can't drain the business's allowance through Saroh's address (past it the account message still stands and nothing is counted); the business's own provider has no such cap. A plan cell marked soft gives Saroh no allowance, since a soft cap never stops a send.
+- Amended 2026-10-06 (owner): **a business connects its own email provider on Grow and Pro only.** The catalogue's `integrations` row decides (a plan without it, or at its cap, can't connect one); Free relies on Saroh's allowance and upgrades to get its own. Settings and the allowance's notices offer connecting only when the plan has room for it, read by the connect's own check (`MeteringService.hasRoom`), and otherwise lead with seeing plans.
+- Still open: review invitations (MARKETING_CLAIMS D11), and the other notices after booking emails have run clean.
+- Consequences: the booking notices (confirmed, moved, cancelled) go through Saroh when the rule allows: no provider of its own, the business's flag on, an allowance with room, and no global stop. Every other notice keeps DEC-011's rule: no provider, no customer email.
+- **Reversed 2026-10-07 (owner).** (1) A business's messages to its customers go only through the business's own connected email provider; Saroh sends none of them. The code built for this decision (`sarohMaySend`, the Saroh sender, the allowance, Settings' "Booking emails" block) stays in place and stays off: the `SAROH_BUSINESS_EMAIL` flag is not switched on for any business. (2) On Free, which can't connect its own email (DEC-091), customers get no emails; they see their updates in their account on the business's site. That is intended. (3) Review invitations go through the business's own provider only; with no connected email provider, no invitation is sent (settles MARKETING_CLAIMS D11). (4) Unchanged: a site's sign-in codes and the email-changed notice stay on Saroh's own identity email (ADR-011).
+
+## DEC-087 An in-person booking is offered only inside the business's opening hours
+
+**Status: Accepted — 2026-10-06** · user · from #820
+
+- Context: opening hours are kept per walk-in storefront (`Store.kind` SHOP, `openingHours`; Settings › Hours writes every storefront), but the slot engine never read them. Free times came only from each person's hours, or a service's own hours, so a business could offer times it says it is closed.
+- Decision: when a business has a SHOP storefront with opening hours, every in-person booking (a service that is `IN_PERSON`, or `EITHER` booked in person) is offered only inside those hours: a person's or service's hours are cut to them. Online bookings (`ONLINE`, or `EITHER` booked online) are not cut. A business with no SHOP storefront, or none with hours set, works as before. If its storefronts' hours differ, a time is offered when any of them is open.
+- Consequences: the Availability page shows the hours that fall outside opening hours as not bookable, and says why, so the merchant can see the cut. Bookings already made are never moved or cancelled. Supersedes nothing.
+
+## DEC-088 The business decides how a booking is paid: online, at the desk, or both
+
+**Status: Accepted — 2026-10-06** · user · from #821 and #822
+
+- Context: the booking page offered "pay now" whenever Payments was on and a provider connected, and "Pay at the desk" only when no deposit was due. The business had no say, and a deposit with no provider left a service that couldn't be booked online at all, while the summary still showed a desk line (#822).
+- Decision: Booking rules gain "How people pay when they book": Online, At the desk, or Both (default Both, which keeps today's behaviour). The booking page offers only the methods the business allows, and online only when a provider can take it. A deposit or full price at booking needs online: when online isn't allowed or no provider is connected, the service editor says so where the deposit is chosen (#821), and the booking page never shows a payment line it can't honour.
+- Consequences: existing businesses read as Both. One setting for the whole business, beside the other booking rules, since bookings aren't tied to a storefront.
+
+## DEC-089 A deposit that can't be taken online follows the business's payment setting
+
+**Status: Accepted — 2026-10-06** · user · amends DEC-088
+
+- Context: DEC-088 blocked a booking whose service asks a deposit (or the full price) at booking whenever online payment wasn't possible, with "‹business› can't take the deposit online right now. Get in touch with them to book." The pricing line (mkt/plan-deposits) took the opposite view: book it and pay at the desk.
+- Decision: the business's "How people pay when they book" decides. With Both or At the desk, a deposit that can't be taken online (desk only, Payments off, or no provider) is paid at the desk: the booking goes through as pay at the desk, and the summary shows that line. With Online only, the booking page says to get in touch and the booking can't be made, as before.
+- Consequences: the API accepts DESK for a deposit service whenever the business allows the desk and online isn't possible. The service editor's warning says what will happen (paid at the desk, or can't be booked online). Supersedes the blocking part of DEC-088 for Both and At the desk.
+
+## DEC-090 A template carries its own exact palette and type scale
+
+**Status: Accepted — 2026-10-06** · owner · amends [DEC-046](#dec-046-brand-and-fonts-are-their-own-track-and-sarohs-fonts-stop-reaching-merchant-sites-now)'s curated catalogue, for templates only · industry templates plan (U1b fidelity)
+
+- Context: the first two industry templates could not match their designs. Website › Style holds curated swatch keys (six rows of five) and five sliders, and a design is drawn in exact colours no row holds (the blog's red `#9C2A18`, the ceramics studio's deep green `#1F3D2B`, its page `#F4F1E8` and hairlines), with a display size, body size, reading width and small wide-tracked section labels the heading-scale slider cannot express, and 1px hairline gaps under the 6px slider floor.
+- Decision: **a template's colourway may carry its own exact palette and a small type scale.** `Site.style.palette` holds one `#RRGGBB` colour per `--site-*` role (page, card, text, body, quiet text, hairline, accent and its text, hero, call-to-action band and footer, each with its text); every text pairing is checked to 4.5:1 and refused by field otherwise. `Site.style.type` holds a display size (40–72px), a body size (15–19px), a reading width (52–76ch) and a section-title style (`plain`, `eyebrow`, `eyebrowAccent`), refused outside those bounds. **Merchants still choose only from curated choices**: Website › Style lists the site's template's colourways as named options beside the swatch rows, and the API refuses a palette or type scale that is neither one of those colourways' nor the one the site already holds. There is no colour picker, and the type scale has no control of its own. The grid gap may go down to 1px for a template; the merchant's slider still starts at 6px.
+- Consequences: the colours a page wears are still the merchant's `--site-*` layer, never Saroh's. The publisher turns each hex into the HSL triple the layer already carries, so the renderer's guard is unchanged and no `#` reaches a stylesheet. Blocks read the type scale through `--site-display-size`, `--site-body-size` and `--site-measure` with today's sizes as the fallbacks, and section titles carry `data-site-title` for the eyebrow, so an untouched site renders exactly as before. Section headings use the site's heading face throughout. Product grid gains a `plates` look and gallery and projects a caption placement `over` the photo, each on a bounded band. Reset returns a template site to the colourway it was made in.
+- Migration: none. Both fields are optional JSON inside `Site.style`.
+
+## DEC-091 A business connects its own email and payment accounts on a paid plan
+
+**Status: Accepted — 2026-10-06** · user · from the DEC-086 email work and the plan checks on saroh.io
+
+- Context: the catalogue's `integrations` row ("Third-party connections") meters connected payment and messaging providers, but it was off on every plan. With plan rules on, no business could connect its own email provider or its Razorpay or Cashfree account, which contradicts DEC-086's "connect your own email" and Grow's online payments.
+- Decision: the row is now "Your own email and payment accounts". It is included with no cap on paid plans and locked on Free. Payment and messaging providers both count towards it. Free relies on Saroh's small booking-email allowance (DEC-086) and takes money offline, and upgrades to connect its own.
+- Consequences: the published catalogue needs a new version with the row on for paid plans before plan rules are switched on anywhere. Settings and the Saroh-email notices on Free offer an upgrade rather than "Connect your email". The sample catalogue (`seed.ts`) follows with no caps.
+- Amended 2026-10-07 (owner): DEC-086 is reversed, so Free has no Saroh booking-email allowance to rely on. A Free business's customers get no emails; they see their updates in their account.
+
+## DEC-092 Taking payment online is not a setup step on a plan without it
+
+**Status: Accepted — 2026-10-06** · user · from #835
+
+- Context: on a plan without online payments, the "Ready to take payments" checklist (Settings › Business) and Home's "Get ready to take money" counted "Take payment online" as a step left (#835). Nothing in setup could finish it, so a Free business could never reach all done.
+- Decision: that step is not counted. Both checklists show it beside the steps, outside the count and the bar, as "Comes with ‹plan›" when the catalogue's `payments` row names the plan that has it, otherwise "Comes with a paid plan", with See plans to `/settings/billing#change-plan`. Payments' other steps (connect, finish connecting, reconnect) still count on a plan that takes payment online.
+- Consequences: `readyChecklist` returns the plan's asides as `outside`, apart from `done` and `total`; `loadReadyChecklist` and `loadSettingsChecklist` read billing access only on such a plan, best-effort. Once every counted step is done the checklists hide, aside included; the plan page and the Payment panel still say it.
+
+## DEC-093 A paid plan starts with a nominal first month on autopay, for a 12-month term
+
+**Status: Accepted — 2026-10-07** · user · from the UX audit (UX-003, D1/D2)
+
+- Context: the plan checkout's quote said "30-day free trial, nothing charged today", while Razorpay took a small mandate check. Monthly subscriptions were created as open-ended mandates running for years, and the yearly plan as a yearly autopay. None of it matched the pricing decided on 5 Oct.
+- Decision: after launch, a new paid plan starts with a nominal first month and autopay. The checkout names the mandate check honestly, and says if it is refunded. A monthly plan runs for 12 charges and then renews with one tap. A yearly plan is a single payment for the year. The launch offer comes from the catalogue, never fixed text.
+- Consequences: the subscription is created with a 12-charge limit and the yearly plan as a one-time order. The checkout and Plan and billing describe exactly what is charged today and later. Returning from Razorpay checks the payment, without waiting for the webhook. Builds #803.
+
+## DEC-094 One website per business at launch, on every plan
+
+**Status: Accepted — 2026-10-07** · user · from the UX audit (D3)
+
+- Context: the catalogue sold Pro with more than one website, but the app allows one per business.
+- Decision: one website on every plan for launch. The Websites row is hidden from the pricing page, and the Website row says "your own domain". More websites per business is future work.
+- Consequences: the catalogue on each instance needs a new version with the row changed before the pricing page is live.
+
+## DEC-095 Free's monthly booking cap counts only bookings customers make online
+
+**Status: Accepted — 2026-10-07** · user · from the UX audit (D5)
+
+- Context: Free's monthly bookings cap also refused bookings the owner made at the desk, and customers learned bookings were paused only after filling in the whole form.
+- Decision: the cap counts bookings customers make on the business's site. Bookings staff make in the workspace are never capped. Past the cap, the booking page says up front that online booking is paused, before the form.
+- Consequences: metering filters by where a booking came from. The booking page reads the cap state before showing the form.
+
+## DEC-096 Opening hours limit in-person booking times for every business
+
+**Status: Accepted — 2026-10-07** · user · amends DEC-087 · from the UX audit (UX-009, D8)
+
+- Context: DEC-087 cut booking times only to walk-in (SHOP) storefronts' hours. Settings › Hours saves to the business's hours shown in the site header, so a business with no walk-in location offered times outside the hours its own site displays.
+- Decision: the hours set in Settings › Hours limit in-person booking times for every business, whatever its storefronts. Online-only sessions are not cut, as in DEC-087.
+- Consequences: one source of opening hours for the header, the booking page and the slot engine. Bookings already made are never moved.
+
+## DEC-097 Possible duplicate contacts are offered to staff to merge, never merged automatically
+
+**Status: Accepted — 2026-10-07** · user · keeps DEC-049 · from the UX audit (UX-013)
+
+- Context: a customer signing in on a merchant site gets a separate contact unless the existing contact's email was already verified (DEC-049). The audit saw duplicates as a bug.
+- Decision: DEC-049 stands, for safety: a shared or mistyped inbox must not open someone else's history. Staff see "This may be the same person" with a merge action on both contacts, and merging is their choice (ADR-011: nothing merges silently).
+- Consequences: a merge prompt on the contact pages, backed by an email match. Merging keeps both histories.
+
+## DEC-098 Counter money follows permissions, never role names
+
+**Status: Accepted — 2026-10-07** · user · from the UX audit (D7)
+
+- Context: seeing amounts and recording payments at the counter was decided partly by role name (Owner, Admin, Member).
+- Decision: what a person can see and do with money is decided only by the permissions their role carries, as set by the owner or an admin. No screen or endpoint checks a role name for money.
+- Consequences: every role-name check for money is replaced by its permission (ADR-008). Built-in roles keep their default permissions.
+
+## DEC-099 Custom roles are a Pro feature; class packs aren't offered yet
+
+**Status: Accepted — 2026-10-07** · user · from the UX audit
+
+- Decision:
+    - Custom roles are included on Pro only. Free and Grow can't create them or give a role permissions beyond the built-in ones (taking permissions away is never blocked).
+    - Class packs aren't offered on any plan for now. The module is hidden like Automations (DEC-068), and existing data is kept.
+- Consequences: the catalogue's Custom roles row is off on Free and Grow, and the class packs module joins the not-offered list.
+
+## DEC-100 The 12-month term ends with a request to pay; paying resubscribes
+
+**Status: Accepted — 2026-10-07** · user · clarifies DEC-093
+
+- Decision: a monthly plan's 12 charges, or a yearly plan's year, run to the end of the term. Before the end the owner is asked to pay for the next term, and paying resubscribes them for another term. The first month is priced before GST, like every Saroh price.
+- Consequences: the renew prompt opens in the term's last 30 days. A business that doesn't pay moves to Free at the term's end, with the move-down rules (#800/#801).
+
+## DEC-101 A release going live closes its review; footers carry a contact email
+
+**Status: Accepted — 2026-10-07** · user
+
+- Decision:
+    - When a site change or test release goes live, any open review request for it is closed.
+    - Saroh's own sites show contact@saroh.in as the contact address.
+    - A merchant's site footer shows the business's own contact email when the business has added one.
+
+## DEC-102 The Saroh credit on merchant sites: Free only
+
+**Status: Accepted — 2026-10-07** · user · from the UX audit (D4)
+
+- Decision: Free sites show "Made with Saroh" in the footer, linking with the business's referral code. Paid plans show no Saroh credit.
+- Consequences: the renderer reads the plan to choose the footer credit, replacing the "Runs on Saroh" line every site shows today.
+
+## DEC-103 Publishing needs approval is a Pro feature
+
+**Status: Accepted — 2026-10-07** · user · from the UX audit (D9)
+
+- Decision: the "Publishing needs approval" website setting is included on Pro only. A teammate's site edits wait for an owner's or admin's approval before going live. The setting is hidden on Free and Grow, not upsold from a switch that does nothing.
+- Consequences: the catalogue's approval row is included on Pro. An approval already switched on, on a plan without it, stops applying, and publishing goes through as normal.
+
+## DEC-104 Customers can use discount codes at a merchant site's checkout
+
+**Status: Accepted — 2026-10-07** · user · from the UX audit (D12)
+
+- Decision: on every plan that sells on its website, the site's bag and checkout accept the merchant's discount codes from Sell › Discounts, with the same rules as at the counter.
+- Consequences: the checkout quote validates and applies a code, and orders record the code used.
+
+## DEC-105 Team seats count people who can change things; view-only people have their own limit
+
+**Status: Accepted — 2026-10-07** · user · from the UX audit (D6)
+
+- Decision: anyone whose role carries a write permission (books, sells, edits), including bookable staff, uses a team seat. People whose role carries only view permissions don't use a seat. They count toward a separate per-plan limit, the one Reviewers use today, which can change by policy.
+- Consequences: metering classifies a member by their role's permissions, not its name. The catalogue's Reviewers row becomes the view-only people limit.
+
+## DEC-106 Storefront roles follow permissions for money too
+
+**Status: Accepted — 2026-10-07** · user · amends DEC-048 · extends DEC-098
+
+- Context: DEC-048 let a storefront's Admin, Manager or Editor take and change that storefront's orders, recording payment included, because of their storefront role name.
+- Decision: on a storefront too, seeing amounts and recording or taking payment depend only on the permissions the person's roles carry. No storefront role name grants money.
+- Consequences: the storefront role checks in the stores service give way to permissions. A storefront role that should take payments needs a role carrying the payment permission.
+
+## DEC-107 Every Saroh web app runs on Cloudflare Workers, deployed from GitHub Actions
+
+**Status: Accepted — 2026-10-08** · owner · supersedes DEC-025 · epic #864
+
+- Context: merchant sites render per request, and Vercel bills that traffic by data sent, requests and origin transfer; the account's daily build limit also stopped deploys on 7 Oct. The merchant sites moved to a Worker on 7 Oct (`saroh.app` production, `<address>.saroh.io` dev).
+- Decision:
+    - **The marketing site, workspace, accounts and admin move too.** Each app is one Worker per environment (`saroh-<app>` and `saroh-<app>-dev`), built with OpenNext. Vercel is no longer used once the move is done.
+    - **GitHub Actions builds and deploys** (`deploy-sites.yml`, `deploy-frontends.yml`): `development` → the dev Workers, `main` → production, only the apps whose code or packages changed. Settings that aren't secret live in each app's `wrangler.jsonc` and feed the build too; secrets live in the GitHub environments `cloudflare-development` (branch `development` only) and `cloudflare-production` (`main` only) and are copied onto the Worker on every deploy, never printed.
+    - **Dev stays private.** The dev apps keep the access-key gate (DEC-081): without the key a visitor lands on the same page in production. A dev app without its key is never deployed.
+    - **The marketing site is fully static.** Every page is built at deploy time and served from the build; nothing regenerates at request time (a Worker can't read `content/` or compile MDX while serving). Pricing and the launch offer are read when the site is built, and a deployment's build fails rather than publish the placeholder. Dated pages appear through a nightly rebuild at 00:00 IST; a pricing publish starts a build (`SITE_DEPLOY_GITHUB_TOKEN` on the API).
+- Consequences: the visitor's address comes from `cf-connecting-ip` behind Cloudflare. Routes are set to fail open, so a failing Worker falls through to the origin while Vercel is still there. `VERCEL_ENV` / `VERCEL_GIT_COMMIT_REF` keep their names for now: the apps' checks read them and the deploy sets them.

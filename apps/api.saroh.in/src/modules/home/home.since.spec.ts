@@ -42,6 +42,8 @@ function db(
         bookings?: number;
         reviews?: number;
         money?: { currency: string; total: string | null; count: number }[];
+        /** Credit notes in the window (UX-061): what went back. */
+        refunded?: { currency: string; total: string | null; count: number }[];
         anything?: boolean;
     } = {},
 ) {
@@ -62,12 +64,17 @@ function db(
         },
         invoice: {
             findFirst: first,
-            groupBy: jest.fn().mockResolvedValue(
-                (over.money ?? []).map((m) => ({
-                    currency: m.currency,
-                    _sum: { total: m.total },
-                    _count: { _all: m.count },
-                })),
+            groupBy: jest.fn((args: { where: { kind?: unknown } }) =>
+                Promise.resolve(
+                    (args.where.kind === "CREDIT_NOTE"
+                        ? (over.refunded ?? [])
+                        : (over.money ?? [])
+                    ).map((m) => ({
+                        currency: m.currency,
+                        _sum: { total: m.total },
+                        _count: { _all: m.count },
+                    })),
+                ),
             ),
         },
     };
@@ -208,6 +215,7 @@ describe("readSince", () => {
                 // Real orders only, as the Orders list counts them (H-3).
                 NOT: {
                     placedOnline: true,
+                    payOnHandover: false,
                     paymentStatus: "UNPAID",
                     paymentIntents: { none: { status: "SUCCEEDED" } },
                 },
@@ -226,6 +234,21 @@ describe("readSince", () => {
             paidAt: { gte: since },
             kind: { not: "CREDIT_NOTE" },
         });
+    });
+
+    it("says what was taken net of what went back (UX-061)", async () => {
+        const items = await readSince(
+            db({
+                money: [{ currency: "INR", total: "1000.00", count: 3 }],
+                refunded: [{ currency: "INR", total: "250.00", count: 1 }],
+            }) as never,
+            "org_1",
+            EVERY,
+            SINCE,
+        );
+        expect(items.find((i) => i.kind === "PAYMENTS")?.amountMinor).toBe(
+            75_000,
+        );
     });
 
     it("leaves out a figure that is zero, and money that nets to nothing", async () => {

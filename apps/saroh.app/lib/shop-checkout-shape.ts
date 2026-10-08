@@ -12,9 +12,10 @@ import { isTestReleaseRefusal, TEST_RELEASE_MESSAGE } from "@saroh/site-blocks";
  * turned into the page's own words. Kept apart from `shop-checkout.ts`,
  * which reads the app's env, so they can be tested without one.
  *
- * No API text reaches the customer except the two sentences written for
- * them (a fourth open checkout, and the sold-out refund): the rest of the
- * API's messages are written for Saroh or the merchant.
+ * No API text reaches the customer except the sentences written for them
+ * (a fourth open checkout, a fourth order waiting to be paid at the
+ * handover, and the sold-out refund): the rest of the API's messages are
+ * written for Saroh or the merchant.
  */
 
 /** Whether this site takes an online order now, and how it leaves. */
@@ -23,6 +24,8 @@ export interface CheckoutOptions {
     storefront: { name: string };
     currency: string;
     ways: { type: string; label: string; fee: string | null }[];
+    /** How it can be paid; absent from an API before offline payment. */
+    payments?: { online: boolean; onHandover: boolean };
 }
 
 function isRecord(v: unknown): v is Record<string, unknown> {
@@ -39,7 +42,18 @@ const STANDINGS = new Set([
     "refunding",
     "refunded",
     "closed",
+    "to-pay",
 ]);
+const PAYMENTS = new Set(["ONLINE", "ON_HANDOVER"]);
+
+function isPayment(v: unknown): boolean {
+    return (
+        isRecord(v) &&
+        isString(v.type) &&
+        PAYMENTS.has(v.type) &&
+        isString(v.label)
+    );
+}
 
 function isWay(v: unknown): boolean {
     return (
@@ -63,6 +77,15 @@ export function isCheckoutOptions(v: unknown): v is CheckoutOptions {
     );
 }
 
+/** Where a pick-up is collected (UX-025); absent from an older API. */
+function isPickup(v: unknown): boolean {
+    return (
+        v === undefined ||
+        v === null ||
+        (isRecord(v) && isString(v.address) && isStringOrNull(v.hours))
+    );
+}
+
 function isLine(v: unknown): boolean {
     return (
         isRecord(v) &&
@@ -81,6 +104,15 @@ function isLine(v: unknown): boolean {
     );
 }
 
+/** A code's answer on the quote (DEC-104); absent from an older API. */
+function isDiscount(v: unknown): boolean {
+    if (v === undefined || v === null) return true;
+    if (!isRecord(v) || !isString(v.code)) return false;
+    return v.applied === true
+        ? isString(v.amount)
+        : v.applied === false && isString(v.reason) && isString(v.message);
+}
+
 export function isQuote(v: unknown): v is CheckoutQuote {
     return (
         isRecord(v) &&
@@ -93,19 +125,29 @@ export function isQuote(v: unknown): v is CheckoutQuote {
             (isString(v.fulfilment) && WAYS.has(v.fulfilment))) &&
         isString(v.subtotal) &&
         isString(v.delivery) &&
+        isDiscount(v.discount) &&
         isString(v.total) &&
-        typeof v.ready === "boolean"
+        typeof v.ready === "boolean" &&
+        // Absent from an API before offline payment: online only.
+        (v.payments === undefined ||
+            (Array.isArray(v.payments) && v.payments.every(isPayment))) &&
+        isPickup(v.pickup)
     );
 }
 
 export function isStarted(v: unknown): v is CheckoutStarted {
-    if (!isRecord(v) || !isRecord(v.payment)) return false;
-    const p = v.payment;
-    return (
+    if (!isRecord(v)) return false;
+    const order =
         isString(v.orderId) &&
         isString(v.orderNumber) &&
         isString(v.total) &&
-        isString(v.currency) &&
+        isString(v.currency);
+    // Paid at the handover: placed, with no window to open.
+    if (v.payBy === "ON_HANDOVER") return order && v.payment === null;
+    if (!isRecord(v.payment)) return false;
+    const p = v.payment;
+    return (
+        order &&
         isString(p.provider) &&
         typeof p.amountCents === "number" &&
         isString(p.currency) &&
@@ -143,13 +185,18 @@ const WORDS: Record<ShopProblem, string> = {
 };
 
 /** The API's error envelope: `{ error: { message, details } }`. */
-function errorOf(body: unknown): { message?: string; reason?: string } {
+function errorOf(body: unknown): {
+    message?: string;
+    reason?: string;
+    field?: string;
+} {
     if (!isRecord(body)) return {};
     const e = isRecord(body.error) ? body.error : body;
     const details = isRecord(e.details) ? e.details : {};
     return {
         message: isString(e.message) ? e.message : undefined,
         reason: isString(details.reason) ? details.reason : undefined,
+        field: isString(details.field) ? details.field : undefined,
     };
 }
 
@@ -158,7 +205,7 @@ export function problemOf(
     status: number,
     body: unknown,
 ): { ok: false; reason: ShopProblem; message: string } {
-    const { message, reason } = errorOf(body);
+    const { message, reason, field } = errorOf(body);
     const fail = (r: ShopProblem, words = WORDS[r]) => ({
         ok: false as const,
         reason: r,
@@ -169,10 +216,21 @@ export function problemOf(
     if (isTestReleaseRefusal(status, body)) return fail("test-release");
     if (status === 401) return fail("signed-out");
     if (status === 403) return fail("cant-order");
+    // A code that stopped applying, said in the customer's words (DEC-104):
+    // the checkout writes these sentences for the shopper.
+    if (
+        status === 409 &&
+        reason === "bag-changed" &&
+        field === "discountCode"
+    ) {
+        return message ? fail("bag-changed", message) : fail("bag-changed");
+    }
     if (status === 409 && reason === "bag-changed") return fail("bag-changed");
     if (status === 429) {
-        // The one limit written for the customer: a fourth open checkout.
-        return message?.startsWith("You have other checkouts waiting")
+        // The limits written for the customer: a fourth open checkout, or a
+        // fourth order waiting to be paid at the handover.
+        return message?.startsWith("You have other checkouts waiting") ||
+            message?.startsWith("You have orders waiting")
             ? fail("busy", message)
             : fail("busy");
     }
@@ -216,6 +274,13 @@ function cleanLines(v: unknown): CleanLine[] | null {
 const cleanWay = (v: unknown): string | null =>
     isString(v) && WAYS.has(v) ? v : null;
 
+/** A discount code as the API takes it, or undefined: never anything else. */
+const cleanCode = (v: unknown): string | undefined => {
+    if (!isString(v)) return undefined;
+    const code = v.trim().toUpperCase();
+    return /^[A-Z0-9_-]{1,32}$/.test(code) ? code : undefined;
+};
+
 const text = (v: unknown, max: number): string | undefined =>
     isString(v) && v.trim() ? v.trim().slice(0, max) : undefined;
 
@@ -225,12 +290,17 @@ const text = (v: unknown, max: number): string | undefined =>
  */
 export function quoteBody(
     v: unknown,
-): { lines: CleanLine[]; fulfilment?: string } | null {
+): { lines: CleanLine[]; fulfilment?: string; discountCode?: string } | null {
     if (!isRecord(v)) return null;
     const lines = cleanLines(v.lines);
     if (!lines) return null;
     const way = cleanWay(v.fulfilment);
-    return way ? { lines, fulfilment: way } : { lines };
+    const code = cleanCode(v.discountCode);
+    return {
+        lines,
+        ...(way ? { fulfilment: way } : {}),
+        ...(code ? { discountCode: code } : {}),
+    };
 }
 
 /** A start request as the API takes it, rebuilt the same way. */
@@ -242,8 +312,12 @@ export function startBody(v: unknown): Record<string, unknown> | null {
         isString(v.key) && /^[A-Za-z0-9_-]{8,64}$/.test(v.key) ? v.key : null;
     if (!lines || lines.length === 0 || !way || !key) return null;
     const body: Record<string, unknown> = { lines, fulfilment: way, key };
+    // Online unless the customer chose to pay at the handover.
+    if (v.payment === "ON_HANDOVER") body.payment = "ON_HANDOVER";
     const notes = text(v.notes, 500);
     if (notes) body.notes = notes;
+    const code = cleanCode(v.discountCode);
+    if (code) body.discountCode = code;
     if (isRecord(v.address)) {
         const a = v.address;
         const address: Record<string, string> = {};

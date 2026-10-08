@@ -31,6 +31,16 @@
     --mk-tint: 40 72.4% 94.3%; /* #FBF4E6 — the highlighted plan's column */
     --mk-soon: 40.5 90.2% 92%; /* #FDF1D8 — the "Coming soon" pill */
     --mk-line-row: 42 23.8% 91.8%; /* #EFECE5 — rules between table rows */
+    --mk-prose: 40 7% 16.9%; /* #2E2C28 — a Resources page's long-form copy */
+    --mk-ok: 150.3 59.5% 30%; /* #1F7A4D — "Available", a field that's done */
+    --mk-ok-tint: 141.4 33.3% 91.8%; /* #E3F1E8 — the "Available" pill */
+    /* The link preview tool's verdicts, its field's hint and its code block. */
+    --mk-good: 150.3 59.5% 30%; /* #1F7A4D — "Looks right", a tag that's set */
+    --mk-good-bg: 141.4 33.3% 91.8%; /* #E3F1E8 */
+    --mk-bad: 3 71.3% 32.7%; /* #8F1E18 — "Needs a fix", an error */
+    --mk-bad-bg: 9.6 64.1% 92.4%; /* #F8E3DF */
+    --mk-hint: 41.3 6.4% 51%; /* #8A857A — a field's placeholder */
+    --mk-code: 42.9 23.3% 88.2%; /* #E8E4DA — text in a code block on Ink */
 
     /* The design's three shadows: cards on hover, screenshots, the hero. */
     --mk-shadow-card: 0 10px 30px rgba(28, 28, 26, 0.08);
@@ -38,6 +48,9 @@
     --mk-shadow-hero: 0 30px 80px rgba(28, 28, 26, 0.22);
     --mk-shadow-menu: 0 24px 60px rgba(28, 28, 26, 0.16);
     --mk-shadow-zoom: 0 30px 80px rgba(0, 0, 0, 0.4);
+    /* Resources: a drawn settings panel, and an integration card on hover. */
+    --mk-shadow-panel: 0 16px 44px rgba(28, 28, 26, 0.12);
+    --mk-shadow-lift: 0 12px 34px rgba(28, 28, 26, 0.1);
     --mk-scrim: rgba(28, 28, 26, 0.82); /* behind an enlarged screenshot */
 }
 

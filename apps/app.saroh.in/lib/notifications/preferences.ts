@@ -14,8 +14,8 @@
  * has on, and says what each channel can do for them here. Only channels
  * that can deliver are offered:
  * - the bell, to someone whose role sees the inbox;
- * - email, through the business's own connected provider — otherwise the
- *   column is off, with "Connect email in Providers";
+ * - email, which Saroh sends, so it needs no provider of the business's
+ *   (DEC-011, amended 2026-10-07);
  * - WhatsApp appears only once a WhatsApp provider is connected, and even
  *   then can't be switched on: Saroh keeps no WhatsApp number for a team
  *   member, and says so.
@@ -59,12 +59,13 @@ export const ALERTS = [
         label: "Someone joins the team",
         note: "When an invite is accepted",
     },
-    // Not in the design: a test release's scheduled go-live (DEC-071, T10).
-    // The API offers it only to who can publish, with test releases on.
+    // Not in the design: a test release's scheduled go-live (DEC-071, T10),
+    // and a reviewer's verdict or notes (UX-043). The API offers it only to
+    // who can publish, with test releases on.
     {
         key: "site",
-        label: "Website goes live",
-        note: "When a scheduled go-live runs, or couldn't",
+        label: "Your website",
+        note: "A reviewer's verdict or notes, and a scheduled go-live",
     },
 ] as const;
 export type AlertKey = (typeof ALERTS)[number]["key"];
@@ -112,7 +113,7 @@ export interface AlertRow {
 
 /** A line under the heading saying why something can't be switched on. */
 export interface AlertNote {
-    id: "not-available" | "email" | "whatsapp" | "nothing";
+    id: "not-available" | "whatsapp" | "nothing";
     text: string;
     /** Where to fix it, when this person can. */
     link?: { label: string; href: string };
@@ -124,8 +125,6 @@ export interface AlertGrid {
     rows: AlertRow[];
     notes: AlertNote[];
 }
-
-const PROVIDERS_HREF = "/settings/providers";
 
 const alertOf = (key: AlertKey) =>
     ALERTS.find((a) => a.key === key) ?? ALERTS[0];
@@ -219,23 +218,6 @@ export function alertGrid(read: AlertPreferencesRead): AlertGrid {
             id: "nothing",
             text: "Nothing here reaches your role in this business yet.",
         });
-    }
-    if (rows.length > 0 && !prefs.channels.email.available) {
-        notes.push(
-            prefs.canConnect
-                ? {
-                      id: "email",
-                      text: "Email alerts go out through your business's own email provider, and none is connected.",
-                      link: {
-                          label: "Connect email in Providers",
-                          href: PROVIDERS_HREF,
-                      },
-                  }
-                : {
-                      id: "email",
-                      text: "Email alerts go out through the business's own email provider. Ask an owner to connect email in Providers.",
-                  },
-        );
     }
     if (rows.length > 0 && columns.includes("whatsapp")) {
         notes.push({

@@ -7,6 +7,7 @@
  */
 
 import { formatMoney } from "@/lib/format/money";
+import { permits } from "@/lib/organizations/permits";
 import type { resolveActiveOrganization } from "@/lib/organizations/service";
 import type { DeskTake } from "@/lib/services/desk-pay";
 import { methodWord } from "@/lib/services/desk-pay";
@@ -72,28 +73,26 @@ type Org = Awaited<ReturnType<typeof resolveActiveOrganization>>;
 
 /** `payment:manage`: may hand back money the rule keeps. */
 export function canRefundPayments(organization: Org): boolean {
-    return organization?.actions
-        ? organization.actions.includes("payment:manage")
-        : organization?.role === "OWNER" || organization?.role === "ADMIN";
+    return permits(organization, "payment:manage");
 }
 
 /** `order:read`: may open an order, a treatment's among them (E9). */
 export function canReadOrders(organization: Org): boolean {
-    return organization?.actions
-        ? organization.actions.includes("order:read")
-        : organization?.role === "OWNER" || organization?.role === "ADMIN";
+    return permits(organization, "order:read");
 }
 
 /**
  * `booking:write` and `invoice:write`: may take payment at the desk (P2),
  * the pair a booking's pay link needs too (permission matrix) — the
- * booking is the desk's, the invoice it marks paid is paper.
+ * booking is the desk's, the invoice it marks paid is paper. Asked of the
+ * role's permissions only, never its name (DEC-098); a role without them
+ * is shown Take payment disabled, with `CANT_TAKE_PAYMENTS`.
  */
 export function canTakeDeskPayments(organization: Org): boolean {
-    return organization?.actions
-        ? organization.actions.includes("booking:write") &&
-              organization.actions.includes("invoice:write")
-        : organization?.role === "OWNER" || organization?.role === "ADMIN";
+    return (
+        permits(organization, "booking:write") &&
+        permits(organization, "invoice:write")
+    );
 }
 
 const money = (cents: number, currency: string | null) =>

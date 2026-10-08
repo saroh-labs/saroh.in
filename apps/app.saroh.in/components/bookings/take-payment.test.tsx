@@ -355,9 +355,16 @@ describe("the booking page's Take ₹X", () => {
         );
     });
 
-    it("is hidden from a role that can't take it", () => {
+    it("is shown disabled, with why, to a role that can't take it (FB-1, DEC-098)", () => {
         renderDetail(detail({}), { canTake: false, canLink: false });
-        expect(takeButton()).toBeUndefined();
+        const locked = takeButton();
+        expect(locked?.textContent).toBe("Take ₹500");
+        expect(locked?.disabled).toBe(true);
+        const why = locked?.getAttribute("aria-describedby") ?? "";
+        expect(document.getElementById(why)?.textContent).toBe(
+            "Your role can't take payments — ask an owner or admin.",
+        );
+        // No desk at all (an older page): nothing to say.
         renderDetail(detail({}));
         expect(takeButton()).toBeUndefined();
     });
@@ -486,9 +493,42 @@ describe("the calendar quick look's Take ₹X", () => {
         );
     });
 
-    it("is hidden from a role that can't take it, and when nothing is left", () => {
+    it("is shown disabled, with why, to a role that can't take it (FB-1, DEC-098)", () => {
         renderPeek(diaryBooking(), { canTake: false, canLink: false });
+        const locked = peekTake();
+        expect(locked?.disabled).toBe(true);
+        const why = locked?.getAttribute("aria-describedby") ?? "";
+        expect(document.getElementById(why)?.textContent).toBe(
+            "Your role can't take payments — ask an owner or admin.",
+        );
+    });
+
+    it("says Take payment, with no figure, when the API only says something is due", () => {
+        const { take: _take, ...noMoney } = diaryBooking();
+        renderPeek(
+            { ...noMoney, toTake: true },
+            { canTake: false, canLink: false },
+        );
+        const locked = Array.from(document.querySelectorAll("button")).find(
+            (b) => b.textContent === "Take payment",
+        );
+        expect(locked?.disabled).toBe(true);
         expect(peekTake()).toBeUndefined();
+        expect(document.body.textContent).toContain(
+            "Your role can't take payments",
+        );
+    });
+
+    it("is hidden when nothing is left to take", () => {
+        renderPeek(diaryBooking({ take: null, toTake: false }), {
+            canTake: false,
+            canLink: false,
+        });
+        expect(
+            Array.from(document.querySelectorAll("button")).some((b) =>
+                b.textContent.startsWith("Take "),
+            ),
+        ).toBe(false);
         renderPeek(diaryBooking({ take: null }), {
             canTake: true,
             canLink: true,

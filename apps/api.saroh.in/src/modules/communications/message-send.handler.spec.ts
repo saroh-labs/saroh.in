@@ -14,17 +14,27 @@ jest.mock("./confirmation-stamp", () => ({
     stampConfirmedEmail: jest.fn().mockResolvedValue(false),
 }));
 
-jest.mock("@saroh/database", () => ({
-    prisma: {
+jest.mock("@saroh/database", () => {
+    const client = {
         delivery: { findUnique: jest.fn(), update: jest.fn() },
         message: { findUnique: jest.fn(), update: jest.fn() },
-        communicationProvider: { findUnique: jest.fn() },
-    },
-}));
+        communicationProvider: { findUnique: jest.fn(), updateMany: jest.fn() },
+        job: { create: jest.fn() },
+    };
+    return {
+        prisma: {
+            ...client,
+            $transaction: jest.fn((cb: (tx: typeof client) => unknown) =>
+                cb(client),
+            ),
+        },
+    };
+});
 
 import type { Job } from "@saroh/database";
 import { prisma } from "@saroh/database";
 
+import { ProviderKeysRefusedError } from "../../common/providers/provider-attention";
 import { JobHandlerRegistry } from "../jobs/job-handler.registry";
 import { encryptSecret } from "../payments/crypto";
 import { stampConfirmedEmail } from "./confirmation-stamp";
@@ -155,6 +165,74 @@ describe("MessageSendHandler", () => {
         );
     });
 
+    it("marks the connection as needing attention when the provider refuses its key, and tells the team once (UX-012)", async () => {
+        deliveryFindUnique.mockResolvedValue({ id: "del_1", status: "QUEUED" });
+        messageFindUnique.mockResolvedValue(message);
+        providerFindUnique.mockResolvedValue(sealedProviderRow());
+        const updateMany = prisma.communicationProvider.updateMany as jest.Mock;
+        const jobCreate = prisma.job.create as jest.Mock;
+        updateMany.mockResolvedValue({ count: 1 });
+
+        const fake = new FakeCommsProvider(
+            "EMAIL",
+            new ProviderKeysRefusedError("Email send failed (HTTP 403)", 403),
+        );
+        const handler = new MessageSendHandler(
+            new FakeCommsProviderFactory(fake),
+        );
+
+        // Still a failed send, retried as before.
+        await expect(handler.handle(job())).rejects.toThrow(
+            "Email send failed (HTTP 403)",
+        );
+        expect(updateMany).toHaveBeenCalledWith({
+            where: { id: "cp_1", organizationId: "org_1", attentionAt: null },
+            data: {
+                attentionReason: "KEYS_REFUSED",
+                attentionAt: expect.any(Date),
+            },
+        });
+        expect(jobCreate).toHaveBeenCalledWith({
+            data: {
+                organizationId: "org_1",
+                type: "team.alert",
+                payload: {
+                    event: "provider",
+                    channel: "EMAIL",
+                    providerId: "cp_1",
+                    since: expect.any(String),
+                },
+            },
+        });
+        expect(JSON.stringify(jobCreate.mock.calls)).not.toContain(
+            CREDS.apiKey,
+        );
+
+        // Refused again while flagged: nothing more is queued.
+        jobCreate.mockClear();
+        updateMany.mockResolvedValue({ count: 0 });
+        await expect(handler.handle(job())).rejects.toThrow();
+        expect(jobCreate).not.toHaveBeenCalled();
+    });
+
+    it("flags nothing on a provider failure that isn't about the key", async () => {
+        deliveryFindUnique.mockResolvedValue({ id: "del_1", status: "QUEUED" });
+        messageFindUnique.mockResolvedValue(message);
+        providerFindUnique.mockResolvedValue(sealedProviderRow());
+
+        const handler = new MessageSendHandler(
+            new FakeCommsProviderFactory(
+                new FakeCommsProvider(
+                    "EMAIL",
+                    new Error("Email send failed (HTTP 500)"),
+                ),
+            ),
+        );
+
+        await expect(handler.handle(job())).rejects.toThrow();
+        expect(prisma.communicationProvider.updateMany).not.toHaveBeenCalled();
+    });
+
     it("is idempotent: a re-run on an already-SENT delivery is a no-op (never double-sends)", async () => {
         deliveryFindUnique.mockResolvedValue({ id: "del_1", status: "SENT" });
 
@@ -169,6 +247,24 @@ describe("MessageSendHandler", () => {
         expect(messageFindUnique).not.toHaveBeenCalled();
         expect(deliveryUpdate).not.toHaveBeenCalled();
         expect(messageUpdate).not.toHaveBeenCalled();
+    });
+
+    it("never sends a delivery withdrawn by a resend (a review invitation's dead link)", async () => {
+        deliveryFindUnique.mockResolvedValue({
+            id: "del_1",
+            status: "CANCELLED",
+            provider: "RESEND",
+        });
+
+        const fake = new FakeCommsProvider("EMAIL");
+        const handler = new MessageSendHandler(
+            new FakeCommsProviderFactory(fake),
+        );
+
+        await expect(handler.handle(job())).resolves.toBeUndefined();
+        expect(fake.calls).toHaveLength(0);
+        expect(messageFindUnique).not.toHaveBeenCalled();
+        expect(deliveryUpdate).not.toHaveBeenCalled();
     });
 
     it("records FAILED (no send) when no provider is connected for the channel", async () => {

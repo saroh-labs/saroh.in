@@ -85,11 +85,20 @@ export const ALERT_MODULE: Record<AlertEvent, string | null> = {
 
 /** The inbox notice types each row covers. */
 export const ALERT_NOTIFICATION_TYPES: Record<AlertEvent, readonly string[]> = {
-    order: ["order.new"],
+    // R34: an order to pay on handover nobody came for in three days.
+    order: ["order.new", "order.uncollected"],
     booking: ["booking.new", "booking.moved", "booking.cancelled"],
-    failed: ["payment.failed"],
+    // UX-012: a provider that refused the business's keys.
+    failed: ["payment.failed", "provider.attention"],
     team: ["team.joined"],
-    site: ["site.live", "site.not_live"],
+    // UX-043: a reviewer's verdict, or their first note of a round.
+    site: [
+        "site.live",
+        "site.not_live",
+        "site.review.approved",
+        "site.review.changes",
+        "site.review.note",
+    ],
 };
 
 /** Which row an inbox notice type belongs to, or null (enquiries, reviews). */
@@ -137,7 +146,9 @@ export function alertOn(
 /**
  * Why a channel can't be used, when it can't:
  * - `NO_INBOX`: the person's role doesn't see the bell (`notification:read`).
- * - `NO_PROVIDER`: the business has no connected provider for it.
+ * - `NO_PROVIDER`: the business has no connected provider for it (WhatsApp
+ *   only: email alerts come from Saroh, whatever the business connected,
+ *   DEC-011 amended 2026-10-07).
  * - `NO_NUMBER`: WhatsApp is connected, but Saroh keeps no WhatsApp number
  *   for a team member, so nothing could reach them there.
  */
@@ -150,7 +161,6 @@ export type ChannelState =
 export function channelState(input: {
     channel: AlertChannel;
     seesInbox: boolean;
-    emailConnected: boolean;
     whatsappConnected: boolean;
 }): ChannelState {
     switch (input.channel) {
@@ -159,9 +169,8 @@ export function channelState(input: {
                 ? { available: true }
                 : { available: false, reason: "NO_INBOX" };
         case "email":
-            return input.emailConnected
-                ? { available: true }
-                : { available: false, reason: "NO_PROVIDER" };
+            // Saroh sends it, so it reaches anyone with a sign-in email.
+            return { available: true };
         case "whatsapp":
             return input.whatsappConnected
                 ? { available: false, reason: "NO_NUMBER" }

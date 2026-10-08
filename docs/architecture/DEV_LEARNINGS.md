@@ -2434,6 +2434,37 @@ other, never to 1. The RLS gate (`int-rls` in `pnpm prepush --all`) is what
 catches a recurrence.
 **Category**: tests · rule in `apps/api.saroh.in/test/truncate.ts`
 
+## Pricing — a publish nested a transaction the Postgres adapter can't open
+
+**Problem**: Every catalogue publish and rollback failed with "Nested
+transactions are not supported by adapter @prisma/adapter-pg: createSavepoint
+is not implemented". The unit's own gate never ran its db specs, so it shipped
+to the integration branch.
+**Root cause**: `writeCatalogueVersion` picked "open my own transaction" by
+checking `"$transaction" in db`, but a transaction client answers to it too;
+called with the publish's `tx`, it opened a second, nested transaction.
+**Fix**: two functions: `writeCatalogueVersion(prisma, …)` opens its own,
+`writeCatalogueVersionInTx(tx, …)` joins the caller's. Never decide by probing
+the client. The pricing db specs (`catalogue-writes.db.spec.ts`) pin it.
+**Category**: database · rule in `packages/database/src/pricing-catalogue.ts`
+
+## Seed — a catalogue version went live after the clock that read it
+
+**Problem**: every fresh showcase seed threw `no "pro" plan`, so the e2e stack
+never started on the marketing branch.
+**Root cause**: the base seed installed catalogue version 1 live from the wall
+clock, while the showcase reads the live plan at the clock rounded down to the
+half hour — earlier, so version 1 wasn't live yet when the showcase looked.
+**Fix**: the seed's version 1 is live from a fixed past date. A seed never
+dates something "now" that a later step reads at a different "now".
+`prepush --e2e` (fresh-seed path) is what caught it.
+**Category**: seed · rule in `packages/database/src/seed/`
+
+## E2E — a new account was sent to production's onboarding
+
+**Problem**: the first browser test to follow a sign-up into onboarding
+(`signup-from-marketing.spec.ts`) timed out on
+
 ## E2E — a new account was sent to production's onboarding
 
 **Problem**: the first browser test to follow a sign-up into onboarding
@@ -2534,6 +2565,22 @@ editor's window, and canvas lookups go through `queryCanvas`.
 code that looks up an element by id from a click uses the click target's
 `ownerDocument` — at phone or tablet width the page is in another document.
 **Category**: frontend · site editor · `apps/app.saroh.in/components/sites/editor/device-frame.tsx`
+
+## Frontend — empty and off states unreadable in dark
+
+**Problem**: In dark mode the line under "No invoices from Saroh yet" (and
+every `EmptyState`, `CapabilityOffState` and `PermissionDeniedState`
+description and note) read at about 2:1 — axe `color-contrast`, found
+checking Plan and billing (U14) in dark.
+**Root cause**: `StateCard` set its description and note in `text-neutral-600`,
+Ink 600, a light-mode cut with no dark value. The `a11y.spec.ts` audit runs
+light only, so nothing caught it.
+**Fix**: `dark:text-muted-foreground` beside it, as the `neutral` Badge
+already does (`packages/ui/src/components/ui/data-state.tsx`).
+**Rule**: A raw ramp step (`text-neutral-600`) on text needs its dark pair;
+prefer a semantic token. Check a screen's empty and failed states in dark,
+not only its full one (`saroh-four-scenes`).
+**Category**: frontend · design system · `packages/ui/src/components/ui/data-state.tsx`
 
 ## Frontend — the calendar's layout switch was 29px tall on a phone
 
@@ -2682,3 +2729,588 @@ the local run uses three integration databases; local Postgres has
 **Rule**: `docs/patterns/devops-tooling-and-deploy.md` → "Capped workers in
 the static burst".
 **Category**: tooling · gate · `scripts/prepush.sh`
+
+## Invoices — a treatment's balance printed today's seller, not its deposit's
+
+**Symptom**: a treatment's balance invoice, raised when the rest was paid
+after a deposit, printed the business's address, GSTIN and state as they
+were that day. A business that moved or re-registered between the two got
+a balance that disagreed with its deposit, and its place of supply and
+CGST + SGST vs IGST split were worked out afresh against the new state.
+**Root cause**: `ensureTreatmentBalanceInvoice` built the paper with
+`buildManualInvoice` from `loadTaxProfile`, patching only `registered` and
+(in DEC-082) the name, legal name and email from the deposit. ADR-008 says
+a correction takes its original's seller; the desk's balance, credit notes
+and supplementary invoices already did, through `buildCorrection`. Each
+frozen field added since was patched in one at a time, and the rest missed.
+**Fix**: the balance is built with `buildCorrection` from the deposit's
+row, so every frozen seller field, the place of supply and the tax type
+come from the deposit. Unit specs mock a settings change; `visits.db.spec`
+changes the profile between deposit and balance.
+**Rule**: `docs/patterns/backend-billing-and-classes.md` → "Issued paper
+never changes"; ADR-008 → "A balance after a deposit".
+**Category**: invoices · GST · `apps/api.saroh.in/src/modules/invoices/order-invoicing.ts`
+
+## E2E — phone specs passed while tables hid 200–280px sideways
+
+**Symptom**: The Phone Tables audit (5 Oct, T10) found Stock, the product
+page's tabs and a customer's orders hiding 200–280px of columns — Can sell,
+Status — on a 390px phone, while every phone spec's "no sideways scroll"
+check passed on the same screens.
+**Root cause**: The specs measured the PAGE (`documentElement.scrollWidth
+<= innerWidth`). A 600px table inside an `overflow-x-auto` card keeps the
+page exactly the screen's width, so the check passed on the very bug. Nor
+did anything on screen say there was more: a phone draws no scrollbar.
+**Fix**: `e2e/fixtures/hidden-sideways.ts` — `hiddenSideways(page, allow)`
+lists every element inside `main` that clips or scrolls content wider than
+itself, and `expectNothingHiddenSideways(page)` polls it to empty. Scrollers
+that mean to scroll are allowed by default: `ScrollX` (`@saroh/ui/scroll-x`,
+marked `data-scroll-x`, which fades the side with more and hints "Swipe for
+more →" once), tab strips (`role=tablist`) and calendar grids
+(`role=grid`). DataView also stopped flashing its table on a phone before
+hydration (T8): the server draws the table and the list behind a 760px
+media rule and the client keeps the one in use.
+**Rule**: On a phone nothing hides sideways
+(`docs/patterns/frontend-verification.md`). A phone spec that checks the
+page fits also calls `expectNothingHiddenSideways`.
+**Category**: e2e · layout · `e2e/fixtures/hidden-sideways.ts`
+
+## Link preview — a public tool that emails stranger-supplied text is a relay
+
+**Symptom**: A security review of the link preview tool (5 Oct, before
+release) found its email gate could send any text to any inbox from
+Saroh's address: the report quoted the checked page's title, description,
+site name, picture address and tags, and named its domain in the subject.
+Anyone could host a page saying what they liked, type a stranger's email,
+and have Saroh deliver it — and tick "Also send me Saroh news" on their
+behalf. The caps on it were in one process's memory, the API took calls
+without saroh.in's relay, the checked address rode in a logged query
+string, and DNS for a stranger's name ran on libuv's four-thread pool
+(`dns.lookup`), where a never-answering nameserver could stall SMTP,
+database connects, zlib and crypto for every user.
+**Root cause**: The email was designed as "the report, mailed", without
+asking who chooses its words; and the tool was built like an internal
+endpoint (in-memory limits, GET, the system resolver) though anyone on the
+internet drives it.
+**Fix**: `report-email.ts` writes our words only: a fixed subject, the
+score, fix titles from a fixed list, size advice and one link back to the
+tool. No consent is asked or stored (`newsConsent` false). Both caps (3 a
+UTC day per address, 300 a day in all) are counted in `WaitlistSignup`.
+Both routes need the signed relay (`SiteRelayGuard`), the check is a POST,
+`redactUrl` drops `/public/tools/` query strings, and the stored link is
+origin and path. DNS goes over c-ares (`dns.promises.Resolver`, 1.5 s, one
+try) and at most 8 checks run at once (`busy` past that).
+**Rule**: `docs/patterns/backend-integrations.md` — "An email a stranger can
+trigger carries only our words".
+**Category**: security · email · `apps/api.saroh.in/src/modules/link-preview/`
+
+## Layout — a phone zoomed out on text it never showed
+
+**Symptom**: On the batch-2026-10-05-5 gate, a customer's Orders tab
+measured `innerWidth` 557 at a 375px phone, and New invoice's "Issue with
+pay link" could not be clicked on a Pixel 7: each try hit another element
+(the quantity box, the h1). Neither failed alone on a fresh seed.
+**Root cause**: Two widths no one could see. (1) An order card's
+`sr-only` ", order #1042" sits inside the truncated title link, but it is
+`position: absolute` and its containing block was the card's `li`
+(`relative`), so the link's `overflow: hidden` never clipped it: placed
+after a long title, it widened the page by 180px. (2) New invoice's left
+column was a `grid` with an implicit `auto` track, whose least width is
+its widest item's min-content — the contact picker's one-line
+"name · email". A parallel spec's 60-character email, first in the list,
+made it 1089px; the phone zoomed out and Playwright's clicks landed short.
+**Fix**: `OrderCardFrame` wraps the title in a `relative` span, so the
+truncated link clips its screen-reader words; the invoice form's column is
+`grid-cols-[minmax(0,1fr)]`.
+**Rule**: An `sr-only` inside truncated text needs a positioned ancestor
+inside the clip; a `grid` that holds one-line, truncating content names
+its track `minmax(0,1fr)` (`min-w-0` on the grid itself is not enough).
+**Category**: layout · phone · `components/commerce/orders/order-row.tsx`,
+`components/invoices/invoice-form.tsx`
+
+## Shop checkout — the bag's name and phone were asked for twice, and lost
+
+**Symptom**: a customer who typed their name and phone in the bag was asked
+for the phone again in Razorpay's window, and their account's "My details"
+said "Add your name" after the order. Found filming the checkout demo.
+**Root cause**: `CheckoutPay` built the window's prefill from the signed-in
+customer only (a first sign-in has no name, and never a phone), dropping the
+bag's delivery address. On the API, `createCheckoutOrder` never named the
+account's contact, though a first booking does (`accountContactInTx`).
+**Fix**: the bag hands its delivery to `CheckoutPay`, whose prefill falls
+back to its name and phone (digits only). The checkout names an unnamed
+contact from the delivery name, through `resolveContact`, and keeps a name
+it has. `shop.test.tsx` and `public-checkout.db.spec.ts` cover both.
+**Rule**: what a customer typed once is never asked for again in the same
+flow; a signed-in flow fills the contact's empty name, as bookings do.
+**Category**: shop · checkout · `packages/site-blocks/src/shop/checkout-sheet.tsx`,
+`apps/api.saroh.in/src/modules/orders/checkout-order.ts`
+
+## Discounts — an empty percentage said only "Validation failed"
+
+**Symptom**: saving a discount code with the percentage (or amount) empty
+showed a toast reading "Validation failed", with nothing under the field.
+**Root cause**: the form's schema took any string for `percent` and
+`amount`; the API's DTO refused it with class-validator, whose array of
+messages the exceptions filter sends as the bare "Validation failed" with no
+`field`, so the form could only toast it.
+**Fix**: `lib/discounts/value.ts` checks the chosen kind's value with the
+API's rules, and the form's `superRefine` puts the problem under its field.
+**Rule**: `docs/patterns/frontend-forms.md` → "The schema checks what the API's DTO
+checks".
+**Category**: discounts · forms · `apps/app.saroh.in/components/stores/discount-form.tsx`
+
+## Orders — a counter-paid order edited up asked for its whole new total
+
+**Symptom**: an order paid in cash at the counter, edited to cost more, asked
+for its whole new total online instead of the difference; on a plan without
+online payments the edit said "the money didn't settle" and nothing could
+record the difference by hand (audit, 6 Oct 2026).
+**Root cause**: the edit worked out what was paid from SUCCEEDED payment
+intents only. A counter payment (`takeCounterPaymentInTx`, "Record as paid")
+writes no intent and kept no amount, so `kept` was 0. The read had papered
+over the same gap with "paid by hand: nothing is due".
+**Fix**: `Order.paidByHand` keeps what was taken outside Saroh;
+`orders/hand-payments.ts` counts it beside online payments for the edit, the
+read, the list row and the pay link (0 on an older order paid by hand reads
+as its total). With no way online (`orders/order-online.ts`) nothing is
+tried, and "Record payment" (`POST orders/:id/record-payment`) settles the
+difference and its supplementary invoice. Edited down, the till gives back
+what was paid by hand. `order-kitchen.service.spec.ts` ("the difference after
+an edit…") and `order-difference.db.spec.ts` cover it.
+**Rule**: "what the order was paid" is every payment it received — online
+and recorded by hand — read through `hand-payments.ts`, never intents alone.
+**Category**: orders · money · `apps/api.saroh.in/src/modules/orders/order-kitchen.service.ts`
+
+## Seeds — the clinic's 70-day sweep timed out on CI, not locally
+
+**Symptom**: PR #825's unit job failed twice on `clinic.test.ts` ("keeps
+every booking, bill and state, 70 days running"): 123s and 125s against a
+120s limit. The same test took 16s in `pnpm prepush`.
+**Root cause**: CI's unit job runs `turbo run test` across every affected
+package at once on a small runner, so the CPU-bound sweep (490 seeds) runs
+about 8 times slower than on a laptop. The database package's tests only run
+on CI when that package changes, so the seed's growth since the limit was set
+(E9's treatment orders) went unseen until a migration landed.
+**Fix**: the sweep's limit is 300s, with the reason beside it.
+**Rule**: a CPU-bound test's timeout gets at least 8 times its local time;
+don't set it just above what a laptop takes.
+**Category**: seeds · CI · `packages/database/src/seed/showcase/clinic.test.ts`
+
+## Gate — every integration spec failed after merging a schema change
+
+**Symptom**: after merging a unit that added `BookingRules.bookingPayment`,
+`pnpm prepush --all` failed nearly every int and int-rls shard with
+`PrismaClientValidationError` on the new field. Lint, types and the browser
+specs passed.
+**Root cause**: `@saroh/database`'s build runs `prisma generate`, but turbo
+caches only `dist/**`. The unit's worktree had built the same inputs, so the
+batch's build was a cache hit: `dist` was restored and the Prisma client in
+`node_modules` stayed the old one.
+**Fix**: the gate's int-build step runs `prisma generate` before the turbo
+build, every time (about a second).
+**Rule**: anything generated outside a task's turbo `outputs` must be
+regenerated before it is used; a cache hit won't do it.
+**Category**: gate · Prisma · `scripts/prepush.sh` (int-build)
+
+## Tests — a db spec passed in every local gate and failed in CI on PAYMENTS_ENC_KEY
+
+**Symptom**: `plan-limits.db.spec.ts` ("integrations … refuses a new
+connection past the cap") passed in every `pnpm prepush --int`/`--all` and
+failed in CI's integration shard with "PAYMENTS_ENC_KEY is not set".
+**Root cause**: connecting a provider encrypts its credentials. The local gate
+exports a test `PAYMENTS_ENC_KEY` for every step (`scripts/prepush.sh`); CI's
+integration job sets none. Specs that connect providers mock `../../env` with
+the test key; this one read the real env, so it only worked locally.
+**Fix**: the spec mocks `../../env`, keeping the real values and adding the
+test key, as the payments specs do.
+**Rule**: a db spec that encrypts or connects a provider brings its own test
+key (mock `../../env`); never rely on the gate's exported one. Check by running
+it with `env -u PAYMENTS_ENC_KEY`.
+**Category**: tests · CI vs local gate
+
+## Plans & modules — an empty instance could never get its first pricing
+
+**Symptom**: on an instance with nothing published (dev, 6 Oct), the console's
+Plans & modules page said "Change anything below to start a draft" with
+nothing below it; the first catalogue had to go in through the API. Once a
+draft existed, Review & publish blocked it with "Nothing differs from the live
+version".
+**Root cause**: every edit cloned the live catalogue (`draft-store.tsx`, `if
+(!base) return`), and the publish check counted changes against live, which
+are always zero when nothing is live. Every test fixture had a live version,
+so neither path was ever drawn.
+**Fix**: a first-run screen (starter catalogue or blank) through the store's
+`start`, and "first version" wording with publishing allowed when nothing is
+live. Tests in `plans-shell.test.tsx` and `tab-publish.test.tsx` start from
+no live version.
+**Rule**: a screen that edits "the live thing" needs a test with no live
+thing; an empty instance is a real state, not an edge case.
+**Category**: admin console · empty states
+**Symptom**: A security review of the link preview tool (5 Oct, before
+release) found its email gate could send any text to any inbox from
+Saroh's address: the report quoted the checked page's title, description,
+site name, picture address and tags, and named its domain in the subject.
+Anyone could host a page saying what they liked, type a stranger's email,
+and have Saroh deliver it — and tick "Also send me Saroh news" on their
+behalf. The caps on it were in one process's memory, the API took calls
+without saroh.in's relay, the checked address rode in a logged query
+string, and DNS for a stranger's name ran on libuv's four-thread pool
+(`dns.lookup`), where a never-answering nameserver could stall SMTP,
+database connects, zlib and crypto for every user.
+**Root cause**: The email was designed as "the report, mailed", without
+asking who chooses its words; and the tool was built like an internal
+endpoint (in-memory limits, GET, the system resolver) though anyone on the
+internet drives it.
+**Fix**: `report-email.ts` writes our words only: a fixed subject, the
+score, fix titles from a fixed list, size advice and one link back to the
+tool. No consent is asked or stored (`newsConsent` false). Both caps (3 a
+UTC day per address, 300 a day in all) are counted in `WaitlistSignup`.
+Both routes need the signed relay (`SiteRelayGuard`), the check is a POST,
+`redactUrl` drops `/public/tools/` query strings, and the stored link is
+origin and path. DNS goes over c-ares (`dns.promises.Resolver`, 1.5 s, one
+try) and at most 8 checks run at once (`busy` past that).
+**Rule**: `docs/patterns/backend-integrations.md` — "An email a stranger can
+trigger carries only our words".
+**Category**: security · email · `apps/api.saroh.in/src/modules/link-preview/`
+
+## Layout — a phone zoomed out on text it never showed
+
+**Symptom**: On the batch-2026-10-05-5 gate, a customer's Orders tab
+measured `innerWidth` 557 at a 375px phone, and New invoice's "Issue with
+pay link" could not be clicked on a Pixel 7: each try hit another element
+(the quantity box, the h1). Neither failed alone on a fresh seed.
+**Root cause**: Two widths no one could see. (1) An order card's
+`sr-only` ", order #1042" sits inside the truncated title link, but it is
+`position: absolute` and its containing block was the card's `li`
+(`relative`), so the link's `overflow: hidden` never clipped it: placed
+after a long title, it widened the page by 180px. (2) New invoice's left
+column was a `grid` with an implicit `auto` track, whose least width is
+its widest item's min-content — the contact picker's one-line
+"name · email". A parallel spec's 60-character email, first in the list,
+made it 1089px; the phone zoomed out and Playwright's clicks landed short.
+**Fix**: `OrderCardFrame` wraps the title in a `relative` span, so the
+truncated link clips its screen-reader words; the invoice form's column is
+`grid-cols-[minmax(0,1fr)]`.
+**Rule**: An `sr-only` inside truncated text needs a positioned ancestor
+inside the clip; a `grid` that holds one-line, truncating content names
+its track `minmax(0,1fr)` (`min-w-0` on the grid itself is not enough).
+**Category**: layout · phone · `components/commerce/orders/order-row.tsx`,
+`components/invoices/invoice-form.tsx`
+
+## Email — nodemailer says CONN for every timeout, whatever the stage
+
+**Symptom** (U1 review, 6 Oct; the first fix was wrong too, caught by the
+branch's code review the same day): the Saroh business sender has to tell
+"failed, safe to retry" from "unknown, may have gone, never retry". It first
+classed a send as unknown when the error's `command` started with `DATA`;
+nodemailer never produces that for a lost connection. The first fix then
+read the stage from `responseCode` 354, as if nodemailer attached the last
+reply to a dropped connection. It doesn't: a drop after "354" arrived as
+`ECONNECTION` (or `ESOCKET`) with no `responseCode`, was classed `failed`
+and retried, and the customer could be emailed twice.
+**Root cause**: both rules were written from the error shape we expected.
+In nodemailer 10.0.10 (`dist/cjs/smtp-connection/index.js`) every drop and
+inactivity timeout is `command: 'CONN'`, and `_onClose` passes on only the
+unparsed `_remainder` — a reply already handled (the 354) is never on the
+error. So the stage cannot be read from the error at all: a drop after 354
+and a drop during EHLO look the same.
+**Fix**: `outcomeOfError` classes by what can be known. A 4xx/5xx
+`responseCode` is `failed`. Errors that only happen before the hand-over
+are `failed`: `EAUTH`, `EDNS`, `ETLS`, `ECONNREFUSED`/`ENOTFOUND` (which
+nodemailer re-tags `ESOCKET`, keeping Node's `syscall: 'connect'` or
+`'getaddrinfo'`), and the "Connection timeout" and "Greeting never
+received" timeouts. Any other drop with no server reply (`ECONNECTION`,
+`ESOCKET`, the mid-session "Timeout") is `unknown` and never retried. The
+spec drives a real nodemailer session against a stub server on loopback
+that closes after "354", so the shape is nodemailer's, not ours.
+**Rule**: Classify a library's errors from its source, and test against the
+library itself (a stub server is minutes of work), not a hand-made object.
+When the stage can't be known, a send that may have gone is never retried.
+**Category**: email · `modules/communications/providers/saroh-email.sender.ts`
+
+## Readiness — a step the plan can't let the business finish is not "setup left"
+
+**Symptom** (UX audit, 7 Oct, UX-006/017/019): on Free, Home's Needs you,
+Settings › Modules ("Finish setup"), the Turn on sheet ("Connect Razorpay or
+Cashfree now", pre-selected), its toast, every Connect on Providers, the
+Providers tab note and Profile all sent the owner to connect a payment or
+email provider. The API refused the connect correctly, but only after the
+whole key form was typed. Home and Settings also counted different steps
+("1 of 2" against "2 of 5"), Settings counting a logo and a pipeline as
+payment readiness.
+**Root cause**: readiness was worked out from the data alone (no provider →
+SETUP_REQUIRED) while the plan's say (`payments`, `integrations`, DEC-091)
+was only asked by the write. And Settings added its nudges to the count.
+**Fix**: the PAYMENTS readiness adapter reads the plan first: no provider on
+a plan without online payments is ACTIVE (offline Payments), with no
+blocker, since a blocker on an ACTIVE module would shut its routes
+(`ModuleEnforcementGuard`). Home skips "connect a messaging provider" where
+`integrations` has no room. The app reads the plan once per screen
+(`connectLocksOf`, `ownAccountsRoom`) and says "Comes with ‹plan› · See
+plans" in place of Connect, before any form. Provider connect asks the plan
+before the business details. Settings counts exactly Home's steps; its
+nudges are "Make it yours", never counted. On a plan without online
+payments, How to pay us is the counted step.
+**Rule**: anything that offers an action asks the same plan check the
+write does, up front. A step the plan holds back is said beside the steps,
+never counted, never a Connect.
+**Category**: plans · `capabilities/readiness/module-readiness.registry.ts`, `app.saroh.in/lib/providers/connect-lock.ts`, `lib/settings/ready.ts`
+
+## React — JSX text split across lines can hydrate differently
+
+**Symptom** (UX audit, 7 Oct, UX-086): Settings › Business (and Hours,
+the same page) logged a hydration mismatch in `PayPreview`: the server's
+text ended `asked you to.”` and the client's had trailing spaces.
+**Root cause**: a sentence written as JSX text across several lines, with
+an interpolation and HTML entities (`&ldquo;`, `&apos;`), was collapsed
+differently by the two renders under dev.
+**Fix**: the sentence is one template string in a single `{…}` expression;
+the component test asserts the exact text.
+**Rule**: a sentence with an interpolation in it is one string expression,
+not JSX text wrapped over lines.
+**Category**: react · `components/organizations/pay-instructions-section.tsx`
+
+### Next's dev server logged provider keys and sign-in codes from server actions
+
+**Symptom**: during the 7 Oct local UX audit, the stack log held the Razorpay and email API keys typed into Settings › Providers, plus sign-in codes.
+**Cause**: Next 16 defaults `logging.serverFunctions` to true. In development (`NODE_ENV === 'development'` only; production never logs them) every server action's arguments go to the terminal, and a dev log captures them.
+**Fix**: `logging: { serverFunctions: false }` in the Next config of every app whose server actions carry a secret (app, admin, accounts, saroh.app). Local logs that already held keys were scrubbed.
+**Rule**: A server action that takes a credential or code must not rely on logs staying private. Turn off dev argument logging in any app that has one, and never treat a dev log as safe to share.
+**Category**: security · `apps/*/next.config.*`
+
+## Time zones — server-rendered times read UTC for a business that never set its zone
+
+**Symptom** (UX audit, 7 Oct; #836): Order Detail said "Today, 04:28" on a
+full load and 09:58 after a client navigation; the site editor said "In
+review … 04:39 UTC" and "Last published 04:24 UTC"; the console showed the
+business's time zone as "Not set".
+**Root cause**: two halves. A business set up with no profile fields had no
+`BusinessProfile`, and setup never stored a zone, so most businesses had
+none. And the app had no shared way to write a time in the business's
+zone: `ViewerDate` renders the server's UTC first and corrects in the
+browser, and the site editor's `exactDate` pinned UTC on purpose to dodge
+hydration mismatches.
+**Fix**: setup always stores a zone (the country's when it keeps one, else
+the browser's, else India's; `organizations/business-zone.ts`), and
+`20261029153000_business_time_zone_backfill` gives every existing business
+the zone its readers already fell back to, never overwriting one. `GET
+/organizations` carries `timeZone`; the app shell provides it
+(`BusinessZoneProvider`), and `BusinessDate` / `useBusinessZone` /
+`activeBusinessZone()` write times in it, so server and browser agree from
+the first paint. `invoiceZone` (#836) is the same rule (`businessZone`).
+**Rule**: A time a business reads about its own work (an order, a version,
+a review) is written in the business's zone, never the viewer's or the
+server's: `BusinessDate`, or `useBusinessZone()` for a string. Pinning UTC
+avoids a hydration mismatch by being wrong for everyone.
+**Category**: dates · `app.saroh.in/components/shared/business-zone.tsx`
+
+## Team — a custom role was lost when the invitation was accepted (UX-004)
+
+**Problem**: Someone invited as "Front desk" joined as a Member: no New
+booking, no order changes, and Roles said "Front desk · 0 people". The
+invitation row read `role=front-desk ACCEPTED`; the membership `MEMBER`.
+**Root cause**: `accept` stored `toRole(invitation.role)`, the helper that
+narrows a stored key to the four built-ins for display. Every unit test
+mocked Prisma and checked a Reviewer invite, so nothing ran invite → accept →
+resolve with a role the business made.
+**Fix**: Accept stores the invited key when that role still exists in the
+business (MEMBER when it was removed since); migration
+`20261029141100_invited_custom_role` puts back the memberships the old accept
+dropped, only where nobody changed the role since.
+`invite-custom-role.db.spec.ts` runs the whole path and then asks the booking
+and order services what the role may do.
+**Category**: roles · rule in `docs/patterns/backend-auth-and-access.md`
+(invitations). `toRole` is for the response's `role` field only — never for
+what is written.
+
+## Payments — fake provider keys show CONNECTED; Pay then 500s and nobody is told (UX-012)
+
+**Problem**: An audit connected made-up Razorpay and Resend keys and both
+came back 201 CONNECTED. A customer pressing Pay got "can't take payment
+online right now", the API logged an unhandled 500
+(`Razorpay order creation failed (HTTP 401)`), and the business saw a green
+badge and heard nothing.
+**Root cause**: Connecting only sealed the keys; nothing asked the provider.
+At checkout the adapter's plain `Error` reached the global filter as a 500,
+and no code read a 401 as "these keys stopped working".
+**Fix**: An authenticated read on connect refuses keys with a field error;
+a 401/403 on a live call throws `ProviderKeysRefusedError`, which marks the
+connection `attention: KEYS_REFUSED` and queues the team's alert once; a
+failed provider order is a deliberate 503 in the customer's words. Tests in
+`common/providers/provider-key-checks.spec.ts`, `payments.service.spec.ts`
+and `message-send.handler.spec.ts`.
+**Category**: integrations · rule in `docs/patterns/backend-integrations.md` ("Keys are checked before they are kept, and watched after")
+
+## Renderer — an unknown page on a merchant's site answered 200 (UX-071)
+
+**Problem**: `/news/anything` on a live site showed the not-found page, but the
+response was `200` — a soft 404 that search engines and uptime checks read as
+a real page.
+**Root cause**: `apps/saroh.app/app/[domain]/loading.tsx` wrapped every page of
+a site in a Suspense boundary, so the response started streaming (status and
+headers sent) before the page ran `notFound()`. Next can't change the status
+after that; it only adds a `noindex` tag. The middleware already worked around
+it for `/account`.
+**Fix**: The segment loading state went. A site's pages render fully before
+the first byte, so `notFound()` (unknown page, post or product) answers 404.
+`e2e/tests/site-not-found.spec.ts` pins it. Don't put a `loading.tsx`, or a
+`<Suspense>` around `children`, above a page that can 404.
+**Category**: renderer · Next streaming
+
+### Two migrations with one timestamp
+
+**Symptom**: on 7 Oct two parallel units in one batch each added a `20261029153000_*` migration. An older pair (`20261024100000_*`) was already on development unnoticed.
+**Cause**: unit agents pick timestamps on their own, and nothing compared them. Prisma replays folders in name order, so two folders with one timestamp run in an order nobody chose.
+**Fix**: renamed the unapplied one (`20261029160000_billing_first_month`). `check:migration-ids` (prepush and CI) fails on any shared timestamp. The applied 24 Oct pair is allowlisted, because a migration that has run can't be renamed.
+**Rule**: before merging parallel units, the orchestrator runs `check:migration-ids`. A clash is fixed by renaming the migration that hasn't reached any database.
+**Category**: database · `scripts/check-migration-ids.mjs`
+
+## Notifications — the audit saw no booking confirmation, order notice or review alert (UX-041–043)
+
+**Problem**: The 7 Oct audit found no booking confirmation in any log, no
+"order placed" message in the customer's thread, no email to the owner for
+a web order, nothing for review events or a plan change, and "You've
+reached your 1 websites on Free" on day one.
+**Root cause**: Several. Booking notices did work: every `booking.notify`
+wrote its thread message (the audit database had 24); nothing was emailed
+because the business had no provider and `SAROH_BUSINESS_EMAIL` is off by
+default, so there was no log line to find. "Order placed" was never a
+notice kind. Team alert email went only through the business's own
+provider with New order off by default, so a Free business (which can't
+connect one, DEC-091) could never hear of a web order. Review writes and
+plan overrides queued nothing. A total cap of one was crossed by setup, and
+limit notices were never taken back when the count fell.
+**Fix**: `ORDER_PLACED` through the one `emailRoute`; Saroh's own mail
+(after commit) for a web order to owners and admins and for reviewers;
+`team.alert` `review`; `plan.change.notice`; `quietAtOne` and
+`limit-notice-clear.ts`; `countedWhat` for "1 website". Tests beside each.
+**Lesson**: when checking a notice by hand, read `CustomerNotice` and the
+thread before the mail log: a missing email is often the route saying no.
+**Category**: jobs · rules in `docs/patterns/backend-jobs.md` (Customer
+notices, Team alerts, Plan limit notices, Plan change notices)
+
+## Images — one Help screen never loaded in CI, and the retry hung on the same one
+
+**Symptom**: `help.spec.ts` "the article draws its five real screens" failed
+twice in a row on PR #845, on phone and then on desk, both times with the
+retry too. Each time one shot's `/_next/image?url=…&w=…` request never got a
+response (trace status -1 after 15s). The other four loaded in about 0.2s.
+Within a run it was the same image and width on both tries (product-5 at
+1200 on phone, product-4 at 750 on desk). The test passed in every earlier
+PR's CI and 256/256 times locally on a cold image cache.
+**Root cause**: not pinned down. CI runs the marketing site with `next
+start`, so Next's own image optimizer serves every shot. A request for one
+key stalled, and later requests for that key waited on it. On Vercel the
+optimizer is separate infrastructure, so it's a CI-stack failure.
+**Fix**: Help's shots are captured as WebP at the size they're shown
+(≤ ~110 KB), so `help-step.tsx` passes `unoptimized` and they're served as
+files. The optimizer only re-encoded them.
+**Rule**: An image we capture and compress ourselves doesn't go through
+`/_next/image`. If a browser spec waits on an image's `naturalWidth`, a
+trace showing one `/_next/image` request with no response points at the
+optimizer, not at the page.
+**Category**: marketing · `apps/saroh.in/components/v2/help/help-step.tsx`
+
+## Permissions — the permission suite's fake API stopped giving a Member any Orders (DEC-098)
+
+**Symptom**: on batch-2026-10-07-3, `permissions.spec.ts` "a business with
+no orders yet is empty" and "a failed Orders read says so" showed Orders'
+locked card ("Your role … doesn't include orders"). Sell was also missing
+from the Member's rail.
+**Root cause**: DEC-098 made the app decide money and orders by the role's
+resolved permissions only (`permits()`). A response without `actions` now
+permits nothing. The real API always sends `actions`, but the fake API
+(`e2e/fixtures/permissions-api.mjs`) sent only `role: "MEMBER"` for its
+default scenarios, which the app's old role-name fallback used to fill in.
+**Fix**: the fixture sends a built-in Member's permissions (the policy's
+read-only floor plus `order:stage`) for any scenario without its own role.
+**Rule**: when the app changes which field of an API response it decides
+on, update the permission suite's fake API to send what the real API does.
+The fake API mirrors the API's answers, not the app's fallbacks.
+**Category**: e2e · `e2e/fixtures/permissions-api.mjs`
+
+## Billing — a catalogue version move read as a downgrade to Free (N1)
+
+**Symptom**: after a pricing publish with policy `move`, Settings › Plan and
+billing told every business "Your plan changes to Free on 14 Oct". That
+included businesses already on Free, and ones on a plan override directly
+under "Pro free until 31 Dec 2027".
+**Root cause**: the plan view's pending-move note named the move's target
+plan and never compared it with the plan the business moves from. A move
+publish puts every subscription on the same plan of the new version, so a
+Free business's move is Free to Free. An override business's subscription
+is on Free underneath, so its move read "changes to Free" beside the
+override.
+**Fix**: the access read's `pendingMove` carries `fromPlanId`. The plan
+view says nothing when only the version changes, lets a live plan override
+speak until it ends (its note names where the business lands), and keeps
+the authorise prompt, worded for a new price on the same plan.
+**Rule**: a version move isn't a plan change. Before saying "your plan
+changes", compare the target with the plan the business moves from, and
+let a live plan override speak first.
+**Category**: billing · `apps/app.saroh.in/lib/saroh-billing/plan-view.ts`
+
+## Dependencies — a catalog bump that changed nothing
+
+**Symptom**: the `next16` catalog in `pnpm-workspace.yaml` moved from
+16.3.6 to 16.3.8 (the Cloudflare adapter needs at least 16.3.8), and
+`pnpm install` finished cleanly. Every Next 16 app still installed 16.3.6,
+and the adapter's build used it. `pnpm install --frozen-lockfile` passed.
+**Root cause**: pnpm 9.9 rewrote the lockfile's catalog `specifier` to
+16.3.8 and kept `version: 16.3.6`. better-auth's peer resolution in two
+importers also kept 16.3.6. `pnpm update` did not move it either.
+**Fix**: set the catalog entry's `version` and the two peer references to
+16.3.8 by hand, then `pnpm install` (which also dropped the entries only
+16.3.6 had used).
+**Rule**: after changing a catalog pin, check what got installed
+(`node -p "require('next/package.json').version"` from an app), not only
+that the install passed. `pnpm run check:catalog-lock` (prepush and CI)
+fails when an exactly pinned catalog entry and the lockfile disagree.
+**Category**: tooling · `pnpm-workspace.yaml`, `scripts/check-catalog-lock.mjs`
+
+## Sites — behind Cloudflare, every visitor had Cloudflare's address
+
+**Symptom**: none reported. Found while preparing merchant sites for
+Cloudflare Workers (7 Oct 2026), the same day `saroh.app` started going
+through Cloudflare's proxy to Vercel.
+**Root cause**: `visitorAddress` (`apps/saroh.app/lib/site-relay.ts`) read
+`x-real-ip`, then the first `x-forwarded-for` entry. Behind Cloudflare's
+proxy, Vercel writes Cloudflare's edge address into both, so the address
+saroh.app signs into the relay (which the API's per-visitor limits key on)
+was one of a few Cloudflare addresses for every visitor. On a Worker it is
+worse: `x-forwarded-for` starts with whatever the visitor sent.
+**Fix**: read `cf-connecting-ip` first. Cloudflare writes it and overwrites
+any a visitor sends, both on a Worker and when it proxies to Vercel.
+**Rule**: whoever terminates the visitor's connection names the visitor.
+When a proxy or CDN is added in front of an app, check which header the app
+takes the client address from (the API's version is
+`common/trust-proxy.ts`).
+**Category**: sites · `apps/saroh.app/lib/site-relay.ts`
+
+## Security — CodeQL stopped the 8 Oct release on six alerts
+
+**Symptom**: the release PR (#881) failed CodeQL with 1 critical and 5 high
+alerts in code it changed.
+**Root cause**, one by one:
+
+- `verifyPreviewToken` took the `?preview=` query as a string; a repeated
+  parameter arrives as an array (type confusion).
+- `domainOf` (email provider) and `studioHasEmail` (templates) used regexes
+  that backtrack: quadratic or worse on a long hostile value (ReDoS).
+- `site-flags.ts` `words()` and `content/templates.ts` `plain()` decoded
+  `&amp;` before other entities, so `&amp;nbsp;` was decoded twice.
+- A test stripped tags with a regex to read text (flagged as incomplete
+  sanitisation).
+  **Fix**: the token check refuses anything but a string; `domainOf` cuts at
+  `indexOf(">")`; the email pattern has one way to match (labels without dots)
+  and a 254-character cap; `&amp;` is decoded last; the test reads text through
+  the DOM. Each has a test, including hostile inputs that must answer in
+  under 200 ms.
+  **Rule**: a value from a request is `unknown` until checked (a query can be
+  an array). A regex on outside input has no two quantifiers that can match
+  the same characters; when in doubt, use `indexOf`/`split`. Decode `&amp;`
+  last. `eslint-plugin-regexp`'s `no-super-linear-backtracking` and
+  `no-super-linear-move` catch the regex cases; they flag 53 existing places,
+  so turning them on is its own task.
+  **Category**: security · CodeQL on PRs (`.github` code scanning)

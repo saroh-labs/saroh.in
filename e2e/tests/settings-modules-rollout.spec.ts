@@ -24,6 +24,8 @@ const RAW_CODE = /\b[A-Z]{2,}(?:_[A-Z0-9]+)+\b/;
 const SHOWN_AS: Partial<Record<string, string>> = {
     CRM: "Contacts",
     COMMERCE: "Sell",
+    // Bookings is Bookings on screen (UX-078).
+    APPOINTMENTS: "Bookings",
 };
 
 /** Where each module's section lives, for the ones that have one. */

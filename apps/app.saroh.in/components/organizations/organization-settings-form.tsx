@@ -14,9 +14,11 @@ import { Input } from "@saroh/ui/input";
 import { cn } from "@saroh/ui/lib/utils";
 import { Switch } from "@saroh/ui/switch";
 import { showError, showInfo } from "@saroh/ui/toast";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
-import type { FieldErrors } from "react-hook-form";
+import type { ReactNode } from "react";
+import { useEffect, useRef, useState } from "react";
+import type { FieldErrors, Resolver } from "react-hook-form";
 import { useForm, useWatch } from "react-hook-form";
 import { z } from "zod";
 
@@ -35,6 +37,10 @@ import type { BusinessRow } from "@/components/organizations/business-section";
 import { BusinessSection } from "@/components/organizations/business-section";
 import { GstinGuide } from "@/components/organizations/gstin-guide";
 import { InvoiceNumberFields } from "@/components/organizations/invoice-number-fields";
+import {
+    PAY_SECTION,
+    PayInstructionsSection,
+} from "@/components/organizations/pay-instructions-section";
 import {
     fieldWidth,
     RegisteredAddressFields,
@@ -91,7 +97,10 @@ import {
     kindWords,
     ORGANIZATION_KINDS,
 } from "@/lib/organizations/kind";
-import { addressProblems } from "@/lib/organizations/registered-address";
+import {
+    addressProblems,
+    stateProblem,
+} from "@/lib/organizations/registered-address";
 import { saveOrganizationSettings } from "@/lib/organizations/settings-actions";
 import type { OrganizationSettings } from "@/lib/organizations/settings-service";
 import { browserZone, zoneLabel } from "@/lib/organizations/time-zones";
@@ -287,11 +296,28 @@ const SECTIONS = {
 type SectionKey = keyof typeof SECTIONS;
 const SECTION_KEYS = Object.keys(SECTIONS) as SectionKey[];
 
-/** The tabs, in the design's order. */
-type TabKey = SectionKey | "hours";
-const TAB_KEYS: TabKey[] = ["identity", "contact", "tax", "hours", "address"];
+/**
+ * The tabs, in the design's order; How to pay us (R32) follows what every
+ * invoice carries. Hours and How to pay us keep their own forms.
+ */
+type OwnFormKey = "hours" | "pay";
+type TabKey = SectionKey | OwnFormKey;
+const TAB_KEYS: TabKey[] = [
+    "identity",
+    "contact",
+    "tax",
+    "pay",
+    "hours",
+    "address",
+];
+const OWN_FORM: Record<OwnFormKey, { title: string; panel: string }> = {
+    hours: { title: HOURS_SECTION.title, panel: "business-hours-panel" },
+    pay: { title: PAY_SECTION.title, panel: "business-pay-panel" },
+};
+const isOwnForm = (key: TabKey | null): key is OwnFormKey =>
+    key === "hours" || key === "pay";
 const titleOf = (key: TabKey) =>
-    key === "hours" ? HOURS_SECTION.title : SECTIONS[key].title;
+    isOwnForm(key) ? OWN_FORM[key].title : SECTIONS[key].title;
 
 const sectionOf = (field: string): SectionKey =>
     SECTION_KEYS.find((key) =>
@@ -391,13 +417,41 @@ export function OrganizationSettingsForm({
     // rather than waiting for the page to be fetched again.
     const [settings, setSettings] = useState(initial);
     const savedZone = settings.profile?.timezone ?? "";
+    // Said Registered at setup and no type chosen since: the take-money
+    // checklist holds going live on it, so the field says why.
+    const typeAsked =
+        settings.profile?.registered === true &&
+        businessTypeOf(settings.profile.type) === "";
     // In the address, so Search settings can open the tab a setting is on.
     const [tab, setTab] = useTabParam(BUSINESS_TAB_PARAM, TAB_KEYS, "identity");
     const [editing, setEditing] = useState<TabKey | null>(null);
     // The Hours card keeps its own form; whether it has changes, from it.
     const [hoursDirty, setHoursDirty] = useState(false);
+    // How to pay us (R32) keeps its own form too.
+    const [payDirty, setPayDirty] = useState(false);
+    // An Indian address isn't whole without its state (UX-018): asked only
+    // while the address card is being edited, so a saved address without
+    // one never holds up another card's save. In the resolver, so the form's
+    // own checks keep it (a manual error would be cleared by the next one).
+    const editingRef = useRef(editing);
+    useEffect(() => {
+        editingRef.current = editing;
+    }, [editing]);
+    const resolver: Resolver<FormValues> = async (values, context, options) => {
+        const result = await zodResolver(formSchema)(values, context, options);
+        const noState =
+            editingRef.current === "address" ? stateProblem(values) : null;
+        if (!noState) return result;
+        return {
+            values: {},
+            errors: {
+                ...result.errors,
+                gstState: { type: "custom", message: noState },
+            },
+        };
+    };
     const form = useForm<FormValues>({
-        resolver: zodResolver(formSchema),
+        resolver,
         defaultValues: valuesOf(initial),
         mode: "onChange",
     });
@@ -417,7 +471,12 @@ export function OrganizationSettingsForm({
         // eslint-disable-next-line react-hooks/exhaustive-deps -- re-run per change of the values (or a refusal appearing), not per render
     }, [watched, showing]);
     // Whether the open card has changes, whichever form holds it.
-    const editDirty = editing === "hours" ? hoursDirty : isDirty;
+    const editDirty =
+        editing === "hours"
+            ? hoursDirty
+            : editing === "pay"
+              ? payDirty
+              : isDirty;
     // An open edit with changes holds the way off this page.
     const { leaveTo, stay } = useLeaveGuard(editing !== null && editDirty);
     // Undo on a save (F12); what it saved back shows at once.
@@ -484,7 +543,7 @@ export function OrganizationSettingsForm({
 
     async function onSubmit(values: FormValues) {
         // Hours save through their own card's form.
-        if (!editing || editing === "hours") return;
+        if (!editing || isOwnForm(editing)) return;
         // The number format's rules, said on its field before the API would.
         const numberRefusal = numberFormatProblemOnSave(values, dirtyFields);
         if (numberRefusal) {
@@ -639,6 +698,9 @@ export function OrganizationSettingsForm({
             {
                 label: "Type",
                 value: businessTypeLabel(saved.type) ?? "",
+                ...(typeAsked
+                    ? { empty: "Not chosen yet — you said it's registered" }
+                    : {}),
             },
             {
                 label: "Time zone",
@@ -725,7 +787,21 @@ export function OrganizationSettingsForm({
             },
         ],
     };
-    const notes: Partial<Record<SectionKey, string>> = {
+    const notes: Partial<Record<SectionKey, ReactNode>> = {
+        // The invoices themselves, from here too: a site for my work has
+        // no Invoices row in the rail until Payments is on (UX-074).
+        tax: (
+            <>
+                The invoices you send, and their numbers, are in{" "}
+                <Link
+                    href="/billing/invoices"
+                    className="font-medium text-foreground underline underline-offset-4 hover:decoration-2"
+                >
+                    Invoices
+                </Link>
+                .
+            </>
+        ),
         identity:
             "Invoices are issued in the legal name, if you've set one. Your links keep working if you rename the business.",
         address:
@@ -851,8 +927,9 @@ export function OrganizationSettingsForm({
                                 />
                             </FormControl>
                             <FormDescription>
-                                An individual trades in their own name; a
-                                company is registered as one.
+                                {typeAsked
+                                    ? "You said at setup that the business is registered. Choose which kind before you take money."
+                                    : "An individual trades in their own name; a company is registered as one."}
                             </FormDescription>
                             <FormMessage />
                         </FormItem>
@@ -897,7 +974,8 @@ export function OrganizationSettingsForm({
                                 <Input {...field} type="email" />
                             </FormControl>
                             <FormDescription>
-                                Where customers can reach the business.
+                                Where customers can reach the business. Your
+                                website shows it at the foot of every page.
                             </FormDescription>
                             <FormMessage />
                         </FormItem>
@@ -1132,8 +1210,8 @@ export function OrganizationSettingsForm({
                             role="tab"
                             aria-selected={on}
                             aria-controls={
-                                key === "hours"
-                                    ? "business-hours-panel"
+                                isOwnForm(key)
+                                    ? OWN_FORM[key].panel
                                     : "business-panel"
                             }
                             tabIndex={on ? 0 : -1}
@@ -1158,7 +1236,7 @@ export function OrganizationSettingsForm({
             </div>
 
             <div className="flex flex-wrap items-start gap-5">
-                {tab === "hours" ? null : (
+                {isOwnForm(tab) ? null : (
                     <div className="grid min-w-0 flex-[1_1_460px] gap-4">
                         <form
                             id="business-panel"
@@ -1218,9 +1296,23 @@ export function OrganizationSettingsForm({
                     onDirty={setHoursDirty}
                     offerUndo={undo.offer}
                 />
+                {/* Its own form and its own preview: what customers see. */}
+                <PayInstructionsSection
+                    saved={settings.payInstructions}
+                    businessName={settings.name}
+                    hidden={tab !== "pay"}
+                    editing={editing === "pay"}
+                    canEdit={canEdit}
+                    onEdit={() => startEditing("pay")}
+                    onDone={() => setEditing(null)}
+                    onDirty={setPayDirty}
+                    onSaved={setSettings}
+                    offerUndo={undo.offer}
+                />
 
                 <BusinessPrintPreview
-                    live={editing !== null && editing !== "hours" && isDirty}
+                    hidden={tab === "pay"}
+                    live={editing !== null && !isOwnForm(editing) && isDirty}
                     logoUrl={settings.logo?.url ?? null}
                     registered={registered}
                     number={number(v)}

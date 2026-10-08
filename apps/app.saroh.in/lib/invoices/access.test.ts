@@ -2,22 +2,34 @@ import { describe, expect, it } from "vitest";
 
 import { billingLanding, mayRead, paymentsLockedCopy } from "./access";
 
+/** An owner, as the API resolves them: the built-in's default money reads. */
+const OWNER = {
+    role: "OWNER" as const,
+    actions: ["invoice:read", "subscription:read"],
+};
+
 describe("billingLanding — where /billing goes (DEC-070)", () => {
     it("lands on Subscriptions with Payments on", () => {
-        expect(billingLanding({ role: "OWNER" }, true)).toBe(
-            "/billing/subscriptions",
-        );
+        expect(billingLanding(OWNER, true)).toBe("/billing/subscriptions");
     });
 
     it("lands on Invoices with Payments off: invoices need no module", () => {
-        expect(billingLanding({ role: "OWNER" }, false)).toBe(
-            "/billing/invoices",
-        );
+        expect(billingLanding(OWNER, false)).toBe("/billing/invoices");
     });
 
     it("lands on Invoices for a role that reads invoices and not subscriptions", () => {
         const org = { role: "MEMBER" as const, actions: ["invoice:read"] };
         expect(billingLanding(org, true)).toBe("/billing/invoices");
+    });
+
+    it("Free, memberships locked by the plan: lands on Invoices (UX-047)", () => {
+        expect(billingLanding(OWNER, true, true)).toBe("/billing/invoices");
+    });
+
+    it("Grow, memberships in the plan: lands on Subscriptions", () => {
+        expect(billingLanding(OWNER, true, false)).toBe(
+            "/billing/subscriptions",
+        );
     });
 
     it("leaves a role that reads neither to Subscriptions' own gate", () => {
@@ -34,11 +46,16 @@ describe("mayRead — who opens Payments' screens (D18)", () => {
         expect(mayRead(org, "subscription:read")).toBe(false);
     });
 
-    it("falls back to money staying with owners and admins", () => {
-        expect(mayRead({ role: "OWNER" }, "invoice:read")).toBe(true);
-        expect(mayRead({ role: "ADMIN" }, "subscription:read")).toBe(true);
-        expect(mayRead({ role: "MEMBER" }, "invoice:read")).toBe(false);
-        expect(mayRead({ role: "REVIEWER" }, "invoice:read")).toBe(false);
+    it("never reads the role's name (DEC-098): an Owner reads by its permissions", () => {
+        expect(mayRead(OWNER, "invoice:read")).toBe(true);
+        expect(mayRead({ role: "OWNER" }, "invoice:read")).toBe(false);
+        expect(mayRead({ role: "ADMIN" }, "subscription:read")).toBe(false);
+        expect(
+            mayRead(
+                { role: "MEMBER", actions: ["invoice:read"] },
+                "invoice:read",
+            ),
+        ).toBe(true);
     });
 
     it("locks nothing when the organization couldn't be read: the API decides", () => {

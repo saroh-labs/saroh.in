@@ -8,15 +8,16 @@
  * Runs in the integration project (TEST_DATABASE_URL).
  */
 jest.mock("../../common/email", () => ({
-    sendWaitlistInvitationEmail: jest.fn(),
+    sendWaitlistLaunchInviteEmail: jest.fn(),
 }));
 
 import { prisma } from "@saroh/database";
 
 import type { PlatformAdminInfo } from "../../common/decorators/platform-admin-context.decorator";
-import { sendWaitlistInvitationEmail } from "../../common/email";
+import { sendWaitlistLaunchInviteEmail } from "../../common/email";
 import type { AdminAuditService } from "../admin/admin-audit.service";
 import { AdminWaitlistService } from "../admin/admin-waitlist.service";
+import { WaitlistInvitesService } from "./invites.service";
 import { WaitlistRetentionHandler } from "./waitlist-retention.handler";
 import { WaitlistService } from "./waitlist.service";
 
@@ -26,7 +27,10 @@ const DAY_MS = 24 * 60 * 60 * 1000;
 
 const service = new WaitlistService();
 const audit = { write: jest.fn() };
-const admin = new AdminWaitlistService(audit as unknown as AdminAuditService);
+const admin = new AdminWaitlistService(
+    audit as unknown as AdminAuditService,
+    new WaitlistInvitesService(),
+);
 const staff: PlatformAdminInfo = {
     userId: "support_1",
     platformAdminId: "pa_1",
@@ -63,6 +67,30 @@ describe("joining", () => {
         expect(second.position).toBe(first.position + 1);
         expect(first.refCode).toMatch(/^[a-z2-9]{8}$/);
         expect(second.refCode).not.toBe(first.refCode);
+    });
+
+    it("keeps the gallery template a visitor saved, and only one it knows (U13)", async () => {
+        await joined({
+            email: mail("tpl"),
+            business: "Iron & Oak",
+            kind: "gym",
+            template: "gym",
+        });
+        await joined({
+            email: mail("tpl-unknown"),
+            business: "Kesar Salon",
+            kind: "salon",
+            template: "no-such-template",
+        });
+        const rows = await prisma.waitlistSignup.findMany({
+            where: { email: { in: [mail("tpl"), mail("tpl-unknown")] } },
+            select: { email: true, template: true },
+            orderBy: { position: "asc" },
+        });
+        expect(rows).toEqual([
+            { email: mail("tpl"), template: "gym" },
+            { email: mail("tpl-unknown"), template: null },
+        ]);
     });
 
     it("treats A.B+x@gmail.com as ab@gmail.com: a repeat, no place, no new row", async () => {
@@ -131,7 +159,7 @@ describe("joining", () => {
 
     it("emails nobody", async () => {
         await joined({ email: mail("quiet"), business: "Q", kind: "other" });
-        expect(sendWaitlistInvitationEmail).not.toHaveBeenCalled();
+        expect(sendWaitlistLaunchInviteEmail).not.toHaveBeenCalled();
     });
 });
 
@@ -329,6 +357,49 @@ describe("retention", () => {
             mail("came"),
             mail("recent"),
             mail("waiting"),
+        ]);
+    });
+});
+
+describe("the link preview tool's entries (resources plan U2)", () => {
+    it("drops a report-only entry 12 months after its check, and only the link from any other", async () => {
+        const now = new Date();
+        const old = new Date(now.getTime() - 400 * DAY_MS);
+        const recent = new Date(now.getTime() - 30 * DAY_MS);
+        const report = (who: string, at: Date) =>
+            prisma.waitlistSignup.create({
+                data: {
+                    email: mail(who),
+                    emailKey: mail(who),
+                    source: "link-preview",
+                    checkedUrl: "https://example-bakery.in/",
+                    checkedAt: at,
+                    newsConsent: false,
+                },
+            });
+        await report("old-report", old);
+        await report("new-report", recent);
+        await joined({ email: mail("owner"), business: "O", kind: "shop" });
+        await prisma.waitlistSignup.updateMany({
+            where: { email: mail("owner") },
+            data: { checkedUrl: "https://owner.example.com/", checkedAt: old },
+        });
+
+        await expect(new WaitlistRetentionHandler().sweep(now)).resolves.toBe(
+            1,
+        );
+
+        const left = await prisma.waitlistSignup.findMany({
+            select: { email: true, checkedUrl: true, checkedAt: true },
+            orderBy: { position: "asc" },
+        });
+        expect(left).toEqual([
+            {
+                email: mail("new-report"),
+                checkedUrl: "https://example-bakery.in/",
+                checkedAt: recent,
+            },
+            { email: mail("owner"), checkedUrl: null, checkedAt: null },
         ]);
     });
 });

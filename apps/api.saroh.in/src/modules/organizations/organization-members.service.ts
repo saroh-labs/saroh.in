@@ -19,6 +19,15 @@ import {
     AuditOutcome,
     AuditService,
 } from "../audit/audit.service";
+import { planMeter } from "../billing/metering.service";
+import type { SeatKind } from "../billing/seats";
+import {
+    BOOKABLE_STAFF,
+    roleActionsOf,
+    seatKindOf,
+    seatModule,
+    seatOf,
+} from "../billing/seats";
 import { enqueueTeamAlert } from "../notifications/team-alerts";
 import { CAPABILITY_BY_ACTION } from "./capability-catalogue";
 import { hashInviteToken } from "./invite-token";
@@ -88,6 +97,12 @@ export interface MemberView {
      * when someone has one.
      */
     extraActions: OrgAction[];
+    /**
+     * Whether they use one of the plan's team seats (DEC-105): their role or
+     * extras can change something, or they take bookings. False for someone
+     * who can only look, who counts toward the plan's view-only people.
+     */
+    usesSeat: boolean;
 }
 
 export interface StorefrontRoleView {
@@ -107,6 +122,8 @@ export interface InvitationView {
     status: string;
     expiresAt: Date;
     createdAt: Date;
+    /** Whether the role invited to uses a team seat (DEC-105). */
+    usesSeat: boolean;
 }
 
 /**
@@ -149,6 +166,9 @@ export class OrganizationMembersService {
                         role: true,
                         extraActions: true,
                         user: { select: { name: true, email: true } },
+                        // On the diary: someone who takes bookings uses a
+                        // seat whatever their role (DEC-105).
+                        staffMember: { select: { status: true } },
                     },
                 }),
                 prisma.siteReviewer.findMany({
@@ -195,7 +215,7 @@ export class OrganizationMembersService {
                 }),
             ]);
 
-        const roleActions = new Map(roleRows.map((r) => [r.key, r.actions]));
+        const roleActions = roleActionsOf(roleRows);
         const lastActive = new Map(
             sessions.map((s) => [s.userId, s._max.updatedAt]),
         );
@@ -232,6 +252,13 @@ export class OrganizationMembersService {
                 isBuiltInRole(m.role) ? null : roleActions.get(m.role),
                 m.extraActions,
             ),
+            usesSeat:
+                seatOf(
+                    roleActions,
+                    m.role,
+                    m.extraActions,
+                    m.staffMember?.status === BOOKABLE_STAFF,
+                ) === "seat",
         }));
     }
 
@@ -243,25 +270,36 @@ export class OrganizationMembersService {
     async listInvitations(ctx: OrganizationContext): Promise<InvitationView[]> {
         authorize(ctx, "member:invite");
 
-        const invitations = await prisma.organizationInvitation.findMany({
-            where: { organizationId: ctx.organizationId, status: "PENDING" },
-            orderBy: { createdAt: "desc" },
-            select: {
-                id: true,
-                email: true,
-                role: true,
-                siteIds: true,
-                status: true,
-                expiresAt: true,
-                createdAt: true,
-            },
-        });
+        const [invitations, roleRows] = await Promise.all([
+            prisma.organizationInvitation.findMany({
+                where: {
+                    organizationId: ctx.organizationId,
+                    status: "PENDING",
+                },
+                orderBy: { createdAt: "desc" },
+                select: {
+                    id: true,
+                    email: true,
+                    role: true,
+                    siteIds: true,
+                    status: true,
+                    expiresAt: true,
+                    createdAt: true,
+                },
+            }),
+            prisma.organizationRole.findMany({
+                where: { organizationId: ctx.organizationId },
+                select: { key: true, actions: true },
+            }),
+        ]);
+        const roleActions = roleActionsOf(roleRows);
         // No token, hashed or otherwise. It is in the invitee's inbox and
         // nowhere else; a roster screen is not a place to re-read it from.
         return invitations.map((i) => ({
             ...i,
             role: toRole(i.role),
             roleKey: i.role,
+            usesSeat: seatOf(roleActions, i.role) === "seat",
         }));
     }
 
@@ -292,33 +330,68 @@ export class OrganizationMembersService {
 
         const token = randomBytes(32).toString("hex");
         const expiresAt = new Date(Date.now() + INVITE_TTL_MS);
-        const invitation = await prisma.organizationInvitation.upsert({
-            where: {
-                organizationId_email: {
-                    organizationId: ctx.organizationId,
-                    email: dto.email,
+        // The plan's team seats count people and open invitations whose
+        // role can change something (DEC-105): a new invitation is checked;
+        // sending a live one again adds nobody. A role that only looks is
+        // checked against the plan's view-only people instead, the same way.
+        const kind = await this.seatKindFor(ctx.organizationId, dto.role);
+        const invitation = await planMeter.withRoom(
+            ctx.organizationId,
+            seatModule(kind),
+            (tx) =>
+                tx.organizationInvitation.upsert({
+                    where: {
+                        organizationId_email: {
+                            organizationId: ctx.organizationId,
+                            email: dto.email,
+                        },
+                    },
+                    create: {
+                        organizationId: ctx.organizationId,
+                        email: dto.email,
+                        role: dto.role,
+                        siteIds,
+                        tokenHash: hashInviteToken(token),
+                        invitedByUserId: ctx.userId,
+                        expiresAt,
+                    },
+                    update: {
+                        role: dto.role,
+                        siteIds,
+                        tokenHash: hashInviteToken(token),
+                        invitedByUserId: ctx.userId,
+                        expiresAt,
+                        status: "PENDING",
+                        acceptedAt: null,
+                    },
+                    select: {
+                        id: true,
+                        email: true,
+                        role: true,
+                        expiresAt: true,
+                    },
+                }),
+            {
+                // A live invitation of the same kind already counts this person.
+                addingIn: async (tx) => {
+                    const live = await tx.organizationInvitation.findFirst({
+                        where: {
+                            organizationId: ctx.organizationId,
+                            email: dto.email,
+                            status: "PENDING",
+                            expiresAt: { gt: new Date() },
+                        },
+                        select: { role: true },
+                    });
+                    if (!live) return 1;
+                    const was = await this.seatKindFor(
+                        ctx.organizationId,
+                        live.role,
+                    );
+                    return was === kind ? 0 : 1;
                 },
             },
-            create: {
-                organizationId: ctx.organizationId,
-                email: dto.email,
-                role: dto.role,
-                siteIds,
-                tokenHash: hashInviteToken(token),
-                invitedByUserId: ctx.userId,
-                expiresAt,
-            },
-            update: {
-                role: dto.role,
-                siteIds,
-                tokenHash: hashInviteToken(token),
-                invitedByUserId: ctx.userId,
-                expiresAt,
-                status: "PENDING",
-                acceptedAt: null,
-            },
-            select: { id: true, email: true, role: true, expiresAt: true },
-        });
+        );
 
         const organization = await prisma.organization.findUnique({
             where: { id: ctx.organizationId },
@@ -495,7 +568,14 @@ export class OrganizationMembersService {
             );
         }
 
-        const role = toRole(invitation.role);
+        // The role as invited: a built-in, or a role the business made
+        // (UX-004). Narrowing a made role to MEMBER here is how "Front desk"
+        // joined as a Member everywhere, its permissions never reaching them.
+        const roleKey = await invitedRoleKey(
+            invitation.organizationId,
+            invitation.role,
+        );
+        const role = toRole(roleKey);
         // Sites deleted since the invite was sent are dropped rather than
         // failing the accept: the person still belongs in the workspace.
         const sites = await prisma.site.findMany({
@@ -518,9 +598,9 @@ export class OrganizationMembersService {
                 create: {
                     organizationId: invitation.organizationId,
                     userId: user.id,
-                    role,
+                    role: roleKey,
                 },
-                update: { role },
+                update: { role: roleKey },
             });
             for (const site of sites) {
                 await tx.siteReviewer.upsert({
@@ -559,13 +639,14 @@ export class OrganizationMembersService {
             targetType: "membership",
             targetId: user.id,
             outcome: AuditOutcome.Success,
-            metadata: { role, siteCount: sites.length },
+            metadata: { role: roleKey, siteCount: sites.length },
         });
 
         return {
             organizationId: invitation.organizationId,
             organization: invitation.organization,
             role,
+            roleKey,
             // Where to send them: the site they were asked to look at.
             siteId: sites[0]?.id ?? null,
         };
@@ -599,8 +680,30 @@ export class OrganizationMembersService {
         const kept = extraActionsFor(dto.role, membership.extraActions);
         const extrasChanged = kept.length !== membership.extraActions.length;
 
+        // Someone who only looks uses no team seat (DEC-105): moved to a
+        // role that can change something, they are one more seat; moved the
+        // other way, one more view-only person. Checked first on the
+        // transaction, as it takes the meter's lock.
+        const bookable = membership.staffMember?.status === BOOKABLE_STAFF;
+        const [was, becomes] = await Promise.all([
+            this.seatKindFor(
+                ctx.organizationId,
+                membership.role,
+                membership.extraActions,
+                bookable,
+            ),
+            this.seatKindFor(ctx.organizationId, dto.role, kept, bookable),
+        ]);
+
         await prisma.$transaction(
             async (tx) => {
+                if (was !== becomes) {
+                    await planMeter.roomInTx(
+                        tx,
+                        ctx.organizationId,
+                        seatModule(becomes),
+                    );
+                }
                 await tx.membership.update({
                     where: {
                         organizationId_userId: {
@@ -759,16 +862,35 @@ export class OrganizationMembersService {
         if (given.length === 0 && taken.length === 0) {
             return { userId, extraActions: next };
         }
+        // Giving someone more than their role is a role of their own, the
+        // plan's "Custom roles" row (UX-030): refused where the plan leaves
+        // it off. Taking extras away never asks, so a business that moved
+        // down can still tidy up.
+        if (given.length > 0) {
+            await planMeter.assertIncluded(organizationId, "roles");
+        }
+        // An extra that changes something takes a view-only person onto a
+        // team seat (DEC-105): checked as the change is written.
+        const bookable = membership.staffMember?.status === BOOKABLE_STAFF;
+        const joinsSeats =
+            seatKindOf(before, bookable) === "viewOnly" &&
+            seatKindOf(after, bookable) === "seat";
 
-        const { count } = await prisma.membership.updateMany({
-            where: {
-                organizationId,
-                userId,
-                role: membership.role,
-                extraActions: { equals: membership.extraActions },
-            },
-            data: { extraActions: next },
-        });
+        const { count } = await planMeter.withRoom(
+            organizationId,
+            "members",
+            (tx) =>
+                tx.membership.updateMany({
+                    where: {
+                        organizationId,
+                        userId,
+                        role: membership.role,
+                        extraActions: { equals: membership.extraActions },
+                    },
+                    data: { extraActions: next },
+                }),
+            { adding: joinsSeats ? 1 : 0 },
+        );
         if (count === 0) {
             throw new ConflictException(
                 "Someone changed this person's role or permissions while you were editing. Reload to see them, then try again.",
@@ -915,7 +1037,11 @@ export class OrganizationMembersService {
                     userId,
                 },
             },
-            select: { role: true, extraActions: true },
+            select: {
+                role: true,
+                extraActions: true,
+                staffMember: { select: { status: true } },
+            },
         });
         if (!membership) {
             throw new NotFoundException(
@@ -1031,6 +1157,22 @@ export class OrganizationMembersService {
     }
 
     /**
+     * Whether someone at this role, with these extras, uses a team seat or
+     * is view-only (DEC-105): by what they can do, never the role's name.
+     */
+    private async seatKindFor(
+        organizationId: string,
+        roleKey: string,
+        extras?: readonly string[],
+        bookable = false,
+    ): Promise<SeatKind> {
+        return seatKindOf(
+            await this.actionsOf(organizationId, roleKey, false, extras),
+            bookable,
+        );
+    }
+
+    /**
      * What a role in this business may do, with a person's extras when
      * given (F17); 400 if the role must exist and does not.
      */
@@ -1081,6 +1223,25 @@ function labelsOf(actions: readonly OrgAction[]): string[] {
 /** "Refund orders, See invoices and Export orders". */
 function listed(labels: readonly string[]): string {
     return new Intl.ListFormat("en", { type: "conjunction" }).format(labels);
+}
+
+/**
+ * The role key a membership made from an invitation holds: the built-in it
+ * names, or the business's own role when it still exists. A role removed
+ * since the invite was sent leaves the read-only floor (MEMBER), which is
+ * what a dangling key would resolve to anyway — stored as MEMBER, so Team
+ * names it rather than showing a key nobody can pick.
+ */
+export async function invitedRoleKey(
+    organizationId: string,
+    invited: string,
+): Promise<string> {
+    if (isBuiltInRole(invited)) return invited;
+    const made = await prisma.organizationRole.findUnique({
+        where: { organizationId_key: { organizationId, key: invited } },
+        select: { key: true },
+    });
+    return made?.key ?? "MEMBER";
 }
 
 /** Narrow a stored role string, defaulting the unrecognized to MEMBER. */

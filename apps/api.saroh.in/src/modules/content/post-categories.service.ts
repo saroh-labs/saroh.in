@@ -56,10 +56,8 @@ export class PostCategoriesService {
             });
             return { id: category.id };
         } catch {
-            throw new ConflictException({
-                message: "That slug is already taken",
-                field: "slug",
-            });
+            // A create racing another for the same address.
+            throw slugTaken(null);
         }
     }
 
@@ -87,10 +85,8 @@ export class PostCategoriesService {
             });
             return { id: categoryId };
         } catch {
-            throw new ConflictException({
-                message: "That slug is already taken",
-                field: "slug",
-            });
+            // A create racing another for the same address.
+            throw slugTaken(null);
         }
     }
 
@@ -126,16 +122,28 @@ export class PostCategoriesService {
         await assertSiteVisible(ctx, siteId);
     }
 
+    /**
+     * Refuse a slug another category holds, naming that category (UX-066):
+     * "You already have a category called “Seasonal”." — the merchant typed
+     * a name, and "slug" is a word they never chose.
+     */
     private async assertSlugFree(siteId: string, slug: string): Promise<void> {
         const existing = await prisma.postCategory.findUnique({
             where: { siteId_slug: { siteId, slug } },
-            select: { id: true },
+            select: { id: true, name: true },
         });
         if (existing) {
-            throw new ConflictException({
-                message: "That slug is already taken",
-                field: "slug",
-            });
+            throw slugTaken(existing.name);
         }
     }
+}
+
+/** The refusal for a category whose address another holds (UX-066). */
+export function slugTaken(existingName: string | null): ConflictException {
+    return new ConflictException({
+        message: existingName
+            ? `You already have a category called “${existingName}”.`
+            : "You already have a category with that name.",
+        field: "slug",
+    });
 }

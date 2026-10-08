@@ -9,6 +9,7 @@ import { JobHandlerRegistry } from "../jobs/job-handler.registry";
 import { JobsModule } from "../jobs/jobs.module";
 import { OrganizationsModule } from "../organizations/organizations.module";
 import { GoLiveHandler, SITE_GO_LIVE_TYPE } from "./go-live.handler";
+import { PublicFooterService } from "./public-footer.service";
 import { PublicSitesController } from "./public-sites.controller";
 import { PublicVisitService } from "./public-visit.service";
 import { SitePreviewLinksService } from "./site-preview-links.service";
@@ -45,6 +46,7 @@ import { TestReleasesService } from "./test-releases.service";
         SitePreviewLinksService,
         TestReleasesService,
         PublicVisitService,
+        PublicFooterService,
         GoLiveHandler,
         OrganizationGuard,
     ],

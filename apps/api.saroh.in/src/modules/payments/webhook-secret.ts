@@ -1,3 +1,5 @@
+import { WEBHOOK_EVENTS as SHARED_WEBHOOK_EVENTS } from "@saroh/integrations";
+
 import type { SupportedProvider } from "./providers/provider.port";
 
 /**
@@ -30,23 +32,13 @@ export const WEBHOOK_SECRET_REQUIRED =
 /**
  * The webhook events to tick in the provider's dashboard: the ones
  * `webhooks/providers/*.webhook.ts` act on. Autopay adds its own when it is
- * switched on (`supportsMandates` is still false).
+ * switched on (`supportsMandates` is still false). The list lives in
+ * `@saroh/integrations`, which the marketing site's integration pages are
+ * checked against, so the two can't drift (Resources plan U3).
  */
-export const WEBHOOK_EVENTS: Record<SupportedProvider, readonly string[]> = {
-    RAZORPAY: [
-        "payment.captured",
-        "payment.failed",
-        "order.paid",
-        "refund.processed",
-        "refund.failed",
-    ],
-    CASHFREE: [
-        "PAYMENT_SUCCESS_WEBHOOK",
-        "PAYMENT_FAILED_WEBHOOK",
-        "PAYMENT_USER_DROPPED_WEBHOOK",
-        "REFUND_STATUS_WEBHOOK",
-    ],
-};
+export const WEBHOOK_EVENTS: Readonly<
+    Record<SupportedProvider, readonly string[]>
+> = SHARED_WEBHOOK_EVENTS;
 
 /** The sealed blob, as far as webhooks care. */
 export interface SealedCredentials {

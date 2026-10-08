@@ -7,7 +7,7 @@ import { useState, useTransition } from "react";
 
 import { TurnOnSheet } from "@/components/modules/turn-on/turn-on-sheet";
 import { setModuleStatusAction } from "@/lib/modules/actions";
-import { blockerSentence } from "@/lib/modules/blocker-copy";
+import { refusalSentence } from "@/lib/modules/blocker-copy";
 import type { ModuleView } from "@/lib/modules/schema";
 import type { AlsoSellFeature } from "@/lib/services/also-sell";
 import { alsoSellToast } from "@/lib/services/also-sell";
@@ -40,14 +40,13 @@ export function AlsoSell({
             const res = await set(f.key, false);
             if (!res.ok) {
                 // The API says why in a sentence.
-                const refused = res.blockers?.[0];
-                showError(refused ? blockerSentence(refused) : res.error);
+                showError(refusalSentence(res));
                 return;
             }
             router.refresh();
             showUndo(alsoSellToast(f.label, false), () => {
                 void set(f.key, true).then((back) => {
-                    if (!back.ok) showError(back.error);
+                    if (!back.ok) showError(refusalSentence(back));
                     router.refresh();
                 });
             });

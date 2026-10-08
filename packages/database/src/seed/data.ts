@@ -697,32 +697,6 @@ export const POSTS: readonly {
     },
 ];
 
-// --- Billing -------------------------------------------------------------
-
-/**
- * The plan Northwind is on.
- *
- * Not decoration: `EntitlementService` caps an unsubscribed org at ONE site and
- * refuses a custom-domain claim outright (`FREE_ENTITLEMENTS`). Without a
- * subscription the three sites and the domain claim below are states the
- * product would never have let this org reach, and a fixture that cannot exist
- * is the kind that produces confident, wrong findings.
- */
-export const PLAN = {
-    key: "business",
-    version: 1,
-    name: "Business",
-    /** Paise, matching the schema's minor-unit convention — ₹1,499 a month. */
-    priceCents: 149900,
-    interval: "month",
-    entitlements: {
-        sites: 5,
-        storefronts: 5,
-        teamMembers: 10,
-        customDomain: true,
-    },
-} as const;
-
 // --- Providers -----------------------------------------------------------
 
 /**
@@ -745,7 +719,7 @@ export const COMMUNICATION_PROVIDER = {
     channel: "EMAIL",
     provider: "RESEND",
     status: "CONNECTED",
-    fromAddress: "orders@northwindsupply.in",
+    fromAddress: "northwind@example.com",
 } as const;
 
 /**

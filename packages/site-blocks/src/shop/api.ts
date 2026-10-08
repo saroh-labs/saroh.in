@@ -38,6 +38,18 @@ export interface QuoteWay {
     fee: string | null;
 }
 
+/**
+ * How an order is paid: online in the provider's window, or at the
+ * handover — "Pay when you collect", "Pay on delivery".
+ */
+export type ShopPayment = "ONLINE" | "ON_HANDOVER";
+
+/** A way to pay the chosen way of leaving can take, in the shop's words. */
+export interface QuotePayment {
+    type: ShopPayment;
+    label: string;
+}
+
 /** The bag priced now: every amount is the server's. */
 export interface CheckoutQuote {
     currency: string;
@@ -46,8 +58,37 @@ export interface CheckoutQuote {
     fulfilment: ShopWay | null;
     subtotal: string;
     delivery: string;
+    /**
+     * The code typed in the bag: what it took off the lines, or why it took
+     * nothing — the counter's rules (DEC-104). Null without a code; absent
+     * from an API before site codes.
+     */
+    discount?: QuoteDiscount | null;
     total: string;
     ready: boolean;
+    /**
+     * How an order leaving the chosen way can be paid, online first. Empty
+     * until a way is chosen; absent from an API before offline payment,
+     * which takes online payment only.
+     */
+    payments?: QuotePayment[];
+    /**
+     * Where a pick-up is collected (UX-025): the place's address and
+     * hours. Null when Pick-up isn't offered; absent from an older API.
+     */
+    pickup?: PickupPlace | null;
+}
+
+/** A discount code as the bag shows it. */
+export type QuoteDiscount =
+    | { code: string; applied: true; amount: string }
+    | { code: string; applied: false; reason: string; message: string };
+
+/** A place customers visit, to collect a pick-up from. */
+export interface PickupPlace {
+    address: string;
+    /** "Mon–Sat 10:00–19:00, Sun closed"; null when not set. */
+    hours: string | null;
 }
 
 /** Where a Local delivery or a shipment goes. */
@@ -66,17 +107,26 @@ export interface StartCheckout {
     fulfilment: ShopWay;
     address?: DeliveryAddress;
     notes?: string;
+    /** How it is paid; left out, online. */
+    payment?: ShopPayment;
+    /** A code the bag applied, judged again by the server. */
+    discountCode?: string;
     /** Stable for one checkout, so a double tap starts it once. */
     key: string;
 }
 
-/** A started checkout: the order and the provider's window to open. */
+/**
+ * A started checkout: the order and the provider's window to open — or,
+ * paid at the handover, no window: the order is placed already.
+ */
 export interface CheckoutStarted {
     orderId: string;
     orderNumber: string;
     total: string;
     currency: string;
-    payment: PaymentHandoff;
+    /** Absent from an API before offline payment: online. */
+    payBy?: ShopPayment;
+    payment: PaymentHandoff | null;
 }
 
 /** How a started checkout stands while the payment is confirmed. */
@@ -85,8 +135,9 @@ export interface CheckoutStanding {
     /**
      * refunding: paid, but it sold out or had closed; the refund is owed
      * and being sent. refunded: the provider has taken it — on its way.
+     * to-pay: placed, to be paid at the handover.
      */
-    state: "paying" | "placed" | "refunding" | "refunded" | "closed";
+    state: "paying" | "placed" | "refunding" | "refunded" | "closed" | "to-pay";
     total: string;
     currency: string;
     /** For "refunding" and "refunded": what the customer is told. */
@@ -118,6 +169,7 @@ export interface ShopCheckoutApi {
     quote(body: {
         lines: BagItem[];
         fulfilment?: ShopWay;
+        discountCode?: string;
     }): Promise<ShopResult<CheckoutQuote>>;
     start(body: StartCheckout): Promise<ShopResult<CheckoutStarted>>;
     standing(orderId: string): Promise<ShopResult<CheckoutStanding>>;

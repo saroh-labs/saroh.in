@@ -62,8 +62,8 @@ export type RedeemResult =
 /**
  * Does this code apply to this order, and what comes off?
  *
- * Pure: no database, no clock of its own, integer cents throughout — so a
- * future cart can call the same decision the merchant's order form does.
+ * Pure: no database, no clock of its own, integer cents throughout — so the
+ * site's bag (DEC-104) calls the same decision the merchant's order form does.
  *
  * `appliesTo` decides reach, never the number of reach ids: a STOREFRONT code
  * whose storefronts were all deleted reaches nothing and refuses, rather than
@@ -127,6 +127,52 @@ export function redeem(
         ok: true,
         amountCents: Math.max(0, Math.min(discount.amountCents ?? 0, subtotal)),
     };
+}
+
+/**
+ * Why a typed code took nothing off, beyond the order itself: the business
+ * has no such code, or the storefront belongs to no business to look in.
+ */
+export type CodeRefusal = RedeemRefusal | "UNKNOWN" | "NO_BUSINESS";
+
+/** The refusal, as a sentence for the merchant typing the code. */
+export function codeRefusalMessage(code: string, reason: CodeRefusal): string {
+    switch (reason) {
+        case "UNKNOWN":
+            return `${code} is not a code in this business`;
+        case "NO_BUSINESS":
+            return "This location is not part of a business, so it cannot take a code";
+        default:
+            return refusalMessage(code, reason);
+    }
+}
+
+/**
+ * The refusal, as a sentence for a customer typing the code at a site's
+ * checkout (DEC-104): the same reasons as at the counter, in a shopper's
+ * words — nothing about locations or the business's set-up.
+ */
+export function customerRefusalMessage(
+    code: string,
+    reason: CodeRefusal,
+): string {
+    switch (reason) {
+        case "UNKNOWN":
+            return `${code} isn't a code this shop has. Check it and try again.`;
+        case "NO_BUSINESS":
+            return "This shop can't take codes.";
+        case "SCHEDULED":
+            return `${code} can't be used yet.`;
+        case "EXPIRED":
+            return `${code} has ended.`;
+        case "EXHAUSTED":
+            return `${code} has been used as many times as it allows.`;
+        case "STOREFRONT":
+        case "CURRENCY":
+            return `${code} can't be used in this shop.`;
+        case "NO_MATCH":
+            return `${code} doesn't apply to anything in your bag.`;
+    }
 }
 
 /** The refusal, as a sentence for the merchant typing the code. */

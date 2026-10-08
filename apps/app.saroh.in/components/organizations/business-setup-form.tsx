@@ -35,6 +35,11 @@ import {
     ORGANIZATION_KINDS,
 } from "@/lib/organizations/kind";
 import type { AddressAvailability } from "@/lib/organizations/service";
+import { browserZone } from "@/lib/organizations/time-zones";
+import {
+    startCheckoutAfterOnboarding,
+    takeLaunchOfferAfterOnboarding,
+} from "@/lib/saroh-billing/checkout-actions";
 
 import { SetupKindChoice } from "./setup-kind-choice";
 
@@ -54,9 +59,9 @@ const COMMON_COUNTRIES = [
 /**
  * Setup asks only whether the business is registered; Settings › Business
  * offers the six types (F10). Registered saves no type: "registered" is this
- * form's own value and never reaches the API, so a Pvt Ltd, LLP or
- * partnership isn't guessed at. They pick the real one in Settings before
- * they go live.
+ * form's own value, sent as `registered: true`, so a Pvt Ltd, LLP or
+ * partnership isn't guessed at. The take-money checklist then asks for the
+ * real one before they go live (`ready.ts`).
  */
 const TYPES = [
     {
@@ -105,24 +110,43 @@ type FormValues = z.infer<typeof formSchema>;
 export function BusinessSetupForm({
     email,
     backTo,
+    checkout,
+    invite,
+    defaultName,
 }: {
     /** Who is signed in — named beside the way out, so it is clear whose. */
     email: string;
     /** Where Back goes: the workspace, when they already have a business. */
     backTo?: string;
+    /**
+     * The paid plan picked on saroh.in (plan U27): once the business exists,
+     * its checkout. Null: it starts on Free, as every business does.
+     */
+    checkout?: { plan: string; cycle: "month" | "year"; name: string } | null;
+    /**
+     * An opening-day invite's token (plan U31): once the business exists,
+     * it takes the launch offer. It wins over `checkout`.
+     */
+    invite?: string | null;
+    /** The name the business was listed under on the waitlist (U31). */
+    defaultName?: string;
 }) {
     const router = useRouter();
     const form = useForm<FormValues>({
         resolver: zodResolver(formSchema),
         defaultValues: {
             kind: undefined,
-            name: "",
+            name: defaultName ?? "",
             address: "",
             type: undefined,
             country: "IN",
         },
     });
     const { isSubmitting } = form.formState;
+    // Set up, and on the way to Home: the push takes a moment, and the
+    // button stays "Setting up…" until the page goes (UX-076).
+    const [leaving, setLeaving] = useState(false);
+    const busy = isSubmitting || leaving;
 
     /** Whether the merchant has typed an address of their own. */
     const [edited, setEdited] = useState(false);
@@ -193,16 +217,23 @@ export function BusinessSetupForm({
         // A site for my work is not asked (KTD-6), so it sends no type even
         // if one was picked under another answer first.
         const asked = kindDefaults(values.kind).asksRegistered;
+        const zone = browserZone();
         const res = await createOrganization({
             name: values.name.trim(),
             kind: values.kind,
             address: values.address,
             profile: {
-                // Registered leaves the type unset (see TYPES).
+                // Registered leaves the type unset and says so (see TYPES).
                 ...(asked && values.type === "individual"
-                    ? { type: "individual" }
+                    ? { type: "individual", registered: false }
+                    : {}),
+                ...(asked && values.type === "registered"
+                    ? { registered: true }
                     : {}),
                 country: values.country,
+                // The browser's zone (UX-008): the business's for a country
+                // that keeps several; one that keeps one zone uses that.
+                ...(zone ? { timezone: zone } : {}),
             },
         });
         if (!res.ok) {
@@ -213,6 +244,36 @@ export function BusinessSetupForm({
             }
             return;
         }
+        if (invite) {
+            // Where the waitlist entry is marked joined and the offer
+            // starts; the API checks the invite against this account.
+            const taken = await takeLaunchOfferAfterOnboarding(invite);
+            if (!taken.ok) {
+                showError(
+                    `${values.name.trim()} is set up, but the launch offer isn't applied yet.`,
+                    taken.error,
+                );
+            }
+        } else if (checkout) {
+            const started = await startCheckoutAfterOnboarding({
+                plan: checkout.plan,
+                cycle: checkout.cycle,
+            });
+            if (started.kind === "authorise") {
+                // The provider's page, given once (U15). Leaving the app,
+                // so the button stays "Setting up…" until the page goes.
+                window.location.assign(started.url);
+                await new Promise(() => undefined);
+                return;
+            }
+            if (started.kind === "failed") {
+                showError(
+                    `${values.name.trim()} is set up, but ${checkout.name} isn't started yet.`,
+                    started.error,
+                );
+            }
+        }
+        setLeaving(true);
         router.push("/");
         router.refresh();
     }
@@ -344,7 +405,7 @@ export function BusinessSetupForm({
                                             aria-hidden
                                             className="size-3.5"
                                         />
-                                        Free — your website will live here.
+                                        Available. Your website will live here.
                                     </span>
                                 ) : taken ? (
                                     availability.reason
@@ -493,14 +554,14 @@ export function BusinessSetupForm({
                     <Button
                         type="submit"
                         className="wk-press h-10 flex-1 font-semibold"
-                        disabled={isSubmitting || taken}
+                        disabled={busy || taken}
                         title={
                             taken && availability.reason
                                 ? availability.reason
                                 : undefined
                         }
                     >
-                        {isSubmitting
+                        {busy
                             ? "Setting up…"
                             : kind === "BUSINESS"
                               ? "Create the business"

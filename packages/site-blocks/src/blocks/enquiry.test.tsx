@@ -6,7 +6,11 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import type { SendResult } from "../account/messages";
 import { PageSections } from "../section-renderer";
 import type { EnquiryThread } from "./enquiry";
-import EnquirySection, { THREAD_MESSAGE_MAX } from "./enquiry";
+import EnquirySection, {
+    ENQUIRY_FALLBACK_ERROR,
+    enquiryErrorMessage,
+    THREAD_MESSAGE_MAX,
+} from "./enquiry";
 
 /**
  * The Contact page's form for a signed-in customer (round-2 A13): it asks
@@ -172,5 +176,61 @@ describe("the Contact page's form, signed in (A13)", () => {
             />,
         );
         expect(screen.getByText(/^Signed in as Farah Khan\./)).toBeTruthy();
+    });
+});
+
+describe("enquiryErrorMessage (UX-066)", () => {
+    const fields = [
+        {
+            name: "email",
+            label: "Email",
+            type: "email" as const,
+            required: true,
+        },
+        {
+            name: "name",
+            label: "Your name",
+            type: "text" as const,
+            required: true,
+        },
+    ];
+
+    it("says a bad email in words", () => {
+        expect(
+            enquiryErrorMessage(
+                {
+                    error: {
+                        message: 'Field "email" must be a valid email',
+                        details: { field: "email", reason: "invalid_email" },
+                    },
+                },
+                fields,
+            ),
+        ).toBe(
+            "That email doesn't look right — check for a missing @ or a typo.",
+        );
+    });
+
+    it("names the box that needs filling in by its label", () => {
+        expect(
+            enquiryErrorMessage(
+                { error: { details: { field: "name", reason: "required" } } },
+                fields,
+            ),
+        ).toBe("Please fill in your name.");
+    });
+
+    it("never shows the API's own words", () => {
+        expect(
+            enquiryErrorMessage(
+                {
+                    error: {
+                        message: "This form is misconfigured (no email field)",
+                    },
+                },
+                fields,
+            ),
+        ).toBe(ENQUIRY_FALLBACK_ERROR);
+        expect(enquiryErrorMessage(null, fields)).toBe(ENQUIRY_FALLBACK_ERROR);
     });
 });

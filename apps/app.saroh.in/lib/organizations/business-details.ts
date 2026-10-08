@@ -1,11 +1,13 @@
 import { gstinProblem } from "@/lib/invoices/gstin";
 
+import type { OrganizationKind } from "./kind";
 import { kindOf, kindWords } from "./kind";
 import type { RegisteredAddressValues } from "./registered-address";
 import { PIN_SHAPE } from "./registered-address";
 import type {
     OrganizationSettings,
     OrganizationSettingsInput,
+    readOrganizationSettings,
 } from "./settings-service";
 
 /**
@@ -172,4 +174,55 @@ export function detailsWhy(
     const what =
         address && gstin ? `${yours} and GSTIN` : gstin ? "your GSTIN" : yours;
     return `Every invoice prints ${what}. Add ${address && gstin ? "them" : "it"} once and we'll ${then}.`;
+}
+
+/** What is on file, read before the sheet opens — or why it couldn't be. */
+export type DetailsOnFile =
+    | { state: "failed"; message: string; forbidden: boolean }
+    | {
+          state: "ready";
+          values: BusinessDetailsValues;
+          inIndia: boolean;
+          /** Picks the sheet's words (DEC-070); absent from an older API. */
+          kind: OrganizationKind | undefined;
+      };
+
+/** The step's starting point, from a settings read (a page's or the sheet's). */
+export function detailsOnFileOf(
+    res: Awaited<ReturnType<typeof readOrganizationSettings>>,
+): DetailsOnFile {
+    return res.ok
+        ? {
+              state: "ready",
+              values: detailsValuesOf(res.data),
+              inIndia: inIndia(res.data.profile?.country),
+              kind: res.data.kind,
+          }
+        : { state: "failed", message: res.error, forbidden: res.forbidden };
+}
+
+/**
+ * What the API would refuse an invoice for, read off what is on file — its
+ * `missingFrom` (`modules/invoices/business-details.ts`), rule for rule: the
+ * address is its first line, city, PIN and, for an Indian or registered
+ * business, its state; a registered business needs its GSTIN. Nothing when
+ * the read failed or never happened: the API's refusal is still the
+ * authority, and asks in its own time (#838).
+ */
+export function missingOnFile(
+    onFile: DetailsOnFile | null | undefined,
+): BusinessDetail[] {
+    if (onFile?.state !== "ready") return [];
+    const v = onFile.values;
+    const filled = (s: string) => s.trim() !== "";
+    const needsState = onFile.inIndia || v.gstRegistered;
+    const address =
+        filled(v.addressLine1) &&
+        filled(v.city) &&
+        filled(v.postalCode) &&
+        (!needsState || filled(v.gstState));
+    const missing: BusinessDetail[] = [];
+    if (!address) missing.push("address");
+    if (v.gstRegistered && !filled(v.taxId)) missing.push("gstin");
+    return missing;
 }

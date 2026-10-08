@@ -20,15 +20,27 @@ import {
  * check — the members screen hides what it can, and the API refuses it.
  */
 
+/**
+ * Team, read again with the action's answer (UX-028): the new invite or
+ * change shows at once. `router.refresh()` after the action alone left
+ * "No one else yet" on screen until a reload.
+ */
+const TEAM_PATH = "/settings/people";
+
 export async function inviteMember(input: InviteMemberInput) {
-    return inviteMemberApi(input);
+    const res = await inviteMemberApi(input);
+    if (res.ok) revalidatePath(TEAM_PATH);
+    return res;
 }
 
+/** Revalidates the layout: someone's role decides what their rail shows. */
 export async function updateMemberRole(
     userId: string,
     input: { role: string; siteIds?: string[] },
 ) {
-    return updateMemberRoleApi(userId, input);
+    const res = await updateMemberRoleApi(userId, input);
+    if (res.ok) revalidatePath("/", "layout");
+    return res;
 }
 
 /**
@@ -42,11 +54,15 @@ export async function setMemberExtraActions(userId: string, actions: string[]) {
 }
 
 export async function removeMember(userId: string) {
-    return removeMemberApi(userId);
+    const res = await removeMemberApi(userId);
+    if (res.ok) revalidatePath(TEAM_PATH);
+    return res;
 }
 
 export async function revokeInvitation(invitationId: string) {
-    return revokeInvitationApi(invitationId);
+    const res = await revokeInvitationApi(invitationId);
+    if (res.ok) revalidatePath(TEAM_PATH);
+    return res;
 }
 
 /** Team's storefront-people notice, dismissed for the business (F16). */

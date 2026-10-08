@@ -177,6 +177,62 @@ test.describe("Stock screen", () => {
         }
     });
 
+    test("on a phone, nothing on Levels or the Log hides sideways", async ({
+        page,
+    }, testInfo) => {
+        // T2/T3: under 760px each shelf is a card with a line per storefront
+        // and each log entry two wrapping lines — no scroller, no column cut
+        // off. Read-only on Rye (two storefronts, Hill Road and Online).
+        test.skip(
+            !testInfo.project.name.startsWith("phone"),
+            "the phone layout",
+        );
+        await signIn(page, rye.member);
+        await page.goto(`/open/${rye.org}`);
+
+        /** What scrolls or clips sideways inside `main`, bar the tab strip. */
+        const hidden = () =>
+            page
+                .locator("main")
+                .evaluate((main) =>
+                    [...main.querySelectorAll("*")]
+                        .filter(
+                            (el) =>
+                                !el.closest("nav") &&
+                                getComputedStyle(el).overflowX !== "visible" &&
+                                el.scrollWidth > el.clientWidth + 1,
+                        )
+                        .map(
+                            (el) =>
+                                `${el.tagName}.${(el.getAttribute("class") ?? "").slice(0, 60)} ${el.scrollWidth}/${el.clientWidth}`,
+                        ),
+                );
+
+        await page.goto("/commerce/stock");
+        const levels = page.getByRole("list", { name: "Stock levels" });
+        await expect(levels).toBeVisible();
+        // A beans size Online sells: its Online line is on screen, whole.
+        const beans = levels
+            .getByRole("listitem")
+            .filter({ hasText: "House blend beans" })
+            .filter({ hasText: /Online.*can sell|Online.*Sold out/ })
+            .first();
+        await expect(beans).toBeVisible();
+        const online = beans.getByText(/^Online ·$/);
+        // Scrolled to, its whole line is on screen: nothing cut sideways.
+        await online.scrollIntoViewIfNeeded();
+        await expect(online).toBeInViewport({ ratio: 1 });
+        expect(await hidden()).toEqual([]);
+
+        await page.goto("/commerce/stock?tab=log");
+        const entry = page.locator("main li").filter({ hasText: "→" }).first();
+        await expect(entry).toBeVisible();
+        const after = entry.getByText(/^\d+ → \d+$/);
+        await after.scrollIntoViewIfNeeded();
+        await expect(after).toBeInViewport({ ratio: 1 });
+        expect(await hidden()).toEqual([]);
+    });
+
     test("a role without Commerce is shown the door, not stock", async ({
         page,
     }) => {

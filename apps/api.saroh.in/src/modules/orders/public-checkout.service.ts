@@ -12,6 +12,7 @@ import { prisma, runInOrgContext } from "@saroh/database";
 
 import { toMoneyString } from "../../common/money";
 import { FixedWindowRateLimiter } from "../bookings/rate-limiter";
+import { DiscountsService } from "../discounts/discounts.service";
 import { assertOrganizationOpen } from "../organizations/organization-lifecycle.gate";
 import type { CreateIntentResult } from "../payments/payments.service";
 import { PaymentsService } from "../payments/payments.service";
@@ -27,13 +28,23 @@ import {
     ORDER_CLOSED_WHILE_PAYING,
     SOLD_OUT_REFUNDING,
 } from "../stock/stock-words";
-import type { ShopScope } from "./checkout-bag";
+import type { PickupPlace } from "../stores/pickup-place";
+import type { BagCode, ShopScope } from "./checkout-bag";
 import { priceBag, shopSettings } from "./checkout-bag";
 import type { SiteAccount } from "./checkout-order";
 import { createCheckoutOrder } from "./checkout-order";
 import type { BagLine, CheckoutQuote, CheckoutWay } from "./checkout-quote";
 import { feeCents } from "./checkout-quote";
-import { checkoutReadiness } from "./checkout-readiness";
+import type {
+    CheckoutPayment,
+    CheckoutPayOption,
+    CheckoutReadiness,
+} from "./checkout-readiness";
+import {
+    checkoutReadiness,
+    payableWays,
+    payOptionsFor,
+} from "./checkout-readiness";
 import type { CheckoutQuoteDto, CheckoutStartDto } from "./checkout.dto";
 import {
     assertItemsAllow,
@@ -55,14 +66,18 @@ import { fromCents } from "./order-pricing";
  * - **Priced by the server.** The bag carries listing and variant ids and
  *   quantities; prices, GST (DEC-023), the ways an order can leave and "can
  *   sell" are re-read here (`checkout-quote.ts`).
- * - **Offered only when it can be paid.** A storefront that is paused, or
- *   that no provider can take a payment for, has no checkout: the options
- *   say so, the site offers "Ask about ordering", and start refuses (403)
- *   even when called directly — nothing is created.
+ * - **Offered only when it can be paid.** Online needs a plan with online
+ *   payments and a provider; paying on handover ("Pay when you collect",
+ *   "Pay on delivery") is always open on a plan without them, and on a plan
+ *   with them only when the storefront turns it on (`checkout-readiness.ts`).
+ *   A storefront that is paused, or that neither way can pay for, has no
+ *   checkout: the options say so, the site offers "Ask about ordering", and
+ *   start refuses (403) even when called directly — nothing is created.
  * - **Start is signed in.** Behind `CustomerSessionGuard`: the signed relay
- *   and a live session for this very site. It makes the unpaid online order
- *   (`online-checkout.ts`) and its intent, and a retry with the same key
- *   returns the same pair.
+ *   and a live session for this very site. Paid online, it makes the unpaid
+ *   online order (`online-checkout.ts`) and its intent; paid on handover,
+ *   the order, holding its units, and nothing to pay now. A retry with the
+ *   same key returns the same order.
  * - **Limited.** Options and quote per visitor address; start per address
  *   and per account (at most three checkouts open at once, business-wide;
  *   a new one at a storefront closes the account's older unpaid ones
@@ -85,15 +100,34 @@ export interface CheckoutOptions {
     currency: string;
     /** The ways the storefront offers, with their fees; empty when it can't. */
     ways: CheckoutWay[];
+    /** How it can be paid: online, on handover, both, or neither (can't). */
+    payments: { online: boolean; onHandover: boolean };
+    /**
+     * Where a pick-up is collected (UX-025): the storefront's address and
+     * hours, the business's public details. Null when Pick-up isn't offered.
+     */
+    pickup: PickupPlace | null;
 }
 
-/** A started checkout: the order, and the provider's non-secret handoff. */
+/** The bag priced now, and how an order leaving the chosen way is paid. */
+export interface PricedBag extends CheckoutQuote {
+    /** Empty until a way is chosen, or when the shop can't take orders. */
+    payments: CheckoutPayOption[];
+    /** Where a pick-up is collected (UX-025); null when Pick-up isn't offered. */
+    pickup: PickupPlace | null;
+}
+
+/**
+ * A started checkout: the order, and the provider's non-secret handoff —
+ * or, paid on handover, no handoff: the order is placed already.
+ */
 export interface CheckoutStarted {
     orderId: string;
     orderNumber: string;
     total: string;
     currency: string;
-    payment: CreateIntentResult;
+    payBy: CheckoutPayment;
+    payment: CreateIntentResult | null;
 }
 
 /**
@@ -105,10 +139,11 @@ export interface CheckoutStarted {
  * - refunded: the same, and the provider has taken the refund: the money
  *   is on its way back (DEC-026).
  * - closed: never paid, and closed.
+ * - to-pay: placed to be paid on handover, and not paid yet.
  */
 export interface CheckoutStanding {
     orderNumber: string;
-    state: "paying" | "placed" | "refunding" | "refunded" | "closed";
+    state: "paying" | "placed" | "refunding" | "refunded" | "closed" | "to-pay";
     total: string;
     currency: string;
     /** For "refunding" and "refunded": what the customer is told (DEC-032). */
@@ -146,6 +181,10 @@ export class PublicCheckoutService {
             STARTS_PER_WINDOW,
             START_WINDOW_MS,
         ),
+        // The counter's discount evaluation (DEC-104); stateless, so a test
+        // that builds this service by hand gets the real one.
+        @Optional()
+        private readonly discounts: DiscountsService = new DiscountsService(),
     ) {}
 
     /** Whether this site can take an online order now, and how it leaves. */
@@ -161,20 +200,29 @@ export class PublicCheckoutService {
                 scope.organizationId,
                 scope.storefront.id,
             );
+            const pays = paysOf(ready);
+            const ways = ready.ok
+                ? payableWays(pays, settings.ways).map((type) => {
+                      const fee = feeCents(type, settings.fees);
+                      return {
+                          type,
+                          label: FULFILMENT_RULES[type].label,
+                          fee: fee > 0 ? fromCents(fee) : null,
+                      };
+                  })
+                : [];
             return {
-                canOrder: ready.ok,
+                // No way an order can leave (Pick-up from a place with no
+                // address, UX-025): the product page asks about ordering
+                // rather than filling a bag that can't be checked out.
+                canOrder: ready.ok && ways.length > 0,
                 storefront: { name: scope.storefront.name },
                 currency: settings.currency,
-                ways: ready.ok
-                    ? settings.ways.map((type) => {
-                          const fee = feeCents(type, settings.fees);
-                          return {
-                              type,
-                              label: FULFILMENT_RULES[type].label,
-                              fee: fee > 0 ? fromCents(fee) : null,
-                          };
-                      })
-                    : [],
+                ways,
+                payments: pays,
+                pickup: ways.some((w) => w.type === "PICKUP")
+                    ? settings.pickup
+                    : null,
             };
         });
     }
@@ -184,22 +232,44 @@ export class PublicCheckoutService {
         siteId: string,
         dto: CheckoutQuoteDto,
         callerHash: string | undefined,
-    ): Promise<CheckoutQuote> {
+    ): Promise<PricedBag> {
         this.read(siteId, callerHash);
         return this.inShop(siteId, async (scope) => {
-            const { quote } = await priceBag(
+            const pays = paysOf(
+                await checkoutReadiness(
+                    prisma,
+                    scope.organizationId,
+                    scope.storefront.id,
+                ),
+            );
+            // A shop that can't take orders still prices its bag as it
+            // always has (a test release's bag, DEC-071); only the ways
+            // to pay are empty.
+            const canPay = pays.online || pays.onHandover;
+            const { quote, settings } = await priceBag(
                 scope,
                 bagOf(dto.lines),
                 dto.fulfilment ?? null,
+                canPay ? pays : undefined,
+                this.codeOf(scope, dto.discountCode),
             );
-            return quote;
+            return {
+                ...quote,
+                pickup: quote.ways.some((w) => w.type === "PICKUP")
+                    ? settings.pickup
+                    : null,
+                payments: quote.fulfilment
+                    ? payOptionsFor(pays, quote.fulfilment)
+                    : [],
+            };
         });
     }
 
     /**
      * Start paying: the unpaid online order at the sells-from storefront,
-     * and its intent. The customer is the session's; the relay's address is
-     * what the start limit counts.
+     * and its intent — or, paid on handover, the order holding its units,
+     * with nothing to pay now. The customer is the session's; the relay's
+     * address is what the start limit counts.
      */
     async start(
         siteId: string,
@@ -235,7 +305,11 @@ export class PublicCheckoutService {
                         checkoutKey: dto.key,
                     },
                 },
-                select: { id: true, customer: { select: { email: true } } },
+                select: {
+                    id: true,
+                    payOnHandover: true,
+                    customer: { select: { email: true } },
+                },
             });
             if (existing) {
                 if (
@@ -246,13 +320,18 @@ export class PublicCheckoutService {
                         "That checkout isn't yours. Start again.",
                     );
                 }
-                return this.pay(scope, account, existing.id, dto.key);
+                return existing.payOnHandover
+                    ? this.placed(existing.id)
+                    : this.pay(scope, account, existing.id, dto.key);
             }
 
-            const { quote, lines, settings } = await priceBag(
+            const payBy: CheckoutPayment = dto.payment ?? "ONLINE";
+            const { quote, lines, settings, applied } = await priceBag(
                 scope,
                 bagOf(dto.lines),
                 dto.fulfilment,
+                ready,
+                this.codeOf(scope, dto.discountCode),
             );
             if (!quote.ready || quote.fulfilment !== dto.fulfilment) {
                 throw new ConflictException({
@@ -262,6 +341,37 @@ export class PublicCheckoutService {
                 });
             }
             const type = dto.fulfilment;
+            // A way to pay the shop offers for this way to leave: one turned
+            // off since the bag was priced is a changed bag, priced again.
+            if (!payOptionsFor(ready, type).some((o) => o.type === payBy)) {
+                throw new ConflictException({
+                    message:
+                        "How you can pay has changed. Check your bag, then place your order.",
+                    details: { reason: "bag-changed" },
+                });
+            }
+            // A code that no longer applies (it ended, or its last use went
+            // at the counter meanwhile) is a changed bag: priced again, the
+            // bag says why — never a full-price order the customer didn't
+            // agree to.
+            if (dto.discountCode && !applied) {
+                throw new ConflictException({
+                    message:
+                        quote.discount && !quote.discount.applied
+                            ? quote.discount.message
+                            : "Your code no longer applies. Check your bag, then place your order.",
+                    details: { reason: "bag-changed", field: "discountCode" },
+                });
+            }
+            // Nothing left to pay online: a provider can't take a payment
+            // of nothing, so the order is placed to be settled at the handover.
+            if (payBy === "ONLINE" && applied && Number(quote.total) <= 0) {
+                throw new ConflictException({
+                    message:
+                        "Your code covers the whole order, so there's nothing to pay online. Choose to pay when it reaches you.",
+                    details: { reason: "bag-changed", field: "discountCode" },
+                });
+            }
             // A product that lists how it may leave refuses any other (B12).
             assertItemsAllow(lines, type);
             if (shipsToAddress(type) && !dto.address) {
@@ -277,8 +387,12 @@ export class PublicCheckoutService {
                 shippingCents: feeCents(type, settings.fees),
                 currency: settings.currency,
                 dto,
+                payOnHandover: payBy === "ON_HANDOVER",
+                discount: applied,
             });
-            return this.pay(scope, account, orderId, dto.key);
+            return payBy === "ON_HANDOVER"
+                ? this.placed(orderId)
+                : this.pay(scope, account, orderId, dto.key);
         });
     }
 
@@ -304,6 +418,7 @@ export class PublicCheckoutService {
                     currency: true,
                     status: true,
                     paymentStatus: true,
+                    payOnHandover: true,
                     customer: { select: { email: true } },
                     paymentIntents: {
                         select: {
@@ -350,7 +465,9 @@ export class PublicCheckoutService {
                           : "refunding"
                       : order.status === "CANCELLED"
                         ? "closed"
-                        : "paying";
+                        : order.payOnHandover
+                          ? "to-pay"
+                          : "paying";
             return {
                 orderNumber: order.orderId,
                 state,
@@ -367,6 +484,19 @@ export class PublicCheckoutService {
     }
 
     // -----------------------------------------------------------------------
+
+    /** A typed code, bound to the counter's evaluation for this business. */
+    private codeOf(
+        scope: ShopScope,
+        code: string | null | undefined,
+    ): BagCode | null {
+        if (!code) return null;
+        return {
+            code,
+            check: (order) =>
+                this.discounts.checkForOrder(scope.organizationId, code, order),
+        };
+    }
 
     private read(siteId: string, callerHash: string | undefined): void {
         // A caller the platform gives no address for shares one bucket per
@@ -455,9 +585,36 @@ export class PublicCheckoutService {
             orderNumber: order.orderId,
             total: toMoneyString(order.total),
             currency: order.currency,
+            payBy: "ONLINE",
             payment,
         };
     }
+
+    /** An order placed to be paid on handover: nothing to pay now. */
+    private async placed(orderId: string): Promise<CheckoutStarted> {
+        const order = await prisma.order.findUniqueOrThrow({
+            where: { id: orderId },
+            select: { orderId: true, total: true, currency: true },
+        });
+        return {
+            orderId,
+            orderNumber: order.orderId,
+            total: toMoneyString(order.total),
+            currency: order.currency,
+            payBy: "ON_HANDOVER",
+            payment: null,
+        };
+    }
+}
+
+/** How a storefront can be paid; neither when it can't take orders. */
+function paysOf(ready: CheckoutReadiness): {
+    online: boolean;
+    onHandover: boolean;
+} {
+    return ready.ok
+        ? { online: ready.online, onHandover: ready.onHandover }
+        : { online: false, onHandover: false };
 }
 
 function bagOf(

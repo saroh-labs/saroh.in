@@ -13,6 +13,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { ModuleView } from "@/lib/modules/schema";
 import type { SetupDefaults } from "@/lib/modules/turn-on-schema";
 import type { EnableResult } from "@/lib/modules/turn-on-service";
+import type { ConnectLocks } from "@/lib/providers/connect-lock";
 
 import { TurnOnSheet } from "./turn-on-sheet";
 
@@ -20,7 +21,10 @@ const readSetupDefaultsAction =
     vi.fn<(keys: string[]) => Promise<SetupDefaults[]>>();
 const enableModuleAction =
     vi.fn<(key: string, setup: object) => Promise<EnableResult>>();
+/** What the plan won't let the business connect (UX-006); none by default. */
+let locks: ConnectLocks = { payments: null, messaging: null };
 vi.mock("@/lib/modules/turn-on-actions", () => ({
+    readConnectLocksAction: () => Promise.resolve(locks),
     readSetupDefaultsAction: (keys: string[]) => readSetupDefaultsAction(keys),
     enableModuleAction: (key: string, setup: object) =>
         enableModuleAction(key, setup),
@@ -122,6 +126,9 @@ const DEFAULTS: Record<string, SetupDefaults["defaults"]> = {
 let hiddenKeys: string[] = [];
 /** The template the API says a new site starts from (K15); null says none. */
 let websiteTemplate: { id: string; name: string } | null = null;
+/** The templates the API says it could start from instead (U12). */
+let websiteTemplates: SetupDefaults["templates"] = [];
+let websiteKind: string | null = null;
 
 /** jsdom has no layout, so nothing to observe. */
 class NoResize {
@@ -145,6 +152,9 @@ beforeEach(() => {
     ).IS_REACT_ACT_ENVIRONMENT = true;
     hiddenKeys = [];
     websiteTemplate = null;
+    locks = { payments: null, messaging: null };
+    websiteTemplates = [];
+    websiteKind = null;
     // Radix's checkbox measures itself; jsdom has no ResizeObserver.
     vi.stubGlobal("ResizeObserver", NoResize);
     readSetupDefaultsAction.mockReset();
@@ -157,6 +167,8 @@ beforeEach(() => {
                 hidden: hiddenKeys.includes(key),
                 read: true,
                 template: key === "WEBSITE" ? websiteTemplate : null,
+                templates: key === "WEBSITE" ? websiteTemplates : [],
+                kind: key === "WEBSITE" ? websiteKind : null,
             })),
         ),
     );
@@ -437,6 +449,65 @@ describe("Website", () => {
         });
     });
 
+    it("offers the templates suggested for the business, and sends one chosen (U12)", async () => {
+        websiteTemplate = { id: "starter", name: "Starter" };
+        websiteKind = "BUSINESS";
+        websiteTemplates = [
+            { id: "starter", name: "Starter", kinds: [], uses: [] },
+            { id: "portfolio", name: "Portfolio", kinds: [], uses: [] },
+            {
+                id: "bakery",
+                name: "Bakery",
+                kinds: ["food"],
+                uses: ["COMMERCE"],
+            },
+            { id: "gym", name: "Gym", kinds: ["gym"], uses: ["APPOINTMENTS"] },
+        ];
+        // Sell is turned on with the website, so a shop's template suits.
+        await open(["COMMERCE", "WEBSITE"]);
+        const group = () => {
+            const label = Array.from(sheet().querySelectorAll("span")).find(
+                (el) => el.textContent === "Starts from",
+            );
+            const el = sheet().querySelector(
+                `[role="radiogroup"][aria-labelledby="${label?.id}"]`,
+            );
+            if (!el) throw new Error("No template choice");
+            return el;
+        };
+        const radios = () =>
+            Array.from(
+                group().querySelectorAll<HTMLButtonElement>('[role="radio"]'),
+            );
+        const names = radios().map((r) => r.closest("label")?.textContent);
+        // The kind's first; Bookings is off, so not the gym's; Portfolio
+        // is not a business's.
+        expect(names).toEqual(["Starter", "BakeryUses Products"]);
+        expect(radios()[0]?.getAttribute("aria-checked")).toBe("true");
+        expect(text()).toContain("Uses Products");
+
+        await press(radios()[1]);
+        await press(button(/^Turn on/));
+        expect(enableModuleAction).toHaveBeenCalledWith("WEBSITE", {
+            siteName: "Northwind",
+            address: "northwind",
+            templateId: "bakery",
+        });
+    });
+
+    it("keeps the sentence when only the kind's template suits", async () => {
+        websiteTemplate = { id: "portfolio", name: "Portfolio" };
+        websiteKind = "WORK";
+        websiteTemplates = [
+            { id: "starter", name: "Starter", kinds: [], uses: [] },
+            { id: "portfolio", name: "Portfolio", kinds: [], uses: [] },
+        ];
+        await open(["WEBSITE"]);
+        expect(text()).toContain(
+            "Starts from the Portfolio template. Change its pages any time.",
+        );
+    });
+
     it("says a refusal it can't place at the top of the sheet", async () => {
         enableModuleAction.mockResolvedValueOnce({
             ok: false,
@@ -466,7 +537,7 @@ describe("Payments and Communications", () => {
         await open(["PAYMENTS"]);
         await press(button(/^Later$/));
         expect(enableModuleAction).toHaveBeenCalledWith("PAYMENTS", {});
-        expect(push).toHaveBeenCalledWith("/billing/subscriptions");
+        expect(push).toHaveBeenCalledWith("/billing");
     });
 
     it("Communications brings Contacts, and Later stays where it is", async () => {
@@ -484,11 +555,77 @@ describe("Payments and Communications", () => {
     });
 });
 
+describe("on a plan that won't let the business connect (Free, UX-006)", () => {
+    const lock = {
+        comesWith: "Comes with Grow",
+        cta: "See Grow",
+        href: "/settings/billing?plan=grow#change-plan",
+        upgrade: "Grow",
+        full: false,
+    };
+
+    it("Payments: no Connect now, the plan and How to pay us instead, and Turn on", async () => {
+        locks = { payments: lock, messaging: lock };
+        await open(["PAYMENTS"]);
+        expect(text()).toContain(
+            "Taking payment online comes with Grow. Until then, customers pay you the ways you set in How to pay us.",
+        );
+        expect(text()).toContain(
+            "How to pay us for customers who pay you directly.",
+        );
+        expect(text()).not.toContain("Connect now");
+        expect(text()).not.toContain("Razorpay or Cashfree");
+        expect(
+            sheet().querySelector(
+                'a[href="/settings/billing?plan=grow#change-plan"]',
+            ),
+        ).not.toBeNull();
+        await press(button(/^Turn on$/));
+        expect(enableModuleAction).toHaveBeenCalledWith("PAYMENTS", {});
+        // Never sent to Providers to type keys the API refuses.
+        expect(push).toHaveBeenCalledWith("/billing");
+        expect(push).not.toHaveBeenCalledWith("/settings/providers");
+    });
+
+    it("the toast never asks to connect a locked provider", async () => {
+        locks = { payments: lock, messaging: lock };
+        enableModuleAction.mockImplementation((key) =>
+            Promise.resolve({
+                ok: true,
+                module: view(key, {
+                    lifecycle: "ENABLED",
+                    readiness:
+                        key === "COMMUNICATIONS" ? "SETUP_REQUIRED" : "ACTIVE",
+                    blockers:
+                        key === "COMMUNICATIONS"
+                            ? [{ code: "COMMUNICATIONS_NO_PROVIDER" }]
+                            : [],
+                }),
+                alreadyEnabled: false,
+            }),
+        );
+        await open(["COMMUNICATIONS"]);
+        expect(text()).toContain("Connecting your own email comes with Grow.");
+        await press(button(/^Turn on$/));
+        expect(showSuccess).toHaveBeenCalledWith(
+            "Contacts and Communications are on.",
+        );
+    });
+
+    it("Grow: Connect now is offered as before", async () => {
+        await open(["PAYMENTS"]);
+        expect(text()).toContain("Connect now");
+        expect(text()).not.toContain("comes with Grow");
+    });
+});
+
 describe("Contacts and Insights", () => {
     it("asks nothing, just Turn on", async () => {
         await open(["CRM"]);
         expect(text()).toContain("Turn on Contacts");
-        expect(text()).toContain("Nothing to fill in.");
+        // Never "works as soon as it's on" before "Finish setup" (UX-083).
+        expect(text()).toContain("Nothing to fill in here.");
+        expect(text()).not.toContain("It works as soon as it's on");
         expect(sheet().querySelectorAll("input")).toHaveLength(0);
         await press(button(/^Turn on$/));
         expect(enableModuleAction).toHaveBeenCalledWith("CRM", {});

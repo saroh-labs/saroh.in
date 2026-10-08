@@ -49,6 +49,11 @@ export const APPROVAL_BADGE: Record<
         approved: () => false,
         text: (by) => `Gone live without approval by ${by}`,
     },
+    // The merchant took the request back (UX-068).
+    WITHDRAWN: {
+        approved: () => false,
+        text: (by) => `Review request withdrawn by ${by}`,
+    },
 };
 
 /**
@@ -91,6 +96,7 @@ export function statusReadout({
     lastSavedAt,
     openNotes,
     scheduled = null,
+    zone,
 }: {
     saving: boolean;
     styleSaving: boolean;
@@ -114,6 +120,8 @@ export function statusReadout({
      * next to the live site, whatever the draft says.
      */
     scheduled?: string | null;
+    /** The business's zone, for when the verdict was given (UX-008). */
+    zone: string;
 }): { status: EditorStatus; detail: string; line: string } {
     const status = editorStatus({
         // The style is saved on its own clock; unsaved or saving style is
@@ -156,7 +164,12 @@ export function statusReadout({
             ? `${APPROVAL_BADGE[review.latestApproval.outcome].text(
                   review.latestApproval.by,
                   review.approvalIsStale,
-              )} · ${exactDate(review.latestApproval.at)}`
+              )} · ${exactDate(review.latestApproval.at, zone)}`
+            : null,
+        // What they asked to change, in their words (UX-043).
+        review.latestApproval?.outcome === "CHANGES_REQUESTED" &&
+        review.latestApproval.reason
+            ? `“${review.latestApproval.reason}”`
             : null,
         openNotes > 0
             ? `${openNotes} open ${openNotes === 1 ? "note" : "notes"}`

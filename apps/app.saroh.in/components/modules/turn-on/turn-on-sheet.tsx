@@ -9,6 +9,7 @@ import {
     SheetTitle,
 } from "@saroh/ui/sheet";
 import { Skeleton } from "@saroh/ui/skeleton";
+import Link from "next/link";
 import type { ReactNode } from "react";
 import { useRef, useState } from "react";
 
@@ -21,9 +22,12 @@ import {
     comesWithLines,
     CONNECT_KEYS,
     GIVES,
+    GIVES_OFFLINE,
     hasSetup,
     moduleName,
 } from "@/lib/modules/turn-on";
+import type { ConnectLock } from "@/lib/providers/connect-lock";
+import { connectLockFor, connectLockLine } from "@/lib/providers/connect-lock";
 
 import { BookingsFields } from "./bookings-fields";
 import { Section } from "./field";
@@ -111,7 +115,12 @@ function TurnOnBody({
     const names = picked.map((k) => moduleName(k, modules));
     const single = picked.length === 1 ? picked[0] : undefined;
     const fielded = plan.order.filter(hasSetup);
-    const connecting = plan.order.filter((k) => CONNECT_KEYS.has(k));
+    // A provider the plan won't let the business connect is never offered
+    // (UX-006): its module says so in place of "Connect now / Later".
+    const lockOf = (k: string) => connectLockFor(k, t.locks);
+    const connecting = plan.order.filter(
+        (k) => CONNECT_KEYS.has(k) && !lockOf(k),
+    );
     // Payments or Communications with nothing else to fill in: its two
     // answers are the sheet's two buttons.
     const connectButtons =
@@ -152,9 +161,11 @@ function TurnOnBody({
                     Turn on {listWords(names)}
                 </SheetTitle>
                 <SheetDescription className="mt-0.5 text-pretty text-[12.5px] leading-normal text-muted-foreground">
-                    {single && GIVES[single]
-                        ? GIVES[single]
-                        : "Each one works as soon as it's on. Anything else waits in Finish setup."}
+                    {single && lockOf(single) && GIVES_OFFLINE[single]
+                        ? GIVES_OFFLINE[single]
+                        : single && GIVES[single]
+                          ? GIVES[single]
+                          : "Each one works as soon as it's on. Anything else waits in Finish setup."}
                 </SheetDescription>
             </div>
 
@@ -233,6 +244,18 @@ function TurnOnBody({
                                             errors={errorsOf(k)}
                                             suggestion={t.suggestion}
                                             template={t.websiteTemplate}
+                                            choices={t.websiteChoices}
+                                        />
+                                    </Section>
+                                );
+                            }
+                            const lock = CONNECT_KEYS.has(k) ? lockOf(k) : null;
+                            if (lock) {
+                                return (
+                                    <Section key={k} title={title}>
+                                        <ConnectLocked
+                                            moduleKey={k}
+                                            lock={lock}
                                         />
                                     </Section>
                                 );
@@ -250,10 +273,12 @@ function TurnOnBody({
                             }
                             return null;
                         })}
-                        {fielded.length === 0 && !connectButtons ? (
+                        {fielded.length === 0 &&
+                        !connectButtons &&
+                        !plan.order.some((k) => lockOf(k)) ? (
                             <p className="text-[12.5px] text-muted-foreground">
-                                Nothing to fill in. It works as soon as
-                                it&apos;s on.
+                                Nothing to fill in here. Anything it still needs
+                                is said once it&apos;s on.
                             </p>
                         ) : null}
                         {connectButtons ? (
@@ -339,6 +364,31 @@ function ActionBar({ children }: { children: ReactNode }) {
             className="flex flex-wrap items-center justify-end gap-2 border-t border-border bg-card px-[18px] py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]"
         >
             {children}
+        </div>
+    );
+}
+
+/**
+ * In place of "Connect now / Later" when the plan won't let the business
+ * connect this provider (DEC-091, UX-006): what it means, and See plans.
+ * The module still turns on — Payments as the offline kind.
+ */
+function ConnectLocked({
+    moduleKey,
+    lock,
+}: {
+    moduleKey: string;
+    lock: ConnectLock;
+}) {
+    return (
+        <div className="grid gap-2 rounded-[9px] bg-muted px-3 py-2.5 text-[12.5px] leading-normal">
+            <p className="text-pretty">{connectLockLine(moduleKey, lock)}</p>
+            <Link
+                href={lock.href}
+                className="justify-self-start font-semibold text-foreground underline underline-offset-2"
+            >
+                {lock.cta}
+            </Link>
         </div>
     );
 }

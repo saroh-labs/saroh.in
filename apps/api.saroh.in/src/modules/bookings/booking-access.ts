@@ -59,6 +59,16 @@ export function requireBookingPower(
     );
 }
 
+/**
+ * Whether this person may take payment at the desk (P2): `booking:write`
+ * for the booking and `invoice:write` for the paper it marks paid. Asked of
+ * the role's permissions only, never its name (DEC-098), so a role the
+ * business made with both takes payment and one without is told why.
+ */
+export function mayTakeDeskPayment(ctx: OrganizationContext): boolean {
+    return allows(ctx, "booking:write") && allows(ctx, "invoice:write");
+}
+
 /** Spending or giving back a holder's class on a booking. */
 export const CANT_USE_PACKS =
     "Your role can't pay for bookings with class packs.";

@@ -17,6 +17,7 @@ function build(opts: {
     } as unknown as FeatureFlagService;
     const entitlements = {
         can: jest.fn().mockResolvedValue(opts.entitled ?? true),
+        moduleIncluded: jest.fn().mockResolvedValue(true),
     } as unknown as EntitlementService;
     const readiness = {
         evaluate: jest.fn().mockResolvedValue(

@@ -18,6 +18,7 @@ import { contactReach } from "../site-accounts/notice-reach";
 import { isValidSlotStart } from "./availability";
 import { requireBookingPower } from "./booking-access";
 import { refuseIfClosed, toAvailabilityService } from "./booking-slots";
+import { openingFor, refuseOutsideOpening } from "./opening-hours";
 import type { SignedInCustomer } from "./public-bookings.service";
 import {
     alreadyBooked,
@@ -113,6 +114,12 @@ export class WaitlistService {
             startAt,
             sessionEnd(service, startAt),
         );
+        // An in-person class keeps to opening hours (DEC-087). One offered
+        // either way may still be had online, so its line is not refused.
+        refuseOutsideOpening(await openingFor(service, "ONLINE"), {
+            startAt,
+            endAt: sessionEnd(service, startAt),
+        });
         if (!mayOffer(startAt, now)) {
             throw new ConflictException({
                 message: WAITLIST_WORDS.tooLate,

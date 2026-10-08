@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import type { ModuleView } from "@/lib/modules/schema";
+import type { PayInstructionsSettings } from "@/lib/organizations/pay-instructions";
 import type { ConnectedCommsProvider } from "@/lib/providers/service";
 
 import { settingsChecklist } from "./nudges";
@@ -146,6 +147,48 @@ describe("emailAttention", () => {
             "Needs you: email is disconnected",
         );
         expect(providersTabNote(null)).toBeNull();
+        // Free can't connect its own email (DEC-091): never "Needs you",
+        // and only who may see the plans hears a paid plan brings it.
+        const held = { connected: false, canConnect: false };
+        expect(providersTabNote("not-connected", { setup: held })).toBeNull();
+        expect(
+            providersTabNote("not-connected", { setup: held, mayPlans: true }),
+        ).toBe("Your own email comes with a paid plan");
+        expect(
+            providersTabNote("not-connected", {
+                setup: { connected: false, canConnect: true },
+            }),
+        ).toBe("Needs you: no email provider yet");
+        expect(providersTabNote("disconnected", { setup: held })).toBe(
+            "Needs you: email is disconnected",
+        );
+        // Keys refused (UX-012) is said whatever the plan.
+        expect(providersTabNote("refused", { setup: held })).toBe(
+            "Needs you: your email provider refused its keys",
+        );
+    });
+
+    it("on a plan that can't connect one (DEC-091), says a paid plan brings it, to who may see the plans", () => {
+        const free = { connected: false, canConnect: false };
+        expect(
+            providersTabNote("not-connected", { setup: free, mayPlans: true }),
+        ).toBe("Your own email comes with a paid plan");
+        expect(
+            providersTabNote("not-connected", { setup: free, mayPlans: false }),
+        ).toBeNull();
+        // Room to connect, or unread: as before.
+        expect(
+            providersTabNote("not-connected", {
+                setup: { connected: false, canConnect: true },
+                mayPlans: true,
+            }),
+        ).toBe("Needs you: no email provider yet");
+        expect(providersTabNote("not-connected")).toBe(
+            "Needs you: no email provider yet",
+        );
+        expect(
+            providersTabNote("disconnected", { setup: free, mayPlans: false }),
+        ).toBe("Needs you: email is disconnected");
     });
 });
 
@@ -238,6 +281,129 @@ describe("readyChecklist", () => {
         const pay = r.left.find((i) => i.key === "payments");
         expect(pay?.href).toBe("/settings/modules");
         expect(pay?.why).toMatch(/Turn on Payments/);
+    });
+
+    it("on a plan without online payments, says it beside the steps, outside the count (#835, DEC-092)", () => {
+        const facts = {
+            products: 0,
+            services: 0,
+            sites: 0,
+            sitesNotLive: 0,
+            onlinePaymentsInPlan: false,
+        };
+        const notConnected = mod("PAYMENTS", {
+            readiness: "SETUP_REQUIRED",
+            blockers: [
+                {
+                    code: "PAYMENTS_NO_PROVIDER",
+                    actionHref: "/settings/providers",
+                },
+            ],
+        });
+        const r = readyChecklist({
+            settings: { ...settled, setup: facts },
+            modules: [notConnected],
+        });
+        // Not a step: neither counted nor left.
+        expect(r.steps.map((s) => s.key)).not.toContain("payments");
+        expect(r.left.map((i) => i.key)).not.toContain("payments");
+        expect(r.outside).toHaveLength(1);
+        expect(r.outside[0]).toMatchObject({
+            key: "payments",
+            label: "Take payment online",
+            comesWith: "Comes with a paid plan",
+            cta: "See plans",
+            href: "/settings/billing#change-plan",
+        });
+        expect(r.outside[0]?.why).toMatch(/How to pay us/);
+        // The heading stays about money.
+        expect(checklistHeading(r)).toBe("Get ready to take money");
+
+        // The catalogue names the plan that has it: said, and linked to.
+        const named = readyChecklist({
+            settings: { ...settled, setup: facts },
+            modules: [notConnected],
+            onlineUpgrade: { planId: "plan_b", name: "Plan B", pricePaise: 0 },
+        });
+        expect(named.outside[0]).toMatchObject({
+            comesWith: "Comes with Plan B",
+            href: "/settings/billing?plan=plan_b#change-plan",
+        });
+
+        // Payments off and something sells: still the plan, not "Turn on".
+        const off = readyChecklist({
+            settings: { ...settled, setup: facts },
+            modules: [
+                mod("PAYMENTS", {
+                    lifecycle: "DISABLED",
+                    readiness: "DISABLED",
+                }),
+                mod("APPOINTMENTS"),
+            ],
+        });
+        expect(off.left.map((i) => i.key)).not.toContain("payments");
+        expect(off.outside.map((a) => a.key)).toEqual(["payments"]);
+        // Off with nothing that sells: no money to take, nothing said.
+        const quiet = readyChecklist({
+            settings: { ...settled, setup: facts },
+            modules: [
+                mod("PAYMENTS", {
+                    lifecycle: "DISABLED",
+                    readiness: "DISABLED",
+                }),
+            ],
+        });
+        expect(quiet.steps.map((s) => s.key)).not.toContain("payments");
+        expect(quiet.outside).toEqual([]);
+
+        // A plan with online payments keeps the provider step, counted.
+        const paid = readyChecklist({
+            settings: {
+                ...settled,
+                setup: { ...facts, onlinePaymentsInPlan: true },
+            },
+            modules: [notConnected],
+        });
+        expect(paid.left.find((i) => i.key === "payments")).toMatchObject({
+            label: "Connect payments",
+            href: "/settings/providers",
+        });
+        expect(paid.outside).toEqual([]);
+    });
+
+    it("lets a business on a plan without online payments reach all done (DEC-092)", () => {
+        const facts = {
+            products: 1,
+            services: 0,
+            sites: 1,
+            sitesNotLive: 0,
+            onlinePaymentsInPlan: false,
+        };
+        const modules = [
+            mod("PAYMENTS", {
+                readiness: "SETUP_REQUIRED",
+                blockers: [{ code: "PAYMENTS_NO_PROVIDER" }],
+            }),
+            mod("COMMERCE"),
+            mod("WEBSITE"),
+        ];
+        const r = readyChecklist({
+            settings: { ...settled, setup: facts },
+            modules,
+        });
+        expect(r.total).toBeGreaterThan(0);
+        expect(r.done).toBe(r.total);
+        expect(r.left).toEqual([]);
+        expect(takeMoneyPlace(r, false)).toBeNull();
+        expect(r.outside.map((a) => a.key)).toEqual(["payments"]);
+        // Settings' card carries the same aside, and the same count.
+        const settings = settingsChecklist({
+            settings: { ...settled, setup: facts, logo: null },
+            modules,
+            messaging: null,
+        });
+        expect(settings.outside).toEqual(r.outside);
+        expect(settings.steps.map((s) => s.key)).not.toContain("payments");
     });
 
     it("says a provider that stopped is broken", () => {
@@ -518,9 +684,10 @@ describe("steps only when something invoices or takes money (DEC-070)", () => {
             "address",
             "site",
         ]);
-        expect(settingsChecklist(input).steps.map((s) => s.key)).toEqual([
-            "address",
-            "site",
+        // Settings counts Home's steps; the rest is "Make it yours" (UX-019).
+        const settings = settingsChecklist(input);
+        expect(settings.steps.map((s) => s.key)).toEqual(["address", "site"]);
+        expect((settings.extras ?? []).map((s) => s.key)).toEqual([
             "businessType",
             "logo",
         ]);
@@ -556,7 +723,8 @@ describe("steps only when something invoices or takes money (DEC-070)", () => {
         expect(handlesMoney([mod("WEBSITE")], facts(0))).toBe(false);
         expect(handlesMoney([mod("WEBSITE")], facts(2))).toBe(true);
         expect(handlesMoney([mod("COURSES")], facts(0))).toBe(true);
-        expect(handlesMoney([mod("CLASS_PACKS")], undefined)).toBe(true);
+        // Not offered (DEC-099): hidden, so it says nothing.
+        expect(handlesMoney([mod("CLASS_PACKS")], facts(0))).toBe(false);
         expect(handlesMoney([mod("PAYMENTS")], undefined)).toBe(true);
         expect(handlesMoney(null, facts(1))).toBe(true);
         expect(handlesMoney(null, facts(0))).toBeNull();
@@ -586,36 +754,121 @@ describe("steps only when something invoices or takes money (DEC-070)", () => {
     });
 });
 
-describe("checklistHeading (DEC-070)", () => {
+describe("the real business type, for a business that said Registered (prelaunch)", () => {
+    /** Sells, everything else in, and setup's answer to "Is it registered?". */
+    const input = (
+        registered: boolean | null | undefined,
+        type: string | null,
+    ) => ({
+        settings: {
+            ...settled,
+            profile: { ...settled.profile, type, registered },
+            logo: { url: "https://x/logo.png", mediaId: null },
+            setup: {
+                products: 1,
+                services: 0,
+                sites: 0,
+                sitesNotLive: 0,
+                invoices: 0,
+            },
+        },
+        modules: [mod("PAYMENTS"), mod("COMMERCE")],
+        messaging: null,
+    });
+
+    it("holds back going live until the type is chosen, and says why", () => {
+        const list = readyChecklist(input(true, null));
+        const step = list.steps.find((s) => s.key === "businessType");
+        expect(step).toMatchObject({
+            done: false,
+            label: "Choose your business type",
+            cta: "Choose type",
+            href: "/settings/organization?section=identity#business-type",
+        });
+        expect(step?.why).toMatch(/You said your business is registered/);
+        expect(step?.why).toMatch(/private limited, LLP, partnership/);
+        expect(list.left.map((s) => s.key)).toEqual(["businessType"]);
+        expect(list.done).toBe(list.total - 1);
+    });
+
+    it("is done once a type is chosen", () => {
+        const list = readyChecklist(input(true, "llp"));
+        expect(list.steps.find((s) => s.key === "businessType")?.done).toBe(
+            true,
+        );
+        expect(list.left).toEqual([]);
+    });
+
+    it("comes right after the address", () => {
+        const keys = readyChecklist(input(true, null)).steps.map((s) => s.key);
+        expect(keys.indexOf("businessType")).toBe(keys.indexOf("address") + 1);
+    });
+
+    it.each([
+        ["said Not registered", false],
+        ["wasn't asked", null],
+        ["an older API", undefined],
+    ])("never holds back a business that %s", (_, registered) => {
+        const list = readyChecklist(input(registered, null));
+        expect(list.steps.map((s) => s.key)).not.toContain("businessType");
+        expect(list.left).toEqual([]);
+    });
+
+    it("is asked once in Settings: the step, not the suggestion as well", () => {
+        const all = (list: ReturnType<typeof settingsChecklist>) =>
+            [...list.steps, ...(list.extras ?? [])].map((s) => s.key);
+        const keys = all(settingsChecklist(input(true, null)));
+        expect(keys.filter((k) => k === "businessType")).toHaveLength(1);
+        // Not registered: only Settings' suggestion, which Home never shows.
+        const suggested = settingsChecklist(input(false, null));
+        expect(
+            (suggested.extras ?? []).filter((s) => s.key === "businessType"),
+        ).toHaveLength(1);
+        expect(
+            readyChecklist(input(false, null)).steps.map((s) => s.key),
+        ).not.toContain("businessType");
+    });
+
+    it("isn't asked of a business with nothing that invoices or takes money (DEC-070)", () => {
+        const site = {
+            ...input(true, null),
+            modules: [
+                mod("PAYMENTS", {
+                    lifecycle: "DISABLED",
+                    readiness: "DISABLED",
+                }),
+                mod("WEBSITE"),
+            ],
+        };
+        expect(readyChecklist(site).steps.map((s) => s.key)).not.toContain(
+            "businessType",
+        );
+    });
+});
+
+describe("checklistHeading (DEC-070, UX-019)", () => {
     const steps = (...keys: string[]) => ({
         steps: keys.map((key) => ({ key }) as ReadyStep),
     });
 
-    it("says money while a money step is in the list, done or not", () => {
-        expect(checklistHeading(steps("address", "site"), "home")).toBe(
+    it("says money while a money step is in the list, done or not — one title on Home and Settings", () => {
+        expect(checklistHeading(steps("address", "site"))).toBe(
             "Get ready to take money",
         );
-        expect(checklistHeading(steps("payments"), "settings")).toBe(
-            "Ready to take payments",
+        expect(checklistHeading(steps("payments"))).toBe(
+            "Get ready to take money",
         );
-        expect(checklistHeading(steps("site", "logo"), "settings")).toBe(
-            "Ready to take payments",
+        expect(checklistHeading(steps("howToPay"))).toBe(
+            "Get ready to take money",
         );
     });
 
     it("says the site when publishing it is all there is", () => {
-        expect(checklistHeading(steps("site"), "home")).toBe(
-            "Get your site live",
-        );
-        expect(checklistHeading(steps("site", "pipeline"), "settings")).toBe(
-            "Get your site live",
-        );
+        expect(checklistHeading(steps("site"))).toBe("Get your site live");
     });
 
-    it("says setting up for Settings' other asks alone", () => {
-        expect(checklistHeading(steps("email", "pipeline"), "settings")).toBe(
-            "Finish setting up",
-        );
+    it("says setting up for anything else", () => {
+        expect(checklistHeading(steps())).toBe("Finish setting up");
     });
 });
 
@@ -694,5 +947,200 @@ describe("setup hidden, per business in this browser", () => {
         // Writing over it starts afresh rather than failing.
         expect(writeSetupHidden(() => store, "org-a", true)).toBe(true);
         expect(readSetupHidden(() => store, "org-a")).toBe(true);
+    });
+});
+
+describe("How to pay us as a step, per plan (UX-007)", () => {
+    const facts = (onlinePaymentsInPlan?: boolean) => ({
+        products: 1,
+        services: 0,
+        sites: 0,
+        sitesNotLive: 0,
+        ...(onlinePaymentsInPlan === undefined ? {} : { onlinePaymentsInPlan }),
+    });
+    const none: PayInstructionsSettings = {
+        upiId: null,
+        bankAccountName: null,
+        bankAccountNumber: null,
+        bankIfsc: null,
+        bankName: null,
+        note: null,
+    };
+    const selling = [mod("PAYMENTS"), mod("COMMERCE")];
+
+    it("Free (no online payments): counts it, linked to How to pay us", () => {
+        const r = readyChecklist({
+            settings: {
+                ...settled,
+                setup: facts(false),
+                payInstructions: none,
+            },
+            modules: selling,
+        });
+        const step = r.left.find((i) => i.key === "howToPay");
+        expect(step).toMatchObject({
+            label: "Tell customers how to pay you",
+            href: "/settings/organization?section=pay",
+        });
+        expect(r.steps[0]?.key).toBe("howToPay");
+    });
+
+    it("Free: done with a UPI ID, or whole bank details; a note alone isn't a way to pay", () => {
+        const done = (pay: typeof none) =>
+            readyChecklist({
+                settings: {
+                    ...settled,
+                    setup: facts(false),
+                    payInstructions: pay,
+                },
+                modules: selling,
+            }).steps.find((s) => s.key === "howToPay")?.done;
+        expect(done({ ...none, upiId: "shop@okexample" })).toBe(true);
+        expect(
+            done({
+                ...none,
+                bankAccountNumber: "123456789012",
+                bankIfsc: "ABCD0123456",
+            }),
+        ).toBe(true);
+        expect(done({ ...none, note: "Pay at the counter" })).toBe(false);
+    });
+
+    it("Grow (online payments): not a step, connecting payments is", () => {
+        const r = readyChecklist({
+            settings: { ...settled, setup: facts(true), payInstructions: none },
+            modules: selling,
+        });
+        const keys = r.steps.map((s) => s.key);
+        expect(keys).not.toContain("howToPay");
+        expect(keys).toContain("payments");
+    });
+
+    it("an unread plan never asks it", () => {
+        const r = readyChecklist({
+            settings: { ...settled, setup: facts(), payInstructions: none },
+            modules: selling,
+        });
+        expect(r.steps.map((s) => s.key)).not.toContain("howToPay");
+    });
+
+    it("a site with nothing to sell is never asked it (DEC-070)", () => {
+        const r = readyChecklist({
+            settings: {
+                ...settled,
+                setup: { ...facts(false), invoices: 0 },
+                payInstructions: none,
+            },
+            modules: [
+                mod("PAYMENTS", {
+                    lifecycle: "DISABLED",
+                    readiness: "DISABLED",
+                }),
+                mod("WEBSITE"),
+            ],
+        });
+        expect(r.steps.map((s) => s.key)).not.toContain("howToPay");
+    });
+
+    it("Home and Settings count it the same (UX-019)", () => {
+        const input = {
+            settings: {
+                ...settled,
+                setup: facts(false),
+                payInstructions: none,
+                logo: null,
+            },
+            modules: selling,
+            messaging: null,
+        };
+        const home = readyChecklist(input);
+        const settings = settingsChecklist(input);
+        expect([settings.done, settings.total]).toEqual([
+            home.done,
+            home.total,
+        ]);
+    });
+});
+
+describe("the address saved without its state (UX-018)", () => {
+    it("names the state, not the whole address", () => {
+        const r = readyChecklist({
+            settings: {
+                ...settled,
+                registeredAddress: {
+                    ...settled.registeredAddress,
+                    state: null,
+                },
+            },
+            modules: [mod("COMMERCE")],
+        });
+        expect(r.left.find((i) => i.key === "address")).toMatchObject({
+            label: "Add the state to your address",
+            cta: "Add state",
+        });
+    });
+
+    it("still asks for the address when more than the state is missing", () => {
+        const r = readyChecklist({
+            settings: {
+                ...settled,
+                registeredAddress: {
+                    ...settled.registeredAddress,
+                    state: null,
+                    city: null,
+                },
+            },
+            modules: [mod("COMMERCE")],
+        });
+        expect(r.left.find((i) => i.key === "address")?.label).toBe(
+            "Add your registered address",
+        );
+    });
+});
+
+describe("keys a provider refused (UX-012, FB-7)", () => {
+    const refused = {
+        reason: "KEYS_REFUSED" as const,
+        since: "2026-10-07T00:00:00Z",
+    };
+
+    it("email: needs a person, said as refused keys", () => {
+        const comm = [mod("COMMUNICATIONS")];
+        const attention = emailAttention(comm, [
+            { ...comms("EMAIL"), attention: refused },
+        ]);
+        expect(attention).toBe("refused");
+        expect(providersTabNote(attention)).toBe(
+            "Needs you: your email provider refused its keys",
+        );
+        // One that still works is enough.
+        expect(
+            emailAttention(comm, [
+                { ...comms("EMAIL"), attention: refused },
+                { ...comms("EMAIL"), id: "b" },
+            ]),
+        ).toBeNull();
+    });
+
+    it("payments: the step asks for the keys again, broken", () => {
+        const r = readyChecklist({
+            settings: settled,
+            modules: [
+                mod("PAYMENTS", {
+                    readiness: "ATTENTION_REQUIRED",
+                    blockers: [
+                        {
+                            code: "PAYMENTS_KEYS_REFUSED",
+                            actionHref: "/settings/providers",
+                        },
+                    ],
+                }),
+            ],
+        });
+        expect(r.left.find((i) => i.key === "payments")).toMatchObject({
+            label: "Enter your payment keys again",
+            broken: true,
+            href: "/settings/providers",
+        });
     });
 });

@@ -26,6 +26,17 @@ insufficient" (PRODUCT_STRATEGY §18).
   500px and silently looks fine. Check for horizontal overflow
   (`scrollWidth > innerWidth`) and for controls overlapping, which an overflow
   check misses.
+- **Current** — **On a phone nothing hides sideways** (2026-10-05, Phone
+  Tables audit T10). The page fitting its width is not enough: a wide table
+  inside an `overflow-x-auto` card passes that check while hiding columns.
+  Below 760px rows become cards or lists (DataView does this itself), and
+  whatever must still scroll sideways goes in `ScrollX`
+  (`@saroh/ui/scroll-x`), which fades the side with more, hints once and is
+  keyboard-scrollable. A phone spec that checks the page fits also calls
+  `expectNothingHiddenSideways(page)` (`e2e/fixtures/hidden-sideways.ts`),
+  which fails on any clipping or scrolling box inside `main` other than
+  ScrollX (`data-scroll-x`), a tab strip (`role=tablist`), a calendar grid
+  (`role=grid`) or an `allow` selector.
 - **Adopted** — **Check more than one skin** when the change touches colour,
   radius or density; the four skins differ in both (`frontend-design-system.md`).
 - **Adopted** — **Break the source and look** at any screen that reads data: the

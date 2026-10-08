@@ -141,12 +141,10 @@ describe("bulkActions", () => {
             payment: "UNPAID",
         });
         const one = bulkActions([unpaid, row("NEW")], false);
-        expect(one.note).toBe("1 isn't paid yet — the kitchen can't start it");
+        expect(one.note).toBe("1 isn't paid yet, so it can't be started");
         expect(one.actions[0].lines).toHaveLength(1);
         const two = bulkActions([unpaid, { ...unpaid, id: "ox" }], false);
-        expect(two.note).toBe(
-            "2 aren't paid yet — the kitchen can't start them",
-        );
+        expect(two.note).toBe("2 aren't paid yet, so they can't be started");
         expect(two.actions).toEqual([]);
     });
 

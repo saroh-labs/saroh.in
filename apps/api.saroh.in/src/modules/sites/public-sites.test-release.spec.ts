@@ -11,6 +11,7 @@ jest.mock("./test-release-lookup", () => ({
 
 import { HttpException, HttpStatus } from "@nestjs/common";
 
+import type { PublicFooterService } from "./public-footer.service";
 import { PublicSitesController } from "./public-sites.controller";
 import type { PublicVisitService } from "./public-visit.service";
 import type { SitePreviewLinksService } from "./site-preview-links.service";
@@ -22,6 +23,7 @@ function controller() {
         {} as SitesService,
         {} as SitePreviewLinksService,
         {} as PublicVisitService,
+        {} as PublicFooterService,
     );
 }
 

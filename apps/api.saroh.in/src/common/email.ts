@@ -140,7 +140,10 @@ export type VerificationOtpType =
  * plugin config in @saroh/auth).
  *
  * The console fallback prints the code so local dev, which has no SMTP, can
- * still complete a signup.
+ * still complete a signup. Where the fake code transport is allowed (never in
+ * production, `siteCodesFakeAllowed`), it also leaves the code in the
+ * temp-directory outbox, so a browser test can sign up a new account from
+ * the marketing site end to end (plan U27, `signup-from-marketing.spec.ts`).
  */
 export function sendVerificationOtpEmail(
     to: string,
@@ -152,6 +155,9 @@ export function sendVerificationOtpEmail(
     const minutes = Math.max(1, Math.round(expiresInSeconds / 60));
     if (!transporter) {
         console.info(`[${copy.heading}] (no SMTP) ${to}: code ${otp}`);
+        if (siteCodesFakeAllowed(declaredNodeEnv, env.SITE_CODES_EMAIL_FAKE)) {
+            writeSiteCodeOutbox(to, otp);
+        }
         return Promise.resolve();
     }
     void transporter.sendMail({
@@ -233,9 +239,15 @@ export function sendDeleteAccountEmail(
  */
 export function sendEnquiryNotificationEmail(
     to: string,
-    details: { contactName: string; formName: string; leadUrl: string },
+    details: {
+        contactName: string;
+        formName: string;
+        leadUrl: string;
+        /** A short line of what they wrote (UX-002); null when nothing but an address. */
+        message?: string | null;
+    },
 ): Promise<void> {
-    const { contactName, formName, leadUrl } = details;
+    const { contactName, formName, leadUrl, message } = details;
     if (!transporter) {
         console.info(
             `[New enquiry] (no SMTP) ${to}: ${contactName} via ${formName} -> ${leadUrl}`,
@@ -248,9 +260,104 @@ export function sendEnquiryNotificationEmail(
         subject: `New enquiry from ${contactName}`,
         html: actionEmail(
             `New enquiry from ${contactName}`,
-            `${contactName} submitted the "${formName}" form. Open the lead to follow up.`,
+            message
+                ? `${contactName} wrote through the "${formName}" form: “${message}” Open the lead to reply.`
+                : `${contactName} submitted the "${formName}" form. Open the lead to follow up.`,
             leadUrl,
             "View lead",
+        ),
+    });
+    return Promise.resolve();
+}
+
+/** What a team alert email says, worded by `notifications/team-alert.handler.ts`. */
+export interface TeamAlertMail {
+    subject: string;
+    heading: string;
+    body: string;
+    /** Where it opens in the workspace; none when there is nowhere to open. */
+    url: string | null;
+    /** The button's words; "Open it in Saroh" when not said. */
+    cta?: string;
+    /** Why they got it, and where to change it. */
+    footer: string;
+}
+
+/**
+ * A team alert (round-2 F14: a new order, a booking, a failed payment,
+ * someone joining, a scheduled go-live, a provider that refused its keys,
+ * a website review) to one person on a business's team. The only mail
+ * helper for the team's alerts: every one goes through
+ * `notifications/team-alert.handler.ts`.
+ * Saroh telling a business about its own business, so Saroh sends it, as
+ * the new-enquiry alert above, whether or not the business has an email
+ * provider (DEC-011, amended 2026-10-07).
+ *
+ * Sent in Saroh's own name, so the handler words it in fixed words and the
+ * business's cleaned names only (`site-accounts/sender-name.ts`), never
+ * text a customer typed; everything is escaped again here. Console
+ * fallback with no SMTP, like the other `send*` helpers.
+ */
+export function sendTeamAlertEmail(
+    to: string,
+    mail: TeamAlertMail,
+): Promise<void> {
+    if (!transporter) {
+        console.info(
+            `[Team alert] (no SMTP) ${to}: ${mail.subject}${mail.url ? ` -> ${mail.url}` : ""}`,
+        );
+        return Promise.resolve();
+    }
+    const button = mail.url
+        ? `<p><a href="${esc(mail.url)}" style="display:inline-block;padding:10px 16px;background:#111;color:#fff;text-decoration:none;border-radius:6px">${esc(mail.cta ?? "Open it in Saroh")}</a></p>`
+        : "";
+    void transporter.sendMail({
+        from: FROM,
+        to,
+        subject: mail.subject,
+        html: `<div style="font-family:sans-serif;max-width:480px;margin:0 auto">
+  <h2>${esc(mail.heading)}</h2>
+  <p>${esc(mail.body)}</p>
+  ${button}
+  <p style="color:#666;font-size:12px">${esc(mail.footer)}</p>
+</div>`,
+    });
+    return Promise.resolve();
+}
+
+/**
+ * Tell an owner or admin a customer wrote from their account on the
+ * business's site (UX-014). Sent by the `customer-message.notify` job, once
+ * per recipient, the way an enquiry's notice is: console fallback with no
+ * SMTP, and the in-app notice stays the record. Every value is escaped in
+ * the body (`actionEmail`); the subject is kept to one line.
+ */
+export function sendCustomerMessageNotificationEmail(
+    to: string,
+    details: {
+        customerName: string;
+        /** A short line of what they wrote. */
+        message: string;
+        threadUrl: string;
+    },
+): Promise<void> {
+    const { customerName, message, threadUrl } = details;
+    const name = customerName.replace(/[\r\n]+/g, " ").trim();
+    if (!transporter) {
+        console.info(
+            `[Customer message] (no SMTP) ${to}: ${name} -> ${threadUrl}`,
+        );
+        return Promise.resolve();
+    }
+    void transporter.sendMail({
+        from: FROM,
+        to,
+        subject: `${name} sent you a message`,
+        html: actionEmail(
+            `${name} sent you a message`,
+            `${name} wrote from their account on your website: “${message}” They see your reply when they sign in there.`,
+            threadUrl,
+            "Read and reply",
         ),
     });
     return Promise.resolve();
@@ -360,31 +467,102 @@ export function sendOrganizationInvitationEmail(
     return Promise.resolve();
 }
 
-/** Whether an email actually left — the one sender that has to know. */
+/** Whether an email actually left, for a sender that has to know. */
 export type EmailOutcome = "sent" | "not-configured" | "failed";
 
 /**
- * Ask a customer to review what they bought (product reviews, plan
- * 2026-09-21-001).
+ * The opening-day invite off the waitlist (marketing plan U31): "Your Saroh
+ * invite", with a link that is the invitee's alone. Awaited and it says how
+ * it went: the batch records an invite as sent
+ * only once its email has left.
  *
- * Unlike the senders above it AWAITS the send and says how it went: an
- * invitation is only recorded once its email has left, so a failed send never
- * leaves the merchant believing a customer was asked. The link carries a
- * token that is stored only as a hash — so without SMTP it is printed ONLY in
- * development (an allowlist, per devops-environments-and-flags), never into a
- * production log.
+ * With no SMTP it never leaves the process: where the fake transport is
+ * allowed (development, or `SITE_CODES_EMAIL_FAKE` named off production,
+ * `siteCodesFakeAllowed`), `log` prints it and counts it sent and `fail`
+ * fails it; anywhere else nothing left. `businessName` is what the visitor
+ * typed, so it is escaped. The email names no offer length or price: the
+ * waitlist page says what the offer is.
  */
-export async function sendReviewInvitationEmail(
+export async function sendWaitlistLaunchInviteEmail(
     to: string,
-    reviewUrl: string,
-    storeName: string,
+    details: { url: string; businessName: string | null; validDays: number },
 ): Promise<EmailOutcome> {
+    const { url, businessName, validDays } = details;
     if (!transporter) {
-        // In development the console IS the delivery, as for every sender
-        // here; everywhere else no SMTP means nothing left.
-        if (env.NODE_ENV === "development") {
+        if (siteCodesFakeAllowed(declaredNodeEnv, env.SITE_CODES_EMAIL_FAKE)) {
+            if (env.SITE_CODES_EMAIL_FAKE === "fail") return "failed";
+            console.info(`[Saroh invite] (no SMTP) ${to}: ${url}`);
+            return "sent";
+        }
+        return "not-configured";
+    }
+    try {
+        await transporter.sendMail({
+            from: FROM,
+            to,
+            subject: LAUNCH_INVITE_SUBJECT,
+            html: launchInviteEmail(url, businessName, validDays),
+        });
+        return "sent";
+    } catch {
+        return "failed";
+    }
+}
+
+export const LAUNCH_INVITE_SUBJECT = "Your Saroh invite";
+
+/** The invite's body; every value in it is escaped. */
+export function launchInviteEmail(
+    url: string,
+    businessName: string | null,
+    validDays: number,
+): string {
+    const href = esc(url);
+    const what = businessName ? esc(businessName) : "your business";
+    return `<div style="font-family:sans-serif;max-width:480px;margin:0 auto">
+  <h2>Saroh is open, and you're in</h2>
+  <p>You joined the waitlist and we promised one email, on opening day. This is it.</p>
+  <p>Create your account with this email address and set up ${what}. It starts on the launch offer from the waitlist page, and you add no payment details to begin.</p>
+  <p><a href="${href}" style="display:inline-block;padding:10px 16px;background:#111;color:#fff;text-decoration:none;border-radius:6px">Set up ${what}</a></p>
+  <p style="color:#666;font-size:12px">The link is yours alone: it works once, with this email address, for ${validDays} days. Or paste it: ${href}</p>
+</div>`;
+}
+
+// ---------------------------------------------------------------------------
+// Saroh's own billing mail (pricing catalogue U17)
+// ---------------------------------------------------------------------------
+
+/** One Saroh billing email: an invoice, a failed payment, a trial ending. */
+export interface SarohBillingEmail {
+    to: string[];
+    subject: string;
+    html: string;
+    /** Where a reply goes (`SAROH_BILLING_EMAIL`), when set. */
+    replyTo?: string | null;
+    attachments?: { filename: string; content: Buffer }[];
+}
+
+/**
+ * Send Saroh's own billing mail to a business (U17): Saroh billing the
+ * business for its plan, from Saroh's identity transport. Awaited, and it
+ * says how it went, because the `billing.email` job retries a failure and
+ * records a send.
+ *
+ * With no SMTP it never reaches the network: the fake transport the code
+ * email uses (`SITE_CODES_EMAIL_FAKE`, development by default) logs the
+ * subject and how many it was for — never the addresses or the body — or
+ * fails every send with `fail`. Anywhere else with no SMTP, nothing left.
+ */
+export async function sendSarohBillingEmail(
+    email: SarohBillingEmail,
+): Promise<EmailOutcome> {
+    if (email.to.length === 0) return "not-configured";
+    if (!transporter) {
+        if (siteCodesFakeAllowed(declaredNodeEnv, env.SITE_CODES_EMAIL_FAKE)) {
+            if (env.SITE_CODES_EMAIL_FAKE === "fail") return "failed";
+            const files = email.attachments?.length ?? 0;
             console.info(
-                `[Review invite] (no SMTP) ${to} -> ${storeName}: ${reviewUrl}`,
+                `[Saroh billing] (no SMTP) ${email.subject} to ${email.to.length} recipient(s)${files ? `, ${files} attachment(s)` : ""}`,
             );
             return "sent";
         }
@@ -393,14 +571,15 @@ export async function sendReviewInvitationEmail(
     try {
         await transporter.sendMail({
             from: FROM,
-            to,
-            subject: `How was your order from ${storeName}?`,
-            html: actionEmail(
-                `How was your order?`,
-                `${storeName} would like to hear what you thought of what you bought. It takes a minute, and you can review each item. The link works for 30 days.`,
-                reviewUrl,
-                "Leave a review",
-            ),
+            to: email.to,
+            ...(email.replyTo ? { replyTo: email.replyTo } : {}),
+            subject: email.subject,
+            html: email.html,
+            attachments: email.attachments?.map((a) => ({
+                filename: a.filename,
+                content: a.content,
+                contentType: "application/pdf",
+            })),
         });
         return "sent";
     } catch {
@@ -409,34 +588,26 @@ export async function sendReviewInvitationEmail(
 }
 
 /**
- * Invite someone off the waitlist to create their account (admin console
- * U11). Awaited, like the review invitation: a person is only marked invited
- * once their email has left, so the waitlist never claims an invitation that
- * nobody received. Without SMTP it prints only in development.
+ * The link preview tool's report (resources plan U2, KTD-5), to the address
+ * the visitor typed to unlock it: plain text, Saroh's own words and the
+ * facts the API read itself — never text the caller sent. Awaited, so the
+ * page can say whether a copy went. Without SMTP it prints only in
+ * development (the fake transport); elsewhere nothing leaves.
  */
-export async function sendWaitlistInvitationEmail(
+export async function sendLinkReportEmail(
     to: string,
-    signupUrl: string,
+    subject: string,
+    text: string,
 ): Promise<EmailOutcome> {
     if (!transporter) {
         if (env.NODE_ENV === "development") {
-            console.info(`[Waitlist invite] (no SMTP) ${to}: ${signupUrl}`);
+            console.info(`[Link report] (no SMTP) ${to}: ${subject}`);
             return "sent";
         }
         return "not-configured";
     }
     try {
-        await transporter.sendMail({
-            from: FROM,
-            to,
-            subject: "Your Saroh account is ready to create",
-            html: actionEmail(
-                "You're in",
-                "You asked to hear when Saroh was ready for you. It is: create your account with this email address and set up your business.",
-                signupUrl,
-                "Create your account",
-            ),
-        });
+        await transporter.sendMail({ from: FROM, to, subject, text });
         return "sent";
     } catch {
         return "failed";
@@ -476,32 +647,88 @@ export function siteCodesSmtpSecure(
     return port === 465;
 }
 
-function getSiteCodesTransporter(): Transporter | null {
-    const own = env.SITE_CODES_SMTP_HOST !== undefined;
-    const host = own
-        ? env.SITE_CODES_SMTP_HOST
-        : (env.SMTP_HOST ?? env.SMTP_HOSTNAME);
-    const port = own ? env.SITE_CODES_SMTP_PORT : env.SMTP_PORT;
-    const user = own
-        ? env.SITE_CODES_SMTP_USER
-        : (env.SMTP_USER ?? env.USER_ACCOUNT);
-    const pass = own
-        ? env.SITE_CODES_SMTP_PASS
-        : (env.SMTP_PASS ?? env.USER_PASSWORD);
+type SiteCodesSmtpEnv = IdentitySmtpEnv &
+    Pick<
+        typeof env,
+        | "SITE_CODES_SMTP_HOST"
+        | "SITE_CODES_SMTP_PORT"
+        | "SITE_CODES_SMTP_USER"
+        | "SITE_CODES_SMTP_PASS"
+        | "SITE_CODES_SMTP_SECURE"
+    >;
+
+/**
+ * How every pooled Saroh send connects (codes, a business's email). Codes
+ * and booking emails come in bursts, and a send that finds a connection still
+ * open skips the TLS and login round trips. An idle connection still closes
+ * after `socketTimeout`, so a lone send opens a fresh one; two at most keeps
+ * a burst from opening a crowd of them at the provider. The short timeouts
+ * let a stuck provider fail inside the request or job, so it can retry.
+ */
+export const POOLED_SEND = {
+    pool: true as const,
+    maxConnections: 2,
+    connectionTimeout: 5_000,
+    greetingTimeout: 5_000,
+    socketTimeout: 10_000,
+};
+
+type IdentitySmtpEnv = Pick<
+    typeof env,
+    | "SMTP_HOST"
+    | "SMTP_HOSTNAME"
+    | "SMTP_PORT"
+    | "SMTP_SECURE"
+    | "SMTP_USER"
+    | "SMTP_PASS"
+    | "USER_ACCOUNT"
+    | "USER_PASSWORD"
+>;
+
+/**
+ * A pooled transport on the identity `SMTP_*` set (in production, SES;
+ * DEC-085), connecting as the identity transport does, or null with no SMTP.
+ * Each caller makes its own pool from it, so one stream's burst never queues
+ * behind another's.
+ */
+export function identitySmtpOptions(source: IdentitySmtpEnv) {
+    const host = source.SMTP_HOST ?? source.SMTP_HOSTNAME;
+    const user = source.SMTP_USER ?? source.USER_ACCOUNT;
+    const pass = source.SMTP_PASS ?? source.USER_PASSWORD;
     if (!host || !user || !pass) return null;
-    const portNumber = port ? Number(port) : 465;
-    return nodemailer.createTransport({
+    return {
         host,
-        port: portNumber,
-        // The identity fallback connects exactly as the identity transport does.
-        secure: own
-            ? siteCodesSmtpSecure(portNumber, env.SITE_CODES_SMTP_SECURE)
-            : env.SMTP_SECURE !== "false",
+        port: source.SMTP_PORT ? Number(source.SMTP_PORT) : 465,
+        secure: source.SMTP_SECURE !== "false",
         auth: { user, pass },
-        connectionTimeout: 5_000,
-        greetingTimeout: 5_000,
-        socketTimeout: 10_000,
-    });
+        ...POOLED_SEND,
+    };
+}
+
+/** The code transport's settings: its own SMTP set, else the identity one. */
+export function siteCodesTransportOptions(source: SiteCodesSmtpEnv) {
+    if (source.SITE_CODES_SMTP_HOST === undefined) {
+        return identitySmtpOptions(source);
+    }
+    const host = source.SITE_CODES_SMTP_HOST;
+    const user = source.SITE_CODES_SMTP_USER;
+    const pass = source.SITE_CODES_SMTP_PASS;
+    if (!host || !user || !pass) return null;
+    const port = source.SITE_CODES_SMTP_PORT
+        ? Number(source.SITE_CODES_SMTP_PORT)
+        : 465;
+    return {
+        host,
+        port,
+        secure: siteCodesSmtpSecure(port, source.SITE_CODES_SMTP_SECURE),
+        auth: { user, pass },
+        ...POOLED_SEND,
+    };
+}
+
+function getSiteCodesTransporter(): Transporter | null {
+    const options = siteCodesTransportOptions(env);
+    return options ? nodemailer.createTransport(options) : null;
 }
 
 const siteCodesTransporter = getSiteCodesTransporter();

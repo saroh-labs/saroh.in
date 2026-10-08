@@ -1,0 +1,345 @@
+"use client";
+
+import { formatInr } from "@saroh/pricing-catalog";
+import { Button } from "@saroh/ui/button";
+import { FailedState } from "@saroh/ui/data-state";
+import { Input } from "@saroh/ui/input";
+import { cn } from "@saroh/ui/lib/utils";
+import { Check } from "lucide-react";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import type { ReactNode } from "react";
+import { useEffect, useState, useTransition } from "react";
+
+import { ViewerDate } from "@/components/shared/viewer-date";
+import type { CouponCheck } from "@/lib/saroh-billing/billing-actions";
+import { checkCouponAction } from "@/lib/saroh-billing/billing-actions";
+import type { Cycle, PickerRow } from "@/lib/saroh-billing/plan-view";
+
+import type { PickedPlan } from "./change-plan-dialog";
+import { ChangePlanDialog } from "./change-plan-dialog";
+import { RefreshButton } from "./refresh-button";
+import { card } from "./styles";
+
+/**
+ * The plan picker, add-ons and coupon ("Saroh Settings" design, Plan and
+ * billing): Monthly | Yearly when the catalogue offers yearly, a row per
+ * plan with what it unlocks (the catalogue's card lines, UX-045) and its
+ * button — "Start N-day trial", "Upgrade", "Switch", "Keep …" — and the
+ * Coupon card, whose code is checked on Apply (UX-046) and goes with the
+ * next change's quote. Picking a row opens the change (`ChangePlanDialog`).
+ *
+ * `?plan=&cycle=` on the address opens that plan's change straight away:
+ * it is where every "Upgrade" in the app lands (`upgradeHref`).
+ */
+export function PlanChooser({
+    rows,
+    yearly,
+    initialCycle,
+    canChange,
+    addons,
+    currentPlan,
+}: {
+    /** Per cycle; null when Saroh's price list couldn't be read. */
+    rows: Record<Cycle, PickerRow[]> | null;
+    yearly: { on: false } | { on: true; freeMonths: number };
+    initialCycle: Cycle;
+    /** `billing:manage`: changing plan is the owner's. */
+    canChange: boolean;
+    /** The Add-ons card, between the picker and the coupon, as drawn. */
+    addons: ReactNode;
+    /** The plan it's on now, for the quote's "you stay on …". */
+    currentPlan: string;
+}) {
+    const router = useRouter();
+    const pathname = usePathname();
+    const search = useSearchParams();
+    const [cycle, setCycle] = useState<Cycle>(
+        yearly.on ? initialCycle : "month",
+    );
+    const [picked, setPicked] = useState<PickedPlan | null>(null);
+    const [couponIn, setCouponIn] = useState("");
+    const [coupon, setCoupon] = useState("");
+    const [couponErr, setCouponErr] = useState("");
+    const [checked, setChecked] = useState<CouponCheck | null>(null);
+    const [checking, startCheck] = useTransition();
+
+    const shown = rows?.[cycle] ?? [];
+
+    // An "Upgrade" from elsewhere in the app (`?plan=&cycle=`): open that
+    // plan's change once per arrival — adjusted while rendering, as React
+    // does for state that follows a prop — then tidy the address.
+    const wanted = search.get("plan");
+    const [arrived, setArrived] = useState<string | null>(null);
+    const arrival = wanted ? search.toString() : null;
+    if (arrival !== null && arrival !== arrived && rows && canChange) {
+        setArrived(arrival);
+        const want: Cycle =
+            search.get("cycle") === "year" && yearly.on ? "year" : cycle;
+        const row = rows[want].find((r) => r.planId === wanted);
+        if (row) {
+            setCycle(want);
+            setPicked({ planId: row.planId, name: row.name, cycle: want });
+        }
+    }
+    // Tidied away: the same link may open it again later.
+    if (arrival === null && arrived !== null) setArrived(null);
+    useEffect(() => {
+        if (wanted)
+            router.replace(`${pathname}#change-plan`, { scroll: false });
+    }, [wanted, pathname, router]);
+
+    function apply() {
+        const code = couponIn.trim().toUpperCase();
+        if (!code) {
+            setCouponErr("Type a code first.");
+            return;
+        }
+        if (!/^[A-Z0-9_-]{1,32}$/.test(code)) {
+            setCouponErr("That code isn't valid.");
+            return;
+        }
+        // Checked now, against the paid plans on offer here (UX-046).
+        const plans = shown
+            .filter((r) => r.cta !== null && r.price !== "₹0")
+            .map((r) => r.planId);
+        startCheck(async () => {
+            const res = await checkCouponAction({ code, cycle, plans });
+            if (!res.ok) {
+                setCouponErr(res.error);
+                return;
+            }
+            setChecked(res.data);
+            setCoupon(res.data.code);
+            setCouponIn("");
+            setCouponErr("");
+        });
+    }
+
+    return (
+        <>
+            <section
+                id="change-plan"
+                aria-label="Change plan"
+                className={cn(card, "scroll-mt-4")}
+            >
+                <div className="flex flex-wrap items-center gap-2.5 border-b border-border/70 px-[18px] py-3">
+                    <span className="flex-[1_1_260px] text-[12.5px] text-muted-foreground">
+                        {canChange
+                            ? "Monthly is autopay for 12 months and yearly is one payment; before either ends, we ask you to pay for the next term. Upgrades start today; downgrades from your next charge."
+                            : "Changing plan is the owner's. These are Saroh's plans and what each is for."}
+                    </span>
+                    {yearly.on && rows ? (
+                        <div
+                            role="radiogroup"
+                            aria-label="Billing"
+                            className="flex gap-0.5 rounded-[9px] border border-border bg-muted/50 p-[3px]"
+                        >
+                            {(["month", "year"] as const).map((c) => (
+                                <button
+                                    key={c}
+                                    type="button"
+                                    role="radio"
+                                    aria-checked={cycle === c}
+                                    onClick={() => setCycle(c)}
+                                    className={cn(
+                                        "h-7 rounded-md px-3 text-[12.5px] font-semibold text-foreground transition-colors duration-fast hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring active:bg-accent-active coarse:h-11",
+                                        cycle === c && "bg-muted",
+                                    )}
+                                >
+                                    {c === "month"
+                                        ? "Monthly"
+                                        : `Yearly · ${yearly.freeMonths} months free`}
+                                </button>
+                            ))}
+                        </div>
+                    ) : null}
+                </div>
+                {rows === null ? (
+                    <FailedState
+                        title="Saroh's plans couldn't be loaded"
+                        description="Your plan hasn't changed. Try again in a moment to see the others."
+                        action={<RefreshButton />}
+                        className="rounded-none border-0 py-8 sm:py-8"
+                    />
+                ) : (
+                    shown.map((row, i) => (
+                        <div
+                            key={row.planId}
+                            data-plan={row.planId}
+                            className={cn(
+                                "flex flex-wrap items-center gap-3 px-[18px] py-[13px]",
+                                i > 0 && "border-t border-border/70",
+                                row.current && "bg-muted/50",
+                            )}
+                        >
+                            <div className="min-w-0 flex-[1_1_240px]">
+                                <p className="text-[14px] font-semibold">
+                                    {row.name}{" "}
+                                    <span className="font-medium text-foreground/80">
+                                        {row.price}
+                                    </span>
+                                </p>
+                                <p className="mt-0.5 text-[12px] text-muted-foreground">
+                                    {row.what}
+                                </p>
+                                {row.note ? (
+                                    <p className="mt-1 text-[12.5px] font-semibold text-foreground/80">
+                                        {row.note.lead}
+                                        {row.note.iso ? (
+                                            <ViewerDate iso={row.note.iso} />
+                                        ) : null}
+                                    </p>
+                                ) : null}
+                                {row.lines.length > 0 ? (
+                                    <ul
+                                        aria-label={`What ${row.name} gives you`}
+                                        className="mt-1.5 grid gap-0.5 text-[12.5px] text-foreground/80"
+                                    >
+                                        {row.lead ? (
+                                            <li className="text-muted-foreground">
+                                                {row.lead}
+                                            </li>
+                                        ) : null}
+                                        {row.lines.map((l) => (
+                                            <li
+                                                key={l}
+                                                className="flex items-start gap-1.5"
+                                            >
+                                                <Check
+                                                    aria-hidden
+                                                    className="mt-0.5 size-3.5 shrink-0 text-muted-foreground"
+                                                />
+                                                {l}
+                                            </li>
+                                        ))}
+                                    </ul>
+                                ) : null}
+                            </div>
+                            {row.current && !(row.cta && canChange) ? (
+                                <span className="text-[12.5px] font-semibold text-foreground/80">
+                                    Current plan
+                                </span>
+                            ) : row.cta && canChange ? (
+                                <Button
+                                    type="button"
+                                    variant="outline"
+                                    size="sm"
+                                    aria-label={`${row.cta}: ${row.name}`}
+                                    onClick={() =>
+                                        setPicked({
+                                            planId: row.planId,
+                                            name: row.name,
+                                            cycle,
+                                        })
+                                    }
+                                >
+                                    {row.cta}
+                                </Button>
+                            ) : null}
+                        </div>
+                    ))
+                )}
+            </section>
+
+            {addons}
+
+            {canChange ? (
+                <section
+                    aria-label="Coupon"
+                    className={cn(card, "grid gap-2 px-[18px] py-3.5")}
+                >
+                    <span className="font-display text-[15px] font-semibold">
+                        Coupon
+                    </span>
+                    {coupon ? (
+                        <div className="flex flex-wrap items-center gap-2.5">
+                            <span className="text-[13px]">
+                                <span className="font-mono font-semibold">
+                                    {coupon}
+                                </span>
+                                {checked
+                                    ? ` · ${formatInr(checked.discountPaise)} off ${
+                                          checked.cycle === "year"
+                                              ? "the first yearly charge"
+                                              : checked.charges === 1
+                                                ? "the first month"
+                                                : `each of the first ${checked.charges} months`
+                                      } of ${checked.planName}, before GST. Used when you start a paid plan above.`
+                                    : " · used with the plan you choose above"}
+                            </span>
+                            <button
+                                type="button"
+                                onClick={() => {
+                                    setCoupon("");
+                                    setChecked(null);
+                                    setCouponErr("");
+                                }}
+                                className="rounded-sm text-[12.5px] font-semibold text-foreground/80 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring active:text-muted-foreground"
+                            >
+                                Remove
+                            </button>
+                        </div>
+                    ) : null}
+                    {!coupon || couponErr ? (
+                        <form
+                            className="flex flex-wrap items-center gap-2"
+                            onSubmit={(e) => {
+                                e.preventDefault();
+                                apply();
+                            }}
+                        >
+                            <Input
+                                value={couponIn}
+                                onChange={(e) => {
+                                    setCouponIn(e.target.value);
+                                    setCouponErr("");
+                                }}
+                                placeholder="Code"
+                                aria-label="Coupon code"
+                                aria-invalid={couponErr ? true : undefined}
+                                aria-describedby={
+                                    couponErr ? "coupon-error" : undefined
+                                }
+                                maxLength={32}
+                                autoComplete="off"
+                                className="h-[34px] w-[180px] bg-muted/50 font-mono text-[13px] uppercase coarse:h-11"
+                            />
+                            <Button
+                                type="submit"
+                                variant="outline"
+                                size="sm"
+                                disabled={checking}
+                            >
+                                {checking ? "Checking…" : "Apply"}
+                            </Button>
+                            {couponErr ? (
+                                <span
+                                    id="coupon-error"
+                                    role="alert"
+                                    className="text-[12.5px] text-destructive"
+                                >
+                                    {couponErr}
+                                </span>
+                            ) : null}
+                        </form>
+                    ) : null}
+                </section>
+            ) : null}
+
+            <ChangePlanDialog
+                // A fresh dialog per plan picked: its coupon note, invoice
+                // details and quote start over.
+                key={picked ? `${picked.planId}:${picked.cycle}` : "closed"}
+                picked={picked}
+                coupon={coupon}
+                currentPlan={currentPlan}
+                onCouponRefused={(error) => {
+                    setCouponErr(error);
+                    setCoupon("");
+                    setChecked(null);
+                }}
+                onClose={() => setPicked(null)}
+            />
+        </>
+    );
+}

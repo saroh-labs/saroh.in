@@ -125,6 +125,7 @@ const TAB_LABEL: Record<BusinessTab, string> = {
     contact: "Contact",
     tax: "Tax and invoices",
     hours: "Hours",
+    pay: "How to pay us",
     address: "Registered address",
 };
 
@@ -283,12 +284,12 @@ export function activityLine(
         }
         case "organization.module.enabled":
             return line(
-                `switched on ${moduleName(meta, event.targetId)}`,
+                `turned on ${moduleName(meta, event.targetId)}`,
                 MODULES,
             );
         case "organization.module.disabled":
             return line(
-                `switched off ${moduleName(meta, event.targetId)}`,
+                `turned off ${moduleName(meta, event.targetId)}`,
                 MODULES,
             );
         case "organization.plan.changed": {

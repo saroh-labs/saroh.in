@@ -9,9 +9,24 @@ import type { LaunchMode, PlanId } from "@/lib/links";
  * a fixed set of values, which is how that is kept true.
  */
 export interface AnalyticsEvents {
-    cta_click: { plan?: string; page: string; mode: LaunchMode };
-    waitlist_join: { kind: string; src: string; plan?: PlanId; ref?: boolean };
+    /** `template`: a gallery template's slug, a fixed set (`content/templates.ts`). */
+    cta_click: {
+        plan?: string;
+        page: string;
+        mode: LaunchMode;
+        template?: string;
+    };
+    waitlist_join: {
+        kind: string;
+        src: string;
+        plan?: PlanId;
+        ref?: boolean;
+        template?: string;
+    };
     referral_copy: Record<string, never>;
+    pricing_toggle: { control: "yearly" | "gst"; value: boolean };
+    /** A Help article's "Did this help?": its slug, and yes or no. */
+    help_vote: { article: string; helpful: "yes" | "no" };
 }
 
 type Gtag = (command: "event", name: string, params: object) => void;

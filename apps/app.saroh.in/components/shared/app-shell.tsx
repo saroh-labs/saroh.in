@@ -1,12 +1,20 @@
 import { getServerSession } from "@saroh/auth/next";
 import { cookies, headers } from "next/headers";
 
+import { PlanEndingBanner } from "@/components/billing/plan-ending-banner";
+import { PlanRefusalHost } from "@/components/billing/plan-refusal";
 import { AppHeader } from "@/components/shared/app-header";
 import { AppSidebar } from "@/components/shared/app-sidebar";
+import { BusinessZoneProvider } from "@/components/shared/business-zone";
 import { CommandMenu } from "@/components/shared/command-menu";
 import type { NavCounts } from "@/components/shared/nav-items";
 import { NOTIFICATIONS_NAV, navCan } from "@/components/shared/nav-items";
+import {
+    lockedNavHrefs,
+    planLockedModuleKeys,
+} from "@/components/shared/nav-locks";
 import { TabBar } from "@/components/shared/tab-bar";
+import { businessZone } from "@/lib/format/business-zone";
 import { getHome } from "@/lib/home/service";
 import { listModules } from "@/lib/modules/service";
 import { RAIL_COLLAPSED, RAIL_COOKIE } from "@/lib/nav/rail-cookie";
@@ -15,6 +23,7 @@ import {
     listOrganizations,
     resolveActiveOrganization,
 } from "@/lib/organizations/service";
+import { billingAccessOrNull } from "@/lib/saroh-billing/service";
 import { listSites } from "@/lib/sites/service";
 import { getStockTracking } from "@/lib/stock/service";
 import { getStorefrontAllowance } from "@/lib/stores/storefronts";
@@ -64,16 +73,10 @@ export async function AppShell({ children }: { children: React.ReactNode }) {
     // a transient API error never blanks the shell; a successful fetch that
     // returns nothing is "nothing is enabled yet", which a new Organization
     // should see reflected in its nav rather than papered over.
-    const [unread, moduleKeys, home, sites, storefronts, stock] =
+    const [unread, modules, home, sites, storefronts, stock, billing] =
         await Promise.all([
             unreadNotificationCount(),
-            listModules()
-                .then((modules) =>
-                    modules
-                        .filter((m) => m.readiness !== "DISABLED")
-                        .map((m) => m.key),
-                )
-                .catch(() => null),
+            listModules().catch(() => null),
             // The rail's work counts come from the same ranked read model Home uses,
             // so the two can never disagree. Non-fatal: a rail without badges is a
             // working rail, and this renders on every page.
@@ -102,7 +105,25 @@ export async function AppShell({ children }: { children: React.ReactNode }) {
              * already withholds): the nav fails open.
              */
             getStockTracking().catch(() => null),
+            /*
+             * What the plan locks (U14), for the rail's locks. An aid: null
+             * when it can't be read or the role may not (the page and the
+             * API still say so).
+             */
+            billingAccessOrNull(),
         ]);
+    // Available modules, plus those shut only by the plan: locked, not off,
+    // so they stay in the rail with a lock and a way up (U14).
+    const planLocked = modules ? planLockedModuleKeys(modules) : [];
+    const moduleKeys = modules
+        ? [
+              ...modules
+                  .filter((m) => m.readiness !== "DISABLED")
+                  .map((m) => m.key),
+              ...planLocked,
+          ]
+        : null;
+    const lockedHrefs = lockedNavHrefs(planLocked, billing);
     const stockTracked = stock?.tracked ?? null;
 
     /*
@@ -195,8 +216,10 @@ export async function AppShell({ children }: { children: React.ReactNode }) {
                     roleKey={roleKey}
                     actions={actions}
                     counts={counts}
+                    locked={lockedHrefs}
                     stockTracked={stockTracked}
                     storefronts={storefronts?.used ?? null}
+                    kind={activeOrg?.kind ?? null}
                 />
                 {/* The working area is white and the rail sits on Paper: the
                 product spends white surfaces, and the page you work on is
@@ -220,10 +243,21 @@ export async function AppShell({ children }: { children: React.ReactNode }) {
                         tabIndex={-1}
                         className="flex flex-1 flex-col pb-[var(--tab-bar-inset)] outline-none"
                     >
-                        {children}
+                        {/*
+                         * The business's zone (UX-008): every time a page
+                         * writes with `BusinessDate` reads as the business
+                         * keeps it, on the server's first paint too.
+                         */}
+                        <BusinessZoneProvider zone={businessZone(activeOrg)}>
+                            {/* A plan that ends within 30 days (#805). */}
+                            <PlanEndingBanner ending={billing?.planEnding} />
+                            {children}
+                        </BusinessZoneProvider>
                     </div>
                 </div>
             </div>
+            {/* A write the plan refused, shown as its notice (U14). */}
+            <PlanRefusalHost />
             {/* Below 760px, the rail's place is taken by this. */}
             <TabBar
                 unread={unread}
@@ -234,6 +268,7 @@ export async function AppShell({ children }: { children: React.ReactNode }) {
                 counts={counts}
                 stockTracked={stockTracked}
                 storefronts={storefronts?.used ?? null}
+                kind={activeOrg?.kind ?? null}
             />
         </div>
     );

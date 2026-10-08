@@ -136,8 +136,9 @@ process.stdin.on("data", (c) => chunks.push(c));
 process.stdin.on("end", async () => {
     const parser = new PDFParse({ data: new Uint8Array(Buffer.concat(chunks)) });
     const result = await parser.getText();
+    const meta = await parser.getInfo();
     await parser.destroy();
-    process.stdout.write(JSON.stringify({ text: result.text, pages: result.total }));
+    process.stdout.write(JSON.stringify({ text: result.text, pages: result.total, info: meta.info }));
 });
 `;
 
@@ -147,12 +148,22 @@ async function pdfText(r: InvoiceRow, business: PaperBusiness = RYE) {
     const out = execFileSync(process.execPath, ["-e", EXTRACT], {
         input: file,
     });
-    const { text, pages } = JSON.parse(out.toString()) as {
+    const { text, pages, info } = JSON.parse(out.toString()) as {
         text: string;
         pages: number;
+        info: Record<string, string>;
     };
-    return { file, text, pages };
+    return { file, text, pages, info };
 }
+
+describe("the PDF file's own details", () => {
+    it("names the business as its maker, never Saroh", async () => {
+        const { info } = await pdfText(taxInvoice());
+        expect(info.Author).toBe(RYE.name);
+        expect(info.Creator).toBe(RYE.name);
+        expect(info.Producer).toBe(RYE.name);
+    });
+});
 
 describe("the invoice's paper as words", () => {
     it("formats money and dates as the screen does, with the year", () => {
@@ -297,6 +308,20 @@ describe("the invoice's paper as words", () => {
         expect(paid.title).toBe("Receipt");
         expect(paid.footer).toBe(
             "Receipt — paid in full. Pulse Studio is not registered for GST, so no tax is charged.",
+        );
+
+        // The receipt says how it was paid (UX-082).
+        const byUpi = view(
+            row({
+                number: "PS-0007",
+                status: "PAID",
+                paidAt: new Date("2026-09-06T05:00:00Z"),
+                paymentMethod: "UPI",
+            }),
+            pulse,
+        );
+        expect(byUpi.footer).toBe(
+            "Receipt — paid in full by UPI. Pulse Studio is not registered for GST, so no tax is charged.",
         );
     });
 
@@ -469,5 +494,64 @@ describe("an issued paper names the seller as it was at issue (DEC-082)", () => 
         expect(text).toContain("hello@rye.example");
         expect(text).not.toContain("Rye Bakehouse");
         expect(text).not.toContain("orders@ryebakehouse.example");
+    });
+});
+
+describe("How to pay us on an unpaid invoice (#833)", () => {
+    const PAY = {
+        upiId: "rye@okhdfc",
+        bankAccountName: "Rye and Company",
+        bankAccountNumber: "123456789012",
+        bankIfsc: "HDFC0001234",
+        bankName: "HDFC Bank",
+        note: "Put the invoice number in the note.",
+    };
+    const paper = (r: InvoiceRow, pay: typeof PAY | null = PAY) => {
+        const i = serializeInvoice(r, NOW, { detail: true });
+        return paperView({ ...i, number: i.number! }, RYE, ZONE, pay);
+    };
+
+    it("prints the UPI ID, the bank transfer and the note while it is owed", () => {
+        expect(paper(row()).howToPay).toEqual([
+            "UPI: rye@okhdfc",
+            "Bank transfer: Rye and Company · A/c 1234 5678 9012 · IFSC HDFC0001234 · HDFC Bank",
+            "Put the invoice number in the note.",
+        ]);
+        // Overdue asks to be paid too.
+        expect(
+            paper(row({ dueAt: new Date("2026-09-10T05:00:00Z") })).howToPay,
+        ).not.toBeNull();
+    });
+
+    it("prints nothing on paid, void or credit paper, or when none is set", () => {
+        expect(paper(row({ status: "PAID" })).howToPay).toBeNull();
+        expect(paper(row({ status: "VOID" })).howToPay).toBeNull();
+        expect(paper(row({ kind: "CREDIT_NOTE" })).howToPay).toBeNull();
+        expect(paper(row(), null).howToPay).toBeNull();
+        expect(view(row()).howToPay).toBeNull();
+    });
+
+    it("leaves out what isn't set", () => {
+        expect(
+            paper(row(), {
+                ...PAY,
+                bankAccountName: null,
+                bankAccountNumber: null,
+                bankIfsc: null,
+                bankName: null,
+                note: null,
+            }).howToPay,
+        ).toEqual(["UPI: rye@okhdfc"]);
+    });
+
+    it("the PDF's text carries it", async () => {
+        const file = await renderInvoicePdf(paper(row()));
+        const out = execFileSync(process.execPath, ["-e", EXTRACT], {
+            input: file,
+        });
+        const { text } = JSON.parse(out.toString()) as { text: string };
+        expect(text.replace(/\s+/g, "")).toContain("HOWTOPAYUS");
+        expect(text).toContain("UPI: rye@okhdfc");
+        expect(text).toContain("IFSC HDFC0001234");
     });
 });

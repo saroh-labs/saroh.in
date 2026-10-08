@@ -7,16 +7,20 @@ import type {
     RenderedFeatures,
     RenderedGallery,
     RenderedHero,
+    RenderedHours,
     RenderedJournal,
     RenderedPacks,
+    RenderedPerson,
     RenderedPlans,
     RenderedProductGrid,
     RenderedProjects,
     RenderedRichText,
     RenderedServicesList,
     RenderedTestimonials,
+    RenderedTimetable,
     RenderedVisitUs,
 } from "@saroh/block-contract";
+import { resolveVariant, sectionFrameOf } from "@saroh/block-contract";
 
 import BookingSection from "./blocks/booking";
 import ContactSection from "./blocks/contact";
@@ -27,10 +31,12 @@ import FaqSection from "./blocks/faq";
 import FeaturesSection from "./blocks/features";
 import GallerySection from "./blocks/gallery";
 import HeroSection from "./blocks/hero";
+import HoursSection from "./blocks/hours";
 import type { JournalFeed } from "./blocks/journal";
 import JournalSection from "./blocks/journal";
 import type { PacksFeed } from "./blocks/packs";
 import PacksSection from "./blocks/packs";
+import PersonSection from "./blocks/person";
 import type { PlansFeed } from "./blocks/plans";
 import PlansSection from "./blocks/plans";
 import type { ProductGridFeed } from "./blocks/product-grid";
@@ -39,10 +45,13 @@ import ProjectsSection from "./blocks/projects";
 import RichTextSection from "./blocks/rich-text";
 import ServicesListSection from "./blocks/services-list";
 import TestimonialsSection from "./blocks/testimonials";
+import TimetableSection from "./blocks/timetable";
 import VisitUsSection from "./blocks/visit-us";
 import type { ModulePageTopContent } from "./module-page-top";
 import { ModulePageTop } from "./module-page-top";
 import type { PricesActions } from "./prices/api";
+import { sectionRendersNothing } from "./section-empty";
+import type { SiteFixtures } from "./site-fixtures";
 
 /**
  * One section of a published page, as the snapshot carries it.
@@ -82,9 +91,16 @@ export default function SectionRenderer({
     prices,
     thread,
     productGrid,
+    fixtures,
     modulePage = false,
 }: {
     section: Section;
+    /**
+     * The business's live data, given (`site-fixtures.ts`): the blocks that
+     * read it in the browser draw these instead and fetch nothing. Only the
+     * renderer's template renders pass it.
+     */
+    fixtures?: SiteFixtures;
     /**
      * The section is on a module page (DEC-073 #9): a rich-text intro lines
      * up with the cards rather than sitting in the centred reading column.
@@ -139,6 +155,9 @@ export default function SectionRenderer({
      */
     productGrid?: ProductGridFeed;
 }) {
+    // A pinned moment (`SiteFixtures.now`); undefined on a live site, where
+    // each block reads the clock.
+    const now = fixtures?.now ? new Date(fixtures.now) : undefined;
     switch (section.type) {
         case "hero":
             return (
@@ -147,6 +166,9 @@ export default function SectionRenderer({
                     apiUrl={apiUrl}
                     bookHref={bookHref}
                     siteId={siteId}
+                    visit={fixtures?.visit}
+                    today={fixtures?.today}
+                    now={now}
                 />
             );
         case "richText":
@@ -192,6 +214,7 @@ export default function SectionRenderer({
                     content={section.content as RenderedServicesList}
                     apiUrl={apiUrl}
                     bookHref={bookHref}
+                    services={fixtures?.services}
                 />
             );
         case "contact":
@@ -204,6 +227,8 @@ export default function SectionRenderer({
                     content={section.content as RenderedVisitUs}
                     apiUrl={apiUrl}
                     siteId={siteId}
+                    visit={fixtures?.visit}
+                    now={now}
                 />
             );
         case "journal":
@@ -213,6 +238,7 @@ export default function SectionRenderer({
                     feed={journal}
                     apiUrl={apiUrl}
                     siteId={siteId}
+                    now={now}
                 />
             );
         case "plans":
@@ -250,6 +276,30 @@ export default function SectionRenderer({
                     content={section.content as RenderedProjects}
                 />
             );
+        case "timetable":
+            return (
+                <TimetableSection
+                    content={section.content as RenderedTimetable}
+                    apiUrl={apiUrl}
+                    siteId={siteId}
+                    bookHref={bookHref}
+                    timetable={fixtures?.timetable}
+                />
+            );
+        case "hours":
+            return (
+                <HoursSection
+                    content={section.content as RenderedHours}
+                    apiUrl={apiUrl}
+                    siteId={siteId}
+                    visit={fixtures?.visit}
+                    now={now}
+                />
+            );
+        case "person":
+            return (
+                <PersonSection content={section.content as RenderedPerson} />
+            );
         case "booking":
             return (
                 <BookingSection
@@ -284,6 +334,20 @@ function paddingOverride(content: unknown): React.CSSProperties | undefined {
 }
 
 /**
+ * Whether a section is a full-bleed hero (U2), which the site header lies
+ * over when it opens the page. `PageSections` marks the first section's
+ * wrapper with `data-site-first-hero`, and the header's own classes key off
+ * the mark (`site-chrome.tsx`), so a page that does not open with one keeps
+ * the header exactly as it was.
+ */
+export function opensOverPhoto(section: Section): boolean {
+    return (
+        section.type === "hero" &&
+        resolveVariant("hero", section.content) === "fullBleed"
+    );
+}
+
+/**
  * Render an ordered list of sections. Snapshot sections are already in display
  * order, so we key by index (positions are stable within an immutable
  * snapshot).
@@ -291,6 +355,19 @@ function paddingOverride(content: unknown): React.CSSProperties | undefined {
  * The wrapper exists to carry a per-section padding override. It used to be
  * absent, so a merchant could set a section's padding in the editor, watch the
  * preview honour it, publish, and see the live site ignore it.
+ *
+ * It also carries the section's frame (`section-frame.ts`): its anchor as the
+ * wrapper's `id`, so a header entry or a button can jump to it, and its band
+ * as `data-site-band`, whose colours `SiteTheme` writes. `data-site-section`
+ * marks every wrapper, for the rules that apply inside sections only (a
+ * template's column width, definition lists). A section that sets none of it
+ * gets no id and no band: the page is what it was.
+ *
+ * A section known on the server to draw nothing (a feed-backed block with
+ * nothing in its feed, `section-empty.ts`) gets no wrapper, so no anchor. A
+ * block that reads in the browser and settles on nothing leaves its wrapper
+ * empty. The header hides a menu entry whose target is missing or empty
+ * (`useShownInPageItems` in `site-header-menu.tsx`).
  */
 export function PageSections({
     sections,
@@ -303,6 +380,7 @@ export function PageSections({
     prices,
     thread,
     productGrids,
+    fixtures,
     top = null,
     modulePage = top !== null,
 }: {
@@ -341,11 +419,31 @@ export function PageSections({
      * `sections`: every grid asks for its own.
      */
     productGrids?: readonly (ProductGridFeed | undefined)[];
+    /**
+     * The business's live data, given rather than read (`site-fixtures.ts`):
+     * the renderer's template renders only. A live site never passes it.
+     */
+    fixtures?: SiteFixtures;
 }) {
     return (
         <>
             {top ? <ModulePageTop title={top.title} lead={top.lead} /> : null}
             {sections.map((section, i) => {
+                const frame = sectionFrameOf(section.content);
+                // A feed-backed block with nothing to show (`section-empty`):
+                // no wrapper and so no anchor to jump to. The layout already
+                // left its entry out of the menu, and the header drops one
+                // whose target is missing.
+                if (
+                    sectionRendersNothing(section, {
+                        journal,
+                        plans,
+                        packs,
+                        productGrid: productGrids?.[i],
+                    })
+                ) {
+                    return null;
+                }
                 const style = paddingOverride(section.content);
                 // Close under the page's title, not a section's padding away.
                 const className = top && i === 0 ? "[&>*]:!pt-5" : undefined;
@@ -361,11 +459,24 @@ export function PageSections({
                         prices={prices}
                         thread={thread}
                         productGrid={productGrids?.[i]}
+                        fixtures={fixtures}
                         modulePage={modulePage}
                     />
                 );
                 return (
-                    <div key={i} className={className} style={style}>
+                    <div
+                        key={i}
+                        id={frame.anchor}
+                        className={className}
+                        style={style}
+                        data-site-section=""
+                        data-site-band={frame.band}
+                        data-site-first-hero={
+                            !top && i === 0 && opensOverPhoto(section)
+                                ? "fullBleed"
+                                : undefined
+                        }
+                    >
                         {rendered}
                     </div>
                 );

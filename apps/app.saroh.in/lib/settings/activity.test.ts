@@ -339,7 +339,7 @@ describe("activityLine — values a save recorded (#509)", () => {
                 targetId: "PAYMENTS",
                 metadata: { module: "Payments", enabled: true },
             }),
-        ).toBe("Sanjay switched on Payments → Modules");
+        ).toBe("Sanjay turned on Payments → Modules");
         // A row from before the name was recorded says the key in words.
         expect(
             said({
@@ -347,7 +347,7 @@ describe("activityLine — values a save recorded (#509)", () => {
                 targetId: "COMMERCE",
                 metadata: null,
             }),
-        ).toBe("Sanjay switched off Commerce → Modules");
+        ).toBe("Sanjay turned off Sell → Modules");
         expect(
             said({
                 action: "organization.plan.changed",

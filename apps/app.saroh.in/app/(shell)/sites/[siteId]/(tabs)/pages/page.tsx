@@ -98,7 +98,8 @@ export default async function SitePagesPage({
             <ListCard
                 main="Page"
                 end="On the site"
-                note="A page is part of the site's structure. Deleting one is a redirect decision, so it is not a row action."
+                // Plain words (UX-081): where a page is removed, not why it isn't here.
+                note="To remove a page, open it in the editor and choose Delete page in its settings."
             >
                 {pages.map((page) => {
                     const state = pageState(page, site);

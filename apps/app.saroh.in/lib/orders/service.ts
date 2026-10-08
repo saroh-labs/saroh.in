@@ -1,5 +1,6 @@
 import { toFailure } from "@/lib/api/failure";
 import { apiFetch } from "@/lib/api/http";
+import type { PaymentMethod } from "@/lib/invoices/service";
 
 /**
  * One storefront's order writes for app.saroh.in: recording its status or
@@ -19,6 +20,10 @@ export type PaymentStatus = "UNPAID" | "PAID" | "FAILED" | "REFUNDED";
 export interface UpdateOrderInput {
     status?: OrderStatus;
     paymentStatus?: PaymentStatus;
+    /** Marked paid by hand: how it was paid (#834). */
+    paidHow?: PaymentMethod;
+    /** Recorded as refunded by hand: how it went back (UX-061). */
+    refundedHow?: PaymentMethod;
 }
 
 export type OrderResult =

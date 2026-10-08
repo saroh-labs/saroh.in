@@ -11,6 +11,7 @@ import {
     isPublicPlan,
     plansAutopayMethods,
     plansOf,
+    plansOffered,
     plansPayOnline,
 } from "../lib/plans-read";
 import { cn } from "../lib/utils";
@@ -24,14 +25,16 @@ import { askAboutHref } from "../shop/ask-about-ordering";
 /**
  * `plans` v1 — the business's subscription plans on sale, read live (G9).
  *
- * The section stores a title, a highlight, a button label and one switch.
+ * The section stores a title, a line under it (template polish), a
+ * highlight, a button label and one switch.
  * The plans come from `GET public/sites/:siteId/plans`, which serves only
  * plans on sale with their PUBLISHED values (never a draft or an unpublished
  * change) and 404s while Payments is off for the business. Two ways in:
  *
  * - **`feed`** — handed in by the page that serves the site (live or behind
  *   a preview token), read on the server. No plans (none on sale, Payments
- *   off, the read failed): the block renders NOTHING.
+ *   off, memberships not on the business's Saroh plan, the read failed):
+ *   the block renders NOTHING.
  * - **no feed, a `siteId`** — the editor's canvas. The block reads the same
  *   public list itself so the merchant sees their real plans, and says why
  *   the section is empty rather than vanishing.
@@ -105,6 +108,8 @@ type LoadState =
     | { kind: "ready"; plans: PublicPlan[]; payOnline: boolean }
     /** 404: Payments is off, or the site isn't one the API serves. */
     | { kind: "off" }
+    /** The business's Saroh plan leaves memberships off: none listed. */
+    | { kind: "unoffered" }
     | { kind: "error" };
 
 export default function PlansSection({
@@ -145,6 +150,7 @@ export default function PlansSection({
             if (!res.ok) return { kind: "error" };
             const body: unknown = await res.json().catch(() => null);
             const plans = plansOf(body);
+            if (plans && !plansOffered(body)) return { kind: "unoffered" };
             return plans
                 ? { kind: "ready", plans, payOnline: plansPayOnline(body) }
                 : { kind: "error" };
@@ -222,6 +228,15 @@ export default function PlansSection({
             </PlansNote>
         );
     }
+    if (state.kind === "unoffered") {
+        return (
+            <PlansNote title={title}>
+                Memberships aren&apos;t on your Saroh plan, so this section is
+                left off your live site. Members you already have keep renewing.
+                Upgrade and your plans show here again.
+            </PlansNote>
+        );
+    }
     if (state.plans.length === 0) {
         return (
             <PlansNote title={title}>
@@ -260,16 +275,27 @@ const joinButton =
 
 function PlansFrame({
     title,
+    intro = null,
     children,
 }: {
     title: string;
+    /** A line under the title (template polish); the merchant's own words. */
+    intro?: string | null;
     children: React.ReactNode;
 }) {
     return (
         <section className="mx-auto w-full max-w-screen-xl px-5 py-[var(--site-section-padding)] sm:px-[var(--site-page-margin)]">
-            <h2 className="font-site-heading text-site-fg mb-3.5 text-[calc(1.625rem*var(--site-heading-scale))] font-semibold tracking-[-0.01em]">
+            <h2
+                data-site-title=""
+                className="font-site-heading text-site-fg mb-3.5 text-[calc(1.625rem*var(--site-heading-scale))] font-semibold tracking-[-0.01em]"
+            >
                 {title}
             </h2>
+            {intro ? (
+                <p className="text-site-body -mt-1.5 mb-5 max-w-[60ch] text-[15px] leading-relaxed">
+                    {intro}
+                </p>
+            ) : null}
             {children}
         </section>
     );
@@ -340,7 +366,7 @@ function PlanCards({
     }
 
     return (
-        <PlansFrame title={title}>
+        <PlansFrame title={title} intro={said(content.intro)}>
             {done && prices ? (
                 <PricesDone message={done} accountHref={prices.accountHref} />
             ) : null}

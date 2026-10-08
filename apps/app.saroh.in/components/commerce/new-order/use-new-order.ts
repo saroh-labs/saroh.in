@@ -14,6 +14,7 @@ import type {
 } from "@/lib/orders/new-order";
 import {
     bump,
+    canHandOver,
     cashChange,
     clashText,
     EMPTY_ADDRESS,
@@ -42,11 +43,14 @@ const AMOUNT = /^\d+(\.\d{1,2})?$/;
 export function useNewOrder({
     initialStoreId,
     canLink,
+    online = true,
     canSearch,
 }: {
     initialStoreId: string;
     /** May make a pay link (`order:create`, B16). */
     canLink: boolean;
+    /** The plan takes payment online (R33); else no link is offered. */
+    online?: boolean;
     /** Holds `contact:read`: search, and read a picked person's notes. */
     canSearch: boolean;
 }) {
@@ -71,6 +75,8 @@ export function useNewOrder({
     const [chosenPay, setPay] = useState<NewOrderPay>("CASH");
     const [given, setGiven] = useState("");
     const [discount, setDiscount] = useState("");
+    // A counter sale is handed over on the spot by default (UX-059).
+    const [handedOverChoice, setHandedOver] = useState(true);
 
     // The storefront's products, currency and tax.
     useEffect(() => {
@@ -170,6 +176,7 @@ export function useNewOrder({
         pick,
         way,
         canLink: canLink && !!data?.takesPayments,
+        online,
     });
     // A chip that went off (a delivery chosen, the phone removed) hands
     // over to one that isn't, as the design does: pay later → card.
@@ -179,6 +186,8 @@ export function useNewOrder({
             : "CASH"
         : chosenPay;
     const change = cashChange(given, total);
+    // Null where it doesn't apply: a delivery, a link, pay later.
+    const handedOver = canHandOver(pay, way) ? handedOverChoice : null;
     const problem = sheetProblem({
         lines: lines.length,
         pick,
@@ -220,6 +229,8 @@ export function useNewOrder({
         setPay,
         given,
         setGiven,
+        handedOver,
+        setHandedOver,
         discount,
         setDiscount,
         change,

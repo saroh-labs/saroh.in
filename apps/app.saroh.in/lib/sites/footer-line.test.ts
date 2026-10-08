@@ -79,7 +79,7 @@ describe("the footer as the inspector's one-line field (G6)", () => {
         const typed = `Kavi Dental · "Indiranagar" & more`;
         const saved = footerFromLine(typed);
         if (saved === null) throw new Error("expected a footer");
-        // What G17 draws before " · Runs on Saroh" is one line…
+        // What G17 draws before " · Made with Saroh" is one line…
         expect(footerLine(saved)).toEqual({
             kind: "html",
             value: "Kavi Dental · &quot;Indiranagar&quot; &amp; more",

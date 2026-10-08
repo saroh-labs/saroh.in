@@ -120,6 +120,19 @@ export class AccountOrdersService {
                 courierName: true,
                 trackingNumber: true,
                 trackingUrl: true,
+                // A pick-up's place: the storefront's public address and
+                // hours (UX-025), never anything else about it.
+                store: {
+                    select: {
+                        settings: {
+                            select: {
+                                kind: true,
+                                address: true,
+                                openingHours: true,
+                            },
+                        },
+                    },
+                },
                 items: {
                     orderBy: { id: "asc" },
                     select: {

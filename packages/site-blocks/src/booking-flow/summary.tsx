@@ -4,10 +4,20 @@ import { confirmClasses, onDarkMuted } from "./styles";
 
 /** What both confirm surfaces — the aside and the phone bar — show. */
 export interface ConfirmSummary {
+    /**
+     * What the amount is ("Deposit now", "Pay at the desk"), or "" for no
+     * payment line at all: a service that can't be paid for here (#822).
+     */
     dueLabel: string;
     due: string;
     /** Why it cannot go yet, or "" when it can. */
     block: string;
+    /**
+     * The block is only what is left to do — a name not typed yet, before
+     * they've tried to book — so it reads as a next step, not an error
+     * (UX-083).
+     */
+    quiet?: boolean;
     submitError: string | null;
     submitting: boolean;
     onConfirm: () => void;
@@ -25,6 +35,7 @@ export function SummaryAside({
     dueLabel,
     due,
     block,
+    quiet = false,
     submitError,
     submitting,
     onConfirm,
@@ -61,18 +72,25 @@ export function SummaryAside({
                     ),
                 )}
             </dl>
-            <div className="mt-3 flex items-baseline">
-                <span className={cn("flex-1 text-sm", onDarkMuted)}>
-                    {dueLabel}
-                </span>
-                <span className="font-site-heading text-[30px] font-semibold tabular-nums tracking-[-0.02em]">
-                    {due}
-                </span>
-            </div>
+            {dueLabel ? (
+                <div className="mt-3 flex items-baseline">
+                    <span className={cn("flex-1 text-sm", onDarkMuted)}>
+                        {dueLabel}
+                    </span>
+                    <span className="font-site-heading text-[30px] font-semibold tabular-nums tracking-[-0.02em]">
+                        {due}
+                    </span>
+                </div>
+            ) : null}
             {(block && hasService) || submitError ? (
                 <p
                     role="status"
-                    className="text-site-accent mt-2.5 text-[13px]"
+                    className={cn(
+                        "mt-2.5 text-[13px]",
+                        quiet && !submitError
+                            ? onDarkMuted
+                            : "text-site-accent",
+                    )}
                 >
                     {submitError ?? block}
                 </p>
@@ -140,6 +158,7 @@ export function PhoneBar({
     dueLabel,
     due,
     block,
+    quiet = false,
     submitError,
     submitting,
     onConfirm,
@@ -155,22 +174,26 @@ export function PhoneBar({
                     role="status"
                     className={cn(
                         "mb-2 truncate text-[12.5px]",
-                        block || submitError
+                        submitError || (block && !quiet)
                             ? "text-site-accent"
                             : "text-site-bg",
                     )}
                 >
-                    {submitError ?? (block || whenText)}
+                    {submitError ?? ((quiet ? whenText : block) || whenText)}
                 </p>
             ) : null}
             <div className="flex items-center gap-3">
                 <div className="min-w-0 flex-1">
-                    <p className={cn("truncate text-xs", onDarkMuted)}>
-                        {dueLabel}
-                    </p>
-                    <p className="font-site-heading text-2xl font-semibold tabular-nums leading-[1.1] tracking-[-0.02em]">
-                        {due}
-                    </p>
+                    {dueLabel ? (
+                        <>
+                            <p className={cn("truncate text-xs", onDarkMuted)}>
+                                {dueLabel}
+                            </p>
+                            <p className="font-site-heading text-2xl font-semibold tabular-nums leading-[1.1] tracking-[-0.02em]">
+                                {due}
+                            </p>
+                        </>
+                    ) : null}
                 </div>
                 <button
                     type="button"

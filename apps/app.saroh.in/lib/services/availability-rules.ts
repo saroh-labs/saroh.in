@@ -1,9 +1,11 @@
 import type { OffLine } from "@/lib/staff/time-off";
 import { offLines } from "@/lib/staff/time-off";
 import type {
+    BookingPayment,
     BookingRules,
     Closure,
     ExtraHours,
+    OnlineBlocker,
     StaffView,
     WeeklyRange,
 } from "@/lib/staff/types";
@@ -188,8 +190,55 @@ function sameRules(a: BookingRules, b: BookingRules): boolean {
         a.bookAheadDays === b.bookAheadDays &&
         a.latestBookingMinutes === b.latestBookingMinutes &&
         a.freeCancelHours === b.freeCancelHours &&
-        refundsInTime(a) === refundsInTime(b)
+        refundsInTime(a) === refundsInTime(b) &&
+        payWayOf(a) === payWayOf(b)
     );
+}
+
+/** How people pay when they book; both unless it was set (DEC-088). */
+export function payWayOf(rules: BookingRules): BookingPayment {
+    return rules.bookingPayment ?? "BOTH";
+}
+
+/**
+ * "How people pay when they book" (DEC-088), beside the rules: online,
+ * at the desk, or both — both being what every business had before.
+ */
+export const PAY_WAY = {
+    label: "How people pay when they book",
+    options: [
+        { value: "BOTH", label: "Both" },
+        { value: "ONLINE", label: "Online" },
+        { value: "DESK", label: "At the desk" },
+    ],
+} as const;
+
+/**
+ * What the chosen way means on the booking page, and — when online can't
+ * be taken now and the way needs it — why. A deposit is paid online when
+ * it can be, else at the desk wherever the desk is allowed (DEC-089).
+ * `blocker` undefined is "couldn't tell", which says nothing more.
+ */
+export function payWayHint(
+    way: BookingPayment,
+    blocker: OnlineBlocker | null | undefined,
+): string {
+    const base =
+        way === "DESK"
+            ? "Nobody pays on the booking page; they pay when they come, a deposit too."
+            : way === "ONLINE"
+              ? "Everyone pays on the booking page when they book. Free services book with nothing to pay."
+              : "People pay online when they book, or at the desk. A deposit is paid online, or at the desk when you can't take payment online.";
+    if (way === "DESK" || !blocker) return base;
+    const why =
+        blocker === "PAYMENTS_OFF"
+            ? "Payments is switched off"
+            : "no payment provider is connected";
+    const then =
+        way === "ONLINE"
+            ? "nobody can book a service with a price online"
+            : "everything is paid at the desk";
+    return `${base} Right now ${why}, so ${then}.`;
 }
 
 /** The business's refund policy, on unless it was turned off (DEC-058). */

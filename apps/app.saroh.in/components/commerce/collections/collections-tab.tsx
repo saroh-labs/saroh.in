@@ -42,12 +42,15 @@ export function ProductCollectionsTab({
     collections,
     categories,
     retryHref,
+    onShop = false,
 }: {
     overview: ProductOverview;
     /** Every collection; null when that read failed. */
     collections: CollectionSummary[] | null;
     categories: CategoryNode[];
     retryHref: string;
+    /** Live on the online shop (UX-082). */
+    onShop?: boolean;
 }) {
     const [editing, setEditing] = useState(false);
     const [opened, setOpened] = useState<string | null>(null);
@@ -62,7 +65,7 @@ export function ProductCollectionsTab({
         return <PanelForbidden what="collections" />;
     }
     const inIt = placement.data.collections;
-    const web = websiteSummary(placement.data);
+    const web = websiteSummary(placement.data, onShop);
     const byId = new Map((collections ?? []).map((c) => [c.id, c]));
     const handPicked = (collections ?? []).some(
         (c) => c.kind === "HAND_PICKED",

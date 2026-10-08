@@ -15,6 +15,7 @@ import {
 } from "class-validator";
 
 import { MAX_BAG_LINES, MAX_LINE_QUANTITY } from "./checkout-quote";
+import type { CheckoutPayment } from "./checkout-readiness";
 import { DeliveryAddressInput } from "./dto";
 import type { StorefrontFulfilmentType } from "./fulfilment";
 import { STOREFRONT_FULFILMENT_TYPES } from "./fulfilment";
@@ -32,6 +33,12 @@ const trim = ({ value }: { value: unknown }) =>
 
 const blankToNull = ({ value }: { value: unknown }) =>
     typeof value === "string" && value.trim() === "" ? null : value;
+
+/** "  save10 " → "save10"; blank → null (no code). */
+const trimToNull = ({ value }: { value: unknown }) =>
+    typeof value === "string" ? value.trim() || null : value;
+
+const CHECKOUT_PAYMENTS: readonly CheckoutPayment[] = ["ONLINE", "ON_HANDOVER"];
 
 export class BagLineInput {
     @Transform(trim)
@@ -64,6 +71,17 @@ export class CheckoutQuoteDto {
     @IsOptional()
     @IsIn(STOREFRONT_FULFILMENT_TYPES)
     fulfilment?: StorefrontFulfilmentType;
+
+    /**
+     * A discount code from Sell › Discounts (DEC-104). The server judges
+     * it, by the counter's rules, against the bag it prices; nothing the
+     * browser says it takes off is read.
+     */
+    @IsOptional()
+    @Transform(trimToNull)
+    @IsString()
+    @MaxLength(32)
+    discountCode?: string | null;
 }
 
 export class CheckoutStartDto {
@@ -85,12 +103,32 @@ export class CheckoutStartDto {
     @Type(() => DeliveryAddressInput)
     address?: DeliveryAddressInput;
 
+    /**
+     * How it is paid: online in the provider's window (the default, and
+     * what a site from before offline checkout sends by leaving it out), or
+     * on handover — "Pay when you collect", "Pay on delivery".
+     */
+    @IsOptional()
+    @IsIn(CHECKOUT_PAYMENTS, { message: "Choose how you'll pay" })
+    payment?: CheckoutPayment;
+
     /** "Ring the bell", "no sesame". */
     @IsOptional()
     @Transform(blankToNull)
     @IsString()
     @MaxLength(500)
     notes?: string | null;
+
+    /**
+     * A discount code from Sell › Discounts (DEC-104). The server judges
+     * it, by the counter's rules, against the bag it prices; nothing the
+     * browser says it takes off is read.
+     */
+    @IsOptional()
+    @Transform(trimToNull)
+    @IsString()
+    @MaxLength(32)
+    discountCode?: string | null;
 
     /**
      * The checkout sheet's key: a double tap or a retry with the same key

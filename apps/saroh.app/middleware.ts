@@ -117,8 +117,9 @@ export default function middleware(req: NextRequest) {
     }
 
     // The account area switched off (`lib/account-area.ts`) is not there: a
-    // real 404, decided here because the page's own `notFound()` runs after
-    // `[domain]/loading.tsx` has already sent a 200 and started streaming.
+    // 404, decided here before the layout reads the site. (Pages answer a
+    // real 404 too since `[domain]/loading.tsx` went, UX-071: it streamed
+    // every page as 200 from the first byte.)
     if (isAccountPath(path) && !accountAreaOn()) return accountOff();
 
     // Everything else is a tenant hostname: rewrite to the /[domain] route,

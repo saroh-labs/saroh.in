@@ -1,3 +1,5 @@
+import type { PayInstructions } from "@saroh/site-blocks";
+
 /**
  * The public order an order pay link shows (plan B, B11), and the check that
  * narrows it. Kept apart from `order-pay.ts`, which reads the app's env, so
@@ -32,6 +34,35 @@ export interface PayOrder {
      * the apex. Null or absent (an older API): served wherever opened.
      */
     payUrl?: string | null;
+    /**
+     * The business can take this payment online (R33): its plan takes
+     * online payment, Payments is on and its storefront's provider opens
+     * the checkout window. False — a link made before a downgrade, say —
+     * and the page shows the order view-only, with "Pay ‹business›
+     * directly". Absent (an older API): as before, Pay is offered.
+     */
+    payOnline?: boolean;
+    /**
+     * "How to pay us" (R32): the business's UPI ID, bank details and note,
+     * while the order is due. Null or absent: none set.
+     */
+    payInstructions?: PayInstructions | null;
+}
+
+/**
+ * What the page offers under the order:
+ * - `pay`: it's due and can be paid online — Pay and "Check again";
+ * - `elsewhere`: it's due, but the business can't take it online (R33) —
+ *   the order view-only, and "Pay ‹business› directly";
+ * - `settled`: paid, or no longer payable — nothing to do.
+ */
+export type OrderPayOffer = "pay" | "elsewhere" | "settled";
+
+export function orderPayOffer(
+    order: Pick<PayOrder, "status" | "payOnline">,
+): OrderPayOffer {
+    if (order.status !== "DUE") return "settled";
+    return order.payOnline === false ? "elsewhere" : "pay";
 }
 
 function isRecord(v: unknown): v is Record<string, unknown> {

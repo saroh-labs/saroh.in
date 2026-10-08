@@ -1,17 +1,29 @@
 "use client";
 
-import { ctaClasses, destructiveAlertClasses } from "@saroh/site-blocks";
+import {
+    ctaClasses,
+    destructiveAlertClasses,
+    hasPayInstructions,
+    PayInstructionsCard,
+    payWaysText,
+} from "@saroh/site-blocks";
 import { cn } from "@saroh/ui/lib/utils";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 
 import { startPayment } from "@/app/pay/[token]/actions";
+import {
+    DownloadPdfButton,
+    InvoiceCopyActions,
+} from "@/components/download-pdf-button";
 import { InvoiceAutopay } from "@/components/invoice-autopay";
 import { PrintButton } from "@/components/print-button";
 import { ProviderHandoff } from "@/components/provider-handoff";
 import type { CheckoutIntent } from "@/lib/checkout-shape";
 import type { PayInvoice } from "@/lib/invoice-pay";
+import type { PayContact } from "@/lib/invoice-pay-shape";
 import { payDate, payMoney, payOffer, payTitle } from "@/lib/invoice-pay-shape";
+import { hasCustomerPdf } from "@/lib/invoice-pdf";
 
 /**
  * The invoice a pay link shows, and its Pay button (ADR-007, U13).
@@ -27,8 +39,15 @@ import { payDate, payMoney, payOffer, payTitle } from "@/lib/invoice-pay-shape";
  * "Pay and turn on autopay" first (D12, `invoice-autopay.tsx`).
  *
  * A business that doesn't take payment online (`payOnline` false, DEC-070)
- * sends the same link to view the invoice: no Pay button, a copy to print
- * or save as PDF, and "Pay ‹business› the way they've asked you to".
+ * sends the same link to view the invoice: no Pay button, its PDF to
+ * download or a copy to print, and "Pay ‹business› the way they've asked
+ * you to" — or, where the business set them (R32), its UPI ID as a QR,
+ * its bank details and its note (`PayInstructionsCard`).
+ *
+ * Wherever the page has a `pdfHref`, the customer can download the invoice
+ * as the business issued it (DEC-083): beside Print where the page offers
+ * a copy, and as a quieter line under the pay page's other actions. A void
+ * invoice has none.
  *
  * Styled in the business's `--site-*` tokens, never Saroh's brand. Status is
  * an opaque fill with its own foreground, for the reason checkout gives: the
@@ -38,11 +57,14 @@ export function InvoicePay({
     token,
     invoice,
     apiUrl,
+    pdfHref,
 }: {
     token: string;
     invoice: PayInvoice;
     /** Where an autopay window's return is posted (P1). */
     apiUrl?: string;
+    /** This app's route for the invoice's PDF (DEC-083); absent, none. */
+    pdfHref?: string;
 }) {
     const router = useRouter();
     const [intent, setIntent] = useState<CheckoutIntent | null>(null);
@@ -68,6 +90,8 @@ export function InvoicePay({
     // — the invoice to keep, and pay them their own way.
     const offer = payOffer(invoice);
     const payable = offer === "pay";
+    // The PDF, wherever there is one to hand out (DEC-083).
+    const pdf = pdfHref && hasCustomerPdf(invoice.status) ? pdfHref : null;
     // Autopay for the invoice's plan (D12): offered, or on already.
     const autopay =
         invoice.autopay &&
@@ -215,31 +239,64 @@ export function InvoicePay({
                                 : `Pay ${money(invoice.total)}`}
                         </button>
                     )}
-                    <button
-                        type="button"
-                        onClick={() => router.refresh()}
-                        className={cn(ctaClasses("secondary"), "w-full")}
-                    >
-                        Check again
-                    </button>
+                    {/* Only once a payment was started: before that there's
+                        nothing to check (UX-080). */}
+                    {intent ? (
+                        <button
+                            type="button"
+                            onClick={() => router.refresh()}
+                            className={cn(ctaClasses("secondary"), "w-full")}
+                        >
+                            Check again
+                        </button>
+                    ) : null}
                 </div>
             ) : offer === "elsewhere" ? (
                 <div className="mt-6 space-y-4">
-                    <div
-                        role="status"
-                        className="rounded-xl border border-site-border bg-site-surface p-5 text-center"
-                    >
-                        <p className="font-semibold text-site-fg">
-                            Pay {invoice.businessName} the way they&apos;ve
-                            asked you to.
-                        </p>
-                        <p className="mt-1 text-sm text-site-muted">
-                            {invoice.businessName} doesn&apos;t take payment
-                            online. Keep a copy of this invoice for your
-                            records.
-                        </p>
-                    </div>
-                    <PrintButton />
+                    {hasPayInstructions(invoice.payInstructions) ? (
+                        // How the business asked to be paid (R32).
+                        <PayInstructionsCard
+                            instructions={invoice.payInstructions}
+                            businessName={invoice.businessName}
+                            amount={invoice.total}
+                            currency={invoice.currency}
+                            reference={`${payTitle(invoice)} ${invoice.number}`}
+                            lead={offlineLead(
+                                invoice.businessName,
+                                money(invoice.total),
+                                payWaysText(invoice.payInstructions),
+                            )}
+                        />
+                    ) : (
+                        <div
+                            role="status"
+                            className="rounded-xl border border-site-border bg-site-surface p-5 text-center"
+                        >
+                            <p className="font-semibold text-site-fg">
+                                Pay {invoice.businessName} the way they&apos;ve
+                                asked you to.
+                            </p>
+                            <p className="mt-1 text-sm text-site-muted">
+                                {invoice.businessName} doesn&apos;t take payment
+                                online. Keep a copy of this invoice for your
+                                records.
+                            </p>
+                            {invoice.businessContact ? (
+                                <ContactToPay
+                                    contact={invoice.businessContact}
+                                    businessName={invoice.businessName}
+                                />
+                            ) : null}
+                        </div>
+                    )}
+                    {pdf ? (
+                        <InvoiceCopyActions
+                            pdfHref={pdf}
+                            number={invoice.number}
+                        />
+                    ) : (
+                        <PrintButton />
+                    )}
                 </div>
             ) : charging ? (
                 <div className="mt-6 space-y-4">
@@ -296,8 +353,34 @@ export function InvoicePay({
                     ) : null}
                 </div>
             )}
+            {pdf && offer !== "elsewhere" ? (
+                // Paying, paid or held for autopay: the invoice to keep,
+                // under the page's own actions.
+                <div className="mt-4">
+                    <DownloadPdfButton
+                        href={pdf}
+                        number={invoice.number}
+                        variant="link"
+                    />
+                </div>
+            ) : null}
         </section>
     );
+}
+
+/**
+ * The line under "How to pay ‹business›" (R32), true to what is set:
+ * "Pay ₹1,400.00 by UPI or bank transfer", or only the copy to keep when
+ * the business left a note alone.
+ */
+function offlineLead(
+    business: string,
+    total: string,
+    ways: string | null,
+): string {
+    return ways
+        ? `${business} doesn't take payment online. Pay ${total} by ${ways}, and keep a copy of this invoice for your records.`
+        : `${business} doesn't take payment online. Keep a copy of this invoice for your records.`;
 }
 
 function Fact({ label, value }: { label: string; value: string }) {
@@ -333,5 +416,47 @@ function StatusBadge({ status }: { status: PayInvoice["status"] }) {
         >
             {s.label}
         </span>
+    );
+}
+
+/**
+ * No How to pay us set (UX-007): "Contact them to pay", with the business's
+ * phone and email as links, so the customer has something to act on.
+ */
+export function ContactToPay({
+    contact,
+    businessName,
+}: {
+    contact: PayContact;
+    businessName: string;
+}) {
+    return (
+        <div className="mt-4 border-t border-site-border pt-4">
+            <p className="text-sm font-medium text-site-fg">
+                {`Contact ${businessName} to pay`}
+            </p>
+            <ul className="mt-2 flex flex-wrap justify-center gap-x-4 gap-y-1 text-sm">
+                {contact.phone ? (
+                    <li>
+                        <a
+                            href={`tel:${contact.phone}`}
+                            className="text-site-accent underline underline-offset-2"
+                        >
+                            {contact.phone}
+                        </a>
+                    </li>
+                ) : null}
+                {contact.email ? (
+                    <li>
+                        <a
+                            href={`mailto:${contact.email}`}
+                            className="break-all text-site-accent underline underline-offset-2"
+                        >
+                            {contact.email}
+                        </a>
+                    </li>
+                ) : null}
+            </ul>
+        </div>
     );
 }

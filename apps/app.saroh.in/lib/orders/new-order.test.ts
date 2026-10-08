@@ -1,5 +1,8 @@
 import { describe, expect, it } from "vitest";
 
+import { takesOnlinePayment } from "@/lib/billing/access";
+import { offlinePlan, onlinePlan } from "@/lib/billing/fixtures.test-data";
+
 import type { CustomerPick } from "@/lib/customers/picker";
 import {
     bump,
@@ -272,5 +275,28 @@ describe("the line under who it is for (B13b)", () => {
                 phone: null,
             }),
         ).toBe("No contact details");
+    });
+});
+
+describe("New order's payment chips on each plan (R33)", () => {
+    it("on a plan without online payments: no link chip; pay on collection stays", () => {
+        const keys = payOptions({
+            pick: known,
+            way: "PICKUP",
+            canLink: true,
+            online: takesOnlinePayment(offlinePlan()),
+        }).map((p) => p.key);
+        expect(keys).toEqual(["CASH", "UPI", "CARD", "LATER"]);
+    });
+
+    it("on a plan with online payments: the link chip, ready", () => {
+        expect(
+            payOptions({
+                pick: known,
+                way: "PICKUP",
+                canLink: true,
+                online: takesOnlinePayment(onlinePlan()),
+            }).find((p) => p.key === "LINK")?.off,
+        ).toBeNull();
     });
 });

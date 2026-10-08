@@ -58,8 +58,23 @@
   timestamp-without-timezone (`DEV_LEARNINGS.md`).
 - **Current** — **Payloads carry ids, not data;** the handler re-reads current
   state and handles "it was deleted" (`enquiry-notify.handler.ts`).
-- **Adopted** — **Advisory locks have a registry.** None are in use; add the
-  registry to this file before the first one.
+- **Current** — **Advisory locks have a registry** (below). A new
+  `pg_advisory_xact_lock` adds its row in the same change.
+
+### Advisory lock registry — **Current**
+
+Each is a transaction lock on `hashtext(<key>)`, held until the
+transaction ends. Take it before the transaction's row locks, so it never
+waits while holding one.
+
+| Key                                       | Serialises                                                                                                                                                  | Where                                                                                                                                           |
+| ----------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------- |
+| `first-pack:<organizationId>:<contactId>` | Selling a "first pack only" pack to one person                                                                                                              | `class-packs/first-pack.ts`                                                                                                                     |
+| `subscription-plan-name:<organizationId>` | Saving a subscription plan's name in one business                                                                                                           | `subscriptions/plans.ts` (`lockPlanNames`)                                                                                                      |
+| `plan-meter:<organizationId>:<limitKey>`  | Writes that add to one plan limit (a product, a booking…); a booking notice Saroh will email takes `…:sarohEmailsPerMonth` before its first write (DEC-086) | `billing/metering.service.ts` (`lockMeter`, U13); `customer-notify.handler.ts` (the one notice site; `booking.notify` writes nothing before it) |
+
+Race tests wait on an advisory lock with `waitUntilAdvisoryBlockedBy`
+(`test/lock-wait.ts`).
 
 ### Know what the warnings mean — **Current**
 
@@ -106,7 +121,20 @@ nobody was told. Round-2 A14 closed it (`bookings/booking-notify.handler.ts`).
   `Notification`), and delegates the customer's side to
   `CustomerNotifyService`. **`customer.notify`** carries an order step
   (Ready, handed over), queued 10 seconds ahead so an Undo deletes it
-  unsent (`cancelOrderStepNotice`); A12 adds the waitlist offer.
+  unsent (`cancelOrderStepNotice`); A12 adds the waitlist offer. UX-042
+  adds **a website order placed** (`ORDER_PLACED`, `order-placed:<orderId>`):
+  queued with the order when it is to be paid on handover, and with the
+  payment's hold when it is paid online (`enqueueOrderPlacedNotice`). It
+  goes through the same `emailRoute` as every notice, so Saroh never sends
+  it (DEC-086 is booking notices only): the thread, and the business's own
+  provider.
+- **`customer-message.notify`** (UX-014) tells the team a customer wrote
+  from their site account: one inbox notice (`message.new`, opening the
+  customer's thread, unique on `(messageId, type)`) and an email to the
+  owners and admins, as an enquiry's. Only the first message of a turn is
+  queued — one after the team last answered or opened the thread
+  (`notifications/customer-message-notify.ts`); follow-ups land in the
+  thread the team is already pointed at.
 - **Once per event.** Both claim a `CustomerNotice` row keyed to the event
   (`booking:<BookingEvent id>`, `order:<OrderEvent id>`) with
   `createMany({ skipDuplicates })` before writing anything: a Postgres
@@ -121,6 +149,26 @@ nobody was told. Round-2 A14 closed it (`bookings/booking-notify.handler.ts`).
   undone step isn't announced, and the contact goes through
   `resolveContact` (a merge lands on the survivor; a removed contact hears
   nothing).
+- **Saroh emails a booking notice when the business has no provider**
+  (DEC-086), when the one rule says so (`emailRoute` in
+  `communications/saroh-may-send.ts`, the provider read once:
+  the global stop, the business's `SAROH_BUSINESS_EMAIL`, `PLAN_ENFORCEMENT`,
+  a `saroh-emails` allowance with a number, the platform's daily ceiling).
+  The handler decides first, takes the plan-meter lock only for Saroh's
+  route, and hands the route (with the allowance row it read) to
+  `queueTransactional`, so nothing it refuses rolls the notice back and
+  nothing is read twice; the delivery is stamped `SAROH` and
+  `message.send` re-checks the switches (off: `STOPPED`, never retried).
+  Each one counts against `sarohEmailsPerMonth` under the plan-meter lock;
+  at the cap the Message is `ALLOWANCE_USED`, never thrown. A soft
+  `saroh-emails` cell is no allowance (`NO_ALLOWANCE`): it would never
+  refuse. At most `SAROH_EMAILS_PER_BOOKING_PER_DAY` (3) go about one
+  booking in any 24 hours, counted through its `CustomerNotice` rows;
+  past it the Message is `BOOKING_LIMIT` and not counted. A flag that
+  can't be read when the send job runs throws (retried, still `QUEUED`);
+  only a switch read as off stops it. A last attempt that leaves it
+  `QUEUED` logs `saroh_business_email_gave_up org=…` at WARN (it still
+  counts).
 
 ## Autopay charges — **Current** (D13)
 
@@ -156,12 +204,47 @@ nobody was told. Round-2 A14 closed it (`bookings/booking-notify.handler.ts`).
   and queues `team.alert` with that notice's id for the email only.
 - **One notice, filtered per person.** The bell is one org-wide
   `Notification`; `NotificationsService` leaves out, per viewer, the types
-  of rows they turned the bell off for or can't read. Email goes through
-  the business's own provider (`queueTransactional`, recipient
-  `TEAM_MEMBER`) to each member whose role reads it and who has email on.
+  of rows they turned the bell off for or can't read. Email goes from
+  **Saroh** (`sendTeamAlertEmail`, `common/email.ts`), provider or not —
+  Saroh telling a business about its own business (DEC-011, amended
+  2026-10-07) — to each member whose role reads it and who has email on.
+  `tellTeam` returns the emails and the handler sends them after the
+  transaction commits (at most once). Saroh's email carries fixed words and
+  the business's names cleaned (`cleanName`), never a customer's name or a
+  run's free text; the bell keeps the full words.
 - **Once per event**, claimed as a `CustomerNotice` (`TEAM_TOLD`,
   `team:<event>:<id>`), and re-read first: an unpaid checkout, a payment
   that went through after all, or someone who left again is not announced.
+- **Two alerts widen who is emailed**, on the same path and the same
+  helper (there is no second team-mail helper): a new website order
+  (`ownersAdminsByDefault`) emails the owners and admins as an enquiry's
+  notice does, unless they turned the New order email off (UX-042); a
+  review asked of a site's reviewers, and a new test release
+  (`emailReviewersOf`), email its reviewers, who have no bell (UX-043). A
+  provider that refused its keys (UX-012) is emailed too, email providers
+  included: Saroh sends it, not the refused key.
+- **Review alerts** (`team.alert` `{ event: "review" }`,
+  `notifications/review-alerts.ts`, UX-043), queued on the review write's
+  transaction (`sites/review-alert-queue.ts`): a request or a new test
+  release goes to the reviewers (only queued when the site has one); a
+  verdict, or a reviewer's first note of a round
+  (`team:review-note:<site>:<release|draft>:<author>:<request id>`), goes
+  to the bell and the Website row (`site.review.*`), and the person who
+  asked is emailed whatever they chose. A note by someone who can publish
+  queues nothing.
+- **Order alerts live on the New order row** (`event: "order"` in
+  `alert-preferences.ts`, notice types `order.new` and `order.uncollected`).
+  A new order type of alert adds its notice type there, so the bell switch
+  and the role check cover it. **Not collected** (R34, DEC-032): a site
+  order to pay on handover queues `team.alert` `{ event: "uncollected" }`
+  with the order, `runAt` the start of the third day after it was placed in
+  the business's zone (`queueUncollectedAlert`). The run re-reads it: paid,
+  handed over or cancelled since says nothing; not due yet (the zone moved)
+  queues itself again for its day (`putOffUntilDue`); else it is told once
+  (`team:uncollected:<orderId>`). It never cancels the order. Home's row is
+  read live (`home/home-uncollected.ts`), not from the alert. Known gap: a
+  pay-on-handover order placed before this shipped has no alert queued;
+  Home still shows it.
 
 ## Scheduled go-live — **Current** (DEC-071, T10)
 
@@ -196,3 +279,91 @@ nobody was told. Round-2 A14 closed it (`bookings/booking-notify.handler.ts`).
   whatever they chose.
 - A queued job still runs with `SITE_TEST_RELEASES` off (KTD-16): it is a
   go-live the merchant was told would happen.
+
+## Plan limit notices — **Current** (plans catalogue U13)
+
+- **`plan.limit.notice`** tells a business it has used 80% of a plan
+  limit, reached it, or (the site's checkout, a soft cap) gone past it.
+  A metered write queues it on its own transaction only when it crosses
+  one of those lines (`MeteringService.roomInTx`, `crossesNotice`), so a
+  write under 80% queues nothing. Payload: `{ organizationId, moduleId }`.
+- **Re-read, then decide** (`billing/plan-limit-notice.handler.ts`): with
+  `PLAN_ENFORCEMENT` off since, the row uncapped or off, or the count back
+  under 80%, it says nothing. Otherwise it counts again and words the
+  notice with `limitNotice` (`@saroh/pricing-catalog`).
+- **Once per row, level, limit and window**, claimed as a `CustomerNotice`
+  (`PLAN_LIMIT`, `plan-limit:<row>:<warn|full|over>:<limit>:<month|all>`)
+  before the inbox row (`plan.limit`, owners and admins) is written; a
+  monthly limit's window is the month in the business's zone, so next
+  month warns again.
+- **A total cap of one says nothing until it is passed** (`quietAtOne`,
+  UX-041): the business's one website or owner is filled by setting it up.
+  A monthly cap of one still warns.
+- **A notice that no longer stands is cleared** when the inbox is read
+  (`billing/limit-notice-clear.ts`): the count back under its line, a new
+  month, a changed limit or an uncapped row deletes the notice and its
+  claim, so crossing the line again tells again. It never throws.
+
+## Plan change notices — **Current** (UX-041)
+
+- **`plan.change.notice`** tells a business its plan changed when it
+  didn't change it itself: staff set a plan until a date (told now, and
+  again just past the date), or ended one early
+  (`admin/admin-overrides.service.ts`). Payload `{ eventKey, fromPlanId,
+overrideId, reason }`. Re-read, then decide
+  (`billing/plan-change-notice.handler.ts`): still on `fromPlanId` says
+  nothing; an override ended before its date says nothing at its date.
+  Once per event (`PLAN_CHANGED`), inbox type `plan.changed`. Gap: a move
+  the hourly sweep applies (`plan-moves.ts`) and the provider halting a
+  subscription queue none yet; `pricing.move.notice` tells the first a week
+  ahead.
+
+## Pricing catalogue — **Current** (plans catalogue U4)
+
+- **`pricing.site.revalidate`** tells saroh.in that the published pricing
+  changed (KTD-10). A publish or roll back that is live at once queues it on
+  its own transaction; a scheduled version queues it for its `goLiveAt`.
+  Queued only when `PRICING_SITE_URL` and `PRICING_REVALIDATE_SECRET` are set; a failed
+  call throws and retries, and never touches the publish. A version held for
+  its billing-provider plans is refreshed by the sync (U15), not here.
+- **`pricing.move.notice`** tells a business, seven days ahead, that "move
+  them" moves its plan (KTD-4). One per moved subscription whose plan reads
+  differently on the new version. Re-read, then decide: a move cancelled,
+  replaced or applied says nothing; once per move, claimed as a
+  `CustomerNotice` (`plan-move:<subscriptionId>:<pendingFrom>`). Cancelling
+  the version, or a newer move, deletes the notices still PENDING.
+
+## Saroh billing — **Current** (plans catalogue U15)
+
+- **`billing.provider-plans.sync`** makes a published version's paid plans at
+  Saroh's billing provider (RECOMMENDATIONS 5). Queued on the publish's own
+  transaction, one waiting per version; while rows are PENDING it re-queues
+  itself with a growing pause, so the queue's own retries aren't spent.
+  Asking for a plan made under the row's id first keeps a repeat from making
+  a second. The last row SYNCED puts a version past its go-live live and
+  queues `pricing.site.revalidate` on the same transaction.
+- **`billing.provider.cancel`** cancels a provider subscription (now, or at
+  the cycle's end) after a plan change commits: the change never waits on the
+  provider, and a refusal (already cancelled) isn't retried.
+- **`billing.email`** (U17) is Saroh's own mail to a business: an
+  invoice with its PDF (queued with the invoice), a failed charge (queued by
+  the webhook on `pending` or `halted`), a first month or a free trial
+  ending (U16 queues it, `enqueueBillingEmail`), a plan that ends (#805)
+  and a 12-month term that ends (DEC-100: `TERM_ENDING`, queued by the
+  hourly sweep with an inbox notice, claimed once per subscription, end and
+  stage, and silent once a renewal is authorised). To everyone whose role has `billing:manage`, in
+  one message. Re-read, then decide: an invoice already emailed
+  (`emailedAt`), a failed charge paid since, a subscription no longer
+  trialing say nothing; a notice is claimed as a `CustomerNotice`
+  (`SAROH_BILLING_EMAIL`) once it has left. A send that fails throws and is
+  retried; no recipient or no mail set up ends the job with a log line.
+- **`billing.addons.sync`** (U16) puts a subscription's QUEUED add-on
+  charges (`SubscriptionAddonCharge`) on its provider subscription's next
+  charge, queued with the rows (a purchase, a renewal, a change of
+  provider subscription). Each row goes under its own id as the reference
+  and only a QUEUED row becomes SENT; a refusal is logged and the row
+  waits for the next charge; anything unanswered is retried.
+- **`billing.moves.apply`** is the hourly self-rescheduling sweep (one
+  PENDING run, a partial unique index): due pending moves that are ready
+  (`plan-moves.ts`) and OPEN checkouts past `expiresAt`. A paid
+  subscription's move is applied by its renewal webhook first.

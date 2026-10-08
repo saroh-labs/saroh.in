@@ -203,6 +203,29 @@ describe("WEBSITE", () => {
             "setup.address",
         ]);
     });
+
+    // The Turn on sheet's choice of template (industry templates U12).
+    it("takes a template the catalogue has", () => {
+        expect(
+            parseModuleSetup("WEBSITE", {
+                siteName: "Rye",
+                address: "rye",
+                templateId: "bakery",
+            }),
+        ).toEqual({ siteName: "Rye", address: "rye", templateId: "bakery" });
+    });
+
+    it("refuses one it doesn't, on the field", () => {
+        const r = refusal(() =>
+            parseModuleSetup("WEBSITE", {
+                siteName: "Rye",
+                address: "rye",
+                templateId: "nope",
+            }),
+        );
+        expect(r.message).toBe("Choose one of the templates offered.");
+        expect(r.details.field).toBe("setup.templateId");
+    });
 });
 
 describe("modules that ask nothing", () => {

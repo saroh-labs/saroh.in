@@ -1,3 +1,5 @@
+import type { PlanRefusal } from "@/lib/billing/refusal";
+import { planRefusalOf } from "@/lib/billing/refusal";
 import type { BusinessDetail } from "@/lib/organizations/business-details";
 import { missingDetailsOf } from "@/lib/organizations/business-details";
 
@@ -10,7 +12,10 @@ import { missingDetailsOf } from "@/lib/organizations/business-details";
  * knows it. Everything else in the app reads `field`, the convention it
  * already has. A refusal for want of the business's address or GSTIN
  * (DEC-068) also says which are `missing`, so the screen can ask for them
- * in place (`use-business-details-step.tsx`).
+ * in place (`use-business-details-step.tsx`). A refusal by the business's
+ * plan (`PLAN_LIMIT_REACHED`, `MODULE_LOCKED`) carries it as `plan`, so the
+ * screen shows the limit notice and the way up, not the message in a toast
+ * (`reportFailure`, U14).
  */
 export type ApiResult<T> = { ok: true; data: T } | ApiFailure;
 
@@ -19,6 +24,7 @@ export interface ApiFailure {
     error: string;
     field?: string;
     missing?: BusinessDetail[];
+    plan?: PlanRefusal;
 }
 
 interface Envelope {
@@ -43,10 +49,12 @@ export function toFailure(body: unknown, fallback: string): ApiFailure {
     const message = inner?.message ?? b.message ?? b.error;
     const field = fieldOf(inner?.details) ?? fieldOf(b.details);
     const missing = missingDetailsOf(inner?.details ?? b.details);
+    const plan = planRefusalOf(inner?.details ?? b.details, message);
     return {
         ok: false,
         error: typeof message === "string" && message ? message : fallback,
         ...(field ? { field } : {}),
         ...(missing ? { missing } : {}),
+        ...(plan ? { plan } : {}),
     };
 }

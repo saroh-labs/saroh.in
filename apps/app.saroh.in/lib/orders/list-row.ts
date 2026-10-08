@@ -157,31 +157,65 @@ export function rowAge(
 }
 
 /**
+ * How an order placed on the website to be paid on handover is settled:
+ * "pay on collection" for a pick-up, "pay on delivery" otherwise.
+ */
+export function payOnHandoverWords(fulfilmentType: string | undefined): string {
+    return fulfilmentType === "PICKUP"
+        ? "pay on collection"
+        : "pay on delivery";
+}
+
+/**
  * The row's money, only when the API sent it: a caller without `order:read`
- * (the kitchen, DEC-024) gets neither the total nor what is unpaid, and the
- * row draws neither. "₹480 unpaid" only while there is something to collect
- * on an order that still stands.
+ * (the kitchen, DEC-024) gets neither the total nor what is unpaid. "₹480
+ * unpaid" only while there is something to collect on an order that still
+ * stands; "₹480 to pay on collection" when the customer chose to pay at the
+ * handover on the website.
+ *
+ * The kitchen still sees WHETHER it is paid (UX-010), never how much: the
+ * person at the counter must know not to hand over an unpaid order. So
+ * `paid` says "Paid" and `unpaid` "Not paid yet" or "To pay on collection",
+ * with no figure; with the money read, `paid` is null (the total says it).
  */
 export function rowMoney(
     row: Pick<
         OrderRow,
         "total" | "unpaidAmount" | "currency" | "payment" | "standing"
-    >,
-): { total: string | null; unpaid: string | null } {
+    > &
+        Partial<Pick<OrderRow, "payOnHandover" | "fulfilmentType">>,
+): { total: string | null; unpaid: string | null; paid: string | null } {
     const total =
         row.total === undefined
             ? null
             : formatMoneyMajor(row.total, row.currency);
-    const owed = Number(row.unpaidAmount ?? 0);
     const stands = row.standing !== "CANCELLED" && row.standing !== "REFUNDED";
+    if (row.unpaidAmount === undefined) {
+        const how = payOnHandoverWords(row.fulfilmentType);
+        return {
+            total,
+            unpaid:
+                stands && row.payment === "UNPAID"
+                    ? row.payOnHandover
+                        ? `To ${how}`
+                        : "Not paid yet"
+                    : null,
+            paid:
+                total === null &&
+                stands &&
+                (row.payment === "PAID" || row.payment === "PARTLY_REFUNDED")
+                    ? "Paid"
+                    : null,
+        };
+    }
+    const owed = Number(row.unpaidAmount);
     const unpaid =
-        row.unpaidAmount !== undefined &&
-        row.payment === "UNPAID" &&
-        stands &&
-        owed > 0
-            ? `${formatMoneyMajor(row.unpaidAmount, row.currency)} unpaid`
+        row.payment === "UNPAID" && stands && owed > 0
+            ? row.payOnHandover
+                ? `${formatMoneyMajor(row.unpaidAmount, row.currency)} to ${payOnHandoverWords(row.fulfilmentType)}`
+                : `${formatMoneyMajor(row.unpaidAmount, row.currency)} unpaid`
             : null;
-    return { total, unpaid };
+    return { total, unpaid, paid: null };
 }
 
 /** "#1042 · 2 items · Hill Road · Pick-up" — the storefront only with several. */

@@ -1,16 +1,24 @@
 // #277: a note names a section that exists, says where it was when the page is
 // gone, and a reviewer can learn the keys without the editor's write role.
-jest.mock("@saroh/database", () => ({
-    // The real contract helpers: the service sanitizes what it hands a reviewer
-    // (#275), and a bare mock would leave getSectionContract undefined.
-    ...jest.requireActual("@saroh/database"),
-    prisma: {
+jest.mock("@saroh/database", () => {
+    const db: Record<string, unknown> = {
         site: { findFirst: jest.fn() },
         page: { findFirst: jest.fn(), findMany: jest.fn() },
         pageVersion: { findFirst: jest.fn() },
         siteComment: { create: jest.fn(), findMany: jest.fn() },
-    },
-}));
+        // A reviewer's note queues its alert on the same transaction (UX-043).
+        job: { create: jest.fn() },
+        siteReviewer: { count: jest.fn().mockResolvedValue(0) },
+    };
+    db.$transaction = jest.fn((fn: (tx: unknown) => unknown) => fn(db));
+    return {
+        // The real contract helpers: the service sanitizes what it hands a
+        // reviewer (#275), and a bare mock would leave getSectionContract
+        // undefined.
+        ...jest.requireActual("@saroh/database"),
+        prisma: db,
+    };
+});
 
 import { prisma } from "@saroh/database";
 

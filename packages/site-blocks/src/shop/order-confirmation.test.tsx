@@ -30,9 +30,63 @@ const ORDER: OrderConfirmationData = {
         deliverTo: null,
     },
     refunded: false,
+    toPay: null,
 };
 
 describe("OrderConfirmation (P4)", () => {
+    it("says an order paid at the handover is placed and still to pay", () => {
+        render(
+            <OrderConfirmation
+                lookup={{
+                    ok: true,
+                    order: { ...ORDER, toPay: "Pay when you collect" },
+                }}
+                businessName="Rye & Co."
+            />,
+        );
+        expect(
+            screen.getByRole("heading", {
+                level: 1,
+                name: "Thank you — your order is placed",
+            }),
+        ).toBeTruthy();
+        expect(
+            screen.getByText(
+                "You'll pay when you collect your order. Rye & Co. will be in touch when it's ready.",
+            ),
+        ).toBeTruthy();
+        expect(
+            screen.getByText("To pay when you collect").nextElementSibling
+                ?.textContent,
+        ).toBe("₹680");
+        expect(screen.queryByText("Paid")).toBeNull();
+    });
+
+    it("says when the pick-up place is open (UX-025)", () => {
+        render(
+            <OrderConfirmation
+                lookup={{
+                    ok: true,
+                    order: {
+                        ...ORDER,
+                        fulfilment: {
+                            ...ORDER.fulfilment,
+                            pickup: {
+                                name: "Hill Road",
+                                address: "12 Hill Road, Bandra",
+                                hours: "Mon–Sat 10:00–19:00, Sun closed",
+                            },
+                        },
+                    },
+                }}
+                businessName="Rye & Co."
+            />,
+        );
+        expect(
+            screen.getByText("Open Mon–Sat 10:00–19:00, Sun closed"),
+        ).toBeTruthy();
+    });
+
     it("shows the order: its number, lines, total and where to pick it up", () => {
         render(
             <OrderConfirmation

@@ -99,7 +99,7 @@ const ONE_DAYS = {
     capacity: 1,
     days: [
         { date: "2026-09-18", open: true, starts: [] },
-        { date: "2026-09-19", open: false, starts: [] },
+        { date: "2026-09-19", open: false, closed: true, starts: [] },
         {
             date: "2026-09-20",
             open: true,
@@ -292,11 +292,32 @@ describe("the booking page (U19)", () => {
             pay: "DESK",
         });
         expect(body).not.toHaveProperty("amount");
-        // The booker is the account's (A9): no email, phone or name sent.
+        // The booker is the account's (A9): no email or name sent, and no
+        // phone when none was given.
         expect(body).not.toHaveProperty("bookerEmail");
         expect(body).not.toHaveProperty("bookerPhone");
         expect(body).not.toHaveProperty("bookerName");
         expect(typeof body.idempotencyKey).toBe("string");
+    });
+
+    it("sends a phone they gave, optional (UX-049)", async () => {
+        serve((url) =>
+            url.endsWith("/days") ? json(ONE_DAYS) : json(booked(), 201),
+        );
+        render(<BookingFlow page={PAGE} apiUrl={API} account={account()} />);
+        await chooseOneToOne();
+        fireEvent.change(screen.getByLabelText("Phone (optional)"), {
+            target: { value: " +91 98450 12345 " },
+        });
+        fireEvent.click(screen.getByRole("radio", { name: /Pay at the desk/ }));
+        fireEvent.click(
+            screen.getByRole("button", { name: "Book — pay at the desk" }),
+        );
+        await screen.findByRole("heading", { name: "You're booked, Asha." });
+        const post = calls.find((c) => c.url.endsWith("/book"));
+        expect(JSON.parse(post?.init?.body as string)).toMatchObject({
+            bookerPhone: "+91 98450 12345",
+        });
     });
 
     it("pays now: holds the place, starts the payment, and confirms when the hold does", async () => {
@@ -737,6 +758,28 @@ describe("the booking page (U19)", () => {
             }),
         ).toBeInTheDocument();
     });
+
+    it("says online booking is paused before the form, naming no plan (DEC-095)", () => {
+        serve(() => json({}));
+        render(
+            <BookingFlow
+                page={{ ...PAGE, paused: true }}
+                apiUrl={API}
+                account={account()}
+            />,
+        );
+        expect(
+            screen.getByRole("heading", {
+                name: "Online booking is paused for now",
+            }),
+        ).toBeInTheDocument();
+        // Nothing to pick: no service, day or time before being told.
+        expect(
+            screen.queryByRole("radio", { name: /Personal training/ }),
+        ).toBeNull();
+        expect(document.body.textContent).not.toMatch(/plan|limit/i);
+        expect(calls).toHaveLength(0);
+    });
 });
 
 describe("Where and anything we should know (E7)", () => {
@@ -844,6 +887,47 @@ describe("Where and anything we should know (E7)", () => {
         expect(document.body.textContent).not.toMatch(
             /on its way|we'll text|we'll email/i,
         );
+    });
+
+    it("settles Where on a time the clinic is closed: online only, and says why (DEC-087)", async () => {
+        const ONLINE_ONLY = {
+            ...KAVI_DAYS,
+            days: KAVI_DAYS.days.map((d) => ({
+                ...d,
+                starts: d.starts.map((s) => ({ ...s, only: "ONLINE" })),
+            })),
+        };
+        serve((url) =>
+            url.endsWith("/days")
+                ? json(ONLINE_ONLY)
+                : json(
+                      booked({
+                          serviceName: "Video consultation",
+                          online: true,
+                          meetingUrl: LINK,
+                      }),
+                      201,
+                  ),
+        );
+        render(<BookingFlow page={KAVI} apiUrl={API} account={account()} />);
+        await chooseAt(/Video consultation/);
+
+        const clinic = screen.getByRole("radio", { name: "At Kavi Dental" });
+        const video = screen.getByRole("radio", { name: "Video call" });
+        expect(video).toHaveAttribute("aria-checked", "true");
+        expect(clinic).toBeDisabled();
+        expect(
+            screen.getByText(
+                "Kavi Dental is closed then, so this time is online only.",
+            ),
+        ).toBeInTheDocument();
+
+        fireEvent.click(screen.getByRole("radio", { name: /Pay at the desk/ }));
+        fireEvent.click(
+            screen.getByRole("button", { name: "Book — pay at the desk" }),
+        );
+        await screen.findByRole("heading", { name: "You're booked, Asha." });
+        expect(bookBody()).toMatchObject({ locationType: "ONLINE" });
     });
 
     it("never asks Where for an In person service, and says it's at the clinic", async () => {
@@ -1598,7 +1682,7 @@ describe("sign-in at the last step (A9)", () => {
         expect(bookCalls()[0]).toMatchObject({ bookerName: "Neha Joshi" });
     });
 
-    it("never draws a guest details form: no email or phone field, signed in or not", async () => {
+    it("never draws a guest details form: no email field, signed in or not — a phone is optional (UX-049)", async () => {
         serve(() => json(ONE_DAYS));
         const { unmount } = render(
             <BookingFlow
@@ -1609,13 +1693,13 @@ describe("sign-in at the last step (A9)", () => {
         );
         await pickSeven();
         expect(screen.queryByLabelText("Email")).toBeNull();
-        expect(screen.queryByLabelText(/Phone/)).toBeNull();
+        expect(screen.getByLabelText("Phone (optional)")).toHaveValue("");
         unmount();
 
         render(<BookingFlow page={PAGE} apiUrl={API} account={account()} />);
         await pickSeven();
         expect(screen.queryByLabelText("Email")).toBeNull();
-        expect(screen.queryByLabelText(/Phone/)).toBeNull();
+        expect(screen.getByLabelText("Phone (optional)")).not.toBeRequired();
     });
 
     it("'Not you?' signs out, and the last step is signing in again", async () => {
@@ -1990,8 +2074,10 @@ describe("a deposit at booking (E8)", () => {
         ).toBeInTheDocument();
     });
 
-    it("a business that can't take the deposit online says so, and books nothing", async () => {
-        serve((url) => json(url.endsWith("/days") ? ONE_DAYS : {}));
+    it("a business that can't take the deposit online books it to pay at the desk (DEC-089)", async () => {
+        serve((url) =>
+            url.endsWith("/days") ? json(ONE_DAYS) : json(booked(), 201),
+        );
         render(
             <BookingFlow
                 page={{ ...DEPOSIT_PAGE, payOnline: false }}
@@ -1999,15 +2085,173 @@ describe("a deposit at booking (E8)", () => {
                 account={account()}
             />,
         );
+        await chooseOneToOne();
+        const aside = screen.getByRole("complementary", {
+            name: "Your booking",
+        });
+        expect(within(aside).getByText("Pay at the desk")).toBeInTheDocument();
+        expect(within(aside).getByText("₹1,200")).toBeInTheDocument();
+        expect(document.body.textContent).not.toMatch(/Get in touch/);
+        expect(document.body.textContent).not.toMatch(/deposit/i);
         fireEvent.click(
-            screen.getByRole("radio", { name: /Personal training/ }),
+            within(aside).getByRole("button", {
+                name: "Book — pay at the desk",
+            }),
         );
         expect(
             await screen.findByText(
+                "Pay ₹1,200 at the front desk when you arrive.",
+            ),
+        ).toBeInTheDocument();
+        const post = calls.find((c) => c.url.endsWith("/book"));
+        const body = JSON.parse(post?.init?.body as string) as Record<
+            string,
+            unknown
+        >;
+        expect(body).toMatchObject({ pay: "DESK" });
+        expect(body).not.toHaveProperty("amount");
+    });
+});
+
+describe("how the business takes payment (DEC-088)", () => {
+    const withWay = (
+        bookingPayment: "ONLINE" | "DESK" | "BOTH",
+        over: Partial<BookingPageData> = {},
+    ): BookingPageData => ({
+        ...PAGE,
+        ...over,
+        rules: { ...PAGE.rules, bookingPayment },
+    });
+
+    function payWays() {
+        const group = screen.queryByRole("radiogroup", { name: "Paying" });
+        return group
+            ? within(group)
+                  .getAllByRole("radio")
+                  .map((r) => r.getAttribute("aria-label") ?? r.textContent)
+            : [];
+    }
+
+    it("online only: pay now, and no desk", async () => {
+        serve((url) => json(url.endsWith("/days") ? ONE_DAYS : {}));
+        render(
+            <BookingFlow
+                page={withWay("ONLINE")}
+                apiUrl={API}
+                account={account()}
+            />,
+        );
+        await chooseOneToOne();
+        const ways = payWays();
+        expect(ways).toHaveLength(1);
+        expect(ways[0]).toMatch(/^Pay ₹1,200 now/);
+        expect(screen.queryByText(/at the desk/)).toBeNull();
+    });
+
+    it("at the desk only: the desk, and no paying online", async () => {
+        serve((url) => json(url.endsWith("/days") ? ONE_DAYS : {}));
+        render(
+            <BookingFlow
+                page={withWay("DESK")}
+                apiUrl={API}
+                account={account()}
+            />,
+        );
+        await chooseOneToOne();
+        const ways = payWays();
+        expect(ways).toHaveLength(1);
+        expect(ways[0]).toMatch(/^Pay at the desk/);
+        expect(
+            screen.getByRole("button", { name: "Book — pay at the desk" }),
+        ).toBeInTheDocument();
+    });
+
+    it("online only with no provider: get in touch, and no payment line", async () => {
+        serve((url) => json(url.endsWith("/days") ? ONE_DAYS : {}));
+        render(
+            <BookingFlow
+                page={withWay("ONLINE", { payOnline: false })}
+                apiUrl={API}
+                account={account()}
+            />,
+        );
+        await chooseOneToOne();
+        const aside = screen.getByRole("complementary", {
+            name: "Your booking",
+        });
+        expect(
+            within(aside).getByText(
+                "Pulse Fitness can't take payment online right now. Get in touch with them to book.",
+            ),
+        ).toBeInTheDocument();
+        expect(screen.queryByRole("radiogroup", { name: "Paying" })).toBeNull();
+        expect(within(aside).queryByText(/₹/)).toBeNull();
+        expect(screen.queryByText(/at the desk/)).toBeNull();
+    });
+
+    it("at the desk only, with a deposit: books it to pay at the desk (DEC-089)", async () => {
+        serve((url) =>
+            url.endsWith("/days") ? json(ONE_DAYS) : json(booked(), 201),
+        );
+        render(
+            <BookingFlow
+                page={withWay("DESK", {
+                    services: [{ ...PAGE.services[0], depositCents: 60_000 }],
+                })}
+                apiUrl={API}
+                account={account()}
+            />,
+        );
+        await chooseOneToOne();
+        expect(payWays()).toHaveLength(1);
+        expect(payWays()[0]).toMatch(/^Pay at the desk/);
+        const aside = screen.getByRole("complementary", {
+            name: "Your booking",
+        });
+        expect(within(aside).getByText("Pay at the desk")).toBeInTheDocument();
+        expect(document.body.textContent).not.toMatch(/Get in touch/);
+        fireEvent.click(
+            within(aside).getByRole("button", {
+                name: "Book — pay at the desk",
+            }),
+        );
+        await screen.findByText(
+            "Pay ₹1,200 at the front desk when you arrive.",
+        );
+        const post = calls.find((c) => c.url.endsWith("/book"));
+        expect(JSON.parse(post?.init?.body as string)).toMatchObject({
+            pay: "DESK",
+        });
+    });
+
+    it("online only with no provider, with a deposit: get in touch, no payment line, nothing booked", async () => {
+        serve((url) => json(url.endsWith("/days") ? ONE_DAYS : {}));
+        render(
+            <BookingFlow
+                page={withWay("ONLINE", {
+                    payOnline: false,
+                    services: [{ ...PAGE.services[0], depositCents: 60_000 }],
+                })}
+                apiUrl={API}
+                account={account()}
+            />,
+        );
+        await chooseOneToOne();
+        const aside = screen.getByRole("complementary", {
+            name: "Your booking",
+        });
+        expect(
+            within(aside).getByText(
                 "Pulse Fitness can't take the deposit online right now. Get in touch with them to book.",
             ),
         ).toBeInTheDocument();
         expect(screen.queryByRole("radiogroup", { name: "Paying" })).toBeNull();
+        expect(within(aside).queryByText(/₹/)).toBeNull();
+        expect(screen.queryByText(/at the desk/)).toBeNull();
+        expect(
+            within(aside).getByRole("button", { name: "Book" }),
+        ).toHaveAttribute("aria-disabled", "true");
+        fireEvent.click(within(aside).getByRole("button", { name: "Book" }));
         expect(calls.some((c) => c.url.endsWith("/book"))).toBe(false);
     });
 });

@@ -14,10 +14,17 @@ import {
     AuditOutcome,
     AuditService,
 } from "../audit/audit.service";
+import { planTakesOnlinePayment } from "../billing/online-payments-plan";
 import type { NumberRestart } from "../invoices/numbering";
 import { invoiceSeriesKeys } from "../invoices/numbering";
 import { MediaService } from "../media/media.service";
 import { logoProblem } from "./business-logo";
+import type { PayInstructionsView } from "./business-pay-instructions";
+import {
+    PAY_SELECT,
+    payInstructionsView,
+    payInstructionsWrite,
+} from "./business-pay-instructions";
 import { phoneWrite } from "./business-phone";
 import type {
     RegisteredAddressView,
@@ -64,6 +71,13 @@ export interface OrganizationSettings {
          * set, and then the site shows no Call button.
          */
         phone: string | null;
+        /**
+         * Setup's answer to "Is it registered?": true for Registered, which
+         * saves no type, so the take-money checklist asks for the real one
+         * before the business goes live; false for Not registered; null when
+         * it wasn't asked.
+         */
+        registered: boolean | null;
     } | null;
     /**
      * When the business first sold something: the earliest order on record,
@@ -89,6 +103,12 @@ export interface OrganizationSettings {
      * served from and the library object it is; null until one is set.
      */
     logo: { url: string; mediaId: string | null } | null;
+    /**
+     * "How to pay us" (R32): the UPI ID, bank details and note a customer
+     * sees on their own unpaid invoice, order or booking. Every field null
+     * until set.
+     */
+    payInstructions: PayInstructionsView;
 }
 
 /** The checklist's facts ({@link OrganizationSettings.setup}). */
@@ -107,6 +127,13 @@ export interface SetupFacts {
      * for even with nothing on that takes money (DEC-070, KTD-7).
      */
     invoices: number;
+    /**
+     * The plan takes new online payments (#835). False: the checklist's
+     * payments step says online payment comes with a paid plan rather
+     * than "Connect payments" — connecting a provider would change
+     * nothing. Fails open, as every plan check does.
+     */
+    onlinePaymentsInPlan: boolean;
 }
 
 /** What the settings read selects from the profile. */
@@ -119,6 +146,7 @@ const PROFILE_SELECT = {
     website: true,
     timezone: true,
     phone: true,
+    legallyRegistered: true,
     gstRegistered: true,
     gstState: true,
     invoicePrefix: true,
@@ -131,6 +159,7 @@ const PROFILE_SELECT = {
     addressLine2: true,
     city: true,
     postalCode: true,
+    ...PAY_SELECT,
 } as const;
 
 interface ProfileRow {
@@ -142,6 +171,7 @@ interface ProfileRow {
     website: string | null;
     timezone: string | null;
     phone: string | null;
+    legallyRegistered: boolean | null;
     gstRegistered: boolean;
     gstState: string | null;
     invoicePrefix: string | null;
@@ -154,6 +184,12 @@ interface ProfileRow {
     addressLine2: string | null;
     city: string | null;
     postalCode: string | null;
+    payUpiId?: string | null;
+    payBankAccountName?: string | null;
+    payBankAccountNumber?: string | null;
+    payBankIfsc?: string | null;
+    payBankName?: string | null;
+    payNote?: string | null;
 }
 
 function splitProfile(
@@ -166,6 +202,7 @@ function splitProfile(
             tax: taxView(null, counters),
             registeredAddress: addressView(null),
             logo: null,
+            payInstructions: payInstructionsView(null),
         };
     }
     const {
@@ -181,14 +218,26 @@ function splitProfile(
         addressLine2: _a2,
         city: _ci,
         postalCode: _pc,
+        legallyRegistered,
+        payUpiId: _u,
+        payBankAccountName: _ban,
+        payBankAccountNumber: _bno,
+        payBankIfsc: _bi,
+        payBankName: _bn,
+        payNote: _pn,
         ...profile
     } = p;
     return {
         // A row the F10b backfill hasn't reached yet still says `company`.
-        profile: { ...profile, type: businessTypeRead(profile.type) },
+        profile: {
+            ...profile,
+            type: businessTypeRead(profile.type),
+            registered: legallyRegistered ?? null,
+        },
         tax: taxView(p, counters),
         registeredAddress: addressView(p),
         logo: logoUrl ? { url: logoUrl, mediaId: logoMediaId ?? null } : null,
+        payInstructions: payInstructionsView(p),
     };
 }
 
@@ -308,12 +357,23 @@ export class OrganizationSettingsService {
                   taxSent,
               )
             : {};
+        // How to pay us (R32): checked as the bank details will stand.
+        const payData = dto.payInstructions
+            ? payInstructionsWrite(
+                  dto.payInstructions,
+                  await prisma.businessProfile.findUnique({
+                      where: { organizationId: ctx.organizationId },
+                      select: PAY_SELECT,
+                  }),
+              )
+            : {};
         const changed: string[] = [
             ...(dto.name !== undefined ? ["name"] : []),
             ...(dto.kind !== undefined ? ["kind"] : []),
             ...Object.keys(profileData),
             ...Object.keys(phone),
             ...Object.keys(taxData),
+            ...Object.keys(payData),
         ];
 
         // Nothing to do — return current state rather than writing an empty
@@ -354,6 +414,7 @@ export class OrganizationSettingsService {
                 ...timezone,
                 ...phone,
                 ...taxData,
+                ...payData,
             };
             if (Object.keys(written).length > 0) {
                 await tx.businessProfile.upsert({
@@ -557,27 +618,41 @@ export class OrganizationSettingsService {
     /** What the take-money checklist ticks, counted now. */
     private async setupFacts(organizationId: string): Promise<SetupFacts> {
         const site = { organizationId, deletedAt: null };
-        const [products, services, sites, sitesNotLive, invoices] =
-            await Promise.all([
-                prisma.product.count({
-                    where: { organizationId, status: { not: "ARCHIVED" } },
-                }),
-                prisma.service.count({
-                    where: {
-                        organizationId,
-                        deletedAt: null,
-                        status: { not: "ARCHIVED" },
-                    },
-                }),
-                prisma.site.count({ where: site }),
-                prisma.site.count({
-                    where: { ...site, currentPublicationId: null },
-                }),
-                prisma.invoice.count({
-                    where: { organizationId, status: { not: "VOID" } },
-                }),
-            ]);
-        return { products, services, sites, sitesNotLive, invoices };
+        const [
+            products,
+            services,
+            sites,
+            sitesNotLive,
+            invoices,
+            onlinePaymentsInPlan,
+        ] = await Promise.all([
+            prisma.product.count({
+                where: { organizationId, status: { not: "ARCHIVED" } },
+            }),
+            prisma.service.count({
+                where: {
+                    organizationId,
+                    deletedAt: null,
+                    status: { not: "ARCHIVED" },
+                },
+            }),
+            prisma.site.count({ where: site }),
+            prisma.site.count({
+                where: { ...site, currentPublicationId: null },
+            }),
+            prisma.invoice.count({
+                where: { organizationId, status: { not: "VOID" } },
+            }),
+            planTakesOnlinePayment(organizationId),
+        ]);
+        return {
+            products,
+            services,
+            sites,
+            sitesNotLive,
+            invoices,
+            onlinePaymentsInPlan,
+        };
     }
 
     /** The earliest order in the business, across every storefront. */

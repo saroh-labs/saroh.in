@@ -3,7 +3,7 @@ import { cn } from "@saroh/ui/lib/utils";
 import Link from "next/link";
 import type { ReactNode } from "react";
 
-import { ViewerDate } from "@/components/shared/viewer-date";
+import { BusinessDate } from "@/components/shared/business-zone";
 import type { RowAttention } from "@/lib/orders/attention";
 import { rowAttention } from "@/lib/orders/attention";
 import type { OrderRow } from "@/lib/orders/business-service";
@@ -88,7 +88,7 @@ export function OrderGridHead({
             <div aria-hidden>Status</div>
             <div aria-hidden>Placed</div>
             <div aria-hidden className="text-right">
-                {money ? "Total" : ""}
+                {money ? "Total" : "Payment"}
             </div>
             <div aria-hidden />
         </div>
@@ -146,6 +146,19 @@ function AttentionTag({ attention }: { attention: RowAttention }) {
             )}
         >
             {attention.text}
+        </span>
+    );
+}
+
+/**
+ * "Paid" for the kitchen's view (UX-010): whether it is paid, with no
+ * figure; the unpaid words sit under the step.
+ */
+function PaidWord({ paid }: { paid: string | null }) {
+    if (!paid) return null;
+    return (
+        <span className="font-sans text-[12px] font-semibold text-success-subtle-foreground">
+            {paid}
         </span>
     );
 }
@@ -245,12 +258,88 @@ export function OrderGridRow({
                 ) : null}
             </div>
             <div className="min-w-0 truncate text-[12.5px] text-neutral-700 dark:text-muted-foreground">
-                <ViewerDate iso={row.placedAt} variant="moment" />
+                <BusinessDate iso={row.placedAt} variant="moment" />
             </div>
             <div className="whitespace-nowrap text-right font-display text-[13.5px] font-semibold tabular-nums tracking-[-0.02em]">
-                {v.money.total}
+                {v.money.total ?? <PaidWord paid={v.money.paid} />}
             </div>
             <div className="flex justify-end">{menu}</div>
+        </li>
+    );
+}
+
+/**
+ * The phone card's frame, shared by every list of orders that has to fit a
+ * phone (the Orders list, a product's Orders tab, a customer's Orders tab),
+ * so the three can't drift: a title line (who or what, with an aside such as
+ * the total), a meta line (the number, the step) and an optional footer.
+ * The title opens the order and its hit area covers the card.
+ */
+export function OrderCardFrame({
+    title,
+    href,
+    onOpen,
+    aside,
+    meta,
+    footer,
+    lead,
+    highlighted = false,
+}: {
+    title: ReactNode;
+    /** Where the card goes; ignored when `onOpen` is given. */
+    href: string;
+    /** Open a quick view instead of following `href`. */
+    onOpen?: () => void;
+    /** On the title line, after the title: the total, a status. */
+    aside?: ReactNode;
+    meta: ReactNode;
+    footer?: ReactNode;
+    /** Before the card's words: a selection box. */
+    lead?: ReactNode;
+    highlighted?: boolean;
+}) {
+    const name =
+        "min-w-0 flex-1 truncate text-[14px] font-semibold text-foreground";
+    // The title's own box holds a screen reader's words (", order #1042"):
+    // positioned here, the truncated link clips them. Left to the card,
+    // their place past a long title widened the page on a phone.
+    const words = <span className="relative">{title}</span>;
+    return (
+        <li
+            className={cn(
+                "relative flex min-w-0 items-start gap-3 rounded-[11px] border border-border bg-card p-3 transition-colors duration-fast hover:bg-foreground/[0.035] active:bg-foreground/[0.06]",
+                highlighted &&
+                    "border-highlight-border bg-brand-subtle hover:bg-brand-subtle",
+            )}
+        >
+            {lead}
+            <div className="flex min-w-0 flex-1 flex-col gap-1">
+                <div className="flex min-w-0 items-baseline gap-2">
+                    {onOpen ? (
+                        <button
+                            type="button"
+                            aria-haspopup="dialog"
+                            onClick={onOpen}
+                            className={cn(
+                                ROW_LINK,
+                                name,
+                                "cursor-pointer text-left underline-offset-2 hover:underline active:text-muted-foreground",
+                            )}
+                        >
+                            {words}
+                        </button>
+                    ) : (
+                        <Link href={href} className={cn(ROW_LINK, name)}>
+                            {words}
+                        </Link>
+                    )}
+                    {aside}
+                </div>
+                <div className="flex flex-wrap items-center gap-1.5 text-[12px] text-muted-foreground">
+                    {meta}
+                </div>
+                {footer}
+            </div>
         </li>
     );
 }
@@ -272,66 +361,50 @@ export function OrderCard({
     onOpen?: () => void;
 }) {
     const v = rowView(row, showStore);
-    const name =
-        "min-w-0 flex-1 truncate text-[14px] font-semibold text-foreground";
-    const card = (
-        <div className="flex min-w-0 flex-1 flex-col gap-1">
-            <div className="flex min-w-0 items-baseline gap-2">
-                {onOpen ? (
-                    <button
-                        type="button"
-                        aria-haspopup="dialog"
-                        onClick={onOpen}
+    return (
+        <OrderCardFrame
+            title={v.customer}
+            href={v.href}
+            onOpen={onOpen}
+            highlighted={open === true || select?.checked === true}
+            lead={
+                select ? (
+                    <Checkbox
+                        checked={select.checked}
+                        onCheckedChange={select.onToggle}
+                        aria-label={`${select.checked ? "Deselect" : "Select"} order number ${row.orderId}`}
                         className={cn(
-                            ROW_LINK,
-                            name,
-                            "cursor-pointer text-left underline-offset-2 hover:underline active:text-muted-foreground",
+                            BOX,
+                            "mt-px size-6 flex-none rounded-[6px]",
                         )}
-                    >
-                        {v.customer}
-                    </button>
-                ) : (
-                    <Link href={v.href} className={cn(ROW_LINK, name)}>
-                        {v.customer}
-                    </Link>
-                )}
-                {v.money.total ? (
+                    />
+                ) : null
+            }
+            aside={
+                v.money.total ? (
                     <span className="font-display text-[14px] font-semibold tabular-nums">
                         {v.money.total}
                     </span>
-                ) : null}
-            </div>
-            <div className="flex flex-wrap items-center gap-1.5 text-[12px] text-muted-foreground">
-                <span className="font-mono">{v.ref}</span>
-                <StepPill progress={v.progress} dot={false} />
-                <span>{row.fulfilmentLabel}</span>
-                {v.age ? <AgeText age={v.age} /> : null}
-                <AttentionTag attention={v.attention} />
-            </div>
-            {v.money.unpaid ? (
-                <div className="text-[12px] font-bold text-destructive-subtle-foreground">
-                    {v.money.unpaid}
-                </div>
-            ) : null}
-        </div>
-    );
-    return (
-        <li
-            className={cn(
-                "relative flex min-w-0 items-start gap-3 rounded-[11px] border border-border bg-card p-3 transition-colors duration-fast hover:bg-foreground/[0.035] active:bg-foreground/[0.06]",
-                (open === true || select?.checked === true) &&
-                    "border-highlight-border bg-brand-subtle hover:bg-brand-subtle",
-            )}
-        >
-            {select ? (
-                <Checkbox
-                    checked={select.checked}
-                    onCheckedChange={select.onToggle}
-                    aria-label={`${select.checked ? "Deselect" : "Select"} order number ${row.orderId}`}
-                    className={cn(BOX, "mt-px size-6 flex-none rounded-[6px]")}
-                />
-            ) : null}
-            {card}
-        </li>
+                ) : (
+                    <PaidWord paid={v.money.paid} />
+                )
+            }
+            meta={
+                <>
+                    <span className="font-mono">{v.ref}</span>
+                    <StepPill progress={v.progress} dot={false} />
+                    <span>{row.fulfilmentLabel}</span>
+                    {v.age ? <AgeText age={v.age} /> : null}
+                    <AttentionTag attention={v.attention} />
+                </>
+            }
+            footer={
+                v.money.unpaid ? (
+                    <div className="text-[12px] font-bold text-destructive-subtle-foreground">
+                        {v.money.unpaid}
+                    </div>
+                ) : null
+            }
+        />
     );
 }

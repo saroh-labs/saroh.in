@@ -4,7 +4,10 @@ import { notFound } from "next/navigation";
 import { SiteTheme } from "@saroh/site-blocks";
 
 import { PreviewGone } from "@/components/preview-gone";
+import { previewMenu } from "@/lib/in-page-menu";
+import { KEEP_LINKS_INSIDE } from "@/lib/preview-links";
 import { getPreviewByToken } from "@/lib/publication";
+import { SITE_FACES } from "@/lib/site-fonts";
 import { SiteFooter, SiteHeader } from "@saroh/site-blocks";
 
 /**
@@ -47,14 +50,19 @@ export default async function PreviewLayout({
 
     const base = `/preview/${encodeURIComponent(token)}`;
     const { snapshot, siteName, expiresAt, modules } = preview;
+    // Less entries to home sections with nothing to show now (G10, G9…).
+    const navigation = await previewMenu(snapshot, preview.siteId, token);
 
     return (
         <div className="min-h-screen bg-site-bg text-site-body">
             <PreviewBar siteName={siteName} expiresAt={expiresAt} />
-            <SiteTheme variables={snapshot.site.styleVariables} />
+            <SiteTheme
+                variables={snapshot.site.styleVariables}
+                faces={SITE_FACES}
+            />
             <SiteHeader
                 name={snapshot.site.name}
-                navigation={snapshot.site.navigation ?? []}
+                navigation={navigation}
                 // The menu the live site would draw now (G19): a module
                 // page whose module is off is out of it here too.
                 modules={modules}
@@ -111,21 +119,7 @@ function PreviewBar({
     );
 }
 
-/**
- * Rewrites a click on any root-relative link to stay under the preview. The
- * menu is already correct without this (the header takes a base path); this
- * covers buttons and links inside sections and rich text, whose targets are
- * the live site's paths. Without scripts those links leave the preview, and
- * the bar has already said the preview is not the live site.
- *
- * The script body is a constant, and the base path reaches it through a
- * `data-` attribute, which React escapes. It used to be spliced into the
- * script with `JSON.stringify`, which escapes quotes but not `<`, so a base
- * containing `</script>` would have closed the element and let the rest run
- * as markup (CodeQL js/bad-code-sanitization). That could not happen here —
- * `base` is `encodeURIComponent`-ed and only exists for a token the API
- * accepted — but a script built from strings is one refactor away from it.
- */
+/** The click handler in `lib/preview-links.ts` (UX-069), given the base. */
 function KeepLinksInside({ base }: { base: string }) {
     return (
         <script
@@ -134,5 +128,3 @@ function KeepLinksInside({ base }: { base: string }) {
         />
     );
 }
-
-const KEEP_LINKS_INSIDE = `(function(s){var base=s&&s.getAttribute("data-preview-base");if(!base)return;document.addEventListener("click",function(e){var t=e.target;var a=t&&t.closest?t.closest("a[href]"):null;if(!a)return;var h=a.getAttribute("href");if(!h||h.charAt(0)!=="/"||h.indexOf("//")===0||h.indexOf(base)===0)return;a.setAttribute("href",base+h);},true);})(document.currentScript);`;

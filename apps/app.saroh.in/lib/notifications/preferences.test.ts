@@ -73,11 +73,12 @@ describe("alertGrid", () => {
             }),
         });
         expect(grid.rows.map((r) => [r.label, r.note])).toEqual([
-            ["Website goes live", "When a scheduled go-live runs, or couldn't"],
+            [
+                "Your website",
+                "A reviewer's verdict or notes, and a scheduled go-live",
+            ],
         ]);
-        expect(grid.rows[0]?.cells[0]?.label).toBe(
-            "Website goes live by Bell, on",
-        );
+        expect(grid.rows[0]?.cells[0]?.label).toBe("Your website by Bell, on");
     });
 
     it("never offers the Monday summary: nothing sends it (default 127)", () => {
@@ -96,49 +97,22 @@ describe("alertGrid", () => {
         ]);
     });
 
-    it("with no email provider, email is off and fixed, with the way to connect one", () => {
-        const grid = alertGrid({
-            status: "ok",
-            prefs: prefs({
-                channels: {
-                    bell: { available: true },
-                    email: { available: false, reason: "NO_PROVIDER" },
-                    whatsapp: { available: false, reason: "NO_PROVIDER" },
-                },
-            }),
-        });
-        const email = grid.rows[0]?.cells.find((c) => c.channel === "email");
-        expect(email).toMatchObject({
-            on: false,
-            disabled: true,
-            label: "New order by Email, off — no provider connected",
-        });
-        expect(grid.notes).toEqual([
-            {
-                id: "email",
-                text: "Email alerts go out through your business's own email provider, and none is connected.",
-                link: {
-                    label: "Connect email in Providers",
-                    href: "/settings/providers",
-                },
-            },
-        ]);
-    });
-
-    it("tells someone who can't connect one who can, with no link", () => {
+    it("email needs no provider: Saroh sends it, and nothing says one is needed", () => {
         const grid = alertGrid({
             status: "ok",
             prefs: prefs({
                 canConnect: false,
                 channels: {
                     bell: { available: true },
-                    email: { available: false, reason: "NO_PROVIDER" },
+                    email: { available: true },
                     whatsapp: { available: false, reason: "NO_PROVIDER" },
                 },
             }),
         });
-        expect(grid.notes[0]?.link).toBeUndefined();
-        expect(grid.notes[0]?.text).toMatch(/Ask an owner/);
+        const email = grid.rows[0]?.cells.find((c) => c.channel === "email");
+        expect(email).toMatchObject({ disabled: false });
+        expect(grid.notes).toEqual([]);
+        expect(JSON.stringify(grid)).not.toMatch(/provider/i);
     });
 
     it("a WhatsApp cell appears once a provider is connected, and still can't be switched on", () => {

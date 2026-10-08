@@ -13,8 +13,8 @@ const MEMBER: OrganizationContext = { ...OWNER, role: "MEMBER" };
 const REVIEWER: OrganizationContext = { ...OWNER, role: "REVIEWER" };
 
 function make(data: {
-    payments?: { status: string }[];
-    comms?: { status: string }[];
+    payments?: { status: string; attentionAt?: Date | null }[];
+    comms?: { status: string; attentionAt?: Date | null }[];
     domains?: { status: string }[];
 }) {
     const db = {
@@ -112,10 +112,23 @@ describe("ProviderHealthService", () => {
         // The queries select ONLY status — no credential columns.
         const select =
             db.merchantPaymentProvider.findMany.mock.calls[0][0].select;
-        expect(Object.keys(select)).toEqual(["status"]);
+        expect(Object.keys(select)).toEqual(["status", "attentionAt"]);
         // And nothing in the output looks like a secret.
         const json = JSON.stringify(health).toLowerCase();
         expect(json).not.toContain("credential");
         expect(json).not.toContain("secret");
+    });
+    it("reports FAILED, with where to fix it, when the only connection refused its keys (UX-012)", async () => {
+        const { svc } = make({
+            payments: [{ status: "CONNECTED", attentionAt: new Date() }],
+            comms: [{ status: "CONNECTED", attentionAt: null }],
+        });
+        const list = await svc.list(OWNER);
+        expect(byKey(list, "PAYMENTS")).toMatchObject({
+            status: "FAILED",
+            message: expect.stringContaining("refused its keys"),
+            actionHref: "/settings/providers",
+        });
+        expect(byKey(list, "COMMUNICATIONS")?.status).toBe("ACTIVE");
     });
 });

@@ -1,5 +1,7 @@
 import { randomInt } from "node:crypto";
 
+import { listTemplates } from "@saroh/templates";
+
 /**
  * What the waitlist (U30, plan KTD-17) treats as "the same entry", and the
  * short ids in referral links. Pure, so the rules are tested on their own.
@@ -21,6 +23,32 @@ export type WaitlistKind = (typeof WAITLIST_KINDS)[number];
 /** The plans a "Get early access · ‹Plan›" button can name. */
 export const WAITLIST_PLANS = ["free", "grow", "pro"] as const;
 export type WaitlistPlan = (typeof WAITLIST_PLANS)[number];
+
+/**
+ * The templates a waitlist entry may save: the gallery's (saroh.in's
+ * `/templates`, industry templates U13), by slug. A template is in the
+ * gallery when its manifest names the kinds of business it is for and a
+ * sample business — the rule `content/templates.ts` on saroh.in shows by —
+ * so a template is saveable exactly when it can be seen there.
+ */
+export const WAITLIST_TEMPLATES: readonly string[] = listTemplates()
+    .filter((t) => (t.kinds?.length ?? 0) > 0 && t.sample !== undefined)
+    .map((t) => t.slug ?? t.id);
+
+/**
+ * A saved template's slug as stored, or null: trimmed and lower-cased, and
+ * only one the gallery shows. An unknown one is dropped rather than refused,
+ * as a bad referral id is: an old link must not stop someone joining.
+ */
+export function waitlistTemplate(
+    raw: string | null | undefined,
+): string | null {
+    const slug = (raw ?? "").trim().toLowerCase();
+    return WAITLIST_TEMPLATES.includes(slug) ? slug : null;
+}
+
+/** The `source` of an entry the link preview tool's email gate made (KTD-5). */
+export const LINK_PREVIEW_SOURCE = "link-preview";
 
 const GMAIL = new Set(["gmail.com", "googlemail.com"]);
 
@@ -87,7 +115,10 @@ export function cleanSource(raw: string | null | undefined): string {
  * support report without putting the list in the log aggregator.
  */
 export function maskEmail(email: string): string {
-    const [local = "", domain = ""] = email.split("@");
-    const head = local.slice(0, 2);
-    return `${head}${"*".repeat(Math.max(local.length - 2, 0))}@${domain}`;
+    const at = email.lastIndexOf("@");
+    const local = at < 0 ? email : email.slice(0, at);
+    const domain = at < 0 ? "" : email.slice(at + 1);
+    // One character and a fixed mask: neither a short local part nor its
+    // length shows through.
+    return `${local.slice(0, 1)}***@${domain}`;
 }

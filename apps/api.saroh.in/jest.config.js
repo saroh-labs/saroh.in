@@ -66,6 +66,8 @@ module.exports = {
         // commands, and the readiness registry — all with mocked Prisma/flags/
         // entitlements (no DB, no network).
         "<rootDir>/src/modules/capabilities/module-availability.service.spec.ts",
+        // U12: the plan step, and PAYMENTS locking actions, never the module.
+        "<rootDir>/src/modules/capabilities/module-availability.catalogue.spec.ts",
         "<rootDir>/src/modules/capabilities/module-lifecycle.service.spec.ts",
         "<rootDir>/src/modules/capabilities/readiness/module-readiness.registry.spec.ts",
         // #115 module API controller (mocked services).
@@ -92,6 +94,9 @@ module.exports = {
         // the real starter template — never touch a DB.
         "<rootDir>/src/modules/sites/**/*.spec.ts",
         "<rootDir>/src/modules/domains/**/*.spec.ts",
+        // The category refusal's words (UX-066); the rest of content's
+        // specs read the dev database.
+        "<rootDir>/src/modules/content/post-categories.slug.spec.ts",
         // S3-003 jobs: nextBackoff (pure), PrismaJobQueue.fail branch selection
         // (mocked prisma.job), the worker dispatch loop (in-memory FakeJobQueue
         // + real registry), and the registry — all DB-free / timer-free.
@@ -215,6 +220,17 @@ module.exports = {
         // G13: the site bag's pricing, DB-free. The real rows are in
         // public-checkout.db.spec.ts.
         "<rootDir>/src/modules/orders/checkout-quote.spec.ts",
+        // Whether the site can take an online order, with the plan's say
+        // over online payments — DB-free.
+        "<rootDir>/src/modules/orders/checkout-readiness.spec.ts",
+        // Paying at the handover at the site's checkout (2026-10-06): the
+        // order's write and the service's choice, with a mocked database.
+        "<rootDir>/src/modules/orders/offline-checkout-order.spec.ts",
+        "<rootDir>/src/modules/orders/offline-checkout-start.spec.ts",
+        // R34: an order to pay on handover nobody came for, pure.
+        "<rootDir>/src/modules/orders/uncollected.spec.ts",
+        // Record as refunded's amount and words (UX-061).
+        "<rootDir>/src/modules/orders/hand-payments.spec.ts",
         // P4: the site's order confirmation, DB-free. Its access rules are
         // in checkout-confirmation.db.spec.ts.
         "<rootDir>/src/modules/orders/checkout-confirmation.spec.ts",
@@ -223,6 +239,10 @@ module.exports = {
         "<rootDir>/src/modules/discounts/redeem.spec.ts",
         "<rootDir>/src/modules/discounts/discounts.service.spec.ts",
         "<rootDir>/src/modules/discounts/discounts.controller.spec.ts",
+        // DEC-104: one discount evaluation for the counter and the site's
+        // checkout, and the code in the site's bag.
+        "<rootDir>/src/modules/discounts/check-for-order.spec.ts",
+        "<rootDir>/src/modules/orders/site-discount-quote.spec.ts",
         // ADR-007 invoices: pure totals, numbering and standing, and the
         // service with a jest-mocked Prisma. Never touch a DB. (The numbering
         // races in invoices.db.spec.ts need Postgres and run in integration.)
@@ -278,6 +298,9 @@ module.exports = {
         "<rootDir>/src/modules/subscriptions/public-plans.spec.ts",
         // G20: a plan joined online — its snapshot and waiting joins. Pure.
         "<rootDir>/src/modules/subscriptions/plan-join.spec.ts",
+        // 6 Oct 2026: memberships need the plan's rows to be set up.
+        "<rootDir>/src/modules/subscriptions/membership-plan-lock.spec.ts",
+        "<rootDir>/src/modules/subscriptions/public-plans.lock.spec.ts",
         "<rootDir>/src/modules/class-packs/class-packs.service.spec.ts",
         "<rootDir>/src/modules/class-packs/class-packs.controller.spec.ts",
         "<rootDir>/src/modules/class-packs/dto.spec.ts",
@@ -338,10 +361,17 @@ module.exports = {
         // the billing webhook inbox (signature-before-write, idempotent replay).
         // Jest-mocked Prisma + fake provider; never touch a DB or the network.
         "<rootDir>/src/modules/billing/**/*.spec.ts",
+        // Plans catalogue U3: the draft-preview token, the public view of a
+        // snapshot and the impact rules — pure. The *.db.spec.ts beside them
+        // run in the integration project.
+        "<rootDir>/src/modules/pricing/**/*.spec.ts",
         // Public waitlist capture: normalization, idempotency (including the
         // concurrent-insert P2002 race), and that a full address never reaches
         // the logs. Jest-mocked Prisma; no DB.
         "<rootDir>/src/modules/waitlist/**/*.spec.ts",
+        // Link preview tool (resources plan U2): the SSRF guard, the head
+        // parser, the report and the gate, with fake DNS and transports.
+        "<rootDir>/src/modules/link-preview/**/*.spec.ts",
         "<rootDir>/test/**/*.spec.ts",
         // #90 (S0-011) API bootstrap smoke test: compiles the full AppModule DI
         // graph so "the app doesn't even start" (the 0fc8f72 boot crash class)

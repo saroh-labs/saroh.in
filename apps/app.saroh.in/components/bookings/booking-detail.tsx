@@ -10,8 +10,10 @@ import { JoinOnline } from "@/components/bookings/join-online";
 import { OutcomeControl } from "@/components/bookings/outcome-control";
 import { RescheduleBooking } from "@/components/bookings/reschedule-booking";
 import { TakePayment } from "@/components/bookings/take-payment";
+import { TakePaymentLocked } from "@/components/bookings/take-payment-locked";
 import { TreatmentVisits } from "@/components/bookings/treatment-visits";
 import { formatDayLabel, formatTimeRange } from "@/lib/format/datetime";
+import { formatMoney } from "@/lib/format/money";
 import { formatStatus } from "@/lib/format/status";
 import {
     deadlineText,
@@ -51,7 +53,12 @@ export function BookingDetailView({
      * Taking payment at the desk (P2): `booking:write` and `invoice:write`,
      * and whether a pay link can be sent (a provider connected).
      */
-    desk?: { canTake: boolean; canLink: boolean };
+    desk?: {
+        canTake: boolean;
+        canLink: boolean;
+        /** The plan takes payment online (R33); else no link is offered. */
+        online?: boolean;
+    };
     /** Whether the slot has ended. Read by the page so "now" stays out of render. */
     past: boolean;
     /**
@@ -100,6 +107,24 @@ export function BookingDetailView({
     return (
         <main className="mx-auto w-full max-w-4xl p-6 sm:p-8">
             <PageHeader
+                // Where it sits (UX-083): Bookings › All bookings › this one.
+                breadcrumb={[
+                    <Link
+                        key="bookings"
+                        href="/bookings"
+                        className="hover:text-foreground"
+                    >
+                        Bookings
+                    </Link>,
+                    <Link
+                        key="all"
+                        href="/bookings/all"
+                        className="hover:text-foreground"
+                    >
+                        All bookings
+                    </Link>,
+                    service.name,
+                ]}
                 title={service.name}
                 description={
                     madeBy
@@ -217,9 +242,22 @@ export function BookingDetailView({
                                 currency={booking.money.currency}
                                 who={bookerLabel(booking)}
                                 canLink={desk.canLink}
+                                online={desk.online}
                                 triggerClassName="h-9"
                             />
                         </div>
+                    ) : booking.money?.take && desk ? (
+                        // Shown, disabled, with why (FB-1, DEC-098).
+                        <TakePaymentLocked
+                            className="mt-3"
+                            amount={
+                                formatMoney(
+                                    booking.money.take.cents,
+                                    booking.money.currency,
+                                ) ?? null
+                            }
+                            triggerClassName="h-9"
+                        />
                     ) : null}
                     {/* The deadline fixed at booking (DEC-051): moving the
                         booking never moves it, so it is said here. */}

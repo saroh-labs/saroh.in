@@ -1,6 +1,13 @@
+import type { UpgradeTo } from "@/lib/billing/access";
+import { upgradeHref } from "@/lib/billing/access";
+import type { EmailSetup } from "@/lib/communications/email-setup";
 import { rolledOut } from "@/lib/modules/rollout";
 import type { ModuleView } from "@/lib/modules/schema";
 import { inIndia, yourAddress } from "@/lib/organizations/business-details";
+import {
+    BUSINESS_TYPE_ANCHOR,
+    businessTypeOf,
+} from "@/lib/organizations/business-types";
 import type {
     OrganizationSettings,
     SetupFacts,
@@ -8,6 +15,9 @@ import type {
 import type { ConnectedCommsProvider } from "@/lib/providers/service";
 
 import { BUSINESS_TAB_PARAM } from "./search";
+
+/** The API's readiness code for keys the payment provider refused (UX-012). */
+export const PAYMENTS_KEYS_REFUSED = "PAYMENTS_KEYS_REFUSED";
 
 /** The API's readiness code for payments that can't be confirmed (DEC-063). */
 export const PAYMENTS_WEBHOOK_SECRET_MISSING =
@@ -30,7 +40,7 @@ export const PAYMENTS_WEBHOOK_SECRET_MISSING =
  */
 
 /** Why email needs a person, or `null` when it does not (or we can't tell). */
-export type EmailAttention = "disconnected" | "not-connected";
+export type EmailAttention = "disconnected" | "not-connected" | "refused";
 
 /**
  * On for this business, and rolled out by Saroh: a module whose rollout is
@@ -53,17 +63,53 @@ export function emailAttention(
 ): EmailAttention | null {
     if (!modules || !messaging || !on(modules, "COMMUNICATIONS")) return null;
     const email = messaging.filter((c) => c.channel === "EMAIL");
-    if (email.some((c) => c.status === "CONNECTED")) return null;
+    const connected = email.filter((c) => c.status === "CONNECTED");
+    // Connected, but its provider refused the keys (UX-012): not sending.
+    // (Read here, not from `providers/rows`, which would import this.)
+    if (connected.some((c) => c.attention?.reason !== "KEYS_REFUSED")) {
+        return null;
+    }
+    if (connected.length > 0) return "refused";
     if (email.length > 0) return "disconnected";
     return messaging.some((c) => c.status === "CONNECTED")
         ? null
         : "not-connected";
 }
 
-/** The Providers tab's line in the settings tabs, when email needs a person. */
-export function providersTabNote(attention: EmailAttention | null) {
+/**
+ * Whether the plan holds the business's own email back (DEC-091): none
+ * connected, and the connect's own check says no room for one
+ * (`GET …/comms-providers/email-setup`). Never asked to connect then — a
+ * connect the API would refuse — only told it comes with a paid plan.
+ */
+export function emailHeldByPlan(
+    attention: EmailAttention | null,
+    setup: EmailSetup | null | undefined,
+): boolean {
+    return (
+        attention === "not-connected" &&
+        setup?.connected === false &&
+        setup.canConnect === false
+    );
+}
+
+/**
+ * The Providers tab's line in the settings tabs, when email needs a person.
+ * On a plan that can't connect one (DEC-091) it says a paid plan brings it,
+ * and only to who may see the plans (`billing:read`).
+ */
+export function providersTabNote(
+    attention: EmailAttention | null,
+    plan: { setup?: EmailSetup | null; mayPlans?: boolean } = {},
+) {
     if (attention === "disconnected") {
         return "Needs you: email is disconnected";
+    }
+    if (attention === "refused") {
+        return "Needs you: your email provider refused its keys";
+    }
+    if (emailHeldByPlan(attention, plan.setup)) {
+        return plan.mayPlans ? "Your own email comes with a paid plan" : null;
     }
     if (attention === "not-connected") {
         return "Needs you: no email provider yet";
@@ -72,7 +118,14 @@ export function providersTabNote(attention: EmailAttention | null) {
 }
 
 export type ReadyStepKey =
-    "payments" | "address" | "tax" | "catalogue" | "site" | "shop";
+    | "payments"
+    | "howToPay"
+    | "address"
+    | "businessType"
+    | "tax"
+    | "catalogue"
+    | "site"
+    | "shop";
 
 /** The API's Website step: the shop waits on "Sells from" (P4). */
 export const WEBSITE_SHOP_NOT_CHOSEN = "WEBSITE_SHOP_NOT_CHOSEN";
@@ -98,6 +151,20 @@ export interface ReadyStep extends ReadyItem {
     done: boolean;
 }
 
+/**
+ * Something the plan holds back, shown beside the steps but never counted
+ * (DEC-092): a business on a plan without it can still reach all done.
+ */
+export interface ReadyAside {
+    key: "payments" | "email";
+    label: string;
+    why: string;
+    /** "Comes with ‹plan›", or "Comes with a paid plan". */
+    comesWith: string;
+    cta: string;
+    href: string;
+}
+
 export interface ReadyChecklist {
     /** Every step that could be checked, in the order to do them. */
     steps: ReadyStep[];
@@ -105,6 +172,15 @@ export interface ReadyChecklist {
     left: ReadyItem[];
     done: number;
     total: number;
+    /** What the plan holds back: shown, outside `done` and `total`. */
+    outside: ReadyAside[];
+    /**
+     * Settings' "Make it yours" (UX-019): what Settings also suggests —
+     * email, business type, logo, a pipeline — listed apart and never
+     * counted, so Settings and Home show the same count for the same
+     * business. Absent on Home.
+     */
+    extras?: ReadyStep[];
 }
 
 export const business = (section: string) =>
@@ -144,15 +220,54 @@ const connect = (href: string): ReadyItem => ({
     broken: false,
 });
 
-function payments(modules: readonly ModuleView[]): Check | null {
+/**
+ * On a plan without online payments (#835, DEC-092): connecting a provider
+ * would change nothing, and nothing the business can do in setup would
+ * either, so it is not a step. It is said beside the steps, outside the
+ * count — the plan that has it (the catalogue's `payments` row names it;
+ * otherwise "a paid plan") and See plans — so a business on that plan can
+ * reach all done. The plan is asked first, as the API asks it
+ * (`onlinePaymentBlocker`): Payments on or off, a provider or none. Only
+ * where taking money applies: Payments is on, or something that sells is.
+ */
+function onlinePaymentsAside(
+    modules: readonly ModuleView[],
+    setup: Pick<SetupFacts, "onlinePaymentsInPlan"> | undefined,
+    upgrade: UpgradeTo | null | undefined,
+): ReadyAside | null {
+    if (setup?.onlinePaymentsInPlan !== false) return null;
+    const view = modules.find((m) => m.key === "PAYMENTS");
+    if (!view) return null;
+    const selling = SELLING.some((k) => on(modules, k));
+    if (view.lifecycle !== "ENABLED" && !selling) return null;
+    return {
+        key: "payments",
+        label: "Take payment online",
+        why: "Until then, customers pay you the ways you set in How to pay us.",
+        comesWith: upgrade
+            ? `Comes with ${upgrade.name}`
+            : "Comes with a paid plan",
+        cta: "See plans",
+        href: upgradeHref(upgrade?.planId),
+    };
+}
+
+function payments(
+    modules: readonly ModuleView[],
+    setup: Pick<SetupFacts, "onlinePaymentsInPlan"> | undefined,
+): Check | null {
     const view = modules.find((m) => m.key === "PAYMENTS");
     // Not offered to this business at all (its rollout hasn't reached it):
     // nothing it could do about it here, so not a step.
     if (!view) return null;
+    const selling = SELLING.some((k) => on(modules, k));
+    // The plan is asked first, as the API asks it (`onlinePaymentBlocker`):
+    // without online payments it is no step at all (`onlinePaymentsAside`).
+    if (setup?.onlinePaymentsInPlan === false) return null;
     if (view.lifecycle !== "ENABLED") {
         // Nothing that sells is on either: no money to take yet, so the step
         // does not apply. Something sells: Payments has to come on first.
-        if (!SELLING.some((k) => on(modules, k))) return null;
+        if (!selling) return null;
         return {
             ...connect("/settings/modules"),
             why: "Turn on Payments, then connect your provider, so money reaches your bank.",
@@ -163,6 +278,22 @@ function payments(modules: readonly ModuleView[]): Check | null {
     // Connected, but no payment through it can be confirmed: saved without
     // its webhook signing secret (DEC-063). Not ready to take money, and
     // not "switched off" either.
+    // Its provider refused the keys on a live call (UX-012): connected, but
+    // nothing goes through until they are entered again.
+    if (
+        view.readiness === "ATTENTION_REQUIRED" &&
+        view.blockers[0]?.code === PAYMENTS_KEYS_REFUSED
+    ) {
+        return {
+            key: "payments",
+            label: "Enter your payment keys again",
+            why: "Your payment provider refused its keys, so customers can't pay online.",
+            cta: "Enter keys again",
+            href,
+            broken: true,
+            left: true,
+        };
+    }
     if (
         view.readiness === "ATTENTION_REQUIRED" &&
         view.blockers[0]?.code === PAYMENTS_WEBHOOK_SECRET_MISSING
@@ -194,6 +325,37 @@ function payments(modules: readonly ModuleView[]): Check | null {
 const filled = (v: string | null | undefined) => !!v?.trim();
 
 /**
+ * How customers pay a business on a plan without online payments (UX-007):
+ * the UPI ID or bank details its invoices, orders and desk bookings show
+ * (How to pay us, R32). It is how such a business gets paid, so it counts,
+ * in the place connecting payments has on a plan with them. Done once a
+ * UPI ID or whole bank details are in: a note alone names no way to pay.
+ * Only where taking money applies, and only on that plan — read as the API
+ * says it (`onlinePaymentsInPlan`), so an unread plan never asks. Absent
+ * from an API older than How to pay us: unknown, not a step.
+ */
+function howToPay(
+    settings: Pick<OrganizationSettings, "setup" | "payInstructions">,
+    money: boolean,
+): Check | null {
+    if (!money || settings.setup?.onlinePaymentsInPlan !== false) return null;
+    const pay = settings.payInstructions;
+    if (!pay) return null;
+    const set =
+        filled(pay.upiId) ||
+        (filled(pay.bankAccountNumber) && filled(pay.bankIfsc));
+    return {
+        key: "howToPay",
+        label: "Tell customers how to pay you",
+        why: "Add your UPI ID or bank details. Customers see them on every unpaid invoice, order and booking.",
+        cta: "Add UPI or bank",
+        href: business("pay"),
+        broken: false,
+        left: !set,
+    };
+}
+
+/**
  * The registered address, the API's rule for an invoice (DEC-068): its
  * first line, city and PIN, and an Indian address its state. Until it is
  * in, Issue, Send, a pay link and connecting payments ask for it first.
@@ -203,6 +365,24 @@ function address(
     country: string | null | undefined,
     kind: unknown,
 ): Check {
+    const rest =
+        filled(registered.line1) &&
+        filled(registered.city) &&
+        filled(registered.postalCode);
+    const state = filled(registered.state) || !inIndia(country);
+    // Saved without its state (UX-018): name the state, so the step doesn't
+    // read as if nothing had been saved.
+    if (rest && !state) {
+        return {
+            key: "address",
+            label: "Add the state to your address",
+            why: "It's printed on your invoices, and GST depends on it.",
+            cta: "Add state",
+            href: business("address"),
+            broken: false,
+            left: true,
+        };
+    }
     return {
         key: "address",
         // "your registered address", or "your address" (DEC-070).
@@ -211,12 +391,30 @@ function address(
         cta: "Add address",
         href: business("address"),
         broken: false,
-        left: !(
-            filled(registered.line1) &&
-            filled(registered.city) &&
-            filled(registered.postalCode) &&
-            (filled(registered.state) || !inIndia(country))
-        ),
+        left: !(rest && state),
+    };
+}
+
+/**
+ * The real business type, for a business that said Registered at setup.
+ * Registered saves no type, so a Pvt Ltd, LLP or partnership is never
+ * guessed at; until one is chosen the business isn't ready to take money.
+ * A business that said Not registered, or wasn't asked, is not held by it:
+ * Settings only suggests a type to them (`nudges.ts`).
+ */
+function businessType(
+    profile: OrganizationSettings["profile"] | undefined,
+): Check | null {
+    if (profile?.registered !== true) return null;
+    return {
+        key: "businessType",
+        label: "Choose your business type",
+        why: "You said your business is registered. Choose which kind — private limited, LLP, partnership or another — so your business details are right before you take money.",
+        cta: "Choose type",
+        // Straight to the Type field, not the top of the tab.
+        href: `${business("identity")}#${BUSINESS_TYPE_ANCHOR}`,
+        broken: false,
+        left: businessTypeOf(profile.type) === "",
     };
 }
 
@@ -363,8 +561,10 @@ function shop(modules: readonly ModuleView[]): Check | null {
 
 /**
  * The steps to take money, in order: connect payments, the registered
- * address (once something invoices or takes money, `handlesMoney`), GST, a first product or service, publishing the site and,
- * while its shop waits on it, choosing the storefront it sells from.
+ * address and, for a business that said Registered at setup, its real type
+ * (both once something invoices or takes money, `handlesMoney`), GST, a
+ * first product or service, publishing the site and, while its shop waits
+ * on it, choosing the storefront it sells from.
  *
  * Each check is left, done, or not a step at all. Unknown — the list behind
  * it could not be read — is left out, so the count never claims a step is
@@ -375,27 +575,35 @@ function shop(modules: readonly ModuleView[]): Check | null {
 export function readyChecklist({
     settings,
     modules: all,
+    onlineUpgrade,
 }: {
     settings: Pick<
         OrganizationSettings,
         "tax" | "profile" | "registeredAddress" | "setup" | "kind"
-    >;
+    > &
+        Partial<Pick<OrganizationSettings, "payInstructions">>;
     modules: readonly ModuleView[] | null;
+    /** The plan that takes payment online, when the catalogue names one. */
+    onlineUpgrade?: UpgradeTo | null;
 }): ReadyChecklist {
     // Never a step for a module Saroh has not rolled out (DEC-057).
     const modules = all ? rolledOut(all) : null;
+    const money = handlesMoney(modules, settings.setup) !== false;
     const checks = [
-        modules ? payments(modules) : null,
+        modules ? payments(modules, settings.setup) : null,
+        // On a plan without online payments, How to pay us is how the
+        // business gets paid (UX-007): a step where connecting would be.
+        howToPay(settings, money),
         // Absent from an API older than the registered address: unknown.
         // Asked only once something invoices or takes money (DEC-070).
-        settings.registeredAddress &&
-        handlesMoney(modules, settings.setup) !== false
+        settings.registeredAddress && money
             ? address(
                   settings.registeredAddress,
                   settings.profile?.country,
                   settings.kind,
               )
             : null,
+        money ? businessType(settings.profile) : null,
         tax(settings),
         modules ? catalogue(modules, settings.setup) : null,
         modules ? site(modules, settings.setup) : null,
@@ -414,12 +622,18 @@ export function readyChecklist({
         left,
         done: steps.length - left.length,
         total: steps.length,
+        outside: modules
+            ? [
+                  onlinePaymentsAside(modules, settings.setup, onlineUpgrade),
+              ].filter((a): a is ReadyAside => a !== null)
+            : [],
     };
 }
 
 /** The steps that are about money, rather than getting the site live. */
 const MONEY_STEPS: ReadonlySet<ReadyItem["key"]> = new Set<ReadyItem["key"]>([
     "payments",
+    "howToPay",
     "address",
     "tax",
     "catalogue",
@@ -428,27 +642,32 @@ const MONEY_STEPS: ReadonlySet<ReadyItem["key"]> = new Set<ReadyItem["key"]>([
     "logo",
 ]);
 
-/** Whether any step, done or left, is about money (DEC-070). */
-export function takesMoney(list: Pick<ReadyChecklist, "steps">): boolean {
-    return list.steps.some((s) => MONEY_STEPS.has(s.key));
+/**
+ * Whether any step, done or left, is about money (DEC-070) — or what the
+ * plan holds back beside them (taking payment online, DEC-092).
+ */
+export function takesMoney(
+    list: Pick<ReadyChecklist, "steps"> &
+        Partial<Pick<ReadyChecklist, "outside">>,
+): boolean {
+    return (
+        list.steps.some((s) => MONEY_STEPS.has(s.key)) ||
+        (list.outside?.length ?? 0) > 0
+    );
 }
 
 /**
- * The checklist's heading follows its steps, never the kind (DEC-070): Home's
- * "Get ready to take money" and Settings' "Ready to take payments" while a
- * money step is in the list. Without one, a list that publishes the site is
- * "Get your site live", and Settings' other asks (email, a pipeline) are
- * "Finish setting up".
+ * The checklist's heading follows its counted steps, never the kind
+ * (DEC-070), and is the same on Home and Settings › Business (UX-019): "Get
+ * ready to take money" while a money step is in the list. Without one, a
+ * list that publishes the site is "Get your site live", and anything else
+ * "Finish setting up". Settings' "Make it yours" never changes it.
  */
 export function checklistHeading(
-    list: Pick<ReadyChecklist, "steps">,
-    where: "home" | "settings",
+    list: Pick<ReadyChecklist, "steps"> &
+        Partial<Pick<ReadyChecklist, "outside">>,
 ): string {
-    if (takesMoney(list)) {
-        return where === "home"
-            ? "Get ready to take money"
-            : "Ready to take payments";
-    }
+    if (takesMoney(list)) return "Get ready to take money";
     return list.steps.some((s) => s.key === "site")
         ? "Get your site live"
         : "Finish setting up";

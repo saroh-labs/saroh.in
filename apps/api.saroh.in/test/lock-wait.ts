@@ -85,3 +85,32 @@ export function gate<T = void>(): {
     });
     return { wait, release };
 }
+
+/**
+ * Resolve once some other connection is waiting on an advisory lock that
+ * `holder` holds (`pg_advisory_xact_lock`, e.g. a plan meter's,
+ * `billing/metering.service.ts`); reject after `timeoutMs`. As
+ * {@link waitUntilBlockedBy}, but for a lock that names no table.
+ */
+export async function waitUntilAdvisoryBlockedBy(
+    holder: number,
+    timeoutMs = 10_000,
+): Promise<void> {
+    const deadline = Date.now() + timeoutMs;
+    for (;;) {
+        const [row] = await prisma.$queryRaw<{ waiting: number }[]>`
+            SELECT count(*)::int AS waiting
+            FROM pg_locks l
+            WHERE NOT l.granted
+              AND l.locktype = 'advisory'
+              AND ${holder}::int = ANY (pg_blocking_pids(l.pid))`;
+        if (row.waiting > 0) return;
+        if (Date.now() > deadline) {
+            throw new Error(
+                `no connection waited on an advisory lock held by backend ${holder} within ${timeoutMs}ms`,
+            );
+        }
+        // The poll's own pace, as above.
+        await new Promise((resolve) => setTimeout(resolve, 5));
+    }
+}

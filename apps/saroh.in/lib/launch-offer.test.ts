@@ -6,17 +6,19 @@ import { parseLaunchOffer, readLaunchOffer } from "./launch-offer";
 
 /**
  * The waitlist's launch offer (marketing plan U31): read from the API with
- * a five-minute revalidation, and anything short of a whole offer is null,
+ * once, when the site is built, and anything short of a whole offer is null,
  * the "announced at launch" placeholder. The plan and days here (Plan B,
  * 37) are made up.
  */
 const env = vi.hoisted(() => {
-    const e: { API_URL?: string } = { API_URL: "https://api.test" };
+    const e: { API_URL?: string; NEXT_PHASE?: string; VERCEL_ENV?: string } = {
+        API_URL: "https://api.test",
+    };
     return e;
 });
 vi.mock("@/env", () => ({ env }));
 
-type FetchInit = RequestInit & { next?: { revalidate?: number } };
+type FetchInit = RequestInit;
 
 function answering(body: unknown, status = 200) {
     return vi.fn((_url: string, _init?: FetchInit) =>
@@ -34,11 +36,13 @@ const OFFER = { planId: "b", planName: "Plan B", days: 37 };
 
 afterEach(() => {
     env.API_URL = "https://api.test";
+    env.NEXT_PHASE = undefined;
+    env.VERCEL_ENV = undefined;
     vi.restoreAllMocks();
 });
 
 describe("readLaunchOffer", () => {
-    it("reads /public/waitlist/offer with a five-minute revalidation", async () => {
+    it("reads /public/waitlist/offer once, when the site is built", async () => {
         const fetcher = answering(OFFER);
         await expect(readLaunchOffer(asFetch(fetcher))).resolves.toEqual({
             planName: "Plan B",
@@ -46,7 +50,7 @@ describe("readLaunchOffer", () => {
         });
         const [url, init] = fetcher.mock.calls[0];
         expect(url).toBe("https://api.test/public/waitlist/offer");
-        expect(init?.next?.revalidate).toBe(300);
+        expect(init?.cache).toBe("force-cache");
         expect(init?.signal).toBeInstanceOf(AbortSignal);
     });
 
@@ -101,5 +105,13 @@ describe("launchOfferLines", () => {
             terms: "No card needed. When it ends, you stay on Free unless you choose a plan.",
             doneLine: "Your invite comes with 37 days of Plan B free.",
         });
+    });
+
+    it("API down on a deployment's build: throws rather than publish the placeholder", async () => {
+        env.NEXT_PHASE = "phase-production-build";
+        env.VERCEL_ENV = "production";
+        await expect(
+            readLaunchOffer(asFetch(answering({}, 503))),
+        ).rejects.toThrow();
     });
 });

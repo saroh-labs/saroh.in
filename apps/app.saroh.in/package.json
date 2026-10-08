@@ -9,7 +9,10 @@
         "lint": "eslint .",
         "start": "next start",
         "test": "vitest run",
-        "typecheck": "tsc --noEmit"
+        "typecheck": "tsc --noEmit",
+        "cf:build": "opennextjs-cloudflare build",
+        "cf:preview": "opennextjs-cloudflare preview",
+        "cf:deploy": "opennextjs-cloudflare deploy"
     },
     "portless": "app.saroh",
     "dependencies": {
@@ -42,6 +45,7 @@
         "@radix-ui/react-tooltip": "^1.2.16",
         "@saroh/auth": "workspace:*",
         "@saroh/block-contract": "workspace:*",
+        "@saroh/pricing-catalog": "workspace:*",
         "@saroh/site-blocks": "workspace:*",
         "@saroh/ui": "workspace:*",
         "@t3-oss/env-nextjs": "^0.13.11",
@@ -80,6 +84,7 @@
         "zod": "catalog:"
     },
     "devDependencies": {
+        "@opennextjs/cloudflare": "1.20.9",
         "@saroh/eslint-config": "workspace:*",
         "@saroh/tailwind-config": "workspace:*",
         "@tailwindcss/forms": "^0.5.11",
@@ -96,6 +101,7 @@
         "tailwindcss": "catalog:",
         "tailwindcss-animate": "^1.0.7",
         "typescript": "catalog:",
-        "vitest": "^4.1.11"
+        "vitest": "^4.1.11",
+        "wrangler": "4.148.0"
     }
 }

@@ -89,9 +89,11 @@ export function renderInvoicePdf(
         bufferPages: true,
         info: {
             Title: `${view.title} ${view.number}`,
+            // The business's paper, never Saroh's brand (a customer's PDF
+            // reader shows these): the seller made it.
             Author: view.seller.name,
-            Creator: "Saroh",
-            Producer: "Saroh",
+            Creator: view.seller.name,
+            Producer: view.seller.name,
         },
     });
     doc.registerFont("Regular", regular);
@@ -375,6 +377,25 @@ function draw(doc: Doc, view: PaperView, logo: OpenedImage | null): void {
             .fillColor(MUTED)
             .text(view.inclusive, sx, y, { width: sumW });
         y = doc.y;
+    }
+
+    // ── How to pay us, on an unpaid invoice (#833) ──────────────────────
+    if (view.howToPay) {
+        doc.font("Regular").fontSize(9);
+        const payH = view.howToPay.reduce(
+            (h, line) => h + doc.heightOfString(line, { width }) + 2,
+            0,
+        );
+        y += 18;
+        if (y + 14 + payH + 20 + footerH > bottom()) y = continued();
+        y = label("How to pay us", left, y, width);
+        for (const line of view.howToPay) {
+            doc.font("Regular")
+                .fontSize(9)
+                .fillColor(INK)
+                .text(line, left, y, { width, lineGap: 1.5 });
+            y = doc.y + 2;
+        }
     }
 
     y += 18;

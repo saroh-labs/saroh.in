@@ -114,6 +114,13 @@ export interface Solution {
     heroNote: string;
     changeTitle: string;
     segments: SolutionSegment[];
+    pricing: {
+        title: string;
+        /** The featured plan, with the solution's "fit" line under it. */
+        featured: PlanId;
+        fit: string;
+        second: PlanId;
+    };
     /** The question only this solution's page asks. */
     faq: FaqId;
     closer: string;
@@ -137,3 +144,23 @@ export interface FaqItem {
     q: string;
     a: string;
 }
+
+/**
+ * A plan as the site names it when there is no catalogue to read. Prices and
+ * limits are NOT content: they come from the published pricing catalogue
+ * (`lib/pricing.ts`), and without one every price renders
+ * `PRICE_PLACEHOLDER` and every summary `PLAN_DETAILS_PLACEHOLDER` (the
+ * public-repo rule).
+ */
+export interface PlanTeaser {
+    plan: PlanId;
+    name: string;
+    featured: boolean;
+}
+
+/** The price shown when there is no catalogue to read. */
+export const PRICE_PLACEHOLDER = "—";
+/** The line beside a placeholder price. */
+export const PRICE_NOTE = "Pricing announced at launch";
+/** What a plan includes, when there is no catalogue to read. */
+export const PLAN_DETAILS_PLACEHOLDER = "Plan details announced at launch";

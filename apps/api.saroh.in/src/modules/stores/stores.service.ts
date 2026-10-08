@@ -8,6 +8,7 @@ import {
 import { prisma } from "@saroh/database";
 
 import { EntitlementService } from "../billing/entitlement.service";
+import { planMeter } from "../billing/metering.service";
 import { FeatureFlagService } from "../feature-flags/feature-flags.service";
 import { FlagKey } from "../feature-flags/flags";
 import {
@@ -24,7 +25,11 @@ import { NEW_STOREFRONT_TYPES } from "../orders/fulfilment";
 import { businessCurrency } from "./currency";
 import type { CreateStoreDto, UpdateStoreDto } from "./dto";
 
-/** Staff roles allowed to mutate a store (VIEWER is read-only). */
+/**
+ * Storefront roles allowed to change a store and take its orders (VIEWER is
+ * read-only). Never money: that is the permissions' alone (DEC-106,
+ * `moneyAllows`).
+ */
 const WRITE_ROLES = new Set(["ADMIN", "MANAGER", "EDITOR"]);
 
 /**
@@ -171,13 +176,15 @@ export class StoresService {
      * `store:write`, which changes storefronts, not orders (matrix §3). A
      * storefront role that writes to this storefront (a `StoreOwner`, or a
      * storefront Admin, Manager or Editor) keeps taking and changing its
-     * orders, as it did before the split: storefront bundles stay what they
-     * grant today (DEC-048). The legacy path is unchanged.
+     * orders (DEC-048) — but never its money (DEC-106). A write that
+     * records or takes a payment, or refunds or cancels (`money`, and every
+     * `order:refund`), is asked of the permissions only: `moneyAllows`.
      */
     async orderWriteOrganization(
         storeId: string,
         userId: string,
         action: OrgAction,
+        { money = false }: { money?: boolean } = {},
     ): Promise<{ organizationId: string | null } | null> {
         const store = await prisma.store.findFirst({
             where: { id: storeId, deletedAt: null },
@@ -185,6 +192,17 @@ export class StoresService {
         });
         if (!store) return null;
         const writable = { organizationId: store.organizationId };
+
+        if (money || action === "order:refund") {
+            return (await this.moneyAllowsFor(
+                storeId,
+                store.organizationId,
+                userId,
+                action,
+            ))
+                ? writable
+                : null;
+        }
 
         if (!(await this.useOrgPath(store.organizationId))) {
             return (await this.canWriteLegacy(storeId, userId))
@@ -216,6 +234,52 @@ export class StoresService {
         });
         if (!store?.organizationId) return false;
         return this.orgAllows(store.organizationId, userId, action);
+    }
+
+    /**
+     * Whether this storefront's money is the caller's to see or take
+     * (DEC-106, extending DEC-098 to storefronts): asked of the permissions
+     * the caller's business role carries (ADR-008), and never of a
+     * storefront role — no storefront Admin, Manager or Editor grants money
+     * by its name. A storefront role that should take payments needs a
+     * business role carrying the payment permission.
+     *
+     * With ORG_AUTHORIZATION off (the older per-store model, which has no
+     * permissions to ask) the storefront's owner keeps it too; on the
+     * organization path a `StoreOwner` row is no shortcut either.
+     */
+    async moneyAllows(
+        storeId: string,
+        userId: string,
+        action: OrgAction,
+    ): Promise<boolean> {
+        const store = await prisma.store.findFirst({
+            where: { id: storeId, deletedAt: null },
+            select: { organizationId: true },
+        });
+        if (!store) return false;
+        return this.moneyAllowsFor(
+            storeId,
+            store.organizationId,
+            userId,
+            action,
+        );
+    }
+
+    private async moneyAllowsFor(
+        storeId: string,
+        organizationId: string | null,
+        userId: string,
+        action: OrgAction,
+    ): Promise<boolean> {
+        if (
+            organizationId &&
+            (await this.orgAllows(organizationId, userId, action))
+        ) {
+            return true;
+        }
+        if (await this.useOrgPath(organizationId)) return false;
+        return this.isOwner(storeId, userId);
     }
 
     // ------------------------------------------------------------------
@@ -324,11 +388,14 @@ export class StoresService {
      * as of B5) and is proven by the caller (the org-scoped controller resolves
      * it from the request context, never the client body).
      *
-     * Two caps on the business's live storefronts, checked before anything
-     * else, as `SitesService.createFromTemplate` checks websites: the
-     * product's ceiling first (a 409 — upgrading would not help), then the
-     * plan's `storefronts` entitlement (a 403 at the plan limit). The lower
-     * of the two wins (ADR-010).
+     * Caps on the business's live storefronts, checked before anything
+     * else: the product's ceiling first (a 409 — upgrading would not
+     * help), then the plan's. Where the catalogue governs locations (its
+     * `locations` row, behind PLAN_ENFORCEMENT) it caps only places
+     * customers visit, and a new storefront is online until its kind says
+     * otherwise — so the kind change is what's metered
+     * (`StorefrontsService.update`), and creating one asks nothing more.
+     * Elsewhere the old `storefronts` floor, a 403 (ADR-010).
      */
     async createForUser(
         userId: string,
@@ -343,23 +410,11 @@ export class StoresService {
                 message: `This business has ${existing} locations, as many as Saroh allows. Close one it no longer sells from to add another.`,
             });
         }
-        try {
-            await this.entitlements.check(
-                organizationId,
-                "storefronts",
-                existing,
-            );
-        } catch (err) {
-            if (!(err instanceof ForbiddenException)) throw err;
-            // The check's own words are for a developer; say it as the
-            // merchant meets it.
-            const limit = storefrontLimit(
-                await this.entitlements.getEntitlements(organizationId),
-            );
-            throw new ForbiddenException({
-                message: `Your plan includes ${limit === 1 ? "one location" : `${limit} locations`}. A bigger plan adds more.`,
-            });
-        }
+        const governed = await planMeter.enforcedRow(
+            organizationId,
+            "locations",
+        );
+        if (!governed) await this.storefrontFloor(organizationId, existing);
 
         // A business sells in one currency (DEC-030): a new storefront takes
         // the business's, rather than reading as the column default (USD)
@@ -389,6 +444,30 @@ export class StoresService {
             },
         });
         return { id: store.id };
+    }
+
+    /** The plan's `storefronts` floor, in the merchant's words when it refuses. */
+    private async storefrontFloor(
+        organizationId: string,
+        existing: number,
+    ): Promise<void> {
+        try {
+            await this.entitlements.check(
+                organizationId,
+                "storefronts",
+                existing,
+            );
+        } catch (err) {
+            if (!(err instanceof ForbiddenException)) throw err;
+            // The check's own words are for a developer; say it as the
+            // merchant meets it.
+            const limit = storefrontLimit(
+                await this.entitlements.getEntitlements(organizationId),
+            );
+            throw new ForbiddenException({
+                message: `Your plan includes ${limit === 1 ? "one location" : `${limit} locations`}. A bigger plan adds more.`,
+            });
+        }
     }
 
     /** Update a store's core fields — owner or a write-capable member. */

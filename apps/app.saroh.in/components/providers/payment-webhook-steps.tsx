@@ -134,9 +134,13 @@ export function WebhookAddressStep({
                                 </li>
                             ))}
                         </ul>
-                        <p className="text-[11.5px] leading-[1.45] text-muted-foreground">
-                            Autopay adds its own events when it is switched on.
-                        </p>
+                        {/* Only Razorpay takes autopay; Cashfree has none (#824). */}
+                        {provider === "RAZORPAY" ? (
+                            <p className="text-[11.5px] leading-[1.45] text-muted-foreground">
+                                Autopay adds its own events when it is switched
+                                on.
+                            </p>
+                        ) : null}
                     </div>
                 </>
             ) : (

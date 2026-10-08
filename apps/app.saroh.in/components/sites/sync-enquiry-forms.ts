@@ -24,7 +24,7 @@ type EnsureForm = (
  */
 export async function syncEnquiryForms(
     current: Section[],
-    siteName: string,
+    site: { id: string; name: string },
     ensure: EnsureForm,
 ): Promise<
     | { ok: true; sections: Section[] }
@@ -46,8 +46,11 @@ export async function syncEnquiryForms(
         const content = section.content;
         const res = await ensure({
             formId: content.formId,
+            // The site it belongs to, so its Forms tab lists it (UX-002).
+            siteId: site.id,
             name:
-                [content.title?.trim()].find((s) => s) ?? `${siteName} enquiry`,
+                [content.title?.trim()].find((s) => s) ??
+                `${site.name} enquiry`,
             fields: content.fields,
         });
         if (!res.ok) {

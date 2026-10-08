@@ -7,7 +7,9 @@ import { SiteTheme } from "@saroh/site-blocks";
 import { InvoicePay } from "@/components/invoice-pay";
 import { publicApiUrl } from "@/lib/api-url";
 import { getPayInvoice } from "@/lib/invoice-pay";
+import { payPdfHref } from "@/lib/invoice-pdf";
 import { payRedirect, TENANT_HOST_HEADER } from "@/lib/pay-host";
+import { SITE_FACES } from "@/lib/site-fonts";
 
 /**
  * A customer paying an invoice from its pay link (ADR-007, U13), wearing
@@ -17,7 +19,9 @@ import { payRedirect, TENANT_HOST_HEADER } from "@/lib/pay-host";
  * link's own address (`lib/pay-host.ts`).
  *
  * The link is a credential: the page is noindex and sends no referrer, so the
- * token never leaves in a Referer header to anything the page links to.
+ * token never leaves in a Referer header to anything the page links to. Its
+ * "Download PDF" (DEC-083) is this app's `pdf/route.ts` beside it, which
+ * asks the API server to server, as the page's own read does.
  */
 export const metadata: Metadata = {
     title: "Pay your invoice",
@@ -73,11 +77,14 @@ export default async function PayPage({
     if (elsewhere) redirect(elsewhere);
     return (
         <main className="min-h-screen bg-site-bg text-site-body">
-            {invoice.theme ? <SiteTheme variables={invoice.theme} /> : null}
+            {invoice.theme ? (
+                <SiteTheme variables={invoice.theme} faces={SITE_FACES} />
+            ) : null}
             <InvoicePay
                 token={token}
                 invoice={invoice}
                 apiUrl={publicApiUrl()}
+                pdfHref={payPdfHref(token)}
             />
         </main>
     );

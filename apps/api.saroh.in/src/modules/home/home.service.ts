@@ -1,6 +1,7 @@
 import { Injectable, Logger, Optional } from "@nestjs/common";
 import { prisma } from "@saroh/database";
 
+import { planConnectsOwnAccounts } from "../billing/online-payments-plan";
 import { ModuleAvailabilityService } from "../capabilities/module-availability.service";
 import { CAPTURED_NEEDS_REFUND } from "../invoices/invoice-state";
 import { accountAreaOn } from "../site-accounts/account-area";
@@ -8,6 +9,7 @@ import { ThreadsService } from "../site-accounts/threads.service";
 import { StockChecksService } from "../stock/stock-checks.service";
 import { businessDetailsGap } from "./home-business-details";
 import { overdueFollowUps } from "./home-crm-sources";
+import { noEmailProvider } from "./home-email-setup";
 import { HomeInlineService } from "./home-inline";
 import { lastDayHeader, readLastDay } from "./home-last-day";
 import type {
@@ -45,6 +47,7 @@ import { NO_SCHEDULE, readSchedule } from "./home-schedule";
 import { sitesNotLive, stockShort } from "./home-site-stock-sources";
 import { isStaffView, readStaffNarrow, WHOLE_BUSINESS } from "./home-staff";
 import { readToday, todayScope } from "./home-today";
+import { uncollectedOrders } from "./home-uncollected";
 import { readWeek, weekScope } from "./home-week";
 
 export type {
@@ -110,6 +113,10 @@ const SEVERITY_RANK: Record<HomeSeverity, number> = {
  * capped ({@link EVIDENCE_LIMIT}) and always ordered oldest-first: the thing
  * that has waited longest is the thing most likely to be a problem.
  */
+
+/** Communications on with nothing to send through (readiness registry). */
+const COMMUNICATIONS_NO_PROVIDER = "COMMUNICATIONS_NO_PROVIDER";
+
 @Injectable()
 export class HomeService {
     private readonly logger = new Logger(HomeService.name);
@@ -187,6 +194,19 @@ export class HomeService {
         // pipeline" or "Connect a provider" on a Member's Home is a row they
         // can't act on, and the design's staff Home draws none.
         const offersSetup = !staffView || holds(input, "module:manage");
+        // "Connect a provider to send messages" only where the plan lets the
+        // business connect its own (`integrations`, DEC-091): on a plan
+        // without it, Saroh sends its booking emails (DEC-086) and Home
+        // never pushes it at a lock (UX-006). Asked only when it would show.
+        const ownAccounts =
+            offersSetup &&
+            views.some(
+                (v) =>
+                    v.readiness === "SETUP_REQUIRED" &&
+                    v.blockers[0]?.code === COMMUNICATIONS_NO_PROVIDER,
+            )
+                ? await planConnectsOwnAccounts(input.organizationId)
+                : true;
         for (const view of offersSetup ? views : []) {
             if (view.readiness === "ATTENTION_REQUIRED") {
                 // SETUP/ATTENTION readiness always carries at least one blocker.
@@ -200,6 +220,8 @@ export class HomeService {
                 });
             } else if (view.readiness === "SETUP_REQUIRED") {
                 const blocker = view.blockers[0];
+                if (blocker.code === COMMUNICATIONS_NO_PROVIDER && !ownAccounts)
+                    continue;
                 actions.push({
                     code: `${view.key}_SETUP`,
                     title: blocker.message ?? `Finish setting up ${view.label}`,
@@ -291,6 +313,8 @@ export class HomeService {
             messages,
             refundsFailed,
             detailsGap,
+            uncollected,
+            noEmail,
         ] = await Promise.all([
             active.has("CRM") && canReadLeads
                 ? guard(
@@ -524,6 +548,38 @@ export class HomeService {
                       null,
                   )
                 : skip(null),
+            // Website orders to pay on handover that nobody came for in
+            // three days (R34): whoever works orders sees them, the amount
+            // only with `order:read`. Never cancelled for them.
+            available.has("COMMERCE") &&
+            (holds(input, "order:read") || holds(input, "order:stage"))
+                ? guard(
+                      { moduleKey: "COMMERCE", label: "Uncollected orders" },
+                      () =>
+                          uncollectedOrders(this.db, input.organizationId, {
+                              now,
+                              zone,
+                              money: holds(input, "order:read"),
+                              storeIds: stores,
+                          }),
+                      null,
+                  )
+                : skip(null),
+            // No email provider of its own (DEC-011, amended 2026-10-07):
+            // its customers get no emails. To whoever can connect one, or,
+            // on a plan that can't (DEC-091), see the plans.
+            available.has("COMMUNICATIONS") &&
+            (holds(input, "comms:manage") || holds(input, "billing:read"))
+                ? guard(
+                      { moduleKey: "COMMUNICATIONS", label: "Email" },
+                      () =>
+                          noEmailProvider(this.db, input.organizationId, {
+                              connect: holds(input, "comms:manage"),
+                              plans: holds(input, "billing:read"),
+                          }),
+                      null,
+                  )
+                : skip(null),
         ]);
         const unavailable = slots.flat();
 
@@ -583,6 +639,7 @@ export class HomeService {
                 evidence: owed.evidence,
             });
         }
+        if (uncollected) actions.push(uncollected);
         if (refundsFailed) actions.push(refundsFailed);
         if (detailsGap) actions.push(detailsGap);
         if (renewals) actions.push(renewals);
@@ -591,6 +648,16 @@ export class HomeService {
         if (short) actions.push(short);
         for (const waitingOnUs of [notes, messages, reviews]) {
             if (waitingOnUs) actions.push(waitingOnUs);
+        }
+        if (noEmail) {
+            // It says what the customers miss, and how to fix it, so
+            // readiness's "Connect a provider to send messages" would say
+            // the same thing twice.
+            const setup = actions.findIndex(
+                (a) => a.code === "COMMUNICATIONS_SETUP",
+            );
+            if (setup >= 0) actions.splice(setup, 1);
+            actions.push(noEmail);
         }
         if (notLive) {
             // It names the sites, so readiness's general "Publish your site

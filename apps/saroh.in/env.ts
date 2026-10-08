@@ -28,6 +28,15 @@ import { z } from "zod";
  * API's fixed dev value; unset anywhere else, joins still go through but are
  * all counted as one, and an error is logged.
  *
+ * `API_URL` also feeds the pricing pages (plan U24): `/pricing`, the plan
+ * teasers and the free-plan line read `GET {API_URL}/public/pricing`. Unset,
+ * they show the "Pricing announced at launch" placeholder.
+ *
+ * `PRICING_REVALIDATE_SECRET` (server-only, 32+ characters) is the shared
+ * secret the API sends in `x-saroh-revalidate` when it calls
+ * `POST /api/revalidate` after a pricing version is published or goes live
+ * (KTD-10). The same value is set in the API. Unset, the hook refuses every
+ * call and the pages refresh on their five-minute timer only.
  * `API_URL` also feeds the waitlist's launch offer
  * (`GET {API_URL}/public/waitlist/offer`). Unset, the page says the offer is
  * announced at launch. A production deployment refuses to build without it
@@ -39,6 +48,18 @@ import { z } from "zod";
  * else does): previews, local dev and the browser tests never load the tag,
  * even with the id in a local `.env`, so test runs never count as visitors
  * (they were most of GA's "visitors" until 5 Oct). `lib/ga.ts` decides.
+ * Even there, GA loads only once a visitor accepts the cookie notice
+ * (`app/google-analytics.tsx`).
+ *
+ * `RESOURCES_PREVIEW` (server-only, `1` or `true`) shows Resources pages and
+ * changelog entries before their `publishOn` date (plan KTD-2), so a preview
+ * deployment can be checked before the day. It is ignored on a production
+ * deployment (`VERCEL_ENV=production`), whatever it is set to
+ * (`lib/resources-context.ts`).
+ *
+ * `SAROH_BUILT_ROUTES` is not set by anyone: `next.config.js` writes the
+ * build's page routes into it (`routes.config.js`), so the Resources list links
+ * only pages this build has.
  */
 export const env = createEnv({
     client: {
@@ -52,7 +73,12 @@ export const env = createEnv({
     server: {
         API_URL: z.string().url().optional(),
         SITE_RELAY_SECRET: z.string().min(32).optional(),
+        PRICING_REVALIDATE_SECRET: z.string().min(32).optional(),
+        /** Set by Next itself: "phase-production-build" while building. */
+        NEXT_PHASE: z.string().optional(),
         VERCEL_ENV: z.enum(["production", "preview", "development"]).optional(),
+        RESOURCES_PREVIEW: z.string().optional(),
+        SAROH_BUILT_ROUTES: z.string().optional(),
     },
     shared: {
         NODE_ENV: z.enum(["development", "test", "production"]).optional(),
@@ -60,7 +86,11 @@ export const env = createEnv({
     runtimeEnv: {
         API_URL: process.env.API_URL,
         SITE_RELAY_SECRET: process.env.SITE_RELAY_SECRET,
+        PRICING_REVALIDATE_SECRET: process.env.PRICING_REVALIDATE_SECRET,
+        NEXT_PHASE: process.env.NEXT_PHASE,
         VERCEL_ENV: process.env.VERCEL_ENV,
+        RESOURCES_PREVIEW: process.env.RESOURCES_PREVIEW,
+        SAROH_BUILT_ROUTES: process.env.SAROH_BUILT_ROUTES,
         NODE_ENV: process.env.NODE_ENV,
         NEXT_PUBLIC_ACCOUNTS_URL: process.env.NEXT_PUBLIC_ACCOUNTS_URL,
         NEXT_PUBLIC_LAUNCH_MODE: process.env.NEXT_PUBLIC_LAUNCH_MODE,

@@ -75,6 +75,40 @@ function askedFromUrl(): string | null {
     }
 }
 
+/** The site's words when the form couldn't be read. */
+export const ENQUIRY_FALLBACK_ERROR =
+    "Something went wrong — please check your details and try again.";
+
+/**
+ * What a refused enquiry says to the visitor (UX-066), from the API's error
+ * envelope `{ error: { message, details: { field, reason } } }`. A bad email
+ * and a missing answer are named in words, by the field's label; anything
+ * else is the general line. The API's own message is never shown: it is
+ * written for developers ("Field \"email\" must be a valid email").
+ */
+export function enquiryErrorMessage(
+    body: unknown,
+    fields: RenderedEnquiry["fields"],
+): string {
+    const envelope = body as {
+        error?: { details?: { field?: unknown; reason?: unknown } };
+    } | null;
+    const details = envelope?.error?.details;
+    const field = fields.find((f) => f.name === details?.field);
+    const label = (
+        field?.label.trim() ? field.label : (field?.name ?? "")
+    ).trim();
+    if (details?.reason === "invalid_email") {
+        return "That email doesn't look right — check for a missing @ or a typo.";
+    }
+    if (details?.reason === "required") {
+        return label
+            ? `Please fill in ${label.toLowerCase()}.`
+            : "Please fill in every box marked required.";
+    }
+    return ENQUIRY_FALLBACK_ERROR;
+}
+
 /** Map an enquiry field type to the native input type / control. */
 function inputTypeFor(type: RenderedEnquiry["fields"][number]["type"]): string {
     switch (type) {
@@ -206,9 +240,7 @@ function EnquiryForm({
             }
             setState({
                 kind: "error",
-                message:
-                    body?.message ??
-                    "Something went wrong — please check your details and try again.",
+                message: enquiryErrorMessage(body, content.fields),
             });
         } catch {
             setState({
@@ -238,7 +270,10 @@ function EnquiryForm({
             className="mx-auto w-full max-w-2xl scroll-mt-20 px-5 py-[var(--site-section-padding)] sm:px-[var(--site-page-margin)]"
         >
             {content.title ? (
-                <h2 className="text-site-fg text-3xl font-bold tracking-tight">
+                <h2
+                    data-site-title=""
+                    className="font-site-heading text-site-fg text-3xl font-bold tracking-tight"
+                >
                     {content.title}
                 </h2>
             ) : null}
@@ -438,7 +473,10 @@ function ThreadForm({
             className="mx-auto w-full max-w-2xl scroll-mt-20 px-5 py-[var(--site-section-padding)] sm:px-[var(--site-page-margin)]"
         >
             {content.title ? (
-                <h2 className="text-site-fg text-3xl font-bold tracking-tight">
+                <h2
+                    data-site-title=""
+                    className="font-site-heading text-site-fg text-3xl font-bold tracking-tight"
+                >
                     {content.title}
                 </h2>
             ) : null}

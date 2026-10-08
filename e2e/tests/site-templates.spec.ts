@@ -1,5 +1,5 @@
 // @covers accounts:/login app:/ app:/open app:/sites api:capabilities api:sites pkg:templates
-import type { Page } from "@playwright/test";
+import type { Locator, Page } from "@playwright/test";
 import { expect, test } from "@playwright/test";
 
 import { useSession } from "../fixtures/sessions";
@@ -11,8 +11,9 @@ import { useSession } from "../fixtures/sessions";
  * a business made in a spec has every module dark and can't turn Website
  * on.
  *
- * - The Turn on sheet's Website step says which template, per kind. Read
- *   only, on the three first-run businesses (`FIRST_RUNS`), which
+ * - The Turn on sheet's Website step offers the templates suggested for the
+ *   business (U12, `lib/sites/template-picker.ts`), the kind's first and
+ *   chosen. Read only, on the three first-run businesses (`FIRST_RUNS`), which
  *   `first-run-kind.spec.ts` reads too: the sheet is opened, never saved.
  * - A site for my work turns Website on and opens on the portfolio, with
  *   its Projects block. On `SITE_STARTS`, one business per browser, since a
@@ -29,6 +30,17 @@ async function openHome(page: Page, orgId: string) {
     await useSession(page, "founder");
     await page.goto(`/open/${orgId}`);
     await page.goto("/");
+}
+
+/** The sheet's "Starts from" choice opens on the kind's template, listed first. */
+async function expectStartsFrom(sheet: Locator, name: string) {
+    const radios = sheet
+        .getByRole("radiogroup", { name: "Starts from" })
+        .getByRole("radio");
+    await expect(radios.first()).toHaveAccessibleName(new RegExp(`^${name}`));
+    await expect(radios.first()).toBeChecked();
+    expect(await radios.count()).toBeGreaterThan(1);
+    await expect(sheet).toContainText("Change its pages any time.");
 }
 
 /** Home's "Put up a website" card, pressed until the sheet opens. */
@@ -52,14 +64,12 @@ test.describe("a new site starts from the kind's template (DEC-070, K15)", () =>
         ["SOLO", "Personal"],
         ["WORK", "Portfolio"],
     ] as const) {
-        test(`the Turn on sheet names the ${name} template for ${kind}`, async ({
+        test(`the Turn on sheet starts ${kind} on the ${name} template`, async ({
             page,
         }) => {
             await openHome(page, FIRST_RUN[kind]);
             const sheet = await openWebsiteSheet(page);
-            await expect(sheet).toContainText(
-                `Starts from the ${name} template. Change its pages any time.`,
-            );
+            await expectStartsFrom(sheet, name);
             // The address is the API's prefill, not left blank.
             await expect
                 .poll(() => sheet.getByLabel("Web address").inputValue())
@@ -75,7 +85,7 @@ test.describe("a new site starts from the kind's template (DEC-070, K15)", () =>
             : "desk";
         await openHome(page, `seed_org_site-start_work-${browser}`);
         const sheet = await openWebsiteSheet(page);
-        await expect(sheet).toContainText("Starts from the Portfolio template");
+        await expectStartsFrom(sheet, "Portfolio");
         await sheet.getByRole("button", { name: /^Turn on$/ }).click();
 
         // Website's own screen, then the new site's editor.

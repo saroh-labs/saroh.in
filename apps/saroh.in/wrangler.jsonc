@@ -1,0 +1,67 @@
+// Cloudflare Worker for the marketing site, Help and Resources, built by OpenNext (`pnpm cf:build`).
+// The top level is dev; `env.production` is production. Neither has routes
+// until its cutover. The account comes from CLOUDFLARE_ACCOUNT_ID.
+{
+    "$schema": "node_modules/wrangler/config-schema.json",
+    "name": "saroh-web-dev",
+    "main": ".open-next/worker.js",
+    "compatibility_date": "2026-10-01",
+    // Off: esbuild's name-keeping wraps functions in __name(), which breaks
+    // functions Next turns into inline <script>s ("__name is not defined").
+    "keep_names": false,
+    "compatibility_flags": ["nodejs_compat", "global_fetch_strictly_public"],
+    "assets": {
+        "directory": ".open-next/assets",
+        "binding": "ASSETS",
+    },
+    "services": [
+        {
+            "binding": "WORKER_SELF_REFERENCE",
+            "service": "saroh-web-dev",
+        },
+    ],
+    "images": {
+        "binding": "IMAGES",
+    },
+    "observability": {
+        "enabled": true,
+    },
+    "workers_dev": true,
+    "routes": [],
+    // Settings that aren't secret. GitHub Actions builds with these too
+    // (scripts/cf-env.mjs), so the build and the Worker can't disagree.
+    // VERCEL_ENV / VERCEL_GIT_COMMIT_REF keep the names Vercel used: the
+    // apps' checks read them. Secrets come from GitHub (deploy workflow).
+    "vars": {
+        "VERCEL_ENV": "preview",
+        "VERCEL_GIT_COMMIT_REF": "development",
+        "API_URL": "https://api.saroh.io",
+        "DEV_ACCESS_COOKIE_DOMAIN": ".saroh.io",
+        "DEV_REDIRECT_ORIGIN": "https://saroh.in",
+        "NEXT_PUBLIC_ACCOUNTS_URL": "https://accounts.saroh.io",
+        "RESOURCES_PREVIEW": "1",
+    },
+    "env": {
+        "production": {
+            "name": "saroh-web",
+            "workers_dev": true,
+            "routes": [],
+            "vars": {
+                "VERCEL_ENV": "production",
+                "VERCEL_GIT_COMMIT_REF": "main",
+                "API_URL": "https://api.saroh.in",
+                "NEXT_PUBLIC_ACCOUNTS_URL": "https://accounts.saroh.in",
+                "NEXT_PUBLIC_GA_MEASUREMENT_ID": "G-7KKPRQXCJX",
+            },
+            "services": [
+                {
+                    "binding": "WORKER_SELF_REFERENCE",
+                    "service": "saroh-web",
+                },
+            ],
+            "images": {
+                "binding": "IMAGES",
+            },
+        },
+    },
+}

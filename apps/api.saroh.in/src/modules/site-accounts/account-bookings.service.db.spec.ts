@@ -500,8 +500,8 @@ describe("the account's Bookings (A6)", () => {
         });
         expect(offered.times.length).toBeGreaterThan(0);
         expect(offered.times).not.toContain(b.startAt.toISOString());
-        // A few a day, and never more than the sheet lists.
-        expect(offered.times.length).toBeLessThanOrEqual(12);
+        // Every free time, as the booking page offers them (UX-055), in order.
+        expect([...offered.times].sort()).toEqual(offered.times);
         const target = dayAt(4, 11).toISOString();
 
         const moved = await call(

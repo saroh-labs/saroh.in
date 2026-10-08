@@ -2,15 +2,22 @@
 
 import { Button } from "@saroh/ui/button";
 import { showError, showSuccess } from "@saroh/ui/toast";
+import { Copy } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 
+import { reportFailure } from "@/components/billing/plan-refusal";
 import { InvoicePill } from "@/components/invoices/invoice-pill";
 import { QuickLook, QuickLookCard } from "@/components/shared/quick-look";
 import { ViewerDate } from "@/components/shared/viewer-date";
 import { formatMoneyMajor } from "@/lib/format/money";
 import { createPayLink, readInvoice } from "@/lib/invoices/actions";
 import { customerHref, invoiceHref, sourceHref } from "@/lib/invoices/links";
+import {
+    copyLinkLabel,
+    mintedLink,
+    rememberLink,
+} from "@/lib/invoices/minted-links";
 import {
     isExemptPaper,
     paperTitle,
@@ -43,7 +50,13 @@ export function InvoiceQuickLook({
     canWrite,
     businessName,
     onOpenChange,
+    timeZone,
 }: {
+    /**
+     * The business's zone, which the invoice's dates are written in
+     * (#836), as on the paper the customer gets. Absent, the viewer's.
+     */
+    timeZone?: string;
     businessName: string;
     /** The row it opened from; null when closed. */
     invoice: Invoice | null;
@@ -52,7 +65,9 @@ export function InvoiceQuickLook({
 }) {
     const [read, setRead] = useState<Read>({ state: "loading" });
     const [attempt, setAttempt] = useState(0);
-    const [copied, setCopied] = useState(false);
+    // The pay link's address, once made or asked for again (UX-048): shown
+    // inline, so a blocked clipboard never loses it.
+    const [shown, setShown] = useState<string | null>(null);
     const [busy, setBusy] = useState(false);
     const id = invoice?.id ?? null;
 
@@ -61,7 +76,7 @@ export function InvoiceQuickLook({
     if (id !== wasId) {
         setWasId(id);
         setRead({ state: "loading" });
-        setCopied(false);
+        setShown(null);
     }
 
     useEffect(() => {
@@ -115,19 +130,33 @@ export function InvoiceQuickLook({
     const linkOut = full?.online?.payLinkActive ?? false;
     const firstName = who.name.split(" ")[0] ?? who.name;
 
+    // A link made for this invoice earlier in this tab: shown again as it
+    // is, never replaced by a new one.
+    const remembered = canLink ? mintedLink(i.id) : null;
+
+    async function copyText(url: string, made: boolean) {
+        try {
+            await navigator.clipboard.writeText(url);
+            showSuccess(
+                made
+                    ? `Pay link copied. Send it to ${who.name}.`
+                    : "Pay link copied.",
+            );
+        } catch {
+            showError("Couldn't copy it. Select the link below and copy it.");
+        }
+    }
+
     async function copyLink() {
         if (!i) return;
+        if (shown) return copyText(shown, false);
         setBusy(true);
         const res = await createPayLink(i.id);
         setBusy(false);
-        if (!res.ok) return showError(res.error);
-        try {
-            await navigator.clipboard.writeText(res.data.url);
-            setCopied(true);
-            showSuccess(`Pay link copied. Send it to ${who.name}.`);
-        } catch {
-            showError("Couldn't copy it. Open the invoice to copy the link.");
-        }
+        if (!res.ok) return reportFailure(res);
+        rememberLink(i.id, res.data.url);
+        setShown(res.data.url);
+        await copyText(res.data.url, true);
     }
 
     const links = [
@@ -158,7 +187,11 @@ export function InvoiceQuickLook({
                 <>
                     {paperTitle(i)} ·{" "}
                     {i.issuedAt ? (
-                        <ViewerDate iso={i.issuedAt} variant="dayMonth" />
+                        <ViewerDate
+                            iso={i.issuedAt}
+                            variant="dayMonth"
+                            timeZone={timeZone}
+                        />
                     ) : (
                         "not issued"
                     )}
@@ -168,7 +201,16 @@ export function InvoiceQuickLook({
             description={`${paperTitle(i)} for ${who.name}, ${money(i.total)}.`}
             footer={
                 <>
-                    {canLink ? (
+                    {canLink && remembered && !shown ? (
+                        <Button
+                            type="button"
+                            variant="outline"
+                            onClick={() => setShown(remembered)}
+                            className="h-[38px] px-4 text-[14px]"
+                        >
+                            Show link again
+                        </Button>
+                    ) : canLink ? (
                         <Button
                             type="button"
                             variant="outline"
@@ -176,13 +218,11 @@ export function InvoiceQuickLook({
                             onClick={() => void copyLink()}
                             className="h-[38px] px-4 text-[14px]"
                         >
-                            {busy
-                                ? "Making a link…"
-                                : copied
-                                  ? "Link copied"
-                                  : linkOut
-                                    ? "Copy a new pay link"
-                                    : "Copy pay link"}
+                            {copyLinkLabel({
+                                busy,
+                                shown: shown !== null,
+                                linkOut,
+                            })}
                         </Button>
                     ) : null}
                     <Button
@@ -200,7 +240,11 @@ export function InvoiceQuickLook({
                     className="rounded-[12px] border border-destructive-subtle-foreground bg-destructive-subtle px-3.5 py-[11px] text-[13px] font-bold text-destructive-subtle-foreground"
                 >
                     {late.before} — due{" "}
-                    <ViewerDate iso={i.dueAt} variant="dayMonth" />
+                    <ViewerDate
+                        iso={i.dueAt}
+                        variant="dayMonth"
+                        timeZone={timeZone}
+                    />
                 </div>
             ) : null}
 
@@ -307,13 +351,52 @@ export function InvoiceQuickLook({
                 </div>
             </section>
 
+            {canLink && shown ? (
+                <ShownLink url={shown} onCopy={() => void copyLink()} />
+            ) : null}
+
             <p className="text-[12.5px] leading-[1.5] text-foreground">
                 {payLine(i, money)}
-                {canLink && linkOut && !copied
-                    ? " A pay link is out; copying a new one stops the old one working."
+                {canLink && linkOut && !shown && !remembered
+                    ? " A pay link is out. Its address was shown once, when it was made, so copying makes a new one and the old one stops working."
                     : null}
             </p>
         </QuickLook>
+    );
+}
+
+/**
+ * The pay link's address, shown in place (UX-048): selectable, with its own
+ * copy button, so it can be copied by hand when the clipboard is blocked.
+ */
+export function ShownLink({
+    url,
+    onCopy,
+}: {
+    url: string;
+    onCopy: () => void;
+}) {
+    return (
+        <div className="grid gap-1.5" aria-label="Pay link" role="group">
+            <div className="flex min-w-0 items-center gap-2">
+                <code className="min-w-0 flex-1 select-all break-all rounded-[7px] bg-muted px-[9px] py-[7px] font-mono text-[12px]">
+                    {url}
+                </code>
+                <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={onCopy}
+                    aria-label="Copy the pay link"
+                >
+                    <Copy aria-hidden className="size-4" />
+                </Button>
+            </div>
+            <p className="text-[12px] leading-[1.45] text-muted-foreground">
+                Kept here until you close this tab. Copying it again
+                doesn&apos;t make a new link.
+            </p>
+        </div>
     );
 }
 

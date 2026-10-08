@@ -6,9 +6,12 @@ import { useRouter } from "next/navigation";
 import type { ReactNode } from "react";
 import { useCallback, useMemo, useState, useTransition } from "react";
 
+import { showPlanRefusal } from "@/components/billing/plan-refusal";
 import { NeedsYou } from "@/components/commerce/needs-you";
 import { ConfirmDialog } from "@/components/shared/confirm-dialog";
 import { DataView } from "@/components/shared/data-view/data-view";
+import type { PlanMeter } from "@/lib/billing/meter";
+import type { PlanRefusal } from "@/lib/billing/refusal";
 import type { ProductRating } from "@/lib/product-reviews/service";
 import { deleteProduct, setProductStatus } from "@/lib/products/actions";
 import type { CatalogueRow } from "@/lib/products/catalogue";
@@ -65,6 +68,7 @@ export function CatalogueScreen({
     canStock,
     collectionsPanel,
     collectionCount = null,
+    meter = null,
 }: {
     query: ListQuery;
     /** The first page, read on the server. */
@@ -84,6 +88,8 @@ export function CatalogueScreen({
     collectionsPanel?: ReactNode;
     /** How many collections there are; null when they couldn't be read. */
     collectionCount?: number | null;
+    /** The plan's product limit, shown before New product (UX-036). */
+    meter?: PlanMeter | null;
 }) {
     const router = useRouter();
     const [navigating, startNavigation] = useTransition();
@@ -171,13 +177,20 @@ export function CatalogueScreen({
         // Undo puts back only what changed.
         const before: { id: string; was: ProductStatus }[] = [];
         let why: string | undefined;
+        let plan: PlanRefusal | undefined;
         targets.forEach((r, i) => {
             const res = results[i];
             if (res.ok) before.push({ id: r.id, was: r.status });
-            else why ??= res.error;
+            else {
+                why ??= res.error;
+                plan ??= res.plan;
+            }
         });
         const failed = targets.length - before.length;
+        // Un-archiving past the plan's products limit (U13): its notice.
+        if (plan) showPlanRefusal(plan);
         if (before.length === 0) {
+            if (plan) return;
             // Nothing changed: say why, and offer no Undo for it.
             showError(
                 targets.length === 1
@@ -228,7 +241,8 @@ export function CatalogueScreen({
     async function duplicate(row: CatalogueRow) {
         const res = await duplicateListedProduct(row.id, query.storefront);
         if (!res.ok) {
-            showError("It couldn't be duplicated.", res.error);
+            if (res.plan) showPlanRefusal(res.plan);
+            else showError("It couldn't be duplicated.", res.error);
             return;
         }
         showSuccess(`${res.data.name} is a draft — stock starts at 0.`);
@@ -289,6 +303,7 @@ export function CatalogueScreen({
                 stores={stores}
                 storeId={query.storefront}
                 canWrite={canWrite}
+                meter={meter}
             />
             <NeedsYou
                 needs={data.needs}

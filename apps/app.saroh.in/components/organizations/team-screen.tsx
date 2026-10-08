@@ -1,6 +1,8 @@
 "use client";
 
+import { showPlanRefusal } from "@/components/billing/plan-refusal";
 import { SettingsPanelHeader } from "@/components/settings/settings-panel";
+import { useBusinessZone } from "@/components/shared/business-zone";
 import { zodResolver } from "@hookform/resolvers/zod";
 import {
     Avatar,
@@ -34,9 +36,10 @@ import {
     SheetDescription,
     SheetTitle,
 } from "@saroh/ui/sheet";
-import { showError, showSuccess } from "@saroh/ui/toast";
+import { showError, showInfo, showSuccess } from "@saroh/ui/toast";
 import { Check, Info, Mail, Plus, Users } from "lucide-react";
 import { useRouter } from "next/navigation";
+import type { ReactNode } from "react";
 import { useState } from "react";
 import { useForm, useWatch } from "react-hook-form";
 
@@ -48,8 +51,15 @@ import {
     extraLabels,
     roleGrants,
 } from "@/lib/organizations/extras";
-import type { InviteValues } from "@/lib/organizations/invitations";
-import { invitationMeta, inviteSchema } from "@/lib/organizations/invitations";
+import type { InviteValues, TeamLimit } from "@/lib/organizations/invitations";
+import {
+    invitationMeta,
+    inviteRoom,
+    inviteSchema,
+    teamCountLine,
+    teamCounts,
+    usesSeat,
+} from "@/lib/organizations/invitations";
 import {
     inviteMember,
     removeMember,
@@ -63,6 +73,7 @@ import type {
     StorefrontTeamNoticePerson,
 } from "@/lib/organizations/members";
 import type { Role, RoleCatalogue } from "@/lib/organizations/roles";
+import type { RolesLock } from "@/lib/organizations/roles-lock";
 import type { OrganizationRole } from "@/lib/organizations/service";
 import {
     STOREFRONT_TEAM_LABEL,
@@ -95,13 +106,13 @@ const ROLE_LABEL: Record<OrganizationRole, string> = {
  * what the API's policy grants (`organization-policy.ts`): a business may
  * have several owners and never none; an admin lacks only closing the
  * business, so cannot change or remove an owner either; a member runs the
- * day — reads it and moves kitchen orders — sees the business's settings
+ * day — reads it and moves orders along — sees the business's settings
  * without changing them, and sees no money.
  */
 const ROLE_BLURB: Record<OrganizationRole, string> = {
     OWNER: "Can open and change everything. A business always has at least one owner, so it can never be locked out.",
     ADMIN: "Can do everything an owner can, except close the business or change or remove an owner.",
-    MEMBER: "Runs the day — sees bookings, contacts and the team, and moves kitchen orders along. No money, and no business settings.",
+    MEMBER: "Runs the day — sees bookings, contacts and the team, and moves orders along as they're prepared. No money, and no business settings.",
     REVIEWER:
         "Can look at the websites they're invited to, comment and sign them off. Nothing else in the business.",
 };
@@ -179,8 +190,8 @@ const TEAM_TABS = ["roles", "people"] as const;
  * Roles a business invents live in `RolesTab`, backed by the API's own
  * catalogue. Still not built, because nothing backs them yet: choosing a
  * role's ring colour (the avatar has one token per built-in, so invented roles
- * wear a neutral ring), and requiring two-step sign-in (the switch is drawn
- * off and says so — Saroh has no two-step sign-in).
+ * wear a neutral ring), and requiring two-step sign-in: Saroh has none, so
+ * the design's row is left out rather than drawn as "Coming soon" (UX-085).
  *
  * A person's extra permissions (F17) are set in the Edit drawer under their
  * role, and People shows an "Extra permissions" column once anyone has one
@@ -197,6 +208,10 @@ export function TeamScreen({
     catalogue,
     myActions,
     joinedFromStorefronts = [],
+    teamLimit = null,
+    rolesLock = null,
+    limitNotice = null,
+    bookableNoLogin = 0,
 }: {
     organizationName: string;
     members: OrganizationMember[];
@@ -216,12 +231,49 @@ export function TeamScreen({
      * notice. Empty for anyone who may not change roles.
      */
     joinedFromStorefronts?: StorefrontTeamNoticePerson[];
+    /**
+     * The plan's team-members limit (plans catalogue U14): `full` once the
+     * team and its open invites reach it, with the reason the design says.
+     */
+    teamLimit?: TeamLimit | null;
+    /**
+     * The plan leaves roles of your own off (UX-030): New role becomes the
+     * way up, and extra permissions are locked. Null when it has them.
+     */
+    rolesLock?: RolesLock | null;
+    /** Its 80% / 100% notice, above the tab's content. */
+    limitNotice?: ReactNode;
+    /**
+     * People taking bookings with no login: each uses a team seat too
+     * (DEC-105, UX-053), so the count line says them.
+     */
+    bookableNoLogin?: number;
 }) {
     // In the address, so Search settings can open Roles.
     const [tab, setTab] = useTabParam(TEAM_TAB_PARAM, TEAM_TABS, "people");
     const [editing, setEditing] = useState<OrganizationMember | null>(null);
     const [removing, setRemoving] = useState<OrganizationMember | null>(null);
     const [inviteOpen, setInviteOpen] = useState(false);
+    // Full seats still invite someone view-only, who takes no seat (UX-028,
+    // DEC-105). With both caps reached, it says why, as the design flashes
+    // it: the invite would be refused, invites count too, and where more is.
+    const room = inviteRoom(teamLimit);
+    const inviteLabel = !teamLimit?.full
+        ? "Invite someone"
+        : room.open
+          ? "Invite someone view-only"
+          : "Team is full";
+    // What the seats count (DEC-105), from what the API says each uses.
+    const counts = teamCounts(members, invitations);
+    const openInvite = () => {
+        if (!room.open && teamLimit) {
+            showInfo(
+                `${teamLimit.why} (invites count too). See plans in Plan and billing.`,
+            );
+            return;
+        }
+        setInviteOpen(true);
+    };
 
     const byKey = new Map(roles.map((r) => [r.key, r]));
     const book: RoleBook = {
@@ -280,9 +332,9 @@ export function TeamScreen({
                     actions={
                         // On People, where the person invited will appear.
                         canManage && tab === "people" ? (
-                            <Button onClick={() => setInviteOpen(true)}>
+                            <Button onClick={openInvite}>
                                 <Plus className="mr-1.5 size-4" />
-                                Invite someone
+                                {inviteLabel}
                             </Button>
                         ) : undefined
                     }
@@ -327,6 +379,22 @@ export function TeamScreen({
                 </div>
             </div>
 
+            {limitNotice}
+            {/* What the cap counts, so "full" never sits beside People = 1. */}
+            {teamLimit && tab === "people" ? (
+                <p className="text-[12.5px] text-muted-foreground">
+                    {teamCountLine(
+                        counts.people,
+                        counts.waiting,
+                        counts.viewOnly,
+                        bookableNoLogin,
+                    )}
+                    {teamLimit.full
+                        ? " — the team is at its plan's limit."
+                        : ""}
+                </p>
+            ) : null}
+
             {tab === "roles" ? (
                 <RolesTab
                     roles={roles}
@@ -336,6 +404,7 @@ export function TeamScreen({
                     organizationName={organizationName}
                     builtInBlurb={ROLE_BLURB}
                     builtInPlain={ROLE_PLAIN}
+                    rolesLock={rolesLock}
                 />
             ) : members.length <= 1 && invitations.length === 0 ? (
                 <div className="flex flex-col items-center gap-[9px] rounded-xl border border-dashed border-border-strong px-6 py-12 text-center">
@@ -352,11 +421,8 @@ export function TeamScreen({
                         them nothing in any other.
                     </p>
                     {canManage ? (
-                        <Button
-                            className="mt-1"
-                            onClick={() => setInviteOpen(true)}
-                        >
-                            Invite someone
+                        <Button className="mt-1" onClick={openInvite}>
+                            {inviteLabel}
                         </Button>
                     ) : null}
                 </div>
@@ -401,6 +467,7 @@ export function TeamScreen({
                 organizationName={organizationName}
                 book={book}
                 canEditExtras={canEditRoles}
+                rolesLock={rolesLock}
                 onClose={() => setEditing(null)}
                 onRemove={(m) => {
                     setEditing(null);
@@ -421,6 +488,8 @@ export function TeamScreen({
                     book={book}
                     members={members}
                     invitations={invitations}
+                    seatReason={room.seatReason}
+                    viewOnlyReason={room.viewOnlyReason}
                     // The new invite shows at the top of People.
                     onSent={() => setTab("people")}
                 />
@@ -465,8 +534,6 @@ function PeopleTab({
 
     return (
         <div className="space-y-3.5">
-            {canManage ? <TwoStepRequirement /> : null}
-
             {notice}
 
             {canManage && invitations.length > 0 ? (
@@ -615,40 +682,6 @@ function PeopleTab({
 }
 
 /**
- * The design's "Require two-step sign-in for Owners and Admins" row, drawn
- * off and disabled. Saroh has no two-step sign-in (`your-profile.tsx` leaves
- * its row out for the same reason), so there is nothing to require: the
- * switch never moves, and the line under the title says so in place of the
- * design's "Recommended for a business that takes payments."
- */
-function TwoStepRequirement() {
-    return (
-        <div className="flex flex-wrap items-center gap-3 rounded-xl border border-border px-4 py-3">
-            <div className="min-w-0 flex-[1_1_260px]">
-                <p className="text-[13.5px] font-semibold">
-                    Require two-step sign-in for Owners and Admins
-                </p>
-                <p className="mt-0.5 text-[12px] text-muted-foreground">
-                    Coming soon — Saroh doesn&apos;t have two-step sign-in yet.
-                </p>
-            </div>
-            <button
-                type="button"
-                role="switch"
-                aria-checked={false}
-                aria-label="Require two-step sign-in"
-                disabled
-                className="shrink-0 cursor-not-allowed rounded-full p-1 opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-            >
-                <span className="relative block h-6 w-[42px] rounded-full bg-border">
-                    <span className="absolute left-[3px] top-[3px] size-[18px] rounded-full bg-card" />
-                </span>
-            </button>
-        </div>
-    );
-}
-
-/**
  * Invitations sent and not yet answered, above the roster. Hidden when there
  * are none — an empty "not joined yet" box says nothing.
  *
@@ -665,6 +698,7 @@ function PendingInvites({
     book: RoleBook;
 }) {
     const router = useRouter();
+    const zone = useBusinessZone();
     const [busy, setBusy] = useState<{
         id: string;
         action: "resend" | "cancel";
@@ -735,7 +769,7 @@ function PendingInvites({
                                     {invitation.email}
                                 </p>
                                 <p className="text-[11.5px] text-muted-foreground">
-                                    {invitationMeta(invitation)}
+                                    {invitationMeta(invitation, zone)}
                                 </p>
                             </div>
                             <span className="text-[12.5px] text-foreground/80">
@@ -787,6 +821,7 @@ function MemberDrawer({
     organizationName,
     book,
     canEditExtras,
+    rolesLock,
     onClose,
     onRemove,
 }: {
@@ -796,6 +831,8 @@ function MemberDrawer({
     book: RoleBook;
     /** Holds `member:role:update`, which also sets extras (F17). */
     canEditExtras: boolean;
+    /** The plan leaves extras off (UX-030); null when it has them. */
+    rolesLock: RolesLock | null;
     onClose: () => void;
     /** Hands an owner to the one Remove confirmation; see below. */
     onRemove: (member: OrganizationMember) => void;
@@ -828,6 +865,7 @@ function MemberDrawer({
         name: member ? nameOf(member) : "",
         catalogue: book.catalogue,
         myActions: book.myActions,
+        planLocked: rolesLock?.line ?? null,
     });
     const roleChanged = !!member && role !== current;
     const changed = roleChanged || extras.changed;
@@ -1105,6 +1143,8 @@ function InviteDialog({
     book,
     members,
     invitations,
+    seatReason,
+    viewOnlyReason,
     onSent,
 }: {
     open: boolean;
@@ -1114,6 +1154,10 @@ function InviteDialog({
     book: RoleBook;
     members: OrganizationMember[];
     invitations: OrganizationInvitation[];
+    /** The seats are full (UX-028): only someone view-only, and why. */
+    seatReason: string | null;
+    /** The view-only people are full (DEC-105): only a seat, and why. */
+    viewOnlyReason: string | null;
     onSent: () => void;
 }) {
     const router = useRouter();
@@ -1121,17 +1165,37 @@ function InviteDialog({
         memberEmails: members.map((m) => m.email),
         invitedEmails: invitations.map((i) => i.email),
     });
+    const offered = book.all.filter((r) => r.key !== "OWNER");
+    // Why a role can't be picked for want of room on the plan: by whether
+    // holding it uses a seat (DEC-105), never by its name.
+    const noRoom = (r: Role): string | null =>
+        usesSeat(r) ? seatReason : viewOnlyReason;
+    // Picked to start with: Member, or with the seats full the first
+    // view-only role the inviter may give.
+    const startRole =
+        (seatReason
+            ? offered.find((r) => noRoom(r) === null && book.withinReach(r.key))
+                  ?.key
+            : undefined) ?? "MEMBER";
     const form = useForm<InviteValues>({
         resolver: zodResolver(schema),
-        defaultValues: { email: "", role: "MEMBER", siteIds: [] },
+        defaultValues: {
+            email: "",
+            role: startRole,
+            siteIds: [],
+        },
         mode: "onTouched",
     });
     const sending = form.formState.isSubmitting;
     const role = useWatch({ control: form.control, name: "role" });
-    const offered = book.all.filter((r) => r.key !== "OWNER");
 
     function setOpen(next: boolean) {
-        if (!next) form.reset();
+        if (!next)
+            form.reset({
+                email: "",
+                role: startRole,
+                siteIds: [],
+            });
         onOpenChange(next);
     }
 
@@ -1142,6 +1206,12 @@ function InviteDialog({
             ...(values.role === "REVIEWER" ? { siteIds: values.siteIds } : {}),
         });
         if (!res.ok) {
+            // The plan's team limit (U13): its notice, not a toast.
+            if (res.plan) {
+                onOpenChange(false);
+                showPlanRefusal(res.plan);
+                return;
+            }
             // A refusal about the address ("already in this workspace") goes
             // on the field; anything else is a toast.
             if (res.field === "email") {
@@ -1215,32 +1285,47 @@ function InviteDialog({
                                         >
                                             Role
                                         </p>
+                                        {(seatReason ?? viewOnlyReason) ? (
+                                            <p className="text-[12px] leading-[1.45] text-muted-foreground">
+                                                {seatReason ?? viewOnlyReason}
+                                            </p>
+                                        ) : null}
                                         <div
                                             role="radiogroup"
                                             aria-labelledby="invite-role-label"
                                             className="grid gap-1.5"
                                         >
-                                            {offered.map(({ key: r }) => (
-                                                <RoleChoice
-                                                    key={r}
-                                                    name={field.name}
-                                                    value={r}
-                                                    label={book.labelOf(r)}
-                                                    blurb={book.blurbOf(r)}
-                                                    checked={r === field.value}
-                                                    // The API refuses to
-                                                    // invite anyone at a role
-                                                    // that can do more than
-                                                    // the inviter.
-                                                    beyond={
-                                                        !book.withinReach(r)
-                                                    }
-                                                    disabled={sending}
-                                                    onPick={() =>
-                                                        field.onChange(r)
-                                                    }
-                                                />
-                                            ))}
+                                            {offered.map((offer) => {
+                                                const r = offer.key;
+                                                return (
+                                                    <RoleChoice
+                                                        key={r}
+                                                        name={field.name}
+                                                        value={r}
+                                                        label={book.labelOf(r)}
+                                                        blurb={book.blurbOf(r)}
+                                                        checked={
+                                                            r === field.value
+                                                        }
+                                                        // The API refuses to
+                                                        // invite anyone at a role
+                                                        // that can do more than
+                                                        // the inviter.
+                                                        beyond={
+                                                            !book.withinReach(r)
+                                                        }
+                                                        // Full seats take no one
+                                                        // who needs one; full
+                                                        // view-only places take
+                                                        // no one view-only.
+                                                        noRoom={noRoom(offer)}
+                                                        disabled={sending}
+                                                        onPick={() =>
+                                                            field.onChange(r)
+                                                        }
+                                                    />
+                                                );
+                                            })}
                                         </div>
                                     </FormItem>
                                 )}
@@ -1338,6 +1423,7 @@ function RoleChoice({
     blurb,
     checked,
     beyond,
+    noRoom = null,
     disabled,
     onPick,
 }: {
@@ -1347,15 +1433,18 @@ function RoleChoice({
     blurb: string;
     checked: boolean;
     beyond: boolean;
+    /** The plan has no room for this role (UX-028, DEC-105), and why. */
+    noRoom?: string | null;
     disabled: boolean;
     onPick: () => void;
 }) {
+    const off = beyond || noRoom !== null;
     return (
         <label
-            title={beyond ? "Can do more than you can" : undefined}
+            title={beyond ? "Can do more than you can" : (noRoom ?? undefined)}
             className={cn(
                 "block rounded-[9px] border px-3 py-[9px] transition-colors duration-fast has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-ring has-[:focus-visible]:ring-offset-2",
-                beyond
+                off
                     ? "cursor-not-allowed border-border opacity-50"
                     : checked
                       ? "cursor-pointer border-foreground bg-foreground/[0.03] shadow-[inset_0_0_0_1px_hsl(var(--foreground))]"
@@ -1367,11 +1456,17 @@ function RoleChoice({
                 name={name}
                 value={value}
                 checked={checked}
-                disabled={beyond || disabled}
+                disabled={off || disabled}
                 onChange={onPick}
                 className="sr-only"
             />
-            <span className="block text-[13.5px] font-semibold">{label}</span>
+            <span className="flex items-center justify-between gap-2 text-[13.5px] font-semibold">
+                {label}
+                {/* Which one is picked, beyond the border (UX-029). */}
+                {checked && !off ? (
+                    <Check aria-hidden className="size-4 shrink-0" />
+                ) : null}
+            </span>
             <span className="mt-0.5 block text-[12px] text-muted-foreground">
                 {blurb}
             </span>

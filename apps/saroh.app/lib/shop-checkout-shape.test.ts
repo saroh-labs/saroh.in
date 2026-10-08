@@ -5,6 +5,7 @@ import {
     isCheckoutOptions,
     isQuote,
     isStanding,
+    isStarted,
     problemOf,
     quoteBody,
     resultOf,
@@ -115,6 +116,24 @@ describe("the API's answers", () => {
                 ready: false,
             }),
         ).toBe(true);
+        const priced = {
+            currency: "INR",
+            lines: [],
+            ways: [],
+            fulfilment: null,
+            subtotal: "0.00",
+            delivery: "0.00",
+            total: "0.00",
+            ready: false,
+        };
+        // Where a pick-up is collected (UX-025).
+        expect(
+            isQuote({
+                ...priced,
+                pickup: { address: "12 Hill Road", hours: null },
+            }),
+        ).toBe(true);
+        expect(isQuote({ ...priced, pickup: { address: 12 } })).toBe(false);
         expect(resultOf(200, { total: 5 }, isQuote)).toMatchObject({
             ok: false,
             reason: "error",
@@ -227,5 +246,169 @@ describe("where to ask about ordering", () => {
                 ],
             }),
         ).toBeNull();
+    });
+});
+
+describe("paying at the handover (2026-10-06)", () => {
+    const lines = [{ listingId: "l1", variantId: null, quantity: 1 }];
+
+    it("sends the choice on only when it is paying at the handover", () => {
+        expect(
+            startBody({
+                lines,
+                fulfilment: "PICKUP",
+                key: "key-12345678",
+                payment: "ON_HANDOVER",
+            }),
+        ).toMatchObject({ payment: "ON_HANDOVER" });
+        for (const payment of ["ONLINE", "CASH", undefined]) {
+            expect(
+                startBody({
+                    lines,
+                    fulfilment: "PICKUP",
+                    key: "key-12345678",
+                    payment,
+                }),
+            ).not.toHaveProperty("payment");
+        }
+    });
+
+    it("takes an order placed with nothing to pay, and the ways to pay a quote offers", () => {
+        const order = {
+            orderId: "o1",
+            orderNumber: "ORD-1",
+            total: "500.00",
+            currency: "INR",
+        };
+        expect(
+            isStarted({ ...order, payBy: "ON_HANDOVER", payment: null }),
+        ).toBe(true);
+        // Online still needs its window.
+        expect(isStarted({ ...order, payBy: "ONLINE", payment: null })).toBe(
+            false,
+        );
+        const quote = {
+            currency: "INR",
+            lines: [],
+            ways: [],
+            fulfilment: "PICKUP",
+            subtotal: "0.00",
+            delivery: "0.00",
+            total: "0.00",
+            ready: false,
+        };
+        expect(isQuote(quote)).toBe(true);
+        expect(
+            isQuote({
+                ...quote,
+                payments: [
+                    { type: "ON_HANDOVER", label: "Pay when you collect" },
+                ],
+            }),
+        ).toBe(true);
+        expect(
+            isQuote({ ...quote, payments: [{ type: "CASH", label: "Cash" }] }),
+        ).toBe(false);
+        expect(
+            isStanding({
+                orderNumber: "ORD-1",
+                state: "to-pay",
+                total: "500.00",
+                currency: "INR",
+                message: null,
+            }),
+        ).toBe(true);
+    });
+
+    it("says a fourth order waiting to be paid in the API's words, written for the customer", () => {
+        const message =
+            "You have orders waiting to be paid for when they reach you. Once one is collected or delivered, you can order again.";
+        expect(problemOf(429, { error: { message } })).toEqual({
+            ok: false,
+            reason: "busy",
+            message,
+        });
+    });
+});
+
+describe("a discount code in the bag (DEC-104)", () => {
+    const priced = {
+        currency: "INR",
+        lines: [],
+        ways: [],
+        fulfilment: null,
+        subtotal: "500.00",
+        delivery: "0.00",
+        total: "450.00",
+        ready: false,
+    };
+
+    it("sends a tidied code on with the quote and the start, and nothing else", () => {
+        expect(
+            quoteBody({
+                lines: [{ listingId: "l1", variantId: null, quantity: 1 }],
+                discountCode: " save10 ",
+            }),
+        ).toEqual({
+            lines: [{ listingId: "l1", variantId: null, quantity: 1 }],
+            discountCode: "SAVE10",
+        });
+        // Something no code could be is dropped, never forwarded.
+        expect(
+            quoteBody({
+                lines: [{ listingId: "l1", variantId: null, quantity: 1 }],
+                discountCode: "<script>",
+            }),
+        ).toEqual({
+            lines: [{ listingId: "l1", variantId: null, quantity: 1 }],
+        });
+        expect(
+            startBody({
+                lines: [{ listingId: "l1", variantId: null, quantity: 1 }],
+                fulfilment: "PICKUP",
+                key: "abcdefgh",
+                discountCode: "SAVE10",
+            }),
+        ).toMatchObject({ discountCode: "SAVE10" });
+    });
+
+    it("reads a quote's applied or refused code, and one from an older API", () => {
+        expect(
+            isQuote({
+                ...priced,
+                discount: { code: "SAVE10", applied: true, amount: "50.00" },
+            }),
+        ).toBe(true);
+        expect(
+            isQuote({
+                ...priced,
+                discount: {
+                    code: "OLD",
+                    applied: false,
+                    reason: "EXPIRED",
+                    message: "OLD has ended.",
+                },
+            }),
+        ).toBe(true);
+        expect(isQuote({ ...priced, discount: null })).toBe(true);
+        expect(isQuote(priced)).toBe(true);
+        expect(
+            isQuote({ ...priced, discount: { code: "X", applied: "yes" } }),
+        ).toBe(false);
+    });
+
+    it("says a code that stopped applying in the checkout's words", () => {
+        expect(
+            problemOf(409, {
+                error: {
+                    message: "SAVE10 has ended.",
+                    details: { reason: "bag-changed", field: "discountCode" },
+                },
+            }),
+        ).toEqual({
+            ok: false,
+            reason: "bag-changed",
+            message: "SAVE10 has ended.",
+        });
     });
 });

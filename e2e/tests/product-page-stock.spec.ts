@@ -2,6 +2,7 @@
 import type { APIRequestContext, Page } from "@playwright/test";
 import { expect, test } from "@playwright/test";
 
+import { hiddenSideways } from "../fixtures/hidden-sideways";
 import { useSession } from "../fixtures/sessions";
 import type { Storefront } from "../fixtures/throwaway-products";
 import { removeProducts, takeProduct } from "../fixtures/throwaway-products";
@@ -200,4 +201,52 @@ test.describe("product page — Overview and Stock", () => {
             await removeProducts(page.request, NW, name);
         }
     });
+});
+
+/**
+ * The product page on a phone (Phone Tables audit T4): its Orders and Stock
+ * tabs are a card per order and per size under 760px, so Status, Can sell
+ * and Shop shows are on the screen rather than off to its right. Read only,
+ * on Northwind's Platform Trolley, which holds stock for open orders.
+ */
+test.describe("product page on a phone — nothing hides sideways", () => {
+    for (const tab of ["orders", "stock"] as const) {
+        test(`the ${tab} tab fits the screen`, async ({ page }, testInfo) => {
+            test.skip(
+                !testInfo.project.name.startsWith("phone"),
+                "a phone's layout",
+            );
+            await signIn(page);
+            await page.goto(`/open/${ORG}`);
+            await page.goto(
+                `/commerce/products/seed_product_11?storefront=${STORE}&tab=${tab}${tab === "orders" ? "&orders=recent" : ""}`,
+            );
+            if (tab === "orders") {
+                const list = page.getByRole("list", {
+                    name: "Orders for Platform Trolley",
+                });
+                await expect(list).toBeVisible();
+                await expect(page.getByRole("table")).toBeHidden();
+                await expect(
+                    list.getByRole("link", { name: /order #?\S+/ }).first(),
+                ).toBeVisible();
+            } else {
+                const list = page.getByRole("list", {
+                    name: "Platform Trolley: stock by size and location",
+                });
+                await expect(list).toBeVisible();
+                await expect(
+                    list.getByText(/\d+ can sell/).first(),
+                ).toBeVisible();
+            }
+            const width = page.viewportSize()?.width ?? 0;
+            await expect
+                .poll(() =>
+                    hiddenSideways(page, [
+                        'nav[aria-label="Product sections"]',
+                    ]),
+                )
+                .toEqual({ innerWidth: width, culprits: [] });
+        });
+    }
 });

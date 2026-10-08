@@ -4,10 +4,12 @@ import localFont from "next/font/local";
 import "./site.css";
 
 import { home } from "@/content/home";
+import { shownLegal } from "@/content/resources";
 import { SITE_NAME, SITE_URL } from "@/lib/seo";
 
 import { env } from "@/env";
 import { gaMeasurementId } from "@/lib/ga";
+import { resourcesContext } from "@/lib/resources-context";
 
 import { GoogleAnalytics } from "./google-analytics";
 
@@ -79,9 +81,17 @@ export const metadata: Metadata = {
 };
 
 /**
+ * The site is static: every page is built at deploy time and served as a
+ * file, with no regeneration at request time (Cloudflare Workers can neither
+ * read `content/` nor compile MDX while serving). A page dated today appears
+ * through the nightly rebuild at 00:00 IST (plan KTD-2), and published pricing
+ * or a launch offer through the build a publish starts (KTD-10).
+ */
+
+/**
  * The shell every page shares: fonts, GA and the light-only scheme. Pages
  * bring their own chrome through route groups: `(v2)` the Marketing Site V2
- * pages, `(standalone)` the waitlist.
+ * pages, `(standalone)` the waitlist, `(preview)` the pricing draft.
  *
  * Light only (owner, 2026-10-03): no theme provider, no dark class, no
  * toggle; `color-scheme: light` is set here and in site.css.
@@ -91,6 +101,9 @@ export default function RootLayout({
 }: {
     children: React.ReactNode;
 }) {
+    const privacy = shownLegal(resourcesContext()).find(
+        (p) => p.id === "privacy",
+    );
     return (
         <html lang="en" style={{ colorScheme: "light" }}>
             <body
@@ -101,6 +114,7 @@ export default function RootLayout({
                         id: env.NEXT_PUBLIC_GA_MEASUREMENT_ID,
                         vercelEnv: env.VERCEL_ENV,
                     })}
+                    privacyHref={privacy?.href}
                 />
                 <a
                     href="#main"

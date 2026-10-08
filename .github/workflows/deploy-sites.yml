@@ -1,0 +1,91 @@
+name: Build and deploy merchant sites
+
+# Builds apps/saroh.app for Cloudflare Workers (OpenNext) and deploys it.
+#
+#   push to development  -> Worker saroh-sites-dev (<address>.saroh.io, dev API)
+#   push to main         -> Worker saroh-sites (saroh.app, api.saroh.in)
+#
+# A deploy replaces each Worker's routes with wrangler.jsonc's and creates
+# them "fail closed"; Wrangler has no setting for that, so the last step sets
+# them to fail open through the API: if the Worker fails or hits a plan limit,
+# Cloudflare passes the request to the origin (Vercel for saroh.app) instead
+# of showing an error page.
+#
+# NEXT_PUBLIC_* values are compiled in, so each environment is its own build.
+# The Worker's secret (SITE_RELAY_SECRET) lives on the Worker, never here.
+# This workflow reads two secrets, the deploy token (Workers, and routes on
+# saroh.io and saroh.app) and the account id, and prints neither: the repo is
+# public, and so are its Actions logs.
+
+on:
+    push:
+        branches: [main, development]
+        paths:
+            - "apps/saroh.app/**"
+            - "packages/**"
+            - "tooling/**"
+            - "pnpm-lock.yaml"
+            - "pnpm-workspace.yaml"
+            - "package.json"
+            - "turbo.json"
+            - ".github/workflows/deploy-sites.yml"
+    workflow_dispatch:
+
+concurrency:
+    # One deploy at a time; a newer push waits rather than racing it.
+    group: deploy-sites-${{ github.ref_name }}
+    cancel-in-progress: false
+
+jobs:
+    deploy:
+        runs-on: ubuntu-latest
+        permissions:
+            contents: read
+        steps:
+            - uses: actions/checkout@v4
+
+            - uses: ./.github/actions/setup
+              with:
+                  prisma: "false"
+
+            - name: Build the packages the sites use
+              run: pnpm turbo run build --filter='sites^...'
+
+            - name: Build for Cloudflare
+              working-directory: apps/saroh.app
+              env:
+                  NEXT_PUBLIC_ROOT_DOMAIN: ${{ github.ref == 'refs/heads/main' && 'saroh.app' || 'saroh.io' }}
+                  NEXT_PUBLIC_API_URL: ${{ github.ref == 'refs/heads/main' && 'https://api.saroh.in' || 'https://api.saroh.io' }}
+                  API_URL: ${{ github.ref == 'refs/heads/main' && 'https://api.saroh.in' || 'https://api.saroh.io' }}
+                  NEXT_TELEMETRY_DISABLED: "1"
+              run: pnpm cf:build
+
+            - name: Deploy
+              working-directory: apps/saroh.app
+              env:
+                  CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_SITES_DEPLOY_TOKEN }}
+                  # A secret, not a variable, so GitHub masks it in the public log.
+                  CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+              run: pnpm exec wrangler deploy ${{ github.ref == 'refs/heads/main' && '--env production' || '' }}
+
+            - name: Routes fail open
+              # The deploy itself has succeeded by now; a failure here only
+              # leaves the routes fail closed, so it warns rather than fails.
+              continue-on-error: true
+              env:
+                  CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_SITES_DEPLOY_TOKEN }}
+                  ZONE: ${{ github.ref == 'refs/heads/main' && 'saroh.app' || 'saroh.io' }}
+                  SCRIPT: ${{ github.ref == 'refs/heads/main' && 'saroh-sites' || 'saroh-sites-dev' }}
+              run: |
+                  set -euo pipefail
+                  api=https://api.cloudflare.com/client/v4
+                  auth=(-H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" -H "Content-Type: application/json")
+                  zone=$(curl -fsS "${auth[@]}" "$api/zones?name=$ZONE" | jq -r '.result[0].id')
+                  curl -fsS "${auth[@]}" "$api/zones/$zone/workers/routes" \
+                      | jq -c --arg s "$SCRIPT" '.result[] | select(.script == $s)' \
+                      | while read -r route; do
+                          id=$(jq -r .id <<<"$route")
+                          body=$(jq -c '{pattern, script, request_limit_fail_open: true}' <<<"$route")
+                          curl -fsS -X PUT "${auth[@]}" "$api/zones/$zone/workers/routes/$id" -d "$body" > /dev/null
+                          echo "fail open: $(jq -r .pattern <<<"$route")"
+                      done

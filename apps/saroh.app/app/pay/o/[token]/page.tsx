@@ -7,6 +7,7 @@ import { SiteTheme } from "@saroh/site-blocks";
 import { OrderPay } from "@/components/order-pay";
 import { getPayOrder } from "@/lib/order-pay";
 import { payRedirect, TENANT_HOST_HEADER } from "@/lib/pay-host";
+import { SITE_FACES } from "@/lib/site-fonts";
 
 /**
  * A customer paying for an order from its pay link (plan B, B11), wearing
@@ -71,7 +72,9 @@ export default async function OrderPayPage({
     if (elsewhere) redirect(elsewhere);
     return (
         <main className="min-h-screen bg-site-bg text-site-body">
-            {order.theme ? <SiteTheme variables={order.theme} /> : null}
+            {order.theme ? (
+                <SiteTheme variables={order.theme} faces={SITE_FACES} />
+            ) : null}
             <OrderPay token={token} order={order} />
         </main>
     );

@@ -1,0 +1,142 @@
+import type { ModuleAccess } from "./access";
+import type { LimitAction } from "./limit-words";
+import { countedWhat } from "./limit-words";
+import { formatCount } from "./price";
+
+/** A notice shows from this share of the limit. */
+export const LIMIT_WARN_AT = 0.8;
+
+export type LimitNotice =
+    | { on: false; full: false; left?: number }
+    | {
+          on: true;
+          full: boolean;
+          left: number;
+          /** Share used, capped at 100, e.g. "85%". */
+          pct: string;
+          title: string;
+          body: string;
+          cta: string;
+          /** The reason a blocked action gives; empty while only warning, and always for a soft cap. */
+          why: string;
+          /** A soft cap: the notice informs, it never says anything stops. */
+          soft: boolean;
+          /**
+           * Where `cta` goes when the limit names its own way out
+           * (`LimitWords.action`); absent, `cta` is the upgrade.
+           */
+          href?: string;
+      };
+
+/** What a notice may add to the shared words. */
+export interface LimitNoticeOptions {
+    /**
+     * The limit's own first way out (`LimitWords.action`): said first, with
+     * a higher plan second and no add-on.
+     */
+    action?: LimitAction;
+    /**
+     * Whether the business can take `action` now (default true). false: it
+     * can't (Saroh's emails on a plan with no room to connect its own), so
+     * a higher plan leads with `action.closed`'s words and button. null:
+     * that couldn't be read, so neither is claimed — only the higher plan.
+     */
+    actionOpen?: boolean | null;
+    /** When a monthly count starts again ("1 Nov"), said at the cap. */
+    resetsOn?: string | null;
+}
+
+/**
+ * The limit notice every screen shares: nothing under 80%, a warning from
+ * 80%, blocked at 100%. `what` names the counted thing ("products");
+ * `pausedText` says what stops at the limit. Wording follows the design.
+ *
+ * A soft cap (`access.soft`) never refuses, so its notice never says
+ * anything stops: from 80% it says nothing will, and at 100% `pausedText`
+ * (the soft rows' words begin "Nothing is blocked") with no `why`.
+ *
+ * A limit with its own way out (`options.action`, Saroh's emails) says it
+ * first, a higher plan second, and offers no add-on; its button is the
+ * action's. When the business can't take it (`options.actionOpen`), the
+ * higher plan leads and the button is the plan picker's, still with no
+ * add-on. `options.resetsOn` says when a monthly count starts again.
+ */
+export function limitNotice(
+    access: Pick<ModuleAccess, "inc" | "limit" | "plan" | "upgradeTo"> &
+        Partial<Pick<ModuleAccess, "soft" | "upgradeUncapped">>,
+    count: number,
+    what: string,
+    pausedText: string,
+    options: LimitNoticeOptions = {},
+): LimitNotice {
+    if (!access.inc || access.limit === null) return { on: false, full: false };
+    const L = access.limit;
+    const n = Number.isFinite(count) ? Math.max(0, count) : 0;
+    if (n < LIMIT_WARN_AT * L) return { on: false, full: false, left: L - n };
+    const full = n >= L;
+    const up = access.upgradeTo;
+    const soft = access.soft === true;
+    // Storage counts in GB, so a count can have a fraction: one place.
+    const used = formatCount(Math.round(n * 10) / 10);
+    const { action } = options;
+    // An action the business can't take now isn't offered (DEC-086).
+    const open =
+        options.actionOpen === undefined || options.actionOpen === true;
+    const again =
+        full && options.resetsOn
+            ? ` It starts again on ${options.resetsOn}.`
+            : "";
+    const first = full
+        ? pausedText + again
+        : soft
+          ? `Nothing stops at ${formatCount(L)}; we'll let you know when you reach it.`
+          : `You'll be stopped at ${formatCount(L)}.`;
+    // A higher plan with no cap says so (UX-083: never "raises the limit").
+    const uncapped = access.upgradeUncapped === true;
+    const higher = uncapped
+        ? "has no limit"
+        : full
+          ? "raises the limit"
+          : "gives you more";
+    // A limit's own way out comes first, a higher plan second, no add-on;
+    // closed, the higher plan leads and says what it opens.
+    const more = action
+        ? open
+            ? ` ${action.sentence}` + (up ? ` Or ${up} ${higher}.` : "")
+            : up
+              ? ` ${up} ${higher}.` +
+                (options.actionOpen === false
+                    ? ` ${action.closed.sentence}`
+                    : "")
+              : ""
+        : up
+          ? ` ${up} ${higher}.`
+          : // Add-ons aren't bought in the app at launch (UX-080): the
+            // top plan's way to more is asking Saroh.
+            full
+            ? " Talk to us if you need more."
+            : "";
+    return {
+        on: true,
+        full,
+        left: Math.max(0, L - n),
+        pct: `${Math.min(100, Math.round((n / L) * 100))}%`,
+        title: full
+            ? `You've reached your ${formatCount(L)} ${countedWhat(what, L)} on ${access.plan}`
+            : `You've used ${used} of ${formatCount(L)} ${countedWhat(what, L)} on ${access.plan}`,
+        body: first + more,
+        cta: action
+            ? open
+                ? action.label
+                : action.closed.label
+            : up
+              ? "See plans"
+              : "See your plan",
+        ...(action && open ? { href: action.href } : {}),
+        why:
+            full && !soft
+                ? `You've reached your ${what} limit on ${access.plan}`
+                : "",
+        soft,
+    };
+}

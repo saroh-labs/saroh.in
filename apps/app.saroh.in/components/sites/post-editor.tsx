@@ -11,10 +11,13 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
 
+import { showPlanRefusal } from "@/components/billing/plan-refusal";
+import { useBusinessZone } from "@/components/shared/business-zone";
 import { ConfirmDialog } from "@/components/shared/confirm-dialog";
 import { OptionSelect } from "@/components/shared/option-select";
 import { MediaPicker } from "@/components/sites/media-picker";
 import { useLeaveGuard } from "@/components/sites/use-leave-guard";
+import { accountSettingsUrl } from "@/lib/accounts";
 import {
     createPost,
     deletePost,
@@ -56,6 +59,16 @@ const RichTextEditor = dynamic(
  * otherwise tell.
  */
 
+/**
+ * Point the address bar at a post that now exists, without a navigation.
+ * Next's router follows `history.replaceState`, so `usePathname` and a later
+ * reload both see the new address, while the editor and what is typed in it
+ * stay mounted.
+ */
+export function adoptPostAddress(path: string): void {
+    window.history.replaceState(window.history.state, "", path);
+}
+
 /** Long enough to be worth saying, short enough not to nag. */
 const AUTOSAVE_MS = 2500;
 
@@ -69,6 +82,7 @@ export function PostEditor({
     /** Absent when writing a new post. */
     post?: PostDetail;
 }) {
+    const zone = useBusinessZone();
     const router = useRouter();
     const [postId, setPostId] = useState(post?.id ?? null);
     const [confirmDelete, setConfirmDelete] = useState(false);
@@ -165,8 +179,11 @@ export function PostEditor({
                 if (!postId && res.data.id) {
                     // A new post becomes a real one on its first save, and the
                     // address should say so — otherwise a reload loses the work.
+                    // The address changes in place (UX-034): a navigation to
+                    // `/posts/<id>` remounted the editor from the server's copy,
+                    // and whatever was typed while the save was out was lost.
                     setPostId(res.data.id);
-                    router.replace(`/sites/${siteId}/posts/${res.data.id}`);
+                    adoptPostAddress(`/sites/${siteId}/posts/${res.data.id}`);
                 }
                 if (!opts.silent) showSuccess("Draft saved.");
                 return res.data.id;
@@ -179,7 +196,7 @@ export function PostEditor({
                 inFlight.current = null;
             }
         },
-        [postId, router, siteId],
+        [postId, siteId],
     );
 
     // Autosave, and only when there is something to save. An editor that loses
@@ -191,6 +208,17 @@ export function PostEditor({
         const t = setTimeout(() => void save({ silent: true }), AUTOSAVE_MS);
         return () => clearTimeout(t);
     }, [dirty, saving, title, content, slug, excerpt, categoryId, image, save]);
+
+    /*
+     * Re-read the server's copy after publishing or taking a post down — only
+     * when the editor opened on a saved post. A post begun at `/posts/new`
+     * changed its address in place, so a refresh would draw the `[postId]`
+     * page and remount the editor over anything typed meanwhile (UX-034);
+     * its header already says what changed.
+     */
+    const refreshServer = useCallback(() => {
+        if (post) router.refresh();
+    }, [post, router]);
 
     // The browser's own guard, for the case the timer has not yet fired.
     useLeaveGuard(dirty);
@@ -214,13 +242,15 @@ export function PostEditor({
         const res = await publishPost(siteId, id);
         setPublishing(false);
         if (!res.ok) {
-            showError(res.error);
+            // At the plan's blog-posts limit (U13): its notice, not a toast.
+            if (res.plan) showPlanRefusal(res.plan);
+            else showError(res.error);
             return;
         }
         setLive(true);
         setLiveAt(new Date().toISOString());
         showSuccess(`Published. It is live at ${res.data.path}.`);
-        router.refresh();
+        refreshServer();
     }
 
     async function onUnpublish() {
@@ -235,7 +265,7 @@ export function PostEditor({
         setLive(false);
         setLiveAt(null);
         showSuccess("Taken off the site. The writing is still here.");
-        router.refresh();
+        refreshServer();
     }
 
     async function onDelete() {
@@ -278,9 +308,9 @@ export function PostEditor({
                         : dirty
                           ? "Unsaved changes"
                           : savedAt
-                            ? `Saved ${shortDate(savedAt)}`
+                            ? `Saved ${shortDate(savedAt, zone)}`
                             : liveAt
-                              ? `Live since ${shortDate(liveAt)}`
+                              ? `Live since ${shortDate(liveAt, zone)}`
                               : ""}
                 </span>
 
@@ -372,6 +402,27 @@ export function PostEditor({
                             </Button>
                         </div>
 
+                        {post?.author ? (
+                            <Field label="Byline">
+                                {/* Said where it comes from (UX-091): the
+                                    writer's own account name, shown on the
+                                    public post, and changed there. */}
+                                <p className="text-sm">
+                                    Shown on the site as by{" "}
+                                    <span className="font-medium">
+                                        {post.author}
+                                    </span>
+                                    .{" "}
+                                    <a
+                                        href={accountSettingsUrl}
+                                        className="underline underline-offset-2"
+                                    >
+                                        Change your name
+                                    </a>
+                                </p>
+                            </Field>
+                        ) : null}
+
                         <Field
                             label="Post path"
                             hint="The end of the post's link. Left empty, it follows the title."
@@ -449,7 +500,7 @@ export function PostEditor({
                             <div className="border-t pt-4">
                                 <p className="text-xs text-muted-foreground">
                                     {liveAt
-                                        ? `Live copy published ${exactDate(liveAt)}.`
+                                        ? `Live copy published ${exactDate(liveAt, zone)}.`
                                         : "This post has never been published."}
                                 </p>
                                 <Button

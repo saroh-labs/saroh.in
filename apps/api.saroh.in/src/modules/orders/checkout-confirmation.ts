@@ -3,6 +3,9 @@ import { prisma, runInOrgContext } from "@saroh/database";
 
 import { fromMinor, toMinor, toMoneyString } from "../../common/money";
 import type { CustomerContext } from "../site-accounts/customer-context.decorator";
+import { openingHoursText } from "../stores/opening-hours-text";
+import type { OpeningHoursDay } from "../stores/storefronts.dto";
+import { onHandoverLabel } from "./checkout-readiness";
 import type { FulfilmentType } from "./fulfilment";
 import { FULFILMENT_RULES, shipsToAddress, typeOf } from "./fulfilment";
 
@@ -19,7 +22,9 @@ import { FULFILMENT_RULES, shipsToAddress, typeOf } from "./fulfilment";
  * - **Only once placed.** An order still being paid, closed unpaid, or
  *   refused and refunded is not an order yet (B1): 404, and the bag sheet
  *   keeps telling that story. A placed order that was refunded later still
- *   reads, as its Track does.
+ *   reads, as its Track does. An order placed to be paid on handover is
+ *   placed from the start, and reads until it is cancelled, saying it is
+ *   still to be paid.
  * - **Only what the customer gave or is owed.** Items, amounts, how it
  *   leaves and where: the storefront's pick-up address, or the delivery
  *   address they typed. Never staff notes, stock or payment ids.
@@ -48,13 +53,19 @@ export interface CheckoutConfirmation {
     delivery: string | null;
     /** Taken off at checkout, "50.00"; null when nothing was. */
     discount: string | null;
+    /** The code that took it off (DEC-104), "SAVE10"; null without one. */
+    discountCode: string | null;
     total: string;
     fulfilment: {
         type: FulfilmentType;
         /** "Pick-up", "Local delivery", "Shipping". */
         label: string;
-        /** Pick-up: where to collect it. */
-        pickup: { name: string; address: string | null } | null;
+        /** Pick-up: where to collect it, and when it's open (UX-025). */
+        pickup: {
+            name: string;
+            address: string | null;
+            hours: string | null;
+        } | null;
         /** Delivery and shipping: where it goes, as they typed it. */
         deliverTo: {
             name: string | null;
@@ -63,6 +74,12 @@ export interface CheckoutConfirmation {
     };
     /** Refunded after it was placed: said, never hidden. */
     refunded: boolean;
+    /**
+     * Placed to be paid on handover and not paid yet: "Pay when you
+     * collect" or "Pay on delivery". Null once paid, and for an order
+     * paid online.
+     */
+    toPay: string | null;
 }
 
 /** What the read selects, and all {@link confirmationView} needs. */
@@ -74,8 +91,11 @@ export interface ConfirmationRow {
     subtotal: { toString(): string };
     shipping: { toString(): string };
     discount: { toString(): string };
+    /** The code the order used, as its redemption recorded it. */
+    discountRedemption?: { code: string } | null;
     total: { toString(): string };
     paymentStatus: string;
+    payOnHandover?: boolean;
     fulfilment: string;
     deliveryName: string | null;
     deliveryLine1: string | null;
@@ -83,7 +103,10 @@ export interface ConfirmationRow {
     deliveryCity: string | null;
     deliveryState: string | null;
     deliveryPostalCode: string | null;
-    store: { name: string; settings: { address: string | null } | null };
+    store: {
+        name: string;
+        settings: { address: string | null; openingHours?: unknown } | null;
+    };
     items: {
         quantity: number;
         price: { toString(): string };
@@ -133,6 +156,7 @@ export function confirmationView(row: ConfirmationRow): CheckoutConfirmation {
         subtotal: toMoneyString(row.subtotal),
         delivery: unlessZero(row.shipping),
         discount: unlessZero(row.discount),
+        discountCode: row.discountRedemption?.code ?? null,
         total: toMoneyString(row.total),
         fulfilment: {
             type,
@@ -142,6 +166,12 @@ export function confirmationView(row: ConfirmationRow): CheckoutConfirmation {
                     ? {
                           name: row.store.name,
                           address: clean(row.store.settings?.address),
+                          hours: openingHoursText(
+                              Array.isArray(row.store.settings?.openingHours)
+                                  ? (row.store.settings
+                                        .openingHours as OpeningHoursDay[])
+                                  : null,
+                          ),
                       }
                     : null,
             deliverTo:
@@ -150,6 +180,10 @@ export function confirmationView(row: ConfirmationRow): CheckoutConfirmation {
                     : null,
         },
         refunded: row.paymentStatus === "REFUNDED",
+        toPay:
+            row.payOnHandover && row.paymentStatus === "UNPAID"
+                ? (onHandoverLabel(type) ?? "Pay when it reaches you")
+                : null,
     };
 }
 
@@ -174,7 +208,14 @@ export class CheckoutConfirmationService {
                     organizationId: customer.organizationId,
                     customerAccountId: customer.accountId,
                     placedOnline: true,
-                    paymentStatus: { in: PLACED },
+                    OR: [
+                        { paymentStatus: { in: PLACED } },
+                        {
+                            payOnHandover: true,
+                            paymentStatus: "UNPAID",
+                            status: { not: "CANCELLED" },
+                        },
+                    ],
                 },
                 select: {
                     orderId: true,
@@ -184,8 +225,10 @@ export class CheckoutConfirmationService {
                     subtotal: true,
                     shipping: true,
                     discount: true,
+                    discountRedemption: { select: { code: true } },
                     total: true,
                     paymentStatus: true,
+                    payOnHandover: true,
                     fulfilment: true,
                     deliveryName: true,
                     deliveryLine1: true,
@@ -196,7 +239,9 @@ export class CheckoutConfirmationService {
                     store: {
                         select: {
                             name: true,
-                            settings: { select: { address: true } },
+                            settings: {
+                                select: { address: true, openingHours: true },
+                            },
                         },
                     },
                     items: {

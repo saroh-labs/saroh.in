@@ -32,6 +32,8 @@ jest.mock("@saroh/database", () => {
         featureFlag: { findUnique: jest.fn().mockResolvedValue(null) },
         // DEC-070: Payments on (no row) unless a test turns it off.
         organizationModule: { findFirst: jest.fn().mockResolvedValue(null) },
+        // How to pay us (R32): none set unless a test sets some.
+        businessProfile: { findUnique: jest.fn().mockResolvedValue(null) },
     };
     return {
         ...actual,
@@ -55,6 +57,8 @@ import {
 } from "@nestjs/common";
 import { prisma } from "@saroh/database";
 
+import { fakePaymentsRow } from "../../../test/fixtures/pricing-catalog";
+import { planMeter } from "../billing/metering.service";
 import { FixedWindowRateLimiter } from "../bookings/rate-limiter";
 import { hashPayToken, mintPayToken } from "../invoices/pay-token";
 import { encryptSecret } from "./crypto";
@@ -157,7 +161,8 @@ describe("PublicInvoicesService.read", () => {
         await makeService().service.read(TOKEN);
         expect(invoiceFindUnique).toHaveBeenCalledWith({
             where: { payTokenHash: hashPayToken(TOKEN) },
-            select: { id: true, organizationId: true },
+            // A renewal stays payable on any plan (online-payments-plan.ts).
+            select: { id: true, organizationId: true, subscriptionId: true },
         });
         expect(JSON.stringify(invoiceFindUnique.mock.calls)).not.toContain(
             TOKEN,
@@ -180,6 +185,10 @@ describe("PublicInvoicesService.read", () => {
                 "payUrl",
                 // DEC-070: whether the page offers Pay.
                 "payOnline",
+                // R32: owed and not payable online, how to pay offline.
+                "payInstructions",
+                // UX-007: none set, how to reach the business instead.
+                "businessContact",
                 "status",
                 "tax",
                 "theme",
@@ -210,6 +219,10 @@ describe("PublicInvoicesService.read", () => {
             payUrl: `https://saroh.app/pay/${TOKEN}`,
             // No provider can open the checkout window here.
             payOnline: false,
+            // R32: the business set none.
+            payInstructions: null,
+            // UX-007: nor a phone or email.
+            businessContact: null,
         });
         // Asked only for what it shows: no email, contact, ids or notes.
         const select = invoiceFindFirst.mock.calls[0][0].select;
@@ -437,6 +450,78 @@ describe("PublicInvoicesService.createIntent", () => {
         expect(result.provider).toBe("CASHFREE");
     });
 
+    it("shows how to pay offline on an owed view-only invoice, and never on a paid one (R32)", async () => {
+        const profileFindUnique = prisma.businessProfile
+            .findUnique as jest.Mock;
+        // Made-up details.
+        profileFindUnique.mockResolvedValue({
+            payUpiId: "lotus.yoga@okexample",
+            payBankAccountName: "Lotus Yoga",
+            payBankAccountNumber: "123456789012",
+            payBankIfsc: "ABCD0123456",
+            payBankName: null,
+            payNote: null,
+        });
+        invoiceFindFirst.mockResolvedValue(STORED);
+        // Payable online: the page's Pay button, and no offline details.
+        const online = await makeService().service.read(TOKEN);
+        expect(online.payOnline).toBe(true);
+        expect(online).not.toHaveProperty("payInstructions");
+        // No provider can open the window: a view link, with them.
+        providerFindFirst.mockResolvedValue(null);
+        const view = await makeService().service.read(TOKEN);
+        expect(view.payOnline).toBe(false);
+        expect(view.payInstructions).toEqual(
+            expect.objectContaining({
+                upiId: "lotus.yoga@okexample",
+                bankIfsc: "ABCD0123456",
+            }),
+        );
+        expect(profileFindUnique).toHaveBeenCalledWith(
+            expect.objectContaining({ where: { organizationId: "org_1" } }),
+        );
+
+        profileFindUnique.mockClear();
+        invoiceFindFirst.mockResolvedValue({ ...STORED, status: "PAID" });
+        const paid = await makeService().service.read(TOKEN);
+        expect(paid).not.toHaveProperty("payInstructions");
+        expect(profileFindUnique).not.toHaveBeenCalled();
+        profileFindUnique.mockResolvedValue(null);
+    });
+
+    it("names a way to reach the business when it set no way to pay (UX-007)", async () => {
+        const profileFindUnique = prisma.businessProfile
+            .findUnique as jest.Mock;
+        // Made-up details: no pay instructions, a phone and an email.
+        profileFindUnique.mockResolvedValue({
+            payUpiId: null,
+            payBankAccountName: null,
+            payBankAccountNumber: null,
+            payBankIfsc: null,
+            payBankName: null,
+            payNote: null,
+            phone: "+919800000000",
+            contactEmail: "hello@lotus.example",
+        });
+        invoiceFindFirst.mockResolvedValue(STORED);
+        providerFindFirst.mockResolvedValue(null);
+        const view = await makeService().service.read(TOKEN);
+        expect(view.payInstructions).toBeNull();
+        expect(view.businessContact).toEqual({
+            phone: "+919800000000",
+            email: "hello@lotus.example",
+        });
+
+        // With a way to pay set, the page shows that, and no contact.
+        profileFindUnique.mockResolvedValue({
+            payUpiId: "lotus.yoga@okexample",
+            phone: "+919800000000",
+        });
+        const withUpi = await makeService().service.read(TOKEN);
+        expect(withUpi).not.toHaveProperty("businessContact");
+        profileFindUnique.mockResolvedValue(null);
+    });
+
     it("refuses when no connection can open the window: the business doesn't take payment online (DEC-070)", async () => {
         const { service } = makeService();
         invoiceFindFirst.mockResolvedValue(PAYABLE);
@@ -516,6 +601,58 @@ describe("PublicInvoicesService.createIntent", () => {
         await expect(service.createIntent(TOKEN, {})).rejects.toMatchObject({
             status: 429,
         });
+    });
+});
+
+describe("PublicInvoicesService on a plan without online payments", () => {
+    const PAYABLE = {
+        id: "inv_1",
+        organizationId: "org_1",
+        status: "ISSUED",
+        total: dec("1400.00"),
+        currency: "INR",
+        subscriptionId: null,
+    };
+
+    beforeEach(() => {
+        jest.spyOn(planMeter, "enforcedRow").mockResolvedValue(
+            fakePaymentsRow("free", "payments"),
+        );
+        providerFindFirst.mockResolvedValue(connectedRow());
+        intentCreate.mockResolvedValue({ id: "pi_1" });
+    });
+    afterEach(() => jest.restoreAllMocks());
+
+    it("opens the business's own invoice as a view link, and refuses paying it online", async () => {
+        const { service, fake } = makeService();
+        invoiceFindFirst.mockResolvedValue({ ...STORED, ...PAYABLE });
+
+        await expect(service.read(TOKEN)).resolves.toMatchObject({
+            payOnline: false,
+        });
+        await expect(service.createIntent(TOKEN, {})).rejects.toThrow(
+            "This business doesn't take payment online.",
+        );
+        expect(fake.calls).toHaveLength(0);
+        expect(intentCreate).not.toHaveBeenCalled();
+    });
+
+    it("keeps a renewal of a subscription the business already has payable online", async () => {
+        const { service, fake } = makeService();
+        invoiceFindUnique.mockResolvedValue({
+            id: "inv_1",
+            organizationId: "org_1",
+            subscriptionId: "sub_1",
+        });
+        invoiceFindFirst.mockResolvedValue({
+            ...PAYABLE,
+            subscriptionId: "sub_1",
+        });
+
+        await expect(service.createIntent(TOKEN, {})).resolves.toMatchObject({
+            amountCents: 140000,
+        });
+        expect(fake.calls).toHaveLength(1);
     });
 });
 

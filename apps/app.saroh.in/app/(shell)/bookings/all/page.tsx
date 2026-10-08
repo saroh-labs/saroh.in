@@ -8,8 +8,9 @@ import { PageContainer } from "@/components/shared/page-container";
 import { SinceNotice } from "@/components/shared/since-notice";
 import { canReadPacks, canUsePacksOnBookings } from "@/lib/class-packs/access";
 import { packsOn } from "@/lib/class-packs/switched-on";
-import { hasPaymentProvider } from "@/lib/invoices/tax";
+import { onlinePayReady } from "@/lib/invoices/payments-on";
 import { modulesOrUnknown } from "@/lib/modules/guard";
+import { permitsFor } from "@/lib/organizations/permits";
 import { resolveActiveOrganization } from "@/lib/organizations/service";
 import { listBookingsWithPast, listServices } from "@/lib/services/service";
 import { requireSession } from "@/lib/session";
@@ -51,17 +52,14 @@ export default async function BookingsPage({
         listServices().catch(() => []),
         resolveActiveOrganization(),
     ]);
-    const may = (action: string) =>
-        organization?.actions
-            ? organization.actions.includes(action)
-            : organization?.role === "OWNER" || organization?.role === "ADMIN";
+    const may = permitsFor(organization);
     // New booking finds the customer by search (E4) and can send a pay link.
     const people = {
         canSearch: may("contact:read"),
         payLink:
             may("booking:write") &&
             may("invoice:write") &&
-            (await hasPaymentProvider().catch(() => false)),
+            (await onlinePayReady()),
     };
 
     // From Home's "Last 24 hours" (F6): the confirmed bookings made since

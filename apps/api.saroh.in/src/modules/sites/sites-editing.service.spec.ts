@@ -61,6 +61,7 @@ jest.mock("@saroh/database", () => {
 
 import { BadRequestException, NotFoundException } from "@nestjs/common";
 import { prisma } from "@saroh/database";
+import { starterTemplate } from "@saroh/templates";
 
 import { draftFingerprint } from "./review-route";
 
@@ -196,6 +197,41 @@ describe("SitesService.replaceDraftSections", () => {
         expect(created.map((s) => s.type)).toEqual(["hero", "richText"]);
         expect(created.every((s) => s.organizationId === "org_1")).toBe(true);
         expect(created.every((s) => s.pageVersionId === "ver_1")).toBe(true);
+    });
+
+    it("keeps a section's anchor, label and band, and refuses an anchor used twice", async () => {
+        const text = (extra: Record<string, unknown>) => ({
+            type: "richText",
+            contractVersion: 1,
+            content: { format: "html", value: "<p>ok</p>", ...extra },
+        });
+        await service.replaceDraftSections(ctx(), "site_1", "page_1", {
+            sections: [
+                text({ anchor: "visit", navLabel: "Visit", band: "inverse" }),
+            ],
+        });
+        const created = sectionCreateMany.mock.calls[0][0].data as Array<{
+            content: Record<string, unknown>;
+        }>;
+        expect(created[0].content).toMatchObject({
+            anchor: "visit",
+            navLabel: "Visit",
+            band: "inverse",
+        });
+
+        sectionCreateMany.mockClear();
+        await expect(
+            service.replaceDraftSections(ctx(), "site_1", "page_1", {
+                sections: [
+                    text({ anchor: "visit" }),
+                    text({}),
+                    text({ anchor: "visit" }),
+                ],
+            }),
+        ).rejects.toMatchObject({
+            response: { details: { index: 2, field: "anchor" } },
+        });
+        expect(sectionCreateMany).not.toHaveBeenCalled();
     });
 
     it("creates an empty DRAFT version when the page has none", async () => {
@@ -827,10 +863,18 @@ describe("SitesService.publishSite", () => {
             outcome: "BYPASSED",
             publicationId: "pub_1",
         });
-        // The outstanding question reads VERDICTS only: a BYPASSED row from an
-        // earlier publish must not count as the reviewer changing their mind.
+        // The outstanding question reads the verdicts and the rows that close
+        // a review (UX-068): an earlier publish's BYPASSED closes what it went
+        // past, and never counts as an approval.
         expect(approvalFindMany.mock.calls[0][0].where.outcome).toEqual({
-            in: ["REQUESTED", "APPROVED", "CHANGES_REQUESTED"],
+            in: [
+                "REQUESTED",
+                "APPROVED",
+                "CHANGES_REQUESTED",
+                "WITHDRAWN",
+                "BYPASSED",
+                "OVERRIDDEN",
+            ],
         });
         // And the publication says which route it took (#278).
         expect(publicationCreate.mock.calls[0][0].data.reviewRoute).toBe(
@@ -995,6 +1039,49 @@ describe("SitesService.publishSite", () => {
         });
         expect(result.currentPublicationId).toBe("pub_1");
         expect(result.publicationId).toBe("pub_1");
+    });
+
+    it("stamps the Publication with the site's own template (KTD-7)", async () => {
+        siteFindFirst.mockResolvedValue({
+            ...siteWithRichText("<p>hello</p>"),
+            templateId: "personal",
+            templateVersion: 1,
+        });
+
+        await service.publishSite(ctx(), "site_1");
+
+        expect(publicationCreate.mock.calls[0][0].data).toMatchObject({
+            templateId: "personal",
+            templateVersion: 1,
+        });
+        // Loaded with the draft, never part of the snapshot.
+        const select = siteFindFirst.mock.calls[0][0].select as Record<
+            string,
+            unknown
+        >;
+        expect(select).toMatchObject({
+            templateId: true,
+            templateVersion: true,
+        });
+        const snapshot = publicationCreate.mock.calls[0][0].data.snapshot as {
+            site: Record<string, unknown>;
+        };
+        expect(snapshot.site).not.toHaveProperty("templateId");
+    });
+
+    it("stamps the starter for a site with no template recorded, as before", async () => {
+        siteFindFirst.mockResolvedValue({
+            ...siteWithRichText("<p>hello</p>"),
+            templateId: null,
+            templateVersion: null,
+        });
+
+        await service.publishSite(ctx(), "site_1");
+
+        expect(publicationCreate.mock.calls[0][0].data).toMatchObject({
+            templateId: starterTemplate.id,
+            templateVersion: starterTemplate.version,
+        });
     });
 
     it("publishes a text block's photo and its side (G7)", async () => {

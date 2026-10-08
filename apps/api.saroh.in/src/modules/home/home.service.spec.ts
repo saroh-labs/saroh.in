@@ -1,4 +1,11 @@
+// Whether the plan lets the business connect its own email (DEC-091),
+// switched per test; the real check is in billing/online-payments-plan.
+jest.mock("../billing/online-payments-plan", () => ({
+    planConnectsOwnAccounts: jest.fn(() => Promise.resolve(true)),
+}));
+
 import { quietLastDay } from "../../../test/home-quiet-db";
+import { planConnectsOwnAccounts } from "../billing/online-payments-plan";
 import type { ModuleAvailabilityService } from "../capabilities/module-availability.service";
 import { HomeService } from "./home.service";
 
@@ -78,11 +85,22 @@ function build(views: View[], fixture: Fixture = {}) {
                 .mockResolvedValue(fixture.activityCount ?? activities.length),
             findMany: jest.fn().mockResolvedValue(activities),
         },
+        // R34's uncollected orders (`payOnHandover` in the where): none,
+        // so every other order read answers as it did.
         order: {
-            count: jest
-                .fn()
-                .mockResolvedValue(fixture.orderCount ?? orders.length),
-            findMany: jest.fn().mockResolvedValue(orders),
+            count: jest.fn((args?: { where?: { payOnHandover?: boolean } }) =>
+                Promise.resolve(
+                    args?.where?.payOnHandover === true
+                        ? 0
+                        : (fixture.orderCount ?? orders.length),
+                ),
+            ),
+            findMany: jest.fn(
+                (args?: { where?: { payOnHandover?: boolean } }) =>
+                    Promise.resolve(
+                        args?.where?.payOnHandover === true ? [] : orders,
+                    ),
+            ),
         },
         booking: {
             count: jest
@@ -217,11 +235,13 @@ describe("HomeService degrades one source at a time (#177, §30)", () => {
         const home = await buildWithFailure("order").build(INPUT);
 
         // Today reads orders for its pick-ups, so it is named too (F5),
-        // and so does This week for its order count (F7).
+        // and so does This week for its order count (F7), and the orders
+        // nobody came for (R34).
         expect(home.unavailable).toEqual([
             { moduleKey: "COMMERCE", label: "Open orders" },
             { moduleKey: "APPOINTMENTS", label: "Today" },
             { moduleKey: "HOME", label: "This week" },
+            { moduleKey: "COMMERCE", label: "Uncollected orders" },
         ]);
         // The schedule survived, which is the whole point.
         expect(home.upcoming).toHaveLength(1);
@@ -500,6 +520,33 @@ describe("HomeService schedule", () => {
 
         expect(model.upcoming).toHaveLength(1);
     });
+
+    it.each([
+        [true, true],
+        [false, false],
+    ])(
+        "Connect a messaging provider shows only where the plan lets the business connect one (room %s, UX-006)",
+        async (room, shown) => {
+            (planConnectsOwnAccounts as jest.Mock).mockResolvedValueOnce(room);
+            const svc = build([
+                {
+                    key: "COMMUNICATIONS",
+                    label: "Communications",
+                    readiness: "SETUP_REQUIRED",
+                    blockers: [
+                        {
+                            code: "COMMUNICATIONS_NO_PROVIDER",
+                            message: "Connect a provider to send messages.",
+                        },
+                    ],
+                },
+            ]);
+            const model = await svc.build(INPUT);
+            expect(
+                model.actions.some((a) => a.code === "COMMUNICATIONS_SETUP"),
+            ).toBe(shown);
+        },
+    );
 
     it("does not push order work through a module that is not ready", async () => {
         // The action sends someone at a door. A door that does not open must

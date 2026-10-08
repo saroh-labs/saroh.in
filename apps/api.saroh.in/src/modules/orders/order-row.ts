@@ -75,6 +75,12 @@ export interface OrderRowDto extends FulfilmentView, LateView {
     standing: ReturnType<typeof orderStanding>;
     /** Paid, not paid yet, partly refunded or refunded. */
     payment: PaymentStanding;
+    /**
+     * Placed at the site's checkout to be paid when it is collected or
+     * delivered: the row says "pay on collection" or "pay on delivery"
+     * while it is not paid yet.
+     */
+    payOnHandover: boolean;
     currency: string;
     /** Only with `order:read`. */
     total?: string;
@@ -118,10 +124,14 @@ export interface RawOrderRow {
     walkInPhone?: string | null;
     status: string;
     paymentStatus: string;
+    /** Absent where it isn't loaded: read as false. */
+    payOnHandover?: boolean;
     stage: string;
     fulfilment: string;
     currency: string;
     total: DecimalLike;
+    /** Taken outside Saroh and recorded on it (`hand-payments.ts`). */
+    paidByHand?: DecimalLike | null;
     createdAt: Date;
     courierName: string | null;
     trackingNumber: string | null;
@@ -184,12 +194,6 @@ export function serializeOrderRow(
         (s, p) => s + p.refunds.reduce((r, x) => r + x.amountCents, 0),
         0,
     );
-    // Marked paid by hand, with no provider payment behind it: nothing is
-    // due, as Order Detail's money card says.
-    const byHand =
-        (order.paymentStatus === "PAID" ||
-            order.paymentStatus === "REFUNDED") &&
-        order.paymentIntents.length === 0;
     const names: string[] = [];
     for (const item of order.items) {
         const name = lineName(item);
@@ -257,13 +261,15 @@ export function serializeOrderRow(
         ),
         standing: orderStanding(order.status, order.paymentStatus),
         payment: paymentStandingOf(order.paymentStatus, captured, refunded),
+        payOnHandover: order.payOnHandover ?? false,
         currency: order.currency,
         ...(view.money
             ? {
                   total: toMoneyString(order.total),
-                  unpaidAmount: fromMinor(
-                      byHand ? 0 : amountDueCents(order, captured),
-                  ),
+                  // Counts what was recorded by hand, as Order Detail's
+                  // money card does: an order paid at the counter and
+                  // edited up owes the difference.
+                  unpaidAmount: fromMinor(amountDueCents(order, captured)),
                   payLinkCreatedAt: order.payLinkCreatedAt ?? null,
               }
             : {}),

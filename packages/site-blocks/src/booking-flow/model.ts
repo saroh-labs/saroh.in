@@ -5,6 +5,7 @@
  */
 
 import { siteMoney } from "../lib/money";
+import type { PayInstructions } from "../pay-instructions/model";
 
 /** Where a service happens (E7): the customer chooses for EITHER. */
 export type ServiceWhere = "IN_PERSON" | "ONLINE" | "EITHER";
@@ -54,6 +55,20 @@ export interface BookingRules {
      * back on its own when cancelled in time. Absent from an older API: on.
      */
     refundInTimeCancels?: boolean;
+    /**
+     * How people pay when they book (DEC-088): online only, at the desk
+     * only, or both. Absent from an older API: both.
+     */
+    bookingPayment?: BookingPayment;
+}
+
+/** How the business lets people pay when they book (DEC-088). */
+export type BookingPayment = "ONLINE" | "DESK" | "BOTH";
+
+/** The rules' way to pay; absent or unknown reads as both, as before. */
+export function bookingPaymentOf(rules: BookingRules): BookingPayment {
+    const way = rules.bookingPayment;
+    return way === "ONLINE" || way === "DESK" ? way : "BOTH";
 }
 
 /** What the page opens with: `GET /public/sites/:siteId/booking`. */
@@ -61,8 +76,17 @@ export interface BookingPageData {
     businessName: string;
     /** False when the business has switched Appointments off. */
     open: boolean;
+    /**
+     * Online booking is paused (DEC-095): the business has had all the
+     * online bookings its plan takes this month. Said before the form,
+     * naming no plan. Absent from an older API: not paused.
+     */
+    paused?: boolean;
     timezone: string;
-    /** Pay now is on offer: Payments on and a provider connected. */
+    /**
+     * Pay now is on offer: the business allows it (DEC-088), Payments is on
+     * and a provider is connected.
+     */
     payOnline: boolean;
     rules: BookingRules;
     services: BookingService[];
@@ -75,12 +99,22 @@ export interface BookingStart {
     staffId: string | null;
     staffName: string | null;
     placesLeft: number | null;
+    /**
+     * A service offered either way: set when this start can be had only
+     * one way — online outside the business's opening hours (DEC-087).
+     */
+    only?: BookingWhere;
 }
 
 export interface BookingDay {
     /** `YYYY-MM-DD` in the business's zone. */
     date: string;
     open: boolean;
+    /**
+     * The business itself is closed that day (UX-054): a closure, or no
+     * opening hours that day. Absent from an older API: not known.
+     */
+    closed?: boolean;
     starts: BookingStart[];
 }
 
@@ -105,6 +139,12 @@ export interface BookResult {
     state: HoldState;
     holdExpiresAt: string | null;
     payToken: string | null;
+    /**
+     * Booked to pay at the desk (R32): how the business says it can be paid
+     * ahead — UPI, bank transfer, a note. Null or absent: none set, or not
+     * a desk booking.
+     */
+    payInstructions?: PayInstructions | null;
 }
 
 /** Where a pay-now hold stands: `GET /public/services/holds/:token`. */
@@ -160,6 +200,7 @@ export function isBookingPage(v: unknown): v is BookingPageData {
     return (
         isStr(v.businessName) &&
         typeof v.open === "boolean" &&
+        (v.paused === undefined || typeof v.paused === "boolean") &&
         isStr(v.timezone) &&
         typeof v.payOnline === "boolean" &&
         numOrNull(r.bookAheadDays) &&
@@ -177,7 +218,11 @@ function isStart(v: unknown): v is BookingStart {
         isInstant(v.endAt) &&
         strOrNull(v.staffId) &&
         strOrNull(v.staffName) &&
-        numOrNull(v.placesLeft)
+        numOrNull(v.placesLeft) &&
+        (v.only === undefined ||
+            v.only === null ||
+            v.only === "IN_PERSON" ||
+            v.only === "ONLINE")
     );
 }
 
@@ -194,6 +239,7 @@ export function isBookingDays(v: unknown): v is BookingDays {
                 isStr(d.date) &&
                 /^\d{4}-\d{2}-\d{2}$/.test(d.date) &&
                 typeof d.open === "boolean" &&
+                (d.closed === undefined || typeof d.closed === "boolean") &&
                 Array.isArray(d.starts) &&
                 d.starts.every(isStart),
         )
@@ -381,19 +427,26 @@ export function creditUsedText(credit: OfferedCredit): string {
 /**
  * The ways a service can be paid for, in the order the pay step lists
  * them (the Kavi Dental and Pulse Fitness designs). A service with a
- * deposit is paid online — its deposit, or the whole price — and never at
- * the desk; one whose deposit is the full price is simply paid now.
- * Without a deposit: now, when the business takes money online, or at the
- * desk. None when a deposit is asked for and the business can't take it
- * online, and none for a service with no price.
+ * deposit is paid online — its deposit, or the whole price — and not at
+ * the desk; one whose deposit is the full price is simply paid now. When
+ * online can't take it (the business chose the desk only, or has no way
+ * to pay online), it is paid at the desk wherever the business allows the
+ * desk (DEC-089). Without a deposit: now, when the business takes money
+ * online, or at the desk. Only what the business allows (DEC-088): `way`
+ * online only drops the desk, at the desk only drops paying online. None
+ * when nothing it allows can be taken — online only, with no way to pay
+ * online — and none for a service with no price.
  */
 export function payChoices(
     service: BookingService,
     payOnline: boolean,
     business: string,
+    way: BookingPayment = "BOTH",
 ): PayChoice[] {
     const price = formatMoney(service.priceCents, service.currency);
     if (!price || !service.priceCents || service.priceCents <= 0) return [];
+    const online = payOnline && way !== "DESK";
+    const atDesk = way !== "ONLINE";
     const isClass = service.kind === "class";
     const place = isClass ? "place" : "appointment";
     // A treatment is paid for whole (E10): "for all 3 visits".
@@ -407,9 +460,17 @@ export function payChoices(
         sub: `Online — your ${place} is confirmed straight away`,
         amount: price,
     };
+    const desk: PayChoice = {
+        pay: "DESK",
+        label: "Pay at the desk",
+        sub: "Held for you; pay when you arrive",
+        amount: price,
+    };
     const deposit = service.depositCents ?? null;
     if (deposit !== null && deposit > 0) {
-        if (!payOnline) return [];
+        // Online can't take it: the desk, where the business allows it
+        // (DEC-089); under online only it can't be booked here.
+        if (!online) return atDesk ? [desk] : [];
         if (deposit >= service.priceCents) return [payNow];
         const part = formatMoney(deposit, service.currency) ?? "";
         const rest = restAfterDeposit(service) ?? "";
@@ -427,26 +488,29 @@ export function payChoices(
             },
         ];
     }
-    const desk: PayChoice = {
-        pay: "DESK",
-        label: "Pay at the desk",
-        sub: "Held for you; pay when you arrive",
-        amount: price,
-    };
-    return payOnline ? [payNow, desk] : [desk];
+    return [...(online ? [payNow] : []), ...(atDesk ? [desk] : [])];
 }
 
-/** A deposit is asked for, and there is no way to pay it here (E8). */
-export function depositUnpayable(
+/**
+ * Why a priced service can't be booked here at all, or null when it can
+ * (E8, DEC-088, DEC-089, #822): the business takes payment only online,
+ * and there is no way to pay online now — no provider connected, or
+ * Payments off. The page then shows this and no payment line. Under Both
+ * or At the desk it never applies: a deposit online can't take is paid at
+ * the desk.
+ */
+export function unpayableText(
     service: BookingService | null,
     payOnline: boolean,
-): boolean {
-    return (
-        !!service &&
-        !payOnline &&
-        (service.depositCents ?? null) !== null &&
-        (service.depositCents ?? 0) > 0
-    );
+    business: string,
+    way: BookingPayment = "BOTH",
+): string | null {
+    if (!service) return null;
+    if (payChoices(service, payOnline, business, way).length > 0) return null;
+    if (!service.priceCents || service.priceCents <= 0) return null;
+    return (service.depositCents ?? 0) > 0
+        ? `${business} can't take the deposit online right now. Get in touch with them to book.`
+        : `${business} can't take payment online right now. Get in touch with them to book.`;
 }
 
 /**
@@ -600,14 +664,16 @@ export function dateIn(iso: string, zone: string): string {
 
 /**
  * What a day button says under its date: how many times are free, or Full
- * (it is open and all taken), or Closed (nobody works then). On a phone the
- * count stands alone and Closed shortens to Shut.
+ * (it is open and all taken), Closed (the business is closed that day), or
+ * No times (it is open, but nobody takes this service then) — UX-054: never
+ * Closed on a day the header says it's open. On a phone the count stands
+ * alone; the words are the same on both.
  */
 export function dayCountLabel(day: BookingDay, phone: boolean): string {
     const n = day.starts.length;
     if (n > 0) return phone ? String(n) : `${n} free`;
     if (day.open) return "Full";
-    return phone ? "Shut" : "Closed";
+    return day.closed ? "Closed" : "No times";
 }
 
 /** The screen-reader name of a day button. */
@@ -617,7 +683,9 @@ export function dayAria(day: BookingDay): string {
         ? `${n} ${n === 1 ? "time" : "times"} free`
         : day.open
           ? "full"
-          : "closed";
+          : day.closed
+            ? "closed"
+            : "no times";
     return `${dateText(day.date, true)}: ${what}`;
 }
 
@@ -698,21 +766,35 @@ function keptText(rules: BookingRules, payingOnline: boolean): string | null {
         : null;
 }
 
-/**
- * The confirmation's closing line. Saroh sends no message, so there is no
- * "link in your confirmation" to point at: changes go through the business.
- */
-export function changeText(
-    business: string,
-    rules: BookingRules,
-    paidOnline = false,
-): string {
+/** The words after "Need to change it? …": the free-cancel window and refund policy. */
+export function changeRules(rules: BookingRules, paidOnline = false): string {
     const free =
         rules.freeCancelHours !== null
             ? ` Free to cancel until ${describeMinutes(rules.freeCancelHours * 60)} before the start.`
             : "";
     const kept = keptText(rules, paidOnline);
-    return `Need to change it? Get in touch with ${business}.${free}${kept ? ` ${kept}` : ""}`;
+    return `${free}${kept ? ` ${kept}` : ""}`;
+}
+
+/** Where a signed-in booker moves or cancels it (UX-055). */
+export const MOVE_OR_CANCEL = "Move or cancel it from your bookings";
+
+/**
+ * The confirmation's closing line. Saroh sends no message, so there is no
+ * "link in your confirmation" to point at. A booking made signed in (every
+ * booking since A9) is moved or cancelled from the booker's own bookings
+ * (UX-055); `movable` false — no account to go to — says to get in touch.
+ */
+export function changeText(
+    business: string,
+    rules: BookingRules,
+    paidOnline = false,
+    movable = false,
+): string {
+    const how = movable
+        ? `${MOVE_OR_CANCEL} on ${business}'s website.`
+        : `Get in touch with ${business}.`;
+    return `Need to change it? ${how}${changeRules(rules, paidOnline)}`;
 }
 
 /** "Places left" words for a class session. */

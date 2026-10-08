@@ -82,7 +82,8 @@ what the API allows.
   included — Order Detail sends money to `order:read` or `payment:read`).
   So a role saved before the split keeps what it could do; no backfill. On
   the store-scoped writes `store:write` no longer takes orders; a storefront
-  role that writes to its storefront still does (DEC-048).
+  role that writes to its storefront still does (DEC-048), but never its
+  money (DEC-106, below).
   `order-permissions.db.spec.ts` pins the matrix one row per endpoint; a new
   order endpoint adds its row there.
 - **Current** (C13, DEC-039) — **Each customer endpoint asks its own power.**
@@ -117,6 +118,30 @@ what the API allows.
   "Your role can't …" (`bookings/booking-access.ts`).
   `booking-permissions.db.spec.ts` pins one row per endpoint; a new booking,
   service or pack endpoint adds its row there.
+- **Current** (DEC-098, 2026-10-07) — **Money follows permissions, never
+  role names.** Seeing amounts, taking a desk payment, marking an invoice
+  paid, recording an order's payment and refunding are asked of the role's
+  permissions only — `allows(ctx, …)` in the API, `permits(org, …)`
+  (`lib/organizations/permits.ts`) in the app, which permits nothing when
+  no permissions came back. Built-in roles keep their default permissions.
+  A role that may take desk payment (`booking:write` + `invoice:write`,
+  `mayTakeDeskPayment`) sees the diary's figures; anyone else gets
+  `toTake: true|false` in place of `take`, and the app shows Take payment
+  (and Mark paid, Paid in cash) **disabled with why**, never hidden.
+  Guarded by `organizations/money-by-permission.spec.ts` (API) and
+  `lib/organizations/money-by-permission.test.ts` (app).
+- **Current** (DEC-106, 2026-10-07) — **Storefront roles follow permissions
+  for money too.** A storefront Admin, Manager or Editor still takes and
+  changes its storefront's orders (DEC-048), but recording or taking a
+  payment, refunding or cancelling, and reading the store-scoped lists that
+  send amounts are asked of the business role's permissions only —
+  `StoresService.moneyAllows`, and `orderWriteOrganization(…, { money })`,
+  which leaves before the storefront-role fallback (`order:refund` always
+  does). With ORG_AUTHORIZATION off the storefront's owner keeps it; on the
+  organization path a `StoreOwner` row is no shortcut. Refused in Order
+  Detail's words ("Your role can't record payments — …"). A storefront role
+  that should take payments needs a business role carrying `order:edit`.
+  Guarded by the same two scans.
 - **Adopted** — **No money figures without a money read** (ADR-008). Stats,
   takings, fees and payouts go only to a role that may read that money
   (`payment:read`, `invoice:read`, `subscription:read`); the API omits them,
@@ -132,6 +157,9 @@ what the API allows.
   routes are `member:read` / `member:invite` / `member:role:update` /
   `member:remove`, plus `POST /organization-invitations/:token/accept`, which
   runs on the session alone because the caller is not a member yet.
+  Accepting stores the role as invited — a built-in, or a role the business
+  made while it still exists (else MEMBER) — never the built-in it maps to
+  (UX-004, `invite-custom-role.db.spec.ts`).
 - **Current** (F19) — **Granting is bounded by reach.** Nobody gives a role a
   permission they don't hold, or changes, renames or removes a role that can
   already do more than they can — their own role included. Members (who can
@@ -159,7 +187,19 @@ what the API allows.
   or removing someone also counts their extras; moving someone to Reviewer
   drops their non-review extras. Each change writes
   `membership.extras.update` (given and taken, keys and labels), which
-  Settings › Activity reads as "gave Ravi Refund orders".
+  Settings › Activity reads as "gave Ravi Refund orders". Giving an extra
+  asks the plan's `roles` row ("Custom roles", UX-030; Pro only, DEC-099) —
+  taking one away never does. So does giving an invented role a permission
+  it didn't have; taking one away or renaming never asks.
+- **Current** (DEC-105) — **Seats follow permissions, never role names.**
+  `billing/seats.ts` decides who uses a team seat: anyone whose role and
+  extras hold a permission outside `VIEW_ONLY_ACTIONS` (every `…:read`,
+  `customer:sensitive`, `order:export`, `site:comment`, `site:approve`), or
+  who takes bookings (an ACTIVE `StaffMember`). Everyone else is view-only
+  and counts toward the `reviewers` row ("View-only people"). Metering,
+  inviting, changing a role, giving an extra and re-permissioning a role all
+  classify through it, and the member, invitation and role views carry
+  `usesSeat` so Team never guesses from a key.
 - **Current** (F16, DEC-048) — **A storefront's people are on the team.**
   Accepting a storefront invite (`members/members.service.ts`) also makes a
   `Membership` in the store's business, in the same transaction, in the
@@ -215,6 +255,96 @@ orgId)` (`organizations/organization-kind.ts`).
 - **Current** — **Three control planes, never conflated** (ADR-003): feature flags
   are Saroh's rollout, entitlements are what a plan permits, modules are what an
   Organization has chosen.
+- **Current** (plans catalogue U5, U12) — **Access is read from the pricing
+  catalogue, in one place.** `CatalogueAccessService.resolve` (billing)
+  turns a business's subscription (or a due pending move, or Free) into
+  plan@version, applies its live overrides — a `plan` override first (how
+  grandfathering works), then remove, grant, limit, raise — and its add-ons
+  (`resolveAccess`, `@saroh/pricing-catalog`). `EntitlementService` reads
+  its limit map (`check`, `can`), module availability its registry step
+  after the rollout gate, behind the `PLAN_ENFORCEMENT` kill switch, and
+  `GET …/billing/access` its rows. A legacy `business`/`pro` subscriber
+  reads as Grow and keeps its own row for the keys no catalogue row sells,
+  so it never resolves as Free; a business with no subscription row and no
+  plan override reads `FREE_ENTITLEMENTS` until the backfills reach it
+  (`docs/architecture/PRICING_ROLLOUT.md`). Never read `Plan.entitlements`
+  directly for access.
+- **Current** (plans catalogue U13) — **A plan limit is checked where the
+  write happens, behind the kill switch.** A write that adds a metered
+  thing calls `planMeter.roomInTx(tx, org, row)` on its own transaction
+  before writing (or `withRoom` when it had no transaction, `assertRoom`
+  when it can't share one), and a write a switch row governs calls
+  `planMeter.assertIncluded(org, row)` (`billing/metering.service.ts`).
+  Off (`PLAN_ENFORCEMENT`), neither reads anything nor opens a
+  transaction. On, a business off the catalogue is never refused, and a
+  plan that can't be read lets the write through (logged,
+  `plan_meter_unresolved`). The refusals are 403 with `details.code`
+  `PLAN_LIMIT_REACHED` (with the limit, the count, `upgradeTo` and the
+  design's notice) or `MODULE_LOCKED`; the booking page gets 409
+  `BOOKINGS_PAUSED`, which names no plan. What each limit counts is
+  `billing/metering.ts`, the one place: orders and bookings that stand
+  (never an unpaid online checkout or a pay-now hold; bookings only those
+  customers made on the site, `Booking.bookedOnline` — the team's own are
+  never capped, and the booking page reads `paused` before its form,
+  DEC-095), in the business's
+  month in its zone (many businesses at once: `billing/metering-across.ts`,
+  the same rules). The site's checkout is never refused (a soft cap,
+  OQ-8); a payment once captured never is (OQ-7). A catalogue cell marked
+  `soft` (storage, site visits) is soft wherever it's checked — counted and
+  told, never refused — whatever the call site passes. Websites (`sites`)
+  and places customers visit (`locations` → `shopLocations`, metered when a
+  storefront's kind becomes SHOP) are the catalogue's where `enforcedRow`
+  answers for the row; elsewhere the old one-website and `storefronts`
+  floor (`LEGACY_FLOOR_ENTITLEMENTS`) still applies, so nothing new locks
+  behind the switch. Team members never count a Reviewer, so moving
+  someone off Reviewer is metered. Over after a downgrade,
+  existing things stay readable and editable; only adding is refused. A
+  new write that adds a metered thing, or a new switch row, gets its call
+  and a row in `billing/plan-limits.db.spec.ts`.
+- **Current** (plan shape of 5 Oct) — **A plan without online payments
+  stops new money online, never what a business already has.** The
+  `payments` and `subscriptions` rows (registry PAYMENTS) are asked where a
+  new online payment or subscription starts, through
+  `billing/online-payments-plan.ts`: a first provider connection, a pay
+  link that charges (invoice, order, booking), a workspace intent, the
+  site's checkout (`checkoutReadiness`: online off, so it takes payment at
+  the handover instead — "Free takes money offline", 2026-10-06), the
+  booking page,
+  packs, plan joins, and subscribing someone. The business hears 403
+  `MODULE_LOCKED`; a customer hears 409 `NOT_PAID_ONLINE` naming no plan.
+  Renewals never ask: the renewal and charge jobs, a renewal invoice's pay
+  link and pay page (`subscriptionId` set), autopay on it, and re-entering a
+  connected provider's keys all go on. PAYMENTS itself stays available
+  (`PLAN_LOCKS_ACTIONS_ONLY`), since it holds refunds, renewals and
+  invoices; invoicing has no registry and needs none (DEC-070).
+  `billing/online-payments-plan.db.spec.ts`.
+- **Current** (6 Oct 2026, "Online needs a paid plan; Free takes money
+  offline") — **Check an online-money feature where it is configured, never
+  at the customer's moment.** A feature that takes money online is set up
+  only on a plan with the `payments` row, and the check sits on the write
+  that sets it up (403 `MODULE_LOCKED`). Nothing a business set up may
+  become unbookable or unbuyable after a downgrade: the customer's side
+  quietly falls back to the offline way and keeps the stored setting for an
+  upgrade. Deposits are the first (`bookings/deposit-plan.ts`): setting a
+  service's `depositMode` to anything but NONE needs the row (NONE, or the
+  deposit it already has, never asks, so the editor's full-form save keeps
+  working); whenever the business can't take money online — that plan,
+  Payments off, or no provider (`takesOnlinePayment`, the one predicate) —
+  the booking page serves no `depositCents` and books the service "pay at
+  the desk", with the stored deposit untouched. Staff bookings never ask. The app locks the control
+  with the way up (`depositLock`). `bookings/deposit-plan.db.spec.ts`.
+  Memberships are the second (`subscriptions/plan-writes.ts`,
+  `plan-drafts.ts`): creating a membership plan, starting or publishing a
+  draft and selling an archived plan again need the `subscriptions` and
+  `payments` rows (`assertPlanStartsSubscriptions`). Changing a plan's
+  wording (also publishing a live plan's changes), archiving, discarding
+  and deleting a draft never ask, so a downgraded business tidies up. A
+  membership has no offline fallback on the site, so there the plan
+  **leaves the site**: `public-plans` answers no plans and `offered: false`
+  (no card, no "Ask about joining"); the editor's canvas says why. Members
+  already on a plan keep renewing; staff can't add new ones (`subscribe`).
+  The app swaps "New plan" for the notice and drops "Sell again"
+  (`membershipPlansLock`). `subscriptions/membership-plan-lock.db.spec.ts`.
 - **Current** (DEC-068) — **Turning a module on creates its minimum in the
   switch's own transaction.** `PUT …/modules/:key { status: "ENABLED", setup }`
   checks `module:manage` and then the action for each thing it creates
@@ -253,7 +383,8 @@ orgId)` (`organizations/organization-kind.ts`).
   a Platform Owner whose ownership does not expire.
 - **Current** — **Cross-tenant reads live only behind the admin guards** (plan
   D2). The admin services (`admin-organizations`, `admin-people`,
-  `admin-machinery`, `admin-waitlist`, `admin-metrics`) read across every
+  `admin-machinery`, `admin-waitlist`, `admin-metrics`, and the pricing
+  catalogue's `ImpactService`) read across every
   business with no organization context, so the `org_isolation` policies take
   their permissive branch. Each says **CROSS-TENANT READ** in its doc comment,
   returns what decides whether to act — never a business's customers, orders

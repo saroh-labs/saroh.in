@@ -9,6 +9,7 @@ import {
     deselectProjectModuleAction,
     selectProjectModuleAction,
 } from "@/lib/modules/actions";
+import { refusalSentence } from "@/lib/modules/blocker-copy";
 import type { ModuleView } from "@/lib/modules/schema";
 
 /**
@@ -64,7 +65,7 @@ function ProjectModuleRow({
                         : `${module.label} removed from this project`,
                 );
             } else {
-                showError(result.error);
+                showError(refusalSentence(result));
             }
         });
     };

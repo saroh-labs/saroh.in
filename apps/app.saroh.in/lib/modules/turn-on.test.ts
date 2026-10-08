@@ -433,9 +433,7 @@ describe("after it is on", () => {
         const pay = turnOnPlan({ picked: ["PAYMENTS"], modules: allOff });
         expect(landingHref(["PAYMENTS"], pay, d)).toBe(PROVIDERS_HREF);
         d.connect.PAYMENTS = false;
-        expect(landingHref(["PAYMENTS"], pay, d)).toBe(
-            "/billing/subscriptions",
-        );
+        expect(landingHref(["PAYMENTS"], pay, d)).toBe("/billing");
         const comms = turnOnPlan({
             picked: ["COMMUNICATIONS"],
             modules: allOff,
@@ -496,6 +494,8 @@ describe("decoding setup-defaults", () => {
             hidden: false,
             read: false,
             template: null,
+            templates: [],
+            kind: null,
         });
     });
 
@@ -524,5 +524,62 @@ describe("decoding setup-defaults", () => {
         expect(decodeSetupDefaults("COMMERCE", { setup: {} }).template).toBe(
             null,
         );
+    });
+
+    it("reads the templates the Website step may offer, and the kind (U12)", () => {
+        const read = decodeSetupDefaults("WEBSITE", {
+            setup: { siteName: "Rye", address: "rye" },
+            template: { id: "starter", name: "Starter" },
+            templates: [
+                {
+                    id: "bakery",
+                    name: "Bakery",
+                    kinds: ["food"],
+                    uses: ["COMMERCE"],
+                },
+                { id: "starter", name: "Starter", kinds: [], uses: [] },
+            ],
+            kind: "BUSINESS",
+        });
+        expect(read.templates.map((t) => t.id)).toEqual(["bakery", "starter"]);
+        expect(read.kind).toBe("BUSINESS");
+        // A list it can't read offers no choice, and the sheet still opens.
+        const odd = decodeSetupDefaults("WEBSITE", {
+            setup: {},
+            templates: "all of them",
+        });
+        expect(odd.read).toBe(true);
+        expect(odd.templates).toEqual([]);
+    });
+
+    it("sends a template only when one was chosen in the sheet", () => {
+        const draft = draftFrom([]);
+        expect(setupFor("WEBSITE", draft)).not.toHaveProperty("templateId");
+        draft.WEBSITE.templateId = "bakery";
+        expect(setupFor("WEBSITE", draft)).toMatchObject({
+            templateId: "bakery",
+        });
+    });
+});
+
+describe("finishSetupItems on a plan that won't let it connect (UX-006)", () => {
+    const comms = {
+        key: "COMMUNICATIONS",
+        label: "Communications",
+        lifecycle: "ENABLED" as const,
+        readiness: "SETUP_REQUIRED" as const,
+        selectedForProject: false,
+        canManage: true,
+        dependencies: [],
+        blockers: [{ code: "COMMUNICATIONS_NO_PROVIDER" }],
+    };
+
+    it("Free: connecting a provider isn't setup left", () => {
+        expect(finishSetupItems([comms], () => true)).toEqual([]);
+    });
+
+    it("Grow: it still is", () => {
+        expect(finishSetupItems([comms], () => false)).toHaveLength(1);
+        expect(finishSetupItems([comms])).toHaveLength(1);
     });
 });

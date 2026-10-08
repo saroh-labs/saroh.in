@@ -19,6 +19,16 @@ import { SiteNav } from "./site-nav";
  */
 let pathname = "/";
 vi.mock("next/navigation", () => ({ usePathname: () => pathname }));
+/** The site's launch switch (plan KTD-16): Pricing shows once it's open. */
+const launch = vi.hoisted((): { mode: "waitlist" | "open" } => ({
+    mode: "waitlist",
+}));
+vi.mock("@/lib/links", async (importOriginal) => ({
+    ...(await importOriginal<Record<string, unknown>>()),
+    get LAUNCH_MODE() {
+        return launch.mode;
+    },
+}));
 vi.mock("next/link", () => ({
     default: ({
         href,
@@ -70,10 +80,18 @@ describe("SiteNav", () => {
         ).toBeNull();
     });
 
-    it("has no Pricing link: Pricing isn't published yet", () => {
+    it("on /pricing, marks Pricing as the page, once the launch switch is open", () => {
+        launch.mode = "open";
+        pathname = "/pricing";
         render(<SiteNav />);
-        expect(screen.queryAllByRole("link", { name: "Pricing" })).toEqual([]);
-        expect(document.querySelector('a[href^="/pricing"]')).toBeNull();
+        const pricing = screen.getAllByRole("link", { name: "Pricing" })[0];
+        expect(pricing.getAttribute("aria-current")).toBe("page");
+        launch.mode = "waitlist";
+    });
+
+    it("draws no Pricing link before launch: it would only bounce to the waitlist", () => {
+        render(<SiteNav />);
+        expect(screen.queryByRole("link", { name: "Pricing" })).toBeNull();
     });
 
     it("Features opens a menu of eight, focused on the first", () => {
@@ -134,6 +152,85 @@ describe("SiteNav", () => {
         expect(starts.length).toBeGreaterThan(0);
         expect(starts[0].getAttribute("href")).toBe("/waitlist?src=nav");
         expect(desktop()).toBeTruthy();
+    });
+});
+
+/** The Resources menu the server would pass on 17 Oct: Help, Integrations, Changelog. */
+const RESOURCES = [
+    { name: "Help", line: "Answers.", href: "/help" },
+    { name: "Integrations", line: "Connect.", href: "/integrations" },
+    { name: "Changelog", line: "What's new.", href: "/changelog" },
+];
+
+describe("SiteNav: Resources (plan U1)", () => {
+    it("has no Resources menu while no Resources page is live", () => {
+        render(<SiteNav />);
+        expect(screen.queryAllByRole("button", { name: /^Resources/ })).toEqual(
+            [],
+        );
+    });
+
+    it("opens by keyboard on its first item; arrows move; Escape closes to its button", () => {
+        render(<SiteNav resources={RESOURCES} />);
+        const resources = button("Resources");
+        resources.focus();
+        // A <button>: Enter and Space click it.
+        fireEvent.click(resources);
+        expect(resources.getAttribute("aria-expanded")).toBe("true");
+        const menu = screen.getByRole("menu", { name: "Resources" });
+        const items = screen.getAllByRole("menuitem");
+        expect(items.map((i) => i.getAttribute("href"))).toEqual([
+            "/help",
+            "/integrations",
+            "/changelog",
+        ]);
+        expect(document.activeElement).toBe(items[0]);
+        fireEvent.keyDown(items[0], { key: "ArrowDown" });
+        expect(document.activeElement).toBe(items[1]);
+        fireEvent.keyDown(items[1], { key: "ArrowUp" });
+        fireEvent.keyDown(items[0], { key: "ArrowUp" });
+        expect(document.activeElement).toBe(items[2]);
+        expect(menu).toBeTruthy();
+
+        fireEvent.keyDown(document, { key: "Escape" });
+        expect(screen.queryByRole("menu")).toBeNull();
+        expect(resources.getAttribute("aria-expanded")).toBe("false");
+        expect(document.activeElement).toBe(resources);
+    });
+
+    it("on a changelog entry, underlines Resources", () => {
+        pathname = "/changelog/saroh-is-open";
+        render(<SiteNav resources={RESOURCES} />);
+        expect(button("Resources").className).toContain("decoration-brand-500");
+        expect(button("Features").className).not.toContain(
+            "decoration-brand-500",
+        );
+    });
+
+    it("on /changelog, the menu marks Changelog as the page", () => {
+        pathname = "/changelog";
+        render(<SiteNav resources={RESOURCES} />);
+        fireEvent.click(button("Resources"));
+        expect(
+            screen
+                .getByRole("menuitem", { name: /^Changelog/ })
+                .getAttribute("aria-current"),
+        ).toBe("page");
+    });
+
+    it("the phone sheet has Resources, open on a Resources page", () => {
+        pathname = "/changelog";
+        render(<SiteNav resources={RESOURCES} />);
+        fireEvent.click(screen.getByRole("button", { name: "Menu" }));
+        const sheet = screen.getByRole("dialog", { name: "Menu" });
+        const row = screen
+            .getAllByRole("button", { name: /^Resources/ })
+            .find((b) => sheet.contains(b));
+        expect(row?.getAttribute("aria-expanded")).toBe("true");
+        const links = Array.from(
+            sheet.querySelectorAll("#nav-sheet-resources a"),
+        ).map((a) => a.getAttribute("href"));
+        expect(links).toEqual(["/help", "/integrations", "/changelog"]);
     });
 });
 

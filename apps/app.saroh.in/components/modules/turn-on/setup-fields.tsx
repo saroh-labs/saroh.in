@@ -9,7 +9,11 @@ import { useId } from "react";
 import type { TurnOnDraft } from "@/lib/modules/turn-on";
 import { tidyAddress } from "@/lib/modules/turn-on";
 import type { FieldErrors } from "@/lib/modules/turn-on-errors";
-import type { Fulfilment } from "@/lib/modules/turn-on-schema";
+import type {
+    Fulfilment,
+    WebsiteTemplateChoice,
+} from "@/lib/modules/turn-on-schema";
+import { usesLine } from "@/lib/sites/template-picker";
 
 import { Field, INPUT } from "./field";
 
@@ -146,7 +150,8 @@ export function SellFields({
  * `.saroh.app` it lives on shown beside what is typed. An address that is
  * taken or reserved comes back from the API on the field. Below them, the
  * template the new site starts from, which follows what is being set up
- * (DEC-070, K15): said, not asked.
+ * (DEC-070, K15): said, and when other templates suit the business (U12),
+ * a short choice of them, the kind's picked to start with.
  */
 export function WebsiteFields({
     draft,
@@ -154,6 +159,7 @@ export function WebsiteFields({
     errors,
     suggestion = null,
     template = null,
+    choices = [],
 }: {
     draft: TurnOnDraft;
     update: Update;
@@ -162,6 +168,8 @@ export function WebsiteFields({
     suggestion?: string | null;
     /** The template a new site starts from; null says nothing. */
     template?: { id: string; name: string } | null;
+    /** The templates suggested for the business, the kind's first. */
+    choices?: readonly WebsiteTemplateChoice[];
 }) {
     const id = useId();
     const w = draft.WEBSITE;
@@ -248,13 +256,78 @@ export function WebsiteFields({
                     Use {suggestion}.saroh.app
                 </button>
             ) : null}
-            {template ? (
+            {template && choices.length > 1 ? (
+                <TemplateChoice
+                    choices={choices}
+                    value={w.templateId ?? template.id}
+                    onChange={(templateId) =>
+                        update((d) => ({
+                            ...d,
+                            WEBSITE: { ...d.WEBSITE, templateId },
+                        }))
+                    }
+                />
+            ) : template ? (
                 <p className="text-[12.5px] leading-normal text-muted-foreground">
                     Starts from the {template.name} template. Change its pages
                     any time.
                 </p>
             ) : null}
         </>
+    );
+}
+
+/**
+ * Which template the new site starts from (U12): the few suggested for the
+ * business, each with what it uses. The rest are a site's to change later,
+ * page by page.
+ */
+function TemplateChoice({
+    choices,
+    value,
+    onChange,
+}: {
+    choices: readonly WebsiteTemplateChoice[];
+    value: string;
+    onChange: (id: string) => void;
+}) {
+    const id = useId();
+    return (
+        <div className="grid min-w-0 gap-2">
+            <span id={`${id}-label`} className="text-[13px] font-medium">
+                Starts from
+            </span>
+            <RadioGroup
+                aria-labelledby={`${id}-label`}
+                value={value}
+                onValueChange={onChange}
+                className="grid min-w-0 gap-2"
+            >
+                {choices.map((c) => {
+                    const uses = usesLine(c);
+                    return (
+                        <label
+                            key={c.id}
+                            htmlFor={`${id}-${c.id}`}
+                            className="flex min-w-0 cursor-pointer items-center gap-2.5 rounded-[9px] border border-border px-3 py-2 text-[13px] transition-colors duration-fast hover:bg-muted/60 active:bg-accent-active coarse:min-h-11"
+                        >
+                            <RadioGroupItem id={`${id}-${c.id}`} value={c.id} />
+                            <span className="min-w-0 font-medium">
+                                {c.name}
+                            </span>
+                            {uses ? (
+                                <span className="ml-auto min-w-0 truncate text-[12px] text-muted-foreground">
+                                    {uses}
+                                </span>
+                            ) : null}
+                        </label>
+                    );
+                })}
+            </RadioGroup>
+            <p className="text-[12.5px] leading-normal text-muted-foreground">
+                Change its pages any time.
+            </p>
+        </div>
     );
 }
 

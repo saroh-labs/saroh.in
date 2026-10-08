@@ -1,10 +1,12 @@
-// @covers web:/ web:/features web:/solutions web:/waitlist web:/api/waitlist api:waitlist
+// @covers web:/ web:/features web:/solutions web:/pricing web:/pricing/draft web:/pricing/preview web:/waitlist web:/api/waitlist web:/api/revalidate api:waitlist api:pricing
+// @covers web:/integrations pkg:integrations
 import { createRequire } from "node:module";
 
 import AxeBuilder from "@axe-core/playwright";
 import type { APIRequestContext, Page, TestInfo } from "@playwright/test";
 import { expect, test } from "@playwright/test";
 
+import { expectNothingHiddenSideways } from "../fixtures/hidden-sideways";
 import { stamp } from "../fixtures/own-data";
 import { urls } from "../playwright.config";
 
@@ -20,12 +22,12 @@ import { urls } from "../playwright.config";
  * - The nav menus open and close by keyboard, desk and phone.
  * - The waitlist form refuses what it should and takes a join through to
  *   the API (its own address, stamped, so it runs beside everything else).
- * - Pricing isn't published (Gate W): no page links to `/pricing`, names
- *   "Compare every plan" or draws a plan card, and `/pricing` itself is a
- *   temporary redirect to the waitlist.
+ * - Pricing's switches work, whether or not the stack has a catalogue
+ *   (no catalogue: the placeholder, and no switches). No figure is read.
  * - Every internal link on every page answers 200, or one 301 to a 200;
  *   every redirect in `apps/saroh.in/redirects.js` lands in one hop; the
- *   sitemap lists exactly the indexable pages and robots.txt keeps out
+ *   sitemap lists the indexable pages (plus published Resources pages)
+ *   and robots.txt keeps out
  *   the API.
  *
  * - No page loads Google Analytics: the tag is production's alone, so a
@@ -52,18 +54,58 @@ const FEATURES = [
 const SOLUTIONS = ["shops", "gyms", "clinics"];
 
 /** The pages a search engine should find, in the launch mode the stack runs (waitlist). */
+/**
+ * Whether this stack's site is built with the launch switch open
+ * (`NEXT_PUBLIC_LAUNCH_MODE`, plan KTD-16). Before launch, Pricing waits at
+ * the waitlist (Gate W) and isn't indexed.
+ */
+const OPEN = process.env.NEXT_PUBLIC_LAUNCH_MODE === "open";
+
 const INDEXED = [
     "/",
+    ...(OPEN ? ["/pricing"] : []),
     ...FEATURES.map((s) => `/features/${s}`),
     ...SOLUTIONS.map((s) => `/solutions/${s}`),
     "/waitlist",
 ];
 
-/** Every page a visitor can land on. */
-const PAGES = INDEXED;
+/**
+ * The Resources pages (plan U1) the sitemap lists once each is published
+ * and built (`apps/saroh.in/content/resources.ts`): which ones depends on
+ * the day and on which routes have landed, so the sitemap may list these on
+ * top of INDEXED, and nothing else. `resources.spec.ts` checks them.
+ */
+const RESOURCE_PREFIXES = [
+    "/changelog",
+    "/help",
+    "/integrations",
+    "/tools/",
+    "/privacy",
+    "/terms",
+    "/refunds",
+    // The gallery and each template's page (`lib/site-pages.ts`), listed
+    // with /templates once it is published (17 Oct, or RESOURCES_PREVIEW=1).
+    "/templates",
+];
+
+/**
+ * The Integrations provider pages (Resources plan U3): every check runs on
+ * them; the sitemap lists them through RESOURCE_PREFIXES.
+ */
+const INTEGRATIONS = ["razorpay", "cashfree", "email"];
+
+/** Every page a visitor can land on: the indexed ones, the integrations, and the pricing draft (no preview cookie: "ended"). */
+const PAGES = [
+    ...INDEXED,
+    "/pricing/draft",
+    ...[
+        "/integrations",
+        ...INTEGRATIONS.map((s) => `/integrations/${s}`),
+    ].filter((p) => !INDEXED.includes(p)),
+];
 
 /** Kept out of search: robots.txt disallows each. */
-const NOT_INDEXED = ["/api/"];
+const NOT_INDEXED = ["/api/", "/pricing/draft", "/pricing/preview"];
 
 interface Redirect {
     source: string;
@@ -71,9 +113,9 @@ interface Redirect {
     statusCode: number;
 }
 // The site's own list, so a redirect added there is checked here too.
-const { REDIRECTS, TEMPORARY } = createRequire(__filename)(
+const { REDIRECTS } = createRequire(__filename)(
     "../../apps/saroh.in/redirects.js",
-) as { REDIRECTS: Redirect[]; TEMPORARY: Redirect[] };
+) as { REDIRECTS: Redirect[] };
 
 /** WCAG 2.0–2.2 A and AA, and axe's best practices (heading order, unique landmarks). */
 const AXE_TAGS = [
@@ -168,6 +210,8 @@ test.describe("every page", () => {
                         { message: `${path} at ${width}` },
                     )
                     .toEqual({ inner: width, scroll: width });
+                // Nor anything inside main hiding sideways (audit T10).
+                await expectNothingHiddenSideways(page);
             }
         });
     }
@@ -355,36 +399,57 @@ test.describe("waitlist", () => {
     });
 });
 
-test.describe("no pricing yet", () => {
-    test("no page links to /pricing or shows a plan", async ({ page }) => {
-        for (const path of PAGES) {
-            await page.goto(`${WEB}${path}`);
-            // The page is drawn before anything is said to be missing.
-            await expect(
-                page.locator("main, [role=main]").first(),
-            ).toBeVisible();
-            await expect(
-                page.locator(
-                    'a[href^="/pricing"], a[href*="saroh.in/pricing"]',
-                ),
-                `${path} links to /pricing`,
-            ).toHaveCount(0);
-            await expect(
-                page.locator("[data-plan]"),
-                `${path} draws a plan card`,
-            ).toHaveCount(0);
-            await expect(page.locator("#pricing")).toHaveCount(0);
-            await expect(page.getByText("Compare every plan")).toHaveCount(0);
-        }
-    });
-
-    test("/pricing is a temporary redirect to the waitlist", async ({
+test.describe("pricing", () => {
+    test("before launch, Pricing waits at the waitlist (Gate W)", async ({
         request,
-    }, testInfo) => {
-        test.skip(!isDesk(testInfo), "HTTP only; once is enough");
-        const res = await head(request, `${WEB}/pricing`);
+    }) => {
+        test.skip(OPEN, "the launch switch is open: Pricing is published");
+        const res = await request.get(`${WEB}/pricing`, { maxRedirects: 0 });
+        // Temporary, so nothing remembers it: Pricing comes back at launch.
         expect(res.status()).toBe(302);
         expect(new URL(res.headers().location, WEB).pathname).toBe("/waitlist");
+    });
+
+    test("the switches work, or the placeholder shows without them", async ({
+        page,
+    }) => {
+        test.skip(!OPEN, "Pricing is published when the launch switch opens");
+        await page.goto(`${WEB}/pricing`);
+        const plans = page.getByRole("region", { name: "Plans" });
+        await expect(plans.locator("[data-plan]").first()).toBeVisible();
+        const billing = plans.getByRole("radiogroup", { name: "Billing" });
+        const gst = plans.getByRole("checkbox", {
+            name: "Show prices with GST",
+        });
+
+        if ((await billing.count()) === 0 && (await gst.count()) === 0) {
+            // No catalogue on this stack: names and the placeholder only.
+            await expect(
+                page.getByText("Pricing announced at launch").first(),
+            ).toBeVisible();
+            return;
+        }
+
+        if (await billing.count()) {
+            const monthly = billing.getByRole("radio").first();
+            const yearly = billing.getByRole("radio").last();
+            await expect(monthly).toHaveAttribute("aria-checked", "true");
+            await yearly.click();
+            await expect(yearly).toHaveAttribute("aria-checked", "true");
+            await expect(monthly).toHaveAttribute("aria-checked", "false");
+            // One tab stop; the arrows choose as they move.
+            await page.keyboard.press("ArrowLeft");
+            await expect(monthly).toHaveAttribute("aria-checked", "true");
+            await expect(monthly).toBeFocused();
+        }
+        if (await gst.count()) {
+            const was = await gst.isChecked();
+            await gst.click();
+            await expect(gst).toBeChecked({ checked: !was });
+            await page.keyboard.press("Space");
+            await expect(gst).toBeChecked({ checked: was });
+        }
+        await expect(plans.locator("[data-plan]").first()).toBeVisible();
     });
 });
 
@@ -422,7 +487,7 @@ test.describe("links, redirects and the sitemap", () => {
     }, testInfo) => {
         test.skip(!isDesk(testInfo), "HTTP only; once is enough");
         expect(REDIRECTS.length).toBeGreaterThan(0);
-        for (const r of [...REDIRECTS, ...TEMPORARY]) {
+        for (const r of REDIRECTS) {
             // A pattern gets a made-up value: it is the catch-all for slugs
             // that no longer exist.
             const source = r.source.replace(/:(\w+)/g, "no-such-$1");
@@ -446,7 +511,14 @@ test.describe("links, redirects and the sitemap", () => {
         ]
             .map((m) => new URL(m[1]).pathname)
             .sort();
-        expect(listed).toEqual([...INDEXED].sort());
+        expect(listed).toEqual(expect.arrayContaining(INDEXED));
+        const extra = listed.filter((p) => !INDEXED.includes(p));
+        expect(
+            extra.filter(
+                (p) => !RESOURCE_PREFIXES.some((r) => p.startsWith(r)),
+            ),
+            "only Resources pages beyond the fixed list",
+        ).toEqual([]);
         for (const path of listed) {
             expect((await head(request, `${WEB}${path}`)).status(), path).toBe(
                 200,
@@ -459,9 +531,19 @@ test.describe("links, redirects and the sitemap", () => {
                 `Disallow: ${path}`,
             );
         expect(robots).toMatch(/Sitemap: \S+\/sitemap\.xml/);
+
+        // The draft and its link say noindex themselves too.
+        const draft = await head(request, `${WEB}/pricing/draft`);
+        expect(draft.headers()["x-robots-tag"]).toContain("noindex");
+        const preview = await head(request, `${WEB}/pricing/preview`);
+        expect(preview.status()).toBe(303);
+        expect(preview.headers()["x-robots-tag"]).toContain("noindex");
+        expect(new URL(preview.headers().location, WEB).pathname).toBe(
+            "/pricing",
+        );
     });
 
-    test("the waitlist route refuses a join with no email", async ({
+    test("the site's API routes refuse what they should", async ({
         request,
     }, testInfo) => {
         test.skip(!isDesk(testInfo), "HTTP only; once is enough");
@@ -470,6 +552,9 @@ test.describe("links, redirects and the sitemap", () => {
             data: { business: "No address" },
         });
         expect(bad.status()).toBe(400);
+        // The revalidate hook wants its secret.
+        const hook = await request.post(`${WEB}/api/revalidate`);
+        expect(hook.status()).toBe(401);
     });
 });
 
@@ -489,4 +574,71 @@ test("no page loads Google Analytics outside production", async ({ page }) => {
         ).toHaveCount(0);
     }
     expect(gaRequests).toEqual([]);
+});
+
+test.describe("integrations", () => {
+    test("live cards link to their pages; planned rows never link", async ({
+        page,
+    }) => {
+        await openCollecting(page, "/integrations");
+        const main = page.locator("main");
+        for (const slug of INTEGRATIONS) {
+            await expect(
+                main.locator(`a[href="/integrations/${slug}"]`),
+            ).toHaveCount(1);
+        }
+        const planned = main.locator("section", {
+            has: page.getByRole("heading", {
+                name: "Planned · not available yet",
+            }),
+        });
+        await expect(planned.getByRole("listitem")).not.toHaveCount(0);
+        await expect(planned.locator("a")).toHaveCount(0);
+    });
+
+    for (const slug of INTEGRATIONS) {
+        test(`/integrations/${slug} walks its steps and never links to itself`, async ({
+            page,
+        }) => {
+            await openCollecting(page, `/integrations/${slug}`);
+            const main = page.locator("main");
+            await expect(main.getByRole("heading", { level: 1 })).toHaveCount(
+                1,
+            );
+            await expect(
+                main.locator(`a[href="/integrations/${slug}"]`),
+            ).toHaveCount(0);
+            const steps = main
+                .getByRole("list", { name: "Steps" })
+                .getByRole("button");
+            expect(await steps.count()).toBeGreaterThanOrEqual(3);
+            const current = main.locator('[aria-current="step"]');
+            await expect(current).toHaveCount(1);
+
+            // Each step, by click: it becomes the current one and its words show.
+            const count = await steps.count();
+            for (let i = 0; i < count; i++) {
+                await steps.nth(i).click();
+                await expect(steps.nth(i)).toHaveAttribute(
+                    "aria-current",
+                    "step",
+                );
+                const panel = page.locator(
+                    `#${await steps.nth(i).getAttribute("aria-controls")}`,
+                );
+                await expect(panel).toBeVisible();
+            }
+
+            // And by keyboard: Home, then Down, from the focused step.
+            await steps.nth(0).focus();
+            await page.keyboard.press("End");
+            await expect(steps.nth(count - 1)).toHaveAttribute(
+                "aria-current",
+                "step",
+            );
+            await expect(steps.nth(count - 1)).toBeFocused();
+            await page.keyboard.press("ArrowDown");
+            await expect(steps.nth(0)).toHaveAttribute("aria-current", "step");
+        });
+    }
 });

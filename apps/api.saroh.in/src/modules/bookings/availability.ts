@@ -535,12 +535,19 @@ export function personSlots(
     zone: string,
     from: Date,
     to: Date,
+    opening: OpeningHours | null = null,
 ): Slot[] {
     let windows = workingIntervals(person, zone, from, to);
     if (serviceRules.length > 0) {
         windows = intersectIntervals(
             windows,
             weeklyIntervals(serviceRules, service.timezone, from, to),
+        );
+    }
+    if (opening) {
+        windows = intersectIntervals(
+            windows,
+            openingIntervals(opening, from, to),
         );
     }
     return slotsInIntervals(
@@ -565,6 +572,7 @@ export function staffSlots(
     zone: string,
     from: Date,
     to: Date,
+    opening: OpeningHours | null = null,
 ): StaffSlot[] {
     const byStart = new Map<number, StaffSlot>();
     for (const person of people) {
@@ -575,6 +583,7 @@ export function staffSlots(
             zone,
             from,
             to,
+            opening,
         );
         for (const slot of slots) {
             const key = slot.startAt.getTime();
@@ -598,6 +607,7 @@ export function isPersonSlotStart(
     person: StaffAvailabilityInput,
     zone: string,
     startAt: Date,
+    opening: OpeningHours | null = null,
 ): boolean {
     const endAt = new Date(
         startAt.getTime() + service.durationMinutes * MINUTE,
@@ -609,5 +619,68 @@ export function isPersonSlotStart(
         zone,
         startAt,
         endAt,
+        opening,
     ).some((slot) => slot.startAt.getTime() === startAt.getTime());
+}
+
+// ── Opening hours (DEC-087) ────────────────────────────────────────────────
+//
+// A business with a walk-in storefront offers in-person bookings only while
+// it is open. Its storefronts' weeks together (a time is open when any of
+// them is) are weekly windows in the business's zone, like a person's hours.
+//
+// A person's hours are cut to them: their free starts step from the later
+// of the two starts, so a shop opening at 9 offers 9:00 even to someone in
+// from 8:15. A service's own times — a class's sessions above all — stay on
+// their own grid, and only the starts that fit wholly inside are kept, as a
+// closure keeps them (E3): a session never moves because the shop's hours
+// changed.
+
+/** When a business is open: its walk-in storefronts' weeks, together. */
+export interface OpeningHours {
+    /** The business's zone — opening times are wall-clock times in it. */
+    zone: string;
+    /** Weekly windows, every storefront's; overlaps are fine. */
+    windows: AvailabilityRuleWindow[];
+}
+
+/** The open times over `[from, to)` (padded a day either side), merged. */
+export function openingIntervals(
+    opening: OpeningHours,
+    from: Date,
+    to: Date,
+): Interval[] {
+    return mergeIntervals(
+        weeklyIntervals(opening.windows, opening.zone, from, to),
+    );
+}
+
+/** The slots that fit wholly inside opening hours; all of them with none. */
+export function insideOpening<T extends Interval>(
+    slots: T[],
+    opening: OpeningHours | null,
+): T[] {
+    if (!opening || slots.length === 0) return slots;
+    let from = slots[0].startAt;
+    let to = slots[0].endAt;
+    for (const slot of slots) {
+        if (slot.startAt < from) from = slot.startAt;
+        if (slot.endAt > to) to = slot.endAt;
+    }
+    const open = openingIntervals(opening, from, to);
+    return slots.filter((slot) =>
+        open.some(
+            (w) =>
+                w.startAt.getTime() <= slot.startAt.getTime() &&
+                w.endAt.getTime() >= slot.endAt.getTime(),
+        ),
+    );
+}
+
+/** Whether one booking fits wholly inside opening hours (always, with none). */
+export function isInsideOpening(
+    slot: Interval,
+    opening: OpeningHours | null,
+): boolean {
+    return insideOpening([slot], opening).length === 1;
 }

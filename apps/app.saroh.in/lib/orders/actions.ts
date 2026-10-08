@@ -1,8 +1,11 @@
 "use server";
 
+import { revalidatePath } from "next/cache";
+
 import type { CourierFields } from "./courier";
 import type {
     ChangeFulfilmentInput,
+    CounterPayment,
     EditOrderInput,
     MoveStageInput,
 } from "./kitchen-service";
@@ -13,6 +16,7 @@ import {
     editOrderBeforePreparing,
     markOrderVisitAttended,
     moveOrderStage,
+    recordOrderPayment,
     refundOrderLines,
     retryOrderRefund,
     saveOrderCourier,
@@ -31,7 +35,20 @@ export async function updateOrder(
     orderId: string,
     input: UpdateOrderInput,
 ): Promise<OrderResult> {
-    return updateOrderApi(storeId, orderId, input);
+    const res = await updateOrderApi(storeId, orderId, input);
+    // Record as paid / refunded / cancelled: the order page and the list
+    // read again in the same round trip, so the money panel isn't left
+    // saying "Still due" until a reload (UX-063).
+    if (res.ok) {
+        revalidatePath(`/commerce/orders/${orderId}`);
+        revalidatePath("/commerce/orders");
+    }
+    return res;
+}
+
+/** Same as updateOrder, for the kitchen's own writes. */
+function refreshOrder(orderId: string) {
+    revalidatePath(`/commerce/orders/${orderId}`);
 }
 
 /* One order's kitchen flow (ADR-008) — org-scoped; the API authorizes each. */
@@ -58,6 +75,12 @@ export async function editBeforePreparing(
     input: EditOrderInput,
 ) {
     return editOrderBeforePreparing(orderId, input);
+}
+
+export async function recordPayment(orderId: string, kind: CounterPayment) {
+    const res = await recordOrderPayment(orderId, kind);
+    if (res.ok) refreshOrder(orderId);
+    return res;
 }
 
 export async function refundLines(

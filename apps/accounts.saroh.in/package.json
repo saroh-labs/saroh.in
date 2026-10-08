@@ -1,39 +1,44 @@
 {
-  "name": "auth",
-  "version": "0.1.0",
-  "private": true,
-  "scripts": {
-    "dev": "portless accounts.saroh next dev",
-    "dev:app": "next dev",
-    "build": "next build",
-    "start": "next start",
-    "lint": "eslint .",
-    "typecheck": "tsc --noEmit"
-  },
-  "portless": "accounts.saroh",
-  "dependencies": {
-    "@saroh/auth": "workspace:*",
-    "@saroh/ui": "workspace:*",
-    "@t3-oss/env-nextjs": "^0.13.11",
-    "better-auth": "^1.6.26",
-    "lucide-react": "catalog:",
-    "next": "catalog:next16",
-    "react": "catalog:react19",
-    "react-dom": "catalog:react19",
-    "react-icons": "catalog:",
-    "zod": "catalog:"
-  },
-  "devDependencies": {
-    "@saroh/eslint-config": "workspace:*",
-    "@saroh/tailwind-config": "workspace:*",
-    "@types/node": "catalog:",
-    "@types/react": "19.2.15",
-    "@types/react-dom": "catalog:react19",
-    "autoprefixer": "catalog:",
-    "eslint": "catalog:",
-    "eslint-config-next": "catalog:",
-    "postcss": "catalog:",
-    "tailwindcss": "catalog:",
-    "typescript": "catalog:"
-  }
+    "name": "auth",
+    "version": "0.1.0",
+    "private": true,
+    "scripts": {
+        "dev": "portless accounts.saroh next dev",
+        "dev:app": "next dev",
+        "build": "next build",
+        "start": "next start",
+        "lint": "eslint .",
+        "typecheck": "tsc --noEmit",
+        "cf:build": "opennextjs-cloudflare build",
+        "cf:preview": "opennextjs-cloudflare preview",
+        "cf:deploy": "opennextjs-cloudflare deploy"
+    },
+    "portless": "accounts.saroh",
+    "dependencies": {
+        "@saroh/auth": "workspace:*",
+        "@saroh/ui": "workspace:*",
+        "@t3-oss/env-nextjs": "^0.13.11",
+        "better-auth": "^1.6.26",
+        "lucide-react": "catalog:",
+        "next": "catalog:next16",
+        "react": "catalog:react19",
+        "react-dom": "catalog:react19",
+        "react-icons": "catalog:",
+        "zod": "catalog:"
+    },
+    "devDependencies": {
+        "@opennextjs/cloudflare": "1.20.9",
+        "@saroh/eslint-config": "workspace:*",
+        "@saroh/tailwind-config": "workspace:*",
+        "@types/node": "catalog:",
+        "@types/react": "19.2.15",
+        "@types/react-dom": "catalog:react19",
+        "autoprefixer": "catalog:",
+        "eslint": "catalog:",
+        "eslint-config-next": "catalog:",
+        "postcss": "catalog:",
+        "tailwindcss": "catalog:",
+        "typescript": "catalog:",
+        "wrangler": "4.148.0"
+    }
 }

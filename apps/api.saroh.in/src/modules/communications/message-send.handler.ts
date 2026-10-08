@@ -1,18 +1,25 @@
-import { Inject, Injectable, Logger } from "@nestjs/common";
-import type { Job } from "@saroh/database";
+import { Inject, Injectable, Logger, Optional } from "@nestjs/common";
+import type { Job, Message } from "@saroh/database";
 import { prisma } from "@saroh/database";
 
+import { isKeysRefused } from "../../common/providers/provider-attention";
+import { IssuedInvoicePdf } from "../invoices/issued-invoice-pdf";
 import type { EncryptedSecret } from "../payments/crypto";
 import { decryptSecret } from "../payments/crypto";
 import { stampConfirmedEmail } from "./confirmation-stamp";
+import { flagCommsProvider } from "./provider-keys";
 import type {
+    CommsAttachment,
     CommsCredentials,
+    CommsProvider,
     CommsProviderFactory,
 } from "./providers/provider.port";
 import {
     COMMS_PROVIDER_FACTORY,
     isCommsChannel,
 } from "./providers/provider.port";
+import { SAROH_PROVIDER, SAROH_STOPPED, SAROH_UNKNOWN } from "./saroh-delivery";
+import { deliverThroughSaroh } from "./saroh-send";
 import { fillSecretLink, SECRET_LINK_SLOT } from "./transactional";
 
 /** The `type` this handler is registered under (matches the send producer). */
@@ -34,10 +41,41 @@ export interface MessageSendPayload {
      * back.
      */
     link?: EncryptedSecret;
+    /**
+     * Send the invoice's PDF with it (DEC-083): the message's own invoice,
+     * drawn here at send time and never stored. Only where the provider
+     * takes attachments; otherwise, or if it can't be drawn, the email goes
+     * with its link alone.
+     */
+    attach?: typeof INVOICE_PDF_ATTACHMENT;
 }
+
+/** The one attachment a message can ask for: its invoice's PDF. */
+export const INVOICE_PDF_ATTACHMENT = "INVOICE_PDF";
+
+/**
+ * The largest PDF sent as an attachment. The paper is a few hundred KB at
+ * most (its logo is capped at 2 MB by `invoice-pdf-logo.ts`); past this,
+ * the email goes with its link alone rather than risk a provider's or an
+ * inbox's limit.
+ */
+export const MAX_ATTACHMENT_BYTES = 5 * 1024 * 1024;
 
 /** Delivery states that are terminal-success — a re-run must NOT re-send. */
 const SENT_STATES = new Set(["SENT", "DELIVERED"]);
+
+/**
+ * A delivery withdrawn before its provider accepted it: a review invitation
+ * resent while an earlier send was queued or retrying (its token rotated, so
+ * the earlier link no longer works). The job skips it.
+ */
+export const CANCELLED_DELIVERY = "CANCELLED";
+
+/**
+ * A Saroh delivery's own terminal states (DEC-086): STOPPED never goes, and
+ * UNKNOWN may already have gone, so a re-run must not send either.
+ */
+const SAROH_TERMINAL_STATES = new Set([SAROH_STOPPED, SAROH_UNKNOWN]);
 
 /**
  * Consumer for the `message.send` job (S6-001): take a QUEUED Delivery and hand
@@ -71,11 +109,14 @@ export class MessageSendHandler {
     constructor(
         @Inject(COMMS_PROVIDER_FACTORY)
         private readonly factory: CommsProviderFactory,
+        // The invoice PDF for an invoice email (DEC-083); absent where a
+        // test builds the handler by hand, and then nothing is attached.
+        @Optional() private readonly invoicePdfs?: IssuedInvoicePdf,
     ) {}
 
     /** Bound {@link JobHandler} to register with the {@link JobHandlerRegistry}. */
     readonly handle = async (job: Job): Promise<void> => {
-        const { messageId, deliveryId, link } =
+        const { messageId, deliveryId, link, attach } =
             job.payload as unknown as MessageSendPayload;
 
         const delivery = await prisma.delivery.findUnique({
@@ -99,6 +140,23 @@ export class MessageSendHandler {
             );
             return;
         }
+        // Withdrawn before it went (a review invitation resent: its old
+        // link no longer works), so it never goes.
+        if (delivery.status === CANCELLED_DELIVERY) {
+            this.logger.log(
+                `message.send: delivery ${deliveryId} was cancelled; skipping.`,
+            );
+            return;
+        }
+        if (
+            delivery.provider === SAROH_PROVIDER &&
+            SAROH_TERMINAL_STATES.has(delivery.status)
+        ) {
+            this.logger.log(
+                `message.send: Saroh delivery ${deliveryId} already ${delivery.status}; skipping.`,
+            );
+            return;
+        }
 
         const message = await prisma.message.findUnique({
             where: { id: messageId },
@@ -116,6 +174,23 @@ export class MessageSendHandler {
                 message.id,
                 `unsupported channel "${message.channel}"`,
             );
+            return;
+        }
+
+        // Saroh sends it for a business with no email of its own (DEC-086):
+        // the route stamped when it was queued wins, so a provider connected
+        // since never sends it a second way.
+        if (delivery.provider === SAROH_PROVIDER) {
+            try {
+                if (await deliverThroughSaroh(delivery.id, message)) {
+                    await this.stamp(message);
+                }
+            } catch (err) {
+                if (job.attempts + 1 >= job.maxAttempts) {
+                    await this.sarohGaveUp(delivery.id, message.organizationId);
+                }
+                throw err;
+            }
             return;
         }
 
@@ -156,6 +231,11 @@ export class MessageSendHandler {
             providerRow.provider,
         );
 
+        const attachments =
+            attach === INVOICE_PDF_ATTACHMENT
+                ? await this.invoicePdf(message, provider, providerRow.provider)
+                : [];
+
         try {
             const { providerMessageId } = await provider.send({
                 to: message.toAddress,
@@ -163,6 +243,7 @@ export class MessageSendHandler {
                 subject: message.subject ?? undefined,
                 body,
                 credentials,
+                ...(attachments.length > 0 ? { attachments } : {}),
             });
 
             await prisma.delivery.update({
@@ -183,12 +264,36 @@ export class MessageSendHandler {
             // the failure, then re-throw so the worker retries with backoff.
             const reason = err instanceof Error ? err.message : "send failed";
             await this.recordFailure(delivery.id, message.id, reason);
+            // The provider refused the keys: the connection needs attention
+            // and the team hears of it once (UX-012).
+            if (isKeysRefused(err)) await this.flag(providerRow);
             throw err;
         }
 
-        // The email went: a confirmation proves the address (A14). The send
-        // is done either way, so a failure here is logged, never retried
-        // into a second email.
+        await this.stamp(message);
+    };
+
+    /** Mark the connection as needing attention; a failure here is only logged. */
+    private async flag(
+        row: Parameters<typeof flagCommsProvider>[0],
+    ): Promise<void> {
+        try {
+            await flagCommsProvider(row);
+        } catch (err) {
+            this.logger.warn(
+                `message.send: could not mark provider ${row.id} as needing attention (${
+                    err instanceof Error ? err.message : "unknown"
+                })`,
+            );
+        }
+    }
+
+    /**
+     * The email went: a confirmation proves the address (A14). The send is
+     * done either way, so a failure here is logged, never retried into a
+     * second email.
+     */
+    private async stamp(message: Message): Promise<void> {
         try {
             await stampConfirmedEmail(prisma, message, new Date());
         } catch (err) {
@@ -198,7 +303,74 @@ export class MessageSendHandler {
                 })`,
             );
         }
-    };
+    }
+
+    /**
+     * The invoice's PDF for its email (DEC-083), or nothing. Nothing when
+     * the provider doesn't take attachments (SMTP and SendGrid relays; see
+     * `email.provider.ts`), the invoice can't be drawn (gone, a draft, void)
+     * or the drawing fails or comes out too large: the email then goes as
+     * it always did, with its link to the invoice, and is never failed for
+     * the file. Drawn again on a retry; never stored.
+     */
+    private async invoicePdf(
+        message: Pick<Message, "id" | "organizationId" | "invoiceId">,
+        provider: CommsProvider,
+        providerName: string,
+    ): Promise<CommsAttachment[]> {
+        if (!message.invoiceId || !this.invoicePdfs) return [];
+        if (!provider.takesAttachments?.(providerName)) return [];
+        try {
+            const pdf = await this.invoicePdfs.draw(
+                message.organizationId,
+                message.invoiceId,
+            );
+            if (!pdf) return [];
+            if (pdf.file.length > MAX_ATTACHMENT_BYTES) {
+                this.logger.warn(
+                    `message.send: message ${message.id}'s invoice PDF is ${pdf.file.length} bytes; sent with its link alone.`,
+                );
+                return [];
+            }
+            return [
+                {
+                    fileName: pdf.fileName,
+                    contentType: "application/pdf",
+                    content: pdf.file,
+                },
+            ];
+        } catch (err) {
+            this.logger.warn(
+                `message.send: message ${message.id}'s invoice PDF couldn't be drawn (${
+                    err instanceof Error ? err.message : "unknown"
+                }); sent with its link alone.`,
+            );
+            return [];
+        }
+    }
+
+    /**
+     * The last attempt at a Saroh send ended with it still QUEUED (its
+     * switch couldn't be read each time, DEC-086): nothing more will try
+     * it, yet a QUEUED delivery counts against the business's allowance
+     * and nobody is told. Said once at WARN, by business only — never the
+     * address or the words — so someone can look.
+     */
+    private async sarohGaveUp(
+        deliveryId: string,
+        organizationId: string,
+    ): Promise<void> {
+        try {
+            const now = await prisma.delivery.findUnique({
+                where: { id: deliveryId },
+                select: { status: true },
+            });
+            if (now?.status !== "QUEUED") return;
+        } catch {
+            // Unreadable now too: it is most likely still QUEUED; say so.
+        }
+        this.logger.warn(`saroh_business_email_gave_up org=${organizationId}`);
+    }
 
     /** Mark the Delivery FAILED (+ sanitized error, attempts++) and Message FAILED. */
     private async recordFailure(

@@ -43,8 +43,15 @@ export function ViewerDate({
     iso,
     variant = "short",
     className,
+    timeZone: fixedZone,
 }: {
     iso: string;
+    /**
+     * A zone to write it in instead of the viewer's — the business's, for a
+     * date printed on a document such as an invoice's issue date (#836).
+     * Both sides know it, so server and client agree from the first paint.
+     */
+    timeZone?: string;
     /**
      * `heading` says "Today" / "Tomorrow" where it applies; `short` is a date;
      * `datetime` adds the time, for a timeline where the hour matters.
@@ -65,11 +72,12 @@ export function ViewerDate({
         | "monthYear";
     className?: string;
 }) {
-    const timeZone = useSyncExternalStore(
+    const viewerZone = useSyncExternalStore(
         subscribe,
         getTimeZone,
         getServerTimeZone,
     );
+    const timeZone = fixedZone ?? viewerZone;
 
     const text =
         variant === "moment"

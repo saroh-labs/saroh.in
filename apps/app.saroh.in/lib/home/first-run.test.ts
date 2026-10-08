@@ -5,6 +5,8 @@ import { INVOICE_JOB } from "@/lib/organizations/kind";
 
 import {
     firstRunJobs,
+    heldByPlan,
+    mayManageModules,
     mayWriteInvoices,
     onButNotOpen,
     sidebarName,
@@ -226,10 +228,12 @@ describe("mayWriteInvoices", () => {
         ).toBe(false);
     });
 
-    it("falls back to the built-in roles without them", () => {
-        expect(mayWriteInvoices({ role: "OWNER" })).toBe(true);
-        expect(mayWriteInvoices({ role: "ADMIN" })).toBe(true);
-        expect(mayWriteInvoices({ role: "MEMBER" })).toBe(false);
+    it("never reads the role's name: no permissions sent, none permitted (DEC-098)", () => {
+        expect(mayWriteInvoices({ role: "OWNER" })).toBe(false);
+        expect(mayWriteInvoices({ role: "ADMIN" })).toBe(false);
+        expect(
+            mayWriteInvoices({ role: "MEMBER", actions: ["invoice:write"] }),
+        ).toBe(true);
         expect(mayWriteInvoices(null)).toBe(false);
     });
 });
@@ -297,5 +301,39 @@ describe("onButNotOpen", () => {
                 }),
             ]),
         ).toBe(false);
+    });
+});
+
+describe("heldByPlan (#837)", () => {
+    const plan = { code: "ENTITLEMENT_REQUIRED" } as const;
+
+    it("is true when what is on is shut only by the plan", () => {
+        expect(
+            heldByPlan([
+                mod("COMMERCE", { lifecycle: "ENABLED", blockers: [plan] }),
+            ]),
+        ).toBe(true);
+    });
+
+    it("is false when nothing is on, or something else shuts it too", () => {
+        expect(heldByPlan([mod("COMMERCE", { blockers: [plan] })])).toBe(false);
+        expect(
+            heldByPlan([
+                mod("COMMERCE", {
+                    lifecycle: "ENABLED",
+                    blockers: [{ code: "UNAUTHORIZED" }, plan],
+                }),
+            ]),
+        ).toBe(false);
+    });
+});
+
+describe("mayManageModules", () => {
+    it("reads module:manage off the server's views", () => {
+        expect(mayManageModules([mod("CRM")])).toBe(true);
+        expect(mayManageModules([mod("CRM", { canManage: false })])).toBe(
+            false,
+        );
+        expect(mayManageModules([])).toBe(false);
     });
 });

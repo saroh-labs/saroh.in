@@ -24,8 +24,10 @@ import { SHOP_OFFLINE } from "./api";
 import type { BagDraft, BagPriced } from "./bag-sheet";
 import { BagSheet, EMPTY_DRAFT } from "./bag-sheet";
 import { bagCount, clearBag, onOpenBag, useBag } from "./bag-store";
+import type { OnlineStarted } from "./checkout-sheet";
 import {
     CheckoutPay,
+    OrderPlacedToPay,
     STANDING_POLL_MS,
     STANDING_POLL_TRIES,
 } from "./checkout-sheet";
@@ -48,7 +50,9 @@ import { readPendingCheckout, writePendingCheckout } from "./pending-checkout";
  * bag finds them as they were, and the same bag placed again is the same
  * order. A payment made but not yet confirmed when its sheet closes is
  * remembered (`pending-checkout.ts`) and asked about until the server
- * answers; the bag empties once the order is placed.
+ * answers; the bag empties once the order is placed. An order paid at the
+ * handover is placed when it starts: the bag empties, and the sheet says
+ * it is still to be paid.
  *
  * On a test release (DEC-071, T6) the bag is priced as usual, and
  * "Continue" stops there: in place of the sign-in sheet it says what the
@@ -59,7 +63,8 @@ type Step =
     | { kind: "closed" }
     | { kind: "bag" }
     | { kind: "sign-in"; then: StartCheckout }
-    | { kind: "pay"; started: CheckoutStarted }
+    | { kind: "pay"; started: OnlineStarted; request: StartCheckout }
+    | { kind: "placed"; started: CheckoutStarted; toPay: string }
     | { kind: "test-release"; priced: BagPriced };
 
 export interface ShopBagProps {
@@ -181,7 +186,25 @@ export function ShopBag({
         setBusy(false);
         if (result.ok) {
             setCustomer(who);
-            setStep({ kind: "pay", started: result.data });
+            const started = result.data;
+            if (started.payment === null) {
+                // Paid at the handover: placed already, nothing to pay now.
+                placed();
+                setStep({
+                    kind: "placed",
+                    started,
+                    toPay:
+                        request.fulfilment === "PICKUP"
+                            ? "Pay when you collect"
+                            : "Pay on delivery",
+                });
+                return;
+            }
+            setStep({
+                kind: "pay",
+                started: { ...started, payment: started.payment },
+                request,
+            });
             return;
         }
         if (result.reason === "signed-out") {
@@ -281,12 +304,22 @@ export function ShopBag({
                 onClose={() => setStep({ kind: "bag" })}
             />
 
+            {step.kind === "placed" ? (
+                <OrderPlacedToPay
+                    started={step.started}
+                    businessName={businessName}
+                    toPay={step.toPay}
+                    onClose={close}
+                />
+            ) : null}
+
             {step.kind === "pay" && customer ? (
                 <CheckoutPay
                     started={step.started}
                     api={api}
                     businessName={businessName}
                     customer={customer}
+                    delivery={step.request.address}
                     onPlaced={placed}
                     onConfirming={confirming}
                     onSettled={settled}

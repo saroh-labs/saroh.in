@@ -417,6 +417,10 @@ export function AddressPanel({
     const id = useId();
     const [url, setUrl] = useState("");
     const [alt, setAlt] = useState("");
+    // The address is opened as a picture before it is added (UX-082): a
+    // broken one says so here, not as a blank tile on the shop. A host that
+    // refuses to be shown elsewhere can still be added on purpose.
+    const [check, setCheck] = useState<"idle" | "checking" | "broken">("idle");
     // On only when the click will add: the address `mediaSrc` rebuilds
     // behind https://, which is what's stored.
     const safe = mediaSrc(url);
@@ -430,7 +434,10 @@ export function AddressPanel({
             <Input
                 id={`${id}-url`}
                 value={url}
-                onChange={(e) => setUrl(e.target.value)}
+                onChange={(e) => {
+                    setUrl(e.target.value);
+                    setCheck("idle");
+                }}
                 placeholder="https://images.example.com/photo.jpg"
                 className="font-mono text-[12px]"
                 aria-invalid={problem ? true : undefined}
@@ -448,25 +455,47 @@ export function AddressPanel({
                 id={`${id}-url-hint`}
                 className={cn(
                     "text-[12px]",
-                    problem ? "text-destructive" : "text-muted-foreground",
+                    problem || check === "broken"
+                        ? "text-destructive"
+                        : "text-muted-foreground",
                 )}
             >
-                {problem ?? "The shop shows it from that address."}
+                {problem ??
+                    (check === "broken"
+                        ? "That address didn't open as a picture. Check it, or upload the photo instead."
+                        : "The shop shows it from that address.")}
             </p>
-            <div>
+            <div className="flex flex-wrap gap-2">
                 <Button
                     type="button"
                     size="sm"
-                    disabled={!valid}
+                    disabled={!valid || check === "checking"}
                     onClick={() => {
                         // What's stored is the address rebuilt behind https://,
                         // never the text as typed (release #772).
-                        if (safe?.startsWith("https://"))
+                        if (!safe?.startsWith("https://")) return;
+                        setCheck("checking");
+                        const img = new Image();
+                        img.onload = () => {
+                            setCheck("idle");
                             onAdd(safe, alt.trim());
+                        };
+                        img.onerror = () => setCheck("broken");
+                        img.src = safe;
                     }}
                 >
-                    Add photo
+                    {check === "checking" ? "Checking…" : "Add photo"}
                 </Button>
+                {check === "broken" && safe?.startsWith("https://") ? (
+                    <Button
+                        type="button"
+                        size="sm"
+                        variant="outline"
+                        onClick={() => onAdd(safe, alt.trim())}
+                    >
+                        Add it anyway
+                    </Button>
+                ) : null}
             </div>
         </div>
     );

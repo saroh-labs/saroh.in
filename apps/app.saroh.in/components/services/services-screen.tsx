@@ -15,6 +15,7 @@ import type { ModuleView } from "@/lib/modules/schema";
 import { updateService } from "@/lib/services/actions";
 import type { AlsoSellFeature } from "@/lib/services/also-sell";
 import { callName } from "@/lib/services/call-name";
+import { onlineBookingProblem } from "@/lib/services/online-booking";
 import type { Service } from "@/lib/services/service";
 import {
     lengthLine,
@@ -24,7 +25,7 @@ import {
     usageLine,
 } from "@/lib/services/service-cards";
 import type { ServiceUsage } from "@/lib/services/usage";
-import type { StaffView } from "@/lib/staff/types";
+import type { BookingPaymentView, StaffView } from "@/lib/staff/types";
 
 const btn = "h-[38px] rounded-[9px] px-4 text-[14px]";
 
@@ -35,7 +36,9 @@ const btn = "h-[38px] rounded-[9px] px-4 text-[14px]";
  * role that can't change services) open the Service Editor; Stop taking
  * bookings takes a service off the booking page and keeps the bookings
  * already made, with Undo. "Also sell" (E12) switches Courses and Class
- * packs on or off, for whoever may switch modules.
+ * packs on or off, for whoever may switch modules. A service people can't
+ * book online as it is paid (DEC-088, #821) says so on its card, with the
+ * way to fix it.
  */
 export function ServicesScreen({
     services,
@@ -44,6 +47,7 @@ export function ServicesScreen({
     currency,
     canEdit,
     hasPage,
+    payment = null,
     alsoSell,
     modules = [],
 }: {
@@ -56,6 +60,8 @@ export function ServicesScreen({
     canEdit: boolean;
     /** Whether the business has a booking page; null when unknown. */
     hasPage: boolean | null;
+    /** How people pay when they book (DEC-088); null when unknown. */
+    payment?: BookingPaymentView | null;
     /** Courses and Class packs, on or off; null for no card. */
     alsoSell: AlsoSellFeature[] | null;
     /** Every module, for what "Also sell" brings when it turns one on. */
@@ -136,6 +142,15 @@ export function ServicesScreen({
                             ? formatMoney(s.priceCents, s.currency ?? currency)
                             : "Free";
                         const who = takers(s.id);
+                        // Only a live service on the booking page is
+                        // booked online at all; one paid at the desk
+                        // instead still books, so only a service that
+                        // can't be booked is marked (DEC-089).
+                        const found =
+                            live && s.showOnBookingPage
+                                ? onlineBookingProblem(s, payment)
+                                : null;
+                        const problem = found?.blocked ? found : null;
                         return (
                             <li
                                 key={s.id}
@@ -194,6 +209,17 @@ export function ServicesScreen({
                                           ? `With ${who.map((p) => callName(p.name)).join(", ")}`
                                           : "Nobody takes it yet — it books in its own hours"}
                                 </div>
+                                {problem ? (
+                                    <p className="mt-2 rounded-[8px] bg-warning-subtle px-2.5 py-1.5 text-[12px] leading-[1.45] text-warning-subtle-foreground">
+                                        {problem.line}{" "}
+                                        <Link
+                                            href={problem.fix.href}
+                                            className="rounded-sm font-medium underline underline-offset-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                                        >
+                                            {problem.fix.label}
+                                        </Link>
+                                    </p>
+                                ) : null}
                                 <div className="mt-2 border-t border-border/60 pt-2 text-[12px] text-muted-foreground">
                                     {usageLine(
                                         s,

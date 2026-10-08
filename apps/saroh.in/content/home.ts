@@ -4,11 +4,15 @@
  * `solutions.ts` and `faq.ts`; this file holds only what is Home's own, plus
  * the copy every page's CTA band shares.
  *
- * No page names a price, a plan limit or what a plan includes (Gate W:
- * Pricing isn't published yet). The free-plan line is a fixed, neutral
- * sentence.
+ * The free-plan line and the plan teasers follow the public-repo rule: no
+ * prices, no limits. Their figures come from the pricing catalogue
+ * (`lib/plan-teasers.ts`), with the placeholders as the fallback. What each
+ * plan includes is set in the admin (DEC-075, D3), so no line here says
+ * what Free leaves out or what a paid plan adds: "Move up when you need
+ * more."
  */
-import type { ShotRef } from "./types";
+import type { PlanTeaser, ShotRef } from "./types";
+import { PLAN_DETAILS_PLACEHOLDER } from "./types";
 
 export interface HeroWord {
     /** The saffron initial. */
@@ -39,6 +43,8 @@ export const home = {
     featuresEyebrow: "Everything in Saroh",
     featuresTitle: "Eight parts, one workspace.",
     solutionsTitle: "Solutions",
+    pricingTitle: "Pricing",
+    pricingCompare: "Compare every plan",
     faqTitle: "Questions",
     /** The dark CTA band's title (the design's "band" closer). */
     closer: "Every morning, know what needs you.",
@@ -47,9 +53,27 @@ export const home = {
 
 /**
  * The line under every hero's buttons (Home, the feature and solution
- * pages). Neutral on purpose: it names no plan's limits or contents.
+ * pages): "Free to start: one website, … and …. Move up when you need
+ * more." The middle is the free plan's own card lines for these modules,
+ * read from the pricing catalogue (`lib/plan-teasers.ts` `freePlanLine`), so
+ * no limit is written here, and the tail names no paid plan's contents: the
+ * split is set in the admin (DEC-075, D3). With no catalogue the line is
+ * `fallback`.
  */
-export const FREE_PLAN_LINE = "Free to start. Move up when you need more.";
+export const FREE_PLAN_LINE = {
+    lead: "Free to start",
+    /** Catalogue module ids, in the order the line names them. */
+    modules: ["website", "products", "bookings"],
+    tail: "Move up when you need more.",
+    fallback: `Free to start. Move up when you need more. ${PLAN_DETAILS_PLACEHOLDER}.`,
+} as const;
+
+/** Home's pricing teaser and the plan order everywhere: Grow is featured. */
+export const PLAN_TEASERS: PlanTeaser[] = [
+    { plan: "free", name: "Free", featured: false },
+    { plan: "grow", name: "Grow", featured: true },
+    { plan: "pro", name: "Pro", featured: false },
+];
 
 /** The dark CTA band every page closes with; each page brings its title. */
 export const CTA_BAND = {

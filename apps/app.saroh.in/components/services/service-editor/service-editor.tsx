@@ -12,6 +12,7 @@ import { StatePill } from "@/components/bookings/calendar/parts";
 import { LeaveDialog } from "@/components/commerce/product-editor-v2/editor-parts";
 import { ConfirmDialog } from "@/components/shared/confirm-dialog";
 import { useLeaveGuard } from "@/components/sites/use-leave-guard";
+import type { PlanLock } from "@/lib/billing/access";
 import {
     archiveService,
     createService,
@@ -24,6 +25,7 @@ import {
     changedSections,
     draftOf,
     glance,
+    hasBookableHours,
     savedMessage,
     serviceInput,
     serviceProblems,
@@ -36,7 +38,7 @@ import {
 } from "@/lib/services/service-editor";
 import type { ServiceUsage } from "@/lib/services/usage";
 import { setStaffServices } from "@/lib/staff/actions";
-import type { StaffView } from "@/lib/staff/types";
+import type { BookingPaymentView, StaffView } from "@/lib/staff/types";
 
 import { AtAGlance } from "./at-a-glance";
 import {
@@ -70,9 +72,10 @@ export function ServiceEditor({
     currency,
     timezone,
     canEdit,
-    kindUp,
     hasPage,
     hasStorefront = null,
+    paymentsLock = null,
+    payment = null,
 }: {
     /** Null while creating. */
     service: Service | null;
@@ -87,12 +90,18 @@ export function ServiceEditor({
     /** The business's time zone, for a new service. */
     timezone: string;
     canEdit: boolean;
-    /** Kind up front; otherwise under More settings. */
-    kindUp: boolean;
     /** Whether the business has a booking page; null when unknown. */
     hasPage: boolean | null;
     /** A storefront to sell treatments from (E10); null when unknown. */
     hasStorefront?: boolean | null;
+    /**
+     * The plan's lock on online payments (`rowLock(…, "payments")`): a
+     * deposit is taken online, so it locks the deposits. Null when open,
+     * unknown or not enforced.
+     */
+    paymentsLock?: PlanLock | null;
+    /** How people pay when they book (DEC-088); null when unknown. */
+    payment?: BookingPaymentView | null;
 }) {
     const router = useRouter();
     const people = (staff ?? []).filter((p) => p.status === "ACTIVE");
@@ -168,6 +177,7 @@ export function ServiceEditor({
             name: input.name,
             kind: draft.kind,
             comingUp,
+            hasPerson: draft.staffIds.length > 0,
         });
         if (service) {
             const res = await updateService(
@@ -333,14 +343,21 @@ export function ServiceEditor({
             >
                 <legend className="sr-only">{title}</legend>
                 <div className="grid min-w-0 flex-[1_1_420px] gap-3.5">
-                    <WhatItIs draft={draft} set={set} kindUp={kindUp} />
+                    <WhatItIs draft={draft} set={set} />
                     <TimeSection
                         draft={draft}
                         set={set}
                         hasStaff={hasStaff}
                         noStorefront={noStorefront}
                     />
-                    <PriceSection draft={draft} set={set} currency={currency} />
+                    <PriceSection
+                        draft={draft}
+                        set={set}
+                        currency={currency}
+                        savedDeposit={saved.deposit}
+                        paymentsLock={paymentsLock}
+                        payment={payment}
+                    />
                     <WhoTakesIt
                         draft={draft}
                         set={set}
@@ -351,7 +368,6 @@ export function ServiceEditor({
                     <MoreSettings
                         draft={draft}
                         set={set}
-                        kindHere={!kindUp}
                         serviceId={service?.id ?? null}
                         rules={rules}
                         canEdit={canEdit}
@@ -364,6 +380,14 @@ export function ServiceEditor({
                         draft={draft}
                         set={set}
                         hasPage={hasPage}
+                        hasHours={
+                            rules === null ||
+                            hasBookableHours(
+                                saved.kind,
+                                rules.length,
+                                saved.staffIds.length,
+                            )
+                        }
                     />
                     <AtAGlance rows={glance(draft, usage, currency)} />
                     <p className="text-pretty text-[12px] leading-[1.5] text-muted-foreground">

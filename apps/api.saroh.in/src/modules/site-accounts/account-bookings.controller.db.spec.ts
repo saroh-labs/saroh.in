@@ -619,7 +619,60 @@ describe("who may book signed in", () => {
         ).toBe(0);
     });
 
-    it("takes no email, phone or business from the body: 400", async () => {
+    it("keeps a phone they gave on the booking, and gives it to a record that has none (UX-049)", async () => {
+        const biz = await business();
+        const { token, account } = await signIn(biz.host);
+        const res = await book(biz, token, {
+            serviceId: biz.oneToOne,
+            startAt: nextMonday(8).toISOString(),
+            bookerPhone: "+91 98450 12345",
+        });
+        expect(res.status).toBe(201);
+        const booking = await prisma.booking.findFirstOrThrow({
+            where: { serviceId: biz.oneToOne },
+        });
+        expect(booking).toMatchObject({
+            bookerPhone: "+91 98450 12345",
+            bookedOnline: true,
+        });
+        const contact = await prisma.contact.findUniqueOrThrow({
+            where: { id: account.contactId },
+        });
+        expect(contact.phone).toBe("+91 98450 12345");
+
+        // A record that has a phone keeps it.
+        await prisma.contact.update({
+            where: { id: account.contactId },
+            data: { phone: "+91 80 0000 0000" },
+        });
+        const again = await book(biz, token, {
+            serviceId: biz.oneToOne,
+            // Check-up runs 6–9, an hour each: 7 is free, 9 would end past it.
+            startAt: nextMonday(7).toISOString(),
+            bookerPhone: "+91 70000 00000",
+        });
+        expect(again.status).toBe(201);
+        expect(
+            (
+                await prisma.contact.findUniqueOrThrow({
+                    where: { id: account.contactId },
+                })
+            ).phone,
+        ).toBe("+91 80 0000 0000");
+    });
+
+    it("refuses a phone that isn't one: 400", async () => {
+        const biz = await business();
+        const { token } = await signIn(biz.host);
+        const res = await book(biz, token, {
+            serviceId: biz.oneToOne,
+            startAt: nextMonday(6).toISOString(),
+            bookerPhone: "call me maybe",
+        });
+        expect(res.status).toBe(400);
+    });
+
+    it("takes no email or business from the body: 400", async () => {
         const biz = await business();
         const { token } = await signIn(biz.host);
 

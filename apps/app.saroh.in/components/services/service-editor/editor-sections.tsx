@@ -7,16 +7,20 @@ import { Textarea } from "@saroh/ui/textarea";
 import { useId } from "react";
 
 import { Chip, Eyebrow } from "@/components/bookings/calendar/parts";
+import type { PlanLock } from "@/lib/billing/access";
 import { currencySymbol } from "@/lib/format/money";
+import { onlineBookingProblem } from "@/lib/services/online-booking";
+import type { DepositMode } from "@/lib/services/service";
 import type { ServiceDraft } from "@/lib/services/service-editor";
 import {
     bookingPageNote,
     draftVisits,
     staffNote,
     timeNote,
+    toMinor,
     wholeNumber,
 } from "@/lib/services/service-editor";
-import type { StaffView } from "@/lib/staff/types";
+import type { BookingPaymentView, StaffView } from "@/lib/staff/types";
 
 import { DepositField } from "./deposit-field";
 import { FIELD, HELP, LABEL, NumberField, Section } from "./fields";
@@ -36,7 +40,11 @@ interface Edit {
 
 const CHIP = "h-[34px] text-[13px]";
 
-export function WhatItIs({ draft, set, kindUp }: Edit & { kindUp: boolean }) {
+/**
+ * Name, what to tell customers, and Kind — one-to-one or a class — up
+ * front, since it decides how everything below works (UX-056).
+ */
+export function WhatItIs({ draft, set }: Edit) {
     const ids = { name: useId(), desc: useId(), kind: useId() };
     return (
         <Section title="What it is">
@@ -65,33 +73,32 @@ export function WhatItIs({ draft, set, kindUp }: Edit & { kindUp: boolean }) {
                 className="mt-[5px] rounded-[8px] text-[14px]"
             />
             <p className={HELP}>Shown on the booking page under the name.</p>
-            {kindUp ? (
-                <>
-                    <Eyebrow id={ids.kind} className="mt-3">
-                        Kind
-                    </Eyebrow>
-                    <div
-                        role="radiogroup"
-                        aria-labelledby={ids.kind}
-                        className="flex flex-wrap gap-1.5"
-                    >
-                        <Chip
-                            on={draft.kind === "one"}
-                            className={CHIP}
-                            onClick={() => set({ kind: "one" })}
-                        >
-                            One-to-one
-                        </Chip>
-                        <Chip
-                            on={draft.kind === "class"}
-                            className={CHIP}
-                            onClick={() => set({ kind: "class" })}
-                        >
-                            Class
-                        </Chip>
-                    </div>
-                </>
-            ) : null}
+            <Eyebrow id={ids.kind} className="mt-3">
+                Kind
+            </Eyebrow>
+            <div
+                role="radiogroup"
+                aria-labelledby={ids.kind}
+                className="flex flex-wrap gap-1.5"
+            >
+                <Chip
+                    on={draft.kind === "one"}
+                    className={CHIP}
+                    onClick={() => set({ kind: "one" })}
+                >
+                    One-to-one
+                </Chip>
+                <Chip
+                    on={draft.kind === "class"}
+                    className={CHIP}
+                    onClick={() => set({ kind: "class" })}
+                >
+                    Class
+                </Chip>
+            </div>
+            <p className={HELP}>
+                A class runs at set times with a number of places.
+            </p>
         </Section>
     );
 }
@@ -160,8 +167,29 @@ export function PriceSection({
     draft,
     set,
     currency,
-}: Edit & { currency: string }) {
+    savedDeposit,
+    paymentsLock = null,
+    payment,
+}: Edit & {
+    currency: string;
+    /** The deposit the service has saved. */
+    savedDeposit?: DepositMode;
+    /** The plan's lock on online payments (deposits are taken online). */
+    paymentsLock?: PlanLock | null;
+    /** How people pay when they book (DEC-088); null when unknown. */
+    payment: BookingPaymentView | null;
+}) {
     const id = useId();
+    // Only a service on the booking page is booked online at all.
+    const problem = draft.showOnBookingPage
+        ? onlineBookingProblem(
+              {
+                  priceCents: toMinor(draft.price),
+                  depositMode: draft.deposit,
+              },
+              payment,
+          )
+        : null;
     return (
         <Section title="Price">
             <label htmlFor={id} className={LABEL}>
@@ -179,6 +207,10 @@ export function PriceSection({
                 price={draft.price}
                 currency={currency}
                 visits={draftVisits(draft)}
+                saved={savedDeposit}
+                paymentsLock={paymentsLock}
+                way={payment?.bookingPayment}
+                problem={problem}
                 onChange={(deposit) => set({ deposit })}
             />
         </Section>
@@ -249,7 +281,12 @@ export function BookingPageCard({
     draft,
     set,
     hasPage,
-}: Edit & { hasPage: boolean | null }) {
+    hasHours = true,
+}: Edit & {
+    hasPage: boolean | null;
+    /** It has times to offer (UX-024); true when unknown. */
+    hasHours?: boolean;
+}) {
     return (
         <Section title="Booking page">
             <label className="flex cursor-pointer items-start gap-[9px] text-[13px]">
@@ -263,7 +300,11 @@ export function BookingPageCard({
                 <span>
                     Show on the booking page
                     <span className="mt-0.5 block text-[12px] text-muted-foreground">
-                        {bookingPageNote(hasPage, draft.showOnBookingPage)}
+                        {bookingPageNote(
+                            hasPage,
+                            draft.showOnBookingPage,
+                            hasHours,
+                        )}
                     </span>
                 </span>
             </label>

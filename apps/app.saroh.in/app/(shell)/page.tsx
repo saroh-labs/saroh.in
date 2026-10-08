@@ -109,6 +109,7 @@ export default async function Home() {
                 lastDay={home.lastDay}
                 name={session.user.name}
                 businessName={business?.name ?? "This business"}
+                kind={kind}
             />
             <div className="mt-5">
                 <HomeDashboard

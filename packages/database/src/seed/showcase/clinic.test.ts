@@ -360,7 +360,9 @@ const ist = (date: string, hhmm: string) =>
 // the working day, after closing and late at night.
 const TIMES = ["00:00", "06:30", "09:00", "12:30", "16:00", "19:30", "23:30"];
 
-const SWEEP_TIMEOUT_MS = 120_000;
+// 490 seeds. About 16s on a laptop, but over 120s on CI's runner, where
+// turbo runs every package's tests at once (PR #825); hence the headroom.
+const SWEEP_TIMEOUT_MS = 300_000;
 
 describe("Kavi Dental seeded on any day", () => {
     it(

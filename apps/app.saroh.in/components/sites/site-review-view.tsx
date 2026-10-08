@@ -8,7 +8,9 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 
+import { useBusinessZone } from "@/components/shared/business-zone";
 import { SectionReview } from "@/components/sites/section-review";
+import { VerdictControls } from "@/components/sites/verdict-controls";
 import { createApproval } from "@/lib/sites/actions";
 import { exactDate } from "@/lib/sites/format-date";
 import {
@@ -65,16 +67,20 @@ export function SiteReviewView({
     review: ReviewState;
     releases?: ReleasesForReview;
 }) {
+    const zone = useBusinessZone();
     const router = useRouter();
     const [recording, setRecording] = useState(false);
 
-    async function record(outcome: ReviewerVerdict) {
+    async function record(
+        outcome: ReviewerVerdict,
+        reason?: string,
+    ): Promise<boolean> {
         setRecording(true);
-        const res = await createApproval(site.id, outcome);
+        const res = await createApproval(site.id, outcome, undefined, reason);
         setRecording(false);
         if (!res.ok) {
             showError(res.error);
-            return;
+            return false;
         }
         showSuccess(
             outcome === "APPROVED"
@@ -82,6 +88,7 @@ export function SiteReviewView({
                 : "Recorded that you asked for changes.",
         );
         router.refresh();
+        return true;
     }
 
     const open = comments.filter((c) => c.resolvedAt === null).length;
@@ -116,7 +123,7 @@ export function SiteReviewView({
                 <p
                     role="status"
                     className="rounded-lg border bg-muted px-4 py-3 text-sm"
-                    title={exactDate(review.latestApproval.at)}
+                    title={exactDate(review.latestApproval.at, zone)}
                 >
                     {review.latestApproval.outcome === "REQUESTED"
                         ? `${review.latestApproval.by} asked for a review.`
@@ -126,7 +133,11 @@ export function SiteReviewView({
                             ? `${review.latestApproval.by} published without waiting for approval.`
                             : review.latestApproval.outcome === "OVERRIDDEN"
                               ? `${review.latestApproval.by} went live without approval.`
-                              : `${review.latestApproval.by} asked for changes.`}
+                              : review.latestApproval.outcome === "WITHDRAWN"
+                                ? `${review.latestApproval.by} withdrew the review request.`
+                                : review.latestApproval.reason
+                                  ? `${review.latestApproval.by} asked for changes: “${review.latestApproval.reason}”`
+                                  : `${review.latestApproval.by} asked for changes.`}
                     {open > 0
                         ? ` ${open === 1 ? "1 note is" : `${open} notes are`} open.`
                         : ""}
@@ -167,24 +178,9 @@ export function SiteReviewView({
                 canComment={site.can.comment}
             />
 
-            {site.can.approve ? (
+            {site.can.approve && !review.askedByYou ? (
                 <div className="flex flex-wrap gap-2 border-t pt-4">
-                    <Button
-                        type="button"
-                        variant="outline"
-                        disabled={recording}
-                        onClick={() => void record("APPROVED")}
-                    >
-                        Approve
-                    </Button>
-                    <Button
-                        type="button"
-                        variant="outline"
-                        disabled={recording}
-                        onClick={() => void record("CHANGES_REQUESTED")}
-                    >
-                        Ask for changes
-                    </Button>
+                    <VerdictControls recording={recording} onRecord={record} />
                     <p className="w-full text-xs text-muted-foreground">
                         Neither publishes anything. The owner decides when the
                         site goes live, and a publish that goes ahead without an

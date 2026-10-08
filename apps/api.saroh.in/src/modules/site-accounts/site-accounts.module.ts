@@ -3,6 +3,7 @@ import { Module } from "@nestjs/common";
 
 import { sendSiteEmailChangedEmail } from "../../common/email";
 import { CommunicationsService } from "../communications/communications.service";
+import { InvoicePdfModule } from "../invoices/invoice-pdf.module";
 import { JobHandlerRegistry } from "../jobs/job-handler.registry";
 import { JobsModule } from "../jobs/jobs.module";
 import { AccountAreaGuard } from "./account-area";
@@ -30,6 +31,7 @@ import {
     EMAIL_CHANGED_SENDER,
     EmailChangeService,
 } from "./email-change.service";
+import { ReceiptPdfService } from "./receipt-pdf.service";
 import { SessionsController } from "./sessions.controller";
 import { SessionsService } from "./sessions.service";
 import { SignInCodesService } from "./sign-in-codes.service";
@@ -56,7 +58,11 @@ import { ThreadsService } from "./threads.service";
  */
 @Module({
     // The notices' job is registered at boot.
-    imports: [JobsModule],
+    imports: [
+        JobsModule,
+        // A receipt's "Download PDF" (DEC-083).
+        InvoicePdfModule,
+    ],
     controllers: [
         SignInController,
         SessionsController,
@@ -71,6 +77,7 @@ import { ThreadsService } from "./threads.service";
         AccountUnlinkService,
         AccountAreaGuard,
         AccountHomeService,
+        ReceiptPdfService,
         EmailChangeService,
         // Health notes: open since A13 worded C12's staff card per source.
         { provide: CUSTOMER_NOTES_OPEN, useValue: CUSTOMER_NOTES_OPEN_DEFAULT },

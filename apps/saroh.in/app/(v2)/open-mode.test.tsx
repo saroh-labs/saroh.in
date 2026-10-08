@@ -1,11 +1,13 @@
 // @vitest-environment jsdom
-import { cleanup, render } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import type { AnchorHTMLAttributes } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
+import { fakeCatalog } from "@/lib/pricing.fixture";
+
 /**
  * Launch (plan U27, KTD-16): with `NEXT_PUBLIC_LAUNCH_MODE=open`, every
- * "start" button on Home, a feature and a solution page, and in the
+ * "start" button on Home, Pricing, a feature and a solution page, and in the
  * nav, goes to sign-up on accounts with the plan it names, and none to the
  * waitlist. The waitlist page still renders: launch moves the buttons, it
  * doesn't delete the page.
@@ -17,6 +19,9 @@ vi.mock("@/env", () => ({
         NEXT_PUBLIC_LAUNCH_MODE: "open",
         NEXT_PUBLIC_ACCOUNTS_URL: "https://accounts.example.test",
     },
+}));
+vi.mock("@/lib/pricing", () => ({
+    readLivePricing: () => Promise.resolve(fakeCatalog()),
 }));
 vi.mock("next/navigation", () => ({
     usePathname: () => "/",
@@ -66,8 +71,28 @@ const slug = (s: string) => ({ params: Promise.resolve({ slug: s }) });
 describe("open mode (U27)", () => {
     it("Home: every start button goes to sign-up", async () => {
         const { default: HomePage } = await import("./page");
-        const { container } = render(HomePage());
+        const { container } = render(await HomePage());
         expectOpen(container);
+    });
+
+    it("Pricing: each plan to sign-up with its plan, and the cycle shown", async () => {
+        const { default: PricingRoute } = await import("./pricing/page");
+        const { container } = render(await PricingRoute());
+        expectOpen(container);
+        const href = (plan: string) =>
+            container
+                .querySelector(`[data-plan="${plan}"] a`)
+                ?.getAttribute("href");
+        expect(href("free")).toBe(
+            `${ACCOUNTS}/signup?plan=free&src=pricing-plans`,
+        );
+        expect(href("grow")).toBe(
+            `${ACCOUNTS}/signup?plan=grow&cycle=month&src=pricing-plans`,
+        );
+        fireEvent.click(screen.getByRole("radio", { name: /^Yearly/ }));
+        expect(href("pro")).toBe(
+            `${ACCOUNTS}/signup?plan=pro&cycle=year&src=pricing-plans`,
+        );
     });
 
     it("a feature and a solution page: to sign-up", async () => {

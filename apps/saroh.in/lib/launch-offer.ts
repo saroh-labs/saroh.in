@@ -2,19 +2,17 @@ import type { LaunchOfferTerms } from "@/content/waitlist";
 import { env } from "@/env";
 
 /**
- * The launch offer, read from api.saroh.in (`GET /public/waitlist/offer`):
- * the plan the opening-day offer puts a business on, by name, and the API's
- * `LAUNCH_OFFER_DAYS`. The length is set on the API only, so it is never
- * written in this repo.
+ * The launch offer, read from api.saroh.in (`GET /public/waitlist/offer`,
+ * marketing plan U31): the plan the opening-day invites put a business on,
+ * named as the live catalogue names it, and `LAUNCH_OFFER_DAYS`. The page
+ * and the invites read the same setting, so they can't disagree, and
+ * neither number is ever written in this repo.
  *
  * Cached for five minutes (ISR), the API's own `max-age`. Anything short of
  * a valid offer — no `API_URL`, a 404 (no offer set), an error, a slow or
  * malformed answer — is null, and the page keeps "Offer details announced
  * at launch". An offer that can't be read is never shown half right.
  */
-
-/** Seconds an offer is served before it is read again. */
-export const OFFER_REVALIDATE_SECONDS = 300;
 
 /** How long a read may take before the page gives up on it. */
 const TIMEOUT_MS = 3000;
@@ -45,7 +43,8 @@ export async function readLaunchOffer(
     try {
         const res = await fetcher(`${api}/public/waitlist/offer`, {
             headers: { accept: "application/json" },
-            next: { revalidate: OFFER_REVALIDATE_SECONDS },
+            // Read once, when the page is built (the site is static).
+            cache: "force-cache",
             signal: AbortSignal.timeout(TIMEOUT_MS),
         });
         if (res.status === 404) return null;
@@ -55,6 +54,11 @@ export async function readLaunchOffer(
         if (!offer) throw new Error("The launch offer answer is malformed");
         return offer;
     } catch (err) {
+        // A deployment's build fails rather than publish the placeholder over
+        // a real offer (the site is static; see `readLivePricing`).
+        if (env.NEXT_PHASE === "phase-production-build" && env.VERCEL_ENV) {
+            throw err;
+        }
         console.warn(
             "[waitlist] the launch offer could not be read; showing the placeholder",
             err instanceof Error ? err.message : err,

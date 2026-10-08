@@ -1,3 +1,5 @@
+import { CANT_MARK_PAID } from "@/lib/organizations/permits";
+
 import { sendLabel } from "./send";
 import type { InvoiceStanding } from "./service";
 
@@ -10,7 +12,8 @@ import type { InvoiceStanding } from "./service";
  * reminded, gets its pay link copied, is marked paid, printed or
  * cancelled; a paid one is printed or refunded. "Copy pay link" is offered
  * only where the link takes payment (`payOnline`, DEC-070): without it the
- * link only shows the invoice, and Send says "Send invoice".
+ * link only shows the invoice, Send says "Send invoice", and "Copy view
+ * link" hands the merchant that link to send themselves (#833).
  */
 export type DetailActionId =
     | "draftSend"
@@ -20,6 +23,7 @@ export type DetailActionId =
     | "send"
     | "remind"
     | "copyLink"
+    | "copyViewLink"
     | "pay"
     | "print"
     | "pdf"
@@ -33,6 +37,8 @@ export interface DetailAction {
     primary?: boolean;
     danger?: boolean;
     disabled?: boolean;
+    /** Why it is disabled, said beside it (FB-1). */
+    reason?: string;
 }
 
 export interface DetailActionState {
@@ -116,6 +122,14 @@ export function detailActions(s: DetailActionState): DetailAction[] {
                 primary: !s.sendable,
                 disabled: s.linkBusy,
             });
+        } else if (!s.payOnline && !s.charging) {
+            // No pay link can be made (#833): a link that shows the
+            // invoice and how to pay, for the merchant to send themselves.
+            actions.push({
+                id: "copyViewLink",
+                label: s.linkBusy ? "Making a link…" : "Copy view link",
+                disabled: s.linkBusy,
+            });
         }
         return [
             ...actions,
@@ -129,7 +143,21 @@ export function detailActions(s: DetailActionState): DetailAction[] {
             { id: "cancel", label: "Cancel invoice", danger: true },
         ];
     }
+    // Owed, and this role can't record it (DEC-098): Mark paid is shown,
+    // disabled, with why — the permission decides, never the role's name.
+    const locked: DetailAction[] =
+        !s.canWrite && owed
+            ? [
+                  {
+                      id: "pay",
+                      label: "Mark paid",
+                      disabled: true,
+                      reason: CANT_MARK_PAID,
+                  },
+              ]
+            : [];
     const actions: DetailAction[] = [
+        ...locked,
         { id: "print", label: "Print", primary: true },
         ...pdf,
     ];

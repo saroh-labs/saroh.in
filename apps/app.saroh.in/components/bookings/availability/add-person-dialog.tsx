@@ -17,9 +17,10 @@ import { createStaff } from "@/lib/staff/actions";
 
 /**
  * Someone new on the diary (U3): a name and what they do. A trainer at the
- * front desk may never log in, so no account is needed; their hours are set
- * on this page once they are added, and which services they take on
- * Services.
+ * front desk may never log in, so no login is needed, but like everyone who
+ * takes bookings they use a team seat (DEC-105); a full team is refused by
+ * the API and said here. Their hours are set on this page once they are
+ * added, and which services they take on Services.
  */
 export function AddPersonDialog({
     open,
@@ -71,8 +72,9 @@ export function AddPersonDialog({
                         Add someone who takes bookings
                     </DialogTitle>
                     <DialogDescription className="mb-3 mt-[3px] text-[12.5px] text-muted-foreground">
-                        They need no account. Their hours start empty, so nobody
-                        can book them until you add some.
+                        They don&apos;t need a login, but they use a team seat,
+                        as everyone who takes bookings does. Their hours start
+                        empty, so nobody can book them until you add some.
                     </DialogDescription>
                     <Label htmlFor={ids.name} className="text-[12.5px]">
                         Name

@@ -13,6 +13,7 @@ import {
     ForbiddenException,
     NotFoundException,
 } from "@nestjs/common";
+import type { Prisma } from "@saroh/database";
 import { prisma } from "@saroh/database";
 
 import { giveBusinessDetails } from "../../../test/business-details";
@@ -63,8 +64,13 @@ async function book(
     });
 }
 
-/** A booking whose ₹400 deposit of ₹800 was paid online at booking. */
-async function depositPaid() {
+/**
+ * A booking whose ₹400 deposit of ₹800 was paid online at booking; `paper`
+ * is what its invoice froze at issue.
+ */
+async function depositPaid(
+    paper: Prisma.InvoiceUncheckedCreateInput | object = {},
+) {
     const booking = await book({
         paidWith: "PAID",
         snapshot: {
@@ -89,6 +95,7 @@ async function depositPaid() {
             issuedAt: NOW,
             paidAt: NOW,
             paymentMethod: "ONLINE",
+            ...paper,
             lines: {
                 create: {
                     organizationId: owner.organizationId,
@@ -324,6 +331,35 @@ describe("taking payment at the desk (P2, real database)", () => {
         });
     });
 
+    it("the balance prints the deposit's frozen seller and tax standing, not today's settings (ADR-008, DEC-082)", async () => {
+        // Issued as a tax invoice by the business as it was then; it has
+        // since moved, deregistered and been renamed.
+        const frozen = {
+            sellerGstin: "29AAGCR4375J1ZU",
+            sellerState: "29",
+            sellerAddress: "1 Old Road, Bengaluru 560001, Karnataka",
+            sellerName: "Kavi Dental (Old Town)",
+            sellerLegalName: "Kavi Dental LLP",
+            sellerEmail: "old@kavi.in",
+            placeOfSupply: "29",
+            taxType: "INTRA",
+        };
+        const { booking, invoice: deposit } = await depositPaid(frozen);
+        const paid = await take(owner, booking.id, {
+            method: "UPI",
+            amountCents: 40_000,
+        });
+        const balance = await prisma.invoice.findUniqueOrThrow({
+            where: { id: paid.invoiceId },
+        });
+        expect(balance).toMatchObject({
+            kind: "SUPPLEMENTARY",
+            relatedInvoiceId: deposit.id,
+            ...frozen,
+        });
+        expect(balance.igst.toString()).toBe("0");
+    });
+
     it("a pay link already out: its invoice is paid at the desk instead, and the link stops", async () => {
         const booking = await book({ paidWith: null });
         const { token } = await bookings.payLink(owner, booking.id, NOW);
@@ -505,5 +541,47 @@ describe("taking payment at the desk (P2, real database)", () => {
             .find((b) => b.id === paidOne.id);
         expect(row?.paidAtDesk).toEqual({ method: "UPI" });
         expect(row).not.toHaveProperty("take");
+        expect(row?.toTake).toBe(false);
+        // …and whether there is something to take, so the app can show
+        // Take payment disabled with why (DEC-098, FB-1).
+        const dueRow = theirs.diaries
+            .flatMap((d) => d.bookings)
+            .find((b) => b.id === due.id);
+        expect(dueRow).not.toHaveProperty("take");
+        expect(dueRow?.toTake).toBe(true);
+        expect(dueRow?.service).not.toHaveProperty("priceCents");
+    });
+
+    it("a role the business made with both permissions takes payment and sees what it takes, whatever its name (DEC-098)", async () => {
+        const booking = await book();
+        const frontDesk: OrganizationContext = {
+            ...owner,
+            role: "MEMBER",
+            roleKey: "front-desk",
+            actions: new Set([
+                "booking:read",
+                "booking:write",
+                "invoice:read",
+                "invoice:write",
+            ]),
+        };
+        const range = {
+            from: new Date(booking.startAt.getTime() - 3_600_000).toISOString(),
+            to: new Date(booking.endAt.getTime() + 3_600_000).toISOString(),
+        };
+        const calendar = await bookings.calendarBookings(frontDesk, range);
+        expect(calendar.money).toBe(true);
+        const row = calendar.diaries
+            .flatMap((d) => d.bookings)
+            .find((b) => b.id === booking.id);
+        expect(row).toMatchObject({
+            take: { cents: 50_000 },
+            service: { currency: "INR" },
+        });
+        const paid = await take(frontDesk, booking.id, {
+            method: "CASH",
+            amountCents: 50_000,
+        });
+        expect(paid.amountCents).toBe(50_000);
     });
 });

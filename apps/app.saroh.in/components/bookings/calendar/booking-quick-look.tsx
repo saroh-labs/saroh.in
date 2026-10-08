@@ -16,6 +16,7 @@ import { useEffect, useState } from "react";
 
 import { NewBookingDialog } from "@/components/bookings/new-booking-dialog";
 import { TakePayment } from "@/components/bookings/take-payment";
+import { TakePaymentLocked } from "@/components/bookings/take-payment-locked";
 import { formatMoney } from "@/lib/format/money";
 import {
     bookingChangeText,
@@ -216,10 +217,11 @@ function OneToOne({
         // Taken at the desk (P2): how, never how much.
         paidText(b)
     ) : b.paidWith === "PAID" ? (
+        // How it was paid, and how much to someone who sees money (UX-049).
         price ? (
-            `${price} paid`
+            `${price} paid online`
         ) : (
-            "Paid"
+            "Paid online"
         )
     ) : b.paidWith === "DESK" ? (
         "Not yet — pays at the session"
@@ -298,6 +300,31 @@ function OneToOne({
                 currency={b.service.currency ?? null}
                 who={whoFor(b)}
                 canLink={ctx.desk.canLink}
+                online={ctx.desk.online}
+                variant="outline"
+                triggerClassName={btn.ghost}
+            />,
+        );
+    } else if (
+        !undo &&
+        ctx.desk &&
+        !ctx.desk.canTake &&
+        (b.take || b.toTake) &&
+        state !== "cancelled"
+    ) {
+        // Shown, disabled, with why (FB-1, DEC-098): the figure only when
+        // the API sent it.
+        actions.push(
+            <TakePaymentLocked
+                key="take"
+                amount={
+                    b.take
+                        ? (formatMoney(
+                              b.take.cents,
+                              b.service.currency ?? null,
+                          ) ?? null)
+                        : null
+                }
                 variant="outline"
                 triggerClassName={btn.ghost}
             />,

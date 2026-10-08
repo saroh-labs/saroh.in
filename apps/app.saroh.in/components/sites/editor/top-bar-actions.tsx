@@ -8,8 +8,10 @@ import {
     DropdownMenuTrigger,
 } from "@saroh/ui/dropdown-menu";
 import { cn } from "@saroh/ui/lib/utils";
+import { Popover, PopoverContent, PopoverTrigger } from "@saroh/ui/popover";
 import {
     ChevronDown,
+    Ellipsis,
     Eye,
     FlaskConical,
     Link2,
@@ -19,7 +21,11 @@ import {
     Plus,
     Smartphone,
     Tablet,
+    Undo2,
+    UserCheck,
 } from "lucide-react";
+import type { ReactNode } from "react";
+import { useState } from "react";
 
 import { OptionSelect } from "@/components/shared/option-select";
 import { ThemeToggle } from "@/components/shared/theme-toggle";
@@ -37,6 +43,13 @@ export interface TopBarActionProps {
     asking: boolean;
     inReview: boolean;
     askForReview: () => void;
+    /** Take the open request back (UX-068). */
+    withdrawReview: () => void;
+    /**
+     * Open the whole site's Feedback, where a preview link is made (UX-068):
+     * the "anyone with the link" half of Share.
+     */
+    onSharePreview: () => void;
     publishing: boolean;
     publishDisabled: boolean;
     publishHint: string | undefined;
@@ -75,15 +88,28 @@ const ACTION =
     "h-[34px] gap-[7px] rounded-[9px] px-3 text-[0.78125rem] font-semibold text-muted-foreground";
 
 /**
- * The bar's actions: theme, width, zoom and Preview, then Share for review and
+ * The bar's actions: theme, width, zoom and Preview, then Share and
  * Publish. Moved out of `editor-top-bar.tsx` (G4) so a phone can show the same
  * controls in its menu, `stacked`, with every target sized for a thumb.
  */
 export function TopBarActions({
     stacked = false,
+    compact = false,
     ...p
-}: TopBarActionProps & { stacked?: boolean }) {
-    const touch = stacked && "h-11 w-full justify-start";
+}: TopBarActionProps & {
+    stacked?: boolean;
+    /**
+     * Narrow (UX-035): Preview, Feedback and Test release fold into "More",
+     * so Publish stays on screen at tablet width.
+     */
+    compact?: boolean;
+}) {
+    const [moreOpen, setMoreOpen] = useState(false);
+    /** Close "More" before an action that opens something over the editor. */
+    const fromMore = (run: () => void) => (): void => {
+        setMoreOpen(false);
+        run();
+    };
     return (
         <div
             className={
@@ -155,6 +181,124 @@ export function TopBarActions({
                 />
             </div>
 
+            {compact ? (
+                <Popover open={moreOpen} onOpenChange={setMoreOpen}>
+                    <PopoverTrigger asChild>
+                        <Button
+                            variant="outline"
+                            size="sm"
+                            aria-label="More: preview, feedback and test releases"
+                            className={cn(ACTION, "w-[34px] px-0")}
+                        >
+                            <Ellipsis aria-hidden className="size-[15px]" />
+                        </Button>
+                    </PopoverTrigger>
+                    <PopoverContent
+                        align="end"
+                        className="flex w-60 flex-col gap-2 p-2"
+                    >
+                        <SecondaryActions
+                            {...p}
+                            stacked
+                            setPreviewing={(on) =>
+                                fromMore(() => p.setPreviewing(on))()
+                            }
+                            onFeedback={
+                                p.onFeedback
+                                    ? fromMore(p.onFeedback)
+                                    : undefined
+                            }
+                            testRelease={
+                                p.testRelease
+                                    ? {
+                                          ...p.testRelease,
+                                          onMake: p.testRelease.onMake
+                                              ? fromMore(p.testRelease.onMake)
+                                              : undefined,
+                                          onOpenList: fromMore(
+                                              p.testRelease.onOpenList,
+                                          ),
+                                      }
+                                    : undefined
+                            }
+                        />
+                    </PopoverContent>
+                </Popover>
+            ) : (
+                <SecondaryActions {...p} stacked={stacked} />
+            )}
+
+            {/*
+             * Share (UX-068): one button, two ways — ask a teammate to
+             * review, or hand anyone a preview link. While a review is
+             * open it says so and offers to take the request back. Style
+             * is the rail's Brand tab (G2), so the bar has no button for it.
+             */}
+            <ShareControl {...p} stacked={stacked} />
+
+            {/*
+             * The one action that puts the site in front of the
+             * public. Not disabled while In review: publishing then
+             * is allowed and recorded as a bypass (#278, DEC-047).
+             * Its title says what it puts live (G2). Unlike the
+             * design it stays pressable when nothing has changed:
+             * publishing again is how a new version is made.
+             */}
+            <Button
+                size="sm"
+                className={cn(
+                    "wk-press h-[34px] rounded-[9px] px-3.5 text-[0.78125rem] font-semibold",
+                    stacked && "h-11 w-full",
+                )}
+                title={p.publishHint}
+                onClick={p.onPublish}
+                // With "Publishing needs approval" on, only an owner can
+                // press it, and it says so rather than refusing on the press.
+                disabled={
+                    p.publishDisabled || (p.needsApproval && !p.canOverride)
+                }
+            >
+                {p.publishing
+                    ? "Publishing…"
+                    : p.needsApproval
+                      ? "Needs approval"
+                      : "Publish"}
+                {/*
+                 * Things worth a look before publishing, as a dot (UX-081):
+                 * a number here read as "changes to publish" when it
+                 * counted warnings. The check lists them on the press, so
+                 * the dot stays out of the button's name.
+                 */}
+                {!p.publishing && p.flagCount > 0 ? (
+                    <span
+                        aria-hidden
+                        data-flag-dot=""
+                        title={`${p.flagCount} ${p.flagCount === 1 ? "thing" : "things"} worth a look`}
+                        className="ml-1.5 inline-block size-1.5 rounded-full bg-background/80"
+                    />
+                ) : null}
+            </Button>
+            {/* A phone has no hover, so what Publish puts live is written out. */}
+            {stacked && p.publishHint ? (
+                <p className="text-xs leading-relaxed text-muted-foreground">
+                    {p.publishHint}
+                </p>
+            ) : null}
+        </div>
+    );
+}
+
+/**
+ * Preview, Feedback and the Test release split: in the bar on a desk, in
+ * "More" when narrow (UX-035), and full width in a phone's menu.
+ */
+function SecondaryActions({
+    stacked,
+    ...p
+}: TopBarActionProps & { stacked: boolean }) {
+    const touch = stacked && "h-11 w-full justify-start";
+    return (
+        <>
             {/*
              * Preview removes the editing tools from the same canvas;
              * it does not switch to another renderer (G5). While it is
@@ -189,69 +333,117 @@ export function TopBarActions({
                 </Button>
             ) : null}
 
-            {/*
-             * Style is the rail's Brand tab now (G2), as the design
-             * draws it, so the bar no longer carries a button for it.
-             */}
-            <Button
-                variant="outline"
-                size="sm"
-                className={cn(ACTION, touch)}
-                disabled={p.asking || p.inReview}
-                onClick={p.askForReview}
-            >
-                <Link2 aria-hidden className="size-[15px]" />
-                {p.inReview ? "In review" : "Share for review"}
-            </Button>
-
             {p.testRelease ? (
                 <TestReleaseSplit actions={p.testRelease} stacked={stacked} />
             ) : null}
+        </>
+    );
+}
 
-            {/*
-             * The one action that puts the site in front of the
-             * public. Not disabled while In review: publishing then
-             * is allowed and recorded as a bypass (#278, DEC-047).
-             * Its title says what it puts live (G2). Unlike the
-             * design it stays pressable when nothing has changed:
-             * publishing again is how a new version is made.
-             */}
-            <Button
-                size="sm"
-                className={cn(
-                    "wk-press h-[34px] rounded-[9px] px-3.5 text-[0.78125rem] font-semibold",
-                    stacked && "h-11 w-full",
-                )}
-                title={p.publishHint}
-                onClick={p.onPublish}
-                // With "Publishing needs approval" on, only an owner can
-                // press it, and it says so rather than refusing on the press.
-                disabled={
-                    p.publishDisabled || (p.needsApproval && !p.canOverride)
-                }
+/** One row of the Share menu: what it does, then what that means. */
+function ShareChoice({
+    icon,
+    label,
+    hint,
+    onSelect,
+    disabled,
+}: {
+    icon: ReactNode;
+    label: string;
+    hint: string;
+    onSelect: () => void;
+    disabled?: boolean;
+}) {
+    return (
+        <button
+            type="button"
+            disabled={disabled}
+            onClick={onSelect}
+            className="flex w-full gap-2.5 rounded-md px-2.5 py-2 text-left transition-colors hover:bg-secondary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50 coarse:min-h-11"
+        >
+            <span aria-hidden className="mt-0.5 text-muted-foreground">
+                {icon}
+            </span>
+            <span className="grid gap-0.5">
+                <span className="text-[0.8125rem] font-semibold">{label}</span>
+                <span className="text-xs leading-snug text-muted-foreground">
+                    {hint}
+                </span>
+            </span>
+        </button>
+    );
+}
+
+/**
+ * Share (UX-068). "Share for review" used to flip the site to In review on
+ * the press, while the link anyone could open sat in Feedback; now both are
+ * named choices, and an open review can be withdrawn.
+ */
+function ShareControl({
+    stacked,
+    ...p
+}: TopBarActionProps & { stacked: boolean }) {
+    const [open, setOpen] = useState(false);
+    const pick = (run: () => void) => () => {
+        setOpen(false);
+        run();
+    };
+    const choices = (
+        <>
+            {p.inReview ? (
+                <ShareChoice
+                    icon={<Undo2 className="size-4" />}
+                    label="Withdraw the review request"
+                    hint="The site stops reading In review. Notes stay."
+                    disabled={p.asking}
+                    onSelect={pick(p.withdrawReview)}
+                />
+            ) : (
+                <ShareChoice
+                    icon={<UserCheck className="size-4" />}
+                    label="Ask a teammate to review"
+                    hint="Puts the site In review. Reviewers comment on blocks; publishing still works."
+                    disabled={p.asking}
+                    onSelect={pick(p.askForReview)}
+                />
+            )}
+            <ShareChoice
+                icon={<Link2 className="size-4" />}
+                label="Share a preview link"
+                hint="A link anyone can open to read the draft. Nothing goes live."
+                onSelect={pick(p.onSharePreview)}
+            />
+        </>
+    );
+    if (stacked) {
+        return (
+            <div
+                role="group"
+                aria-label={p.inReview ? "In review" : "Share"}
+                className="grid gap-1 rounded-lg border p-1"
             >
-                {p.publishing
-                    ? "Publishing…"
-                    : p.needsApproval
-                      ? "Needs approval"
-                      : "Publish"}
-                {/*
-                 * The outstanding flag count as a badge, so the
-                 * button keeps its width while the number moves.
-                 */}
-                {!p.publishing && p.flagCount > 0 ? (
-                    <span className="ml-1.5 rounded bg-background/20 px-1.5 py-0.5 text-[0.6875rem] tabular-nums leading-none">
-                        {p.flagCount}
-                    </span>
-                ) : null}
-            </Button>
-            {/* A phone has no hover, so what Publish puts live is written out. */}
-            {stacked && p.publishHint ? (
-                <p className="text-xs leading-relaxed text-muted-foreground">
-                    {p.publishHint}
-                </p>
-            ) : null}
-        </div>
+                {choices}
+            </div>
+        );
+    }
+    return (
+        <Popover open={open} onOpenChange={setOpen}>
+            <PopoverTrigger asChild>
+                <Button
+                    variant="outline"
+                    size="sm"
+                    aria-haspopup="dialog"
+                    className={ACTION}
+                >
+                    <Link2 aria-hidden className="size-[15px]" />
+                    {p.inReview ? "In review" : "Share"}
+                    <ChevronDown aria-hidden className="size-[13px]" />
+                </Button>
+            </PopoverTrigger>
+            <PopoverContent align="end" className="grid w-72 gap-1 p-1">
+                {choices}
+            </PopoverContent>
+        </Popover>
     );
 }
 

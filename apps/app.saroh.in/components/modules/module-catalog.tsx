@@ -2,6 +2,7 @@ import { EmptyState } from "@saroh/ui/empty-state";
 
 import { rolledOut } from "@/lib/modules/rollout";
 import type { ModuleView } from "@/lib/modules/schema";
+import type { ConnectLocks } from "@/lib/providers/connect-lock";
 
 import { ModuleList } from "./module-list";
 
@@ -14,7 +15,14 @@ import { ModuleList } from "./module-list";
  * is on?", and a column of switches answers it at a glance. What still needed
  * a person rises to the top of the list.
  */
-export function ModuleCatalog({ modules }: { modules: ModuleView[] }) {
+export function ModuleCatalog({
+    modules,
+    locks = null,
+}: {
+    modules: ModuleView[];
+    /** What the plan won't let the business connect (UX-006). */
+    locks?: ConnectLocks | null;
+}) {
     // Only what Saroh has rolled out (DEC-057); the rest still count for
     // what goes off with what.
     const shown = rolledOut(modules);
@@ -27,5 +35,5 @@ export function ModuleCatalog({ modules }: { modules: ModuleView[] }) {
         );
     }
 
-    return <ModuleList modules={shown} all={modules} />;
+    return <ModuleList modules={shown} all={modules} locks={locks} />;
 }

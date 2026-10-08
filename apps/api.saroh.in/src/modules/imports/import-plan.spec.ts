@@ -217,3 +217,19 @@ describe("suggestMapping", () => {
         expect(suggestMapping([], FIELDS)).toEqual({});
     });
 });
+
+describe("suggestMapping with other headings (UX-065)", () => {
+    it("matches a heading by its alias, and never a field that isn't mappable", () => {
+        expect(
+            suggestMapping(
+                ["Full Name", "Pin code", "Mobile"],
+                ["name", "zipCode"],
+                {
+                    fullname: "name",
+                    pincode: "zipCode",
+                    mobile: "phone",
+                },
+            ),
+        ).toEqual({ "Full Name": "name", "Pin code": "zipCode" });
+    });
+});

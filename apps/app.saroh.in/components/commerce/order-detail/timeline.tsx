@@ -1,6 +1,6 @@
 import { cn } from "@saroh/ui/lib/utils";
 
-import { ViewerDate } from "@/components/shared/viewer-date";
+import { BusinessDate } from "@/components/shared/business-zone";
 
 import { Panel, PanelTitle } from "./parts";
 
@@ -36,7 +36,7 @@ export function OrderTimeline({ steps }: { steps: TimelineStep[] }) {
                                 {s.what}
                             </div>
                             <div className="mt-px text-[12px] text-muted-foreground">
-                                <ViewerDate iso={s.at} variant="moment" />
+                                <BusinessDate iso={s.at} variant="moment" />
                                 {s.who ? ` · ${s.who}` : null}
                             </div>
                         </div>

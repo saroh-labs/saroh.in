@@ -168,3 +168,20 @@ describe("the site's settings show whether publishing needs approval (T13)", () 
         );
     });
 });
+
+describe("each settings section says when it goes live (UX-081)", () => {
+    const html = renderToStaticMarkup(
+        <SiteSettings site={site} address={address} />,
+    );
+    const marks = Array.from(
+        html.matchAll(/data-saves="(now|publish)"/g),
+        (m: RegExpMatchArray) => m[1],
+    );
+
+    it("marks the address and domain live at once, the rest with a publish", () => {
+        expect(marks.filter((m) => m === "now")).toHaveLength(2);
+        expect(marks.filter((m) => m === "publish")).toHaveLength(5);
+        expect(words(html)).toContain("Live as soon as it's saved");
+        expect(words(html)).toContain("Goes live with your next publish");
+    });
+});

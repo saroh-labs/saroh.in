@@ -56,3 +56,15 @@ cbc4c924acdd856c4bc3abfafab16957bc397f63:apps/api.saroh.in/src/modules/subscript
 07492ebf64c272eb0efeb17f9306a9e493b78da1:apps/api.saroh.in/src/modules/payments/autopay.razorpay.db.spec.ts:generic-api-key:62
 b580854ea34baab02cce3f8bd2fda3eb87f15912:apps/api.saroh.in/test/fixtures/razorpay-recurring.ts:generic-api-key:47
 c45022983411033024eacea16b61a80fe6de9865:apps/api.saroh.in/src/modules/subscriptions/public-plan-join.db.spec.ts:generic-api-key:69
+
+# Idempotency keys in the offline-checkout specs (pay when you collect, 6 Oct
+# 2026). Each is the same short made-up test fixture: a word, a dash and a run
+# of digits, sent as the checkout's idempotency key to the code under test. No
+# service issues or accepts it. Flagged by generic-api-key because the property
+# is named "key".
+b0b12141037c74bc4edf462a64c9cae7147bb904:apps/api.saroh.in/src/modules/orders/offline-checkout-order.spec.ts:generic-api-key:119
+b0b12141037c74bc4edf462a64c9cae7147bb904:apps/api.saroh.in/src/modules/orders/offline-checkout-start.spec.ts:generic-api-key:92
+b0b12141037c74bc4edf462a64c9cae7147bb904:apps/saroh.app/lib/shop-checkout-shape.test.ts:generic-api-key:242
+b0b12141037c74bc4edf462a64c9cae7147bb904:apps/saroh.app/lib/shop-checkout-shape.test.ts:generic-api-key:251
+# A made-up idempotency key in the discount-code checkout spec (UX-060).
+ac41556585e5d71344e4f7ef0c3c0bf8684808c8:apps/api.saroh.in/src/modules/orders/offline-checkout-start.spec.ts:generic-api-key:351

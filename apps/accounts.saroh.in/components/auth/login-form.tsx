@@ -13,6 +13,7 @@ import {
     AuthSubmit,
 } from "@/components/auth/field";
 import { SocialButtons } from "@/components/auth/social-buttons";
+import { isJoining, withCarry } from "@/lib/joining";
 
 /**
  * `returnTo` is where this sign-in should land (#222) — the page the visitor
@@ -39,6 +40,10 @@ export function LoginForm({
     const [password, setPassword] = useState("");
     const [error, setError] = useState<string | null>(null);
     const [isLoading, setIsLoading] = useState(false);
+    // Joining someone's business through their invitation (UX-029).
+    const joining = isJoining(returnTo);
+    // The invitation's address, which the accept insists on: fixed.
+    const emailLocked = joining && !!invitedEmail;
 
     async function handleSubmit(e: React.FormEvent) {
         e.preventDefault();
@@ -63,10 +68,7 @@ export function LoginForm({
             // Carry the destination through the detour: someone who has to
             // verify first should still land where they were going, not at
             // the launcher because they took an extra step.
-            router.push(
-                `/verify-email?email=${encodeURIComponent(email)}` +
-                    `&redirect=${encodeURIComponent(returnTo)}`,
-            );
+            router.push(withCarry("/verify-email", returnTo, email));
             return;
         }
         if (err) return;
@@ -83,7 +85,14 @@ export function LoginForm({
         <div>
             {/* The heading names the act, as the design does on every page;
                 the panel beside it says what logging in reaches. */}
-            <AuthHeading title="Log in" blurb="Welcome back." />
+            <AuthHeading
+                title={joining ? "Log in to join" : "Log in"}
+                blurb={
+                    joining
+                        ? "Then you join the business that invited you."
+                        : "Welcome back."
+                }
+            />
             <form onSubmit={handleSubmit} noValidate>
                 {error ? <AuthError>{error}</AuthError> : null}
                 <AuthField
@@ -92,9 +101,15 @@ export function LoginForm({
                     type="email"
                     autoComplete="email"
                     placeholder="you@example.com"
-                    note="The address you signed up with."
+                    note={
+                        emailLocked
+                            ? "The invitation was sent to this address, so it has to be this account."
+                            : "The address you signed up with."
+                    }
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
+                    readOnly={emailLocked}
+                    aria-readonly={emailLocked || undefined}
                     required
                     disabled={isLoading}
                 />
@@ -123,7 +138,11 @@ export function LoginForm({
             <AuthFooter>
                 No account yet?{" "}
                 <Link
-                    href={`/signup?redirect=${encodeURIComponent(returnTo)}`}
+                    href={withCarry(
+                        "/signup",
+                        returnTo,
+                        emailLocked ? invitedEmail : undefined,
+                    )}
                     className="text-foreground decoration-border-strong hover:decoration-foreground active:text-muted-foreground underline underline-offset-4 transition-colors"
                 >
                     Create one

@@ -1,5 +1,6 @@
 import { toFailure } from "@/lib/api/failure";
 import { apiFetch, getJson } from "@/lib/api/http";
+import type { PlanRefusal } from "@/lib/billing/refusal";
 
 /**
  * CSV import data access for app.saroh.in (#175).
@@ -48,6 +49,8 @@ export interface ApplyResult {
     updated: number;
     skipped: number;
     failed: number;
+    /** New products left out to fit the plan (UX-036); absent from an older API. */
+    overLimit?: number;
     plan: ImportPlan;
 }
 
@@ -55,18 +58,25 @@ export interface ImportDescriptor {
     entity: ImportEntity;
     requiredFields: string[];
     mappableFields: string[];
+    /** Each field in words (UX-065); absent from an older API. */
+    fieldLabels?: Record<string, string>;
     keyLabel: string;
 }
 
 export type Result<T> =
     | { ok: true; data: T }
-    | { ok: false; error: string; fileIssues?: RowIssue[] };
+    | { ok: false; error: string; fileIssues?: RowIssue[]; plan?: PlanRefusal };
 
 export interface ImportInput {
     csv: string;
     /** Empty asks the api to suggest a mapping from the file's headers. */
     mapping: Record<string, string>;
     policy: DuplicatePolicy;
+    /**
+     * Apply only: bring in only the first N new products, what the plan
+     * has room for (UX-036).
+     */
+    createAtMost?: number;
 }
 
 async function post<T>(path: string, body: unknown): Promise<Result<T>> {
@@ -79,9 +89,12 @@ async function post<T>(path: string, body: unknown): Promise<Result<T>> {
     // A refused file lists its problems under `error.details.fileIssues`.
     const details = (data as { error?: { details?: unknown } } | null)?.error
         ?.details as { fileIssues?: RowIssue[] } | undefined;
+    const failure = toFailure(data, "Something went wrong");
     return {
         ok: false,
-        error: toFailure(data, "Something went wrong").error,
+        error: failure.error,
+        // Its plan refused the rows (U13): shown as the notice (U14).
+        ...(failure.plan ? { plan: failure.plan } : {}),
         ...(details?.fileIssues ? { fileIssues: details.fileIssues } : {}),
     };
 }

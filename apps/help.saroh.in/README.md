@@ -1,5 +1,12 @@
 # help.saroh.in
 
+> **Not deployed. help.saroh.in is served by the saroh.in project** (owner,
+> 6 Oct 2026): this app was never on Vercel, so the domain points at the
+> saroh.in project, whose `proxy.ts` sends it to the home page until Help
+> publishes (17 Oct) and to saroh.in/help after (`apps/saroh.in/lib/help-host.ts`,
+> the old-to-new map). This app's own `proxy.ts` does the same and is kept only
+> while the app is; the two maps are tested against the app's help links.
+
 Product help for the people **using** Saroh to run a business — not for
 developers contributing to the repo. (Developer docs live in
 [`docs.saroh.in`](../docs.saroh.in).)
@@ -47,12 +54,15 @@ pnpm install
 pnpm --filter help dev       # https://help.saroh.localhost
 ```
 
-No environment variables and no backend.
+No backend. One optional variable: `MARKETING_URL`, the marketing site's
+origin the move sends people to (unset: `https://www.saroh.in`; see
+`env.ts`).
 
 ## Verification
 
 ```bash
 pnpm --filter help typecheck
 pnpm --filter help lint
+pnpm --filter help test
 pnpm --filter help build
 ```

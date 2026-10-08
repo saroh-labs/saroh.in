@@ -6,6 +6,7 @@ import { useState } from "react";
 
 import type { OrderMenuPending } from "@/components/commerce/order-actions";
 import { OrderActions } from "@/components/commerce/order-actions";
+import { useBusinessZone } from "@/components/shared/business-zone";
 import { formatMoneyMajor } from "@/lib/format/money";
 import { useClock } from "@/lib/hooks/use-clock";
 import { readyNoticeText } from "@/lib/messages/notice-reach";
@@ -21,6 +22,7 @@ import {
     waiting,
 } from "@/lib/orders/lifecycle";
 import type { StepTone } from "@/lib/orders/list-row";
+import { handoverPayment } from "@/lib/orders/pay-on-handover";
 import type { AllergyNote, KitchenStage, OrderRead } from "@/lib/orders/read";
 import type { Arrival } from "@/lib/orders/row-menu";
 import type { Sellable } from "@/lib/orders/sellables";
@@ -43,6 +45,7 @@ import { CustomerCard } from "./customer-card";
 import { EditPanel } from "./edit-panel";
 import { HoldCard } from "./hold-card";
 import { AllergyBanner, OrderItems } from "./items";
+import { KitchenPaymentCard } from "./kitchen-payment-card";
 import { MoneyCard } from "./money-card";
 import { OrderCrumbs, OrderHeading } from "./order-header";
 import type { PillTone } from "./parts";
@@ -152,7 +155,9 @@ export function OrderDetail({
     const appointment = isAppointment(order);
     const visits = appointment ? order.visits : undefined;
     const now = new Date(clock ?? Date.parse(order.updatedAt));
-    const zone = visits?.service.timezone ?? "UTC";
+    // The service's zone, else the business's (UX-008), never UTC.
+    const businessZone = useBusinessZone();
+    const zone = visits?.service.timezone ?? businessZone;
     const standing = appointment
         ? (({ label, tone }) => ({ label, tone: VISITS_TONE[tone] }))(
               visitsStanding(
@@ -162,12 +167,15 @@ export function OrderDetail({
               ),
           )
         : headerStep(order);
+    // Paid at the handover (website checkout): made and brought first.
+    const handover = handoverPayment(order);
     const unpaid =
         order.status !== "CANCELLED" &&
         (order.paymentStatus === "FAILED" ||
-            (order.paymentStatus === "UNPAID" && order.stage === "NEW"));
+            (order.paymentStatus === "UNPAID" &&
+                (order.stage === "NEW" || handover !== null)));
     const next: KitchenStage | null =
-        can.stage && !unpaid && !appointment
+        can.stage && (!unpaid || handover !== null) && !appointment
             ? (order.next.stages[0] ?? null)
             : null;
     const open = isOpen(order);
@@ -292,6 +300,15 @@ export function OrderDetail({
                     Nothing left to do
                 </span>
             ) : null}
+            {handover && can.stage && !next && open && !hold ? (
+                // Ready, and paid at the handover: Collected waits for the
+                // payment (the API refuses it before then, UX-010).
+                <span className="text-[13px] font-semibold text-muted-foreground">
+                    {handover === "collection"
+                        ? "Mark collected once it's paid"
+                        : "Mark delivered once it's paid"}
+                </span>
+            ) : null}
         </OrderHeading>
     );
 
@@ -345,11 +362,24 @@ export function OrderDetail({
                         failed={order.paymentStatus === "FAILED"}
                         first={first}
                         canRecord={can.edit}
-                        onCash={() => setMenu({ kind: "payment", to: "PAID" })}
+                        onCash={() =>
+                            setMenu({
+                                kind: "payment",
+                                to: "PAID",
+                                how: "CASH",
+                            })
+                        }
                         onSendLink={
                             linkable && can.payOnline ? payLink.ask : undefined
                         }
                         sending={payLink.busy}
+                        handover={handover ?? undefined}
+                        uncollectedDays={order.uncollectedDays}
+                        onCancel={
+                            change.cancel === null && !hold
+                                ? () => setPanel("cancel")
+                                : undefined
+                        }
                     />
                 ) : null}
                 {appointment ? (
@@ -556,6 +586,7 @@ export function OrderDetail({
                                 money={money}
                                 delivery={delivery}
                                 way={order.fulfilmentLabel}
+                                handover={handover ?? undefined}
                                 appointment={appointment}
                                 paymentStatus={order.paymentStatus}
                                 refundStanding={order.refundStanding}
@@ -566,6 +597,9 @@ export function OrderDetail({
                                     can.refund ? kitchen.retryRefund : undefined
                                 }
                                 busy={busy}
+                                onRecordPayment={
+                                    can.edit ? kitchen.recordPayment : undefined
+                                }
                                 payLink={
                                     linkable ? (
                                         <PayLinkBlock
@@ -579,7 +613,12 @@ export function OrderDetail({
                                     ) : null
                                 }
                             />
-                        ) : null}
+                        ) : (
+                            <KitchenPaymentCard
+                                order={order}
+                                canRecord={can.edit}
+                            />
+                        )}
                         {aside}
                     </div>
                 </div>

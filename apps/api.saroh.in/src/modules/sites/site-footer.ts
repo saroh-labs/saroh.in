@@ -19,6 +19,12 @@ import { BadRequestException } from "@nestjs/common";
  * collected for one thing into something else without ever asking. So the
  * footer is written by the merchant, or it does not exist.
  *
+ * The one exception is decided, not derived: the contact email, which
+ * Settings › Business asks for as "where customers can reach the business"
+ * and says the site shows (DEC-101). The renderer reads it live beside the
+ * phone and place (`public-footer.service.ts`); it is never written into
+ * this footer, and the legal name and tax id stay unpublished.
+ *
  * WHY THE richText SHAPE. `{ format, value }` is what a richText section
  * already carries, so this reuses the authoring model, the publish-time
  * sanitizer and — when the rich text editor lands (#208) — the editor itself.
@@ -26,10 +32,21 @@ import { BadRequestException } from "@nestjs/common";
  * the first, for no gain.
  */
 
+/**
+ * How the footer is laid out (industry templates, polish pass). Absent is
+ * today's single centred line; `left` is the designs' row — the name in the
+ * heading face, the merchant's line, "Runs on Saroh" at the far end. Kept in
+ * the renderer as `FOOTER_LAYOUTS` (site-blocks); a spec holds them equal.
+ */
+export const FOOTER_LAYOUTS = ["centre", "left"] as const;
+export type FooterLayout = (typeof FOOTER_LAYOUTS)[number];
+
 /** A footer as stored on `Site.footer` and served in the snapshot. */
 export interface SiteFooter {
     format: "html" | "markdown";
     value: string;
+    /** `left`, or absent for the centred line ("centre" is stored as absent). */
+    layout?: "left";
 }
 
 /**
@@ -84,9 +101,51 @@ export function parseSiteFooter(input: unknown): SiteFooter | null {
         );
     }
 
-    // Trailing whitespace in authored HTML is noise; an all-whitespace value is
-    // an empty footer however it was typed.
-    if (rawValue.trim() === "") return null;
+    const rawLayout = o.layout ?? "centre";
+    if (!(FOOTER_LAYOUTS as readonly unknown[]).includes(rawLayout)) {
+        throw new BadRequestException(
+            `footer.layout must be one of ${FOOTER_LAYOUTS.join(", ")}.`,
+        );
+    }
+    const layout = rawLayout === "left" ? { layout: "left" as const } : {};
 
-    return { format: rawFormat, value: rawValue };
+    // Trailing whitespace in authored HTML is noise; an all-whitespace value is
+    // an empty footer however it was typed. A footer laid out on the left
+    // keeps its layout with no line: the row is then the name and "Runs on
+    // Saroh", and a line written later lands in it.
+    if (rawValue.trim() === "") {
+        return layout.layout
+            ? { format: rawFormat, value: "", ...layout }
+            : null;
+    }
+
+    return { format: rawFormat, value: rawValue, ...layout };
+}
+
+/**
+ * The footer an update stores (#202): what was sent, keeping the stored
+ * layout when the update does not name one. The footer's two editors (Site
+ * settings and the editor's footer line) send only the line, so a template's
+ * left-hand row survives the merchant rewriting the line, or clearing it.
+ */
+export function footerAfterUpdate(
+    input: unknown,
+    stored: unknown,
+): SiteFooter | null {
+    const parsed = parseSiteFooter(input);
+    const named =
+        input !== null &&
+        typeof input === "object" &&
+        (input as { layout?: unknown }).layout !== undefined;
+    if (named) return parsed;
+    let kept: SiteFooter | null = null;
+    try {
+        kept = parseSiteFooter(stored);
+    } catch {
+        // A stored footer that no longer parses carries no layout to keep.
+    }
+    if (kept?.layout !== "left") return parsed;
+    return parsed
+        ? { ...parsed, layout: "left" }
+        : { format: kept.format, value: "", layout: "left" };
 }

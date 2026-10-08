@@ -41,6 +41,25 @@ const isMoney = oneOf([
 ] as const);
 const isVisitState = oneOf(["done", "booked", "missed", "to-book"] as const);
 const isRefundStatus = oneOf(["SENT", "CONFIRMING", "REFUSED"] as const);
+const isPaidHow = oneOf([
+    "online",
+    "desk",
+    "both",
+    "pack",
+    "membership",
+] as const);
+
+/** What was paid for a booking (UX-049); absent from an older API. */
+function isPaid(v: unknown): boolean {
+    return (
+        v === undefined ||
+        v === null ||
+        (isRecord(v) &&
+            isPaidHow(v.how) &&
+            isNullableString(v.amount) &&
+            isNullableString(v.currency))
+    );
+}
 
 function isTerms(v: unknown): v is AccountCancelTerms {
     return (
@@ -72,7 +91,8 @@ export function isBookingRow(v: unknown): v is AccountBookingRow {
                 isNumber(visit.of))) &&
         isBoolean(v.cancelledLate) &&
         (v.move === null || isMove(v.move)) &&
-        (v.cancel === null || isTerms(v.cancel))
+        (v.cancel === null || isTerms(v.cancel)) &&
+        isPaid(v.paid)
     );
 }
 

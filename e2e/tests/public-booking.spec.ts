@@ -96,9 +96,12 @@ async function details(page: Page) {
     await expect(
         page.getByText(/You'll confirm your email with a code/),
     ).toBeVisible();
-    // No guest form: nobody types an email or a phone on the page.
+    // No guest form: nobody types an email on the page. A phone is
+    // offered, and only offered (UX-049): left empty, the booking goes on.
     await expect(page.getByLabel("Email")).toHaveCount(0);
-    await expect(page.getByLabel(/Phone/)).toHaveCount(0);
+    await expect(page.getByLabel(/Phone/)).toHaveAccessibleName(
+        "Phone (optional)",
+    );
     await page.getByLabel("Name").fill("Asha Rao");
 }
 

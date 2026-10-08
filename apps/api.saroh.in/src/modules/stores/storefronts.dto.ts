@@ -180,6 +180,15 @@ export class UpdateStorefrontDto {
     @IsBoolean()
     guestCheckout?: boolean;
 
+    /**
+     * "Pay when you collect" and "Pay on delivery" at the site's checkout,
+     * beside paying online (a plan without online payments offers them
+     * whatever this says).
+     */
+    @IsOptional()
+    @IsBoolean()
+    offerPayOnHandover?: boolean;
+
     @IsOptional()
     @IsBoolean()
     paused?: boolean;

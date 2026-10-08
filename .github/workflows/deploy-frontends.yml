@@ -1,0 +1,184 @@
+name: Build and deploy frontends
+
+# Builds the marketing site, the workspace, accounts and admin for Cloudflare
+# Workers (OpenNext) and deploys each one whose code, or a package it uses,
+# changed. The merchant sites have their own workflow (deploy-sites.yml).
+#
+#   push to development  -> the dev Workers (saroh-*-dev, *.saroh.io)
+#   push to main         -> the production Workers (saroh-*, *.saroh.in)
+#   every night 00:00 IST -> the marketing site, both environments, so a page
+#                            dated today appears (the site is static)
+#   manual / the API     -> one app (or all) in one environment; the API starts
+#                            the marketing site's build when pricing or the
+#                            launch offer is published
+#
+# Settings that aren't secret live in each app's wrangler.jsonc and are used
+# for the build too (scripts/cf-env.mjs). Secrets live in the GitHub
+# environments `cloudflare-development` and `cloudflare-production`: they are
+# passed to the build and copied onto the Worker on every deploy, and never
+# printed (the repo, and so this log, is public).
+
+on:
+    push:
+        branches: [main, development]
+        paths:
+            - "apps/saroh.in/**"
+            - "apps/app.saroh.in/**"
+            - "apps/accounts.saroh.in/**"
+            - "apps/admin.saroh.in/**"
+            - "packages/**"
+            - "tooling/**"
+            - "pnpm-lock.yaml"
+            - "pnpm-workspace.yaml"
+            - "package.json"
+            - "turbo.json"
+            - "scripts/cf-env.mjs"
+            - ".github/workflows/deploy-frontends.yml"
+    schedule:
+        # 18:30 UTC is 00:00 IST.
+        - cron: "30 18 * * *"
+    workflow_dispatch:
+        inputs:
+            app:
+                description: Which app
+                type: choice
+                options: [web, application, auth, admin, all]
+                default: web
+            environment:
+                description: Where
+                type: choice
+                options: [development, production]
+                default: development
+
+jobs:
+    plan:
+        name: What to deploy
+        runs-on: ubuntu-latest
+        permissions:
+            contents: read
+        outputs:
+            matrix: ${{ steps.plan.outputs.matrix }}
+        steps:
+            - uses: actions/checkout@v4
+              with:
+                  fetch-depth: 0
+            - uses: ./.github/actions/setup
+              with:
+                  prisma: "false"
+            - id: plan
+              env:
+                  EVENT: ${{ github.event_name }}
+                  REF: ${{ github.ref_name }}
+                  BEFORE: ${{ github.event.before }}
+                  INPUT_APP: ${{ inputs.app }}
+                  INPUT_ENV: ${{ inputs.environment }}
+              run: |
+                  set -euo pipefail
+                  # package name -> app directory
+                  declare -A DIR=( [web]=apps/saroh.in [application]=apps/app.saroh.in [auth]=apps/accounts.saroh.in [admin]=apps/admin.saroh.in )
+                  item() { printf '{"pkg":"%s","dir":"%s","env":"%s","ref":"%s"}' "$1" "${DIR[$1]}" "$2" "$3"; }
+                  items=()
+                  case "$EVENT" in
+                    schedule)
+                      items+=("$(item web production main)" "$(item web development development)") ;;
+                    workflow_dispatch)
+                      ref=$([ "$INPUT_ENV" = production ] && echo main || echo development)
+                      if [ "$INPUT_APP" = all ]; then pkgs="web application auth admin"; else pkgs="$INPUT_APP"; fi
+                      for p in $pkgs; do items+=("$(item "$p" "$INPUT_ENV" "$ref")"); done ;;
+                    push)
+                      env=$([ "$REF" = main ] && echo production || echo development)
+                      if [ -z "$BEFORE" ] || [ "$BEFORE" = "0000000000000000000000000000000000000000" ] \
+                        || ! git cat-file -e "$BEFORE^{commit}" 2>/dev/null; then
+                        affected="web application auth admin"
+                      else
+                        # Each app whose own code, or a workspace package it uses, changed.
+                        affected=$(pnpm -s exec turbo run build --filter="...[$BEFORE]" --dry=json \
+                          | jq -r '.packages[]' | grep -xE 'web|application|auth|admin' || true)
+                      fi
+                      for p in $affected; do items+=("$(item "$p" "$env" "$REF")"); done ;;
+                  esac
+                  json=$(printf '%s\n' "${items[@]:-}" | grep . | jq -sc '.' || echo '[]')
+                  echo "matrix=$json" >> "$GITHUB_OUTPUT"
+                  echo "To deploy: $json"
+
+    deploy:
+        name: Deploy ${{ matrix.pkg }} (${{ matrix.env }})
+        needs: plan
+        if: needs.plan.outputs.matrix != '[]'
+        runs-on: ubuntu-latest
+        permissions:
+            contents: read
+        environment: cloudflare-${{ matrix.env }}
+        strategy:
+            fail-fast: false
+            matrix:
+                include: ${{ fromJson(needs.plan.outputs.matrix) }}
+        concurrency:
+            group: deploy-frontend-${{ matrix.pkg }}-${{ matrix.env }}
+            cancel-in-progress: false
+        env:
+            CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_SITES_DEPLOY_TOKEN }}
+            CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+            NEXT_TELEMETRY_DISABLED: "1"
+        steps:
+            - uses: actions/checkout@v4
+              with:
+                  ref: ${{ matrix.ref }}
+
+            - uses: ./.github/actions/setup
+              with:
+                  prisma: "false"
+
+            - name: Settings from wrangler.jsonc
+              run: node scripts/cf-env.mjs "${{ matrix.dir }}" "${{ matrix.env }}" >> "$GITHUB_ENV"
+
+            # Secrets for the build and the Worker. A dev app without its access
+            # key would be open to anyone, so its deploy stops here instead.
+            - name: Secrets
+              env:
+                  DEV_ACCESS_KEY: ${{ secrets.DEV_ACCESS_KEY }}
+                  SITE_RELAY_SECRET: ${{ secrets.SITE_RELAY_SECRET }}
+              run: |
+                  set -euo pipefail
+                  names=()
+                  if [ "${{ matrix.env }}" = development ]; then
+                    [ -n "$DEV_ACCESS_KEY" ] || { echo "::error::DEV_ACCESS_KEY is missing: a dev app would be public"; exit 1; }
+                    names+=(DEV_ACCESS_KEY)
+                  fi
+                  if [ "${{ matrix.pkg }}" = web ]; then
+                    [ -n "$SITE_RELAY_SECRET" ] || { echo "::error::SITE_RELAY_SECRET is missing"; exit 1; }
+                    names+=(SITE_RELAY_SECRET)
+                  fi
+                  json='{}'
+                  for n in "${names[@]:-}"; do
+                    [ -n "$n" ] || continue
+                    echo "$n=${!n}" >> "$GITHUB_ENV"
+                    json=$(jq -c --arg k "$n" --arg v "${!n}" '. + {($k): $v}' <<<"$json")
+                  done
+                  umask 077
+                  printf '%s' "$json" > "$RUNNER_TEMP/worker-secrets.json"
+                  echo "Secrets for the Worker: ${names[*]:-none}"
+
+            - name: Build the packages the app uses
+              run: pnpm turbo run build --filter='${{ matrix.pkg }}^...'
+
+            - name: Build for Cloudflare
+              working-directory: ${{ matrix.dir }}
+              run: pnpm cf:build
+
+            - name: Secrets onto the Worker
+              working-directory: ${{ matrix.dir }}
+              run: |
+                  set -euo pipefail
+                  if [ "$(cat "$RUNNER_TEMP/worker-secrets.json")" != "{}" ]; then
+                    pnpm exec wrangler secret bulk "$RUNNER_TEMP/worker-secrets.json" \
+                      ${{ matrix.env == 'production' && '--env production' || '' }} > /dev/null
+                  fi
+                  rm -f "$RUNNER_TEMP/worker-secrets.json"
+
+            # OpenNext's deploy, not wrangler's: it first copies the prebuilt
+            # pages into the Worker's static files (the marketing site is served
+            # from them).
+            - name: Deploy
+              working-directory: ${{ matrix.dir }}
+              run: pnpm exec opennextjs-cloudflare deploy ${{ matrix.env == 'production' && '--env production' || '' }}

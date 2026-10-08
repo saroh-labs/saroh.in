@@ -1,13 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import type { SarohPlan, SarohSubscription } from "./plan";
-import {
-    planIncludes,
-    planOptions,
-    planPrice,
-    planSummary,
-    usageLine,
-} from "./plan";
+import { planIncludes, planPrice, planSummary, usageLine } from "./plan";
 
 const plan = (over: Partial<SarohPlan> = {}): SarohPlan => ({
     id: "plan_business",
@@ -61,7 +55,7 @@ describe("planIncludes", () => {
         );
     });
 
-    it("never counts websites: a business has one for now (ADR-006)", () => {
+    it("never counts websites: one on every plan (ADR-006, DEC-094)", () => {
         expect(planIncludes({ sites: 5 })).not.toMatch(/5|websites/);
     });
 });
@@ -128,35 +122,6 @@ describe("planSummary", () => {
             kind: "text",
             text: "Date not set yet",
         });
-    });
-});
-
-describe("planOptions", () => {
-    const SCALE = plan({
-        id: "p3",
-        key: "scale",
-        name: "Scale",
-        priceCents: 399900,
-    });
-
-    it("marks the current plan and prices the others as up or across", () => {
-        const options = planOptions([SCALE, plan(), FREE], sub());
-        expect(options.map((o) => [o.key, o.current, o.cta])).toEqual([
-            ["free", false, "Switch"],
-            ["business", true, null],
-            ["scale", false, "Upgrade"],
-        ]);
-    });
-
-    it("offers every plan to choose when there is none", () => {
-        expect(planOptions([plan(), FREE], null).map((o) => o.cta)).toEqual([
-            "Choose",
-            "Choose",
-        ]);
-        // A plan that has ended is not the current one.
-        expect(
-            planOptions([plan()], sub({ status: "CANCELLED" }))[0]?.current,
-        ).toBe(false);
     });
 });
 

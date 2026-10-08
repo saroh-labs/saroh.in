@@ -2,6 +2,7 @@
 import type { Browser, Page } from "@playwright/test";
 import { expect, test } from "@playwright/test";
 
+import { expectNothingHiddenSideways } from "../fixtures/hidden-sideways";
 import { makeOrder } from "../fixtures/own-data";
 import { useSession } from "../fixtures/sessions";
 import { demoUser, ignoreHTTPSErrors, urls } from "../playwright.config";
@@ -267,6 +268,9 @@ test.describe("orders list", () => {
             sw: document.documentElement.scrollWidth,
         }));
         expect(doc.sw).toBeLessThanOrEqual(doc.vw);
+        // The page fitting is not enough: no card or box inside it may hide
+        // a column sideways (Phone Tables audit T10).
+        await expectNothingHiddenSideways(page);
 
         // The filters are behind one button now (B5), so the first card
         // starts above the fold rather than under a wall of menus.
@@ -777,8 +781,15 @@ test.describe("orders quick view and row menu (B5)", () => {
             await expect(
                 panel.getByRole("list", { name: "Steps" }),
             ).toBeVisible();
+            // Whether it is paid, never a figure (UX-010, DEC-024): the
+            // Payment line stays, with no amount and nothing to refund or pay.
             await expect(panel.getByText(/₹/)).toHaveCount(0);
-            await expect(panel.getByText("Payment")).toHaveCount(0);
+            await expect(
+                panel.getByRole("button", { name: /Refund|pay link/i }),
+            ).toHaveCount(0);
+            await expect(
+                panel.getByRole("link", { name: /Refund|pay link/i }),
+            ).toHaveCount(0);
         }
         await page.close();
     });

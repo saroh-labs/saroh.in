@@ -76,6 +76,13 @@ export class CreateSiteFromTemplateDto {
     @IsInt({ message: "templateVersion must be an integer" })
     @Min(1, { message: "templateVersion must be at least 1" })
     templateVersion?: number;
+
+    /** One of the template's colourways; its first when absent (KTD-1). */
+    @IsOptional()
+    @Transform(trim)
+    @IsString()
+    @MaxLength(60)
+    styleId?: string;
 }
 
 /**
@@ -351,6 +358,17 @@ export class CreateApprovalDto {
         message: "outcome must be APPROVED or CHANGES_REQUESTED",
     })
     outcome!: "APPROVED" | "CHANGES_REQUESTED";
+
+    /**
+     * What needs changing (UX-043): required with CHANGES_REQUESTED, so the
+     * person whose work it is knows what to do; ignored on an approval.
+     */
+    @ValidateIf((o: CreateApprovalDto) => o.outcome === "CHANGES_REQUESTED")
+    @Transform(trim)
+    @IsString({ message: "Say what needs changing." })
+    @MinLength(3, { message: "Say what needs changing." })
+    @MaxLength(500, { message: "Keep it under 500 characters." })
+    reason?: string;
 
     /**
      * The test release the verdict is on (DEC-071, T8). The verdict is then

@@ -1,4 +1,10 @@
-import type { ContractVersion, SectionType } from "@saroh/block-contract";
+import type {
+    ContractVersion,
+    FontPairKey,
+    SectionType,
+    SitePaletteInput,
+    SiteTypeScale,
+} from "@saroh/block-contract";
 
 /**
  * Site templates (Stage 2 — S2-002).
@@ -113,14 +119,99 @@ export interface TemplatePage {
     title: string;
     /** Marks the site's home page. At most one page should set this. */
     isHome?: boolean;
+    /**
+     * Put in the site's menu, in page order (UX-070). A new site starts
+     * with a real menu, so Settings, the pre-publish check and the live
+     * header all name the same one.
+     */
+    inMenu?: boolean;
     /** Ordered sections; array index becomes the persisted `order`. */
     sections: TemplateSection[];
+    /**
+     * Whether the page is laid down for this context. Absent means always.
+     * For a page whose every section is bound to one module (a gym's
+     * Timetable), so a business without it gets no page that would render
+     * empty. Never on the home page: a site always has one.
+     */
+    when?: (ctx: TemplateContext) => boolean;
+}
+
+/**
+ * The kinds of business a template is for: the waitlist's taxonomy
+ * (`waitlist-keys.ts` in the API, `content/waitlist.ts` on saroh.in), so the
+ * gallery's kind filter and the waitlist speak one vocabulary. An API spec
+ * holds the two lists equal.
+ */
+export const TEMPLATE_KINDS = [
+    "salon",
+    "gym",
+    "clinic",
+    "coach",
+    "food",
+    "shop",
+    "creator",
+    "other",
+] as const;
+export type TemplateKind = (typeof TEMPLATE_KINDS)[number];
+
+/** What a template's site is built around (the gallery's "shape" fact). */
+export const TEMPLATE_SHAPES = [
+    "store",
+    "services",
+    "journal",
+    "portfolio",
+    "docs",
+] as const;
+export type TemplateShape = (typeof TEMPLATE_SHAPES)[number];
+
+/**
+ * A look a template's site starts in (plan KTD-1): the `Site.style`
+ * vocabulary — swatch keys per row and slider values — plus a font pair.
+ * Choices, not CSS: the API validates it exactly as it validates a style the
+ * merchant saves (`parseSiteStyle`), so a template cannot reach the page with
+ * anything Website › Style could not have chosen. Absent fields keep the
+ * default.
+ */
+export interface TemplateStyle {
+    /** Swatch key per style row (`pageGround`, `text`, `accent`, …). */
+    colours?: Readonly<Record<string, string>>;
+    /** Slider values (`pageMargin`, `cornerRadius`, …). */
+    scalars?: Readonly<Record<string, number>>;
+    /** A key from `FONT_PAIRS` (`@saroh/block-contract`). */
+    fontPair?: FontPairKey;
+    /**
+     * The design's own exact colours (DEC-090), `#RRGGBB` per `--site-*`
+     * role; when present they replace the swatch rows' colours. Checked by
+     * `parsePalette` (`@saroh/block-contract`): every text pairing 4.5:1.
+     * A merchant reaches it only by choosing this colourway.
+     */
+    palette?: Readonly<SitePaletteInput>;
+    /**
+     * The design's type scale (DEC-090): display and body size, reading
+     * width, section-title style. Bounded by `parseTypeScale`; not a
+     * Website › Style control.
+     */
+    type?: Readonly<SiteTypeScale>;
+}
+
+/** One named colourway of a template, e.g. "Original" or "Night". */
+export interface TemplateStylePreset {
+    /** Stable within the template; recorded on the site (`Site.styleId`). */
+    id: string;
+    /** What the picker and Website › Style call it. */
+    name: string;
+    style: TemplateStyle;
 }
 
 /**
  * A versioned, declarative site template. `id@version` is the registry key —
  * a template evolves by publishing a NEW version alongside the old one, so
  * sites already built from an earlier version keep working.
+ *
+ * Everything after `pages` is optional metadata for the picker and the public
+ * gallery (industry templates plan, U1). A template with none of it is still
+ * a complete template: it creates a site in the default look, as every
+ * template did before.
  */
 export interface TemplateManifest {
     /** Stable template identifier, e.g. `"starter"`. */
@@ -133,4 +224,57 @@ export interface TemplateManifest {
     description?: string;
     /** The pages this template lays down. */
     pages: TemplatePage[];
+    /** The gallery's URL segment (`/templates/<slug>`); defaults to `id`. */
+    slug?: string;
+    /** The kinds of business it is offered to first. */
+    kinds?: readonly TemplateKind[];
+    /** What the site is built around. */
+    shape?: TemplateShape;
+    /** The sample business its renders show, e.g. a bakery and its address. */
+    sample?: { name: string; host: string };
+    /**
+     * The module keys (`COMMERCE`, `APPOINTMENTS`, …) its sections need to
+     * show their real data. Words for the gallery ("uses Products"); turning
+     * a module on is still the merchant's choice.
+     */
+    uses?: readonly string[];
+    /**
+     * Its colourways, the default FIRST. A site made from the template starts
+     * in the first, or the one asked for by id. Absent: the default look.
+     */
+    styles?: readonly TemplateStylePreset[];
+    /**
+     * The site's footer as it starts (industry templates, polish pass): a
+     * short line the design sets beside the name — "14 Hill Road, Bandra
+     * West · Closed Mondays" — and how the footer is laid out. Written to
+     * `Site.footer` at creation as plain text, where the owner rewrites it in
+     * Site settings like any footer; it is sample text, like a template's
+     * headings, so a pre-publish check can tell it is still the template's
+     * by comparing it with this. Absent: no footer is written, and the site
+     * ends in its name (and "Made with Saroh" on Free, DEC-102).
+     */
+    footer?: TemplateFooter;
+}
+
+/** A template's starting footer. See {@link TemplateManifest.footer}. */
+export interface TemplateFooter {
+    /** One line, plain text; no line breaks. */
+    line?: string;
+    /** `left` for the designs' row; absent or `centre` for today's line. */
+    layout?: "centre" | "left";
+}
+
+/**
+ * The colourway a new site starts in: the one asked for, else the first.
+ * `undefined` when the template has none (the site keeps the default look),
+ * and `null` when an id was asked for that the template does not have — the
+ * caller refuses that, rather than silently giving a different look.
+ */
+export function templateStylePreset(
+    template: Pick<TemplateManifest, "styles">,
+    styleId?: string,
+): TemplateStylePreset | null | undefined {
+    const styles = template.styles ?? [];
+    if (styleId === undefined) return styles[0];
+    return styles.find((s) => s.id === styleId) ?? null;
 }

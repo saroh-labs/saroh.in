@@ -1,6 +1,8 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
 
+import { withoutShadowedInPageEntries } from "@saroh/block-contract";
+
 import type { SiteHeaderAction, SiteNavItem } from "./site-header-menu";
 import { SiteMenu, SiteNavRow } from "./site-header-menu";
 import { trimTrailingSlashes } from "./url-path";
@@ -12,10 +14,19 @@ import { trimTrailingSlashes } from "./url-path";
  * like the live site, so there is one implementation of each, here (#252).
  */
 
+/**
+ * How the footer is laid out. Absent is today's: one centred line. `left`
+ * is the industry designs' row: the site's name in its heading face, the
+ * merchant's line beside it, and the Saroh credit (Free only) at the far end.
+ */
+export const FOOTER_LAYOUTS = ["centre", "left"] as const;
+export type FooterLayout = (typeof FOOTER_LAYOUTS)[number];
+
 /** What the merchant wrote at the foot of their site. */
 export interface SiteFooterContent {
     format: "html" | "markdown";
     value: string;
+    layout?: FooterLayout;
 }
 
 /** Where a footer line breaks into more than one line. */
@@ -25,11 +36,11 @@ const BLOCK_OR_BREAK =
 /**
  * A merchant's footer as one line, or `null` when it is more than that.
  *
- * The footer ends in "Runs on Saroh" (G17, default 67), set after the
+ * On Free the footer ends in "Made with Saroh" (DEC-102), set after the
  * merchant's own line with a " · ", as the design draws it. That only works
  * for a line: plain text with no line break, or html that is a single
  * paragraph. Anything richer (two paragraphs, a list, a heading) keeps its
- * own block, and "Runs on Saroh" goes on the line below it.
+ * own block, and the credit goes on the line below it.
  *
  * The html branch hands back the paragraph's inner markup. Publish sanitized
  * the whole value, and a `<p>`'s contents are inline markup, so drawing them
@@ -47,15 +58,50 @@ export function footerLine(
     return { kind: "html", value: inner };
 }
 
+/** A trimmed string, or null when there is nothing in it. */
+function nonBlank(value: string | null | undefined): string | null {
+    const trimmed = value?.trim() ?? "";
+    return trimmed === "" ? null : trimmed;
+}
+
 /**
- * The foot of every page (#202, G17): the merchant's own line, then
- * "Runs on Saroh" linking to saroh.in.
+ * The business's public phone and place (UX-038), and its contact email
+ * when it has added one (DEC-101), for the footer.
+ */
+export interface SiteContact {
+    phone: string | null;
+    address: string | null;
+    email?: string | null;
+}
+
+/**
+ * The Saroh credit a Free site's footer carries (DEC-102): "Made with
+ * Saroh", linking to saroh.in with the business's referral code (#812).
+ * Paid plans have none, and a site drawn with none shows no Saroh credit.
+ */
+export interface SiteCredit {
+    href: string;
+}
+
+/** Where "Made with Saroh" links: saroh.in with the business's code. */
+export function madeWithSarohHref(referralCode: string): string {
+    return `https://saroh.in/?ref=${encodeURIComponent(referralCode)}`;
+}
+
+/**
+ * The foot of every page (#202, G17): the merchant's own line, then on Free
+ * "Made with Saroh" linking to saroh.in with the business's referral code
+ * (DEC-102). Paid plans show no Saroh credit; the renderer reads the plan
+ * and passes `credit` only for Free.
  *
- * "Runs on Saroh" stays on every site this round (default 67), so the footer
- * always renders now. With nothing written, the merchant's line is the site's
- * name, which the header already shows to everyone. Nothing from the business
- * profile is published here: `parseSiteFooter` in the API says why that stays
- * the merchant's to write.
+ * The footer always renders. With nothing written, the merchant's line is
+ * the site's name, which the header already shows to everyone.
+ *
+ * `contact` (UX-038) is the business's PUBLIC place and phone: the same live
+ * read the Visit us block and the booking header show (`/visit`, G8, DEC-053),
+ * where Settings › Business calls the number "Phone on your website". Its
+ * `email` is the business's contact email, shown when the business has added
+ * one (DEC-101); Settings › Business says the site shows it.
  *
  * The link is plain text in the site's own footer colours and type, never
  * Saroh's colours or font: a merchant's site does not wear the brand. The
@@ -73,19 +119,32 @@ export function footerLine(
 export function SiteFooter({
     footer,
     name,
+    contact = null,
+    credit = null,
 }: {
     footer: SiteFooterContent | null | undefined;
     /** The site's name: the footer's line when the merchant wrote none. */
     name: string;
+    /** The business's public phone, place and email; null draws none. */
+    contact?: SiteContact | null;
+    /** "Made with Saroh" on Free (DEC-102); null shows no Saroh credit. */
+    credit?: SiteCredit | null;
 }) {
+    const phone = nonBlank(contact?.phone);
+    const email = nonBlank(contact?.email);
+    const address = nonBlank(contact?.address);
     const written = footer && footer.value.trim() !== "" ? footer : null;
+    if (footer?.layout === "left") {
+        return <LeftFooter written={written} name={name} credit={credit} />;
+    }
     const line = written
         ? footerLine(written)
         : { kind: "text" as const, value: name.trim() };
+    const hasLine = line !== null && line.value !== "";
 
     return (
         <footer className="border-site-border bg-site-footer-bg text-site-footer-fg font-site-body w-full border-t px-5 pb-7 pt-5 sm:px-[var(--site-page-margin)]">
-            <div className="mx-auto max-w-screen-xl text-center text-[12.5px]">
+            <div className="max-w-site-content mx-auto text-center text-[12.5px]">
                 {written && line === null ? (
                     written.format === "html" ? (
                         <div
@@ -103,10 +162,28 @@ export function SiteFooter({
                         </p>
                     )
                 ) : null}
-                <p>
-                    {line && line.value !== "" ? (
-                        <>
-                            {line.kind === "html" ? (
+                {phone || email || address ? (
+                    <p className="mb-2 flex flex-wrap items-center justify-center gap-x-3 gap-y-1 text-[13px]">
+                        {phone ? (
+                            <a
+                                href={`tel:${phone.replace(/[^\d+]/g, "")}`}
+                                className={FOOTER_LINK}
+                            >
+                                Call {phone}
+                            </a>
+                        ) : null}
+                        {email ? (
+                            <a href={`mailto:${email}`} className={FOOTER_LINK}>
+                                {email}
+                            </a>
+                        ) : null}
+                        {address ? <span>{address}</span> : null}
+                    </p>
+                ) : null}
+                {hasLine || credit ? (
+                    <p>
+                        {line && hasLine ? (
+                            line.kind === "html" ? (
                                 <span
                                     // Sanitized at publish — see above.
                                     dangerouslySetInnerHTML={{
@@ -115,19 +192,100 @@ export function SiteFooter({
                                 />
                             ) : (
                                 <span>{line.value}</span>
-                            )}
-                            {" · "}
-                        </>
+                            )
+                        ) : null}
+                        {hasLine && credit ? " · " : null}
+                        {credit ? <MadeWithSaroh credit={credit} /> : null}
+                    </p>
+                ) : null}
+            </div>
+        </footer>
+    );
+}
+
+/** A link in the footer, in the footer's own colours. */
+const FOOTER_LINK =
+    "focus-visible:ring-site-footer-fg rounded-sm underline underline-offset-2 hover:no-underline focus-visible:outline-none focus-visible:ring-2";
+
+/**
+ * "Made with Saroh" (DEC-102), in the footer's own colours and type, never
+ * Saroh's: a merchant's site does not wear the brand.
+ */
+function MadeWithSaroh({
+    credit,
+    className = "",
+}: {
+    credit: SiteCredit;
+    className?: string;
+}) {
+    return (
+        <a
+            href={credit.href}
+            target="_blank"
+            rel="noopener"
+            className={[FOOTER_LINK, className].filter(Boolean).join(" ")}
+        >
+            Made with Saroh
+        </a>
+    );
+}
+
+/**
+ * The `left` footer — the designs' row (Bakery, Ceramics, Blogs): one row
+ * on the page's column, its margins inside the column so it lines up with
+ * the header and the sections, wrapping on a phone —
+ * the name in the heading face, the merchant's line (an address, the days
+ * they open), and on Free "Made with Saroh" pushed to the far end. A footer richer
+ * than a line keeps its own block above the row, left-aligned too. The same
+ * safety note as {@link SiteFooter}: html arrives sanitized.
+ */
+function LeftFooter({
+    written,
+    name,
+    credit,
+}: {
+    written: SiteFooterContent | null;
+    name: string;
+    credit: SiteCredit | null;
+}) {
+    const line = written ? footerLine(written) : null;
+    return (
+        <footer className="border-site-border bg-site-footer-bg text-site-footer-fg font-site-body w-full border-t pb-12 pt-6">
+            {/* The margins inside the column, as the header and every
+                section have them, so the name lines up with the page's
+                left edge on a template's column (`--site-content-width`). */}
+            <div className="max-w-site-content mx-auto px-5 sm:px-[var(--site-page-margin)]">
+                {written && line === null ? (
+                    written.format === "html" ? (
+                        <div
+                            className="prose prose-sm prose-headings:text-site-footer-fg prose-p:text-site-footer-fg prose-a:text-site-footer-fg prose-strong:text-site-footer-fg prose-li:text-site-footer-fg mb-4 max-w-none"
+                            // Sanitized at publish — see SiteFooter.
+                            dangerouslySetInnerHTML={{ __html: written.value }}
+                        />
+                    ) : (
+                        <p className="mb-4 whitespace-pre-wrap text-sm">
+                            {written.value}
+                        </p>
+                    )
+                ) : null}
+                <div className="flex flex-wrap items-baseline gap-x-6 gap-y-2 text-[13.5px]">
+                    <span className="font-site-heading text-base font-semibold tracking-[-0.02em]">
+                        {name.trim()}
+                    </span>
+                    {line && line.value !== "" ? (
+                        line.kind === "html" ? (
+                            <span
+                                // Sanitized at publish — see SiteFooter.
+                                dangerouslySetInnerHTML={{ __html: line.value }}
+                            />
+                        ) : (
+                            <span>{line.value}</span>
+                        )
                     ) : null}
-                    <a
-                        href="https://saroh.in"
-                        target="_blank"
-                        rel="noopener"
-                        className="focus-visible:ring-site-footer-fg rounded-sm underline underline-offset-2 hover:no-underline focus-visible:outline-none focus-visible:ring-2"
-                    >
-                        Runs on Saroh
-                    </a>
-                </p>
+                    {credit ? (
+                        <MadeWithSaroh credit={credit} className="ml-auto" />
+                    ) : null}
+                </div>
             </div>
         </footer>
     );
@@ -204,7 +362,9 @@ export function withShopLink(
     if (menu.some(opensShop)) return [...menu];
     const shop: SiteNavItem = { label: "Shop", href: SHOP_HREF, kind: "SHOP" };
     if (menu.length === 0) return [{ label: "Home", href: "/" }, shop];
-    const at = menu[0] && isHome(menu[0]) ? 1 : 0;
+    // After Home and the home page's own sections, which lead the menu.
+    let at = menu[0] && isHome(menu[0]) ? 1 : 0;
+    while (menu[at] && isInPage(menu[at])) at++;
     return [...menu.slice(0, at), shop, ...menu.slice(at)];
 }
 
@@ -212,6 +372,39 @@ export function withShopLink(
 function isHome(item: SiteNavItem): boolean {
     return item.href === "/" || item.href === "";
 }
+
+/** An entry that jumps to a section of the home page (`/#visit`). */
+function isInPage(item: SiteNavItem): boolean {
+    return item.href.startsWith("/#");
+}
+
+/**
+ * The header over a full-bleed hero (U2).
+ *
+ * When the page's first section is a full-bleed hero, `PageSections` marks
+ * its wrapper `data-site-first-hero`, and these classes — keyed off that
+ * mark with `:has()`, so the layout needs to know nothing about the page —
+ * lay the header over the photo: no longer sticky, taking no room of its
+ * own (the hero leaves room for it), with no ground or rule of its own, but
+ * its own band of the page's ink fading down from the top, so the name and
+ * the menu read over any photo, or over none. The words over it take the
+ * page's paper, as the hero's do. Every other page's header is unchanged:
+ * without the mark, none of these classes applies.
+ *
+ * Literal strings, not built from a prefix, so Tailwind finds them.
+ */
+// Joined, not `cn()`-merged: tailwind-merge reads the gradient as
+// replacing `bg-transparent` and drops it, and the ground would show.
+const OVER_PHOTO = [
+    "[body:has([data-site-first-hero])_&]:relative",
+    "[body:has([data-site-first-hero])_&]:-mb-16",
+    "[body:has([data-site-first-hero])_&]:h-16",
+    "[body:has([data-site-first-hero])_&]:border-transparent",
+    "[body:has([data-site-first-hero])_&]:bg-transparent",
+    "[body:has([data-site-first-hero])_&]:bg-gradient-to-b",
+    "[body:has([data-site-first-hero])_&]:from-site-fg/75",
+    "[body:has([data-site-first-hero])_&]:to-transparent",
+].join(" ");
 
 /**
  * The site's header (#206, G17), in one row: the name, the menu, the bag,
@@ -267,24 +460,36 @@ export function SiteHeader({
     /** Sign in, or the signed-in customer's avatar (A3). Same rule. */
     account?: ReactNode;
 }) {
-    const to = (href: string) =>
-        basePath && href.startsWith("/") ? `${basePath}${href}` : href;
-    const items = withShopLink(siteMenu(navigation, modules), shopServes).map(
-        (item) => ({
-            label: item.label,
-            href: to(item.href),
-        }),
-    );
+    const to = (href: string) => {
+        if (!basePath || !href.startsWith("/")) return href;
+        // A section of the home page (`/#visit`): the preview's own home,
+        // with the anchor, never "/preview/<token>/#visit".
+        if (href.startsWith("/#")) return `${basePath}${href.slice(1)}`;
+        return `${basePath}${href}`;
+    };
+    // A section entry a page entry names leaves once the modules that are
+    // off have (`withoutShadowedInPageEntries`): it stands in for its module
+    // page only while that page is out of the menu.
+    const items = withShopLink(
+        withoutShadowedInPageEntries(siteMenu(navigation, modules)),
+        shopServes,
+    ).map((item) => ({
+        label: item.label,
+        href: to(item.href),
+    }));
     const main = action ? { label: action.label, href: to(action.href) } : null;
     const hasMenu = items.length > 0 || main !== null;
 
     return (
-        <header className="border-site-border bg-site-bg font-site-body sticky top-0 z-30 border-b">
-            <div className="mx-auto flex min-h-11 max-w-screen-xl items-center gap-3.5 px-5 py-2.5 sm:px-[var(--site-page-margin)]">
+        <header
+            data-site-header=""
+            className={`border-site-border bg-site-bg font-site-body sticky top-0 z-30 border-b ${OVER_PHOTO}`}
+        >
+            <div className="max-w-site-content mx-auto flex min-h-11 items-center gap-3.5 px-5 py-2.5 sm:px-[var(--site-page-margin)]">
                 <Link
                     href={to("/")}
                     aria-label={`${name} — home`}
-                    className="text-site-fg focus-visible:ring-site-accent flex min-w-0 cursor-pointer items-center rounded-[var(--site-radius)] hover:opacity-80 focus-visible:outline-none focus-visible:ring-2 active:opacity-70"
+                    className="text-site-fg focus-visible:ring-site-accent [body:has([data-site-first-hero])_&]:text-site-bg flex min-w-0 cursor-pointer items-center rounded-[var(--site-radius)] hover:opacity-80 focus-visible:outline-none focus-visible:ring-2 active:opacity-70"
                 >
                     <span className="font-site-heading truncate text-lg font-semibold tracking-[-0.02em]">
                         {name}

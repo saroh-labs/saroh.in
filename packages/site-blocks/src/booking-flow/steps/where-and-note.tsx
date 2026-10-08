@@ -14,6 +14,7 @@ export function WhereAndNote({
     business,
     asksWhere,
     where,
+    onlyWhere = null,
     note,
     onWhere,
     onNote,
@@ -24,6 +25,11 @@ export function WhereAndNote({
     /** Only a service offered either way asks Where. */
     asksWhere: boolean;
     where: BookingWhere;
+    /**
+     * The one way the chosen time can be had (DEC-087), or null: the other
+     * is shown but can't be picked, and the page says why.
+     */
+    onlyWhere?: BookingWhere | null;
     note: string;
     onWhere: (where: BookingWhere) => void;
     onNote: (note: string) => void;
@@ -51,16 +57,26 @@ export function WhereAndNote({
                                 type="button"
                                 role="radio"
                                 aria-checked={where === option}
+                                disabled={
+                                    onlyWhere !== null && onlyWhere !== option
+                                }
                                 onClick={() => onWhere(option)}
                                 className={cn(
                                     optionClasses(where === option),
-                                    "text-[15px] font-semibold",
+                                    "text-[15px] font-semibold disabled:cursor-not-allowed disabled:opacity-50",
                                 )}
                             >
                                 {whereLabel(option, business)}
                             </button>
                         ))}
                     </div>
+                    {onlyWhere ? (
+                        <p className="text-site-muted mt-1.5 text-[12.5px]">
+                            {onlyWhere === "ONLINE"
+                                ? `${business} is closed then, so this time is online only.`
+                                : "This time is in person only."}
+                        </p>
+                    ) : null}
                     {where === "ONLINE" ? (
                         <p className="text-site-muted mt-1.5 text-[12.5px]">
                             The link to join shows here once you&apos;re booked.

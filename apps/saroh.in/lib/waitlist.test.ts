@@ -23,11 +23,9 @@ describe("waitlistContext", () => {
     });
 
     it("keeps the CTA builder's plan and source", () => {
-        expect(
-            waitlistContext({ plan: "grow", src: "solutions-gyms" }),
-        ).toEqual({
+        expect(waitlistContext({ plan: "grow", src: "pricing-grow" })).toEqual({
             plan: "grow",
-            src: "solutions-gyms",
+            src: "pricing-grow",
             ref: undefined,
         });
         expect(waitlistContext({ src: "Instagram" }).src).toBe("instagram");
@@ -48,6 +46,24 @@ describe("waitlistContext", () => {
         expect(waitlistContext({ ref: ["abcdefgh", "x"] }).ref).toBe(
             "abcdefgh",
         );
+    });
+
+    it("keeps a template only when it is one of the gallery's (U13)", () => {
+        const known = ["gym", "bakery"];
+        expect(waitlistContext({ template: "gym" }, known).template).toBe(
+            "gym",
+        );
+        expect(waitlistContext({ template: " Gym " }, known).template).toBe(
+            "gym",
+        );
+        expect(
+            waitlistContext({ template: "salon" }, known).template,
+        ).toBeUndefined();
+        expect(
+            waitlistContext({ template: "<script>" }, known).template,
+        ).toBeUndefined();
+        // No list, no template: the form never sends one it can't name.
+        expect(waitlistContext({ template: "gym" }).template).toBeUndefined();
     });
 });
 

@@ -18,6 +18,14 @@ import { isBillOfSupply } from "../invoices/invoice-title";
 import { payLinkUrlFor } from "../invoices/pay-link-url";
 import { invoicePayOnline, NOT_PAID_ONLINE } from "../invoices/pay-online";
 import { hashPayToken } from "../invoices/pay-token";
+import type {
+    BusinessContactView,
+    PayInstructionsView,
+} from "../organizations/business-pay-instructions";
+import {
+    businessContactOf,
+    businessPayInstructionsOf,
+} from "../organizations/business-pay-instructions";
 import { assertOrganizationOpen } from "../organizations/organization-lifecycle.gate";
 import { siteOriginOf } from "../sites/site-origin";
 import { parseSiteStyle, siteStyleVariables } from "../sites/site-style";
@@ -103,6 +111,19 @@ export interface PublicInvoiceView {
      * receipt in the account area does not.
      */
     payUrl?: string;
+    /**
+     * "How to pay us" (R32): the business's UPI ID, bank details and note,
+     * on the pay link's read of an invoice that is owed and can't be paid
+     * online — the customer's own invoice, so the details go to someone the
+     * business billed. Null when the business set none; absent otherwise.
+     */
+    payInstructions?: PayInstructionsView | null;
+    /**
+     * The business's phone and email (UX-007), on the same read when it set
+     * no How to pay us: the page says "Contact them to pay" with a way to
+     * reach them. Null when neither is set; absent otherwise.
+     */
+    businessContact?: BusinessContactView | null;
 }
 
 /** What the pay page may say about autopay (D12). */
@@ -225,11 +246,16 @@ function notFound(): never {
 
 /**
  * A 409 when the business doesn't take payment online (DEC-070): Payments
- * is off, or no provider can open the checkout window. The invoice is still
- * owed; the customer pays the business some other way.
+ * is off, no provider can open the checkout window, or its plan takes no
+ * new online payment — a renewal of a subscription it already has still
+ * does. The invoice is still owed; the customer pays the business some
+ * other way.
  */
-async function assertPaysOnline(organizationId: string): Promise<void> {
-    if (await invoicePayOnline(prisma, organizationId)) return;
+async function assertPaysOnline(
+    organizationId: string,
+    invoice: { subscriptionId: string | null },
+): Promise<void> {
+    if (await invoicePayOnline(prisma, organizationId, invoice)) return;
     throw new ConflictException({
         message: NOT_PAID_ONLINE,
         details: { reason: "not-paid-online" },
@@ -282,14 +308,26 @@ export class PublicInvoicesService {
                 invoicePaper(found.organizationId, found.id),
                 // A link sent before Payments went off opens as a view
                 // link: it never errors (DEC-070).
-                invoicePayOnline(prisma, found.organizationId),
+                invoicePayOnline(prisma, found.organizationId, found),
             ]);
             // Autopay only on a plan's invoice that offers it (D12), and
             // only while the business takes payment online.
-            const [autopay, charging] = await Promise.all([
+            const owed =
+                paper.status === "ISSUED" || paper.status === "OVERDUE";
+            const [autopay, charging, payInstructions] = await Promise.all([
                 payOnline ? this.payAutopay(found) : null,
                 chargeUnderWayOn(prisma, found.organizationId, found.id),
+                // How to pay the business offline (R32): only on an owed
+                // invoice the page offers no Pay button for.
+                owed && !payOnline
+                    ? businessPayInstructionsOf(found.organizationId)
+                    : undefined,
             ]);
+            // No way to pay set: a way to reach the business instead (UX-007).
+            const businessContact =
+                payInstructions === null
+                    ? await businessContactOf(found.organizationId)
+                    : undefined;
             const view: PublicInvoiceView = autopay
                 ? { ...paper, payOnline, autopay }
                 : { ...paper, payOnline };
@@ -302,6 +340,8 @@ export class PublicInvoicesService {
             return {
                 ...view,
                 payUrl: await payLinkUrlFor(found.organizationId, token),
+                ...(payInstructions !== undefined ? { payInstructions } : {}),
+                ...(businessContact !== undefined ? { businessContact } : {}),
                 ...(charging
                     ? { autopayCharging: { at: charging.at.toISOString() } }
                     : {}),
@@ -407,7 +447,7 @@ export class PublicInvoicesService {
             });
         }
         return runInOrgContext(found.organizationId, async () => {
-            await assertPaysOnline(found.organizationId);
+            await assertPaysOnline(found.organizationId, found);
             const origin = await siteOriginOf(found.organizationId);
             return autopay.startForInvoice({
                 organizationId: found.organizationId,
@@ -490,6 +530,7 @@ export class PublicInvoicesService {
                     total: true,
                     currency: true,
                     source: true,
+                    subscriptionId: true,
                     booking: {
                         select: { status: true, holdExpiresAt: true },
                     },
@@ -523,7 +564,7 @@ export class PublicInvoicesService {
             // A view link (DEC-070): the page offers no Pay, and the API
             // agrees. A booking's pay-now hold above was started online
             // and keeps the provider's own refusal.
-            await assertPaysOnline(found.organizationId);
+            await assertPaysOnline(found.organizationId, invoice);
             // One charge at a time (D13): autopay is charging it.
             if (
                 await chargeUnderWayOn(prisma, found.organizationId, invoice.id)
@@ -534,12 +575,14 @@ export class PublicInvoicesService {
         });
     }
 
-    private async find(
-        tokenHash: string,
-    ): Promise<{ id: string; organizationId: string }> {
+    private async find(tokenHash: string): Promise<{
+        id: string;
+        organizationId: string;
+        subscriptionId: string | null;
+    }> {
         const row = await prisma.invoice.findUnique({
             where: { payTokenHash: tokenHash },
-            select: { id: true, organizationId: true },
+            select: { id: true, organizationId: true, subscriptionId: true },
         });
         if (!row) notFound();
         return row;

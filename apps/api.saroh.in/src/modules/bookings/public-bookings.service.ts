@@ -32,6 +32,13 @@ import {
 import { bookingLocation, intakeNoteOf } from "./booking-intake";
 import { paidADeposit } from "./booking-money";
 import {
+    depositPaidAtDesk,
+    onlinePaymentBlocker,
+    onlineUnavailableMessage,
+    refuseDisallowedPay,
+} from "./booking-payment";
+import type { BookingRulesValue } from "./booking-rules";
+import {
     bookingWindowRefusal,
     loadBookingRules,
     withinBookingWindow,
@@ -46,6 +53,7 @@ import {
     toAvailabilityService,
 } from "./booking-slots";
 import type { BookPay } from "./dto";
+import { openingFor, refuseOutsideOpening } from "./opening-hours";
 import type {
     PublicBooking,
     PublicBookingPage,
@@ -56,7 +64,6 @@ import {
     publicBookingPage,
     publicDays,
     publicServices,
-    takesOnlinePayment,
     toPublicBooking,
 } from "./public-booking-page";
 import { FixedWindowRateLimiter } from "./rate-limiter";
@@ -323,9 +330,10 @@ export class PublicBookingsService {
         signedIn?: SignedInCustomer,
     ): Promise<{ booking: Booking; payToken: string | null }> {
         // 1. Load the Service. Org is derived from HERE, never the client.
-        const { service, rules } = await loadBookableService(serviceId, {
+        const loaded = await loadBookableService(serviceId, {
             bookingPage: true,
         });
+        const { rules, service } = loaded;
         // A signed-in customer books only their own business's services:
         // another business's service is as good as missing (A9).
         if (signedIn && service.organizationId !== signedIn.organizationId) {
@@ -339,19 +347,32 @@ export class PublicBookingsService {
             ? await this.signedInBooker(signedIn, given)
             : given;
         // How they pay, as the service allows it (E8): a deposit service is
-        // paid online, in part or in full; any other never takes a deposit.
-        // A credit (A10) pays the class whatever its price or deposit, and
-        // only for someone signed in: it is their own pack or membership.
+        // paid online, in part or in full — or at the desk when online can't
+        // take it and the business allows the desk (DEC-089); any other
+        // never takes a deposit. A credit (A10) pays the class whatever its
+        // price or deposit, and only for someone signed in: it is their own
+        // pack or membership.
         const askedPay = asked.pay;
         const credit =
             askedPay === "CREDIT" ? creditOf(asked, service, signedIn) : null;
+        const bookingRules = await loadBookingRules(
+            prisma,
+            service.organizationId,
+        );
+        const deskForDeposit =
+            (askedPay === "DESK" || askedPay === undefined) &&
+            depositCents(service.priceCents, service.depositMode) !== null &&
+            (await depositPaidAtDesk(service.organizationId, bookingRules));
         const input: BookInput = {
             ...asked,
             pay:
                 askedPay === "CREDIT"
                     ? askedPay
-                    : payAtBooking(service, askedPay),
+                    : payAtBooking(service, askedPay, deskForDeposit),
         };
+        // …and as the business allows it (DEC-088): online, at the desk, or
+        // both. Refused before anything is held.
+        refuseDisallowedPay(service, input.pay, bookingRules);
         // A treatment is sold as one order (E9, DEC-050): with nowhere to
         // sell it, or no email to bill, it is refused before anything is
         // held.
@@ -376,6 +397,18 @@ export class PublicBookingsService {
             startAt,
             new Date(startAt.getTime() + service.durationMinutes * 60_000),
         );
+        // In person, only while the business is open (DEC-087).
+        const opening = await openingFor(service, place);
+        refuseOutsideOpening(
+            opening,
+            {
+                startAt,
+                endAt: new Date(
+                    startAt.getTime() + service.durationMinutes * 60_000,
+                ),
+            },
+            service.locationType === "EITHER",
+        );
         const availService = toAvailabilityService(service);
         const staffing = await loadStaffing(service);
         if (
@@ -386,11 +419,7 @@ export class PublicBookingsService {
                 "startAt is not a bookable slot for this service",
             );
         }
-        const refusal = bookingWindowRefusal(
-            startAt,
-            now,
-            await loadBookingRules(prisma, service.organizationId),
-        );
+        const refusal = bookingWindowRefusal(startAt, now, bookingRules);
         if (refusal) throw new BadRequestException(refusal);
         const endAt = new Date(
             startAt.getTime() + service.durationMinutes * 60_000,
@@ -400,7 +429,7 @@ export class PublicBookingsService {
         // share of the price, worked out here — never the client's (E8).
         const price =
             input.pay === "NOW" || input.pay === "DEPOSIT"
-                ? await this.onlinePrice(service, input.pay)
+                ? await this.onlinePrice(service, input.pay, bookingRules)
                 : null;
 
         // 3. Rate-limit per (service, hashed IP). Cheap abuse guard. Before
@@ -466,6 +495,7 @@ export class PublicBookingsService {
                 input.staffId,
                 "public",
                 ownHold ?? undefined,
+                opening,
             );
         } catch (err) {
             const twin = await bookingByKey(serviceId, input);
@@ -674,11 +704,19 @@ export class PublicBookingsService {
         // An empty name is no name.
         const typed = given.bookerName?.trim() ?? "";
         const bookerName = [known, typed].find((n) => n !== "");
+        // An empty phone is no phone.
+        const givenPhone =
+            given.bookerPhone?.trim() === ""
+                ? undefined
+                : given.bookerPhone?.trim();
         return {
             ...given,
             bookerEmail: account.email,
             bookerName,
-            bookerPhone: account.contact.phone ?? undefined,
+            // The phone they gave for this booking (UX-049), else the one
+            // their record has. The record keeps its own; a given phone
+            // fills it only when it has none (`reserveInTx`).
+            bookerPhone: givenPhone ?? account.contact.phone ?? undefined,
         };
     }
 
@@ -738,6 +776,7 @@ export class PublicBookingsService {
     private async onlinePrice(
         service: Service,
         pay: "NOW" | "DEPOSIT",
+        rules: Pick<BookingRulesValue, "bookingPayment">,
     ): Promise<{ cents: number; currency: string }> {
         if (
             !service.priceCents ||
@@ -751,12 +790,9 @@ export class PublicBookingsService {
             });
         }
         const deposit = depositCents(service.priceCents, service.depositMode);
-        if (!(await takesOnlinePayment(service.organizationId))) {
+        if ((await onlinePaymentBlocker(service.organizationId)) !== null) {
             throw new ConflictException({
-                message:
-                    deposit === null
-                        ? "This business isn't taking payment online right now. Book it to pay at the desk."
-                        : "This business can't take the deposit online right now. Get in touch with them to book.",
+                message: onlineUnavailableMessage(deposit !== null, rules),
                 field: "pay",
             });
         }
@@ -790,13 +826,16 @@ function creditOf(
 
 /**
  * How a booking is paid, as its service allows (E8, default 39). A service
- * that takes a deposit is paid online: its deposit, or the whole price, and
- * never at the desk — a full-price deposit is simply paying now. A service
- * that takes none is paid now or at the desk, and a deposit is refused.
+ * that takes a deposit is paid online: its deposit, or the whole price — a
+ * full-price deposit is simply paying now — and at the desk only when
+ * `deskForDeposit`: online can't take it and the business allows the desk
+ * (DEC-089, `depositPaidAtDesk`). A service that takes none is paid now or
+ * at the desk, and a deposit is refused.
  */
 export function payAtBooking(
     service: Pick<Service, "priceCents" | "depositMode">,
     pay: BookPay | undefined,
+    deskForDeposit = false,
 ): BookPay | undefined {
     const deposit = depositCents(service.priceCents, service.depositMode);
     if (deposit === null) {
@@ -812,6 +851,7 @@ export function payAtBooking(
     if (pay === "NOW" || pay === "DEPOSIT") {
         return service.depositMode === "FULL" ? "NOW" : pay;
     }
+    if (deskForDeposit) return "DESK";
     throw new BadRequestException({
         message:
             service.depositMode === "FULL"

@@ -5,12 +5,15 @@ import Link from "next/link";
 import type { ReactNode } from "react";
 
 import { OrderPayments } from "@/components/stores/order-payments";
+import type { CounterPayment } from "@/lib/orders/kitchen-service";
+import { paidByHandWords } from "@/lib/orders/paid-how";
 import type { OrderRead, OrderReadMoney } from "@/lib/orders/read";
 import { refundLines } from "@/lib/orders/refund-line";
 import { providerName } from "@/lib/payments/providers";
 import type { OrderPaymentsSummary } from "@/lib/payments/service";
 
 import { actionClass, FOCUS, Panel, PanelTitle } from "./parts";
+import { RecordPayment } from "./record-payment";
 
 const KIND_LABEL: Record<string, string> = {
     CREDIT_NOTE: "Credit note",
@@ -38,9 +41,13 @@ export function MoneyCard({
     onRetryRefund,
     busy = false,
     payLink,
+    onRecordPayment,
     way,
     appointment = false,
+    handover,
 }: {
+    /** Still to be paid at the handover: "collection" or "delivery". */
+    handover?: "collection" | "delivery";
     money: OrderReadMoney;
     /** It goes to an address (a local delivery or a shipment). */
     delivery: boolean;
@@ -58,6 +65,12 @@ export function MoneyCard({
     busy?: boolean;
     /** The pay link's part, for an order still owed money (B11). */
     payLink?: ReactNode;
+    /**
+     * "Record payment" for what a paid order still owes after an edit,
+     * paid at the counter — whoever may record a payment by hand
+     * (`order:edit`).
+     */
+    onRecordPayment?: (kind: CounterPayment) => void;
 }) {
     const n = (v: string) => Number(v);
     const rows: [string, string][] = [["Items", format(n(money.subtotal))]];
@@ -90,21 +103,33 @@ export function MoneyCard({
         payments?.intents.find((i) => i.status === "SUCCEEDED")?.provider ??
         null;
     const paidBy = money.recordedByHand
-        ? "Recorded by hand"
+        ? paidByHandWords(money.paidHow)
         : provider
           ? providerName(provider)
           : n(money.paid) > 0
             ? "Online payment"
             : paymentStatus === "FAILED"
               ? "Didn't go through"
-              : "Not paid yet";
+              : handover
+                ? `Pay on ${handover}`
+                : "Not paid yet";
     const pay: [string, string][] = [["Paid by", paidBy]];
     const refund = refundLines(money, refundStanding, format);
     if (n(money.paid) > 0) pay.push(["Taken", format(n(money.paid))]);
     if (n(money.refunded) > 0) {
         pay.push(["Refunded", format(n(money.refunded))]);
+    } else if (paymentStatus === "REFUNDED" && n(money.paid) > 0) {
+        // Recorded as refunded by hand (UX-061): what was taken went back
+        // outside Saroh, so it reads as refunded, not still taken.
+        pay.push(["Refunded", `${format(n(money.paid))} · by hand`]);
     }
     if (n(money.due) > 0) pay.push(["Still due", format(n(money.due))]);
+    // Paid, then changed to cost more: the difference is still owed until
+    // it is paid online or recorded as paid at the counter.
+    const recordable =
+        onRecordPayment !== undefined &&
+        paymentStatus === "PAID" &&
+        n(money.due) > 0;
     if (n(money.paid) > 0) {
         pay.push([
             "Lands",
@@ -236,6 +261,13 @@ export function MoneyCard({
                 ))}
             </dl>
             {payLink}
+            {recordable ? (
+                <RecordPayment
+                    due={format(n(money.due))}
+                    onRecord={onRecordPayment}
+                    busy={busy}
+                />
+            ) : null}
             {payments && payments.intents.length > 0 ? (
                 <details className="group mt-2 text-[12.5px]">
                     <summary

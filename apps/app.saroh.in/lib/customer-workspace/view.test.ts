@@ -13,6 +13,7 @@ import {
     bookingLists,
     bookingRow,
     canStopOffers,
+    crumbsUnderSell,
     deliveryAddress,
     favourites,
     howTheyGet,
@@ -24,6 +25,7 @@ import {
     orderWhat,
     owedLine,
     packLines,
+    paidText,
     sinceLine,
     tabFromQuery,
     tabsFor,
@@ -569,6 +571,22 @@ describe("a gym customer's bookings and classes", () => {
         );
     });
 
+    it("says Paid, how much and how once money is in, not Pays at the desk (UX-049)", () => {
+        const desk = booking({ paidWith: "DESK" });
+        expect(bookingRow(desk, true, NOW).pay).toBe("Pays at the desk");
+        const paid = booking({
+            paidWith: "DESK",
+            paid: { amount: "800.00", currency: "INR", method: "CASH" },
+        });
+        expect(bookingRow(paid, true, NOW).pay).toMatch(
+            /^Paid ₹800(\.00)? · Cash$/,
+        );
+        expect(
+            paidText({ amount: null, currency: null, method: "ONLINE" }),
+        ).toBe("Paid · Online");
+        expect(paidText(null)).toBeNull();
+    });
+
     it("marks a no-show and a late cancel as the ones to ask about", () => {
         const late = booking({
             id: "b3",
@@ -741,5 +759,23 @@ describe("invoices and offers", () => {
         expect(offersText(stopped, IST, NOW)).toBe("Asked to stop · 20 Sep");
         expect(canStopOffers(stopped)).toBe(false);
         expect(canStopOffers(null)).toBe(false);
+    });
+});
+
+describe("where the crumbs file someone (UX-050)", () => {
+    const link = {
+        linkId: "l1",
+        customerId: "cu1",
+        name: "Riya",
+        email: "riya@example.in",
+        storefront: STORE,
+        linkedAt: "2026-10-01T00:00:00Z",
+    };
+
+    it("files a buyer under Sell › Customers, anyone else under Contacts", () => {
+        expect(crumbsUnderSell(true, { linkedCustomers: [link] })).toBe(true);
+        expect(crumbsUnderSell(true, { linkedCustomers: [] })).toBe(false);
+        expect(crumbsUnderSell(true, {})).toBe(false);
+        expect(crumbsUnderSell(false, { linkedCustomers: [link] })).toBe(false);
     });
 });

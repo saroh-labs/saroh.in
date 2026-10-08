@@ -5,7 +5,11 @@
  * - Appointments counts the upcoming bookings that stand (confirmed, or a
  *   pay-now hold still holding), not past, cancelled or lapsed ones, and
  *   none of another business's;
- * - Class packs, going with it, counts purchases with classes and time left;
+ * - Courses, on and needing it, goes with it and is named;
+ * - Class packs isn't offered (DEC-099): a business that had it on keeps its
+ *   setting and packs, but it is never named as going with Appointments nor
+ *   there to ask about; its line still counts purchases with classes and
+ *   time left, for when it is offered again;
  * - a viewer without `booking:read` is told what stops without a number;
  * - a module Saroh hasn't rolled out is not there to ask about (DEC-057);
  * - the Commerce blocker still refuses, and still names its count.
@@ -21,8 +25,9 @@ const tag = `${process.pid}-${Date.now()}`;
 const ZONE = "Asia/Kolkata";
 const HOUR = 3_600_000;
 const DAY = 24 * HOUR;
+const readiness = new ModuleReadinessRegistry();
 const lifecycle = new ModuleLifecycleService(
-    new ModuleReadinessRegistry(),
+    readiness,
     prisma,
     undefined,
     new FeatureFlagService(),
@@ -88,6 +93,7 @@ beforeAll(async () => {
     await rollOut([
         "MODULE_CRM",
         "MODULE_APPOINTMENTS",
+        "MODULE_COURSES",
         "MODULE_CLASS_PACKS",
         "MODULE_COMMERCE",
     ]);
@@ -98,6 +104,7 @@ beforeAll(async () => {
     studio = await business("Pulse Studio", [
         "CRM",
         "APPOINTMENTS",
+        "COURSES",
         "CLASS_PACKS",
         "COMMERCE",
     ]);
@@ -195,10 +202,13 @@ beforeAll(async () => {
 });
 
 describe("module turn-off impact (F13)", () => {
-    it("Appointments names its 3 upcoming bookings, and the packs going with it", async () => {
+    it("Appointments names its 3 upcoming bookings, and Courses going with it, never Class packs (DEC-099)", async () => {
         const view = await lifecycle.impact(owner(studio), "APPOINTMENTS");
         expect(view.enabled).toBe(true);
-        expect(view.goesWith).toEqual(["CLASS_PACKS"]);
+        // Class packs is on for this business, but isn't offered, so it
+        // isn't named (DEC-099, DEC-057).
+        expect(view.goesWith).toEqual(["COURSES"]);
+        expect(view.items.map((i) => i.moduleKey)).not.toContain("CLASS_PACKS");
         const bookings = view.items.find(
             (i) => i.code === "APPOINTMENTS_UPCOMING_BOOKINGS",
         );
@@ -206,12 +216,17 @@ describe("module turn-off impact (F13)", () => {
         expect(bookings?.message).toBe(
             "3 upcoming bookings stay booked; the booking page stops taking new ones.",
         );
-        const packs = view.items.find(
-            (i) => i.code === "CLASS_PACKS_CREDITS_LEFT",
-        );
+        expect(view.blockers).toEqual([]);
+    });
+
+    it("Class packs' line still counts purchases with classes and time left (data kept, DEC-099)", async () => {
+        const items = await readiness.deactivationImpact("CLASS_PACKS", {
+            organizationId: studio,
+            may: () => true,
+        });
+        const packs = items.find((i) => i.code === "CLASS_PACKS_CREDITS_LEFT");
         expect(packs?.count).toBe(1);
         expect(packs?.moduleKey).toBe("CLASS_PACKS");
-        expect(view.blockers).toEqual([]);
     });
 
     it("counts only the business's own bookings", async () => {
@@ -242,20 +257,24 @@ describe("module turn-off impact (F13)", () => {
     });
 
     it("a module Saroh hasn't rolled out isn't there to ask about (DEC-057)", async () => {
-        await rollOut(["MODULE_CLASS_PACKS"], false);
+        await rollOut(["MODULE_COURSES"], false);
         try {
             await expect(
-                lifecycle.impact(owner(studio), "CLASS_PACKS"),
+                lifecycle.impact(owner(studio), "COURSES"),
             ).rejects.toMatchObject({ status: 404 });
             // Nor is it named as going with Appointments.
             const view = await lifecycle.impact(owner(studio), "APPOINTMENTS");
             expect(view.goesWith).toEqual([]);
-            expect(view.items.map((i) => i.moduleKey)).not.toContain(
-                "CLASS_PACKS",
-            );
+            expect(view.items.map((i) => i.moduleKey)).not.toContain("COURSES");
         } finally {
-            await rollOut(["MODULE_CLASS_PACKS"], true);
+            await rollOut(["MODULE_COURSES"], true);
         }
+    });
+
+    it("Class packs isn't there to ask about even with its flag on (DEC-099)", async () => {
+        await expect(
+            lifecycle.impact(owner(studio), "CLASS_PACKS"),
+        ).rejects.toMatchObject({ status: 404 });
     });
 
     it("Commerce's open orders still block, and the confirm says how many", async () => {

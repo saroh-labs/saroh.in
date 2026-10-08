@@ -61,4 +61,32 @@ describe("toFailure", () => {
             error: "Nope.",
         });
     });
+
+    it("carries a plan refusal, so the screen shows its notice (U14)", () => {
+        const f = toFailure(
+            {
+                error: {
+                    code: "FORBIDDEN",
+                    message: "You've reached your 10 products on Plan A",
+                    details: {
+                        code: "PLAN_LIMIT_REACHED",
+                        limit: 10,
+                        used: 10,
+                        upgradeTo: null,
+                        notice: {
+                            title: "You've reached your 10 products on Plan A",
+                            body: "You can't add more products. Talk to us if you need more.",
+                            cta: "See your plan",
+                        },
+                    },
+                },
+            },
+            "Could not save",
+        );
+        expect(f.error).toBe("You've reached your 10 products on Plan A");
+        expect(f.plan).toMatchObject({
+            code: "PLAN_LIMIT_REACHED",
+            cta: "See your plan",
+        });
+    });
 });

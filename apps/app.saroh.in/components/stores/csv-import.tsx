@@ -16,7 +16,11 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useRef, useState, useTransition } from "react";
 
+import { showPlanRefusal } from "@/components/billing/plan-refusal";
+import type { PlanMeter } from "@/lib/billing/meter";
+import { importRoom } from "@/lib/billing/meter";
 import { applyImport, previewImport } from "@/lib/imports/actions";
+import { fieldLabel } from "@/lib/imports/labels";
 import type {
     ApplyResult,
     DuplicatePolicy,
@@ -37,6 +41,10 @@ import type {
  * Deliberately not a table (§17): mapping is a stack of labelled rows that
  * reflows to one column, so it is usable one-handed rather than being a desktop
  * grid squeezed onto a phone. No affordance depends on hover.
+ *
+ * Fields read in words (UX-065), and on a plan with a product limit the
+ * preview says how many of the new rows fit and offers to bring in those
+ * (UX-036) — never "7 will be created", then the whole file refused.
  */
 
 /** Matches the api's own cap; refused here too so the file is never uploaded. */
@@ -51,10 +59,19 @@ export interface Descriptor {
     entity: ImportEntity;
     requiredFields: string[];
     mappableFields: string[];
+    fieldLabels?: Record<string, string>;
     keyLabel: string;
 }
 
-function IssueList({ issues, total }: { issues: RowIssue[]; total: number }) {
+function IssueList({
+    issues,
+    total,
+    labels,
+}: {
+    issues: RowIssue[];
+    total: number;
+    labels?: Record<string, string>;
+}) {
     return (
         <div className="space-y-2">
             <ul className="space-y-1.5">
@@ -67,9 +84,9 @@ function IssueList({ issues, total }: { issues: RowIssue[]; total: number }) {
                             Row {issue.row}
                         </span>
                         {issue.field ? (
-                            <code className="rounded bg-muted px-1 py-0.5 text-xs">
-                                {issue.field}
-                            </code>
+                            <span className="rounded bg-muted px-1 py-0.5 text-xs font-medium">
+                                {fieldLabel(labels, issue.field)}
+                            </span>
                         ) : null}
                         <span>{issue.message}</span>
                     </li>
@@ -97,10 +114,13 @@ export function CsvImport({
     storeId,
     descriptor,
     backHref,
+    meter = null,
 }: {
     storeId: string;
     descriptor: Descriptor;
     backHref: string;
+    /** The plan's product limit, for a products import (UX-036). */
+    meter?: PlanMeter | null;
 }) {
     const router = useRouter();
     const fileInput = useRef<HTMLInputElement>(null);
@@ -174,14 +194,17 @@ export function CsvImport({
         runPreview(csv, mapping, next);
     }
 
-    function onImport() {
+    function onImport(createAtMost?: number) {
         startTransition(async () => {
             const res = await applyImport(storeId, descriptor.entity, {
                 csv,
                 mapping,
                 policy,
+                ...(createAtMost === undefined ? {} : { createAtMost }),
             });
             if (!res.ok) {
+                // More rows than the plan's products limit (U13): its notice.
+                if (res.plan) showPlanRefusal(res.plan);
                 setError(res.error);
                 if (res.fileIssues) setFileIssues(res.fileIssues);
                 return;
@@ -211,7 +234,23 @@ export function CsvImport({
     // A field already fed by another column cannot be chosen twice.
     const claimed = new Set(Object.values(mapping));
     const plan = preview?.plan;
-    const willWrite = plan ? plan.counts.CREATE + plan.counts.UPDATE : 0;
+    // New products the cap counts (archived rows add none, as the API counts).
+    const adding = plan
+        ? plan.rows.filter(
+              (r) =>
+                  r.outcome === "CREATE" &&
+                  (r.values.status ?? "DRAFT").toUpperCase() !== "ARCHIVED",
+          ).length
+        : 0;
+    const room =
+        descriptor.entity === "products" ? importRoom(meter, adding) : null;
+    // Only the first `fits` new rows come in when the file is over (UX-036).
+    const fits = room?.over ? room.fits : null;
+    const willWrite = plan
+        ? plan.counts.CREATE +
+          plan.counts.UPDATE -
+          (fits === null ? 0 : adding - fits)
+        : 0;
     const rowIssues = plan
         ? plan.rows.flatMap((r) => r.issues).slice(0, MAX_LISTED_ISSUES)
         : [];
@@ -236,6 +275,12 @@ export function CsvImport({
                         <Count label="Updated" value={result.updated} />
                         <Count label="Skipped" value={result.skipped} />
                         <Count label="Not imported" value={result.failed} />
+                        {result.overLimit ? (
+                            <Count
+                                label="Left out to fit your plan"
+                                value={result.overLimit}
+                            />
+                        ) : null}
                     </div>
                     {result.failed > 0 ? (
                         <div className="space-y-2">
@@ -249,6 +294,7 @@ export function CsvImport({
                             <IssueList
                                 issues={rowIssues}
                                 total={totalRowIssues}
+                                labels={descriptor.fieldLabels}
                             />
                         </div>
                     ) : null}
@@ -273,7 +319,12 @@ export function CsvImport({
                         <Label htmlFor="csv-file">CSV file</Label>
                         <p className="text-sm text-muted-foreground">
                             The first row must be column headings. Required:{" "}
-                            {descriptor.requiredFields.join(", ")}.
+                            {descriptor.requiredFields
+                                .map((f) =>
+                                    fieldLabel(descriptor.fieldLabels, f),
+                                )
+                                .join(", ")}
+                            .
                         </p>
                     </div>
                     <input
@@ -307,6 +358,7 @@ export function CsvImport({
                             <IssueList
                                 issues={fileIssues}
                                 total={fileIssues.length}
+                                labels={descriptor.fieldLabels}
                             />
                         ) : null}
                     </CardContent>
@@ -344,7 +396,10 @@ export function CsvImport({
                                                     changeMapping(header, v)
                                                 }
                                             >
-                                                <SelectTrigger className="w-full">
+                                                <SelectTrigger
+                                                    className="w-full"
+                                                    aria-label={`What the “${header}” column fills`}
+                                                >
                                                     <SelectValue />
                                                 </SelectTrigger>
                                                 <SelectContent>
@@ -364,7 +419,10 @@ export function CsvImport({
                                                                     )
                                                                 }
                                                             >
-                                                                {field}
+                                                                {fieldLabel(
+                                                                    descriptor.fieldLabels,
+                                                                    field,
+                                                                )}
                                                                 {descriptor.requiredFields.includes(
                                                                     field,
                                                                 )
@@ -396,7 +454,10 @@ export function CsvImport({
                                         changePolicy(v as DuplicatePolicy)
                                     }
                                 >
-                                    <SelectTrigger className="w-full">
+                                    <SelectTrigger
+                                        className="w-full"
+                                        aria-label="Rows that already exist"
+                                    >
                                         <SelectValue />
                                     </SelectTrigger>
                                     <SelectContent>
@@ -467,14 +528,36 @@ export function CsvImport({
                                     <IssueList
                                         issues={rowIssues}
                                         total={totalRowIssues}
+                                        labels={descriptor.fieldLabels}
                                     />
+                                </div>
+                            ) : null}
+
+                            {room?.over && meter ? (
+                                <div
+                                    role="status"
+                                    className="flex flex-wrap items-center gap-3 rounded-[10px] border border-brand-300 bg-brand-subtle px-3.5 py-3 dark:border-brand-700"
+                                >
+                                    <p className="min-w-0 flex-[1_1_260px] text-pretty text-sm">
+                                        {room.words}{" "}
+                                        {room.fits > 0
+                                            ? `Import the first ${room.fits}, or upgrade for more.`
+                                            : "Upgrade to bring them in."}
+                                    </p>
+                                    <Button asChild variant="outline" size="sm">
+                                        <Link href={meter.href}>
+                                            {meter.upgradeTo
+                                                ? `Upgrade to ${meter.upgradeTo}`
+                                                : "See plans"}
+                                        </Link>
+                                    </Button>
                                 </div>
                             ) : null}
 
                             <div className="flex flex-wrap items-center gap-3 border-t pt-5">
                                 <Button
                                     variant="brand"
-                                    onClick={onImport}
+                                    onClick={() => onImport(fits ?? undefined)}
                                     disabled={pending || willWrite === 0}
                                 >
                                     {pending

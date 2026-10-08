@@ -1,3 +1,4 @@
+import { env } from "../../env";
 import {
     addressProblem,
     addressTaken,
@@ -5,6 +6,7 @@ import {
     freeAddress,
     MAX_ADDRESS_LENGTH,
     releaseExpired,
+    resetReservedExtraForTests,
 } from "./site-address";
 
 const DAY = 86_400_000;
@@ -67,6 +69,49 @@ describe("addressProblem", () => {
     it("lets one hyphen through", () => {
         expect(addressProblem("a-b")).toBeNull();
         expect(addressProblem("rye-bakery-2")).toBeNull();
+    });
+
+    it("keeps words a page could use to pass itself off as Saroh", () => {
+        for (const address of [
+            "official",
+            "saroh-support",
+            "saroh-help",
+            "verify",
+        ]) {
+            expect(addressProblem(address)).toBe(
+                "That address is kept for Saroh",
+            );
+        }
+        expect(addressProblem("officials-bakery")).toBeNull();
+    });
+
+    describe("the instance's own list (RESERVED_ADDRESSES_EXTRA)", () => {
+        // Through `env`, as the code reads it: locally that is a parsed copy of
+        // process.env, on CI (SKIP_ENV_VALIDATION) process.env itself.
+        const before = env.RESERVED_ADDRESSES_EXTRA;
+        afterEach(() => {
+            if (before === undefined) env.RESERVED_ADDRESSES_EXTRA = undefined;
+            else env.RESERVED_ADDRESSES_EXTRA = before;
+            resetReservedExtraForTests();
+        });
+
+        it("keeps each name it lists, trimmed and lower-cased", () => {
+            env.RESERVED_ADDRESSES_EXTRA = " Founder-One ,founderone,, ";
+            resetReservedExtraForTests();
+            expect(addressProblem("founder-one")).toBe(
+                "That address is kept for Saroh",
+            );
+            expect(addressProblem("founderone")).toBe(
+                "That address is kept for Saroh",
+            );
+            expect(addressProblem("founder-two")).toBeNull();
+        });
+
+        it("keeps nothing extra when unset", () => {
+            env.RESERVED_ADDRESSES_EXTRA = undefined;
+            resetReservedExtraForTests();
+            expect(addressProblem("founder-one")).toBeNull();
+        });
     });
 
     it("keeps test for Saroh (a test release's label)", () => {

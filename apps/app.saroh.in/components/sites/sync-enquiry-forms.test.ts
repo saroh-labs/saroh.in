@@ -23,6 +23,8 @@ const enquiry = (label: string, formId?: string): Section => ({
     },
 });
 
+const SITE = { id: "site_1", name: "Northwind" };
+
 const hero = {
     key: "hero_1",
     type: "hero",
@@ -38,7 +40,7 @@ describe("syncEnquiryForms", () => {
         });
         const res = await syncEnquiryForms(
             [hero, enquiry("Note")],
-            "Northwind",
+            SITE,
             ensure,
         );
         expect(res.ok && res.sections[1].content).toMatchObject({
@@ -47,12 +49,25 @@ describe("syncEnquiryForms", () => {
         expect(ensure).toHaveBeenCalledTimes(1);
     });
 
+    // UX-002: a form made in the editor was saved with no site, so the
+    // site's Forms tab never listed it and its entries page 404ed.
+    it("names the site the form belongs to", async () => {
+        const ensure = vi.fn().mockResolvedValue({
+            ok: true,
+            data: { formId: "form_1" },
+        });
+        await syncEnquiryForms([enquiry("Note", "form_1")], SITE, ensure);
+        expect(ensure).toHaveBeenCalledWith(
+            expect.objectContaining({ siteId: "site_1", formId: "form_1" }),
+        );
+    });
+
     // Review of #328: an unfinished enquiry used to fail the sync and stop
     // the whole save, which is what holding back exists to prevent.
     it("skips an unfinished enquiry section instead of failing the save", async () => {
         const ensure = vi.fn();
         const sections = [hero, enquiry("")];
-        const res = await syncEnquiryForms(sections, "Northwind", ensure);
+        const res = await syncEnquiryForms(sections, SITE, ensure);
         expect(ensure).not.toHaveBeenCalled();
         expect(res).toEqual({ ok: true, sections });
     });
@@ -63,7 +78,7 @@ describe("syncEnquiryForms", () => {
             .mockResolvedValue({ ok: false, error: "Could not save the form" });
         const res = await syncEnquiryForms(
             [hero, enquiry("Note")],
-            "Northwind",
+            SITE,
             ensure,
         );
         expect(res).toEqual({

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { isPayOrder } from "./order-pay-shape";
+import { isPayOrder, orderPayOffer } from "./order-pay-shape";
 
 const ORDER = {
     businessName: "Northwind",
@@ -40,5 +40,31 @@ describe("isPayOrder", () => {
         expect(isPayOrder({ ...ORDER, lines: [{ name: "x" }] })).toBe(false);
         const { orderNumber: _n, ...noNumber } = ORDER;
         expect(isPayOrder(noNumber)).toBe(false);
+    });
+});
+
+describe("orderPayOffer (R33)", () => {
+    it("offers Pay when it's due and can be paid online, or an older API says nothing", () => {
+        expect(orderPayOffer({ status: "DUE", payOnline: true })).toBe("pay");
+        expect(orderPayOffer({ status: "DUE" })).toBe("pay");
+    });
+
+    it("is view-only — pay the business directly — when it can't be paid online", () => {
+        expect(orderPayOffer({ status: "DUE", payOnline: false })).toBe(
+            "elsewhere",
+        );
+    });
+
+    it("has nothing to do once paid or closed, online or not", () => {
+        expect(orderPayOffer({ status: "PAID", payOnline: false })).toBe(
+            "settled",
+        );
+        expect(orderPayOffer({ status: "CLOSED", payOnline: true })).toBe(
+            "settled",
+        );
+    });
+
+    it("still accepts the order with payOnline in it", () => {
+        expect(isPayOrder({ ...ORDER, payOnline: false })).toBe(true);
     });
 });

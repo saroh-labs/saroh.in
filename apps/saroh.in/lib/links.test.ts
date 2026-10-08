@@ -20,10 +20,10 @@ describe("cta", () => {
 
     it("waitlist mode: a paid plan reads Get early access · Plan", () => {
         expect(
-            cta({ src: "solutions-gyms", plan: "grow", mode: "waitlist" }),
+            cta({ src: "pricing", plan: "grow", mode: "waitlist" }),
         ).toMatchObject({
             label: "Get early access · Grow",
-            href: "/waitlist?plan=grow&src=solutions-gyms",
+            href: "/waitlist?plan=grow&src=pricing",
         });
     });
 
@@ -49,6 +49,20 @@ describe("cta", () => {
         expect(
             cta({ src: "x", plan: "free", cycle: "year", mode: "open" }).href,
         ).toMatch(/\/signup\?plan=free&src=x$/);
+    });
+
+    it("a gallery template: Save {Name} for early access, carried as ?template= (U13)", () => {
+        const gym = { slug: "gym", name: "Gym" };
+        expect(
+            cta({ src: "templates-gym", template: gym, mode: "waitlist" }),
+        ).toMatchObject({
+            label: "Save Gym for early access",
+            href: "/waitlist?template=gym&src=templates-gym",
+        });
+        // Open mode keeps its own label and carries the template to sign-up.
+        const open = cta({ src: "t", template: gym, mode: "open" });
+        expect(open.label).toBe("Start free");
+        expect(open.href).toMatch(/\/signup\?template=gym&src=t$/);
     });
 
     it("waitlist mode never carries a cycle", () => {

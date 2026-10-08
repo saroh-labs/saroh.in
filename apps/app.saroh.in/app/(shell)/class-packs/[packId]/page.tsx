@@ -24,6 +24,7 @@ import { readFreeCancelHours } from "@/lib/class-packs/packs-page";
 import { getSellingTerms } from "@/lib/class-packs/service";
 import { contactPickerOptions } from "@/lib/invoices/contacts";
 import { modulesOrUnknown } from "@/lib/modules/guard";
+import { permits } from "@/lib/organizations/permits";
 import { resolveActiveOrganization } from "@/lib/organizations/service";
 import { readServices } from "@/lib/services/service";
 import { requireSession } from "@/lib/session";
@@ -73,11 +74,7 @@ export default async function PackDetailPage({
     // of, the card is never drawn (DEC-057). Unknown fails open, as the rail.
     const paymentsOn =
         modules?.find((m) => m.key === "PAYMENTS")?.readiness !== "DISABLED";
-    const readsInvoices =
-        paymentsOn &&
-        (organization?.actions
-            ? organization.actions.includes("invoice:read")
-            : organization?.role === "OWNER" || organization?.role === "ADMIN");
+    const readsInvoices = paymentsOn && permits(organization, "invoice:read");
 
     const [
         holders,

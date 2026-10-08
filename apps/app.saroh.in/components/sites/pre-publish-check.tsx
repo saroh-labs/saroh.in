@@ -4,6 +4,7 @@ import { Button } from "@saroh/ui/button";
 import Link from "next/link";
 import { useEffect } from "react";
 
+import { useBusinessZone } from "@/components/shared/business-zone";
 import {
     APPROVAL_LINE,
     goesLive,
@@ -96,6 +97,7 @@ export function PrePublishCheck({
     /** Jump to a flag's section. Null pageId means a whole-site flag. */
     onJump: (pageId: string | null, sectionIndex: number | null) => void;
 }) {
+    const zone = useBusinessZone();
     // Escape closes. A takeover with no way out but the mouse is a trap, and
     // this one sits between the merchant and the thing they came to do.
     useEffect(() => {
@@ -231,6 +233,7 @@ export function PrePublishCheck({
                         >
                             {APPROVAL_LINE[review.latestApproval.outcome].text(
                                 review.latestApproval,
+                                zone,
                             )}
                             {review.openNotes > 0
                                 ? `, with ${review.openNotes} ${review.openNotes === 1 ? "note" : "notes"} still open.`

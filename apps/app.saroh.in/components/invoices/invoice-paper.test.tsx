@@ -133,7 +133,12 @@ describe("InvoicePaper line GST (DEC-072)", () => {
             }),
         );
         expect(out).toContain("GST 18% · taxable");
-        expect(out.match(/Nil-rated/g)).toHaveLength(1);
+        // One line is nil-rated: once under its name on the desk, once on
+        // a phone's second line.
+        expect(out.match(/Nil-rated/g)).toHaveLength(2);
+        expect(out.match(/data-phone-line[^>]*>[^<]*Nil-rated/g)).toHaveLength(
+            1,
+        );
         expect(out).toMatch(/Sourdough loaf<span[^>]*>Nil-rated/);
         expect(out).toMatch(/Bread club · Sep 2026<\/span>/);
     });
@@ -221,6 +226,7 @@ describe("InvoicePaper's seller (DEC-082)", () => {
         state: { code: "29", name: "Karnataka" },
         address: "1 New Road, Bengaluru 560001, Karnataka",
         logo: "https://cdn.example/rye-logo.png",
+        timeZone: "Asia/Kolkata",
     };
     const FROZEN = {
         sellerName: "Rye & Co.",
@@ -271,5 +277,122 @@ describe("InvoicePaper's seller (DEC-082)", () => {
     it("an issued row without a frozen seller falls back to today's", () => {
         const out = paper(invoice({ sellerName: null }));
         expect(out).toContain("Rye Bakehouse");
+    });
+});
+
+describe("InvoicePaper's lines on a phone (T6)", () => {
+    const croissant = line({
+        description: "Almond croissant (trade)",
+        quantity: 20,
+        unitPrice: "300.00",
+        amount: "6000.00",
+        gst: {
+            hsnSac: "19059020",
+            rate: "18.00",
+            taxableValue: "5084.75",
+            cgst: "457.63",
+            sgst: "457.63",
+            igst: "0.00",
+        },
+    });
+
+    it("a phone's second line carries HSN, quantity × price and GST", () => {
+        const out = html(invoice({ lines: [croissant] }));
+        const phone = /<span data-phone-line[^>]*>([^<]*)</.exec(out);
+        expect(phone?.[0]).toContain("sm:hidden");
+        expect(phone?.[1]).toBe(
+            "HSN 1905 90 20 · 20 × ₹300 · GST 18% · taxable ₹5,084.75",
+        );
+        // The desk keeps its HSN and Qty columns.
+        expect(out).toContain("HSN / SAC");
+        expect(out).toMatch(/hidden sm:block print:block[^"]*">20</);
+    });
+
+    it("no line with an HSN: no HSN column, on the desk either", () => {
+        const out = html(invoice({}));
+        expect(out).toContain("Tax invoice");
+        expect(out).not.toContain("HSN / SAC");
+        expect(out).toContain("sm:grid-cols-[minmax(0,3fr)_56px_90px]");
+        expect(out).not.toContain("70px");
+        // A line of one with no rate has nothing for a second line.
+        expect(out).not.toContain("data-phone-line");
+    });
+});
+
+describe("InvoicePaper's How to pay us (#833)", () => {
+    const pay = {
+        upiId: "rye@okhdfc",
+        bankAccountName: null,
+        bankAccountNumber: null,
+        bankIfsc: null,
+        bankName: null,
+        note: "Put the invoice number in the note.",
+    };
+
+    it("unpaid paper prints how to pay, so a printed copy carries it", () => {
+        const out = html(invoice({ payInstructions: pay }));
+        expect(out).toContain("How to pay us");
+        expect(out).toContain("UPI: rye@okhdfc");
+        expect(out).toContain("Put the invoice number in the note.");
+    });
+
+    it("paid paper, or none set, prints none", () => {
+        expect(
+            html(
+                invoice({
+                    status: "PAID",
+                    standing: "PAID",
+                    payInstructions: pay,
+                }),
+            ),
+        ).not.toContain("How to pay us");
+        expect(html(invoice({ payInstructions: null }))).not.toContain(
+            "How to pay us",
+        );
+    });
+});
+
+describe("InvoicePaper's issue date (#836)", () => {
+    const business = (timeZone: string | null): InvoiceBusiness => ({
+        name: "Rye",
+        legalName: null,
+        email: null,
+        registered: true,
+        gstin: GST.sellerGstin,
+        state: null,
+        address: null,
+        logo: null,
+        timeZone,
+    });
+    // Rendered as the server renders it, whose own zone is UTC.
+    const issued = (issuedAt: string, zone: string | null) =>
+        renderToStaticMarkup(
+            <InvoicePaper
+                invoice={invoice({ issuedAt, dueAt: null })}
+                business={business(zone)}
+                businessName="Rye"
+            />,
+        );
+
+    it("writes an evening-IST issue on the business's day", () => {
+        // 6 Oct 2026, 20:29 IST.
+        expect(issued("2026-10-06T14:59:00Z", "Asia/Kolkata")).toContain(
+            ">6 Oct</time>",
+        );
+    });
+
+    it("writes the business's day where UTC is still on the day before", () => {
+        // 6 Oct 2026, 00:30 IST — 5 Oct in UTC.
+        const out = issued("2026-10-05T19:00:00Z", "Asia/Kolkata");
+        expect(out).toContain(">6 Oct</time>");
+        expect(out).not.toContain(">5 Oct</time>");
+    });
+
+    it("follows a business in another zone, and India's with none set", () => {
+        // 6 Oct 2026, 20:30 in New York — 7 Oct in UTC.
+        expect(issued("2026-10-07T00:30:00Z", "America/New_York")).toContain(
+            ">6 Oct</time>",
+        );
+        expect(issued("2026-10-05T19:00:00Z", null)).toContain(">6 Oct</time>");
     });
 });

@@ -16,10 +16,14 @@ import { SignInSheet } from "./sign-in-sheet";
  * design's header): "Sign in" for a visitor, which opens the sign-in sheet
  * and lands on the account; the signed-in customer's initials, which open
  * it. The header's `account` slot (G17) draws it on every page of the site
- * while the account area is switched on.
+ * while the account area is switched on. On the account's own sign-in
+ * prompt ("page") a sign-in stays on the page that asked for it (UX-052).
  *
  * The sheet's options (the business's phone, whether a challenge is likely)
- * are read when "Sign in" is pressed, not on every page view.
+ * are read when "Sign in" is pressed, not on every page view — but the sheet
+ * opens at once, on what the page already knows, and takes them when they
+ * land (#838). Waiting for the read first left a second or more where the
+ * press showed nothing, and whatever was typed then went nowhere.
  */
 export function AccountEntry({
     customer,
@@ -36,8 +40,8 @@ export function AccountEntry({
     variant?: "header" | "page";
 }) {
     const router = useRouter();
+    const [open, setOpen] = useState(false);
     const [options, setOptions] = useState<SignInOptions | null>(null);
-    const [busy, setBusy] = useState(false);
 
     if (customer) {
         return (
@@ -55,26 +59,23 @@ export function AccountEntry({
         );
     }
 
-    async function open() {
-        if (busy) return;
-        setBusy(true);
-        const loaded = await loadOptions().catch(() => null);
-        setBusy(false);
-        setOptions(
-            loaded ?? {
-                businessName,
-                phone: null,
-                challenge: { required: false, siteKey: null },
-            },
-        );
+    function openSheet() {
+        setOpen(true);
+        // Read afresh on every open: whether a challenge is likely changes.
+        // Until it lands the sheet goes without the phone line; a challenge
+        // it missed, the API asks for when the code is requested.
+        void loadOptions()
+            .then((loaded) => {
+                if (loaded) setOptions(loaded);
+            })
+            .catch(() => undefined);
     }
 
     return (
         <>
             <button
                 type="button"
-                onClick={() => void open()}
-                aria-busy={busy || undefined}
+                onClick={openSheet}
                 className={
                     variant === "page"
                         ? buttonClasses(true)
@@ -86,14 +87,24 @@ export function AccountEntry({
             >
                 Sign in
             </button>
-            {options ? (
+            {open ? (
                 <SignInSheet
                     open
-                    onClose={() => setOptions(null)}
-                    options={options}
+                    onClose={() => setOpen(false)}
+                    options={
+                        options ?? {
+                            businessName,
+                            phone: null,
+                            challenge: { required: false, siteKey: null },
+                        }
+                    }
                     api={api}
                     onSignedIn={() => {
-                        router.push("/account");
+                        // The account's own prompt keeps the page that
+                        // asked (UX-052): signed out on /account/plan, they
+                        // land on their plan. The header's entry opens
+                        // the account.
+                        if (variant !== "page") router.push("/account");
                         router.refresh();
                     }}
                 />

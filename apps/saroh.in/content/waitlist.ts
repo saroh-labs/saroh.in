@@ -1,3 +1,5 @@
+import { SAROH_CONTACT_EMAIL } from "./contact";
+
 /**
  * The waitlist page's content (Waitlist design, plan U30): the kinds of
  * business it asks about, the opening date and the launch offer.
@@ -7,8 +9,8 @@
  * - `openingDate` is null until the open launch is scheduled (OQ-12), and
  *   the header says "Opening soon" instead of a date.
  * - `offer` is null here. The page reads the launch offer from the API
- *   (`GET /public/waitlist/offer`, `lib/launch-offer.ts`) — the plan and
- *   the API's `LAUNCH_OFFER_DAYS` — and builds
+ *   (`GET /public/waitlist/offer`, `lib/launch-offer.ts`) — the same
+ *   `LAUNCH_OFFER_DAYS` and plan the opening-day invites carry — and builds
  *   its lines with `launchOfferLines`. With none, the form says "Offer
  *   details announced at launch". The repo is public: the words are here,
  *   the plan's name and the number of days only ever come from the API.
@@ -98,8 +100,18 @@ export const NO_OFFER = {
     note: "Offer details announced at launch.",
 };
 
+/**
+ * Under "For people who run": where a customer's money goes, and a link to
+ * Integrations (Resources plan U7), drawn only while Integrations is shown
+ * (`linkShown`). Claim WL14 in `MARKETING_CLAIMS.md` (as F3 and CL6).
+ */
+export const WAITLIST_MONEY = {
+    line: "Customers pay through your own Razorpay or Cashfree account, so the money goes straight to you.",
+    link: { label: "See integrations", href: "/integrations" },
+} as const;
+
 /** Where someone writes to be taken off the list (KTD-17). */
-export const WAITLIST_CONTACT = "hello@saroh.in";
+export const WAITLIST_CONTACT = SAROH_CONTACT_EMAIL;
 
 /** The footer's meaning of the name, and where Saroh is. */
 export const WAITLIST_FOOTER = {

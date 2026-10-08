@@ -19,6 +19,10 @@ import {
 } from "../communications/account-thread";
 import { CommunicationsService } from "../communications/communications.service";
 import type { InvoiceTemplate } from "../communications/transactional";
+import {
+    businessPayInstructionsOf,
+    payWaysWords,
+} from "../organizations/business-pay-instructions";
 import { authorize } from "../organizations/organization-policy";
 import {
     AUTOPAY_CHARGE_IN_PROGRESS,
@@ -62,6 +66,8 @@ const SEND_SELECT = {
     kind: true,
     source: true,
     orderId: true,
+    // A renewal stays payable online on any plan (`online-payments-plan.ts`).
+    subscriptionId: true,
     contactId: true,
     billToName: true,
     currency: true,
@@ -88,7 +94,9 @@ function sendable(row: SendRow): boolean {
  * the business's own connected provider — Saroh's email is never used
  * (default 38), and there is no WhatsApp share (default 106). A business
  * that doesn't take payment online sends the same link as a view link
- * (DEC-070): the invoice and its PDF, without a Pay button.
+ * (DEC-070): the invoice and its PDF, without a Pay button. The invoice's
+ * PDF is attached to the email (DEC-083), drawn by the send job where the
+ * business's provider takes attachments — the link alone where it doesn't.
  *
  * The channel rule is {@link sendChannels}. A send mints a fresh pay link,
  * as "New link" does, so the one shared before stops working; the token is
@@ -173,7 +181,7 @@ export class InvoiceSendService {
     ): Promise<InvoiceSendView> {
         const [nextReminderAt, payOnline] = await Promise.all([
             this.nextReminderAt(db, row.id, now),
-            invoicePayOnline(db, organizationId),
+            invoicePayOnline(db, organizationId, row),
         ]);
         const none = (reason: SendBlocker): InvoiceSendView => ({
             channels: [],
@@ -289,6 +297,18 @@ export class InvoiceSendService {
                                 : null,
                             overdue: isPastDue(row, now),
                             payOnline: view.payOnline,
+                            // How to pay offline (R32), named, never the
+                            // details: those stay on the invoice's page.
+                            ...(view.payOnline
+                                ? {}
+                                : {
+                                      payWays: payWaysWords(
+                                          await businessPayInstructionsOf(
+                                              organizationId,
+                                              tx,
+                                          ),
+                                      ),
+                                  }),
                         },
                         recipient: { kind: "INVOICE_BILL_TO", invoiceId: id },
                         // A fresh link, as "New link" makes; the old one
@@ -310,6 +330,10 @@ export class InvoiceSendService {
                                 tx,
                             ),
                         invoiceId: id,
+                        // Its PDF goes with it (DEC-083): drawn by the send
+                        // job, where the business's provider takes
+                        // attachments; otherwise the link alone, as before.
+                        attachInvoicePdf: true,
                         createdByUserId: ctx.userId,
                     },
                 );

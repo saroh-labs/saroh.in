@@ -312,8 +312,11 @@ export async function writeSite(
                 ),
                 publishedAt: publishedAt.toISOString(),
             },
-            // The Site does not record which template produced it; publish
-            // stamps the starter template's identity, so the fixture does too.
+            // A seeded site is laid down by hand, not made from a template,
+            // so its Site.templateId stays null (unknown, KTD-7) and its
+            // publication carries the starter stamp, as the API's publish
+            // does for a site with no template recorded
+            // (`site-template-record.ts`).
             templateId: "starter",
             templateVersion: 1,
             publishedByUserId: userId,

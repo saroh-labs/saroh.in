@@ -1,5 +1,6 @@
 import { toFailure } from "@/lib/api/failure";
 import { apiFetch, getJson, getList, orgBase } from "@/lib/api/http";
+import type { PlanRefusal } from "@/lib/billing/refusal";
 
 import type { SoldOutPlace } from "./tracking";
 
@@ -272,7 +273,14 @@ export function resultField(field?: string): ResultField | undefined {
 }
 
 export type Result<T = { ok: true }> =
-    { ok: true; data: T } | { ok: false; error: string; field?: ResultField };
+    | { ok: true; data: T }
+    | {
+          ok: false;
+          error: string;
+          field?: ResultField;
+          /** Its plan refused it (U13): shown as the notice (U14). */
+          plan?: PlanRefusal;
+      };
 
 const NO_BUSINESS = "Pick a business first, then try again.";
 

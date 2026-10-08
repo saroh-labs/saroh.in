@@ -165,14 +165,14 @@ model Organization {
 
   // CMS / publishing (Stage 2 — S2-001). Every CMS entity is org-owned and
   // carries `organizationId` for tenant scoping / RLS.
-  sites            Site[]
-  pages            Page[]
-  pageVersions     PageVersion[]
-  sections         Section[]
-  siteComments     SiteComment[]
-  siteApprovals    SiteApproval[]
-  sitePreviewLinks SitePreviewLink[]
-  publications     Publication[]
+  sites                Site[]
+  pages                Page[]
+  pageVersions         PageVersion[]
+  sections             Section[]
+  siteComments         SiteComment[]
+  siteApprovals        SiteApproval[]
+  sitePreviewLinks     SitePreviewLink[]
+  publications         Publication[]
   // Frozen candidates of a site and their links (DEC-071).
   siteTestReleases     SiteTestRelease[]
   siteTestReleaseLinks SiteTestReleaseLink[]
@@ -298,27 +298,41 @@ model Organization {
   // dismissed. Only people added after it are listed again.
   storefrontTeamNoticeDismissedAt DateTime?
 
+  // The business's referral code (DEC-102, #812): the `?ref=` its site's
+  // "Made with Saroh" credit links with on Free. 8 characters a reader can't
+  // confuse, never the business name. Null until the credit is first
+  // drawn, which gives it one; referral attribution (#809) reads it.
+  referralCode String? @unique
+
   // A customer's message thread with the business (round-2 A13).
   customerThreads        CustomerThread[]
   customerThreadMessages CustomerThreadMessage[]
 
   // Autopay mandates at the business's own provider (round-2 D11, D20).
-  paymentMandates         PaymentMandate[]
+  paymentMandates          PaymentMandate[]
   // A class pack's history and its holders' extensions (round-2 E13).
-  packEvents              PackEvent[]
-  packExtensions          PackExtension[]
+  packEvents               PackEvent[]
+  packExtensions           PackExtension[]
   // The notices told about a customer's bookings and orders (round-2 A14).
-  customerNotices         CustomerNotice[]
+  customerNotices          CustomerNotice[]
   // Places in line for full classes (round-2 A12).
-  classWaitlistEntries    ClassWaitlistEntry[]
+  classWaitlistEntries     ClassWaitlistEntry[]
   // Bulk kitchen moves held on the server, then committed (round-2 B6).
-  orderStageBatches       OrderStageBatch[]
+  orderStageBatches        OrderStageBatch[]
   // Each person's alert choices here (round-2 F14).
-  notificationPreferences NotificationPreference[]
+  notificationPreferences  NotificationPreference[]
   // Its one order-number series, across every storefront (P3, DEC-066).
-  orderNumberSequence     OrderNumberSequence?
+  orderNumberSequence      OrderNumberSequence?
   // Web addresses it used to have, held for it after a change (DEC-069, L1).
-  addressReservations     AddressReservation[]
+  addressReservations      AddressReservation[]
+  // Saroh billing: add-ons bought and coupons used (pricing catalogue U1).
+  subscriptionAddons       SubscriptionAddon[]
+  pricingCouponRedemptions PricingCouponRedemption[]
+  // Saroh billing: checkouts for a plan change (pricing catalogue U15).
+  billingCheckouts         BillingCheckout[]
+  sarohInvoices            SarohInvoice[]
+  // Saroh billing: add-ons owed on the next charge (pricing catalogue U16).
+  subscriptionAddonCharges SubscriptionAddonCharge[]
 }
 
 // BusinessProfile: optional 1:1 business identity for an Organization, captured
@@ -330,12 +344,18 @@ model BusinessProfile {
   organizationId String       @unique
   organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
 
-  legalName    String?
-  type         String? // individual, partnership, llp, pvt, public, trust; an old `company` = pvt until the F10b backfill rewrites it; accepted until Z4 (business-type.ts)
-  country      String?
-  taxId        String?
-  contactEmail String?
-  website      String?
+  legalName         String?
+  type              String? // individual, partnership, llp, pvt, public, trust; an old `company` = pvt until the F10b backfill rewrites it; accepted until Z4 (business-type.ts)
+  // Setup's answer to "Is it registered?": true for Registered (Pvt Ltd,
+  // LLP, partnership…), which saves no `type`, false for Not registered.
+  // Null: not asked (a site for someone's work, a business set up before
+  // it was kept). True with no `type` asks for the real type before the
+  // business goes live (the take-money checklist).
+  legallyRegistered Boolean?
+  country           String?
+  taxId             String?
+  contactEmail      String?
+  website           String?
 
   // IANA zone the business keeps time in (ADR-007): the default a new
   // subscription snapshots for its renewal dates. Null until the business
@@ -412,6 +432,24 @@ model BusinessProfile {
   // date). A plan's `autopayChargeTiming` wins when set. A CHECK constraint
   // holds the values. No profile yet reads as DAY_AFTER_RENEWAL.
   autopayChargeTiming String @default("DAY_AFTER_RENEWAL")
+
+  // "How to pay us" (R32): how a customer pays the business offline, on
+  // every plan. Shown only on a customer's own unpaid invoice, order and
+  // booking pages (the public reads by token or session), never listed by
+  // slug. All optional; nothing set keeps the generic "pay them the way
+  // they've asked" line. Checked and trimmed by the API
+  // (`organizations/business-pay-instructions.ts`) and never logged; the
+  // audit stream names a change, never the value.
+  // A UPI ID ("name@bank"), lower-cased; the page draws its QR.
+  payUpiId             String?
+  // Bank transfer: the name on the account, its number (digits only, CHECK),
+  // the IFSC (CHECK) and the bank's name.
+  payBankAccountName   String?
+  payBankAccountNumber String?
+  payBankIfsc          String?
+  payBankName          String?
+  // A short note under them ("Send a screenshot to 98450 12345 once paid").
+  payNote              String?
 }
 
 // Membership: links a User to an Organization with a role (renamed from
@@ -1525,8 +1563,15 @@ model Order {
   currency String @default("USD")
 
   // Status
-  status        String @default("PENDING") // PENDING, PROCESSING, SHIPPED, DELIVERED, CANCELLED
-  paymentStatus String @default("UNPAID") // UNPAID, PAID, FAILED, REFUNDED
+  status        String  @default("PENDING") // PENDING, PROCESSING, SHIPPED, DELIVERED, CANCELLED
+  paymentStatus String  @default("UNPAID") // UNPAID, PAID, FAILED, REFUNDED
+  // Money taken outside Saroh and recorded on the order: cash, UPI or a
+  // card machine at the counter, a payment marked by hand, a difference
+  // after an edit recorded as paid — less what an edit handed back from the
+  // till. With the order's SUCCEEDED payments, what it has been paid
+  // (`orders/hand-payments.ts`). 0 on an order paid by hand before it was
+  // kept: such an order counts its total, as it did.
+  paidByHand    Decimal @default(0) @db.Decimal(12, 2)
 
   // Relations
   items        OrderItem[]
@@ -1623,6 +1668,14 @@ model Order {
   // so a customer quoting the old number still finds it (search, the Orders
   // list). Null for every order never renumbered.
   renumberedFrom String?
+
+  // Placed at the site's checkout to be paid when it is handed over: "Pay
+  // when you collect" or "Pay on delivery" (2026-10-06). Such an order is a
+  // real order from the moment it is made, as a staff pay-later order is: it
+  // promises its units at once, shows in Orders as not paid yet, never
+  // closes as an abandoned checkout, and is marked paid by staff. False for
+  // every other order, and every order before it.
+  payOnHandover Boolean @default(false)
 
   @@unique([storeId, orderId])
   @@unique([storeId, checkoutKey])
@@ -2059,6 +2112,14 @@ model StoreSettings {
   // storefront's. Store customers from before it was set stay as they
   // are, so turning it on never re-links a pair that already existed.
   linkSameEmailSince DateTime?
+
+  // "Pay when you collect" and "Pay on delivery" at the site's checkout
+  // (2026-10-06, the owner's rule: online needs a paid plan, Free takes money
+  // offline). On a plan without online payments the checkout always offers
+  // them — it is the only way to pay there — so this is read only where the
+  // plan takes money online: on, the checkout shows them beside paying
+  // online; off (the default, and every existing storefront's), online only.
+  offerPayOnHandover Boolean @default(false)
 }
 
 model StoreFeatures {
@@ -2919,6 +2980,16 @@ model Site {
   // the snapshot at publish. Null means no menu has been built.
   navigation Json?
 
+  // The template this site was made from (industry templates, KTD-7): its id
+  // and version, and the style (colourway) chosen with it, when it has
+  // styles. Set once at creation and never rewritten by an edit. Null means
+  // unknown — a site made before this was recorded — never guessed. Publish
+  // stamps these on each Publication; a site without them stamps the
+  // starter, as every publish did before.
+  templateId      String?
+  templateVersion Int?
+  templateStyleId String?
+
   // Reserved placeholder for the S2-007 custom-domain claim/verification flow.
   // NOT wired to a relation here and NOT the legacy store `CustomDomain`.
   customDomainId String?
@@ -2930,14 +3001,14 @@ model Site {
   currentPublicationId String?      @unique
   currentPublication   Publication? @relation("SiteCurrentPublication", fields: [currentPublicationId], references: [id], onDelete: SetNull)
 
-  pages          Page[]
-  comments       SiteComment[]
+  pages            Page[]
+  comments         SiteComment[]
   // The site's writing (ADR-004).
-  posts          Post[]
-  postCategories PostCategory[]
-  approvals      SiteApproval[]
-  previewLinks   SitePreviewLink[]
-  publications   Publication[]     @relation("SitePublications")
+  posts            Post[]
+  postCategories   PostCategory[]
+  approvals        SiteApproval[]
+  previewLinks     SitePreviewLink[]
+  publications     Publication[]         @relation("SitePublications")
   // Frozen candidates of this site, served on its test host (DEC-071).
   testReleases     SiteTestRelease[]
   testReleaseLinks SiteTestReleaseLink[]
@@ -2946,9 +3017,9 @@ model Site {
   // advisory and a bypass is recorded. On: Publish, restore and Go live
   // succeed only for an approved test release, unless an owner overrides,
   // and the override is recorded. Only an owner turns it on or off.
-  publishNeedsApproval Boolean @default(false)
+  publishNeedsApproval Boolean        @default(false)
   // Who may review this site (#276).
-  reviewers      SiteReviewer[]
+  reviewers            SiteReviewer[]
 
   // Verified subdomain / custom-domain claims routed to this Site (S2-007).
   // Nullable on the Domain side (Domain.siteId) — a claim exists before it is
@@ -3128,7 +3199,8 @@ model SiteApproval {
   byUserId String
   by       User   @relation(fields: [byUserId], references: [id], onDelete: Cascade)
 
-  // REQUESTED | APPROVED | CHANGES_REQUESTED | BYPASSED | OVERRIDDEN.
+  // REQUESTED | APPROVED | CHANGES_REQUESTED | BYPASSED | OVERRIDDEN |
+  // WITHDRAWN (the merchant took a request back, UX-068).
   //
   // REQUESTED is the merchant asking for a review (#278) — the act that makes a
   // review pending, which the model previously had no way to express: a review
@@ -3154,6 +3226,10 @@ model SiteApproval {
   // Written on REQUESTED and APPROVED; null on the other two, which record an
   // act rather than a state of the work.
   draftFingerprint String?
+
+  // What a reviewer asked to change (UX-043): required on a new
+  // CHANGES_REQUESTED, null on every other outcome.
+  reason String?
 
   // The publication a BYPASSED row is about, so version history can show
   // which publish went past an outstanding review. Null on a verdict.
@@ -3373,13 +3449,11 @@ model Publication {
 /**
  * A test release (DEC-071): a named, non-live candidate of a site, served
  * whole at `test--<address>.saroh.app` to whoever holds one of its links.
- *
  * The frozen snapshot is an ordinary `Publication` with `kind = 'TEST'`, so
  * publications stay append-only. Everything about the release that changes
  * (its name and note, a schedule, going live, being discarded) lives here.
  * Going live appends a LIVE copy of the snapshot (`livePublicationId`); the
  * site never points at the TEST row.
- *
  * User ids are plain columns, as `Publication.publishedByUserId` is: removing
  * a person from Saroh never takes a release, or its record, with them.
  */
@@ -3449,7 +3523,6 @@ model SiteTestRelease {
  * hex stored, the raw token returned once. Its own table, so a draft preview
  * token can never open a test host and a test token can never open
  * `/preview/<token>`.
- *
  * SHARE is a link someone made to send; OPEN is a short one minted for the
  * person opening the release from the workspace. A link stops working when it
  * expires, is revoked, or its release is discarded or has gone live.
@@ -3881,6 +3954,8 @@ model Job {
   @@unique([type], map: "Job_one_pending_payments_confirm_pending", where: raw("type = 'payments.confirm-pending' AND status = 'PENDING'"))
   // One waiting run of the waitlist retention sweep (U30), like the renewal chain.
   @@unique([type], map: "Job_one_pending_waitlist_retention", where: raw("type = 'waitlist.retention' AND status = 'PENDING'"))
+  // One waiting run of Saroh billing's plan-move sweep (U15), like the renewal chain.
+  @@unique([type], map: "Job_one_pending_billing_moves_apply", where: raw("type = 'billing.moves.apply' AND status = 'PENDING'"))
   // One waiting run of Insights' hourly rollup chain (DEC-075), like the renewal chain.
   @@unique([type], map: "Job_one_pending_analytics_rollup", where: raw("type = 'analytics.rollup' AND status = 'PENDING'"))
   @@index([status, runAt])
@@ -3914,6 +3989,10 @@ model Notification {
   // Or a product review ("A review needs a reply"). Informational, no FK,
   // like leadId — a notice outlives nothing it could dangle from.
   reviewId String?
+  // Or a customer's message thread (UX-014): the contact it opens on, and
+  // the message that raised it. Informational, no FK, like leadId.
+  contactId String?
+  messageId String?
 
   readAt DateTime? // null = unread
 
@@ -3925,6 +4004,7 @@ model Notification {
   // unconstrained.
   @@unique([leadId, type])
   @@unique([reviewId, type])
+  @@unique([messageId, type])
   @@index([organizationId, userId, readAt])
   @@index([organizationId])
 }
@@ -4170,6 +4250,12 @@ model Booking {
   customerAccountId String?
   customerAccount   CustomerAccount? @relation(fields: [customerAccountId], references: [id], onDelete: SetNull)
 
+  // Made by the customer on the business's site, not by someone on the team
+  // (DEC-095). Free's monthly bookings cap counts only these: a booking the
+  // team makes in the workspace is never capped. Written once, when the
+  // booking is made (`reserveInTx`: no actor means the booker did it).
+  bookedOnline Boolean @default(false)
+
   // The free-cancel deadline, fixed when the booking is made (E8, DEC-051):
   // its start less the business's free-cancel hours then. A move never
   // changes it. Null — bookings before the column, or made with no rule —
@@ -4362,6 +4448,13 @@ model BookingRules {
   /// set it. Never more than was received; a late cancel is never refunded
   /// automatically.
   refundInTimeCancels Boolean @default(true)
+
+  /// How people pay when they book on the booking page (DEC-088, #821,
+  /// #822): ONLINE | DESK | BOTH, CHECKed. BOTH — the default, and what
+  /// every business had before — offers paying online (when a provider can
+  /// take it) and at the desk. A deposit or full price at booking is always
+  /// paid online, so DESK leaves a service that asks one unbookable online.
+  bookingPayment String @default("BOTH")
 }
 
 /// What has happened to a Booking, in order (#121).
@@ -4420,6 +4513,11 @@ model MerchantPaymentProvider {
 
   provider String // "RAZORPAY" | "CASHFREE"
   status   String @default("CONNECTED") // CONNECTED | DISABLED
+
+  // Needs attention (UX-012): the provider refused these keys on a live
+  // call. Null while it works; cleared when the keys are entered again.
+  attentionReason String? // "KEYS_REFUSED"
+  attentionAt     DateTime?
 
   // Non-secret public identifier (e.g. Razorpay key_id) — safe to read back.
   publicKey String?
@@ -4650,6 +4748,11 @@ model CommunicationProvider {
   provider String // e.g. "RESEND" | "SENDGRID" | "SMTP" | "TWILIO" | "META"
   status   String @default("CONNECTED") // CONNECTED | DISABLED
 
+  // Needs attention (UX-012): the provider refused these keys on a live
+  // call. Null while it works; cleared when the keys are entered again.
+  attentionReason String? // "KEYS_REFUSED"
+  attentionAt     DateTime?
+
   fromAddress String? // verified sender (email address / WhatsApp number)
 
   // Sealed credentials (see crypto.ts). Plaintext never stored.
@@ -4682,7 +4785,7 @@ model Message {
   subject   String?
   body      String
 
-  status String @default("QUEUED") // QUEUED | SENT | FAILED | SUPPRESSED
+  status String @default("QUEUED") // QUEUED | SENT | FAILED | SUPPRESSED | CANCELLED (a review invitation resent before it went); a Saroh send (DEC-086) also UNKNOWN, or, not emailed, ALLOWANCE_USED | NO_ALLOWANCE | BOOKING_LIMIT
 
   createdByUserId String?
 
@@ -4699,10 +4802,17 @@ model Message {
   invoice   Invoice? @relation(fields: [invoiceId], references: [id], onDelete: SetNull)
   template  String?
 
+  // The review invitation this message carried (REVIEW_INVITATION, D11).
+  // Its deliveries say whether the invitation went: only one the provider
+  // accepted (SENT or DELIVERED) shows as sent and counts as a send.
+  reviewInvitationId String?
+  reviewInvitation   ReviewInvitation? @relation(fields: [reviewInvitationId], references: [id], onDelete: SetNull)
+
   @@index([organizationId])
   @@index([leadId])
   @@index([contactId])
   @@index([invoiceId, createdAt])
+  @@index([reviewInvitationId, createdAt])
 }
 
 // Delivery — one provider send attempt for a Message, with its final state.
@@ -4716,7 +4826,7 @@ model Delivery {
 
   provider          String
   providerMessageId String?
-  status            String  @default("QUEUED") // QUEUED | SENT | DELIVERED | FAILED | BOUNCED
+  status            String  @default("QUEUED") // QUEUED | SENT | DELIVERED | FAILED | BOUNCED | CANCELLED (a review invitation resent before it went); a SAROH one (DEC-086) also STOPPED | UNKNOWN
   error             String?
   attempts          Int     @default(0)
 
@@ -4725,6 +4835,11 @@ model Delivery {
 
   @@index([organizationId])
   @@index([messageId])
+  // A business's deliveries by route and time: the monthly count of the
+  // emails Saroh sends for it (DEC-086, `COUNTED_SAROH_DELIVERIES`).
+  @@index([organizationId, provider, createdAt])
+  // Every business's Saroh sends in the last day: the platform's ceiling.
+  @@index([createdAt], map: "Delivery_saroh_createdAt_idx", where: raw("provider = 'SAROH'"))
 }
 
 // Consent — a contact's opt-in/out for a channel. Enforced before any send.
@@ -4895,12 +5010,19 @@ model Plan {
 
   active Boolean @default(true) // offerable to NEW subscribers
 
-  subscriptions Subscription[]
+  subscriptions Subscription[] @relation("SubscriptionPlan")
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  @@unique([key, version])
+  // Pricing catalogue (KTD-2): a published version writes one row per plan
+  // AND billing cycle, keyed `catalog.<planId>`, so the unique key carries the
+  // interval. The old (key, version) key could not hold both cycles.
+  pendingSubscriptions Subscription[]        @relation("SubscriptionPendingPlan")
+  providerPlans        PricingProviderPlan[]
+  checkouts            BillingCheckout[]
+
+  @@unique([key, version, interval])
 }
 
 // Subscription — an Organization's subscription to a Plan version (S7-005).
@@ -4915,7 +5037,7 @@ model Subscription {
   organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
 
   planId String
-  plan   Plan   @relation(fields: [planId], references: [id])
+  plan   Plan   @relation("SubscriptionPlan", fields: [planId], references: [id])
 
   status String @default("ACTIVE") // TRIALING | ACTIVE | PAST_DUE | CANCELLED
 
@@ -4925,36 +5047,82 @@ model Subscription {
 
   currentPeriodEnd  DateTime?
   cancelAtPeriodEnd Boolean   @default(false)
+  // When the owner chose to end the plan at the period's end (Free in
+  // Plan and billing, or cancel), as against the term ending with nothing
+  // renewed, which sets `cancelAtPeriodEnd` too (DEC-100). A term's end
+  // then says "as you chose" rather than asking to pay. Cleared whenever
+  // `cancelAtPeriodEnd` is.
+  freeChosenAt      DateTime?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
+  // Pricing catalogue (KTD-4): a move to another plan version, applied by the
+  // renewal path on `pendingFrom` (the first renewal at least 7 days after
+  // go-live). Cleared when applied or when the scheduled version is cancelled.
+  pendingPlanId String?
+  pendingPlan   Plan?     @relation("SubscriptionPendingPlan", fields: [pendingPlanId], references: [id])
+  pendingFrom   DateTime?
+  // "month" | "year". Mirrors the `Plan` row's interval the subscription is
+  // billed on, so a cycle change can be pending on its own.
+  billingCycle  String    @default("month")
+
+  addons            SubscriptionAddon[]
+  couponRedemptions PricingCouponRedemption[]
+  addonCharges      SubscriptionAddonCharge[]
+
+  // Saroh billing (U15): when the provider says the last event it applied
+  // happened. A delivery older than this is acknowledged and changes
+  // nothing, so a late `activated` can't undo a newer `cancelled`.
+  providerEventAt DateTime?
+
   @@unique([provider, providerSubscriptionId])
+  @@unique([id, organizationId])
   @@index([planId])
+  @@index([pendingPlanId])
+  @@index([pendingFrom])
 }
 
-// EntitlementOverride — one plan limit raised for one Organization, for a
-// while, by an operator (admin console). `EntitlementService` applies the
-// highest live override over the plan's own value; an expired or revoked row
-// is history and changes nothing. Numeric caps only: a feature a plan does not
-// include is a plan change, not a limit.
+// EntitlementOverride — one per-business exception, set by an operator (admin
+// console), with a reason. An expired or revoked row is history and changes
+// nothing.
+//
+// `kind` (pricing catalogue KTD-6): `raise` is the original meaning — a
+// numeric cap raised over the plan's (`EntitlementService` applies the highest
+// live one; never lowers). The others are read through the catalogue
+// (`@saroh/pricing-catalog` resolveAccess), combined in the order plan →
+// remove → grant → limit → raise, oldest first within a kind:
+//   grant / remove  — a catalogue module (`moduleKey`) on or off
+//   limit           — a catalogue module's cap set to `value`, up or down
+//   price           — a custom monthly price, `value` in paise
+//   plan            — the business is on catalogue plan `planKey` (how
+//                     grandfathering and the launch offer work, KTD-7, OQ-1)
+// `key` stays required: the legacy entitlement key for `raise`, the module id
+// for a module kind, and "plan" / "price" otherwise. The CHECK constraint
+// `EntitlementOverride_kind_shape` holds each kind to its columns.
+// `expiresAt` null lasts until revoked.
 model EntitlementOverride {
   id             String       @id @default(cuid())
   organizationId String
   organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
 
   key   String
-  value Int
+  value Int?
 
   reason          String
   grantedByUserId String
 
-  expiresAt DateTime
+  expiresAt DateTime?
   revokedAt DateTime?
 
   createdAt DateTime @default(now())
 
+  kind      String  @default("raise")
+  moduleKey String?
+  planKey   String?
+
   @@index([organizationId, expiresAt])
+  @@index([organizationId, kind])
 }
 
 // BillingWebhookEvent — the idempotent inbox for Saroh's billing-provider
@@ -5017,6 +5185,10 @@ model WaitlistSignup {
   country      String?
   // The plan a "Get early access · ‹Plan›" button named, if one did.
   plan         String?
+  // The gallery template a "Save ‹Template› for early access" button saved
+  // (saroh.in/templates, industry templates U13): one of the gallery's slugs
+  // (`waitlistTemplate` in the API), never free text. Null when none was.
+  template     String?
 
   // Where the signup came from: the page's `?src=`, "direct" when none (V2),
   // "saroh.in" from the V1 form. Free text, never trusted for authorization.
@@ -5037,12 +5209,40 @@ model WaitlistSignup {
 
   ipHash String?
 
+  // The link preview tool (resources plan U2, KTD-5): an email given to
+  // unlock its report is kept here with source "link-preview", with the
+  // last address it checked and when. The retention sweep drops the link
+  // after 12 months, and a link-preview-only entry with it (Privacy).
+  checkedUrl       String?
+  checkedAt        DateTime?
+  // Marketing consent. Never set true by the link preview tool, which stopped
+  // asking (security review, 5 Oct 2026): an unverified address can't give
+  // it. False on its new entries; null on entries from forms that never asked.
+  newsConsent      Boolean?
+  // The link preview report emails this address was sent on one UTC day:
+  // the day and how many (at most 3). `reportEmailDay` also lets the gate
+  // count every report email sent today against its daily ceiling.
+  reportEmailDay   DateTime? @db.Date
+  reportEmailCount Int       @default(0)
+
   // Set when the batch containing this signup is opened, so "who is still
   // waiting" is a query rather than a spreadsheet.
   invitedAt DateTime?
   // Set when an invitee signs up (U31). The retention sweep deletes an entry
   // invited more than 12 months ago that never joined.
   joinedAt  DateTime?
+
+  // The opening-day invite (U31, KTD-17): only the SHA-256 of the link's
+  // token is kept, so the table never holds a usable link. Single use (the
+  // entry's `joinedAt`), bound to this entry's email, and it expires.
+  inviteTokenHash      String?   @unique
+  inviteExpiresAt      DateTime?
+  // When the invite email left. Null with `invitedAt` set: claimed, not sent
+  // yet (or the send was interrupted, and a later batch sends it again).
+  inviteSentAt         DateTime?
+  // The business the invitee made with it. A plain id, no FK: the entry is
+  // the waitlist's record and outlives a business that is deleted.
+  joinedOrganizationId String?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -5051,6 +5251,7 @@ model WaitlistSignup {
   @@index([createdAt])
   @@index([invitedAt])
   @@index([referredById])
+  @@index([reportEmailDay])
 }
 
 /// A record of a completed or in-flight idempotent operation.
@@ -5220,11 +5421,15 @@ model ReviewInvitation {
   expiresAt       DateTime
   // Every line reviewed: the link has done its job.
   completedAt     DateTime?
+  // Sends by Saroh's own sender, before invitations moved to the business's
+  // provider (D11, 2026-10-07). Since then a send counts only once its
+  // provider accepted it, read from `messages`' deliveries; new rows hold 0.
   sendCount       Int       @default(1)
   lastSentAt      DateTime  @default(now())
   createdByUserId String?
 
-  reviews ProductReview[]
+  reviews  ProductReview[]
+  messages Message[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -6332,6 +6537,8 @@ model CustomerNotice {
   @@unique([organizationId, eventKey])
   @@index([organizationId])
   @@index([messageId])
+  // One booking's notices: Saroh's cap of emails per booking a day (DEC-086).
+  @@index([organizationId, bookingId, createdAt])
 }
 
 // ============================================================================
@@ -6477,4 +6684,395 @@ model ClassWaitlistEntry {
   @@index([contactId, status])
   @@index([customerAccountId, createdAt])
   @@index([closedAt])
+}
+
+// ── Pricing catalogue (plan 2026-09-29 U1, KTD-1…6) ─────────────────────────
+// Saroh's own plans and modules, edited in admin.saroh.in › Plans & modules.
+// The catalogue is GLOBAL (every business is offered the same one), so these
+// tables carry no organizationId except the two that record what one business
+// bought or redeemed, which have the org_isolation policy.
+
+// PricingCatalogVersion — one published catalogue snapshot, immutable. The
+// live version is the newest whose `goLiveAt` has passed, resolved at read
+// time; a later `goLiveAt` is a scheduled version. `catalog` is validated by
+// `@saroh/pricing-catalog` `catalogSchema`; `changes` is that package's
+// `diff()` against the version before it (the change log).
+model PricingCatalogVersion {
+  id      String @id @default(cuid())
+  version Int    @unique
+
+  catalog  Json
+  goLiveAt DateTime
+  // "keep" leaves businesses on their version; "move" schedules each
+  // subscription's move (Subscription.pendingPlanId).
+  policy   String   @default("keep")
+  note     String   @default("")
+  changes  Json     @default("[]")
+
+  // Null for the version the migration installed.
+  publishedByUserId String?
+
+  createdAt DateTime @default(now())
+
+  @@index([goLiveAt])
+}
+
+// PricingCatalogDraft — the one shared draft (KTD-3), a row keyed "shared".
+// `revision` goes up on every save; a save naming an older revision is
+// refused (409) with who saved since. Deleted on publish or discard.
+model PricingCatalogDraft {
+  id String @id @default("shared")
+
+  catalog     Json
+  revision    Int  @default(0)
+  // The live version the draft was started from.
+  baseVersion Int?
+
+  updatedByUserId String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+// PricingCoupon — a discount code, outside versions: it applies the moment
+// it is saved (KTD-5). `code` is stored upper-cased (CHECK
+// `PricingCoupon_code_upper`), so the unique index refuses "abc" beside
+// "ABC". A coupon that has been redeemed is archived, never deleted (its
+// redemptions are kept, RESTRICT).
+model PricingCoupon {
+  id   String @id @default(cuid())
+  code String @unique
+
+  // Taken off each month for `months` months (monthly), or off the first
+  // yearly charge as `months` months' worth, capped at that charge (U16).
+  discountPaise   Int
+  months          Int
+  // Catalogue plan ids it applies to.
+  planIds         String[]
+  // The Razorpay Offer that takes the same discount off on Razorpay's side
+  // (`offer_` + 14 letters or digits; the column's CHECK). Made by hand in
+  // the Razorpay Dashboard, which offers no API to make one. Without it a
+  // Razorpay checkout refuses the coupon. Changeable, unlike the code.
+  razorpayOfferId String?
+
+  active         Boolean   @default(true)
+  maxRedemptions Int
+  expiresAt      DateTime?
+  archivedAt     DateTime?
+
+  createdByUserId String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  redemptions PricingCouponRedemption[]
+  checkouts   BillingCheckout[]
+}
+
+// PricingCouponRedemption — one business used one coupon. Written when the
+// payment webhook confirms the charge, never at checkout start (U16). One
+// use per business per coupon.
+model PricingCouponRedemption {
+  id String @id @default(cuid())
+
+  couponId String
+  coupon   PricingCoupon @relation(fields: [couponId], references: [id], onDelete: Restrict)
+
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  subscriptionId String?
+  subscription   Subscription? @relation(fields: [subscriptionId], references: [id], onDelete: SetNull)
+
+  // What it took off, as charged.
+  discountPaise Int
+
+  createdAt DateTime @default(now())
+
+  @@unique([couponId, organizationId])
+  @@index([organizationId])
+  @@index([subscriptionId])
+}
+
+// SubscriptionAddon — add-ons a business bought on its Saroh subscription
+// (KTD-5). `addonId` names an add-on in the catalogue version the
+// subscription's plan belongs to; the definition (price, pack size) is read
+// from that version, never the live one.
+model SubscriptionAddon {
+  id String @id @default(cuid())
+
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  subscriptionId String
+  subscription   Subscription @relation(fields: [subscriptionId, organizationId], references: [id, organizationId], onDelete: Cascade)
+
+  addonId  String
+  quantity Int
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([subscriptionId, addonId])
+  @@index([organizationId])
+}
+
+// An add-on owed for one period, put on the provider subscription's next
+// charge (pricing catalogue U16). Add-ons are charged after the period they
+// cover: a row is written at the start of each period for what is held then
+// (from the day of purchase, prorated, for one bought mid-period), sent to
+// the provider as a one-off item on its next charge (`billing.addons.sync`),
+// and becomes a line on Saroh's invoice for that charge. Never edited once
+// sent; a row the provider never took moves to the next charge.
+model SubscriptionAddonCharge {
+  id String @id @default(cuid())
+
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  subscriptionId String
+  subscription   Subscription @relation(fields: [subscriptionId, organizationId], references: [id, organizationId], onDelete: Cascade)
+
+  addonId     String
+  // The invoice line's words, quantity and price per unit before GST.
+  description String
+  quantity    Int
+  unitPaise   Int
+
+  // The days it pays for.
+  periodStart DateTime
+  periodEnd   DateTime
+  // The provider charge it rides on: the provider subscription's next one.
+  chargeAt    DateTime
+
+  provider               String
+  providerSubscriptionId String
+  // The provider's id for the item, once sent.
+  providerChargeId       String?
+
+  status    String  @default("QUEUED") // QUEUED | SENT | INVOICED | DROPPED
+  // Saroh's invoice it became a line on.
+  invoiceId String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([organizationId])
+  @@index([subscriptionId, status])
+  @@index([provider, providerSubscriptionId, status])
+}
+
+// PricingProviderPlan — the billing provider's plan for one billable `Plan`
+// row (a catalogue plan × version × cycle), kept in step by an outbox job
+// with retries (RECOMMENDATIONS 5). A version can't go live, and no move is
+// applied, until its paid rows are SYNCED. Free rows need none.
+model PricingProviderPlan {
+  id String @id @default(cuid())
+
+  planId String
+  plan   Plan   @relation(fields: [planId], references: [id], onDelete: Cascade)
+
+  provider       String // "RAZORPAY" | "CASHFREE"
+  providerPlanId String?
+  status         String    @default("PENDING") // PENDING | SYNCED | FAILED
+  attempts       Int       @default(0)
+  lastError      String?
+  syncedAt       DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([planId, provider])
+  @@unique([provider, providerPlanId])
+  @@index([status])
+}
+
+// BillingCheckout — one attempt to put a business on a paid catalogue plan
+// (pricing catalogue U15). Saroh asks its own billing provider for a new
+// provider subscription on the plan's provider plan; the business authorises
+// it on the provider's page, and the provider's webhook completes it here.
+// The amount is always Saroh's: the plan row's price, and for an upgrade the
+// difference for the rest of the period, both worked out on the server.
+//
+// - NEW: on the plan from the moment it's authorised (coming from Free, a
+//   cancelled plan or one Saroh doesn't bill through a provider).
+// - UPGRADE: on the plan at once; the difference for the rest of the period
+//   is charged at authorisation and the plan's own charges start at `startAt`
+//   (the old period's end). The old provider subscription is cancelled.
+// - SCHEDULED: authorised now, on the plan from `startAt` (a cheaper plan, a
+//   cycle change, or a move the business must authorise again, OQ-6). It
+//   stays SCHEDULED until then, as the subscription's pending move.
+//
+// OPEN waits for the authorisation and lapses at `expiresAt`. One OPEN and
+// one SCHEDULED per business at most.
+model BillingCheckout {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  planId String
+  plan   Plan   @relation(fields: [planId], references: [id])
+  cycle  String // "month" | "year"
+  // NEW | UPGRADE | SCHEDULED | TRIAL (U16: on the plan once authorised, its
+  // first charge at `startAt`, the trial's end). A renewal of the plan it's
+  // on (DEC-093) is a SCHEDULED one for the same plan.
+  kind   String
+  status String @default("OPEN") // OPEN | SCHEDULED | COMPLETED | CANCELLED
+
+  // The provider's subscription; for a yearly plan paid once (DEC-093), its
+  // order, with `providerPlanId` "one-time".
+  provider               String
+  providerSubscriptionId String
+  providerPlanId         String
+  providerCustomerId     String?
+
+  // The plan's recurring price before GST, in paise, as it was quoted.
+  pricePaise        Int
+  // Charged at authorisation, before GST: an UPGRADE's difference for the
+  // rest of the period, or a TRIAL's nominal first month (DEC-093); zero
+  // otherwise.
+  chargeNowPaise    Int @default(0)
+  chargeNowGstPaise Int @default(0)
+
+  // A coupon (U16): `discountPaise` off each of the first `discountCharges`
+  // charges of the plan, before GST, as quoted. Written to
+  // `PricingCouponRedemption` when the first discounted charge is paid.
+  couponId        String?
+  coupon          PricingCoupon? @relation(fields: [couponId], references: [id], onDelete: Restrict)
+  discountPaise   Int            @default(0)
+  discountCharges Int            @default(0)
+
+  // When the plan's own charges start; null for NEW (at authorisation), the
+  // trial's end for TRIAL.
+  startAt     DateTime?
+  expiresAt   DateTime
+  completedAt DateTime?
+  endedReason String?
+
+  // Who Saroh's invoice is billed to (U17), as given at checkout: the GST
+  // state code ("29") that sets the place of supply, and the business's
+  // GSTIN when it has one. Null: the business profile's at invoice time.
+  billToState String?
+  billToGstin String?
+
+  createdByUserId String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([provider, providerSubscriptionId])
+  @@unique([organizationId, status], map: "BillingCheckout_one_live_per_org", where: raw("status = 'OPEN' OR status = 'SCHEDULED'"))
+  @@index([organizationId])
+  @@index([planId])
+  @@index([status, expiresAt])
+  @@index([couponId])
+}
+
+// Saroh's own GST invoice to a business, for a charge Saroh took for its
+// plan (pricing catalogue U17). Written by the billing webhook in the same
+// transaction as the charge it records, once per charge (`chargeKey`), and
+// never changed. Seller and buyer are copied onto it: the paper reads the
+// same whatever the settings say later. Plan and checkout ids are kept as
+// plain columns, not keys: the invoice outlives the rows it names.
+model SarohInvoice {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  // "SRH/26-27/00001": the series (prefix and financial year) and its count.
+  number    String @unique
+  series    String
+  // One invoice per charge: "period:<provider>:<subscription>:<end>" for a
+  // plan period, "upgrade:<checkout>" for an upgrade's difference.
+  chargeKey String @unique
+  // NEW | UPGRADE | SCHEDULED | RENEWAL: what was charged.
+  source    String
+
+  provider               String
+  providerSubscriptionId String?
+  providerEventId        String
+  providerPaymentId      String?
+  checkoutId             String?
+  planId                 String?
+  planName               String
+  cycle                  String // "month" | "year"
+  periodStart            DateTime?
+  periodEnd              DateTime?
+
+  issuedAt DateTime
+  currency String   @default("INR")
+
+  sellerName      String
+  sellerLegalName String?
+  sellerGstin     String?
+  sellerState     String?
+  sellerAddress   String?
+  sellerEmail     String?
+
+  billToName    String
+  billToEmail   String?
+  billToAddress String?
+  billToState   String?
+  billToGstin   String?
+
+  // GST state code; INTRA (CGST + SGST) or INTER (IGST).
+  placeOfSupply String?
+  taxType       String
+
+  // Integer paise (KTD-18). Before discount, the discount, what is taxed,
+  // its GST and what was charged.
+  subtotalPaise Int
+  discountPaise Int @default(0)
+  taxablePaise  Int
+  cgstPaise     Int
+  sgstPaise     Int
+  igstPaise     Int
+  taxPaise      Int
+  totalPaise    Int
+
+  // When its email left; null until then (the `billing.email` job).
+  emailedAt DateTime?
+
+  createdAt DateTime @default(now())
+
+  lines SarohInvoiceLine[]
+
+  @@unique([id, organizationId])
+  @@index([organizationId, issuedAt])
+}
+
+// One line of a Saroh invoice (U17): the plan's period, an upgrade's
+// difference, and later an add-on (U16). GST is worked out per line, on the
+// line's amount after its discount, rounded half-up once (KTD-18).
+model SarohInvoiceLine {
+  id             String       @id @default(cuid())
+  invoiceId      String
+  organizationId String
+  invoice        SarohInvoice @relation(fields: [invoiceId, organizationId], references: [id, organizationId], onDelete: Cascade)
+
+  position      Int
+  description   String
+  sac           String?
+  quantity      Int     @default(1)
+  unitPaise     Int
+  discountPaise Int     @default(0)
+  taxablePaise  Int
+  gstRateBps    Int
+  cgstPaise     Int
+  sgstPaise     Int
+  igstPaise     Int
+  taxPaise      Int
+  amountPaise   Int
+
+  @@unique([invoiceId, position])
+  @@index([organizationId])
+}
+
+// The count behind each Saroh invoice series (U17): one row per prefix and
+// financial year, taken in the invoice's own transaction, so a rolled-back
+// charge leaves no gap. Saroh's, not a business's.
+model SarohInvoiceSequence {
+  series    String   @id
+  last      Int
+  updatedAt DateTime @updatedAt
 }

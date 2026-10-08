@@ -169,6 +169,29 @@ describe("Sell (COMMERCE)", () => {
         expect((await view(ctx, "COMMERCE")).readiness).toBe("ACTIVE");
     });
 
+    it("starts a pick-up location from the registered address (UX-025)", async () => {
+        const ctx = await business();
+        await prisma.businessProfile.create({
+            data: {
+                organizationId: ctx.organizationId,
+                addressLine1: "12 Hill Road",
+                city: "Mumbai",
+                postalCode: "400050",
+            },
+        });
+        const out = await setup.enable(ctx, "COMMERCE", {
+            storefrontName: "Hill Road",
+            fulfilment: ["PICKUP"],
+        });
+        const settings = await prisma.storeSettings.findUniqueOrThrow({
+            where: { storeId: out.created.storefrontId },
+        });
+        expect(settings).toMatchObject({
+            kind: "SHOP",
+            address: "12 Hill Road, Mumbai 400050",
+        });
+    });
+
     it("renames the first storefront there is and sets its ways; none added", async () => {
         const ctx = await business();
         const first = await prisma.store.create({
@@ -1020,6 +1043,32 @@ describe("Website starts from the kind's template (DEC-070, K15)", () => {
             },
         });
         expect((await setup.defaults(ctx, "WEBSITE")).template).toBeUndefined();
+    });
+
+    it("offers the catalogue to choose from instead, with the kind (U12)", async () => {
+        const ctx = await business("Asha Rao", "WORK");
+        const read = await setup.defaults(ctx, "WEBSITE");
+        expect(read.kind).toBe("WORK");
+        expect(read.templates).toContainEqual({
+            id: "bakery",
+            name: "Bakery",
+            kinds: ["food"],
+            uses: ["COMMERCE"],
+        });
+    });
+
+    it("starts the site from the template chosen in the sheet (U12)", async () => {
+        const ctx = await business("Asha Rao", "WORK");
+        const out = await setup.enable(ctx, "WEBSITE", {
+            siteName: "Asha Rao",
+            address: `u12-${seq}-${tag}`,
+            templateId: "writing",
+        });
+        const site = await prisma.site.findUniqueOrThrow({
+            where: { id: out.created.siteId },
+            select: { templateId: true },
+        });
+        expect(site.templateId).toBe("writing");
     });
 
     it.each([

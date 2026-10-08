@@ -389,6 +389,7 @@ describe("CalendarService.read, a month at a time", () => {
                     // Never an abandoned site checkout.
                     NOT: {
                         placedOnline: true,
+                        payOnHandover: false,
                         paymentStatus: "UNPAID",
                         paymentIntents: { none: { status: "SUCCEEDED" } },
                     },

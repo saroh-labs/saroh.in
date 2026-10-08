@@ -8,8 +8,9 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 
+import { reportFailure } from "@/components/billing/plan-refusal";
+import { BusinessDate } from "@/components/shared/business-zone";
 import { ConfirmDialog } from "@/components/shared/confirm-dialog";
-import { ViewerDate } from "@/components/shared/viewer-date";
 import { makeOrderPayLink } from "@/lib/orders/actions";
 
 import { actionClass } from "./parts";
@@ -56,7 +57,7 @@ export function usePayLink({
         startTransition(async () => {
             const res = await makeOrderPayLink(orderId);
             if (!res.ok) {
-                showError(res.error);
+                reportFailure(res);
                 return;
             }
             setUrl(res.data.url);
@@ -160,7 +161,7 @@ export function PayLinkBlock({
         return (
             <div className="mt-2 flex flex-wrap items-center gap-2">
                 <p className="min-w-0 flex-1 text-[12.5px] text-muted-foreground">
-                    Pay link made <ViewerDate iso={madeAt} variant="moment" />
+                    Pay link made <BusinessDate iso={madeAt} variant="moment" />
                 </p>
                 <Button
                     type="button"

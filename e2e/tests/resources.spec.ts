@@ -1,0 +1,236 @@
+// @covers web:/changelog web:/privacy web:/help web:/llms.txt web:/api/waitlist api:waitlist
+import type { APIRequestContext, Page, TestInfo } from "@playwright/test";
+import { expect, test } from "@playwright/test";
+
+import { stamp } from "../fixtures/own-data";
+import { urls } from "../playwright.config";
+
+/**
+ * The Resources frame on saroh.in (plan U1, U4): what only a running site
+ * shows.
+ *
+ * - Every Resources link (the nav's Resources menu, the footer's Resources
+ *   and legal links, the sitemap's Resources pages, and every link inside
+ *   a Resources page) answers 200: no 404, no link to a page that isn't
+ *   published or built (R2, R8 as a class).
+ * - No Resources page links to itself in its own content (R8).
+ * - Every page /llms.txt lists answers 200 (plan U7).
+ * - No Resources page scrolls sideways at 390.
+ * - The changelog's email field joins the list (`source=changelog`) and
+ *   confirms; the same address again is not an error.
+ *
+ * Which pages exist depends on the day (publish by date, KTD-2) and on
+ * which routes have landed, so the spec reads them from the site itself:
+ * the sitemap and the footer. Read-only but for its own stamped joins.
+ */
+
+const WEB = urls.WEB_URL;
+
+const isDesk = (testInfo: TestInfo) => testInfo.project.name.startsWith("desk");
+
+const RESOURCE_PREFIXES = [
+    "/changelog",
+    "/help",
+    "/integrations",
+    "/tools/",
+    "/privacy",
+];
+const isResource = (path: string) =>
+    RESOURCE_PREFIXES.some((r) => path === r || path.startsWith(r));
+
+/** The Resources pages the sitemap lists today. */
+async function resourcePages(request: APIRequestContext): Promise<string[]> {
+    const xml = await (await request.get(`${WEB}/sitemap.xml`)).text();
+    return [...xml.matchAll(/<loc>([^<]+)<\/loc>/g)]
+        .map((m) => new URL(m[1]).pathname)
+        .filter(isResource);
+}
+
+/** A link resolves: 200, or a single 301/308 to a 200. */
+async function resolves(request: APIRequestContext, url: string) {
+    const first = await request.get(url, { maxRedirects: 0 });
+    if (first.status() === 200) return "200";
+    if (![301, 308].includes(first.status())) return String(first.status());
+    const to = new URL(first.headers().location, url).toString();
+    const second = await request.get(to, { maxRedirects: 0 });
+    return second.status() === 200 ? "200" : `→ ${second.status()}`;
+}
+
+/**
+ * Same-site paths of the links matching `selector`. A jump within the page
+ * ("On this page", `#step-1`) is not a link to another page, so it is left
+ * out.
+ */
+async function sitePaths(page: Page, selector: string): Promise<string[]> {
+    const hrefs = await page
+        .locator(selector)
+        .evaluateAll((els) => els.map((el) => (el as HTMLAnchorElement).href));
+    const here = new URL(page.url()).pathname;
+    return [
+        ...new Set(
+            hrefs
+                .map((h) => new URL(h))
+                .filter((u) => u.origin === new URL(WEB).origin)
+                .filter((u) => !(u.hash && u.pathname === here))
+                .map((u) => u.pathname),
+        ),
+    ];
+}
+
+test("the changelog is listed, and every Resources page in the sitemap answers", async ({
+    request,
+}, testInfo) => {
+    test.skip(!isDesk(testInfo), "HTTP only; once is enough");
+    const pages = await resourcePages(request);
+    // The changelog page is live before launch, in its pre-launch state.
+    expect(pages).toContain("/changelog");
+    for (const path of pages) {
+        expect(await resolves(request, `${WEB}${path}`), path).toBe("200");
+    }
+});
+
+test("every Resources link resolves, and no page links to itself", async ({
+    page,
+    request,
+}, testInfo) => {
+    test.skip(!isDesk(testInfo), "the links are the same on the phone");
+    const pages = await resourcePages(request);
+    const checked = new Set<string>();
+    for (const path of pages) {
+        await page.goto(`${WEB}${path}`);
+        await expect(page.locator("main")).toBeVisible();
+
+        const own = await sitePaths(page, "main a[href]");
+        expect(
+            own.filter((p) => p === path),
+            `${path} links to itself`,
+        ).toEqual([]);
+
+        const footer = await sitePaths(page, "footer a[href]");
+        const links = [...own, ...footer.filter(isResource)];
+        for (const link of links) {
+            if (checked.has(link)) continue;
+            checked.add(link);
+            expect(
+                await resolves(request, `${WEB}${link}`),
+                `${link} (from ${path})`,
+            ).toBe("200");
+        }
+    }
+
+    // The nav's Resources menu: every item answers.
+    await page.goto(`${WEB}/`);
+    const nav = page.getByRole("navigation", { name: "Main" });
+    await nav.getByRole("button", { name: "Resources" }).click();
+    const items = await sitePaths(page, "#nav-menu-resources a[href]");
+    expect(items).toContain("/changelog");
+    for (const item of items) {
+        expect(await resolves(request, `${WEB}${item}`), item).toBe("200");
+    }
+    await page.keyboard.press("Escape");
+    await expect(nav.getByRole("menu")).toHaveCount(0);
+});
+
+test("every page /llms.txt lists answers", async ({ request }, testInfo) => {
+    test.skip(!isDesk(testInfo), "HTTP only; once is enough");
+    const res = await request.get(`${WEB}/llms.txt`);
+    expect(res.status()).toBe(200);
+    const text = await res.text();
+    expect(text.startsWith("# Saroh")).toBe(true);
+    // Its links are absolute on www.saroh.in; check each path on this stack.
+    const paths = Array.from(text.matchAll(/\]\((https:\/\/[^)]+)\)/g)).map(
+        (m) => new URL(m[1]).pathname,
+    );
+    expect(paths).toContain("/changelog");
+    for (const path of paths) {
+        expect(await resolves(request, `${WEB}${path}`), path).toBe("200");
+    }
+});
+
+test("no Resources page scrolls sideways at 390", async ({ page, request }) => {
+    for (const path of await resourcePages(request)) {
+        await page.setViewportSize({ width: 390, height: 844 });
+        await page.goto(`${WEB}${path}`);
+        await expect(page.locator("main")).toBeVisible();
+        // Against the width set: a phone viewport widens innerWidth to fit.
+        await expect
+            .poll(
+                () =>
+                    page.evaluate(() => ({
+                        inner: window.innerWidth,
+                        scroll: document.documentElement.scrollWidth,
+                    })),
+                { message: `${path} at 390` },
+            )
+            .toEqual({ inner: 390, scroll: 390 });
+    }
+});
+
+test("the changelog's email joins the list, and the same address again is fine", async ({
+    page,
+}, testInfo) => {
+    // Desk only: the waitlist takes 5 joins a minute per visitor, and every
+    // test here is one visitor (localhost). With desk and phone both posting,
+    // a run of only the marketing and Resources specs hit the limit (429).
+    // The form is the same on the phone; its layout is checked at 390 above.
+    test.skip(
+        testInfo.project.name.startsWith("phone"),
+        "the same request on the phone; the waitlist limits one visitor",
+    );
+    const address = `${stamp(testInfo).toLowerCase()}@example.com`;
+    for (const attempt of ["first", "again"]) {
+        await page.goto(`${WEB}/changelog`);
+        await page
+            .getByRole("textbox", { name: "Email", exact: true })
+            .fill(address);
+        const joined = page.waitForResponse(
+            (r) =>
+                r.url().endsWith("/api/waitlist") &&
+                r.request().method() === "POST",
+        );
+        await page
+            .getByRole("button", { name: "Get one email when something ships" })
+            .click();
+        const res = await joined;
+        expect(res.request().postDataJSON(), attempt).toEqual({
+            email: address,
+            src: "changelog",
+        });
+        expect(res.status(), attempt).toBe(200);
+        await expect(
+            page.locator("main").getByRole("status"),
+            attempt,
+        ).toHaveText("Done. We'll email you when something ships.");
+        await expect(page.locator("main").getByRole("alert")).toHaveCount(0);
+    }
+});
+
+test("help.saroh.in is sent to Help on www, old pages to their article", async ({
+    request,
+}, testInfo) => {
+    test.skip(
+        testInfo.project.name.startsWith("phone"),
+        "a redirect is the same on the phone",
+    );
+    // The stack serves saroh.in on localhost; the proxy reads the Host
+    // header, so this asks for help.saroh.in on it.
+    const go = (path: string) =>
+        request.get(`${WEB}${path}`, {
+            headers: { host: "help.saroh.in" },
+            maxRedirects: 0,
+        });
+    const helpShown = (await request.get(`${WEB}/help`)).status() === 200;
+
+    const home = await go("/");
+    expect(home.status()).toBe(307);
+    expect(home.headers().location).toBe(
+        helpShown ? "https://www.saroh.in/help" : "https://www.saroh.in/",
+    );
+
+    const selling = await go("/selling");
+    expect(selling.headers().location).toBe(
+        helpShown
+            ? "https://www.saroh.in/help/add-your-first-product"
+            : "https://www.saroh.in/",
+    );
+});

@@ -44,6 +44,8 @@ import {
     attentionFor,
     attentionSuggestionsFor,
 } from "./attention-read";
+import type { BookingPaid } from "./booking-paid";
+import { BOOKING_PAID_INVOICES, bookingPaid } from "./booking-paid";
 import type { ContactNoteView } from "./contact-notes.service";
 import { allergenChoices, loadContactNotes } from "./contact-notes.service";
 import { requireCustomerPower } from "./customer-access";
@@ -201,6 +203,8 @@ export interface DetailBooking {
     packName: string | null;
     /** Cancelled after the free-cancellation window: the class stays used. */
     cancelledLate: boolean;
+    /** What has been paid for it, once anything has (UX-049). */
+    paid: BookingPaid | null;
 }
 
 export interface DetailSubscription {
@@ -655,7 +659,11 @@ export class CustomerDetailService {
                     ),
             wants.bookings
                 ? attempt("bookings", () =>
-                      this.readBookings(organizationId, contactId),
+                      this.readBookings(
+                          organizationId,
+                          contactId,
+                          allows(ctx, "invoice:read"),
+                      ),
                   )
                 : skip,
             wants.subscriptions
@@ -1034,7 +1042,11 @@ export class CustomerDetailService {
         };
     }
 
-    private async readBookings(organizationId: string, contactId: string) {
+    private async readBookings(
+        organizationId: string,
+        contactId: string,
+        seesMoney: boolean,
+    ) {
         const now = new Date();
         const where = { organizationId, contactId };
         const select = {
@@ -1047,6 +1059,7 @@ export class CustomerDetailService {
             paidWith: true,
             subscriptionId: true,
             cancelledLate: true,
+            invoices: BOOKING_PAID_INVOICES,
             service: { select: { id: true, name: true, capacity: true } },
             staff: { select: { id: true, name: true } },
             packRedemption: {
@@ -1102,6 +1115,7 @@ export class CustomerDetailService {
                     ? b.packRedemption.purchase.pack.name
                     : null,
             cancelledLate: b.cancelledLate,
+            paid: bookingPaid(b.invoices, seesMoney),
         });
         return {
             upcoming: upcoming.map(view),

@@ -24,7 +24,13 @@ import type { BookingPeople } from "@/lib/services/booking-pay";
 import type { CalendarLayout } from "@/lib/services/calendar-href";
 import { calendarHref } from "@/lib/services/calendar-href";
 import { callName } from "@/lib/services/call-name";
-import type { Block, Column, LocalDate, Span } from "@/lib/services/diary";
+import type {
+    Block,
+    Column,
+    LocalDate,
+    ServiceHours,
+    Span,
+} from "@/lib/services/diary";
 import {
     addDays,
     blocksOnDay,
@@ -112,6 +118,8 @@ export function CalendarScreen({
     can,
     newBooking,
     notices = null,
+    limitNotice = null,
+    serviceHours = null,
 }: {
     layout: CalendarLayout;
     date: LocalDate;
@@ -130,12 +138,24 @@ export function CalendarScreen({
         hours: boolean;
         order?: boolean;
         /** Take payment at the desk, and send a pay link instead (P2). */
-        desk?: { canTake: boolean; canLink: boolean };
+        desk?: {
+            canTake: boolean;
+            canLink: boolean;
+            /** The plan takes payment online (R33); else no link is offered. */
+            online?: boolean;
+        };
     };
     /** The full New booking dialog, for any service at any open time. */
     newBooking: ReactNode;
     /** What the business can tell its customers with (A14). */
     notices?: NoticeChannels | null;
+    /** The plan's bookings-a-month notice at 80% and 100% (U14). */
+    limitNotice?: ReactNode;
+    /**
+     * With nobody on the diary, the services' own hours (UX-023): drawn as
+     * one column with its free time, as the booking page offers it.
+     */
+    serviceHours?: ServiceHours | null;
 }) {
     const router = useRouter();
     const { hold, undo, pending } = useHeld();
@@ -174,8 +194,17 @@ export function CalendarScreen({
         };
     }, [services]);
     const columns = useMemo(
-        () => dayColumns(calendar, staff, date, timezone, gapAfter, minFree),
-        [calendar, staff, date, timezone, gapAfter, minFree],
+        () =>
+            dayColumns(
+                calendar,
+                staff,
+                date,
+                timezone,
+                gapAfter,
+                minFree,
+                serviceHours,
+            ),
+        [calendar, staff, date, timezone, gapAfter, minFree, serviceHours],
     );
     const dayBlocks = columns
         .flatMap((c) => c.blocks)
@@ -433,15 +462,18 @@ export function CalendarScreen({
     const freeRows =
         staff === null
             ? null
-            : columns.flatMap((c) =>
-                  (c.day?.free ?? []).map((f) => ({
-                      key: `${c.key}${f[0]}`,
-                      who: c.name,
-                      from: f[0],
-                      to: f[1],
-                      book: () => bookGap(c, f),
-                  })),
-              );
+            : columns
+                  // The services' own hours have nobody to book with a tap.
+                  .filter((c) => staffById.has(c.key))
+                  .flatMap((c) =>
+                      (c.day?.free ?? []).map((f) => ({
+                          key: `${c.key}${f[0]}`,
+                          who: c.name,
+                          from: f[0],
+                          to: f[1],
+                          book: () => bookGap(c, f),
+                      })),
+                  );
     const monthBusy = useMemo(() => {
         const days = new Set<LocalDate>();
         for (const d of calendar.diaries) {
@@ -509,6 +541,7 @@ export function CalendarScreen({
                 </div>
             </BookingsTopBar>
             <div className="px-[22px] pb-6 pt-[18px] max-[759px]:px-4">
+                {limitNotice ? <div className="mb-3">{limitNotice}</div> : null}
                 <div className="mb-3 flex flex-wrap items-center gap-3">
                     <h1 className="m-0 font-display text-[28px] font-semibold leading-tight tracking-[-0.03em]">
                         {heading}
@@ -558,8 +591,9 @@ export function CalendarScreen({
                 !staff.some((p) => p.status === "ACTIVE") &&
                 columns.length ? (
                     <p className="mb-3 text-[12.5px] text-muted-foreground">
-                        Nobody is on the diary yet, so there are no free times
-                        to book here.{" "}
+                        {serviceHours && serviceHours.hours.length > 0
+                            ? "Customers book each service in its own hours, shown here as free time. Add the people who take bookings to give each their own column."
+                            : "Nobody is on the diary and no service has hours of its own yet, so customers have no free times to book."}{" "}
                         {can.hours ? (
                             <Link
                                 href="/bookings/availability"

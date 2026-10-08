@@ -2,6 +2,7 @@ import { Transform, Type } from "class-transformer";
 import {
     ArrayMinSize,
     IsArray,
+    IsBoolean,
     IsIn,
     IsInt,
     IsISO8601,
@@ -15,7 +16,11 @@ import {
     ValidateNested,
 } from "class-validator";
 
+import type { PaymentMethod } from "../invoices/invoice-state";
+import { PAYMENT_METHODS } from "../invoices/invoice-state";
+import type { CounterPayment } from "./new-order.dto";
 import {
+    COUNTER_PAYMENTS,
     NewOrderCustomerInput,
     NewOrderPaymentInput,
     WalkInInput,
@@ -211,6 +216,16 @@ export class CreateOrderDto {
     @Type(() => NewOrderPaymentInput)
     payment?: NewOrderPaymentInput;
 
+    /**
+     * Handed over now (UX-059): a counter sale the customer leaves with,
+     * paid now and picked up on the spot, is made Collected at once —
+     * never a New order that needs three more steps after they have gone.
+     * Only with a counter payment and Pick-up.
+     */
+    @IsOptional()
+    @IsBoolean({ message: "Say whether it was handed over." })
+    handedOver?: boolean;
+
     @IsArray()
     @ArrayMinSize(1, { message: "An order needs at least one item" })
     @ValidateNested({ each: true })
@@ -397,6 +412,16 @@ export class EditOrderDto {
     trackingUrl?: string | null;
 }
 
+/**
+ * "Record payment" on a paid order that still owes money — an edit's
+ * difference, paid at the counter or by UPI rather than online. The amount
+ * is the API's: what the order still owes.
+ */
+export class RecordDifferenceDto {
+    @IsIn(COUNTER_PAYMENTS, { message: "Pick how it was paid." })
+    kind!: CounterPayment;
+}
+
 export class UpdateOrderDto {
     @IsOptional()
     @IsString()
@@ -407,6 +432,25 @@ export class UpdateOrderDto {
     @IsString()
     @IsIn(PAYMENT_STATUSES, { message: "Unknown payment status" })
     paymentStatus?: PaymentStatus;
+
+    /**
+     * Marked paid by hand (#834): how the business was paid — cash, UPI, a
+     * bank transfer, a card at the counter or another way. Kept on the
+     * order's invoice and its timeline. Read only with `paymentStatus`
+     * PAID; an app before #834 sends none.
+     */
+    @IsOptional()
+    @IsIn(PAYMENT_METHODS, { message: "Pick how it was paid." })
+    paidHow?: PaymentMethod;
+
+    /**
+     * Recorded as refunded by hand (UX-061): how the money went back. On
+     * the order's timeline with the amount handed back. Read only with
+     * `paymentStatus` REFUNDED; an app before it sends none.
+     */
+    @IsOptional()
+    @IsIn(PAYMENT_METHODS, { message: "Pick how it was handed back." })
+    refundedHow?: PaymentMethod;
 }
 
 /** A query value that may repeat (`?stage=NEW&stage=READY`) or be a list. */

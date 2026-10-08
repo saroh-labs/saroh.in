@@ -12,6 +12,7 @@ import { IANAZone } from "luxon";
 
 import type { OrganizationContext } from "../../common/types/organization-context";
 import { ActivationEvents } from "../analytics/activation-events";
+import { assertPlanTakesOnlinePayment } from "../billing/online-payments-plan";
 import { redeemPackInTx } from "../class-packs/redeem-pack";
 import { assertBusinessDetails } from "../invoices/business-details";
 import { isGstRate } from "../invoices/gst";
@@ -19,7 +20,11 @@ import { allows } from "../organizations/organization-policy";
 import { PaymentsService } from "../payments/payments.service";
 import { OPENS_CHECKOUT } from "../payments/public-key";
 import { isValidSlotStart } from "./availability";
-import { CANT_USE_PACKS, requireBookingPower } from "./booking-access";
+import {
+    CANT_USE_PACKS,
+    mayTakeDeskPayment,
+    requireBookingPower,
+} from "./booking-access";
 import type { PersonDiary } from "./booking-calendar";
 import { groupDiaries } from "./booking-calendar";
 import type { CancelledBooking } from "./booking-cancel";
@@ -44,6 +49,7 @@ import {
     resolvePerson,
     toAvailabilityService,
 } from "./booking-slots";
+import { assertDepositOnPlan } from "./deposit-plan";
 import type { TakeDeskPaymentDto } from "./desk-pay.dto";
 import {
     BOOKING_PAPER,
@@ -58,6 +64,7 @@ import type {
     PaidWith,
     UpdateServiceDto,
 } from "./dto";
+import { openingFor, refuseOutsideOpening } from "./opening-hours";
 import type { BookInput, ReserveBy, ReserveWith } from "./reservation";
 import { loadBookableService, reserve, reserveInTx } from "./reservation";
 import type { ServiceView } from "./service-fields";
@@ -262,6 +269,9 @@ export class BookingsService {
         );
         const depositMode = dto.depositMode ?? "NONE";
         assertDepositPriced(dto.priceCents ?? null, depositMode);
+        // A deposit is taken online, so it comes with a plan that takes
+        // money online — asked here, where it is set (`deposit-plan.ts`).
+        await assertDepositOnPlan(ctx.organizationId, depositMode);
         // A treatment needs a storefront to sell from (E10, DEC-050).
         await assertTreatmentSellable(
             { organizationId: ctx.organizationId, siteId: dto.siteId ?? null },
@@ -404,6 +414,13 @@ export class BookingsService {
             assertDepositPriced(
                 priceAfter,
                 dto.depositMode ?? service.depositMode,
+            );
+            // Setting a new deposit needs online payments on the plan;
+            // NONE, or the deposit it already has, never asks.
+            await assertDepositOnPlan(
+                ctx.organizationId,
+                dto.depositMode,
+                service.depositMode,
             );
             if (dto.depositMode !== undefined) {
                 data.depositMode = dto.depositMode;
@@ -600,8 +617,9 @@ export class BookingsService {
      *
      * Every active person gets a diary, booked or not — the calendar draws a
      * column for each; with `staffId`, only theirs (another org's is a 404).
-     * Prices only with `payment:read` (DEC-020): a Member sees the diary and
-     * the people on it, not the money.
+     * Prices only with `payment:read`, or to someone who may take payment
+     * at the desk (DEC-020, DEC-098): a Member sees the diary and the people
+     * on it, not the money — only whether there is something to take.
      */
     async calendarBookings(
         ctx: OrganizationContext,
@@ -647,7 +665,9 @@ export class BookingsService {
         if (staffId && people.length === 0) {
             throw new NotFoundException("Staff member not found");
         }
-        const money = allows(ctx, "payment:read");
+        // Whoever may take payment at the desk sees what they take (DEC-098):
+        // the figure follows the permission, not the role's name.
+        const money = allows(ctx, "payment:read") || mayTakeDeskPayment(ctx);
         return {
             from: from.toISOString(),
             to: to.toISOString(),
@@ -992,6 +1012,9 @@ export class BookingsService {
             startAt.getTime() + service.durationMinutes * 60_000,
         );
         await refuseIfClosed(ctx.organizationId, startAt, endAt);
+        // By hand it is in person unless the service is online (DEC-087).
+        const opening = await openingFor(service, undefined);
+        refuseOutsideOpening(opening, { startAt, endAt });
         const staffing = await loadStaffing(service);
         if (
             !staffing.perPerson &&
@@ -1097,6 +1120,8 @@ export class BookingsService {
             startAt,
             dto.staffId,
             "team",
+            undefined,
+            opening,
         );
         const paidWith: PaidWith | null = withPack
             ? "PACK"
@@ -1225,6 +1250,8 @@ export class BookingsService {
                 "Connect a payment provider to take payment online.",
             );
         }
+        // A pay link charges online: the plan's too (403 MODULE_LOCKED).
+        await assertPlanTakesOnlinePayment(ctx.organizationId);
         // The link issues the booking's invoice: the business details
         // first (DEC-068).
         await assertBusinessDetails(prisma, ctx.organizationId);

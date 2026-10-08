@@ -95,21 +95,31 @@ export function payOptions(input: {
     way: NewOrderWay["type"] | null;
     /** A pay link can be made here: `order:create` (B16) and a provider. */
     canLink: boolean;
+    /**
+     * The plan takes payment online (`takesOnlinePayment`). When it
+     * doesn't, the link isn't offered at all — not even greyed out — and
+     * the counter ways are the choices (R33). Absent: yes.
+     */
+    online?: boolean;
 }): { key: NewOrderPay; label: string; off: string | null }[] {
     const reach = reachOf(input.pick);
     return [
         { key: "CASH", label: "Cash", off: null },
         { key: "UPI", label: "UPI at the counter", off: null },
         { key: "CARD", label: "Card machine", off: null },
-        {
-            key: "LINK",
-            label: "Send a payment link",
-            off: !input.canLink
-                ? "Connect a payment provider to send a link"
-                : !reach
-                  ? "Needs a customer with a phone or email"
-                  : null,
-        },
+        ...(input.online === false
+            ? []
+            : [
+                  {
+                      key: "LINK" as const,
+                      label: "Send a payment link",
+                      off: !input.canLink
+                          ? "Connect a payment provider to send a link"
+                          : !reach
+                            ? "Needs a customer with a phone or email"
+                            : null,
+                  },
+              ]),
         {
             key: "LATER",
             label: "Pay on collection",
@@ -118,6 +128,20 @@ export function payOptions(input: {
                 : null,
         },
     ];
+}
+
+/**
+ * Whether "Handed over now" applies (UX-059): paid at the counter, now,
+ * and picked up there — the sale the customer walks out with. The API
+ * makes such an order Collected at once, and refuses the flag otherwise.
+ */
+export function canHandOver(
+    pay: NewOrderPay,
+    way: NewOrderWay["type"] | null,
+): boolean {
+    return (
+        way === "PICKUP" && (pay === "CASH" || pay === "UPI" || pay === "CARD")
+    );
 }
 
 /** What the payment will do, said before the button (the design's note). */
@@ -134,7 +158,7 @@ export function payNote(
         case "CARD":
             return `Key ${total} into the machine; create once it approves.`;
         case "LINK":
-            return `You get the link to send to ${reach ?? "the customer"}. The order waits unpaid — the kitchen won't start it until it's paid.`;
+            return `You get the link to send to ${reach ?? "the customer"}. The order waits unpaid, and nobody starts it until it's paid.`;
         case "LATER":
             return "Nothing taken now. It shows as unpaid until they pay at the counter.";
     }
@@ -256,6 +280,21 @@ export function roomFor(
 ): number | null {
     if (sellable.soldOut) return 0;
     return sellable.left === null ? null : Math.max(0, sellable.left - inCart);
+}
+
+/**
+ * A picker chip's words (UX-026): the size and price, and — said, not only
+ * greyed — "Sold out" when none can be added here, or "2 left" when few.
+ */
+export function chipWords(
+    variantTitle: string | null,
+    price: string,
+    room: number | null,
+): string {
+    const what = variantTitle ?? "Add";
+    if (room === 0) return `${what} · Sold out`;
+    if (room !== null && room <= 3) return `${what} · ${price} · ${room} left`;
+    return `${what} · ${price}`;
 }
 
 /** The products the search shows: 5 before typing, 8 once typed. */

@@ -29,10 +29,11 @@ import {
     withStorefrontFallback,
 } from "@/lib/products/overview";
 import { stockBadge } from "@/lib/products/overview-rules";
-import { accessLine } from "@/lib/products/overview-words";
+import { accessLine, shopProductUrl } from "@/lib/products/overview-words";
 import { listCategories } from "@/lib/products/service";
 import { countsStock, trackingControl } from "@/lib/products/tracking";
 import { requireSession } from "@/lib/session";
+import { readWebAddressLinks } from "@/lib/sites/share-links-read";
 import type { ProductStock } from "@/lib/stock/product-stock";
 import { productStock } from "@/lib/stock/product-stock";
 import {
@@ -107,15 +108,18 @@ export default async function ProductPage({
     const view = query.view === "customer" ? "customer" : "team";
     // The business's product (#531), as the storefront in the address sees
     // it — or the first that sells it.
-    const [overview, business] = await Promise.all([
+    const [overview, business, web] = await Promise.all([
         withStorefrontFallback(query.storefront, (at) =>
             getProductOverview(at, productId),
         ),
         // The business's Track stock switch (#515). Optional: unknown, the
         // product's own switch decides.
         getStockTracking().catch(() => null),
+        // Whether the online shop is live (UX-082): null when unread.
+        readWebAddressLinks(),
     ]);
     if (!overview) notFound();
+    const shopUrl = shopProductUrl(web?.links.shop, overview.product);
     const tracking = {
         counts: countsStock(
             overview.product.stockTracked,
@@ -171,7 +175,12 @@ export default async function ProductPage({
 
     return (
         <main className="w-full">
-            <ProductCrumbs overview={overview} storeId={store.id} view={view} />
+            <ProductCrumbs
+                overview={overview}
+                storeId={store.id}
+                view={view}
+                shopUrl={shopUrl}
+            />
             <ProductHeader
                 overview={overview}
                 storeId={store.id}
@@ -222,6 +231,7 @@ export default async function ProductPage({
                                 tracking={tracking}
                                 stock={stock}
                                 now={now}
+                                onShop={shopUrl !== null}
                             />
                         ) : null}
                         {tab === "stock" ? (
@@ -278,6 +288,7 @@ export default async function ProductPage({
                                 collections={collections}
                                 categories={categories}
                                 retryHref={href("collections")}
+                                onShop={shopUrl !== null}
                             />
                         ) : null}
                     </div>

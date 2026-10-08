@@ -11,15 +11,17 @@ import {
     TestReleaseProvider,
 } from "@saroh/site-blocks";
 
+import { SiteViewBeacon } from "@/components/site-view-beacon";
 import { TestReleaseBar } from "@/components/test-release-bar";
 import { TestReleaseGate } from "@/components/test-release-gate";
 import { accountAreaOn } from "@/lib/account-area";
 import { publicApiUrl } from "@/lib/api-url";
-import { getBookingPage } from "@/lib/booking-page";
+import { getBookingPage, getBookingVisit } from "@/lib/booking-page";
 import { getCatalogue } from "@/lib/catalogue";
 import { customerReader } from "@/lib/customer-reader";
 import { getSignedInCustomer } from "@/lib/customer-session";
 import { headerAction } from "@/lib/header-action";
+import { liveMenu } from "@/lib/in-page-menu";
 import {
     getMovedTo,
     getPublicationForHost,
@@ -29,6 +31,7 @@ import {
 import { movedLocation, REQUEST_PATH_HEADER } from "@/lib/request-path";
 import { getCheckoutOptions } from "@/lib/shop-checkout";
 import { getSignInOptions } from "@/lib/sign-in";
+import { getFooterFacts } from "@/lib/site-footer";
 import { classifySiteHost } from "@/lib/site-host-mode";
 import { relayFor } from "@/lib/site-relay";
 import { shareable } from "@/lib/test-metadata";
@@ -36,6 +39,7 @@ import { getTestRelease, rootDomain } from "@/lib/test-release";
 import { HEADER_BELOW_BAR } from "@/lib/test-release-chrome";
 import { SiteFooter, SiteHeader } from "@saroh/site-blocks";
 
+import { SITE_FACES } from "@/lib/site-fonts";
 import {
     loadSignInOptions,
     requestSignInCode,
@@ -181,13 +185,21 @@ export default async function SiteLayout({
      * from the catalogue's answer, and waiting for it would add a round
      * trip to every page of a site that sells.
      */
-    const [booking, catalogue, checkout] = siteId
-        ? await Promise.all([
-              getBookingPage(siteId),
-              getCatalogue(siteId),
-              getCheckoutOptions(siteId),
-          ])
-        : [null, null, null];
+    const [booking, catalogue, checkout, visit, footerFacts, navigation] =
+        await Promise.all([
+            siteId ? getBookingPage(siteId) : null,
+            siteId ? getCatalogue(siteId) : null,
+            siteId ? getCheckoutOptions(siteId) : null,
+            // The footer's public phone and place (UX-038).
+            siteId ? getBookingVisit(siteId) : null,
+            // Its contact email and, on Free, the Saroh credit (DEC-101,
+            // DEC-102).
+            siteId ? getFooterFacts(siteId) : null,
+            // The menu less entries to home sections with nothing to show
+            // now (a Journal with no posts, Plans with none on sale): read
+            // beside the rest, not after it.
+            liveMenu(snapshot, siteId),
+        ]);
     const shopServes = catalogue?.ok ?? false;
     const action = headerAction({ booking, shopServes });
 
@@ -279,7 +291,15 @@ export default async function SiteLayout({
                         <style>{HEADER_BELOW_BAR}</style>
                     </>
                 ) : null}
-                <SiteTheme variables={snapshot.site.styleVariables} />
+                <SiteTheme
+                    variables={snapshot.site.styleVariables}
+                    faces={SITE_FACES}
+                />
+                {/* Page views for Insights (UX-032): live hosts only, never a
+                test release, whose visits are not the business's. */}
+                {siteId && test.mode !== "test" && !resolved.release ? (
+                    <SiteViewBeacon siteId={siteId} apiUrl={publicApiUrl()} />
+                ) : null}
                 {/* The account area draws its own compact header and no
                 footer (DEC-073 #10): the frame leaves these out there. */}
                 <SiteChromeFrame
@@ -287,7 +307,7 @@ export default async function SiteLayout({
                     header={
                         <SiteHeader
                             name={snapshot.site.name}
-                            navigation={snapshot.site.navigation ?? []}
+                            navigation={navigation}
                             // A module page leaves the menu while its module is
                             // off (G15).
                             modules={resolved.modules}
@@ -302,6 +322,13 @@ export default async function SiteLayout({
                         <SiteFooter
                             footer={snapshot.site.footer}
                             name={snapshot.site.name}
+                            contact={{
+                                phone: visit?.phone ?? null,
+                                address: visit?.address ?? null,
+                                email: footerFacts?.email ?? null,
+                            }}
+                            // "Made with Saroh" on Free only (DEC-102).
+                            credit={footerFacts?.credit ?? null}
                         />
                     }
                 >

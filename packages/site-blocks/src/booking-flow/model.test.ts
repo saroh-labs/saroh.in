@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import type { BookingDay, BookingService } from "./model";
 import {
     asksWhere,
+    bookingPaymentOf,
     buildIcs,
     changeText,
     creditChoice,
@@ -10,7 +11,6 @@ import {
     dateText,
     dayAria,
     dayCountLabel,
-    depositUnpayable,
     firstVisitText,
     formatMoney,
     groupStarts,
@@ -30,6 +30,7 @@ import {
     serviceLine,
     serviceWhere,
     timeIn,
+    unpayableText,
     visitsOf,
     whereLabel,
     whereText,
@@ -77,7 +78,7 @@ describe("the words on the booking page (U19)", () => {
         ).toBe("60 min · class of 12");
     });
 
-    it("tells Full from Closed, and shortens on a phone", () => {
+    it("tells Full from Closed from No times, and shortens only the count on a phone", () => {
         const day = (over: Partial<BookingDay>): BookingDay => ({
             date: "2026-09-20",
             open: true,
@@ -90,9 +91,18 @@ describe("the words on the booking page (U19)", () => {
         expect(dayCountLabel(three, false)).toBe("3 free");
         expect(dayCountLabel(three, true)).toBe("3");
         expect(dayCountLabel(day({}), false)).toBe("Full");
-        expect(dayCountLabel(day({ open: false }), false)).toBe("Closed");
-        expect(dayCountLabel(day({ open: false }), true)).toBe("Shut");
-        expect(dayAria(day({ open: false }))).toBe("Sun 20 Sep: closed");
+        // The business is closed that day: Closed, on both (UX-054).
+        const shut = day({ open: false, closed: true });
+        expect(dayCountLabel(shut, false)).toBe("Closed");
+        expect(dayCountLabel(shut, true)).toBe("Closed");
+        expect(dayAria(shut)).toBe("Sun 20 Sep: closed");
+        // Open, but nobody takes this service that day: never "Closed".
+        const none = day({ open: false, closed: false });
+        expect(dayCountLabel(none, false)).toBe("No times");
+        expect(dayCountLabel(none, true)).toBe("No times");
+        expect(dayAria(none)).toBe("Sun 20 Sep: no times");
+        // An older API that doesn't say: No times, never a false Closed.
+        expect(dayCountLabel(day({ open: false }), false)).toBe("No times");
         expect(dayAria(three)).toBe("Sun 20 Sep: 3 times free");
     });
 
@@ -143,6 +153,21 @@ describe("the words on the booking page (U19)", () => {
             "Need to change it? Get in touch with Pulse Fitness. Free to cancel until 12 hours before the start.",
         );
         expect(text).not.toMatch(/email|text|link|SMS/i);
+        // Signed in, it is moved or cancelled from their bookings (UX-055).
+        expect(
+            changeText(
+                "Pulse Fitness",
+                {
+                    bookAheadDays: null,
+                    latestBookingMinutes: null,
+                    freeCancelHours: 12,
+                },
+                false,
+                true,
+            ),
+        ).toBe(
+            "Need to change it? Move or cancel it from your bookings on Pulse Fitness's website. Free to cancel until 12 hours before the start.",
+        );
     });
 
     it("states a no-refund policy only to someone paying online (E30)", () => {
@@ -384,15 +409,114 @@ describe("paying at booking (E8)", () => {
         expect(pays({}, false)).toEqual(["DESK"]);
     });
 
-    it("a deposit that can't be taken online offers nothing, and says so", () => {
-        expect(pays({ depositCents: 30_000 }, false)).toEqual([]);
-        expect(depositUnpayable(service({ depositCents: 30_000 }), false)).toBe(
-            true,
-        );
-        expect(depositUnpayable(service({ depositCents: 30_000 }), true)).toBe(
+    it("a deposit that can't be taken online is paid at the desk, under Both (DEC-089)", () => {
+        const choices = payChoices(
+            service({ depositCents: 30_000 }),
             false,
+            "Kavi Dental",
         );
-        expect(depositUnpayable(service(), false)).toBe(false);
+        expect(choices.map((c) => [c.pay, c.label, c.amount])).toEqual([
+            ["DESK", "Pay at the desk", "₹1,200"],
+        ]);
+        expect(
+            unpayableText(service({ depositCents: 30_000 }), false, "Kavi"),
+        ).toBeNull();
+        expect(
+            unpayableText(service({ depositCents: 30_000 }), true, "Kavi"),
+        ).toBeNull();
+        expect(unpayableText(service(), false, "Kavi")).toBeNull();
+    });
+
+    describe("as the business allows (DEC-088)", () => {
+        const ways = ["BOTH", "ONLINE", "DESK"] as const;
+        const choose = (
+            over: Partial<BookingService>,
+            online: boolean,
+            way: (typeof ways)[number],
+        ) =>
+            payChoices(service(over), online, "Kavi Dental", way).map(
+                (c) => c.pay,
+            );
+        const unpayable = (
+            over: Partial<BookingService>,
+            online: boolean,
+            way: (typeof ways)[number],
+        ) => unpayableText(service(over), online, "Kavi Dental", way);
+
+        it.each([
+            // way, payOnline, no deposit, a deposit, the full price
+            // A deposit online can't take is paid at the desk wherever the
+            // desk is allowed (DEC-089); under online only, nothing.
+            ["BOTH", true, ["NOW", "DESK"], ["DEPOSIT", "NOW"], ["NOW"]],
+            ["BOTH", false, ["DESK"], ["DESK"], ["DESK"]],
+            ["ONLINE", true, ["NOW"], ["DEPOSIT", "NOW"], ["NOW"]],
+            ["ONLINE", false, [], [], []],
+            ["DESK", true, ["DESK"], ["DESK"], ["DESK"]],
+            ["DESK", false, ["DESK"], ["DESK"], ["DESK"]],
+        ] as const)(
+            "%s, online %s: no deposit %j, a deposit %j, the full price %j",
+            (way, online, none, part, full) => {
+                expect(choose({}, online, way)).toEqual(none);
+                expect(choose({ depositCents: 30_000 }, online, way)).toEqual(
+                    part,
+                );
+                expect(choose({ depositCents: 120_000 }, online, way)).toEqual(
+                    full,
+                );
+            },
+        );
+
+        it("says get in touch exactly when a priced service has nothing to pay with", () => {
+            for (const way of ways) {
+                for (const online of [true, false]) {
+                    for (const deposit of [null, 30_000]) {
+                        const over = { depositCents: deposit };
+                        expect(unpayable(over, online, way) !== null).toBe(
+                            choose(over, online, way).length === 0,
+                        );
+                    }
+                }
+            }
+            expect(unpayable({}, false, "ONLINE")).toBe(
+                "Kavi Dental can't take payment online right now. Get in touch with them to book.",
+            );
+            expect(unpayable({ depositCents: 30_000 }, false, "ONLINE")).toBe(
+                "Kavi Dental can't take the deposit online right now. Get in touch with them to book.",
+            );
+            // Both and At the desk never say get in touch (DEC-089).
+            for (const way of ["BOTH", "DESK"] as const) {
+                for (const online of [true, false]) {
+                    expect(
+                        unpayable({ depositCents: 30_000 }, online, way),
+                    ).toBeNull();
+                }
+            }
+        });
+
+        it("a service with no price books with nothing to pay, whatever the rule", () => {
+            for (const way of ways) {
+                expect(choose({ priceCents: null }, false, way)).toEqual([]);
+                expect(unpayable({ priceCents: null }, false, way)).toBeNull();
+            }
+        });
+
+        it("reads an absent or unknown way as both", () => {
+            const rules = {
+                bookAheadDays: null,
+                latestBookingMinutes: null,
+                freeCancelHours: null,
+            };
+            expect(bookingPaymentOf(rules)).toBe("BOTH");
+            expect(
+                bookingPaymentOf({
+                    ...rules,
+                    bookingPayment: "CASH" as never,
+                }),
+            ).toBe("BOTH");
+            expect(bookingPaymentOf({ ...rules, bookingPayment: "DESK" })).toBe(
+                "DESK",
+            );
+        });
     });
 
     it("no price, nothing to choose", () => {

@@ -49,16 +49,17 @@ import type {
 } from "./model";
 import {
     asksWhere,
+    bookingPaymentOf,
     creditChoice,
     creditUsedText,
     dateIn,
     dateText,
-    depositUnpayable,
     formatMoney,
     payChoices,
     restAfterDeposit,
     rulesText,
     timeIn,
+    unpayableText,
     visitsOf,
     whereText,
 } from "./model";
@@ -163,6 +164,8 @@ export interface BookingAccount {
     waitlist?: WaitlistApi;
 }
 
+/** What is left while the name isn't typed (UX-083: a next step until they try to book). */
+const NAME_LEFT = "Add your name.";
 export interface BookingFlowProps {
     page: BookingPageData;
     /** Sign-in and booking with it, through the site's server (A9). */
@@ -218,6 +221,8 @@ export default function BookingFlow({
     // Where, for a service offered either way, and the note (E7).
     const [where, setWhere] = useState<BookingWhere>("IN_PERSON");
     const [note, setNote] = useState("");
+    // A phone to reach them on (UX-049), optional; filled into checkout.
+    const [phoneNo, setPhoneNo] = useState("");
     const [touched, setTouched] = useState(false);
     const [payChoice, setPayChoice] = useState<BookPay | null>(null);
     const [sessionsShown, setSessionsShown] = useState(SESSIONS_SHOWN);
@@ -407,17 +412,26 @@ export default function BookingFlow({
         chosenStart?.startAt ?? null,
     );
     // The ways this service may be paid (E8): the one chosen, else the
-    // first — and a service that takes a deposit is never at the desk.
+    // first — and a service that takes a deposit is at the desk only when
+    // online can't take it (DEC-089). Only the ways the business allows
+    // (DEC-088).
+    const way = bookingPaymentOf(page.rules);
     const choices = service
         ? [
               ...(credit ? [creditChoice(credit, service.currency)] : []),
-              ...payChoices(service, page.payOnline, page.businessName),
+              ...payChoices(service, page.payOnline, page.businessName, way),
           ]
         : [];
+    // A priced service nothing the business allows can pay for (online
+    // only, with no way to pay online): it can't be booked here, and the
+    // summary shows no payment line (#822). A credit still books it.
+    const unpayable = credit
+        ? null
+        : unpayableText(service, page.payOnline, page.businessName, way);
+    const deskOffered = choices.some((c) => c.pay === "DESK");
     const chosenPay =
         choices.find((c) => c.pay === payChoice) ?? choices.at(0) ?? null;
     const pay: BookPay = chosenPay?.pay ?? "DESK";
-    const takesDeposit = (service?.depositCents ?? 0) > 0;
     /** What leaves their account at booking: the deposit or the price. */
     const payingNow = chosenPay?.amount ?? price ?? "";
     /** What is left for the visit once the deposit is paid. */
@@ -425,10 +439,15 @@ export default function BookingFlow({
         pay === "DEPOSIT" && service ? restAfterDeposit(service) : null;
 
     const asks = asksWhere(service);
+    // A time only one way can have (DEC-087: online outside opening hours)
+    // settles Where; any other leaves it to the booker.
+    const onlyWhere = asks ? (chosenStart?.only ?? null) : null;
+    const whereNow: BookingWhere = onlyWhere ?? where;
     /** What the booking page asks beyond the time, as the API takes it. */
     const extras = {
-        ...(asks ? { locationType: where } : {}),
+        ...(asks ? { locationType: whereNow } : {}),
         ...(note.trim() ? { intakeNote: note.trim() } : {}),
+        ...(phoneNo.trim() ? { bookerPhone: phoneNo.trim() } : {}),
     };
 
     // A name is asked for only while the account has none (A9).
@@ -439,13 +458,8 @@ export default function BookingFlow({
 
     const block = !service
         ? "Pick what you'd like to book."
-        : depositUnpayable(service, page.payOnline)
-          ? `${page.businessName} can't take the deposit online right now. Get in touch with them to book.`
-          : !chosenStart
-            ? "Pick a time."
-            : !whoOk
-              ? "Add your name."
-              : "";
+        : (unpayable ??
+          (!chosenStart ? "Pick a time." : !whoOk ? NAME_LEFT : ""));
 
     const whenText = chosenStart
         ? `${dateText(dateIn(chosenStart.startAt, zone), true)} at ${timeIn(chosenStart.startAt, zone)}${
@@ -453,23 +467,28 @@ export default function BookingFlow({
           }`
         : "";
 
-    const dueLabel = waiting
-        ? "Waitlist"
-        : pay === "CREDIT"
-          ? "Uses 1 credit"
-          : pay === "DEPOSIT"
-            ? "Deposit now"
-            : pay === "NOW"
-              ? "To pay now"
-              : price
-                ? "Pay at the desk"
-                : "To pay";
-    const due = waiting
-        ? (formatMoney(0, service?.currency ?? "INR") ?? "₹0")
-        : (chosenPay?.amount ??
-          price ??
-          formatMoney(0, service?.currency ?? "INR") ??
-          "₹0");
+    // Nothing it can take: no payment line at all (#822).
+    const dueLabel = unpayable
+        ? ""
+        : waiting
+          ? "Waitlist"
+          : pay === "CREDIT"
+            ? "Uses 1 credit"
+            : pay === "DEPOSIT"
+              ? "Deposit now"
+              : pay === "NOW"
+                ? "To pay now"
+                : price
+                  ? "Pay at the desk"
+                  : "To pay";
+    const due = unpayable
+        ? ""
+        : waiting
+          ? (formatMoney(0, service?.currency ?? "INR") ?? "₹0")
+          : (chosenPay?.amount ??
+            price ??
+            formatMoney(0, service?.currency ?? "INR") ??
+            "₹0");
     // Not signed in yet, the last step is signing in (A9, the Customer Site
     // design's "Continue to sign in"); the booking follows the code.
     const confirmLabel = !customer
@@ -484,7 +503,7 @@ export default function BookingFlow({
                 ? `Pay ${payingNow} deposit and book`
                 : pay === "NOW"
                   ? `Pay ${price ?? ""} and book`
-                  : price
+                  : price && !unpayable
                     ? "Book — pay at the desk"
                     : "Book";
     const barLabel = !customer
@@ -952,6 +971,7 @@ export default function BookingFlow({
         setPayChoice(null);
         setWhere("IN_PERSON");
         setNote("");
+        setPhoneNo("");
         setTouched(false);
         setSubmitError(null);
         wanted.current = null;
@@ -963,13 +983,19 @@ export default function BookingFlow({
         dueLabel,
         due,
         block,
+        // A name not typed yet is a next step until they try to book.
+        quiet: !touched && block === NAME_LEFT,
         submitError,
         submitting,
         onConfirm: () => void confirm(),
     };
     const choosing = phase.kind === "choose";
     const facts = headerFacts(visit);
-    const showBar = phone && choosing && services.length > 0 && page.open;
+    // Online booking paused at the plan's monthly cap (DEC-095): said up
+    // front, before any choosing, never after the booker has done the work.
+    const paused = page.paused === true;
+    const bookable = page.open && services.length > 0 && !paused;
+    const showBar = phone && choosing && bookable;
 
     return (
         <div
@@ -1018,7 +1044,32 @@ export default function BookingFlow({
 
             <div className="mx-auto -mt-[18px] flex max-w-[1060px] flex-wrap items-start gap-5 px-5">
                 <div className="grid min-w-0 flex-[999_1_460px] grid-cols-[minmax(0,1fr)] gap-3.5">
-                    {!page.open || services.length === 0 ? (
+                    {page.open && services.length > 0 && paused ? (
+                        <div className={card}>
+                            <h2 className="font-site-heading text-site-fg text-[19px] font-semibold tracking-[-0.02em]">
+                                Online booking is paused for now
+                            </h2>
+                            <p className="text-site-body mt-2 text-sm">
+                                {facts.phone ? (
+                                    <>
+                                        Call {page.businessName} on{" "}
+                                        <a
+                                            href={`tel:${facts.phone}`}
+                                            className="focus-visible:ring-site-accent rounded-sm underline underline-offset-2 focus-visible:outline-none focus-visible:ring-2"
+                                        >
+                                            {phoneText(facts.phone)}
+                                        </a>{" "}
+                                        to book a time.
+                                    </>
+                                ) : (
+                                    <>
+                                        Get in touch with {page.businessName} to
+                                        book a time.
+                                    </>
+                                )}
+                            </p>
+                        </div>
+                    ) : !page.open || services.length === 0 ? (
                         <div className={card}>
                             <h2 className="font-site-heading text-site-fg text-[19px] font-semibold tracking-[-0.02em]">
                                 Online booking isn&apos;t open right now
@@ -1064,11 +1115,16 @@ export default function BookingFlow({
                             booker={{
                                 name: bookerName,
                                 email: customer?.email ?? "",
+                                ...(phoneNo.trim()
+                                    ? { phone: phoneNo.trim() }
+                                    : {}),
                             }}
                             busy={leaving}
-                            // A deposit is never paid at the desk (E8).
+                            // Only when the desk is on offer: never for a
+                            // deposit (E8), nor when the business takes
+                            // payment online only (DEC-088).
                             onDesk={
-                                takesDeposit
+                                !deskOffered
                                     ? undefined
                                     : () => void leaveHold("desk")
                             }
@@ -1146,10 +1202,13 @@ export default function BookingFlow({
                                     onName={setName}
                                     onNotYou={() => void notYou()}
                                     asksWhere={asks}
-                                    where={where}
+                                    where={whereNow}
+                                    onlyWhere={onlyWhere}
                                     note={note}
                                     onWhere={pickWhere}
                                     onNote={setNote}
+                                    phone={phoneNo}
+                                    onPhone={setPhoneNo}
                                     forWaitlist={waiting}
                                 />
                             ) : null}
@@ -1172,7 +1231,7 @@ export default function BookingFlow({
                     )}
                 </div>
 
-                {choosing && !phone && services.length > 0 && page.open ? (
+                {choosing && !phone && bookable ? (
                     <SummaryAside
                         serviceName={service?.name ?? null}
                         visits={visitsOf(service)}

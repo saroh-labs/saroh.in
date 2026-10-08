@@ -16,25 +16,29 @@ import {
 import { readServices } from "@/lib/services/service";
 import { readServiceUsage } from "@/lib/services/usage-read";
 import { requireSession } from "@/lib/session";
+import { readBookingPayment } from "@/lib/staff/service";
 
 /**
  * Bookings › Services (U16, E2): what people can book, as the design's
  * cards. The services read is the page; the staff read (who takes each),
  * the bookings read (how each is used) and the sites read (whether there is
  * a booking page) degrade on their own and say so. The module list, for
- * "Also sell" (E12), leaves the card out when it can't be read.
+ * "Also sell" (E12), leaves the card out when it can't be read; how people
+ * pay (DEC-088) marks nothing when it can't.
  */
 export const metadata = { title: "Services" };
 
 export default async function ServicesPage() {
     await requireSession();
-    const [read, staffList, hasPage, canEdit, modules] = await Promise.all([
-        readServices(),
-        readStaffOrNull(),
-        readHasBookingPage(),
-        readCanEditServices(),
-        modulesOrUnknown(),
-    ]);
+    const [read, staffList, hasPage, canEdit, modules, payment] =
+        await Promise.all([
+            readServices(),
+            readStaffOrNull(),
+            readHasBookingPage(),
+            readCanEditServices(),
+            modulesOrUnknown(),
+            readBookingPayment(),
+        ]);
 
     if (!read.ok) {
         return (
@@ -93,6 +97,7 @@ export default async function ServicesPage() {
                     currency={businessCurrencyOf(services)}
                     canEdit={canEdit}
                     hasPage={hasPage}
+                    payment={payment}
                     alsoSell={alsoSellFeatures(modules)}
                     modules={modules ?? []}
                 />

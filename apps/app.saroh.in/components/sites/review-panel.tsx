@@ -5,11 +5,14 @@ import { cn } from "@saroh/ui/lib/utils";
 import { showError, showSuccess } from "@saroh/ui/toast";
 import { useState } from "react";
 
+import { useBusinessZone } from "@/components/shared/business-zone";
 import { PreviewLinks } from "@/components/sites/preview-links";
+import { VerdictControls } from "@/components/sites/verdict-controls";
 import {
     createApproval,
     requestReview,
     setCommentResolved,
+    withdrawReview,
 } from "@/lib/sites/actions";
 import { shortDate } from "@/lib/sites/format-date";
 import { reviewSubject } from "@/lib/sites/release-review";
@@ -90,19 +93,36 @@ export function ReviewPanel({
      * publish, and asking for changes does not block a publish — it is
      * recorded, and publishing over it is recorded as a bypass (#199).
      */
-    async function record(outcome: ReviewerVerdict) {
+    async function record(
+        outcome: ReviewerVerdict,
+        reason?: string,
+    ): Promise<boolean> {
         setRecording(true);
-        const res = await createApproval(siteId, outcome, release?.id);
+        const res = await createApproval(siteId, outcome, release?.id, reason);
         setRecording(false);
         if (!res.ok) {
             showError(res.error);
-            return;
+            return false;
         }
         showSuccess(
             outcome === "APPROVED"
                 ? "Marked as approved."
                 : "Recorded that you asked for changes.",
         );
+        onChanged();
+        return true;
+    }
+
+    /** Take the draft's request back (UX-068): it no longer reads In review. */
+    async function withdraw() {
+        setAsking(true);
+        const res = await withdrawReview(siteId);
+        setAsking(false);
+        if (!res.ok) {
+            showError(res.error);
+            return;
+        }
+        showSuccess("Review request withdrawn.");
         onChanged();
     }
 
@@ -151,38 +171,42 @@ export function ReviewPanel({
 
     const shareLinks = release ? null : <PreviewLinks siteId={siteId} />;
 
-    const verdict = !can.approve ? null : (
-        <div className="flex gap-2 border-b px-3 py-2">
-            <Button
-                type="button"
-                size="sm"
-                variant="outline"
-                className="flex-1"
-                disabled={recording}
-                onClick={() => void record("APPROVED")}
-            >
-                Approve
-            </Button>
-            <Button
-                type="button"
-                size="sm"
-                variant="outline"
-                className="flex-1"
-                disabled={recording}
-                onClick={() => void record("CHANGES_REQUESTED")}
-            >
-                Ask for changes
-            </Button>
-        </div>
-    );
+    /*
+     * Not on your own request (UX-068): approving what you asked to have
+     * looked at is not a second pair of eyes, and the API would not count it.
+     */
+    const verdict =
+        !can.approve || review.askedByYou ? null : (
+            <div className="flex flex-wrap gap-2 border-b px-3 py-2">
+                <VerdictControls
+                    compact
+                    recording={recording}
+                    onRecord={record}
+                />
+            </div>
+        );
 
     const askForReview = !can.ask ? null : (
         <div className="border-b px-3 py-2">
             {review.pending ? (
-                <p className="text-xs leading-relaxed text-muted-foreground">
-                    In review. Publishing still works — it is recorded as going
-                    ahead without approval.
-                </p>
+                <>
+                    <p className="text-xs leading-relaxed text-muted-foreground">
+                        In review. Publishing still works — it is recorded as
+                        going ahead without approval, and ends the review.
+                    </p>
+                    {release ? null : (
+                        <Button
+                            type="button"
+                            size="sm"
+                            variant="ghost"
+                            className="mt-1 h-7 px-2 text-xs"
+                            disabled={asking}
+                            onClick={() => void withdraw()}
+                        >
+                            {asking ? "Withdrawing…" : "Withdraw the request"}
+                        </Button>
+                    )}
+                </>
             ) : (
                 <>
                     <Button
@@ -371,6 +395,7 @@ function Note({
     onToggle: (() => void) | null;
     onJump: (pageId: string, sectionKey: string) => void;
 }) {
+    const zone = useBusinessZone();
     const settled = note.resolvedAt !== null;
     // A local const narrows where the property access does not: the page is
     // null once it has been deleted (#277).
@@ -388,7 +413,7 @@ function Note({
                     {note.author.name}
                 </span>
                 <span className="shrink-0 text-[11px] text-muted-foreground">
-                    {shortDate(note.createdAt)}
+                    {shortDate(note.createdAt, zone)}
                 </span>
             </div>
 

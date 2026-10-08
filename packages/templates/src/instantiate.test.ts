@@ -5,9 +5,11 @@ import { instantiateTemplate, TemplateInstantiationError } from "./instantiate";
 import type { TemplateContext, TemplateManifest } from "./manifest";
 import { getTemplate, listTemplates } from "./registry";
 import {
+    HERO_PROMPT,
     STARTER_TEMPLATE_ID,
     starterTemplate,
     starterTemplateV1,
+    starterTemplateV2,
 } from "./templates/starter";
 
 const sampleProfile: TemplateContext = {
@@ -46,9 +48,10 @@ function everySection(template: TemplateManifest, ctx: TemplateContext) {
 
 describe("registry", () => {
     it("resolves the starter template by id (latest) and by exact version", () => {
-        expect(starterTemplate.version).toBe(2);
+        expect(starterTemplate.version).toBe(3);
         expect(getTemplate(STARTER_TEMPLATE_ID)).toBe(starterTemplate);
-        expect(getTemplate(STARTER_TEMPLATE_ID, 2)).toBe(starterTemplate);
+        expect(getTemplate(STARTER_TEMPLATE_ID, 3)).toBe(starterTemplate);
+        expect(getTemplate(STARTER_TEMPLATE_ID, 2)).toBe(starterTemplateV2);
         // Sites built from v1 keep resolving it (KTD-12).
         expect(getTemplate(STARTER_TEMPLATE_ID, 1)).toBe(starterTemplateV1);
         expect(getTemplate(STARTER_TEMPLATE_ID, 99)).toBeUndefined();
@@ -63,12 +66,12 @@ describe("registry", () => {
     });
 
     it("registers the DEC-070 templates beside the starter (K15)", () => {
-        expect(listTemplates().map((t) => `${t.id}@${t.version}`)).toEqual([
-            "starter@2",
-            "personal@1",
-            "portfolio@1",
-            "writing@1",
-        ]);
+        // First, ahead of the industry templates each registered after them.
+        expect(
+            listTemplates()
+                .map((t) => `${t.id}@${t.version}`)
+                .slice(0, 4),
+        ).toEqual(["starter@3", "personal@1", "portfolio@1", "writing@1"]);
         for (const id of ["personal", "portfolio", "writing"]) {
             expect(getTemplate(id)?.id).toBe(id);
             expect(getTemplate(id, 1)?.version).toBe(1);
@@ -86,7 +89,7 @@ describe("starter@2 — words that fit anyone, and no broken images (DEC-070)", 
     it.each(profiles)(
         "every section passes the contract, for %s",
         (_label, ctx) => {
-            for (const section of everySection(starterTemplate, ctx)) {
+            for (const section of everySection(starterTemplateV2, ctx)) {
                 expect(
                     parseSectionContent(
                         section.type,
@@ -99,7 +102,7 @@ describe("starter@2 — words that fit anyone, and no broken images (DEC-070)", 
     );
 
     it.each(profiles)("carries no image at all, for %s", (_label, ctx) => {
-        for (const section of everySection(starterTemplate, ctx)) {
+        for (const section of everySection(starterTemplateV2, ctx)) {
             expect(imageSources(section.content)).toEqual([]);
             for (const text of strings(section.content)) {
                 expect(text).not.toContain("/templates/starter/");
@@ -110,7 +113,7 @@ describe("starter@2 — words that fit anyone, and no broken images (DEC-070)", 
     it.each(profiles)(
         "never speaks as a company to its customers, for %s",
         (_label, ctx) => {
-            const copy = everySection(starterTemplate, ctx)
+            const copy = everySection(starterTemplateV2, ctx)
                 .flatMap((s) => strings(s.content))
                 .join(" ")
                 .toLowerCase();
@@ -124,7 +127,7 @@ describe("starter@2 — words that fit anyone, and no broken images (DEC-070)", 
     );
 
     it("lays down Home and About, with the gallery given way to words", () => {
-        const { pages } = instantiateTemplate(starterTemplate, sampleProfile);
+        const { pages } = instantiateTemplate(starterTemplateV2, sampleProfile);
         expect(pages.map((p) => p.path)).toEqual(["/", "/about"]);
         expect(pages.filter((p) => p.isHome).map((p) => p.path)).toEqual(["/"]);
         const [home, about] = pages;
@@ -143,7 +146,7 @@ describe("starter@2 — words that fit anyone, and no broken images (DEC-070)", 
     });
 
     it("heads Home with the name and a centred hero that says what it does", () => {
-        const [home, about] = instantiateTemplate(starterTemplate, {
+        const [home, about] = instantiateTemplate(starterTemplateV2, {
             organizationName: "Asha Rao",
         }).pages;
         expect(home.sections[0]?.content).toMatchObject({
@@ -158,7 +161,7 @@ describe("starter@2 — words that fit anyone, and no broken images (DEC-070)", 
     });
 
     it("prefers the owner's own words for the subheading", () => {
-        const hero = instantiateTemplate(starterTemplate, sampleProfile)
+        const hero = instantiateTemplate(starterTemplateV2, sampleProfile)
             .pages[0]?.sections[0]?.content;
         expect(hero).toMatchObject({
             subheading: "Small-batch coffee, roasted with care.",
@@ -167,7 +170,7 @@ describe("starter@2 — words that fit anyone, and no broken images (DEC-070)", 
     });
 
     it("sends every link somewhere real: the email, else its own About page", () => {
-        const { pages } = instantiateTemplate(starterTemplate, {
+        const { pages } = instantiateTemplate(starterTemplateV2, {
             organizationName: "Asha Rao",
         });
         const paths = new Set(pages.map((p) => p.path));
@@ -193,13 +196,60 @@ describe("starter@2 — words that fit anyone, and no broken images (DEC-070)", 
     });
 
     it("weaves the legal name into About, escaped as text", () => {
-        const [, about] = instantiateTemplate(starterTemplate, {
+        const [, about] = instantiateTemplate(starterTemplateV2, {
             organizationName: "Rye & Co.",
             legalName: "Rye <&> Co. Pvt Ltd",
         }).pages;
         const story = about.sections[1].content as { value: string };
         expect(story.value).toContain("Rye &lt;&amp;&gt; Co. Pvt Ltd");
         expect(story.value).not.toContain("<&>");
+    });
+});
+
+describe("starter@3 — a real menu, a prompting hero, one About button (UX-070)", () => {
+    it("puts Home and About in the menu, in page order", () => {
+        const { pages } = instantiateTemplate(starterTemplate, {
+            organizationName: "Asha Rao",
+        });
+        expect(pages.filter((p) => p.inMenu).map((p) => p.path)).toEqual([
+            "/",
+            "/about",
+        ]);
+    });
+
+    it("prompts the owner rather than speaking for them", () => {
+        const [home] = instantiateTemplate(starterTemplate, {
+            organizationName: "Asha Rao",
+        }).pages;
+        expect(home.sections[0]?.content).toMatchObject({
+            heading: "Asha Rao",
+            subheading: HERO_PROMPT,
+        });
+        // Their own words, once they have said any.
+        const own = instantiateTemplate(starterTemplate, sampleProfile).pages[0]
+            ?.sections[0]?.content;
+        expect(own).toMatchObject({
+            subheading: "Small-batch coffee, roasted with care.",
+        });
+    });
+
+    it("has one About button without an email, and a closing Get in touch with one", () => {
+        const hrefs = (ctx: TemplateContext) =>
+            instantiateTemplate(
+                starterTemplate,
+                ctx,
+            ).pages[0]?.sections.flatMap((s) => {
+                const c = s.content as {
+                    href?: string;
+                    cta?: { href?: string };
+                };
+                return [c.href, c.cta?.href].filter(Boolean);
+            });
+        expect(hrefs({ organizationName: "Asha Rao" })).toEqual(["/about"]);
+        expect(hrefs(sampleProfile)).toEqual([
+            "mailto:hello@acme.example",
+            "mailto:hello@acme.example",
+        ]);
     });
 });
 

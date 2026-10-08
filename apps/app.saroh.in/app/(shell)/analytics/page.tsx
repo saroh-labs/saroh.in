@@ -112,6 +112,7 @@ export default async function AnalyticsPage({
                         </h2>
                         <p className="mt-1 text-[13px] leading-[1.5] text-muted-foreground">
                             Last {range.label}: visits, visitors and enquiries.
+                            Updated every hour.
                         </p>
                     </div>
                     <div className="flex items-center gap-1">

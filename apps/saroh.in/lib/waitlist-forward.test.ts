@@ -108,6 +108,29 @@ describe("relaySecret", () => {
 });
 
 describe("joinBody", () => {
+    it("passes on a saved template's slug, trimmed and bounded (U13)", () => {
+        expect(
+            joinBody({
+                email: "a@b.in",
+                business: "Iron & Oak",
+                kind: "gym",
+                src: "templates-gym",
+                template: " gym ",
+            })?.template,
+        ).toBe("gym");
+        expect(
+            joinBody({ email: "a@b.in", business: "X", template: "" })
+                ?.template,
+        ).toBeUndefined();
+        expect(
+            joinBody({
+                email: "a@b.in",
+                business: "X",
+                template: "x".repeat(99),
+            })?.template,
+        ).toHaveLength(40);
+    });
+
     it("passes on the V2 form's fields, with its source", () => {
         expect(
             joinBody({
@@ -141,6 +164,13 @@ describe("joinBody", () => {
         expect(joinBody({ email: "a@b.in" })).toEqual({
             email: "a@b.in",
             source: "saroh.in",
+        });
+    });
+
+    it("takes the changelog's email-only join with its source (plan U4)", () => {
+        expect(joinBody({ email: "a@b.in", src: "changelog" })).toEqual({
+            email: "a@b.in",
+            source: "changelog",
         });
     });
 

@@ -6,8 +6,10 @@ import { showError, showSuccess } from "@saroh/ui/toast";
 import { Copy } from "lucide-react";
 import Link from "next/link";
 import type { ReactNode } from "react";
-import { useState } from "react";
+import { useId, useState } from "react";
 
+import { reportFailure } from "@/components/billing/plan-refusal";
+import { EmailNoteText } from "@/components/communications/email-note";
 import type { InvoiceRef } from "@/components/invoices/invoice-actions";
 import {
     CancelInvoiceDialog,
@@ -17,18 +19,23 @@ import {
 } from "@/components/invoices/invoice-actions";
 import { InvoiceCrumbs } from "@/components/invoices/invoice-crumbs";
 import { InvoicePill } from "@/components/invoices/invoice-pill";
+import { OfflinePayHint } from "@/components/invoices/offline-pay-hint";
 import { SendDialog } from "@/components/invoices/send-dialog";
 import { useBusinessDetailsStep } from "@/components/organizations/use-business-details-step";
 import { ConfirmDialog } from "@/components/shared/confirm-dialog";
 import { ReadOnlyNote } from "@/components/shared/read-only-note";
 import { ViewerDate } from "@/components/shared/viewer-date";
-import { createPayLink } from "@/lib/invoices/actions";
+import type { EmailNote } from "@/lib/communications/email-setup";
+import { INVOICE_EMAIL_WORDS } from "@/lib/communications/email-setup";
+import { createPayLink, createViewLink } from "@/lib/invoices/actions";
 import type { DetailActionId } from "@/lib/invoices/detail-actions";
 import { detailActions, owedHere } from "@/lib/invoices/detail-actions";
+import { mintedLink, rememberLink } from "@/lib/invoices/minted-links";
 import { downloadInvoicePdf, hasPdf } from "@/lib/invoices/pdf";
 import { canSend, paysOnline, wasSent } from "@/lib/invoices/send";
 import type { InvoiceSend, InvoiceSent } from "@/lib/invoices/service";
 import type { PillVariant } from "@/lib/invoices/status";
+import type { OnlineBlocker } from "@/lib/staff/types";
 
 type Dialog =
     | "issue"
@@ -37,6 +44,7 @@ type Dialog =
     | "cancel"
     | "refund"
     | "newLink"
+    | "newViewLink"
     | "send"
     | "remind"
     | "draftSend";
@@ -71,7 +79,12 @@ async function copy(text: string): Promise<boolean> {
  *
  * Without online payment (`payOnline` false, DEC-070) the link only shows
  * the invoice: Send reads "Send invoice", and there is no pay link to copy.
- * The buttons are `detailActions`'.
+ * "Copy view link" copies that link instead (#833): the invoice on the
+ * business's site with no Pay button and with "How to pay us", for a
+ * business that can't email it. Where the plan is what keeps online
+ * payment off (#835), the Payment panel says it comes with a paid plan
+ * rather than "Connect a payment provider". The buttons are
+ * `detailActions`'.
  */
 export function InvoiceDetail({
     invoice,
@@ -90,6 +103,7 @@ export function InvoiceDetail({
     connected,
     after,
     paymentsOn = true,
+    emailNote = null,
 }: {
     invoice: InvoiceRef & { kind: string };
     pill: { label: string; variant: PillVariant };
@@ -105,6 +119,8 @@ export function InvoiceDetail({
         payLinkActive: boolean;
         /** An autopay charge under way (D13): the pay link is held. */
         autopayCharge?: { at: string } | null;
+        /** Why its link can't take payment (#835); absent from an older API. */
+        onlineBlocker?: OnlineBlocker | null;
     } | null;
     /** Whether it can be sent, and how; null from an API before D17. */
     send: InvoiceSend | null;
@@ -124,6 +140,11 @@ export function InvoiceDetail({
      * make the link take payment, so it isn't suggested.
      */
     paymentsOn?: boolean;
+    /**
+     * Why it can't be emailed when the business has no email provider of
+     * its own, with the way to fix it for this person (`emailRefusalNote`).
+     */
+    emailNote?: EmailNote | null;
 }) {
     const [open, setOpen] = useState<Dialog | null>(null);
     // A pay link waits for the registered address (DEC-068): asked here.
@@ -131,7 +152,11 @@ export function InvoiceDetail({
         then: "make its pay link",
         continueLabel: "Save and make link",
     });
-    const [url, setUrl] = useState<string | null>(null);
+    // A pay link made for it earlier in this tab, shown again (UX-048):
+    // its address can't be read back from the API.
+    const [url, setUrl] = useState<string | null>(() => mintedLink(invoice.id));
+    // A view link (#833) or a pay link: what the copied address opens.
+    const [urlKind, setUrlKind] = useState<"pay" | "view">("pay");
     const [busy, setBusy] = useState(false);
     const [downloading, setDownloading] = useState(false);
     const s = invoice.standing;
@@ -151,8 +176,11 @@ export function InvoiceDetail({
         const res = await details.run(() => createPayLink(invoice.id));
         setBusy(false);
         if (!res) return;
-        if (!res.ok) return showError(res.error);
+        // A plan without online payments: its notice and the way up.
+        if (!res.ok) return reportFailure(res);
+        rememberLink(invoice.id, res.data.url);
         setUrl(res.data.url);
+        setUrlKind("pay");
         showSuccess(
             (await copy(res.data.url))
                 ? `Pay link copied. Send it to ${invoice.who}.`
@@ -160,19 +188,45 @@ export function InvoiceDetail({
         );
     }
 
+    /** No pay link can be made (#833): a link to view it and how to pay. */
+    async function makeViewLink() {
+        setBusy(true);
+        const res = await details.run(() => createViewLink(invoice.id));
+        setBusy(false);
+        if (!res) return;
+        if (!res.ok) return reportFailure(res);
+        setUrl(res.data.url);
+        setUrlKind("view");
+        showSuccess(
+            (await copy(res.data.url))
+                ? `Link copied. Send it to ${invoice.who}: it shows the invoice and how to pay you.`
+                : "Link ready. Copy it from the Payment panel.",
+        );
+    }
+
+    function copyShown() {
+        if (!url) return;
+        void copy(url).then((ok) =>
+            ok
+                ? showSuccess(
+                      urlKind === "view" ? "Link copied." : "Pay link copied.",
+                  )
+                : showError("Couldn't copy. Select the link and copy it."),
+        );
+    }
+
     function copyLink() {
-        if (url) {
-            void copy(url).then((ok) =>
-                ok
-                    ? showSuccess("Pay link copied.")
-                    : showError("Couldn't copy. Select the link and copy it."),
-            );
-            return;
-        }
+        if (url && urlKind === "pay") return copyShown();
         // The address of a link already out was shown once; a new one
         // retires it, so that is asked first.
         if (online?.payLinkActive) setOpen("newLink");
         else void makeLink();
+    }
+
+    function copyViewLink() {
+        if (url && urlKind === "view") return copyShown();
+        if (online?.payLinkActive) setOpen("newViewLink");
+        else void makeViewLink();
     }
 
     const print = () => window.print();
@@ -196,6 +250,7 @@ export function InvoiceDetail({
         // One a day: the Payment panel says when.
         remind: { onClick: () => setOpen("remind") },
         copyLink: { onClick: copyLink },
+        copyViewLink: { onClick: copyViewLink },
         pay: { onClick: () => setOpen("pay") },
         print: { onClick: print },
         pdf: { onClick: () => void downloadPdf() },
@@ -203,6 +258,7 @@ export function InvoiceDetail({
         refund: { onClick: () => setOpen("refund") },
         refundOrder: { href: orderHref ?? undefined },
     };
+    const readOnlyId = useId();
     const actions = detailActions({
         standing: s,
         credit,
@@ -261,6 +317,9 @@ export function InvoiceDetail({
                                 variant={variant}
                                 className={cls}
                                 disabled={a.disabled}
+                                aria-describedby={
+                                    a.reason ? readOnlyId : undefined
+                                }
                                 onClick={a.onClick}
                             >
                                 {a.label}
@@ -271,8 +330,9 @@ export function InvoiceDetail({
             </div>
 
             {!canWrite ? (
-                <ReadOnlyNote className="print:hidden">
-                    Your role can read this invoice but not change it.
+                <ReadOnlyNote id={readOnlyId} className="print:hidden">
+                    {actions.find((a) => a.reason)?.reason ??
+                        "Your role can read this invoice but not change it."}
                 </ReadOnlyNote>
             ) : null}
 
@@ -316,36 +376,26 @@ export function InvoiceDetail({
                                         type="button"
                                         variant="outline"
                                         size="sm"
-                                        onClick={copyLink}
-                                        aria-label="Copy the pay link"
+                                        onClick={copyShown}
+                                        aria-label={
+                                            urlKind === "view"
+                                                ? "Copy the link"
+                                                : "Copy the pay link"
+                                        }
                                     >
                                         <Copy aria-hidden className="size-4" />
                                     </Button>
                                 </div>
                             ) : !payOnline ? (
-                                paymentsOn && !online?.providerConnected ? (
-                                    <p className="mt-2 text-[12.5px] leading-[1.5] text-muted-foreground">
-                                        Connect a payment provider to take
-                                        payment online.{" "}
-                                        {canWrite ? (
-                                            <Link
-                                                href="/settings/providers"
-                                                className="font-medium text-foreground underline underline-offset-4 hover:decoration-2 active:text-muted-foreground"
-                                            >
-                                                Connect one
-                                            </Link>
-                                        ) : null}
-                                    </p>
-                                ) : (
-                                    // Payments is off, or its provider can't
-                                    // take a payment (DEC-070): the link only
-                                    // shows the invoice.
-                                    <p className="mt-2 text-[12.5px] leading-[1.5] text-muted-foreground">
-                                        Its link shows the invoice with no Pay
-                                        button. {invoice.who} pays you the way
-                                        you&apos;ve asked them to.
-                                    </p>
-                                )
+                                <OfflinePayHint
+                                    blocker={online?.onlineBlocker ?? null}
+                                    paymentsOn={paymentsOn}
+                                    providerConnected={
+                                        online?.providerConnected ?? false
+                                    }
+                                    canWrite={canWrite}
+                                    who={invoice.who}
+                                />
                             ) : online?.payLinkActive ? (
                                 <p className="mt-2 text-[12.5px] leading-[1.5] text-muted-foreground">
                                     A pay link is out. Its address was shown
@@ -368,15 +418,18 @@ export function InvoiceDetail({
                         {owed &&
                         canWrite &&
                         send?.reason === "NO_EMAIL_PROVIDER" ? (
+                            // No email of its own (DEC-011): why, and the
+                            // way to fix it for who may — the note every
+                            // refused send shows.
                             <p className="mt-2 text-[12.5px] leading-[1.5] text-muted-foreground">
-                                To send invoices by email, connect your email
-                                provider.{" "}
-                                <Link
-                                    href="/settings/providers"
-                                    className="font-medium text-foreground underline underline-offset-4 hover:decoration-2 active:text-muted-foreground"
-                                >
-                                    Providers
-                                </Link>
+                                <EmailNoteText
+                                    note={
+                                        emailNote ?? {
+                                            text: INVOICE_EMAIL_WORDS.connect,
+                                            action: null,
+                                        }
+                                    }
+                                />
                             </p>
                         ) : null}
                     </section>
@@ -443,6 +496,15 @@ export function InvoiceDetail({
                 confirmLabel="Make a new link"
                 cancelLabel="Keep the old one"
                 onConfirm={() => void makeLink()}
+            />
+            <ConfirmDialog
+                open={open === "newViewLink"}
+                onOpenChange={dialog("newViewLink")}
+                title="Make a new link?"
+                description={`The link you shared before stops working straight away. Send ${invoice.who} the new one.`}
+                confirmLabel="Make a new link"
+                cancelLabel="Keep the old one"
+                onConfirm={() => void makeViewLink()}
             />
         </div>
     );
