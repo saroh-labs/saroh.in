@@ -3,6 +3,7 @@ import type { ReactNode } from "react";
 
 import { withoutShadowedInPageEntries } from "@saroh/block-contract";
 
+import { CookieChoicesButton } from "./consent-banner";
 import type { SiteHeaderAction, SiteNavItem } from "./site-header-menu";
 import { SiteMenu, SiteNavRow } from "./site-header-menu";
 import { trimTrailingSlashes } from "./url-path";
@@ -121,6 +122,7 @@ export function SiteFooter({
     name,
     contact = null,
     credit = null,
+    cookieChoices = false,
 }: {
     footer: SiteFooterContent | null | undefined;
     /** The site's name: the footer's line when the merchant wrote none. */
@@ -129,13 +131,25 @@ export function SiteFooter({
     contact?: SiteContact | null;
     /** "Made with Saroh" on Free (DEC-102); null shows no Saroh credit. */
     credit?: SiteCredit | null;
+    /**
+     * "Cookie choices", while a tracker the merchant connected asks the
+     * visitor (DEC-108). Off draws nothing.
+     */
+    cookieChoices?: boolean;
 }) {
     const phone = nonBlank(contact?.phone);
     const email = nonBlank(contact?.email);
     const address = nonBlank(contact?.address);
     const written = footer && footer.value.trim() !== "" ? footer : null;
     if (footer?.layout === "left") {
-        return <LeftFooter written={written} name={name} credit={credit} />;
+        return (
+            <LeftFooter
+                written={written}
+                name={name}
+                credit={credit}
+                cookieChoices={cookieChoices}
+            />
+        );
     }
     const line = written
         ? footerLine(written)
@@ -180,7 +194,7 @@ export function SiteFooter({
                         {address ? <span>{address}</span> : null}
                     </p>
                 ) : null}
-                {hasLine || credit ? (
+                {hasLine || credit || cookieChoices ? (
                     <p>
                         {line && hasLine ? (
                             line.kind === "html" ? (
@@ -196,6 +210,8 @@ export function SiteFooter({
                         ) : null}
                         {hasLine && credit ? " · " : null}
                         {credit ? <MadeWithSaroh credit={credit} /> : null}
+                        {(hasLine || credit) && cookieChoices ? " · " : null}
+                        {cookieChoices ? <CookieChoicesButton /> : null}
                     </p>
                 ) : null}
             </div>
@@ -243,10 +259,12 @@ function LeftFooter({
     written,
     name,
     credit,
+    cookieChoices,
 }: {
     written: SiteFooterContent | null;
     name: string;
     credit: SiteCredit | null;
+    cookieChoices: boolean;
 }) {
     const line = written ? footerLine(written) : null;
     return (
@@ -282,8 +300,14 @@ function LeftFooter({
                             <span>{line.value}</span>
                         )
                     ) : null}
+                    {cookieChoices ? (
+                        <CookieChoicesButton className="ml-auto" />
+                    ) : null}
                     {credit ? (
-                        <MadeWithSaroh credit={credit} className="ml-auto" />
+                        <MadeWithSaroh
+                            credit={credit}
+                            className={cookieChoices ? "" : "ml-auto"}
+                        />
                     ) : null}
                 </div>
             </div>

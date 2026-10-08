@@ -11,6 +11,7 @@ import {
     TestReleaseProvider,
 } from "@saroh/site-blocks";
 
+import { SiteTrackers } from "@/components/site-trackers";
 import { SiteViewBeacon } from "@/components/site-view-beacon";
 import { TestReleaseBar } from "@/components/test-release-bar";
 import { TestReleaseGate } from "@/components/test-release-gate";
@@ -37,6 +38,7 @@ import {
 import { shareable } from "@/lib/test-metadata";
 import { getTestRelease, rootDomain } from "@/lib/test-release";
 import { HEADER_BELOW_BAR } from "@/lib/test-release-chrome";
+import { needsConsent } from "@/lib/trackers";
 import { SiteFooter, SiteHeader } from "@saroh/site-blocks";
 
 import { SITE_FACES } from "@/lib/site-fonts";
@@ -197,7 +199,7 @@ export default async function SiteLayout({
      * from the catalogue's answer, and waiting for it would add a round
      * trip to every page of a site that sells.
      */
-    const [booking, catalogue, checkout, visit, footerFacts, navigation] =
+    const [booking, catalogue, checkout, visit, footerFacts, navigation, head] =
         await Promise.all([
             siteId ? getBookingPage(siteId) : null,
             siteId ? getCatalogue(siteId) : null,
@@ -211,7 +213,13 @@ export default async function SiteLayout({
             // now (a Journal with no posts, Plans with none on sale): read
             // beside the rest, not after it.
             liveMenu(snapshot, siteId),
+            // The merchant's own trackers (DEC-108): live hosts only. Shared
+            // with generateMetadata's read of the codes through `cache`.
+            siteId && test.mode !== "test" && !resolved.release
+                ? getSiteHead(siteId)
+                : NO_HEAD,
         ]);
+    const asksConsent = head.trackers.some((t) => needsConsent(t.kind));
     const shopServes = catalogue?.ok ?? false;
     const action = headerAction({ booking, shopServes });
 
@@ -312,6 +320,17 @@ export default async function SiteLayout({
                 {siteId && test.mode !== "test" && !resolved.release ? (
                     <SiteViewBeacon siteId={siteId} apiUrl={publicApiUrl()} />
                 ) : null}
+                {/* The merchant's own trackers and the banner that asks first
+                (DEC-108): the same live hosts, never a release. */}
+                {siteId &&
+                test.mode !== "test" &&
+                !resolved.release &&
+                head.trackers.length > 0 ? (
+                    <SiteTrackers
+                        trackers={head.trackers}
+                        noticeHref={head.privacyUrl ?? "/cookie-notice"}
+                    />
+                ) : null}
                 {/* The account area draws its own compact header and no
                 footer (DEC-073 #10): the frame leaves these out there. */}
                 <SiteChromeFrame
@@ -341,6 +360,8 @@ export default async function SiteLayout({
                             }}
                             // "Made with Saroh" on Free only (DEC-102).
                             credit={footerFacts?.credit ?? null}
+                            // "Cookie choices" while a tracker asks (DEC-108).
+                            cookieChoices={asksConsent}
                         />
                     }
                 >

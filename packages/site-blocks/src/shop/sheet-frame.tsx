@@ -4,6 +4,7 @@ import type { KeyboardEvent, ReactNode } from "react";
 import { useEffect, useId, useRef } from "react";
 
 import { focusRing, quietFill } from "../booking-flow/styles";
+import { NO_CAPTURE_ATTRS, NO_CAPTURE_CLASS } from "../consent-events";
 import { cn } from "../lib/utils";
 
 /**
@@ -90,7 +91,8 @@ export function SheetFrame({
                 aria-labelledby={`${ids}-title`}
                 tabIndex={-1}
                 onKeyDown={onKeyDown}
-                className="bg-site-surface text-site-fg font-site-body fixed inset-x-0 bottom-0 z-[61] mx-auto max-h-[88vh] max-w-[560px] overflow-y-auto rounded-t-[calc(var(--site-radius)+18px)] px-[18px] pb-[calc(20px+env(safe-area-inset-bottom))] pt-[18px] shadow-[0_-12px_40px_hsl(var(--site-fg)/0.2)] outline-none"
+                {...NO_CAPTURE_ATTRS}
+                className={`bg-site-surface text-site-fg font-site-body fixed inset-x-0 bottom-0 z-[61] mx-auto max-h-[88vh] max-w-[560px] overflow-y-auto rounded-t-[calc(var(--site-radius)+18px)] px-[18px] pb-[calc(20px+env(safe-area-inset-bottom))] pt-[18px] shadow-[0_-12px_40px_hsl(var(--site-fg)/0.2)] outline-none ${NO_CAPTURE_CLASS}`}
             >
                 <div className="flex items-center gap-2.5">
                     <h2
