@@ -266,13 +266,16 @@ const BOUND_ITEMS: Readonly<Partial<Record<string, number>>> = {
 const TEXT_KEYS = ["subheading", "description", "body", "bio", "role", "value"];
 
 function plain(html: string): string {
-    return html
-        .replace(/<[^>]+>/g, " ")
-        .replace(/&nbsp;/g, " ")
-        .replace(/&amp;/g, "&")
-        .replace(/&#39;|&rsquo;/g, "'")
-        .replace(/\s+/g, " ")
-        .trim();
+    return (
+        html
+            .replace(/<[^>]+>/g, " ")
+            .replace(/&nbsp;/g, " ")
+            .replace(/&#39;|&rsquo;/g, "'")
+            // Last, so an escaped entity ("&amp;#39;") isn't decoded twice.
+            .replace(/&amp;/g, "&")
+            .replace(/\s+/g, " ")
+            .trim()
+    );
 }
 
 function clip(text: string, max: number): string {

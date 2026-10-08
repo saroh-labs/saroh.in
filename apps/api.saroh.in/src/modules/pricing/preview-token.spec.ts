@@ -71,4 +71,11 @@ describe("pricing draft-preview token", () => {
     ])("refuses %j without throwing", (token) => {
         expect(verifyPreviewToken(SECRET, token, now)).toBeNull();
     });
+
+    it("refuses a token that isn't a string (a repeated ?preview= is an array)", () => {
+        const { token } = signPreviewToken(SECRET, draft, now);
+        expect(verifyPreviewToken(SECRET, [token, token], now)).toBeNull();
+        expect(verifyPreviewToken(SECRET, undefined, now)).toBeNull();
+        expect(verifyPreviewToken(SECRET, { token }, now)).toBeNull();
+    });
 });

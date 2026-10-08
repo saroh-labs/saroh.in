@@ -71,10 +71,14 @@ export function signPreviewToken(
  */
 export function verifyPreviewToken(
     secret: string,
-    token: string,
+    token: unknown,
     now: Date,
 ): PreviewClaim | null {
-    if (token.length > MAX_TOKEN_LENGTH) return null;
+    // A query parameter given twice (`?preview=a&preview=b`) arrives as an
+    // array, not a string: refused like any other malformed token.
+    if (typeof token !== "string" || token.length > MAX_TOKEN_LENGTH) {
+        return null;
+    }
     const m = TOKEN.exec(token);
     if (!m) return null;
     const expires = Number(m[1]);

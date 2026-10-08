@@ -1,4 +1,4 @@
-import { EmailCommsProvider } from "./email.provider";
+import { domainOf, EmailCommsProvider } from "./email.provider";
 
 // DEC-083: which email providers carry the invoice PDF, and how it is sent.
 // `fetch` is stubbed: no network.
@@ -61,5 +61,22 @@ describe("EmailCommsProvider attachments", () => {
             (fetchMock.mock.calls[0][1] as { body: string }).body,
         ) as Record<string, unknown>;
         expect(sent).not.toHaveProperty("attachments");
+    });
+});
+
+describe("domainOf", () => {
+    it("reads the domain of a plain or a named address", () => {
+        expect(domainOf("hello@Shop.example.com")).toBe("shop.example.com");
+        expect(domainOf("Shop <hello@shop.example.com>")).toBe(
+            "shop.example.com",
+        );
+        expect(domainOf("no-at-sign")).toBeNull();
+        expect(domainOf(null)).toBeNull();
+    });
+
+    it("answers quickly on a long hostile value", () => {
+        const start = performance.now();
+        expect(domainOf(`a@${">".repeat(100_000)}`)).toBeNull();
+        expect(performance.now() - start).toBeLessThan(200);
     });
 });
