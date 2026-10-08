@@ -89,6 +89,9 @@ export function createMemoryStorage(
     const bytesByKey = new Map<string, Uint8Array>();
 
     return {
+        // The browser's PUT never reaches memory; only putBytes does.
+        seesUploads: false,
+
         // eslint-disable-next-line @typescript-eslint/require-await -- async so bad input rejects (parse throws) instead of throwing synchronously, matching the port contract.
         async createSignedUploadUrl(
             input: CreateSignedUploadUrlInput,

@@ -3432,3 +3432,23 @@ same-origin). Merchant sites' HSTS has no `includeSubDomains`: on a merchant's
 own domain it would reach subdomains Saroh doesn't serve.
 **Check**: `pnpm run check:security-headers` (prepush and CI).
 **Category**: security · `apps/*/next.config.*`
+
+## Storage — an upload could skip the byte check, and an SVG was a 500
+
+**Symptom**: found 8 Oct 2026 building #873 (UX-037). On R2, a photo whose
+object was never stored passed the completion check and became READY; and
+the app's pickers take any `image/*`, so an SVG or HEIC reached the storage
+port's allowlist and came back as a 500, "Something went wrong", instead of
+a reason.
+**Root cause**: the completion check let unreadable bytes through for every
+photo, because the in-memory adapter of local development never sees the
+browser's PUT; nothing told the service which storage it had. The type was
+only checked inside the port, where a refusal is a thrown zod error.
+**Fix**: the port says whether it `seesUploads` (R2 yes, memory no), and
+where it does, no bytes is a FAILED upload. `media/upload-checks.ts` refuses
+a type outside the allowlist, and a logo outside PNG, JPG and WebP, before
+signing, in the words the screens already show.
+**Check**: `upload-checks.spec.ts` (real PNG/JPEG/WebP headers, a text file
+renamed `.png`, a type mismatch, an SVG) and `media.service.spec.ts`.
+**Rule**: `docs/patterns/backend-integrations.md` → "Media storage".
+**Category**: security · storage · `apps/api.saroh.in/src/modules/media/`

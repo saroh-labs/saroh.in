@@ -79,6 +79,10 @@ describe("createMemoryStorage", () => {
         expect(() => new URL(dl.url)).not.toThrow();
     });
 
+    it("never sees a browser's upload, only putBytes", () => {
+        expect(createMemoryStorage().seesUploads).toBe(false);
+    });
+
     it("returns a stable public URL", () => {
         const storage = createMemoryStorage({
             publicBaseUrl: "https://cdn.test/",

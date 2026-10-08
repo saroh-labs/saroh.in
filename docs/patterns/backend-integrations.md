@@ -360,7 +360,13 @@ admin health page says so; a deployed API must not run that way.
 - **Images and videos only.** The allowlist is JPEG, PNG, WebP, GIF and AVIF;
   MP4 and MOV join under the video purpose. No documents, no text, no SVG.
   On completion the first bytes must be the format the type says, or the
-  upload is marked FAILED and its object deleted.
+  upload is marked FAILED and its object deleted. A type outside the list
+  (SVG, HEIC, text) is refused before anything is signed, and a logo takes
+  PNG, JPG or WebP only — both in the merchant's words, from
+  `media/upload-checks.ts`, not as a server error. Where the adapter
+  `seesUploads` (R2), no bytes at all is a failed upload too; only the
+  in-memory adapter of local development, which never sees the browser's
+  PUT, lets an unread photo through (#873).
 - **A presigned upload fixes its type and size.** The adapter signs
   `content-type` and `content-length`, so R2 refuses any other. When a test
   fakes the presigner, keep one that signs for real and reads the URL.
