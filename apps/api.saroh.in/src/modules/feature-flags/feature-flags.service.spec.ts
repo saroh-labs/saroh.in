@@ -8,6 +8,7 @@ jest.mock("@saroh/database", () => {
             findMany: jest.fn(),
             upsert: jest.fn(),
             create: jest.fn(),
+            createMany: jest.fn(),
         },
         organization: {
             findUnique: jest.fn(),
@@ -41,6 +42,7 @@ const flagFindUnique = prisma.featureFlag.findUnique as jest.Mock;
 const flagFindMany = prisma.featureFlag.findMany as jest.Mock;
 const flagUpsert = prisma.featureFlag.upsert as jest.Mock;
 const flagCreate = prisma.featureFlag.create as jest.Mock;
+const flagCreateMany = prisma.featureFlag.createMany as jest.Mock;
 const orgFindUnique = prisma.organization.findUnique as jest.Mock;
 const overrideFindUnique = prisma.featureFlagOverride.findUnique as jest.Mock;
 const overrideFindMany = prisma.featureFlagOverride.findMany as jest.Mock;
@@ -55,6 +57,7 @@ const overrideDelete = prisma.featureFlagOverride.delete as jest.Mock;
 beforeEach(() => {
     orgFindUnique.mockResolvedValue({ id: "org_1" });
     flagFindUnique.mockResolvedValue({ key: "registered" });
+    flagCreateMany.mockResolvedValue({ count: 0 });
 });
 
 describe("FeatureFlagService.isEnabled — precedence", () => {
@@ -248,7 +251,7 @@ describe("FeatureFlagService.setOverride", () => {
 
     it("registers a never-configured flag off, audited, before its first override", async () => {
         overrideFindUnique.mockResolvedValue(null);
-        flagFindUnique.mockResolvedValue(null);
+        flagCreateMany.mockResolvedValue({ count: 1 });
 
         await service.setOverride(
             FlagKey.ORG_AUTHORIZATION,
@@ -257,10 +260,11 @@ describe("FeatureFlagService.setOverride", () => {
             "user_1",
         );
 
-        expect(flagCreate).toHaveBeenCalledWith({
-            data: { key: FlagKey.ORG_AUTHORIZATION, enabledByDefault: false },
+        expect(flagCreateMany).toHaveBeenCalledWith({
+            data: [{ key: FlagKey.ORG_AUTHORIZATION, enabledByDefault: false }],
+            skipDuplicates: true,
         });
-        expect(flagCreate.mock.invocationCallOrder[0]).toBeLessThan(
+        expect(flagCreateMany.mock.invocationCallOrder[0]).toBeLessThan(
             overrideUpsert.mock.invocationCallOrder[0],
         );
         expect(auditCreate).toHaveBeenCalledWith({
@@ -277,7 +281,8 @@ describe("FeatureFlagService.setOverride", () => {
 
     it("leaves an existing global default alone", async () => {
         overrideFindUnique.mockResolvedValue(null);
-        flagFindUnique.mockResolvedValue({ key: FlagKey.ORG_AUTHORIZATION });
+        // The row is there already (or another request just wrote it).
+        flagCreateMany.mockResolvedValue({ count: 0 });
 
         await service.setOverride(
             FlagKey.ORG_AUTHORIZATION,

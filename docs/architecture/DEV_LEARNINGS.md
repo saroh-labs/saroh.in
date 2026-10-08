@@ -3304,3 +3304,21 @@ visitor's cookies, got the redirect, and failed with "isn't a valid image".
 `lib/middleware-matcher.test.ts` runs every image under `public/` through
 the matcher and fails if one is gated.
 **Category**: frontend · `apps/app.saroh.in/middleware.ts`
+
+## Flags — two first overrides at once answered 500
+
+**Symptom**: forcing a flag on for two businesses at the same moment, on a
+database where the flag had never been set, failed one of them with 500
+(`Unique constraint failed on the fields: (key)`). Found when two demo films
+set `SITE_SHOP` in parallel on a freshly seeded database (8 Oct 2026).
+**Root cause**: `setOverride` registers a never-configured flag off for
+everyone before writing the override (the override's foreign key needs the
+row). It looked the row up, then created it: both requests saw none, and the
+second create hit the key's unique index.
+**Fix**: register with `createMany({ skipDuplicates: true })`, which waits for
+the other transaction and inserts nothing, and audit the registration only
+when this request made it.
+**Rule**: "find, then create if missing" inside a transaction is not safe
+against a concurrent twin; insert-or-skip on the unique key instead.
+`feature-flags.service.db.spec.ts` forces two businesses on at once.
+**Category**: backend · `apps/api.saroh.in/src/modules/feature-flags/feature-flags.service.ts`

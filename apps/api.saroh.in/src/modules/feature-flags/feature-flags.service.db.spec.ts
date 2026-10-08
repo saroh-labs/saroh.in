@@ -93,6 +93,44 @@ let actorUserId: string;
             expect(flag?.enabledByDefault).toBe(true);
         });
 
+        it("forces two businesses on at once, registering the flag once", async () => {
+            const other = await prisma.organization.create({
+                data: {
+                    name: "Fresh Flags Two",
+                    slug: `fresh-flags-two-${process.pid}`,
+                },
+            });
+
+            // Both find no flag row; neither may fail on its unique key.
+            await Promise.all([
+                service.setOverride(
+                    KEY,
+                    organizationId,
+                    true,
+                    actorUserId,
+                    "a",
+                ),
+                service.setOverride(KEY, other.id, true, actorUserId, "b"),
+            ]);
+
+            await expect(service.isEnabled(KEY, organizationId)).resolves.toBe(
+                true,
+            );
+            await expect(service.isEnabled(KEY, other.id)).resolves.toBe(true);
+            const registrations = await prisma.featureFlagAudit.count({
+                where: { flagKey: KEY, organizationId: null },
+            });
+            expect(registrations).toBe(1);
+
+            await prisma.featureFlagAudit.deleteMany({
+                where: { organizationId: other.id },
+            });
+            await prisma.featureFlagOverride.deleteMany({
+                where: { organizationId: other.id },
+            });
+            await prisma.organization.delete({ where: { id: other.id } });
+        });
+
         it("answers 404 for an organization that does not exist", async () => {
             await expect(
                 service.setOverride(
