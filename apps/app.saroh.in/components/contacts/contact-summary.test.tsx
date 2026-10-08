@@ -48,9 +48,8 @@ describe("ContactSummary", () => {
         );
         // The text a reader sees, read by the DOM rather than by stripping
         // tags with a regex.
-        const text =
-            new DOMParser().parseFromString(html, "text/html").body
-                .textContent ?? "";
+        const text = new DOMParser().parseFromString(html, "text/html").body
+            .textContent;
         expect(text).toContain("Rao & Co");
         expect(text).toContain("· 1 open lead");
         expect(text).toMatch(/· Last order .*499/);
