@@ -4,7 +4,8 @@ import { apiFetch, getActiveOrgId, getList } from "@/lib/api/http";
  * A merchant's own domain, as the api reports it (#200).
  *
  * The state shown anywhere is the api's: PENDING until DNS proves control,
- * VERIFIED after. Nothing here is optimistic — a domain the merchant has just
+ * VERIFIED after, and once verified its `hosting` state (#859): not pointed
+ * yet, live or a problem. Nothing here is optimistic — a domain the merchant has just
  * added is PENDING because that is what it is.
  */
 export type DomainStatus = "PENDING" | "VERIFIED";
@@ -23,6 +24,34 @@ export interface SiteDomain {
     createdAt: string;
     /** The DNS TXT record to publish, exactly as a registrar wants it. */
     dnsRecord: { type: "TXT"; name: string; value: string };
+    /**
+     * Where the hostname stands with our hosting (#859). Absent from an api
+     * before it, which reads as OFF. `lib/domains/domain-view.ts` turns it
+     * into what the screen shows (#861).
+     */
+    hosting?: DomainHostingRead;
+}
+
+/**
+ * - OFF: hosting isn't set up on this instance; the domain can still verify.
+ * - WAITING_VERIFICATION: the TXT check hasn't passed yet.
+ * - NOT_POINTED: verified, waiting for the CNAME and the certificate.
+ * - LIVE: serving the site.
+ * - PROBLEM: something is wrong; `problem` says what in words.
+ *
+ * Free-form on the wire, like `status`: an unknown value never reads as live.
+ */
+export type HostingState =
+    "OFF" | "WAITING_VERIFICATION" | "NOT_POINTED" | "LIVE" | "PROBLEM";
+
+export interface DomainHostingRead {
+    state: HostingState | (string & {});
+    /** What last went wrong, in the merchant's words; null when nothing did. */
+    problem: string | null;
+    /** When our hosting was last asked. */
+    checkedAt: string | null;
+    /** The CNAME to add so the domain reaches the site, when the api knows it. */
+    dnsRecord: { type: "CNAME"; name: string; value: string } | null;
 }
 
 export type DomainsResult<T> =

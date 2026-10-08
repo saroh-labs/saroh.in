@@ -3,10 +3,11 @@
 import { Badge } from "@saroh/ui/badge";
 import { Button } from "@saroh/ui/button";
 import { Input } from "@saroh/ui/input";
-import { showError, showInfo, showSuccess } from "@saroh/ui/toast";
+import { showError, showInfo, showSuccess, showWarning } from "@saroh/ui/toast";
 import { useEffect, useState } from "react";
 
 import { useBusinessZone } from "@/components/shared/business-zone";
+import { DomainRecords } from "@/components/sites/domain-records";
 import { env } from "@/env";
 import {
     claimDomain,
@@ -14,12 +15,18 @@ import {
     removeDomain,
     verifyDomain,
 } from "@/lib/domains/actions";
+import {
+    checkLine,
+    checkToast,
+    DEFAULT_CNAME_TARGET,
+    domainView,
+} from "@/lib/domains/domain-view";
 import { bareHostname } from "@/lib/domains/hostname";
-import type { DomainCheckFailure, SiteDomain } from "@/lib/domains/service";
-import { exactDate, shortDate } from "@/lib/sites/format-date";
+import type { SiteDomain } from "@/lib/domains/service";
+import { exactDate } from "@/lib/sites/format-date";
 
 /**
- * A merchant's own domain, on the site settings screen (#200).
+ * A merchant's own domain, on the site settings screen (#200, #861).
  *
  * The api has been able to claim, verify and route a hostname since S2-007;
  * this is the screen that was never built, and until now the settings copy
@@ -32,97 +39,38 @@ import { exactDate, shortDate } from "@/lib/sites/format-date";
  * action they can take, and it says when it last ran and which check failed,
  * because "no record yet", "wrong value" and "could not look it up" have three
  * different fixes.
- */
-
-/** Where a verified domain points. Configurable per deployment. */
-const CNAME_TARGET = env.NEXT_PUBLIC_CUSTOM_DOMAIN_TARGET ?? "saroh.app";
-
-/*
- * `status` and `lastCheckResult` are free-form strings on the wire. These
- * narrow them without claiming the wire can only carry the known values: an
- * unknown one reads as "not verified" and as the default explanation, which is
- * the safe direction — a state we do not recognise must never render as
- * connected.
  *
- * They live in this client component rather than beside the fetchers: that
- * module reads the session through `next/headers`, so importing a VALUE from
- * it here would pull server-only code into the browser bundle. Types are free;
- * functions are not.
+ * Once verified, the api's hosting state (#859) says where it stands: not
+ * pointed yet (the CNAME, "Visitors don't reach your site yet"), live ("Live
+ * at ‹domain›", the records folded away) or a problem (the records again,
+ * with what is wrong in words). Which is which is `lib/domains/domain-view.ts`;
+ * an instance without hosting set up says what it said before, and never
+ * "Live".
  */
-function isVerified(status: string): boolean {
-    return status === "VERIFIED";
-}
 
-function checkFailure(result: string | null): DomainCheckFailure | null {
-    return result === "NO_RECORD" ||
-        result === "WRONG_VALUE" ||
-        result === "LOOKUP_FAILED"
-        ? result
-        : null;
-}
+/** Where a verified domain points when the api doesn't say. Per deployment. */
+const CNAME_TARGET =
+    env.NEXT_PUBLIC_CUSTOM_DOMAIN_TARGET ?? DEFAULT_CNAME_TARGET;
 
-async function copy(text: string): Promise<boolean> {
-    try {
-        await navigator.clipboard.writeText(text);
-        return true;
-    } catch {
-        return false;
-    }
-}
+const TOAST = {
+    success: showSuccess,
+    info: showInfo,
+    warning: showWarning,
+} as const;
 
-function CopyField({ label, value }: { label: string; value: string }) {
+function Block({
+    children,
+    domain,
+}: {
+    children: React.ReactNode;
+    /** The hostname a domain's block is for (a handle for browser specs). */
+    domain?: string;
+}) {
     return (
-        <div className="grid gap-1 sm:grid-cols-[6rem_minmax(0,1fr)_auto] sm:items-center sm:gap-x-3">
-            <span className="text-xs uppercase tracking-wide text-muted-foreground">
-                {label}
-            </span>
-            <code
-                className="min-w-0 truncate rounded border bg-muted/40 px-2 py-1 text-xs"
-                title={value}
-            >
-                {value}
-            </code>
-            <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                className="h-7 justify-self-start text-xs sm:justify-self-end"
-                onClick={() =>
-                    void copy(value).then((ok) =>
-                        ok
-                            ? showSuccess(`${label} copied.`)
-                            : showError(
-                                  "Could not copy. Select the text and copy it yourself.",
-                              ),
-                    )
-                }
-            >
-                Copy
-            </Button>
+        <div className="space-y-3 px-4 py-3" data-domain={domain}>
+            {children}
         </div>
     );
-}
-
-/** What the last check means for the merchant, and what to do next. */
-function lastCheckLine(domain: SiteDomain, zone: string): string {
-    if (!domain.lastCheckedAt) {
-        return "Not checked yet. Add the record, then check.";
-    }
-    const when = shortDate(domain.lastCheckedAt, zone);
-    switch (checkFailure(domain.lastCheckResult)) {
-        case "WRONG_VALUE":
-            return `Checked ${when}: a record exists, but its value does not match. Copy the value again, exactly, and replace what is there.`;
-        case "LOOKUP_FAILED":
-            return `Checked ${when}: DNS for this domain did not answer. Check the domain is registered and its nameservers are set, then try again.`;
-        case "NO_RECORD":
-        case null:
-        default:
-            return `Checked ${when}: no record found yet. A new DNS record can take up to 48 hours to spread; check again later.`;
-    }
-}
-
-function Block({ children }: { children: React.ReactNode }) {
-    return <div className="space-y-3 px-4 py-3">{children}</div>;
 }
 
 export function CustomDomain({ siteId }: { siteId: string }) {
@@ -183,19 +131,12 @@ export function CustomDomain({ siteId }: { siteId: string }) {
             showError(res.error);
             return;
         }
+        const after = { ...domain, ...res.data.domain };
         setDomains((prev) =>
-            (prev ?? []).map((d) =>
-                d.id === domain.id ? { ...d, ...res.data.domain } : d,
-            ),
+            (prev ?? []).map((d) => (d.id === domain.id ? after : d)),
         );
-        if (res.data.verified) {
-            showSuccess(`${domain.hostname} is verified.`);
-        } else {
-            showInfo(
-                "Not verified yet.",
-                lastCheckLine({ ...domain, ...res.data.domain }, zone),
-            );
-        }
+        const toast = checkToast(domain, after, zone);
+        TOAST[toast.tone](toast.message, toast.description);
     }
 
     async function remove(domain: SiteDomain) {
@@ -230,35 +171,36 @@ export function CustomDomain({ siteId }: { siteId: string }) {
             ) : null}
 
             {domains.map((domain) => {
-                const verified = isVerified(domain.status);
+                const view = domainView(domain, CNAME_TARGET);
+                const line = checkLine(domain, zone);
+                const lineAt =
+                    view.scene === "waiting"
+                        ? domain.lastCheckedAt
+                        : (domain.hosting?.checkedAt ?? null);
                 return (
-                    <Block key={domain.id}>
+                    <Block key={domain.id} domain={domain.hostname}>
                         <div className="flex flex-wrap items-center justify-between gap-2">
                             <div className="flex min-w-0 items-center gap-2">
                                 <span className="truncate text-sm font-medium">
                                     {domain.hostname}
                                 </span>
                                 {/* The api's state, never optimistic: PENDING
-                                    is never drawn as connected. */}
-                                {verified ? (
-                                    <Badge
-                                        className="bg-success text-success-foreground"
-                                        title={
-                                            domain.verifiedAt
-                                                ? `Verified ${exactDate(domain.verifiedAt, zone)}`
-                                                : undefined
-                                        }
-                                    >
-                                        Verified
-                                    </Badge>
-                                ) : (
-                                    <Badge variant="outline">
-                                        Waiting for DNS
-                                    </Badge>
-                                )}
+                                    is never drawn as connected, nor a
+                                    verified domain as live unless the
+                                    hosting says so. */}
+                                <Badge
+                                    variant={view.badge.variant}
+                                    title={
+                                        domain.verifiedAt
+                                            ? `Verified ${exactDate(domain.verifiedAt, zone)}`
+                                            : undefined
+                                    }
+                                >
+                                    {view.badge.label}
+                                </Badge>
                             </div>
                             <div className="flex items-center gap-2">
-                                {verified ? null : (
+                                {view.checkLabel ? (
                                     <Button
                                         type="button"
                                         size="sm"
@@ -268,9 +210,9 @@ export function CustomDomain({ siteId }: { siteId: string }) {
                                     >
                                         {busy === domain.id
                                             ? "Checking…"
-                                            : "Check now"}
+                                            : view.checkLabel}
                                     </Button>
-                                )}
+                                ) : null}
                                 {confirmRemove === domain.id ? null : (
                                     <Button
                                         type="button"
@@ -287,78 +229,46 @@ export function CustomDomain({ siteId }: { siteId: string }) {
                             </div>
                         </div>
 
-                        {verified ? (
-                            <div className="space-y-2">
-                                <p className="text-sm text-muted-foreground">
-                                    You own this domain. To send visitors to
-                                    your site, add this record at your
-                                    registrar:
-                                </p>
-                                <CopyField label="Type" value="CNAME" />
-                                <CopyField
-                                    label="Name"
-                                    value={domain.hostname}
-                                />
-                                <CopyField label="Value" value={CNAME_TARGET} />
-                            </div>
-                        ) : (
-                            <div className="space-y-2">
-                                {/* Both records at once (UX-072): one trip
-                                    to the registrar, not one per check. */}
-                                <p className="text-sm text-muted-foreground">
-                                    Add these two records at your registrar.
-                                    Copy each part exactly.
-                                </p>
-                                <p className="text-xs font-medium">
-                                    1. Proves you own the domain
-                                </p>
-                                <CopyField
-                                    label="Type"
-                                    value={domain.dnsRecord.type}
-                                />
-                                <CopyField
-                                    label="Name"
-                                    value={domain.dnsRecord.name}
-                                />
-                                <CopyField
-                                    label="Value"
-                                    value={domain.dnsRecord.value}
-                                />
-                                <p className="pt-1 text-xs font-medium">
-                                    2. Sends visitors to your site once
-                                    it&apos;s verified
-                                </p>
-                                <CopyField label="Type" value="CNAME" />
-                                <CopyField
-                                    label="Name"
-                                    value={domain.hostname}
-                                />
-                                <CopyField label="Value" value={CNAME_TARGET} />
-                                <p
-                                    className="text-xs text-muted-foreground"
-                                    title={
-                                        domain.lastCheckedAt
-                                            ? exactDate(
-                                                  domain.lastCheckedAt,
-                                                  zone,
-                                              )
-                                            : undefined
-                                    }
+                        {view.liveUrl ? (
+                            <p className="text-sm">
+                                Live at{" "}
+                                <a
+                                    href={view.liveUrl}
+                                    target="_blank"
+                                    rel="noreferrer"
+                                    className="font-medium underline underline-offset-2 [overflow-wrap:anywhere] hover:text-muted-foreground active:text-foreground"
                                 >
-                                    {lastCheckLine(domain, zone)}
-                                </p>
-                            </div>
-                        )}
+                                    {domain.hostname}
+                                </a>
+                            </p>
+                        ) : null}
+
+                        {view.problem ? (
+                            <p className="rounded-md bg-warning-subtle px-3 py-2 text-sm text-warning-subtle-foreground">
+                                {view.problem}
+                            </p>
+                        ) : null}
+
+                        <DomainRecords domain={domain} view={view} />
+
+                        {line ? (
+                            <p
+                                className="text-xs text-muted-foreground"
+                                title={
+                                    lineAt ? exactDate(lineAt, zone) : undefined
+                                }
+                            >
+                                {line}
+                            </p>
+                        ) : null}
 
                         {confirmRemove === domain.id ? (
                             <div className="rounded-md border p-3 text-sm">
                                 {/* Removing states what happens to traffic —
-                                    which is nothing for a pending domain, and
-                                    an outage for a verified one. */}
+                                    nothing for a domain that isn't serving,
+                                    an outage for one that is. */}
                                 <p className="text-muted-foreground">
-                                    {verified
-                                        ? `Visitors to ${domain.hostname} will stop reaching your site and see an error until you point the domain somewhere else. Your web address on Saroh keeps working.`
-                                        : `Nothing changes for visitors: ${domain.hostname} is not serving your site yet. You can add it again later; the record will be different.`}
+                                    {view.removeWarning}
                                 </p>
                                 <div className="mt-2 flex gap-2">
                                     <Button
