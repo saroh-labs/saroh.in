@@ -13,6 +13,8 @@ import { PublicFooterService } from "./public-footer.service";
 import { PublicSitesController } from "./public-sites.controller";
 import { PublicVisitService } from "./public-visit.service";
 import { SitePreviewLinksService } from "./site-preview-links.service";
+import { SiteTrackingController } from "./site-tracking.controller";
+import { SiteTrackingService } from "./site-tracking.service";
 import { SitesController } from "./sites.controller";
 import { SitesService } from "./sites.service";
 import { TestReleasesController } from "./test-releases.controller";
@@ -39,11 +41,13 @@ import { TestReleasesService } from "./test-releases.service";
     controllers: [
         SitesController,
         TestReleasesController,
+        SiteTrackingController,
         PublicSitesController,
     ],
     providers: [
         SitesService,
         SitePreviewLinksService,
+        SiteTrackingService,
         TestReleasesService,
         PublicVisitService,
         PublicFooterService,

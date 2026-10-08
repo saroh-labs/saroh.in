@@ -61,6 +61,7 @@ import { OrganizationRolesService } from "../organizations/organization-roles.se
 import { ProductAccess } from "../products/product-access";
 import { ProductsService } from "../products/products.service";
 import { setPublishNeedsApproval } from "../sites/publish-approval";
+import { SiteTrackingService } from "../sites/site-tracking.service";
 import { SitesService } from "../sites/sites.service";
 import { StaffService } from "../staff/staff.service";
 import { StorefrontsService } from "../stores/storefronts.service";
@@ -88,6 +89,7 @@ const members = new OrganizationMembersService(new AuditService());
 const roles = new OrganizationRolesService();
 const comms = new CommunicationsService();
 const sites = new SitesService(new EntitlementService());
+const tracking = new SiteTrackingService();
 const storefronts = new StorefrontsService();
 const staff = new StaffService();
 const aggregate = new AnalyticsAggregateHandler();
@@ -721,5 +723,68 @@ describe("site visits, soft (DB, U13)", () => {
                 },
             }),
         ).toBe(1);
+    });
+});
+
+describe("a merchant's own trackers (DB, DEC-108)", () => {
+    const siteOf = (b: Business) =>
+        prisma.site.create({
+            data: { organizationId: b.orgId, name: "Site", slug: uniq("s") },
+        });
+    const ga4 = { trackers: { ga4: { id: "G-ABC1234" } } };
+
+    it("refuses adding one where the plan leaves it off, and not where it's on", async () => {
+        const free = await business("free");
+        const freeSite = await siteOf(free);
+        expect(
+            (await refused(tracking.save(free.owner, freeSite.id, ga4)))
+                .details,
+        ).toMatchObject({ code: "MODULE_LOCKED", moduleId: "site-trackers" });
+        // Verification codes are on every plan.
+        await expect(
+            tracking.save(free.owner, freeSite.id, {
+                verifications: { google: "abcDEF123_-ghiJKL456mnoPQR" },
+            }),
+        ).resolves.toMatchObject({
+            verifications: { google: "abcDEF123_-ghiJKL456mnoPQR" },
+        });
+
+        const grow = await business("grow");
+        const growSite = await siteOf(grow);
+        await expect(
+            tracking.save(grow.owner, growSite.id, ga4),
+        ).resolves.toMatchObject({
+            trackers: [{ kind: "ga4", trackerId: "G-ABC1234", enabled: true }],
+        });
+    });
+
+    it("lets a business that moved to Free change or remove what it kept", async () => {
+        const b = await business("free");
+        const site = await siteOf(b);
+        // Saved while on a paid plan.
+        await prisma.siteTracker.create({
+            data: {
+                siteId: site.id,
+                organizationId: b.orgId,
+                kind: "ga4",
+                trackerId: "G-ABC1234",
+            },
+        });
+        await expect(
+            tracking.save(b.owner, site.id, {
+                trackers: { ga4: { id: "G-NEW9999" } },
+            }),
+        ).resolves.toMatchObject({ trackers: [{ trackerId: "G-NEW9999" }] });
+        await expect(
+            tracking.save(b.owner, site.id, { trackers: { ga4: null } }),
+        ).resolves.toMatchObject({ trackers: [] });
+    });
+
+    it("with the switch off, refuses nothing", async () => {
+        const b = await business("free", false);
+        const site = await siteOf(b);
+        await expect(
+            tracking.save(b.owner, site.id, ga4),
+        ).resolves.toBeDefined();
     });
 });
