@@ -273,7 +273,7 @@ describe("SiteTrackingService.save: the plan and Saroh's switch-off", () => {
             .catch((e: unknown) => e);
         expect(err).toBeInstanceOf(ForbiddenException);
         expect((err as ForbiddenException).getResponse()).toMatchObject({
-            code: "TRACKERS_SWITCHED_OFF",
+            details: { code: "TRACKERS_SWITCHED_OFF" },
         });
         expect(db.siteTracker.upsert).not.toHaveBeenCalled();
         // Removing one still works.

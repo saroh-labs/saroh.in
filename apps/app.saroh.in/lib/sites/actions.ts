@@ -6,6 +6,8 @@ import { listVisitPlaces } from "@/lib/stores/storefronts";
 import type { GridCatalogueRead } from "./grid-catalogue";
 import { readGridCatalogue } from "./grid-catalogue";
 import { savePublishNeedsApproval } from "./publish-approval-read";
+import type { SearchTrackingSave } from "./search-tracking";
+import { saveSearchTracking as saveSearchTrackingApi } from "./search-tracking-read";
 import type {
     CreatePageInput,
     CreateSiteInput,
@@ -218,4 +220,16 @@ export async function listGridCatalogue(): Promise<GridCatalogueRead> {
  */
 export async function setPublishNeedsApproval(siteId: string, on: boolean) {
     return savePublishNeedsApproval(siteId, on);
+}
+
+/**
+ * Save the site's verification codes, trackers or privacy page (DEC-108,
+ * U7). Only extracted ids come here; it takes effect on the live site at
+ * once.
+ */
+export async function saveSearchTracking(
+    siteId: string,
+    input: SearchTrackingSave,
+) {
+    return saveSearchTrackingApi(siteId, input);
 }

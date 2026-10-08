@@ -235,10 +235,12 @@ export class SiteTrackingService {
         });
         if (turnsOn) {
             if (settings?.switchedOffAt) {
+                // `details`, because the exception filter passes that on and
+                // drops other keys: the workspace tells this 403 by its code.
                 throw new ForbiddenException({
                     message:
                         "Saroh has switched off trackers on this site. Contact support to turn them back on.",
-                    code: "TRACKERS_SWITCHED_OFF",
+                    details: { code: "TRACKERS_SWITCHED_OFF" },
                 });
             }
             await planMeter.assertIncluded(organizationId, "site-trackers");
