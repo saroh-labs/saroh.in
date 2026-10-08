@@ -1,5 +1,10 @@
 import { notFound } from "next/navigation";
+import { Suspense } from "react";
 
+import {
+    SiteSearchTrackingLoading,
+    SiteSearchTrackingSection,
+} from "@/components/sites/site-search-tracking-section";
 import { SiteSettings } from "@/components/sites/site-settings";
 import { SiteSettingsRead } from "@/components/sites/site-settings-read";
 import { requireSession } from "@/lib/session";
@@ -20,7 +25,8 @@ export const metadata = { title: "Settings · Website" };
  * Store-level equivalents live under Commerce; this is the site's own record:
  * its address, its search appearance, and the card people see when the link is
  * forwarded. All of it is DRAFT state — it reaches the public only through the
- * next publish, exactly like a section edit.
+ * next publish, exactly like a section edit — except "Search and tracking"
+ * (DEC-108), whose codes and trackers are live as soon as they're saved.
  *
  * The Website header above it carries the site's name and the way into the
  * editor, so this tab is only the settings, at a form's measure.
@@ -44,7 +50,7 @@ export default async function SiteSettingsPage({
     const approval = await readPublishApproval(site);
 
     return (
-        <div className="max-w-2xl">
+        <div className="max-w-2xl space-y-8">
             {site.can.manageSettings ? (
                 <SiteSettings
                     site={site}
@@ -60,6 +66,10 @@ export default async function SiteSettingsPage({
                     approval={approval}
                 />
             )}
+            {/* Live at once, not draft state (DEC-108, U7); its own read. */}
+            <Suspense fallback={<SiteSearchTrackingLoading />}>
+                <SiteSearchTrackingSection site={site} address={address} />
+            </Suspense>
         </div>
     );
 }

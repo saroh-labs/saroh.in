@@ -132,6 +132,16 @@ export const MODULE_MAP: Readonly<Record<string, ModuleMapEntry>> = {
         legacyEntitlementKey: null,
     },
     /**
+     * A merchant's own trackers on their website (DEC-108): a switch, under
+     * no registry module, so it never decides whether Website is on.
+     * Verification codes are on every plan and need no row.
+     */
+    "site-trackers": {
+        registry: null,
+        limitKey: null,
+        legacyEntitlementKey: null,
+    },
+    /**
      * Booking emails Saroh sends for a business with no email provider of
      * its own (DEC-086), a month. Under no registry module: the allowance
      * never gates Communications or the business's own provider.

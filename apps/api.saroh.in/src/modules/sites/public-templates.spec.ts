@@ -10,6 +10,7 @@ jest.mock("../../common/guards/organization.guard", () => ({
 import { listTemplates } from "@saroh/templates";
 
 import type { PublicFooterService } from "./public-footer.service";
+import type { PublicHeadService } from "./public-head.service";
 import { PublicSitesController } from "./public-sites.controller";
 import type { PublicVisitService } from "./public-visit.service";
 import type { SitePreviewLinksService } from "./site-preview-links.service";
@@ -30,6 +31,7 @@ describe("GET /public/sites/templates", () => {
         {} as unknown as SitePreviewLinksService,
         {} as unknown as PublicVisitService,
         {} as unknown as PublicFooterService,
+        {} as unknown as PublicHeadService,
     );
 
     it("returns every registered template", () => {

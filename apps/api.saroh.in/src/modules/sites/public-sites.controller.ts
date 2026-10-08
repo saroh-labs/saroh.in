@@ -15,6 +15,8 @@ import { FixedWindowRateLimiter } from "../enquiry/rate-limiter";
 import { SITE_RELAY_HEADER, visitorKey } from "../site-accounts/site-relay";
 import type { PublicFooter } from "./public-footer.service";
 import { PublicFooterService } from "./public-footer.service";
+import type { PublicHead } from "./public-head.service";
+import { PublicHeadService } from "./public-head.service";
 import type { PublicVisit } from "./public-visit.service";
 import { PublicVisitService } from "./public-visit.service";
 import type { SiteMoved } from "./site-moved";
@@ -56,6 +58,7 @@ export class PublicSitesController {
         private readonly previewLinks: SitePreviewLinksService,
         private readonly visits: PublicVisitService,
         private readonly footers: PublicFooterService,
+        private readonly heads: PublicHeadService,
     ) {}
 
     /**
@@ -214,6 +217,23 @@ export class PublicSitesController {
         @Headers(SITE_RELAY_HEADER) relay: string | undefined,
     ): Promise<PublicFooter> {
         return this.footers.read(siteId, visitorKey(ip, relay));
+    }
+
+    /**
+     * What every page's head carries beside the snapshot (DEC-108): the
+     * site's verification codes, and the merchant's own trackers while the
+     * plan includes them. Public values only, read live, never cached, so a
+     * saved code is on the site at once. The visitor is relayed as for
+     * `/visit`.
+     */
+    @Get(":siteId/head")
+    @Header("Cache-Control", "no-store")
+    head(
+        @Param("siteId") siteId: string,
+        @Ip() ip: string,
+        @Headers(SITE_RELAY_HEADER) relay: string | undefined,
+    ): Promise<PublicHead> {
+        return this.heads.read(siteId, visitorKey(ip, relay));
     }
 
     /**

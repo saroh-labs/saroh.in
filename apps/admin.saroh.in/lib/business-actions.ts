@@ -292,6 +292,26 @@ export async function repairModulesAction(
     );
 }
 
+/** Staff kill switch for one site's trackers (#897): off, or back on. */
+export async function siteTrackersAction(
+    organizationId: string,
+    siteId: string,
+    input: Reasoned & { switchOn: boolean },
+) {
+    const { switchOn, ...body } = input;
+    return refresh(
+        organizationId,
+        await adminWrite(
+            `${base(organizationId)}/sites/${encodeURIComponent(siteId)}/trackers/${switchOn ? "switch-on" : "switch-off"}`,
+            "POST",
+            body,
+            switchOn
+                ? "Could not switch the trackers back on."
+                : "Could not switch the trackers off.",
+        ),
+    );
+}
+
 export async function addNoteAction(organizationId: string, body: string) {
     return refresh(
         organizationId,

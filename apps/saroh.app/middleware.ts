@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 
 import { env } from "@/env";
 import { accountAreaOn, isAccountPath } from "@/lib/account-area-switch";
+import { TEST_HOST_ROBOTS } from "@/lib/crawl";
 import { isPayPath, TENANT_HOST_HEADER } from "@/lib/pay-host";
 import { REQUEST_PATH_HEADER, requestPathOf } from "@/lib/request-path";
 import { tenantUrl } from "@/lib/tenant-url";
@@ -22,6 +23,13 @@ export const config = {
          * 4. all root files inside /public (e.g. /favicon.ico)
          */
         "/((?!api/|_next/|_static/|_vercel|[\\w-]+\\.\\w+).*)",
+        /*
+         * 5. …but a site's crawl files are its own (#890): the dotted-path
+         *    rule above would otherwise send them to /public, where no
+         *    tenant has one.
+         */
+        "/robots.txt",
+        "/sitemap.xml",
     ],
 };
 
@@ -99,6 +107,10 @@ export default function middleware(req: NextRequest) {
     // A test release's host (DEC-071, T5): its link, its cookie, its gate
     // and its noindex, and no pay pages (`lib/test-host.ts`).
     if (isTestHost(hostname, env.NEXT_PUBLIC_ROOT_DOMAIN ?? "saroh.app")) {
+        // Nothing on a test host may be crawled, and it has no sitemap
+        // (#890). Answered here, before the gate, so a crawler reads it.
+        if (path === "/robots.txt") return testHostRobots();
+        if (path === "/sitemap.xml") return plainNotFound();
         if (isAccountPath(path) && !accountAreaOn()) return accountOff();
         return testHostResponse(req, tenantUrl(hostname, url), isPayPath(path));
     }
@@ -132,6 +144,27 @@ export default function middleware(req: NextRequest) {
     headers.set(REQUEST_PATH_HEADER, requestPathOf(url));
     return NextResponse.rewrite(tenantUrl(hostname, url), {
         request: { headers },
+    });
+}
+
+/** A test host's robots.txt: disallow everything (#890). */
+function testHostRobots(): NextResponse {
+    return new NextResponse(TEST_HOST_ROBOTS, {
+        headers: {
+            "content-type": "text/plain; charset=utf-8",
+            "x-robots-tag": "noindex",
+        },
+    });
+}
+
+/** A plain 404 with noindex. */
+function plainNotFound(): NextResponse {
+    return new NextResponse("Not found", {
+        status: 404,
+        headers: {
+            "content-type": "text/plain; charset=utf-8",
+            "x-robots-tag": "noindex",
+        },
     });
 }
 

@@ -170,6 +170,14 @@ jobs:
       - name: Catalog pins match the lockfile
         run: pnpm run check:catalog-lock
 
+      # The visitor's address and country come from Cloudflare's headers.
+      - name: Visitor headers read Cloudflare's
+        run: pnpm run check:edge-headers
+
+      # Every app sends the browser security headers on every page.
+      - name: Security headers on every page
+        run: pnpm run check:security-headers
+
       # Merchant sites render off the --site-* layer only, and there is exactly
       # one renderer — gates G2 and G6 (#252).
       - name: Site blocks gate
@@ -178,6 +186,10 @@ jobs:
       # Each migration folder has its own timestamp, so replay order is chosen.
       - name: Migration ids
         run: pnpm run check:migration-ids
+
+      # Shell scripts' mktemp templates carry X's, so prepush runs on Linux.
+      - name: mktemp templates
+        run: pnpm run check:mktemp
 
       # Every browser spec names what it exercises (`// @covers …`), so the
       # local gate can run only the specs a batch reaches. CI still runs all.

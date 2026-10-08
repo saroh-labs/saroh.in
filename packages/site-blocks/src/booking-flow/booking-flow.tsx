@@ -10,6 +10,7 @@ import type {
 import { SignInSheet } from "../account/sign-in-sheet";
 import { DEFAULT_API_URL } from "../api-url";
 import type { PublicVisit } from "../blocks/visit-us";
+import { NO_CAPTURE_ATTRS, NO_CAPTURE_CLASS } from "../consent-events";
 import { phoneText } from "../lib/phone";
 import { cn } from "../lib/utils";
 import { useTestRelease } from "../test-release/context";
@@ -999,8 +1000,10 @@ export default function BookingFlow({
 
     return (
         <div
+            {...NO_CAPTURE_ATTRS}
             className={cn(
                 "bg-site-bg text-site-fg min-h-screen",
+                NO_CAPTURE_CLASS,
                 showBar ? "pb-[150px]" : "pb-10",
             )}
         >

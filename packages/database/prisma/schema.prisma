@@ -176,6 +176,10 @@ model Organization {
   // Frozen candidates of a site and their links (DEC-071).
   siteTestReleases     SiteTestRelease[]
   siteTestReleaseLinks SiteTestReleaseLink[]
+  // A site's verification codes and own trackers (DEC-108).
+  siteVerifications    SiteVerification[]
+  siteTrackers         SiteTracker[]
+  siteTrackingSettings SiteTrackingSettings[]
 
   // Subdomain / custom-domain claims (S2-007). Each Domain is org-owned and its
   // `hostname` is globally unique, so a hostname maps to at most one org.
@@ -3012,6 +3016,12 @@ model Site {
   // Frozen candidates of this site, served on its test host (DEC-071).
   testReleases     SiteTestRelease[]
   testReleaseLinks SiteTestReleaseLink[]
+  // Search-engine verification codes and the merchant's own trackers
+  // (DEC-108). Read live by the renderer, outside the publication: saving
+  // one is never an unpublished change.
+  verifications    SiteVerification[]
+  trackers         SiteTracker[]
+  trackingSettings SiteTrackingSettings?
 
   // "Publishing needs approval" (DEC-071, amends DEC-047). Off: approval is
   // advisory and a bypass is recorded. On: Publish, restore and Go live
@@ -3557,6 +3567,88 @@ model SiteTestReleaseLink {
 }
 
 // ============================================================================
+// SITE VERIFICATION AND OWN TRACKERS (DEC-108)
+// ============================================================================
+//
+// What a merchant connects to their live site: a search engine's verification
+// code, and their own analytics or ad tracker. Only public ids are stored,
+// each checked against its tool's shape (`@saroh/block-contract`,
+// `site-tracking.ts`); nothing a merchant enters can run code, and nothing
+// secret is kept. All of it reaches the live site at once, read beside the
+// publication, never inside it.
+
+/// One search engine's verification code for a site, shown as a `<meta>` tag.
+model SiteVerification {
+  id     String @id @default(cuid())
+  siteId String
+  site   Site   @relation(fields: [siteId, organizationId], references: [id, organizationId], onDelete: Cascade)
+
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  // google | bing | meta | pinterest (CHECKed in the migration).
+  service String
+  // The bare code. Never the tag it came in.
+  code    String
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([siteId, service])
+  @@index([organizationId])
+}
+
+/// One of the merchant's own trackers on a site, by its public id.
+model SiteTracker {
+  id     String @id @default(cuid())
+  siteId String
+  site   Site   @relation(fields: [siteId, organizationId], references: [id, organizationId], onDelete: Cascade)
+
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  // ga4 | google-ads | meta-pixel | posthog | clarity | plausible | umami
+  // (CHECKed in the migration). Loader hosts are fixed in code, never stored.
+  kind      String
+  trackerId String
+  // PostHog only: us | eu.
+  region    String?
+  // Off keeps the id without loading it.
+  enabled   Boolean @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([siteId, kind])
+  @@index([organizationId])
+}
+
+/// A site's tracking settings: the merchant's privacy page, and Saroh's
+/// switch-off.
+model SiteTrackingSettings {
+  siteId String @id
+  site   Site   @relation(fields: [siteId, organizationId], references: [id, organizationId], onDelete: Cascade)
+
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  // An https page the cookie banner links to. Null: the site's own
+  // generated notice.
+  privacyUrl String?
+
+  // Saroh staff switched this site's trackers off (#897): none load until
+  // staff switch them back on, whatever the plan.
+  switchedOffAt        DateTime?
+  switchedOffByStaffId String?
+  switchedOffReason    String?
+
+  updatedAt DateTime @updatedAt
+
+  @@unique([siteId, organizationId])
+  @@index([organizationId])
+}
+
+// ============================================================================
 // DOMAINS: SUBDOMAIN / CUSTOM-DOMAIN CLAIM + VERIFICATION (Stage 2 — S2-007)
 // ============================================================================
 //
@@ -3985,10 +4077,10 @@ model Notification {
   body  String?
 
   // The subject this notice points at (a Lead, for enquiries).
-  leadId   String?
+  leadId    String?
   // Or a product review ("A review needs a reply"). Informational, no FK,
   // like leadId — a notice outlives nothing it could dangle from.
-  reviewId String?
+  reviewId  String?
   // Or a customer's message thread (UX-014): the contact it opens on, and
   // the message that raised it. Informational, no FK, like leadId.
   contactId String?

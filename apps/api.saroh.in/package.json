@@ -27,6 +27,7 @@
     "@nestjs/terminus": "^11.1.1",
     "@prisma/client": "catalog:prisma",
     "@saroh/auth": "workspace:*",
+    "@saroh/block-contract": "workspace:*",
     "@saroh/database": "workspace:*",
     "@saroh/integrations": "workspace:*",
     "@saroh/object-storage": "workspace:*",

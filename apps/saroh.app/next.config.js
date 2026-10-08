@@ -34,8 +34,41 @@ if (missing.length > 0) {
  */
 const TEST_HOST_PATTERNS = ["test--.+", "test\\..+\\..+"];
 
+// Every response: HTTPS only from the first visit on, never shown inside
+// another site's frame (so a sign-in or a button can't be dressed up and
+// clicked through from elsewhere), and no guessing a file's type. The app's
+// own previews are same-origin, so 'self' may still frame it.
+//
+// No includeSubDomains here: on a merchant's own domain it would force HTTPS
+// on every subdomain of their business, including ones Saroh doesn't serve.
+const SECURITY_HEADERS = [
+    { key: "Strict-Transport-Security", value: "max-age=31536000" },
+    { key: "X-Frame-Options", value: "SAMEORIGIN" },
+    { key: "Content-Security-Policy", value: "frame-ancestors 'self'" },
+    { key: "X-Content-Type-Options", value: "nosniff" },
+];
+
+/**
+ * Crawlers that get the page's metadata in `<head>`, rendered before the body
+ * rather than streamed after it (DEC-108, #894). Search Console, Bing, Meta
+ * and Pinterest verify a site by reading a `<meta>` tag in the head, and they
+ * keep checking. Next 16's own list (`html-bots.ts`) is kept whole here and
+ * extended with the crawlers it leaves out: Googlebot itself, and Pinterest's
+ * verifier. Everyone else still gets streamed metadata.
+ */
+const HTML_LIMITED_BOTS = new RegExp(
+    [
+        // Next 16.3's default list.
+        "[\\w-]+-Google|Google-[\\w-]+|Chrome-Lighthouse|Slurp|DuckDuckBot|baiduspider|yandex|sogou|bitlybot|tumblr|vkShare|quora link preview|redditbot|ia_archiver|Bingbot|BingPreview|applebot|facebookexternalhit|facebookcatalog|Twitterbot|LinkedInBot|Slackbot|Discordbot|WhatsApp|SkypeUriPreview|Yeti|googleweblight",
+        // Added for site verification.
+        "Googlebot|Pinterest",
+    ].join("|"),
+    "i",
+);
+
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+    htmlLimitedBots: HTML_LIMITED_BOTS,
     // Development logs every server action's arguments by default, and some
     // carry secrets: provider keys, sign-in codes (UX-005, 7 Oct). Production
     // never logs them; this keeps local logs clean too.
@@ -46,10 +79,15 @@ const nextConfig = {
     // No database here — saroh.app renders via api.saroh.in (single backend).
     reactStrictMode: false,
 
-    // An invoice pay link's token is its credential (ADR-007, U13): the page
-    // sends no referrer and is never indexed, as headers as well as meta tags.
+    // No `X-Powered-By: Next.js`: it only tells scanners what to try.
+    poweredByHeader: false,
+
+    // Every response gets SECURITY_HEADERS. An invoice pay link's token is its
+    // credential (ADR-007, U13): the page sends no referrer and is never
+    // indexed, as headers as well as meta tags.
     async headers() {
         return [
+            { source: "/:path*", headers: SECURITY_HEADERS },
             {
                 source: "/pay/:token*",
                 headers: [

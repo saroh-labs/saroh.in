@@ -14,6 +14,7 @@ import { AdminOrganizationsService } from "./admin-organizations.service";
 import { AdminOverridesService } from "./admin-overrides.service";
 import { AdminPermission } from "./admin-permissions";
 import { AdminRoutes } from "./admin-routes.decorator";
+import { AdminSiteTrackersService } from "./admin-site-trackers.service";
 import {
     AddNoteDto,
     CatalogueMoveDto,
@@ -48,6 +49,7 @@ export class AdminOrganizationsController {
         private readonly access: AdminAccessService,
         private readonly adminAudit: AdminAuditService,
         private readonly idempotency: IdempotencyService,
+        private readonly siteTrackers: AdminSiteTrackersService,
     ) {}
 
     /**
@@ -490,6 +492,57 @@ export class AdminOrganizationsController {
                 this.lifecycle.repairModules({
                     staff,
                     organizationId,
+                    reason: dto.reason,
+                }),
+        );
+    }
+
+    /**
+     * Staff kill switch (#897): no tracker loads on this site until staff
+     * switch it back on, whatever the plan. The reason goes to the ledger.
+     */
+    @Post("organizations/:organizationId/sites/:siteId/trackers/switch-off")
+    @RequireAdminPermission(AdminPermission.OrganizationTrackersWrite)
+    switchTrackersOff(
+        @PlatformAdminContext() staff: PlatformAdminInfo,
+        @Param("organizationId") organizationId: string,
+        @Param("siteId") siteId: string,
+        @Body() dto: OperatorReasonDto,
+    ) {
+        return this.once(
+            "site.trackers.off",
+            staff,
+            organizationId,
+            { ...dto, siteId },
+            () =>
+                this.siteTrackers.switchOff({
+                    staff,
+                    organizationId,
+                    siteId,
+                    reason: dto.reason,
+                }),
+        );
+    }
+
+    /** Let the site's trackers load again (only staff can). */
+    @Post("organizations/:organizationId/sites/:siteId/trackers/switch-on")
+    @RequireAdminPermission(AdminPermission.OrganizationTrackersWrite)
+    switchTrackersOn(
+        @PlatformAdminContext() staff: PlatformAdminInfo,
+        @Param("organizationId") organizationId: string,
+        @Param("siteId") siteId: string,
+        @Body() dto: OperatorReasonDto,
+    ) {
+        return this.once(
+            "site.trackers.on",
+            staff,
+            organizationId,
+            { ...dto, siteId },
+            () =>
+                this.siteTrackers.switchOn({
+                    staff,
+                    organizationId,
+                    siteId,
                     reason: dto.reason,
                 }),
         );

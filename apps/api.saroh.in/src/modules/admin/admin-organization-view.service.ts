@@ -8,6 +8,8 @@ import { CatalogueAccessService } from "../billing/catalogue-access.service";
 import type { EntitlementMap } from "../billing/entitlement.service";
 import { EntitlementService } from "../billing/entitlement.service";
 import { MODULES } from "../capabilities/module-registry";
+import type { SiteTrackersRow } from "./admin-site-trackers.service";
+import { siteTrackerStates } from "./admin-site-trackers.service";
 import { catalogueUsage } from "./catalogue-usage";
 
 const PANEL_ROWS = 20;
@@ -199,6 +201,8 @@ export interface OrganizationSupportView {
     activity: Panel<OrganizationActivityRow[]>;
     operatorActions: Panel<OperatorActionRow[]>;
     notes: Panel<OperatorNote[]>;
+    /** Each site's tracker switch (#897), with who switched it off, in words. */
+    sites: Panel<(SiteTrackersRow & { switchedOffBy: string | null })[]>;
 }
 
 /**
@@ -236,7 +240,7 @@ export class AdminOrganizationViewService {
     ): Promise<OrganizationSupportView> {
         const facts = await this.facts(organizationId);
 
-        const [people, modules, plan, activity, operatorActions, notes] =
+        const [people, modules, plan, activity, operatorActions, notes, sites] =
             await Promise.all([
                 this.panel("people", () =>
                     this.people(organizationId, caller.canReadPii),
@@ -262,6 +266,23 @@ export class AdminOrganizationViewService {
                         author: names.get(row.authorUserId) ?? null,
                     }));
                 }),
+                this.panel("sites", async () => {
+                    const rows = await siteTrackerStates(organizationId);
+                    const names = await this.names(
+                        rows.flatMap((row) =>
+                            row.switchedOff?.byUserId
+                                ? [row.switchedOff.byUserId]
+                                : [],
+                        ),
+                        caller,
+                    );
+                    return rows.map((row) => ({
+                        ...row,
+                        switchedOffBy: row.switchedOff?.byUserId
+                            ? (names.get(row.switchedOff.byUserId) ?? null)
+                            : null,
+                    }));
+                }),
             ]);
 
         return {
@@ -272,6 +293,7 @@ export class AdminOrganizationViewService {
             activity,
             operatorActions,
             notes,
+            sites,
         };
     }
 

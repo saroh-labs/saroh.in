@@ -1221,3 +1221,27 @@ Unless an entry says otherwise, its status is **Proposed — requires audit revi
     - **Dev stays private.** The dev apps keep the access-key gate (DEC-081): without the key a visitor lands on the same page in production. A dev app without its key is never deployed.
     - **The marketing site is fully static.** Every page is built at deploy time and served from the build; nothing regenerates at request time (a Worker can't read `content/` or compile MDX while serving). Pricing and the launch offer are read when the site is built, and a deployment's build fails rather than publish the placeholder. Dated pages appear through a nightly rebuild at 00:00 IST; a pricing publish starts a build (`SITE_DEPLOY_GITHUB_TOKEN` on the API).
 - Consequences: the visitor's address comes from `cf-connecting-ip` behind Cloudflare. Routes are set to fail open, so a failing Worker falls through to the origin while Vercel is still there. `VERCEL_ENV` / `VERCEL_GIT_COMMIT_REF` keep their names for now: the apps' checks read them and the deploy sets them.
+
+## DEC-108 Merchants verify their site and connect their own trackers by public ID only; nothing they enter runs code
+
+**Status: Accepted — 2026-10-08** · owner · extends DEC-012, DEC-071, DEC-091 · epic #889
+
+- Context: merchants run ads and want analytics and Search Console on their Saroh site. Saroh deliberately does not record merchants' visitors itself. The merchant brings their own tools, as with their own email and payments (DEC-091). A merchant site is served on a Saroh address (`*.saroh.app`) or the merchant's domain, so whatever runs there can harm customers and Saroh's domain.
+- Decision:
+    - **Verification codes on every plan.** Google Search Console, Bing, Meta and Pinterest by `<meta>` tag only. The tags stay on the live site, because those services check again later.
+    - **Trackers on paid plans, from a fixed list, by public ID only:** GA4, Google Ads, Meta Pixel, PostHog, Microsoft Clarity, Plausible and Umami Cloud.
+        - Saroh writes every loader, and their hosts are fixed in code.
+        - There is no code box and no Google Tag Manager, because whoever controls a container can run any code on the site.
+        - Vendor features that inject scripts from the vendor's dashboard (PostHog site apps, web experiments and surveys) are switched off and cannot be turned on.
+        - A new tool joins the list only after Saroh checks it can't inject code.
+    - **Nothing secret is stored or served.**
+        - Only public IDs are saved. A pasted value that looks like a key, token, API secret or password is refused and never stored or logged.
+        - The public read the site uses never carries a merchant's provider secrets or any other organization data.
+    - **Live without a publish.** Codes and trackers are read live, outside the publication snapshot: an exception to ADR-002 alongside DEC-071 and DEC-102. The tracker read fails closed: no trackers unless the resolved plan includes them.
+    - **Consent and limits.**
+        - Trackers that need consent load only after the visitor accepts a banner in the site's own look. Accept and Reject are equal, GPC counts as Reject, and the banner always links to a notice.
+        - Trackers never load on checkout, autopay, order-status, account or pay pages, test releases or previews.
+        - Customer details in booking, enquiry, sign-in and checkout forms are masked from session recordings, and Meta's automatic form matching is off.
+    - **Responsibility.** The merchant is responsible for their visitors' data for the tools they connect; Saroh acts on their behalf. Staff can switch off a site's trackers from admin, and the terms forbid malicious use.
+    - **Later.** Shop and booking events, and sending purchases from Saroh's server, are a later plan. Any secret that plan needs is stored encrypted on the API like payment keys, never served.
+- Consequences: new tables hold codes and trackers, separate from the snapshot-bound `Site` fields, and never count as unpublished changes. Each page view makes one more live API read. A catalogue row gates trackers. Every merchant site also gets `sitemap.xml` and `robots.txt`.

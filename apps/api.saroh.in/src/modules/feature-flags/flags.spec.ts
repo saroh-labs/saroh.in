@@ -19,10 +19,28 @@ describe("every flag has a plan to go", () => {
         (key) => {
             const meta = FLAG_METADATA[key];
             expect(meta.purpose.length).toBeGreaterThan(20);
+            // The name a business sees, so staff can find the release a
+            // merchant asks about by the words on their screen.
+            expect(meta.shownAs.trim().length).toBeGreaterThan(1);
+            expect(meta.shownAs).not.toBe(key);
+            expect(["module", "feature", "safety", "migration"]).toContain(
+                meta.group,
+            );
             expect(meta.owner.length).toBeGreaterThan(0);
             expect(meta.removeWhen.length).toBeGreaterThan(10);
             expect(meta.reviewBy).toMatch(/^\d{4}-\d{2}-\d{2}$/);
             expect(Number.isNaN(new Date(meta.reviewBy).getTime())).toBe(false);
+        },
+    );
+});
+
+describe("module flags carry the module's own name", () => {
+    it.each(FLAG_KEYS.filter((key) => key.startsWith("MODULE_")))(
+        "%s is a module shown by its label",
+        (key) => {
+            const meta = FLAG_METADATA[key];
+            expect(meta.group).toBe("module");
+            expect(meta.purpose).toContain(`the ${meta.shownAs} module`);
         },
     );
 });

@@ -139,7 +139,21 @@ export function isKnownFlagKey(key: string): key is FlagKey {
  * reviewed for deletion — `flags.spec.ts` fails a key that does not, so a
  * flag cannot be added without a plan to take it away.
  */
+/**
+ * What kind of release a flag is, for the console's grouped list: a module's
+ * rollout switch, a one-off feature, a kill switch kept for safety, or a
+ * migration between two code paths.
+ */
+export type FlagGroup = "module" | "feature" | "safety" | "migration";
+
 export interface FlagMetadata {
+    /**
+     * The name a business sees for what this flag controls ("Payments",
+     * "Shop on your website"), so staff can find the release a merchant
+     * names. A module's is its label, so the two cannot drift.
+     */
+    shownAs: string;
+    group: FlagGroup;
     /** What turning it on does, in a sentence an operator can act on. */
     purpose: string;
     /** Who decides when it changes — a role, not a person. */
@@ -151,6 +165,8 @@ export interface FlagMetadata {
 }
 
 const MODULE_ROLLOUT = (label: string): FlagMetadata => ({
+    shownAs: label,
+    group: "module",
     purpose: `Makes the ${label} module available to a business that has switched it on. Off hides it everywhere, whatever the business chose.`,
     owner: "Release manager",
     reviewBy: "2027-03-31",
@@ -159,6 +175,8 @@ const MODULE_ROLLOUT = (label: string): FlagMetadata => ({
 
 export const FLAG_METADATA: Record<FlagKey, FlagMetadata> = {
     ORG_AUTHORIZATION: {
+        shownAs: "Team roles",
+        group: "migration",
         purpose:
             "Authorizes a store's staff through the business's own roles (ADR-001). Off keeps the older per-store owner and staff checks.",
         owner: "Platform owner",
@@ -177,6 +195,8 @@ export const FLAG_METADATA: Record<FlagKey, FlagMetadata> = {
     MODULE_AUTOMATIONS: MODULE_ROLLOUT("Automations"),
     MODULE_INSIGHTS: MODULE_ROLLOUT("Insights"),
     SITE_SHOP: {
+        shownAs: "Shop on your website",
+        group: "feature",
         purpose:
             "Opens the shop on a business's website: /shop, product pages and the Sells from setting. Turn it on only once the bag and checkout (G13) have shipped; off hides the shop everywhere.",
         owner: "Release manager",
@@ -185,6 +205,8 @@ export const FLAG_METADATA: Record<FlagKey, FlagMetadata> = {
             "The bag and checkout are live, the shop is on for every business on every instance, and it has needed no kill switch for a release.",
     },
     ACCOUNT_THREAD: {
+        shownAs: "Messages in the customer account",
+        group: "feature",
         purpose:
             "Lets Saroh post to a customer's account thread on the business's site: an invoice sent or reminded about, and later Home's Reply. Turn it on only once the message thread (A13) and its notify job (A14) are live in production; off, invoices go by email alone.",
         owner: "Release manager",
@@ -193,6 +215,8 @@ export const FLAG_METADATA: Record<FlagKey, FlagMetadata> = {
             "The account thread is live on every instance and has needed no kill switch for a release.",
     },
     RAZORPAY_AUTOPAY: {
+        shownAs: "Autopay",
+        group: "feature",
         purpose:
             "Offers autopay (UPI Autopay, card or bank eMandate) to the customers of a business that takes payments through Razorpay. Turn it on only after a Razorpay test-mode run has authorised a mandate and settled one charge; off, no autopay is set up or charged through Razorpay (renewals are invoiced with a pay link, as before autopay), while mandates already made can still be cancelled.",
         owner: "Release manager",
@@ -201,6 +225,8 @@ export const FLAG_METADATA: Record<FlagKey, FlagMetadata> = {
             "Razorpay autopay has run in production on every instance for a release and has needed no kill switch.",
     },
     PAY_LINK_ON_SITE: {
+        shownAs: "Pay links on your web address",
+        group: "feature",
         purpose:
             "Issues pay links on the business's own web address (its custom domain, else its saroh.app address) instead of saroh.app/pay. Turn it on only after the renderer serves pay pages on a business's address in production; off, every link is on saroh.app, and links already sent keep working either way.",
         owner: "Release manager",
@@ -209,6 +235,8 @@ export const FLAG_METADATA: Record<FlagKey, FlagMetadata> = {
             "It has been on for every business on every instance for a release, and the apex-only link functions have been removed.",
     },
     SITE_TEST_RELEASES: {
+        shownAs: "Test releases",
+        group: "feature",
         purpose:
             "Lets a business make test releases of its website: a frozen version on a test address, shared by link, that it can then put live now or at a set time, and the Publishing needs approval setting. Off hides all of it and the test address answers not found; a go-live already scheduled still runs. Turn it on only once the API that keeps test releases out of version history has been live for a release.",
         owner: "Release manager",
@@ -217,6 +245,8 @@ export const FLAG_METADATA: Record<FlagKey, FlagMetadata> = {
             "Test releases are on for every business on every instance, have needed no kill switch for a release, and the flag's seven readers (release endpoints, test-host lookup, scheduling, the Website alert row, the editor panel, the settings row and the setting's own write) have been removed.",
     },
     PLAN_ENFORCEMENT: {
+        shownAs: "Plan limits",
+        group: "safety",
         purpose:
             "Applies the plans catalogue: a module the business's plan doesn't include is unavailable, and the plan's limits are enforced. Turn it on only after the grandfather backfill has run on that instance; off, nothing new is locked or refused (the kill switch).",
         owner: "Release manager",
@@ -225,6 +255,8 @@ export const FLAG_METADATA: Record<FlagKey, FlagMetadata> = {
             "The catalogue has been enforced for every business on every instance for a release with no need to switch it off, and its readers no longer ask it.",
     },
     SAROH_BUSINESS_EMAIL: {
+        shownAs: "Booking emails from Saroh",
+        group: "feature",
         purpose:
             "Lets Saroh email a business's booking confirmations, moves and cancellations from its own notify address while the business has no email provider connected, counted against the plan's monthly allowance. Turn it on for one business first, only once the notify subdomain is verified in SES and the plan versions carry the allowance; off, those customers are told in their account alone, as before. SAROH_BUSINESS_EMAIL_STOP on the API stops it for everyone at once.",
         owner: "Release manager",
@@ -233,6 +265,8 @@ export const FLAG_METADATA: Record<FlagKey, FlagMetadata> = {
             "Saroh's booking emails have been on for every business on every instance for a release with no need to switch them off, and the four readers in saroh-may-send.ts no longer ask it.",
     },
     WEB_ADDRESS_CHANGE: {
+        shownAs: "Change web address",
+        group: "feature",
         purpose:
             "Lets a business's owner change its web address in Settings; the old address forwards for 90 days and stays held for the business. Turn it on only once the renderer forwards an old address in production, first for one business; off, the address can't be changed and no Change button shows.",
         owner: "Release manager",
