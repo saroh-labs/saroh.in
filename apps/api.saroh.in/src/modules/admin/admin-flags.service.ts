@@ -26,6 +26,23 @@ export interface AdminFlagView {
     }[];
 }
 
+/** One change to a flag, with who made it and for which business, by name. */
+export interface AdminFlagChange {
+    id: string;
+    organizationId: string | null;
+    /** The business's name, or `null` for a global change (or one since deleted). */
+    organizationName: string | null;
+    previousValue: boolean | null;
+    newValue: boolean;
+    actorUserId: string;
+    /** The operator's name, else their email; `null` if the account is gone. */
+    actorName: string | null;
+    reason: string | null;
+    createdAt: Date;
+}
+
+const HISTORY_LIMIT = 20;
+
 /**
  * The flag control surface for admin.saroh.in (S1-012, DEC feature-flags).
  *
@@ -70,6 +87,66 @@ export class AdminFlagsService {
                 .sort((a, b) =>
                     a.organizationName.localeCompare(b.organizationName),
                 ),
+        }));
+    }
+
+    /**
+     * The last changes to one flag, newest first, for the Releases screen's
+     * History tab (R9). Read from the flag's own ledger, which `flags:read`
+     * already opens: the platform audit list needs `audit:read`, which a
+     * release manager does not hold. Names are joined here so the console
+     * says who changed what, not two ids.
+     */
+    async history(key: FlagKey): Promise<AdminFlagChange[]> {
+        const rows = await prisma.featureFlagAudit.findMany({
+            where: { flagKey: key },
+            orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+            take: HISTORY_LIMIT,
+            select: {
+                id: true,
+                organizationId: true,
+                previousValue: true,
+                newValue: true,
+                actorUserId: true,
+                reason: true,
+                createdAt: true,
+            },
+        });
+        const actorIds = [...new Set(rows.map((row) => row.actorUserId))];
+        const orgIds = [
+            ...new Set(
+                rows.flatMap((row) =>
+                    row.organizationId ? [row.organizationId] : [],
+                ),
+            ),
+        ];
+        const [actors, organizations] = await Promise.all([
+            actorIds.length > 0
+                ? prisma.user.findMany({
+                      where: { id: { in: actorIds } },
+                      select: { id: true, name: true, email: true },
+                  })
+                : [],
+            orgIds.length > 0
+                ? prisma.organization.findMany({
+                      where: { id: { in: orgIds } },
+                      select: { id: true, name: true },
+                  })
+                : [],
+        ]);
+        const actorName = new Map(
+            actors.map((user) => [
+                user.id,
+                user.name?.trim() ? user.name.trim() : user.email,
+            ]),
+        );
+        const orgName = new Map(organizations.map((org) => [org.id, org.name]));
+        return rows.map((row) => ({
+            ...row,
+            organizationName: row.organizationId
+                ? (orgName.get(row.organizationId) ?? null)
+                : null,
+            actorName: actorName.get(row.actorUserId) ?? null,
         }));
     }
 
