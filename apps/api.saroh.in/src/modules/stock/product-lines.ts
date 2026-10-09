@@ -9,6 +9,12 @@ import { shelfNeed } from "./stock-words";
  * without a variant promise). Each line has a cell per storefront asked
  * for: its shelf there (none yet reads as 0), whether that storefront sells
  * it, and whether it needs someone. Pure.
+ *
+ * A product a lower plan paused (#800, `billing/over-limit.ts`) is hidden
+ * from the site, so nothing new sells from its shelves: like a shelf that
+ * sells nothing, only short (orders already placed, waiting on it) makes
+ * it need someone — never "out" or "low", which would ask to restock what
+ * can't be bought online.
  */
 
 export interface LineShelf {
@@ -45,7 +51,9 @@ export function productLines<S extends LineShelf>(
     },
     shelves: readonly S[],
     storeIds: readonly string[],
+    options: { paused?: boolean } = {},
 ): ProductLine<S>[] {
+    const paused = options.paused === true;
     const listings = new Map(
         product.listings.map((l) => [
             l.storeId,
@@ -88,7 +96,7 @@ export function productLines<S extends LineShelf>(
                               promised: shelf?.promised ?? 0,
                               lowStockAlert: shelf?.lowStockAlert ?? 0,
                           },
-                          line.sells,
+                          line.sells && !paused,
                       )
                     : null,
             };

@@ -218,6 +218,48 @@ export function inviteRoom(limit: TeamLimit | null | undefined): {
 }
 
 /**
+ * Team's Invite button (UX-028, DEC-105, #868, #800): what it says, whether
+ * the dialog may give someone on the diary a login, and — when there is no
+ * one it could invite — why, said on a press instead of a dialog the API
+ * would refuse.
+ *
+ * Over the limit (`over`: a lower plan paused people, #800) nobody on the
+ * diary is offered: a login given now joins as the newest team member, and
+ * the newest past the limit are paused, so it would open nothing.
+ */
+export function inviteButton(
+    limit: TeamLimit | null | undefined,
+    diaryPeople: number,
+    over = false,
+): { label: string; diary: boolean; refused: string | null } {
+    if (!limit?.full) {
+        return { label: "Invite someone", diary: true, refused: null };
+    }
+    const diary = !over && diaryPeople > 0;
+    if (inviteRoom(limit).open) {
+        return {
+            label: "Invite someone view-only",
+            diary: !over,
+            refused: null,
+        };
+    }
+    if (diary) {
+        return {
+            label: "Invite someone on the diary",
+            diary: true,
+            refused: null,
+        };
+    }
+    return {
+        label: "Team is full",
+        diary: false,
+        refused: over
+            ? "Your team is over its plan's limit, so the people who joined most recently are paused and there's no room to invite anyone. Choose a plan in Plan and billing to bring them back."
+            : `${limit.why} (invites count too). See plans in Plan and billing.`,
+    };
+}
+
+/**
  * The people on the diary who take bookings with no login: each uses a team
  * seat (DEC-105, UX-053). One who is a team member is counted on Team
  * already, so is left out.

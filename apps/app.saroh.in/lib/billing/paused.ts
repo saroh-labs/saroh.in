@@ -118,6 +118,21 @@ export function pausedTeam(view: PausedView | null): PausedTeam {
     };
 }
 
+/**
+ * Whether anyone on Team is paused now: the team is over its plan's limit,
+ * not just at it. Team then says "over", and leaves out the plan's
+ * "reached your limit" card, whose "everyone already on the team keeps
+ * access" is no longer true; the paused notes say why and link to Plan
+ * and billing.
+ */
+export function teamOverLimit(team: PausedTeam): boolean {
+    return (
+        team.userIds.length > 0 ||
+        team.invitationIds.length > 0 ||
+        team.diary.length > 0
+    );
+}
+
 function joinNames(names: readonly string[]): string {
     if (names.length <= 1) return names.join("");
     return `${names.slice(0, -1).join(", ")} and ${names[names.length - 1]}`;
