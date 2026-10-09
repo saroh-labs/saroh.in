@@ -71,6 +71,7 @@ waits while holding one.
 | ----------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------- |
 | `first-pack:<organizationId>:<contactId>` | Selling a "first pack only" pack to one person                                                                                                              | `class-packs/first-pack.ts`                                                                                                                     |
 | `subscription-plan-name:<organizationId>` | Saving a subscription plan's name in one business                                                                                                           | `subscriptions/plans.ts` (`lockPlanNames`)                                                                                                      |
+| `domain-alert:<domainId>`                 | Telling one custom domain's down or back (#917), so a "Check now" and a run that both saw the change tell it once                                           | `notifications/domain-alerts.ts` (`wordDomain`)                                                                                                 |
 | `plan-meter:<organizationId>:<limitKey>`  | Writes that add to one plan limit (a product, a booking…); a booking notice Saroh will email takes `…:sarohEmailsPerMonth` before its first write (DEC-086) | `billing/metering.service.ts` (`lockMeter`, U13); `customer-notify.handler.ts` (the one notice site; `booking.notify` writes nothing before it) |
 
 Race tests wait on an advisory lock with `waitUntilAdvisoryBlockedBy`
@@ -134,10 +135,20 @@ nobody was told. Round-2 A14 closed it (`bookings/booking-notify.handler.ts`).
   or the test-only domain fakes on: the chain is never started, a stray
   run logs `domains_recheck_off` and ends, and domains move only on
   "Check now".
-- **No notice when a live domain goes down**, only a WARN
-  (`domain_hosting_went_down`): there is no domain alert to send, and the
-  Domains screen shows the problem. A domain alert would be a new
-  `team.alert` event.
+- **A live domain that goes down tells the team, once per incident**
+  (#917, `notifications/domain-alerts.ts`). The check's write that moves a
+  domain out of live (ACTIVE), or back into it, queues `team.alert`
+  `{ event: "domain", change: "down" | "back" }` on its own transaction
+  (`syncHosting`'s `onLiveChange`), whether the run or "Check now" ran it;
+  the one who pressed Check now isn't emailed. Told on the Your website
+  row (`domain.down`, `domain.back`): the bell names the domain and what
+  is wrong, Saroh's email names the site and links to its settings (a
+  domain is what `cleanName` takes out). Claimed as
+  `team:domain:<id>:<down|back>:<at>`; the last claim decides what may be
+  told next, under the `domain-alert` lock, so "down" is told only after
+  no "down" or a "back", and "back" only after a "down": nothing while a
+  problem lasts, nothing when a domain first goes live. The run still
+  logs `domain_hosting_went_down` at WARN.
 - A domain removed while a run checks it: the run deletes the hostname at
   the host when no row holds it any more, so a re-registration it raced
   isn't left serving.
@@ -228,7 +239,8 @@ nobody was told. Round-2 A14 closed it (`bookings/booking-notify.handler.ts`).
   producer calls `enqueueTeamAlert(tx, …)` on its own transaction
   (`notifications/team-alerts.ts`): a new order (the create, and an online
   checkout's payment), an invoice's pay link failing (the webhook), an
-  invitation accepted. `booking.notify` writes its team notice itself (A14)
+  invitation accepted, a live custom domain going down or coming back
+  (the domain's check, #917, above). `booking.notify` writes its team notice itself (A14)
   and queues `team.alert` with that notice's id for the email only.
 - **One notice, filtered per person.** The bell is one org-wide
   `Notification`; `NotificationsService` leaves out, per viewer, the types

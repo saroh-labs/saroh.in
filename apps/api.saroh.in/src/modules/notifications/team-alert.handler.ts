@@ -13,11 +13,16 @@ import { resolveCapabilities } from "../organizations/organization-policy";
 import { cleanBusinessName } from "../site-accounts/sender-name";
 import type { AlertEvent } from "./alert-preferences";
 import { alertOn, mayHearAbout } from "./alert-preferences";
+import { wordDomain } from "./domain-alerts";
 import { wordReview } from "./review-alerts";
 import type { TeamAlertPayload, WordedAlert } from "./team-alerts";
 import { TEAM_ALERT_TYPE } from "./team-alerts";
 import { putOffUntilDue, wordUncollected } from "./uncollected-alert";
 
+export {
+    DOMAIN_BACK_NOTIFICATION_TYPE,
+    DOMAIN_DOWN_NOTIFICATION_TYPE,
+} from "./domain-alerts";
 export { TEAM_ALERT_TYPE } from "./team-alerts";
 export { ORDER_UNCOLLECTED_NOTIFICATION_TYPE } from "./uncollected-alert";
 
@@ -70,9 +75,10 @@ export interface AlertEmail {
  * Consumer for `team.alert` (round-2 F14): tells the business's team about
  * a new order, a booking the customer made, moved or cancelled, a failed
  * payment, someone joining, a scheduled go-live of the website that ran
- * (DEC-071, T10), or a website order to pay on handover nobody came for in
- * three days (R34, on the New order row), as each person chose in
- * Settings › Your profile.
+ * (DEC-071, T10), a website order to pay on handover nobody came for in
+ * three days (R34, on the New order row), or a live custom domain that
+ * stopped reaching the site and came back (#917, on the Your website
+ * row), as each person chose in Settings › Your profile.
  *
  * On one transaction, in the business's RLS context:
  *  1. What it is about is read again now, and worded. Something that no
@@ -349,6 +355,8 @@ export async function wordAlert(
             return wordProvider(tx, organizationId, payload);
         case "review":
             return wordReview(tx, organizationId, payload);
+        case "domain":
+            return wordDomain(tx, organizationId, payload);
     }
 }
 
@@ -691,6 +699,12 @@ function payloadOf(value: unknown): TeamAlertPayload | null {
             return (p.about === "approval" && str("approvalId")) ||
                 (p.about === "note" && str("commentId")) ||
                 (p.about === "release" && str("testReleaseId"))
+                ? (p as TeamAlertPayload)
+                : null;
+        case "domain":
+            return str("domainId") &&
+                str("at") &&
+                (p.change === "down" || p.change === "back")
                 ? (p as TeamAlertPayload)
                 : null;
         case "site":

@@ -241,6 +241,8 @@ describe("what each person sees of the inbox (F14)", () => {
                 "site.review.approved",
                 "site.review.changes",
                 "site.review.note",
+                "domain.down",
+                "domain.back",
             ],
         });
     });

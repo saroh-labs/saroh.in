@@ -27,6 +27,8 @@ failed call never undoes the verification: the row stays VERIFIED with
 The next check is "Check now" or the `domains.recheck` chain (#860,
 `backend-jobs.md`), which asks Cloudflare often until a domain is live and
 daily after, at most 50 domains a run and stopping on repeated failures.
+Either one moving a live domain to a problem, or back, tells the team once
+per incident (#917, `team.alert` `domain`).
 With `CLOUDFLARE_HOSTNAMES_TOKEN` or `CLOUDFLARE_HOSTNAMES_ZONE_ID` unset the
 port is null, a WARN says so at boot, and the read says `hosting.state: "OFF"`
 (`domain-hosting-sync.ts`).
