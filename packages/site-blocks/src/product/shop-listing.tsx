@@ -4,7 +4,8 @@ import { useState } from "react";
 
 import { focusRing } from "../booking-flow/styles";
 import { cn } from "../lib/utils";
-import { addToBag, openBag } from "../shop/bag-store";
+import { allInBagWords, roomInBag } from "../shop/add-to-bag";
+import { addToBag, openBag, useBag } from "../shop/bag-store";
 import { optionSummary } from "./option-summary";
 import { formatAmount, percentOff } from "./product-page";
 
@@ -47,6 +48,12 @@ export interface ShopListingCard {
     listingId?: string;
     /** The option the card's Add to bag adds; null for none. */
     bagVariantId?: string | null;
+    /**
+     * How many of that option can go in the bag, where the product page
+     * would say "Only N left"; null or absent when it isn't counted out.
+     * Add another stops there (UX-058), as the product page's does.
+     */
+    bagLeft?: number | null;
 }
 
 /* The design's card button: the merchant's accent, the site's radius. */
@@ -77,9 +84,22 @@ export default function ShopListing({
 }) {
     const [added, setAdded] = useState<ReadonlySet<string>>(() => new Set());
     const [notice, setNotice] = useState<string | null>(null);
+    const bag = useBag(bagSite ?? "");
+
+    /** How many of the card's option the bag holds now. */
+    function heldOf(p: ShopListingCard): number {
+        const variantId = p.bagVariantId ?? null;
+        return (
+            bag.find(
+                (i) => i.listingId === p.listingId && i.variantId === variantId,
+            )?.quantity ?? 0
+        );
+    }
 
     function add(p: ShopListingCard) {
         if (!bagSite || !p.listingId || p.soldOut) return;
+        // Not past what is left (UX-058), as the product page stops.
+        if (!roomInBag(p.bagLeft, heldOf(p))) return;
         const variantId = p.bagVariantId ?? null;
         const bag = addToBag(bagSite, {
             listingId: p.listingId,
@@ -112,6 +132,12 @@ export default function ShopListing({
                 {products.map((p) => {
                     const amount = formatAmount(p.price, p.currency, locale);
                     const canAdd = Boolean(bagSite && p.listingId);
+                    // Everything left is in the bag already (UX-058).
+                    const allIn =
+                        canAdd &&
+                        !p.soldOut &&
+                        typeof p.bagLeft === "number" &&
+                        !roomInBag(p.bagLeft, heldOf(p));
                     return (
                         <li key={p.slug} className="relative min-w-0">
                             <a
@@ -189,11 +215,14 @@ export default function ShopListing({
                                 <button
                                     type="button"
                                     onClick={() => add(p)}
-                                    disabled={p.soldOut}
+                                    disabled={p.soldOut || allIn}
                                     aria-label={
                                         p.soldOut
                                             ? `${p.name}: sold out`
-                                            : `Add ${p.name} to your bag`
+                                            : allIn &&
+                                                typeof p.bagLeft === "number"
+                                              ? `${p.name}: ${allInBagWords(p.bagLeft).toLowerCase()}`
+                                              : `Add ${p.name} to your bag`
                                     }
                                     className={cn(
                                         cardButton,
@@ -202,9 +231,11 @@ export default function ShopListing({
                                 >
                                     {p.soldOut
                                         ? "Sold out"
-                                        : added.has(p.slug)
-                                          ? "Add another"
-                                          : "Add to bag"}
+                                        : allIn
+                                          ? "In your bag"
+                                          : added.has(p.slug)
+                                            ? "Add another"
+                                            : "Add to bag"}
                                 </button>
                             ) : null}
                         </li>

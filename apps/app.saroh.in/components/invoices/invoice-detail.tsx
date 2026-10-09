@@ -224,7 +224,9 @@ export function InvoiceDetail({
         setViewUrl(res.data.url);
         showSuccess(
             (await copy(res.data.url))
-                ? `Link copied. Send it to ${invoice.who}: it shows the invoice and how to pay you.`
+                ? s === "PAID"
+                    ? `Link copied. Send it to ${invoice.who}: it shows the invoice, paid.`
+                    : `Link copied. Send it to ${invoice.who}: it shows the invoice and how to pay you.`
                 : "Link ready. Copy it from the Payment panel.",
         );
     }
@@ -284,6 +286,25 @@ export function InvoiceDetail({
         refundOrder: { href: orderHref ?? undefined },
     };
     const readOnlyId = useId();
+    /** The link made in this tab, to copy again from the Payment panel. */
+    const linkBox = url ? (
+        <div className="mt-2 flex min-w-0 items-center gap-2">
+            <code className="min-w-0 flex-1 break-all rounded-[7px] bg-muted px-[9px] py-[7px] font-mono text-[12px]">
+                {url}
+            </code>
+            <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={copyShown}
+                aria-label={
+                    urlKind === "view" ? "Copy the link" : "Copy the pay link"
+                }
+            >
+                <Copy aria-hidden className="size-4" />
+            </Button>
+        </div>
+    ) : null;
     const actions = detailActions({
         standing: s,
         credit,
@@ -396,24 +417,7 @@ export function InvoiceDetail({
                             </p>
                         ) : owed ? (
                             url ? (
-                                <div className="mt-2 flex min-w-0 items-center gap-2">
-                                    <code className="min-w-0 flex-1 break-all rounded-[7px] bg-muted px-[9px] py-[7px] font-mono text-[12px]">
-                                        {url}
-                                    </code>
-                                    <Button
-                                        type="button"
-                                        variant="outline"
-                                        size="sm"
-                                        onClick={copyShown}
-                                        aria-label={
-                                            urlKind === "view"
-                                                ? "Copy the link"
-                                                : "Copy the pay link"
-                                        }
-                                    >
-                                        <Copy aria-hidden className="size-4" />
-                                    </Button>
-                                </div>
+                                linkBox
                             ) : !payOnline ? (
                                 <OfflinePayHint
                                     blocker={online?.onlineBlocker ?? null}
@@ -433,6 +437,9 @@ export function InvoiceDetail({
                                     className="mt-2"
                                 />
                             ) : null
+                        ) : url && urlKind === "view" ? (
+                            // A paid one's view link (UX-080), made here.
+                            linkBox
                         ) : null}
                         {owed && sendable && reminding && nextReminderAt ? (
                             <p className="mt-2 text-[12.5px] leading-[1.5] text-muted-foreground">

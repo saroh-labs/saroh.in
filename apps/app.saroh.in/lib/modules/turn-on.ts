@@ -1,6 +1,7 @@
 import { cleanAddressInput } from "@/lib/organizations/address";
 
 import { blockerSentence } from "./blocker-copy";
+import { moduleName } from "./names";
 import { isHiddenByRollout } from "./rollout";
 import type { ModuleView } from "./schema";
 import { listWords } from "./switch-plan";
@@ -24,26 +25,7 @@ import { FALLBACK_SETUP, FULFILMENTS, hasSetup } from "./turn-on-schema";
 
 type Node = Pick<ModuleView, "key" | "lifecycle" | "dependencies" | "blockers">;
 
-/** What each module is called in the app: the rail's words, not the API's. */
-const NAME: Readonly<Partial<Record<string, string>>> = {
-    COMMERCE: "Sell",
-    APPOINTMENTS: "Bookings",
-    CRM: "Contacts",
-    WEBSITE: "Website",
-    PAYMENTS: "Payments",
-    COMMUNICATIONS: "Communications",
-    INSIGHTS: "Insights",
-    COURSES: "Courses",
-    CLASS_PACKS: "Class packs",
-    AUTOMATIONS: "Automations",
-};
-
-export function moduleName(
-    key: string,
-    modules?: readonly { key: string; label?: string }[],
-): string {
-    return NAME[key] ?? modules?.find((m) => m.key === key)?.label ?? key;
-}
+export { moduleName };
 
 /** The two whose minimum is a provider, connected now or later. */
 export const CONNECT_KEYS: ReadonlySet<string> = new Set([

@@ -110,7 +110,7 @@ export function RescheduleBooking({
                     size="sm"
                     className="wk-press"
                 >
-                    Reschedule
+                    Move
                 </Button>
             </DialogTrigger>
             <DialogContent className="max-h-[80vh] overflow-y-auto sm:max-w-lg">

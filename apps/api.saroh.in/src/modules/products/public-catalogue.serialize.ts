@@ -74,6 +74,12 @@ export interface PublicCatalogueCard {
      * every option is sold out).
      */
     bagVariantId: string | null;
+    /**
+     * How many of that option can be sold, only where the product page would
+     * say "Only N left" (LOW); null otherwise. The card's Add another stops
+     * there (UX-058).
+     */
+    bagLeft: number | null;
 }
 
 export interface PublicCatalogue {

@@ -1,5 +1,6 @@
 import { clock } from "@/lib/calendar/layers";
 import { goesToAddress } from "@/lib/orders/lifecycle";
+import { methodLabel } from "@/lib/payments/method-words";
 import type { Review } from "@/lib/product-reviews/service";
 import { dayText, money, shortPrice } from "@/lib/subscriptions/view";
 
@@ -503,15 +504,6 @@ export function crumbsUnderSell(
     return sells && (d.linkedCustomers?.length ?? 0) > 0;
 }
 
-/** A way of paying, in words; online when it wasn't recorded by hand. */
-const PAID_BY: Record<string, string> = {
-    CASH: "Cash",
-    UPI: "UPI",
-    CARD: "Card",
-    BANK_TRANSFER: "Bank transfer",
-    OTHER: "Other",
-};
-
 /**
  * Money in for a booking, in words (UX-049): "Paid ₹800 · Cash", or
  * "Paid · Online" to a viewer who doesn't see the amount. Null while
@@ -519,7 +511,8 @@ const PAID_BY: Record<string, string> = {
  */
 export function paidText(paid: DetailBooking["paid"]): string | null {
     if (!paid) return null;
-    const how = (paid.method && PAID_BY[paid.method]) ?? "Online";
+    // A way of paying, in words; online when it wasn't recorded by hand.
+    const how = methodLabel(paid.method) ?? "Online";
     const amount =
         paid.amount && paid.currency
             ? ` ${money(paid.amount, paid.currency)}`

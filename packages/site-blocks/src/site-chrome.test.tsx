@@ -750,6 +750,18 @@ describe("the site footer's contact line (UX-038)", () => {
         expect(screen.getByText("12 Main Rd, Indiranagar")).toBeInTheDocument();
     });
 
+    it("writes a stored number the way it is read, not as E.164 (#874)", () => {
+        render(
+            <SiteFooter
+                footer={null}
+                name="Pulse Fitness"
+                contact={{ phone: "+919800000000", address: null }}
+            />,
+        );
+        const call = screen.getByRole("link", { name: "Call +91 98000 00000" });
+        expect(call).toHaveAttribute("href", "tel:+919800000000");
+    });
+
     it("shows the business's contact email when it has added one (DEC-101)", () => {
         render(
             <SiteFooter

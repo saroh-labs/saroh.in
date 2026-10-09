@@ -985,7 +985,7 @@ const ORDER_SHOTS: Shot[] = [
                 fill: '[role="dialog"] input[aria-label="PIN code"]',
                 value: "560001",
             },
-            { click: '[role="dialog"] button:text-is("UPI at the counter")' },
+            { click: '[role="dialog"] button:text-is("UPI")' },
         ],
         clip: { selector: '[role="dialog"]' },
         mark: '[role="dialog"] button:has-text("UPI received · create")',

@@ -15,7 +15,7 @@ import { TreatmentVisits } from "@/components/bookings/treatment-visits";
 import { personHref } from "@/lib/contacts/person-href";
 import { formatDayLabel, formatTimeRange } from "@/lib/format/datetime";
 import { formatMoney } from "@/lib/format/money";
-import { formatStatus } from "@/lib/format/status";
+import { bookingStatus } from "@/lib/format/status";
 import {
     deadlineText,
     paidLine,
@@ -277,8 +277,8 @@ export function BookingDetailView({
                         // A missing button with no explanation reads as a bug.
                         <p className="mt-3 text-sm text-muted-foreground">
                             {service.name} is archived, so this booking cannot
-                            be moved. Make the service active again to
-                            reschedule, or cancel the booking.
+                            be moved. Make the service active again to move it,
+                            or cancel the booking.
                         </p>
                     ) : null}
                     {link ? <JoinOnline url={link} /> : null}
@@ -399,7 +399,7 @@ function StatusBadge({ status }: { status: BookingDetail["status"] }) {
                       : "warning"
             }
         >
-            {formatStatus(status)}
+            {bookingStatus(status)}
         </Badge>
     );
 }

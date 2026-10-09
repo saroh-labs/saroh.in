@@ -9,6 +9,7 @@ import { PageContainer } from "@/components/shared/page-container";
 import { CreateStoreForm } from "@/components/stores/create-store-form";
 import { mayAddStorefront } from "@/lib/business-limits";
 import { requireSession } from "@/lib/session";
+import { locationsWord } from "@/lib/stores/pick";
 import {
     getStorefrontAllowance,
     listStorefronts,
@@ -45,8 +46,7 @@ export default async function NewStorefrontPage() {
             <PageHeader
                 breadcrumb={sellCrumbs(
                     {
-                        label:
-                            storefronts.length > 1 ? "Locations" : "Location",
+                        label: locationsWord(storefronts.length),
                         href: "/commerce/locations",
                     },
                     "New location",

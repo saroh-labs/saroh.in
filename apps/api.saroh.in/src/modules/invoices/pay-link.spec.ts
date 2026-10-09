@@ -395,6 +395,44 @@ describe("a view link (#833)", () => {
             service.createViewLink(owner, "inv_1"),
         ).rejects.toBeInstanceOf(ConflictException);
     });
+
+    it("hands over a paid invoice too, so Copy view link stays on it (UX-080)", async () => {
+        db.invoice.findFirst?.mockResolvedValue(
+            row({ status: "PAID", paidAt: new Date("2026-09-02T00:00:00Z") }),
+        );
+        const { token } = await service.createViewLink(owner, "inv_1");
+        expect(db.invoice.updateMany).toHaveBeenCalledWith(
+            expect.objectContaining({
+                where: expect.objectContaining({ status: "PAID" }),
+                data: {
+                    payTokenHash: hashPayToken(token),
+                    payLinkCreatedAt: expect.any(Date),
+                },
+            }),
+        );
+    });
+
+    it("still refuses a void one", async () => {
+        db.invoice.findFirst?.mockResolvedValue(row({ status: "VOID" }));
+        await expect(
+            service.createViewLink(owner, "inv_1"),
+        ).rejects.toBeInstanceOf(ConflictException);
+        expect(db.invoice.updateMany).not.toHaveBeenCalled();
+    });
+
+    it("a paid invoice still gets no pay link, nor Send's link", async () => {
+        db.invoice.findFirst?.mockResolvedValue(
+            row({ status: "PAID", paidAt: new Date("2026-09-02T00:00:00Z") }),
+        );
+        await expect(service.createPayLink(owner, "inv_1")).rejects.toThrow(
+            "This invoice is already paid.",
+        );
+        await expect(
+            service.createPayLinkInTx(prisma as never, owner, "inv_1", {
+                requireProvider: false,
+            }),
+        ).rejects.toBeInstanceOf(ConflictException);
+    });
 });
 
 describe("How to pay us on the read (#833)", () => {

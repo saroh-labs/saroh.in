@@ -69,6 +69,7 @@ export function CatalogueScreen({
     collectionsPanel,
     collectionCount = null,
     meter = null,
+    limitBannerShown = false,
 }: {
     query: ListQuery;
     /** The first page, read on the server. */
@@ -90,6 +91,8 @@ export function CatalogueScreen({
     collectionCount?: number | null;
     /** The plan's product limit, shown before New product (UX-036). */
     meter?: PlanMeter | null;
+    /** The page's limit banner says the limit: the header doesn't (#874). */
+    limitBannerShown?: boolean;
 }) {
     const router = useRouter();
     const [navigating, startNavigation] = useTransition();
@@ -304,6 +307,7 @@ export function CatalogueScreen({
                 storeId={query.storefront}
                 canWrite={canWrite}
                 meter={meter}
+                bannerShown={limitBannerShown}
             />
             <NeedsYou
                 needs={data.needs}

@@ -166,9 +166,22 @@ export function detailActions(s: DetailActionState): DetailAction[] {
                   },
               ]
             : [];
+    // A paid invoice keeps its view link (UX-080): the customer's copy,
+    // paid, for the merchant to hand over. An order's paper is the order's.
+    const paidView: DetailAction[] =
+        s.canWrite && s.standing === "PAID" && !s.credit && !s.fromOrder
+            ? [
+                  {
+                      id: "copyViewLink",
+                      label: s.linkBusy ? "Making a link…" : "Copy view link",
+                      disabled: s.linkBusy,
+                  },
+              ]
+            : [];
     const actions: DetailAction[] = [
         ...locked,
         { id: "print", label: "Print", primary: true },
+        ...paidView,
         ...pdf,
     ];
     if (s.canWrite && s.standing === "PAID" && !s.credit) {

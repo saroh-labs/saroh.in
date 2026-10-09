@@ -8,7 +8,9 @@ import { listInvitations, listMembers } from "@/lib/members/service";
 import { resolveActiveOrganization } from "@/lib/organizations/service";
 import { requireSession } from "@/lib/session";
 import { storefrontHref } from "@/lib/stores/links";
+import { locationsWord } from "@/lib/stores/pick";
 import { getStore } from "@/lib/stores/service";
+import { listStorefronts } from "@/lib/stores/storefronts";
 
 export const metadata = { title: "Location people" };
 
@@ -26,7 +28,13 @@ export default async function StorefrontPeoplePage({
 }) {
     const { storeId } = await params;
     const session = await requireSession();
-    const store = await getStore(storeId);
+    const [store, count] = await Promise.all([
+        getStore(storeId),
+        // The crumb is named by the count, as the rail is (UX-078).
+        listStorefronts()
+            .then((all) => all.length)
+            .catch(() => null),
+    ]);
     if (!store) notFound();
 
     const [members, invitations, organization] = await Promise.all([
@@ -50,7 +58,10 @@ export default async function StorefrontPeoplePage({
         <PageContainer width="form">
             <PageHeader
                 breadcrumb={sellCrumbs(
-                    { label: "Location", href: "/commerce/locations" },
+                    {
+                        label: locationsWord(count),
+                        href: "/commerce/locations",
+                    },
                     { label: store.name, href: storefrontHref(store.id) },
                     "People",
                 )}

@@ -9,10 +9,24 @@ import {
     includedText,
     planHeader,
     priceChangesText,
+    subscribeHref,
     subscriberRows,
     subscribersEmptyText,
 } from "./plan-detail";
 import type { Plan, PlanEvent, PlanEventsPage, Subscription } from "./service";
+
+describe("subscribeHref (UX-080)", () => {
+    it("opens Subscribe someone on this plan, from its page", () => {
+        expect(subscribeHref({ id: "p1", status: "ACTIVE" })).toBe(
+            "/billing/subscriptions?subscribe=1&plan=p1",
+        );
+    });
+
+    it("offers none for a plan nobody can join", () => {
+        expect(subscribeHref({ id: "p1", status: "DRAFT" })).toBeNull();
+        expect(subscribeHref({ id: "p1", status: "ARCHIVED" })).toBeNull();
+    });
+});
 
 const NOW = new Date("2026-09-18T06:30:00Z");
 const TZ = "Asia/Kolkata";

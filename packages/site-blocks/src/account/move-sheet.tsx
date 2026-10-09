@@ -5,6 +5,7 @@ import { useEffect, useId, useState } from "react";
 import { destructiveAlertClasses } from "../alert";
 import { OneToOne } from "../booking-flow/steps/one-to-one";
 import { accentTint, focusRing } from "../booking-flow/styles";
+import { phoneText } from "../lib/phone";
 import { cn } from "../lib/utils";
 import type { TimesResult } from "./bookings-api";
 import { OFFLINE } from "./bookings-api";
@@ -257,7 +258,7 @@ export function CallSheet({
                         "flex items-center justify-center",
                     )}
                 >
-                    Call {phone}
+                    Call {phoneText(phone)}
                 </a>
             ) : (
                 <button

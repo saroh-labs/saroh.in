@@ -34,7 +34,13 @@ const FALLBACK_ZONE = "Asia/Kolkata";
 export default async function SubscriptionsPage({
     searchParams,
 }: {
-    searchParams: Promise<{ tab?: string; view?: string; subscribe?: string }>;
+    searchParams: Promise<{
+        tab?: string;
+        view?: string;
+        subscribe?: string;
+        /** The plan Subscribe someone opens on, from a plan's page. */
+        plan?: string;
+    }>;
 }) {
     await requireSession();
     const [organization, params] = await Promise.all([
@@ -105,6 +111,7 @@ export default async function SubscriptionsPage({
                 canWrite={canWrite}
                 initialTab={screenTabFromQuery(params.tab ?? params.view)}
                 openSubscribe={canWrite && params.subscribe === "1"}
+                subscribePlanId={params.plan}
                 nowIso={now.toISOString()}
                 settings={settings}
                 autopayOffered={autopay?.offered ?? false}

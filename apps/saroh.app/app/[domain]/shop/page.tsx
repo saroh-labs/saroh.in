@@ -93,13 +93,17 @@ export default async function ShopPage({
     if (route.draw === "unavailable") {
         return <ModulePageUnavailable business={snapshot.site.name} />;
     }
+    // The page's main landmark (UX-082), as the product page has: the
+    // header and footer sit outside it.
     if (route.draw === "page") {
         return (
-            <PublishedPage
-                page={route.page}
-                snapshot={snapshot}
-                siteId={siteId}
-            />
+            <main className="w-full">
+                <PublishedPage
+                    page={route.page}
+                    snapshot={snapshot}
+                    siteId={siteId}
+                />
+            </main>
         );
     }
 
@@ -119,9 +123,11 @@ export default async function ShopPage({
     // online orders now; otherwise the cards open the product, whose page
     // offers "Ask about ordering".
     return (
-        <ShopListing
-            products={lookup.data.products}
-            bagSite={checkout?.canOrder ? siteId : null}
-        />
+        <main className="w-full">
+            <ShopListing
+                products={lookup.data.products}
+                bagSite={checkout?.canOrder ? siteId : null}
+            />
+        </main>
     );
 }

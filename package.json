@@ -12,6 +12,7 @@
         "check:migration-ids": "node scripts/check-migration-ids.mjs",
         "check:mktemp": "node scripts/check-mktemp.mjs",
         "check:routes": "node scripts/check-app-routes.mjs",
+        "check:words": "node scripts/check-words.mjs",
         "prepush": "bash scripts/prepush.sh",
         "db:migrate:deploy": "turbo run db:migrate:deploy",
         "db:push": "turbo run db:push",

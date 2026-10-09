@@ -269,7 +269,7 @@ describe("Track", () => {
                 ok: true,
                 order: {
                     ...DETAIL,
-                    fulfilment: "Appointment, in person",
+                    fulfilment: "Booking, in person",
                     lines: [
                         {
                             name: "Root canal",

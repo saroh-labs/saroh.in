@@ -1,12 +1,15 @@
 import { act, render, screen } from "@testing-library/react";
+import * as React from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
     edgeMask,
     overflowEdges,
     resetScrollHintForTests,
+    revealOffset,
     SCROLL_HINT_KEY,
     ScrollX,
+    useEdgeFade,
 } from "./scroll-x";
 
 /**
@@ -53,6 +56,81 @@ describe("edgeMask", () => {
         const mask = edgeMask({ left: false, right: true });
         expect(mask).toMatch(/^linear-gradient\(to right, #000,/);
         expect(mask).toMatch(/transparent\)$/);
+    });
+});
+
+describe("revealOffset (UX-079)", () => {
+    const strip = { scrollLeft: 0, clientWidth: 300 };
+
+    it("leaves a tab already in view where it is", () => {
+        expect(revealOffset(strip, { offsetLeft: 100, offsetWidth: 80 })).toBe(
+            null,
+        );
+    });
+
+    it("scrolls a tab past the right edge in, with room for the fade", () => {
+        expect(revealOffset(strip, { offsetLeft: 400, offsetWidth: 80 })).toBe(
+            400 + 80 + 28 - 300,
+        );
+    });
+
+    it("scrolls back to a tab hidden on the left, never before the start", () => {
+        expect(
+            revealOffset(
+                { scrollLeft: 200, clientWidth: 300 },
+                { offsetLeft: 10, offsetWidth: 80 },
+            ),
+        ).toBe(0);
+        expect(
+            revealOffset(
+                { scrollLeft: 300, clientWidth: 300 },
+                { offsetLeft: 150, offsetWidth: 80 },
+            ),
+        ).toBe(122);
+    });
+});
+
+function Strip({ current }: { current?: string }) {
+    const ref = React.useRef<HTMLDivElement>(null);
+    const style = useEdgeFade(ref, { current: '[aria-current="page"]' });
+    return (
+        <div ref={ref} data-testid="strip" style={style}>
+            <a href="/a">A</a>
+            <a href="/b" aria-current={current === "b" ? "page" : undefined}>
+                B
+            </a>
+        </div>
+    );
+}
+
+describe("useEdgeFade (UX-079)", () => {
+    afterEach(() => vi.restoreAllMocks());
+
+    it("fades a strip that runs off the screen, and not one that fits", () => {
+        sizes(900, 300);
+        const { unmount } = render(<Strip />);
+        expect(screen.getByTestId("strip").style.maskImage).toContain(
+            "transparent",
+        );
+        unmount();
+        vi.restoreAllMocks();
+        sizes(300, 300);
+        render(<Strip />);
+        expect(screen.getByTestId("strip").style.maskImage).toBe("");
+    });
+
+    it("brings the open tab into view", () => {
+        sizes(900, 300);
+        vi.spyOn(HTMLElement.prototype, "offsetLeft", "get").mockReturnValue(
+            600,
+        );
+        vi.spyOn(HTMLElement.prototype, "offsetWidth", "get").mockReturnValue(
+            80,
+        );
+        render(<Strip current="b" />);
+        expect(screen.getByTestId("strip").scrollLeft).toBe(
+            600 + 80 + 28 - 300,
+        );
     });
 });
 

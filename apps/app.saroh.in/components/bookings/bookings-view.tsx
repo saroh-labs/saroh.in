@@ -16,7 +16,7 @@ import { personHref } from "@/lib/contacts/person-href";
 import { formatDayHeading, formatTimeRange } from "@/lib/format/datetime";
 // From ./booking-state, NOT ./service: this is a client component, and the
 // service module reaches next/headers through the CRM HTTP plumbing.
-import { formatStatus } from "@/lib/format/status";
+import { bookingStatus } from "@/lib/format/status";
 import {
     hasEnded,
     isInNextWeek,
@@ -67,8 +67,8 @@ const FILTERS: DataFilter<BookingWithService>[] = [
     },
     {
         id: "unconfirmed",
-        label: "Unconfirmed",
-        predicate: (b) => b.status !== "CONFIRMED",
+        label: "To confirm",
+        predicate: (b) => b.status === "PENDING",
     },
 ];
 
@@ -213,7 +213,7 @@ export function BookingsView({
                               : "warning"
                     }
                 >
-                    {formatStatus(b.status)}
+                    {bookingStatus(b.status)}
                 </Badge>
             ),
         },

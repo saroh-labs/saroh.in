@@ -57,7 +57,7 @@ const message = {
     organizationId: "org_1",
     channel: "EMAIL",
     toAddress: "asha@example.com",
-    subject: "Your booking with Rye is confirmed",
+    subject: "You're booked with Rye",
     body: "<p>Hi Asha,</p>",
 };
 

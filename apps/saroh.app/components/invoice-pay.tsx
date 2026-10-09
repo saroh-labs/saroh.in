@@ -6,6 +6,7 @@ import {
     hasPayInstructions,
     PayInstructionsCard,
     payWaysText,
+    phoneText,
 } from "@saroh/site-blocks";
 import { cn } from "@saroh/ui/lib/utils";
 import { useRouter } from "next/navigation";
@@ -442,7 +443,7 @@ export function ContactToPay({
                             href={`tel:${contact.phone}`}
                             className="text-site-accent underline underline-offset-2"
                         >
-                            {contact.phone}
+                            {phoneText(contact.phone)}
                         </a>
                     </li>
                 ) : null}

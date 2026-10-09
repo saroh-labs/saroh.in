@@ -218,6 +218,39 @@ describe("a new order", () => {
         });
     });
 
+    it("an order the team took rings no bell, for the one who took it or anyone (#874)", async () => {
+        const tx = makeTx();
+        counterOrder(tx);
+        tx.notificationPreference.findMany.mockResolvedValue([
+            {
+                userId: "u_kitchen",
+                event: "order",
+                channel: "email",
+                enabled: true,
+            },
+        ]);
+        const out = await tellTeam(asTx(tx), ORG, {
+            event: "order",
+            orderId: "ord_1",
+            actorUserId: "u_owner",
+        });
+        expect(out.told).toBe(true);
+        expect(tx.notification.create).not.toHaveBeenCalled();
+        // Claimed once all the same, and emailed as chosen.
+        expect(tx.customerNotice.createMany).toHaveBeenCalled();
+        expect(recipients(out)).toEqual(["u_kitchen"]);
+    });
+
+    it("a website order still rings the bell", async () => {
+        const tx = makeTx();
+        await tellTeam(asTx(tx), ORG, {
+            event: "order",
+            orderId: "ord_1",
+            actorUserId: null,
+        });
+        expect(tx.notification.create).toHaveBeenCalled();
+    });
+
     it("an online checkout never paid is not an order: nothing is said", async () => {
         const tx = makeTx();
         tx.order.findFirst.mockResolvedValue({

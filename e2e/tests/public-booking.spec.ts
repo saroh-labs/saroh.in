@@ -66,7 +66,7 @@ async function pickTime(
     const fromEnd = 1 + slot + (phone ? 4 : 0);
     await page.goto(`${SITE}/book`);
     await expect(
-        page.getByRole("heading", { name: "Book your appointment" }),
+        page.getByRole("heading", { name: "Make a booking" }),
     ).toBeVisible();
     const daysRead = page.waitForRequest((r) =>
         /\/public\/services\/[^/]+\/days$/.test(new URL(r.url()).pathname),

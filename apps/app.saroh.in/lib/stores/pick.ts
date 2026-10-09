@@ -14,3 +14,12 @@ export function pickStorefront<T extends { id: string }>(
         (stores.length === 1 ? stores[0] : undefined)
     );
 }
+
+/**
+ * Sell's row for its locations, named by how many there are: "Location"
+ * for one (or none), "Locations" for several. The rail, the page's title
+ * and every breadcrumb say the same (DEC-069, `saroh-product.md`).
+ */
+export function locationsWord(count: number | null | undefined): string {
+    return (count ?? 0) > 1 ? "Locations" : "Location";
+}

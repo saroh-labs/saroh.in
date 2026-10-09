@@ -72,7 +72,7 @@ export default async function WebsiteTabsLayout({
     ).map((s) => ({
         id: s.id,
         name: s.name.trim() || "Untitled site",
-        state: siteState(s, { domainState: site.can.edit }),
+        state: siteState(s, { domainState: site.can.manageDomain }),
     }));
 
     return (
@@ -88,7 +88,7 @@ export default async function WebsiteTabsLayout({
                         state: siteState(
                             sites.find((s) => s.id === site.id) ?? site,
                             // Domain state only for whoever can fix it.
-                            { domainState: site.can.edit },
+                            { domainState: site.can.manageDomain },
                         ),
                     }}
                     sites={summaries}
