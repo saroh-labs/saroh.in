@@ -33,7 +33,6 @@ name: Build and deploy apps on Cloudflare
 run-name: >-
     ${{ github.event_name == 'workflow_dispatch'
     && format('Deploy {0} to {1}', inputs.app, inputs.environment)
-    || github.event_name == 'schedule' && 'Nightly marketing site build'
     || github.event.head_commit.message }}
 
 on:
@@ -42,9 +41,6 @@ on:
         paths-ignore:
             - "docs/**"
             - "**/*.md"
-    schedule:
-        # 18:30 UTC is 00:00 IST.
-        - cron: "30 18 * * *"
     workflow_dispatch:
         inputs:
             app:
@@ -78,7 +74,7 @@ jobs:
         steps:
             - uses: actions/checkout@v4
               with:
-                  ref: ${{ github.event_name == 'schedule' && 'main' || github.ref }}
+                  ref: ${{ github.ref }}
             - uses: ./.github/actions/setup
               with:
                   prisma: "false"
@@ -93,11 +89,6 @@ jobs:
                   ref_of() { [ "$1" = production ] && echo main || echo development; }
                   with_ref() { jq -c --arg r "$(ref_of "$1")" 'map(. + {ref: $r})'; }
                   case "$EVENT" in
-                    schedule)
-                      # Same fingerprint as yesterday, but today's date: always build.
-                      prod=$(FORCE=1 node scripts/cf-plan.mjs production web | with_ref production)
-                      dev=$(FORCE=1 node scripts/cf-plan.mjs development web | with_ref development)
-                      json=$(jq -c -n --argjson a "$prod" --argjson b "$dev" '$a + $b') ;;
                     workflow_dispatch)
                       only=$([ "$INPUT_APP" = all ] && echo "" || echo "$INPUT_APP")
                       json=$(FORCE=1 node scripts/cf-plan.mjs "$INPUT_ENV" "$only" | with_ref "$INPUT_ENV") ;;
