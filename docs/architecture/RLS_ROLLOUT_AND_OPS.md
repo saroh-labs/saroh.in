@@ -252,14 +252,15 @@ lost.
 
 ## 4. Enablement log
 
-Runtime role name: `saroh_runtime`. Production's existing owner role is
-already called `saroh_app`, so §1's example name can't be reused there.
+Runtime role name on development: `saroh_runtime`. Check §1's example name
+against production's existing roles before reusing it there; pick one that
+doesn't clash with the owner.
 Pre-flight 2b on development also lists five platform-wide tables beyond the
 allow-list above, each correctly not org-scoped: `PricingCatalogDraft`,
 `PricingCatalogVersion`, `PricingCoupon`, `PricingProviderPlan`,
 `SarohInvoiceSequence`.
 
-| Date | Environment | Pre-flight 2c (NULL-org rows) | Probe (step 3) | Smoke (step 5) | By  |
-| ---- | ----------- | ----------------------------- | -------------- | -------------- | --- |
-| 2026-10-09 | development | 0 in all four tables | real org: own 500 of 667 orders, 10 modules; bogus org: 0 Order, SavedView, ApiKey; no context: 667 | read-only pass: Home, Sell (orders, customers, location), Bookings, Contacts, Website, Settings › Team, business switch, public site. Writes on Northwind: product edit and back, a Reviewer invitation sent and cancelled, a public enquiry, Website › Sells from saved, the shop and bag, booking times. Booking and checkout stop at customer sign-in (emailed code), not exercised. 0 RLS/P2028/pool errors in logs | Claude + owner |
-| —    | production  | not run                       | not run        | not run        |     |
+| Date       | Environment | Pre-flight 2c (NULL-org rows) | Probe (step 3)                                                                                      | Smoke (step 5)                                                                                                                                                                                                                                                                                                                                                                                                          | By             |
+| ---------- | ----------- | ----------------------------- | --------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------- |
+| 2026-10-09 | development | 0 in all four tables          | real org: own 500 of 667 orders, 10 modules; bogus org: 0 Order, SavedView, ApiKey; no context: 667 | read-only pass: Home, Sell (orders, customers, location), Bookings, Contacts, Website, Settings › Team, business switch, public site. Writes on Northwind: product edit and back, a Reviewer invitation sent and cancelled, a public enquiry, Website › Sells from saved, the shop and bag, booking times. Booking and checkout stop at customer sign-in (emailed code), not exercised. 0 RLS/P2028/pool errors in logs | Claude + owner |
+| —          | production  | not run                       | not run                                                                                             | not run                                                                                                                                                                                                                                                                                                                                                                                                                 |                |
