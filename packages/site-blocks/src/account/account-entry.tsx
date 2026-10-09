@@ -14,9 +14,10 @@ import { SignInSheet } from "./sign-in-sheet";
 /**
  * The site header's account entry (round-2 plan A, A5; the Customer Site
  * design's header): "Sign in" for a visitor, which opens the sign-in sheet
- * and lands on the account; the signed-in customer's initials, which open
- * it. The header's `account` slot (G17) draws it on every page of the site
- * while the account area is switched on. On the account's own sign-in
+ * and lands on the account; the signed-in customer's initials and "My
+ * account" (the words from 640px up), which open it. The header's
+ * `account` slot (G17) draws it on every page of the site while the
+ * account area is switched on. On the account's own sign-in
  * prompt ("page") a sign-in stays on the page that asked for it (UX-052).
  *
  * The sheet's options (the business's phone, whether a challenge is likely)
@@ -45,16 +46,24 @@ export function AccountEntry({
 
     if (customer) {
         return (
+            // The initials alone were easy to miss as the way back to the
+            // account: wider screens name it beside them; a phone keeps the
+            // badge, and the name stays for a screen reader.
             <Link
                 href="/account"
-                aria-label="My account"
                 title="My account"
                 className={cn(
-                    "bg-site-fg text-site-bg inline-flex size-[38px] shrink-0 cursor-pointer items-center justify-center rounded-full text-xs font-bold hover:opacity-85 active:opacity-70",
+                    "text-site-fg inline-flex h-[38px] shrink-0 cursor-pointer items-center gap-2 whitespace-nowrap rounded-full text-sm font-semibold hover:bg-[color-mix(in_srgb,hsl(var(--site-fg))_6%,transparent)] active:opacity-70 sm:pr-3",
                     focusRing,
                 )}
             >
-                {initials(customer.name, customer.email)}
+                <span
+                    aria-hidden
+                    className="bg-site-fg text-site-bg inline-flex size-[38px] shrink-0 items-center justify-center rounded-full text-xs font-bold"
+                >
+                    {initials(customer.name, customer.email)}
+                </span>
+                <span className="sr-only sm:not-sr-only">My account</span>
             </Link>
         );
     }

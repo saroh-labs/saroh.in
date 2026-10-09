@@ -94,6 +94,22 @@ describe("SiteNav", () => {
         expect(screen.queryByRole("link", { name: "Pricing" })).toBeNull();
     });
 
+    it("draws no Sign in before launch: accounts.saroh.in is closed until then", () => {
+        render(<SiteNav />);
+        expect(screen.queryByRole("link", { name: "Sign in" })).toBeNull();
+    });
+
+    it("draws Sign in once the launch switch is open", () => {
+        launch.mode = "open";
+        render(<SiteNav />);
+        expect(
+            screen
+                .getAllByRole("link", { name: "Sign in" })[0]
+                .getAttribute("href"),
+        ).toMatch(/\/login$/);
+        launch.mode = "waitlist";
+    });
+
     it("Features opens a menu of eight, focused on the first", () => {
         render(<SiteNav />);
         const chevron = () =>

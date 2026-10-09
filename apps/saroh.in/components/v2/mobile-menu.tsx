@@ -20,7 +20,7 @@ const ROW =
  * The phone nav (below 760px, Nav design): the start button and a Menu
  * button that opens a full-screen sheet with Features, Solutions and (when
  * any page is live) Resources as accordions — the section the page is in
- * starts open — then Pricing (once the launch switch is open), Sign in
+ * starts open — then Pricing and Sign in (once the launch switch is open)
  * and the start button. Esc or × closes it and returns focus to Menu; while
  * it is open, focus stays inside.
  */
@@ -167,9 +167,11 @@ function Sheet({
                     Pricing
                 </Link>
             ) : null}
-            <a href={SIGN_IN_URL} className={ROW}>
-                Sign in
-            </a>
+            {LAUNCH_MODE === "open" ? (
+                <a href={SIGN_IN_URL} className={ROW}>
+                    Sign in
+                </a>
+            ) : null}
             <CtaLink
                 src="nav-sheet"
                 onNavigate={onClose}
