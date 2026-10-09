@@ -72,6 +72,13 @@ handler where routes must survive the module being switched off.
 source of truth for which routes are gated and which must never be — a new
 controller in a gated domain gets the decorator and an entry in that spec.
 
+A read of records already made (orders, bookings, customers) is history: put
+`@RequireModule` on the controller's write handlers, never on the class, so
+switching the module off hides the screens but keeps the history readable
+(`history-reads.gate.spec.ts`). Before turning enforcement on, run
+`MODULE_ENFORCEMENT=shadow` and read the `module_enforcement_would_refuse`
+lines (`runbooks/MODULE_ROLLOUT.md`, step 3).
+
 ## Gating a surface
 
 `ModuleGate` at a section's `layout.tsx`, so a deep link to a detail page is

@@ -276,9 +276,13 @@ what the API allows.
   plan entitlement, an invitation sent to someone else.
 - **Current** — **Gate on the server first** (§21, §29). A hidden nav item is a
   usability aid. `ModuleEnforcementGuard` covers 19 controllers across all eight
-  modules and stays dark until `MODULE_ENFORCEMENT` is set;
+  modules and stays dark until `MODULE_ENFORCEMENT` is set (`shadow` logs
+  what it would refuse, refusing nothing);
   `module-annotations.spec.ts` pins what is gated and what must never be
   (refunds, consent withdrawal, public checkout, published sites, webhooks).
+  History reads in a gated domain (orders, store customers, bookings) are left
+  off and their writes gated per handler, so a module switched off keeps its
+  records readable (#117, `history-reads.gate.spec.ts`).
 - **Current** (DEC-070) — **What is being set up never decides access.**
   `Organization.kind` (BUSINESS, SOLO, WORK) picks words and defaults only.
   It is served on the `org:read` summary and the organization list, changed

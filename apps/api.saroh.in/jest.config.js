@@ -76,6 +76,12 @@ module.exports = {
         "<rootDir>/src/modules/capabilities/setup/module-setup.parse.spec.ts",
         // #117 dark module-enforcement guard (mocked reflector + availability).
         "<rootDir>/src/modules/capabilities/module-enforcement.guard.spec.ts",
+        // #117: the guard's shadow/refused log lines and their throttle, the
+        // history reads that stay open with a module off, and the source
+        // scan of what is gated — no database.
+        "<rootDir>/src/modules/capabilities/module-enforcement.log.spec.ts",
+        "<rootDir>/src/modules/capabilities/history-reads.gate.spec.ts",
+        "<rootDir>/src/modules/capabilities/module-annotations.spec.ts",
         // #274 the same guard with the REAL availability service, per role:
         // which roles reach which module under MODULE_ENFORCEMENT (mocked I/O).
         "<rootDir>/src/modules/capabilities/module-enforcement.roles.spec.ts",
