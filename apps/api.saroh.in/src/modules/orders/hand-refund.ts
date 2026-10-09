@@ -105,6 +105,49 @@ export async function readLeftToRefundInTx(
 }
 
 /**
+ * An online refund never hands back more than is left on the ORDER (#865,
+ * DEC-116): its payments' own balances don't know what went back by hand,
+ * so the refund core checks this too, under the order's row lock it holds,
+ * in the same transaction that creates the refund rows. "At most ₹X can be
+ * refunded." in the online "another amount"'s words. Nothing to check
+ * without the order.
+ */
+export async function assertWithinOrderLeftInTx(
+    tx: Pick<Tx, "order" | "paymentIntent">,
+    orderId: string,
+    amountCents: number,
+    currency: string,
+): Promise<void> {
+    const [order, paid] = await Promise.all([
+        tx.order.findUnique({
+            where: { id: orderId },
+            select: {
+                total: true,
+                paymentStatus: true,
+                paidByHand: true,
+                refundedByHand: true,
+            },
+        }),
+        tx.paymentIntent.findMany({
+            where: { ...orderMoneyIntents(orderId), status: "SUCCEEDED" },
+            select: {
+                amountCents: true,
+                refunds: {
+                    where: { status: { not: "FAILED" } },
+                    select: { amountCents: true },
+                },
+            },
+        }),
+    ]);
+    if (!order) return;
+    capGoodwill(
+        amountCents,
+        leftToRefundCents({ ...order, paymentIntents: paid }),
+        currency,
+    );
+}
+
+/**
  * Writes a refund by hand the caller has planned and, for a full one,
  * already moved to REFUNDED: the credit note (the rest of the invoice, or
  * this amount spread over its lines), what was handed back on the order,

@@ -349,7 +349,12 @@ missing: ["address", "gstin"] }` in merchant words, before anything is
   how it went back. `refundedByHand` counts in the order read's `refunded`
   and `leftToRefund`, the list's PARTLY_REFUNDED, and `orderRefundedSql`
   (Spent and takings); Home's "taken" reads the credit note. An online
-  refund's cap does not read it yet.
+  refund (by line, everything left, or another amount) is capped by it
+  too: after its per-payment split, the refund core calls
+  `assertWithinOrderLeftInTx` under the same order lock and transaction
+  that create the refund rows, and refuses more than the order has left
+  ("At most ₹X can be refunded."). An edit's difference (`forEdit`) is
+  not checked: it is the order costing less.
 - **One lock order, every flow:** Order → StockLevel rows (sorted by id,
   `lockStockLevels`) → PaymentRefund → payment intent → Invoice → Booking.
   A status change (cancel, fulfil), the kitchen, an edit, a refund request

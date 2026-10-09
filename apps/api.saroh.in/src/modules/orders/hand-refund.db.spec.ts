@@ -6,6 +6,8 @@
  * PAID with what went back kept on it, says so on the timeline, and comes
  * off Home's "taken", Spent and takings. More than is left is refused; the
  * rest, recorded in full, makes the order REFUNDED and credits the rest.
+ * An online refund afterwards is capped at what is left on the order, not
+ * only at its payment's own balance.
  *
  * Runs in the integration project (TEST_DATABASE_URL).
  */
@@ -19,13 +21,24 @@ jest.mock("../../env", () => ({
 
 import { ConflictException } from "@nestjs/common";
 import { prisma } from "@saroh/database";
+import { createHmac } from "node:crypto";
 
 import { giveBusinessDetails } from "../../../test/business-details";
 import { orderRefundedSql } from "../customer-workspace/spent.sql";
 import type { FeatureFlagService } from "../feature-flags/feature-flags.service";
 import { refundedBetweenWhere } from "../invoices/invoice-state";
+import { PaymentsService } from "../payments/payments.service";
+import {
+    FakeMerchantProvider,
+    FakeProviderFactory,
+} from "../payments/providers/fake.provider";
 import { ProductsService } from "../products/products.service";
 import { StoresService } from "../stores/stores.service";
+import {
+    FakeWebhookProvider,
+    FakeWebhookProviderFactory,
+} from "../webhooks/providers/fake.webhook";
+import { WebhooksService } from "../webhooks/webhooks.service";
 import type { CreateOrderDto } from "./dto";
 import { readLeftToRefundInTx } from "./hand-refund";
 import { OrdersService } from "./orders.service";
@@ -37,6 +50,17 @@ const flags = {
 const stores = new StoresService(flags);
 const products = new ProductsService(stores);
 const orders = new OrdersService(stores);
+const payments = new PaymentsService(
+    new FakeProviderFactory(new FakeMerchantProvider("RAZORPAY")),
+);
+const webhooks = new WebhooksService(
+    new FakeWebhookProviderFactory(new FakeWebhookProvider("RAZORPAY")),
+    payments,
+);
+const WEBHOOK_SECRET = "whsec_o865_test";
+let customerId = "";
+let eventSeq = 0;
+let orderSeq = 0;
 
 let orgId = "";
 let ownerId = "";
@@ -107,7 +131,68 @@ beforeAll(async () => {
             hsnCode: "19059020",
         })
     ).id;
+    customerId = (
+        await prisma.customer.create({
+            data: {
+                storeId,
+                organizationId: orgId,
+                email: `o865-buyer-${tag}@example.com`,
+                firstName: "Asha",
+            },
+        })
+    ).id;
+    await payments.connectProvider(
+        { organizationId: orgId, userId: ownerId, role: "OWNER" },
+        {
+            provider: "RAZORPAY",
+            publicKey: "rzp_test_Public1",
+            keyId: "rzp_test_Public1",
+            keySecret: "rzp_secret",
+            webhookSecret: WEBHOOK_SECRET,
+        },
+    );
 });
+
+/** A loaf and a croissant, ₹298, paid online through the payment webhook. */
+async function paidOnline(): Promise<string> {
+    orderSeq += 1;
+    eventSeq += 1;
+    const order = await orders.create(storeId, ownerId, {
+        customerId,
+        items: [
+            { productId: bread, quantity: 1 },
+            { productId: pastry, quantity: 1 },
+        ],
+        fulfilment: "PICKUP",
+    } as CreateOrderDto);
+    const ref = `o865_${orderSeq}_${tag}`;
+    await prisma.paymentIntent.create({
+        data: {
+            organizationId: orgId,
+            orderId: order.id,
+            provider: "RAZORPAY",
+            providerIntentId: `prov_${ref}`,
+            amountCents: 29_800,
+            currency: "INR",
+            status: "REQUIRES_PAYMENT",
+        },
+    });
+    const raw = Buffer.from(
+        JSON.stringify({
+            providerEventId: `evt_o865_${eventSeq}_${tag}`,
+            eventType: "payment.captured",
+            outcome: "SUCCEEDED",
+            providerIntentId: `prov_${ref}`,
+            providerPaymentRef: `pay_${ref}`,
+        }),
+    );
+    await webhooks.handle("razorpay", orgId, raw, {
+        "x-fake-signature": createHmac("sha256", WEBHOOK_SECRET)
+            .update(raw)
+            .digest("hex"),
+    });
+    return order.id;
+}
 
 /** A loaf and a croissant, ₹298, paid in cash at the counter. */
 const paidOrder = () =>
@@ -260,5 +345,54 @@ describe("a refund recorded by hand, in part (#865)", () => {
                 refundAmount: "1",
             }),
         ).rejects.toThrow("Nothing is left to refund on this order.");
+    });
+});
+
+describe("an online refund after part was refunded by hand (#865)", () => {
+    const owner = () => ({
+        organizationId: orgId,
+        userId: ownerId,
+        role: "OWNER" as const,
+    });
+
+    it("is capped at what is left on the order, not the payment's balance", async () => {
+        const orderId = await paidOnline();
+        expect(
+            (await prisma.order.findUniqueOrThrow({ where: { id: orderId } }))
+                .paymentStatus,
+        ).toBe("PAID");
+        // ₹100 handed back in cash first.
+        await orders.updateStatus(storeId, orderId, ownerId, {
+            paymentStatus: "REFUNDED",
+            refundedHow: "CASH",
+            refundAmount: "100",
+        });
+
+        // The payment's whole balance (₹298) is more than is left: refused,
+        // by line (everything left) and as another amount.
+        await expect(payments.initiateRefund(owner(), orderId)).rejects.toThrow(
+            new ConflictException("At most ₹198 can be refunded."),
+        );
+        await expect(
+            payments.initiateRefund(owner(), orderId, {
+                kind: "goodwill",
+                amountCents: 29_800,
+                reason: "Late",
+            }),
+        ).rejects.toThrow("At most ₹198 can be refunded.");
+        expect(
+            await prisma.paymentRefund.count({
+                where: { paymentIntent: { orderId } },
+            }),
+        ).toBe(0);
+
+        // What is left goes.
+        const refund = await payments.initiateRefund(owner(), orderId, {
+            kind: "goodwill",
+            amountCents: 19_800,
+            reason: "Late",
+        });
+        expect(refund.amountCents).toBe(19_800);
+        expect((await leftOf(orderId)).leftCents).toBe(0);
     });
 });
