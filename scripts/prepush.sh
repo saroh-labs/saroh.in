@@ -820,6 +820,7 @@ bg_step routes pnpm run check:routes
 bg_step catalog-lock pnpm run check:catalog-lock
 bg_step edge-headers pnpm run check:edge-headers
 bg_step security-headers pnpm run check:security-headers
+bg_step deploy-env pnpm run check:deploy-env
 bg_step blocks pnpm run check:blocks
 bg_step cycles pnpm run check:cycles
 bg_step e2e-covers pnpm run check:e2e-covers

@@ -35,10 +35,14 @@ waitlist join for two days (DEV_LEARNINGS). So:
   build (`VERCEL_GIT_COMMIT_REF`) is the dev environment and needs the same,
   plus the dev environment's own (below). Other previews keep their fallbacks
   on purpose (plan 2026-10-05-001 KTD-3). The two variables keep the names
-  Vercel gave them (DEC-107): the `wrangler.jsonc` of saroh.in, app, accounts
-  and admin sets them, and the deploy workflow builds with them. The merchant
-  sites' `wrangler.jsonc` sets neither, so saroh.app's checks on them don't
-  run on its Worker.
+  Vercel gave them (DEC-107): every app's `wrangler.jsonc` sets them
+  (`production`/`main` in `env.production.vars`, `preview`/`development` at
+  the top), plus `NEXT_PUBLIC_VERCEL_ENV` where the app's `env.ts` reads it,
+  and the deploy workflow builds with them. `pnpm run check:deploy-env`
+  (prepush and CI) fails when a marker is missing, and loads each
+  next.config with exactly what its deploy build gets (the wrangler vars and
+  the workflow's secrets) to prove it would pass. A new required variable
+  goes in wrangler vars or the workflow's Secrets step in the same commit.
 - **One resolver per address per app** (`rendererBase()`, `appBase()`,
   `serverApiUrl()`/`publicApiUrl()`), never a fallback repeated at each call.
 - **A provider's environment is one switch on the API** (`CASHFREE_ENV`), sent

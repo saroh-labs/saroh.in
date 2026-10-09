@@ -14,11 +14,11 @@ import { isIP } from "node:net";
  * with `sig` = HMAC-SHA256 over `v1\n<seconds>\n<address>\n<host>`, the
  * same as `apps/saroh.app/lib/site-relay.ts` and the API's `signSiteRelay`.
  *
- * The address comes only from the platform's own header (`cf-connecting-ip`,
- * which Cloudflare writes over whatever a visitor sent; `x-real-ip` as a
- * fallback, kept from when Vercel served the site). A client-sent `X-Forwarded-For` is never read or
- * passed on: anyone can write one, and it would let them pick the key their
- * limit is counted by.
+ * The address comes only from Cloudflare's own header (`cf-connecting-ip`,
+ * which Cloudflare writes over whatever a visitor sent). Nothing else is read
+ * for it: behind Cloudflare a visitor can send `x-real-ip` or
+ * `X-Forwarded-For` themselves, and either would let them pick the key their
+ * limit is counted by. Without Cloudflare's header the address is unknown.
  */
 export const RELAY_HEADER = "x-saroh-relay";
 const VERSION = "v1";
@@ -57,13 +57,11 @@ export function signRelay(
 }
 
 /**
- * The visitor's address from the platform's header, or null. Never
- * `X-Forwarded-For`.
+ * The visitor's address from Cloudflare's header, or null. Never
+ * `x-real-ip` or `X-Forwarded-For`, which a visitor can write.
  */
 export function visitorAddress(headers: Headers): string | null {
-    const raw = (
-        headers.get("cf-connecting-ip") ?? headers.get("x-real-ip")
-    )?.trim();
+    const raw = headers.get("cf-connecting-ip")?.trim();
     return raw && isIP(raw) !== 0 ? raw : null;
 }
 
@@ -115,19 +113,15 @@ export function joinBody(posted: unknown): JoinBody | null {
 }
 
 /**
- * The visitor's country as the edge saw their connection (Cloudflare's
- * `cf-ipcountry`, or, kept from before 9 Oct 2026, Vercel's
- * `x-vercel-ip-country`; two letters), or
- * undefined anywhere it isn't set: local dev, the browser tests, a request
- * that came through neither. Cloudflare's `XX` (unknown) and `T1` (Tor)
- * aren't countries. Never asked of the visitor.
+ * The visitor's country as Cloudflare saw their connection (`cf-ipcountry`,
+ * two letters), or undefined anywhere it isn't set: local dev, the browser
+ * tests, a request that didn't come through Cloudflare. No other header is
+ * read: behind Cloudflare a visitor could send Vercel's old
+ * `x-vercel-ip-country` themselves. Cloudflare's `XX` (unknown) and `T1`
+ * (Tor) aren't countries. Never asked of the visitor.
  */
 export function visitorCountry(headers: Headers): string | undefined {
-    const raw = (
-        headers.get("cf-ipcountry") ?? headers.get("x-vercel-ip-country")
-    )
-        ?.trim()
-        .toUpperCase();
+    const raw = headers.get("cf-ipcountry")?.trim().toUpperCase();
     return raw && /^[A-Z]{2}$/.test(raw) && raw !== "XX" ? raw : undefined;
 }
 

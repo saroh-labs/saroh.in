@@ -210,7 +210,7 @@ describe("getTestRelease", () => {
         requestHeaders = new Headers({
             host: "test--northwind.saroh.app",
             [TEST_RELEASE_HEADER]: TOKEN,
-            "x-real-ip": "203.0.113.9",
+            "cf-connecting-ip": "203.0.113.9",
         });
         answer(200, RELEASE_BODY);
         expect((await getTestRelease("test--northwind.saroh.app")).ok).toBe(

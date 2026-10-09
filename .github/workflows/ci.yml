@@ -178,6 +178,11 @@ jobs:
       - name: Security headers on every page
         run: pnpm run check:security-headers
 
+      # Each Worker's wrangler.jsonc says which environment it is, and its
+      # deploy build would pass next.config's required-variables check.
+      - name: Deploy environment markers
+        run: pnpm run check:deploy-env
+
       # Merchant sites render off the --site-* layer only, and there is exactly
       # one renderer — gates G2 and G6 (#252).
       - name: Site blocks gate

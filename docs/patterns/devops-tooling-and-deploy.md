@@ -44,11 +44,12 @@
 
 ## Invariant checks — **Current**
 
-| Script         | Guards                                                         |
-| -------------- | -------------------------------------------------------------- |
-| `check:routes` | Every emitted destination and static link resolves to a route  |
-| `check:blocks` | G2 and G6: merchant sites stay merchant-coloured; one renderer |
-| `check:cycles` | No circular imports across workspaces                          |
+| Script             | Guards                                                                                                      |
+| ------------------ | ----------------------------------------------------------------------------------------------------------- |
+| `check:routes`     | Every emitted destination and static link resolves to a route                                               |
+| `check:blocks`     | G2 and G6: merchant sites stay merchant-coloured; one renderer                                              |
+| `check:cycles`     | No circular imports across workspaces                                                                       |
+| `check:deploy-env` | Every Worker's environment marker is set and its deploy build passes next.config's required-variables check |
 
 **Adopted** — a repo-wide rule that a lint rule cannot express becomes a
 `scripts/check-*.mjs` wired into CI and AGENTS.md → Before you finish, not a

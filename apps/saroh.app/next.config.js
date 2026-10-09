@@ -1,8 +1,10 @@
 // A production deployment that falls back to built-in addresses talks to
 // whatever the code assumed; one missing variable once dropped every waitlist
-// join for two days (DEV_LEARNINGS, 5 Oct 2026). So a production build (`VERCEL_ENV`;
-// this app's wrangler.jsonc doesn't set it yet, so the check is off on its Worker)
-// refuses to start without these (the API every merchant page reads, its own domain and the relay that keeps the API's rate limits per visitor). Other previews and local builds
+// join for two days (DEV_LEARNINGS, 5 Oct 2026). So a production build
+// (`VERCEL_ENV`, set by wrangler.jsonc's env.production; `check:deploy-env`
+// keeps it there) refuses to start without these (the API every merchant page
+// reads, its own domain and the relay that keeps the API's rate limits per
+// visitor). Other previews and local builds
 // keep their fallbacks (plan 2026-10-05-001 KTD-3).
 const REQUIRED_IN_PRODUCTION = [
     "API_URL",

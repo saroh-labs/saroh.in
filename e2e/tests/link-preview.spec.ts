@@ -17,7 +17,8 @@ import { urls } from "../playwright.config";
  * The API refuses loopback addresses (its SSRF guard), so the stack names
  * 127.0.0.1 in `LINK_PREVIEW_TEST_HOSTS` — a test-only switch the API
  * refuses to boot with in production (`env.ts`). Each test sends its own
- * `x-real-ip`, which saroh.in signs into the relay, so each counts against
+ * `cf-connecting-ip` (standing in for Cloudflare, the only address header
+ * saroh.in reads), which saroh.in signs into the relay, so each counts against
  * its own rate limit and they run beside each other.
  *
  * - the empty state, then a full address pasted: the scheme isn't doubled
@@ -104,7 +105,9 @@ test.afterAll(async () => {
 async function asOwnVisitor(page: Page, testInfo: TestInfo) {
     const n =
         (testInfo.workerIndex * 37 + testInfo.retry * 11 + Date.now()) % 250;
-    await page.setExtraHTTPHeaders({ "x-real-ip": `198.51.100.${n + 1}` });
+    await page.setExtraHTTPHeaders({
+        "cf-connecting-ip": `198.51.100.${n + 1}`,
+    });
 }
 
 async function check(page: Page, address: string) {

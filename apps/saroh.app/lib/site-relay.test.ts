@@ -106,37 +106,23 @@ describe("siteRelaySecret", () => {
 describe("visitorAddress", () => {
     const h = (entries: Record<string, string>) => new Headers(entries);
 
-    it("reads the platform's client address", () => {
-        expect(visitorAddress(h({ "x-real-ip": "198.51.100.4" }))).toBe(
+    it("reads Cloudflare's client address, bare, bracketed or with a port", () => {
+        expect(visitorAddress(h({ "cf-connecting-ip": "198.51.100.4" }))).toBe(
             "198.51.100.4",
         );
+        expect(visitorAddress(h({ "cf-connecting-ip": "2001:db8::7" }))).toBe(
+            "2001:db8::7",
+        );
         expect(
-            visitorAddress(
-                h({ "x-forwarded-for": "198.51.100.5, 10.0.0.1, 10.0.0.2" }),
-            ),
-        ).toBe("198.51.100.5");
-        expect(
-            visitorAddress(h({ "x-forwarded-for": "[2001:db8::1]:443" })),
+            visitorAddress(h({ "cf-connecting-ip": "[2001:db8::1]:443" })),
         ).toBe("2001:db8::1");
         expect(
-            visitorAddress(h({ "x-forwarded-for": "198.51.100.6:5000" })),
+            visitorAddress(h({ "cf-connecting-ip": "198.51.100.6:5000" })),
         ).toBe("198.51.100.6");
     });
 
-    it("prefers x-real-ip over x-forwarded-for", () => {
-        expect(
-            visitorAddress(
-                h({
-                    "x-real-ip": "198.51.100.4",
-                    "x-forwarded-for": "10.9.9.9",
-                }),
-            ),
-        ).toBe("198.51.100.4");
-    });
-
-    it("prefers Cloudflare's cf-connecting-ip over both", () => {
-        // Behind Cloudflare, x-real-ip is Cloudflare's edge and the first
-        // x-forwarded-for entry is whatever the visitor sent.
+    it("reads only Cloudflare's header: x-real-ip and x-forwarded-for are the visitor's word", () => {
+        fakeEnv.NEXT_PUBLIC_VERCEL_ENV = "production";
         expect(
             visitorAddress(
                 h({
@@ -146,14 +132,15 @@ describe("visitorAddress", () => {
                 }),
             ),
         ).toBe("203.0.113.7");
-        expect(visitorAddress(h({ "cf-connecting-ip": "2001:db8::7" }))).toBe(
-            "2001:db8::7",
-        );
+        expect(visitorAddress(h({ "x-real-ip": "198.51.100.4" }))).toBe(null);
+        expect(
+            visitorAddress(h({ "x-forwarded-for": "198.51.100.5, 10.0.0.1" })),
+        ).toBe(null);
     });
 
     it("ignores anything that isn't an address", () => {
         fakeEnv.NEXT_PUBLIC_VERCEL_ENV = "production";
-        expect(visitorAddress(h({ "x-forwarded-for": "evil.example" }))).toBe(
+        expect(visitorAddress(h({ "cf-connecting-ip": "evil.example" }))).toBe(
             null,
         );
     });
@@ -173,7 +160,7 @@ describe("relayFor", () => {
 
     it("signs the visitor's address and the served host", () => {
         const header = relayFor(
-            new Headers({ "x-real-ip": "203.0.113.7" }),
+            new Headers({ "cf-connecting-ip": "203.0.113.7" }),
             "kavi.saroh.app",
         );
         if (!header) throw new Error("no relay");
