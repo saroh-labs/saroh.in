@@ -1253,3 +1253,34 @@ Unless an entry says otherwise, its status is **Proposed — requires audit revi
 - Context: the catalogue's `locations` row already counted only places customers visit (`shopLocations`). Where the catalogue doesn't govern a business (the `PLAN_ENFORCEMENT` switch off, or a business it doesn't reach yet), the old `storefronts` floor still counted every storefront, online-only included, and refused creating one past it.
 - Decision: only a physical place (a storefront whose settings say `SHOP`) is a location. The old floor counts what metering counts (`countUsage(…, "shopLocations")`) and is asked where a storefront becomes a SHOP: created as one (Sell's setup starting from the registered address) or its kind changed to one. Creating an online storefront asks only the product's ceiling (25).
 - Consequences: `billing/legacy-location-floor.ts` holds the floor; its refusal uses the catalogue's words ("Your plan includes N places customers visit"). The workspace's storefront allowance is the ceiling. Sell's setup on a plan with no room starts the location online rather than refusing. The admin console's `storefronts` usage is the shop count.
+
+## DEC-110 Invoice pay links stay hash-only; the screen names when the link was made
+
+**Status: Accepted — 2026-10-08** · owner · #870
+
+- Context: an invoice's pay link was shown in full only in the tab that made it. Storing the token encrypted would let "Show link again" work anywhere, at the cost of a readable token if the database leaked.
+- Decision: keep storing only the token's hash. After a reload or on another device, the invoice says plainly that the full address is shown only once and that a new link ends the old one, and asks before making one. Invoices record when their current link was made (`payLinkCreatedAt`), and the screen names that date.
+- Consequences: the tab forgets a remembered link once anything replaces or closes it (send, reminder, view link, paid, void, credit), so it never shows a dead link.
+
+## DEC-111 A diary person given a login starts as "Calendar only", which uses a seat
+
+**Status: Accepted — 2026-10-08** · owner · amends DEC-105 · #868
+
+- Context: bookable staff can be on the diary without a login (DEC-105). Nothing said what access they get when they are given one.
+- Decision: by default they join as **Calendar only**: their own bookings and diary, and the services they take; no customers, team, set-up, settings or money actions. The owner can pick another role in the invite. It counts as a seat, because it books. On booking detail they still see that booking's price and paid status, as a Member does (DEC-039: the price is part of the booking).
+- Consequences: a built-in, editable `calendar-only` role; own-diary scoping on bookings, calendar, waitlist, Home and alerts; one seat per person whether on the diary, invited or joined.
+
+## DEC-112 One page per person, with tabs
+
+**Status: Accepted — 2026-10-08** · owner · #869 (UX-050)
+
+- Decision: a person has one page, `/contacts/<id>`, with tabs for leads, enquiries, orders, bookings, packs, courses, subscriptions, invoices, reviews, messages and notes. `/customers/<id>` redirects to it. Each tab follows its module, plan and permissions; amounts follow money permissions (DEC-098). The delete confirmation lists what deleting ends, and unpaid invoices keep Record payment on the page. DEC-097 (merge suggestions, never automatic) and DEC-049 stand.
+
+## DEC-113 One word for each thing a merchant sees
+
+**Status: Accepted — 2026-10-09** · owner · #874 (UX-078)
+
+- Decision: **booking** (not appointment or reservation), **Move** (not Reschedule), **Booked** for a confirmed booking and **To confirm** for a pending one, payment methods **Cash, UPI, Card, Bank transfer, Other** ("at the counter" only as a hint), **Closed** (not Shut), and "Location" or "Locations" following the count everywhere. Classes vs credits is not decided yet.
+- Consequences: the list lives in `docs/patterns/saroh-product.md`; code identifiers, routes and stored values keep their names.
+
+Also decided 9 Oct (#886): each admin console deploys only its own environment; see DEC-107.
