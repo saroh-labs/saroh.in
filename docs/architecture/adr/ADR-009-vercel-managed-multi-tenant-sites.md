@@ -1,8 +1,17 @@
 # ADR-009 — Vercel for Saroh-managed multi-tenant sites
 
-**Status:** Accepted — 2026-09-24; implementation pending
+**Status:** Superseded by DEC-107 — 2026-10-08 (was Accepted 2026-09-24)
 **Source:** Architecture discussion with the repository owner.
 **Builds on:** ADR-001 (Organization tenancy), ADR-002 (published snapshots).
+
+> **Note, 2026-10-09:** superseded by DEC-107, and Vercel is retired as of
+> 9 Oct 2026. The merchant sites run on one Saroh-owned Cloudflare Worker
+> (`saroh-sites`, built with OpenNext) that serves `*.saroh.app` and verified
+> custom domains, deployed from GitHub Actions (`deploy-frontends.yml`); every
+> other Saroh web app has its own Worker. The single-codebase, multi-tenant
+> model, the hostname-to-Organization resolution and the rule that only the
+> Saroh API touches the database still hold. The text below is the decision
+> as accepted on 24 Sep and is kept as history.
 
 ## Context
 

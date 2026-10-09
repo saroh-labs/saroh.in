@@ -77,25 +77,23 @@ function bareAddress(raw: string | undefined): string | null {
 }
 
 /**
- * The visitor's address, as this app's platform reports it:
- * `cf-connecting-ip` first, then `x-real-ip`, then the first
- * `x-forwarded-for` entry.
+ * The visitor's address, as Cloudflare reports it: `cf-connecting-ip`, and
+ * nothing else.
  *
  * Cloudflare writes `cf-connecting-ip` and overwrites any a visitor sent, on
- * a Worker and when Cloudflare proxies to Vercel. Behind that proxy Vercel's
- * `x-real-ip` and `x-forwarded-for` name Cloudflare's edge, not the visitor,
- * so every visitor would share a handful of addresses (and the API's
- * per-visitor limits with them). On a Worker `x-forwarded-for` keeps what the
- * visitor sent, so it is never read before Cloudflare's header.
+ * a Worker and in front of any origin it proxies to. `x-real-ip` and
+ * `x-forwarded-for` are never read: on a Worker they hold whatever the
+ * visitor sent, which would let them choose the key the API's per-visitor
+ * limits count them by. Without Cloudflare's header the address is unknown
+ * (null), and the call that needs it isn't made.
  *
- * Off the platform (local development behind portless, CI) a request can
- * arrive with neither; the loopback address stands in there, and only there.
+ * Off the platform (local development behind portless, CI; no
+ * `NEXT_PUBLIC_VERCEL_ENV`) a request arrives without it; the loopback
+ * address stands in there, and only there. The browser tests stand in for
+ * Cloudflare by sending `cf-connecting-ip` themselves (`e2e/tests/site-codes.ts`).
  */
 export function visitorAddress(headers: Headers): string | null {
-    const found =
-        bareAddress(headers.get("cf-connecting-ip") ?? undefined) ??
-        bareAddress(headers.get("x-real-ip") ?? undefined) ??
-        bareAddress(headers.get("x-forwarded-for")?.split(",")[0]);
+    const found = bareAddress(headers.get("cf-connecting-ip") ?? undefined);
     if (found) return found;
     return env.NEXT_PUBLIC_VERCEL_ENV ? null : "127.0.0.1";
 }

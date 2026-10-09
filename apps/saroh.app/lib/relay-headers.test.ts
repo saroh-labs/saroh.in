@@ -23,7 +23,7 @@ import { SITE_RELAY_HEADER } from "./site-relay";
 const visitor = (extra: Record<string, string> = {}) =>
     new Headers({
         host: "rye.saroh.app",
-        "x-real-ip": "203.0.113.7",
+        "cf-connecting-ip": "203.0.113.7",
         ...extra,
     });
 

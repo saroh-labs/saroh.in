@@ -36,7 +36,7 @@ export const env = createEnv({
         SITE_RELAY_SECRET: z.string().min(32).optional(),
         SITE_ACCOUNT_AREA: z.enum(["on", "off"]).optional(),
         TEMPLATE_RENDERS: z.enum(["on", "off"]).optional(),
-        // Set by Vercel on its deployments; the template renders refuse
+        // A name kept from Vercel (DEC-107); the template renders refuse
         // `production` whatever their switch says.
         VERCEL_ENV: z.enum(["development", "preview", "production"]).optional(),
     },

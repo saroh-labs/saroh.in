@@ -64,9 +64,17 @@
     ],
     // Settings that aren't secret; the build reads them too (scripts/cf-env.mjs).
     // SITE_RELAY_SECRET is a Worker secret, from GitHub.
+    // VERCEL_ENV, NEXT_PUBLIC_VERCEL_ENV and VERCEL_GIT_COMMIT_REF keep the
+    // names Vercel used (DEC-107). next.config's required-variables check,
+    // the template renders' production lock and the relay's "no loopback
+    // stand-in on the platform" rule read them; `pnpm run check:deploy-env`
+    // fails if one goes missing.
     // SITE_PAGE_CACHE (on | off) keeps rendered pages (#863), on in dev;
     // SITE_PAGE_CACHE_TTL is how long one is kept, in seconds.
     "vars": {
+        "VERCEL_ENV": "preview",
+        "NEXT_PUBLIC_VERCEL_ENV": "preview",
+        "VERCEL_GIT_COMMIT_REF": "development",
         "API_URL": "https://api.saroh.io",
         "NEXT_PUBLIC_API_URL": "https://api.saroh.io",
         "NEXT_PUBLIC_ROOT_DOMAIN": "saroh.dev",
@@ -79,7 +87,7 @@
         // api.saroh.in (cut over 2026-10-07). A deploy replaces the Worker's
         // routes with these, so they live here, not only in the dashboard;
         // deploy-frontends.yml then sets them to fail open, so a failing Worker
-        // falls through to the origin (Vercel) instead of an error page.
+        // falls through to the origin instead of an error page.
         // Bindings and vars are not inherited, so each is repeated.
         "production": {
             "name": "saroh-sites",
@@ -114,6 +122,9 @@
             // The page cache starts off in production: switch it on here
             // once it has run on dev (#863).
             "vars": {
+                "VERCEL_ENV": "production",
+                "NEXT_PUBLIC_VERCEL_ENV": "production",
+                "VERCEL_GIT_COMMIT_REF": "main",
                 "API_URL": "https://api.saroh.in",
                 "NEXT_PUBLIC_API_URL": "https://api.saroh.in",
                 "NEXT_PUBLIC_ROOT_DOMAIN": "saroh.app",

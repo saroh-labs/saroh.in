@@ -25,6 +25,7 @@ import { NotesPanel } from "@/components/business/notes-panel";
 import { OpenAccess } from "@/components/business/open-access";
 import { PlanActions, RevokeLimit } from "@/components/business/plan-actions";
 import { SiteTrackers } from "@/components/business/site-trackers";
+import { WhatTheySee } from "@/components/business/what-they-see";
 import { Facts, Panel } from "@/components/panel";
 import {
     ChangeRole,
@@ -130,8 +131,8 @@ export default async function BusinessPage({
                                 a reason, and the details open read-only for
                                 thirty minutes, written into the audit trail
                                 with your name and reason. You see what an
-                                operator needs — people, modules, plan,
-                                trackers, activity — and never the
+                                operator needs — what they see, people, modules,
+                                plan, trackers, activity — and never the
                                 business&rsquo;s own customers.
                             </p>
                             <OpenAccess organizationId={organizationId} />
@@ -185,6 +186,13 @@ function Business({
     return (
         <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_380px]">
             <div className="grid min-w-0 content-start gap-6">
+                <Panel
+                    title="What they see"
+                    description="Their live site, and what they can use now."
+                >
+                    {() => <WhatTheySee view={view} />}
+                </Panel>
+
                 <Panel
                     title="People"
                     description="Who belongs to this business, and their role in it."

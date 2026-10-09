@@ -31,8 +31,8 @@ pnpm (`pnpm@9`) + Turborepo monorepo.
   unreleased pricing designs, anything the user calls internal. Read the file
   list before every push.
 - **Never push a unit branch or open a PR per unit.** Work lands in a local
-  `batch-<date>-<n>` branch and goes up once per batch — every push burns five
-  Vercel builds. `docs/patterns/devops-tooling-and-deploy.md`.
+  `batch-<date>-<n>` branch and goes up once per batch — every pushed PR is a
+  full CI run. `docs/patterns/devops-tooling-and-deploy.md`.
 - Shared tokens live in `packages/ui/src/globals.css` and
   `tooling/tailwind-config`. `--accent` is a shadcn neutral, not a brand
   accent — renaming it breaks components.
@@ -100,8 +100,8 @@ A new browser spec owns its data — it runs beside every other test — and
 tags a business-wide change `@serial` (`saroh-browser-tests` skill).
 
 `git push` runs the quick gate itself (`.husky/pre-push`); `--no-verify`
-is for emergencies only. CI is the last net, not the first: every CI round trip is a push, five
-Vercel builds and twenty minutes. `scripts/prepush.sh` runs what CI runs.
+is for emergencies only. CI is the last net, not the first: every CI round trip is a push
+and twenty minutes. `scripts/prepush.sh` runs what CI runs.
 
 ## Learn from every miss
 

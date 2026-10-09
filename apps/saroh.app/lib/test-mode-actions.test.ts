@@ -129,7 +129,7 @@ function onHost(host: string) {
     requestHeaders = new Headers({
         host,
         origin: `https://${host}`,
-        "x-real-ip": "198.18.0.1",
+        "cf-connecting-ip": "198.18.0.1",
     });
 }
 

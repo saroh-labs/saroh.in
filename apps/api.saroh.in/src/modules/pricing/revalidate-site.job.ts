@@ -102,7 +102,7 @@ function requestFor(hook: SiteRefresh): RequestInit {
 /**
  * Queue a revalidation on the caller's transaction. Writes nothing when the
  * hook isn't configured: a job that could only no-op is never queued
- * (backend-jobs.md), and saroh.in then shows the change at its nightly build.
+ * (backend-jobs.md), and saroh.in then shows the change at its next deploy.
  */
 export async function enqueueSiteRevalidation(
     tx: Pick<Prisma.TransactionClient, "job">,

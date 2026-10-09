@@ -9,7 +9,7 @@
  * which the site layout does once it has resolved a live site — and nothing
  * said not to.
  *
- * Outside the Worker (`next dev`, Vercel, a test) there is no record, and
+ * Outside the Worker (`next dev`, a test) there is no record, and
  * every call here does nothing: those render per request, as they always did.
  */
 
