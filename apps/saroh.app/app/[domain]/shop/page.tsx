@@ -54,6 +54,11 @@ export async function generateMetadata({
         });
     }
     const name = snapshot.site.name;
+    // A shop that 404s (below) says so in the tab, not "Shop". The page
+    // asks the same cached lookup, so this costs no second request.
+    if (await shopIsMissing(resolved)) {
+        return { title: `Page not found · ${name}` };
+    }
     // The Shop page's own title (G15), which is also its menu name.
     const label = moduleLabel(snapshot.pages, "SHOP", "Shop");
     return shareable(resolved, {
@@ -65,6 +70,21 @@ export async function generateMetadata({
         },
         metadataBase: new URL(`https://${domain}`),
     });
+}
+
+/** Whether the built-in shop has nothing to serve, so the page 404s. */
+async function shopIsMissing(
+    resolved: NonNullable<Awaited<ReturnType<typeof getSiteForHost>>>,
+): Promise<boolean> {
+    const route = moduleRoute(
+        resolved.snapshot.pages,
+        resolved.modules,
+        "SHOP",
+    );
+    if (route.draw !== "builtin") return false;
+    if (!resolved.siteId) return true;
+    const lookup = await getCatalogue(resolved.siteId);
+    return !lookup.ok && lookup.reason === "missing";
 }
 
 /** A free-form page of the merchant's own, or their writing, lives here. */

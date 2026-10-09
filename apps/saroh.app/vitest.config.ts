@@ -21,6 +21,8 @@ export default defineConfig({
             "lib/**/*.test.ts",
             // The 404 pages, as markup.
             "components/**/*.test.tsx",
+            // Route metadata, with the data layer mocked.
+            "app/**/*.test.ts",
             "middleware.test.ts",
         ],
     },
