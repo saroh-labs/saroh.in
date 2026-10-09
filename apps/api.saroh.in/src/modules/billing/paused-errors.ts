@@ -100,3 +100,52 @@ export function memberPaused(businessName: string): ForbiddenException {
         details: { code: MEMBER_PAUSED },
     });
 }
+
+/**
+ * Whether an error is the `MEMBER_PAUSED` refusal, so a guard that would
+ * otherwise swallow it (and answer with a generic denial, or let the
+ * request through) passes it on in its own words.
+ */
+export function isMemberPaused(err: unknown): boolean {
+    if (!(err instanceof ForbiddenException)) return false;
+    const body = err.getResponse();
+    if (typeof body !== "object") return false;
+    const details = (body as { details?: unknown }).details;
+    return (
+        typeof details === "object" &&
+        details !== null &&
+        (details as { code?: unknown }).code === MEMBER_PAUSED
+    );
+}
+
+function joinNames(names: readonly string[]): string {
+    if (names.length <= 1) return names.join("");
+    return `${names.slice(0, -1).join(", ")} and ${names[names.length - 1]}`;
+}
+
+/**
+ * What the business reads booking someone on the diary with no login who
+ * is past the team limit (#800): they take no new bookings, and the
+ * bookings already made with them are kept.
+ */
+export function diaryPausedWords(names: readonly string[]): string {
+    const who = names.length > 0 ? joinNames(names) : "This person";
+    const are = names.length > 1 ? "are" : "is";
+    return `${who} ${are} paused. Your plan includes fewer team members than you have, so the people who joined most recently take no new bookings. Bookings already made are kept. Choose a plan in Plan and billing to bring them back.`;
+}
+
+/** 409 to the team: a booking with a diary person the plan has paused. */
+export function diaryPaused(names: readonly string[]): ConflictException {
+    return new ConflictException({
+        message: diaryPausedWords(names),
+        details: { code: PAUSED_BY_PLAN, kind: "person", field: "staffId" },
+    });
+}
+
+/** What a customer reads naming someone who takes no bookings just now. */
+export const PERSON_NOT_TAKING_BOOKINGS =
+    "That person isn't taking bookings right now. Pick someone else.";
+
+/** What a customer reads when nobody who takes a service is taking bookings. */
+export const SERVICE_NOT_TAKING_BOOKINGS =
+    "This service isn't taking bookings right now.";

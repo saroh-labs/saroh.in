@@ -29,6 +29,7 @@ import {
     toAvailabilityService,
 } from "./booking-slots";
 import { businessClosedOn } from "./closed-days";
+import { nobodyTaking, pausedDiaryIds, splitPaused } from "./diary-paused";
 import type { BookingLocationType, LocationType } from "./dto";
 import { openingFor } from "./opening-hours";
 import { loadBookableService } from "./reservation";
@@ -210,6 +211,9 @@ export async function publicDays(
     const offer = (
         opening: OpeningHours | null,
     ): { hours: Slot[]; starts: PublicStart[] } => {
+        // Everyone who takes it is past the plan's team limit (#800):
+        // nothing to book, and no open day to suggest otherwise.
+        if (nobodyTaking(staffing)) return { hours: [], starts: [] };
         if (staffing.perPerson && staffing.zone) {
             const hours = outsideClosures(
                 staffSlots(
@@ -412,7 +416,9 @@ export async function publicBookingPage(
                       visits: true,
                       staffServices: {
                           where: { staff: { status: "ACTIVE" } },
-                          select: { staff: { select: { name: true } } },
+                          select: {
+                              staff: { select: { id: true, name: true } },
+                          },
                       },
                   },
               })
@@ -422,6 +428,18 @@ export async function publicBookingPage(
         takesOnlinePayment(organizationId),
         open ? onlineBookingsPaused(organizationId) : Promise.resolve(false),
     ]);
+    // People past the plan's team limit (#800) take no new bookings: they
+    // aren't named, and a service only they take isn't offered.
+    const pausedStaff = open
+        ? await pausedDiaryIds(organizationId)
+        : new Set<string>();
+    const offered = services.flatMap((svc) => {
+        const people = svc.staffServices.map((row) => row.staff);
+        const { taking } = splitPaused(people, pausedStaff);
+        return nobodyTaking({ people: taking, paused: people })
+            ? []
+            : [{ ...svc, taking }];
+    });
     // A website a move to a lower plan paused takes no bookings (#800): the
     // page says so before the form, as at the monthly cap.
     const siteOpen = open
@@ -434,7 +452,7 @@ export async function publicBookingPage(
         timezone: zone,
         payOnline: online && allowsOnline(rules),
         rules,
-        services: services.map((svc) => ({
+        services: offered.map((svc) => ({
             id: svc.id,
             name: svc.name,
             description: svc.description,
@@ -458,8 +476,8 @@ export async function publicBookingPage(
                 svc.locationType === "ONLINE" || svc.locationType === "EITHER"
                     ? svc.locationType
                     : "IN_PERSON",
-            staff: svc.staffServices
-                .map((row) => row.staff.name)
+            staff: svc.taking
+                .map((person) => person.name)
                 .sort((a, b) => a.localeCompare(b)),
         })),
     };

@@ -320,6 +320,9 @@ module.exports = {
         "<rootDir>/src/modules/products/product-paused.spec.ts",
         "<rootDir>/src/modules/content/post-paused.spec.ts",
         "<rootDir>/src/modules/orders/checkout-paused.spec.ts",
+        // …and a paused website sells no packs or plans online.
+        "<rootDir>/src/modules/class-packs/pack-paused.spec.ts",
+        "<rootDir>/src/modules/subscriptions/plan-join-paused.spec.ts",
         "<rootDir>/src/modules/product-reviews/**/*.spec.ts",
         // S5-002 payments: AES-256-GCM credential crypto (round-trip, tamper,
         // missing-key) and PaymentsService specs with a jest-mocked Prisma

@@ -57,18 +57,32 @@ export interface PausesWords {
     lines: string[];
 }
 
+/**
+ * Whose limits a notice means: `new` while the move is still ahead (the
+ * plan the business moves to), `yours` once it has happened (a move made
+ * now: the plan it is already on).
+ */
+export type PausesPlan = "new" | "yours";
+
 /** The paragraphs a notice adds for what pauses; none when nothing does. */
-export function pausesParagraphs(pauses?: PausesWords | null): string[] {
+export function pausesParagraphs(
+    pauses?: PausesWords | null,
+    plan: PausesPlan = "new",
+): string[] {
     if (!pauses || pauses.lines.length === 0) return [];
+    const whose = plan === "yours" ? "your plan's" : "the new plan's";
     return [
-        `On ${pauses.pausesOn}, what's over the new plan's limits becomes read-only:`,
+        `On ${pauses.pausesOn}, what's over ${whose} limits becomes read-only:`,
         ...pauses.lines,
     ];
 }
 
 /** The same, run together for an inbox notice's body. */
-export function pausesSentence(pauses?: PausesWords | null): string {
-    const p = pausesParagraphs(pauses);
+export function pausesSentence(
+    pauses?: PausesWords | null,
+    plan: PausesPlan = "new",
+): string {
+    const p = pausesParagraphs(pauses, plan);
     return p.length ? ` ${p.join(" ")}` : "";
 }
 
@@ -313,6 +327,11 @@ export interface MoveDownWords {
     url: string;
 }
 
+/** A move made now is already on the lower plan: "your plan's limits". */
+function pausesPlanOf(mode: MoveDownWords["mode"]): PausesPlan {
+    return mode === "now" ? "yours" : "new";
+}
+
 function moveDownLead(w: MoveDownWords): string {
     return w.mode === "scheduled"
         ? `${w.businessName} moves from the ${w.planName} plan to the ${w.nextPlanName ?? "Free"} plan on ${w.movesOn ?? w.pausesOn}.`
@@ -327,7 +346,10 @@ export function moveDownEmail(w: MoveDownWords): RenderedEmail {
             `Some things pause on ${w.pausesOn}`,
             [
                 moveDownLead(w),
-                ...pausesParagraphs({ pausesOn: w.pausesOn, lines: w.lines }),
+                ...pausesParagraphs(
+                    { pausesOn: w.pausesOn, lines: w.lines },
+                    pausesPlanOf(w.mode),
+                ),
                 KEEP_EVERYTHING,
             ],
             { label: "Open Plan and billing", href: w.url },
@@ -348,6 +370,6 @@ export function moveDownNotice(
             : `Your business is now on the ${w.planName} plan, and has more than it includes.`;
     return {
         title: `Some things pause on ${w.pausesOn}`,
-        body: `${lead}${pausesSentence({ pausesOn: w.pausesOn, lines: w.lines })} ${KEEP_EVERYTHING}`,
+        body: `${lead}${pausesSentence({ pausesOn: w.pausesOn, lines: w.lines }, pausesPlanOf(w.mode))} ${KEEP_EVERYTHING}`,
     };
 }

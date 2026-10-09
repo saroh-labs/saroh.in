@@ -139,11 +139,26 @@ moving back up restores everything at once.
   `PAUSED_BY_PLAN`; archive, delete and unpublish stay open); the public
   catalogue and blog hide them; a paused location or website refuses
   checkout and booking with `notTakingOrders` (409 `NOT_TAKING_ORDERS`,
-  customer words, no plan named) and the site says it isn't taking orders;
-  a paused team member can't open the business (403 `MEMBER_PAUSED`) and a
-  paused invitation can't be accepted; `GET …/billing/paused` feeds the
-  workspace's marks and banner. **Never touched:** invoices, orders,
+  customer words, no plan named) and the site says it isn't taking orders —
+  class packs and plans bought online too (`siteTakingOrders`, and the
+  packs and plans reads carry `notTakingOrders` via `withPause`, so the
+  blocks show no Buy, Join or "Ask about"); a diary person with no login
+  past the team limit takes no new bookings (`bookings/diary-paused.ts`:
+  `loadStaffing` splits them out, so the slot engine, the booking page,
+  "with whom" and booking by hand never offer them; the team hears who and
+  why, a customer only that they aren't taking bookings; their bookings
+  already made are kept); a paused team member can't open the business
+  (403 `MEMBER_PAUSED`, `organizations/member-paused.ts`) — asked at the
+  organization context, by the storefront authorizer (`StoresService
+.orgAllows`, before the legacy fallback) and passed through by the
+  module gate's store-scoped context, so no route answers them with a
+  generic denial — and a paused invitation can't be accepted;
+  `GET …/billing/paused` feeds the workspace's marks and banner (products
+  list, product page and quick look, posts, locations, websites, Team and
+  its diary people, the calendar). **Never touched:** invoices, orders,
   customers, payment records — no pause reads them.
+- **Notice words:** a move still ahead says "the new plan's limits"; a move
+  already made (`now`) says "your plan's limits" (`pausesParagraphs`).
 - **The admin limit override** says what then happens
   (`admin/limit-override-warning.ts`, #802).
 

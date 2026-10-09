@@ -13,6 +13,8 @@ import {
     assertLocationTakingOrders,
     shopPause,
     siteTakingBookings,
+    siteTakingOrders,
+    withPause,
 } from "./checkout-paused";
 
 const pausedNow = overLimit.pausedNow as jest.Mock;
@@ -119,5 +121,26 @@ describe("siteTakingBookings (#800)", () => {
         await expect(siteTakingBookings("org_1", "site_1")).resolves.toBe(true);
         pausedNow.mockResolvedValue(null);
         await expect(siteTakingBookings("org_1", "site_2")).resolves.toBe(true);
+    });
+});
+
+describe("packs and plans bought online on a paused website (#800)", () => {
+    it("siteTakingOrders is false only for a paused website", async () => {
+        pausedNow.mockResolvedValue(paused({ siteIds: ["site_2"] }));
+        await expect(siteTakingOrders("org_1", "site_2")).resolves.toBe(false);
+        await expect(siteTakingOrders("org_1", "site_1")).resolves.toBe(true);
+    });
+
+    it("withPause leaves a read as it was while the site takes orders", () => {
+        const read = { payOnline: true, packs: [] };
+        expect(withPause(read, true)).toBe(read);
+    });
+
+    it("withPause stops online buying and says the site isn't taking orders", () => {
+        expect(withPause({ payOnline: true, plans: ["p"] }, false)).toEqual({
+            payOnline: false,
+            plans: ["p"],
+            notTakingOrders: true,
+        });
     });
 });

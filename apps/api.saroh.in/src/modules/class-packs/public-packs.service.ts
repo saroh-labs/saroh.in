@@ -9,6 +9,7 @@ import { prisma, runInOrgContext } from "@saroh/database";
 import { toMoneyString } from "../../common/money";
 import { takesOnlinePayment } from "../bookings/public-booking-page";
 import { FixedWindowRateLimiter } from "../bookings/rate-limiter";
+import { siteTakingOrders, withPause } from "../orders/checkout-paused";
 import { PACKS_ON_SALE } from "./pack-on-sale";
 import { packsOffered } from "./packs-offered";
 
@@ -67,6 +68,11 @@ export interface PublicPacks {
     packs: PublicPack[];
     /** Whether a signed-in customer can buy online now. */
     payOnline: boolean;
+    /**
+     * True on a website a move to a lower plan paused (#800): nothing is
+     * sold here online. Absent otherwise.
+     */
+    notTakingOrders?: true;
 }
 
 function notFound(): never {
@@ -160,7 +166,7 @@ export class PublicPacksService {
         if (!site) notFound();
         const { organizationId } = site;
 
-        const [rows, payOnline] = await runInOrgContext(
+        const [rows, payOnline, taking] = await runInOrgContext(
             organizationId,
             async () => {
                 if (!(await packsOffered(organizationId))) notFound();
@@ -198,9 +204,14 @@ export class PublicPacksService {
                         },
                     }),
                     takesOnlinePayment(organizationId),
+                    // A website a lower plan paused sells nothing (#800).
+                    siteTakingOrders(organizationId, siteId),
                 ]);
             },
         );
-        return { payOnline, packs: rows.map(publicPackView) };
+        return withPause(
+            { payOnline, packs: rows.map(publicPackView) },
+            taking,
+        );
     }
 }

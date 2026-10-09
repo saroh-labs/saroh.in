@@ -12,7 +12,7 @@ import type {
 } from "../../common/types/organization-context";
 import { ORG_ROLES } from "../../common/types/organization-context";
 import { overLimit } from "../billing/over-limit.service";
-import { memberPaused } from "../billing/paused-errors";
+import { assertMemberNotPaused } from "./member-paused";
 import type { OrganizationKind } from "./organization-kind";
 import { kindRead } from "./organization-kind";
 import { isBuiltInRole, resolveCapabilities } from "./organization-policy";
@@ -252,25 +252,15 @@ export class OrganizationContextService {
     }
 
     /**
-     * A team member past the plan's limit after a move to a lower plan
-     * (#800) can't open the business: 403 `MEMBER_PAUSED`, in words that
-     * say why and that nothing is lost. The owner is never paused, so the
-     * read is skipped for them; `pausedNow` is cached per business and
-     * pauses nothing when enforcement is off or the plan can't be read.
-     * Operators never reach here: their context isn't a membership.
+     * A team member past the plan's limit (#800) can't open the business:
+     * 403 `MEMBER_PAUSED` (`member-paused.ts`, shared with the storefront
+     * authorizer and the module gate).
      */
-    private async assertNotPaused(
+    private assertNotPaused(
         organizationId: string,
         membership: { id: string; role: string },
     ): Promise<void> {
-        if (membership.role === "OWNER") return;
-        const paused = await overLimit.pausedNow(organizationId);
-        if (!paused?.memberIds.has(membership.id)) return;
-        const organization = await prisma.organization.findUnique({
-            where: { id: organizationId },
-            select: { name: true },
-        });
-        throw memberPaused(organization?.name ?? "this business");
+        return assertMemberNotPaused(organizationId, membership);
     }
 
     /**

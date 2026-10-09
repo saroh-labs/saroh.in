@@ -13,6 +13,7 @@ import { parseBillingEmailPayload } from "./billing-email-payload";
 import {
     moveDownEmail,
     moveDownNotice,
+    pausesParagraphs,
     planEndingNotice,
     termEndingEmail,
 } from "./billing-emails";
@@ -349,7 +350,7 @@ describe("the words (#801)", () => {
         });
         expect(n.title).toBe("Some things pause on 27 Nov 2026");
         expect(n.body).toBe(
-            "Your business is now on the Free plan, and has more than it includes. On 27 Nov 2026, what's over the new plan's limits becomes read-only: Asha is paused: they can't open the business until you move up again. Nothing is deleted. To keep everything, choose or renew a plan in Plan and billing; moving back up restores everything at once.",
+            "Your business is now on the Free plan, and has more than it includes. On 27 Nov 2026, what's over your plan's limits becomes read-only: Asha is paused: they can't open the business until you move up again. Nothing is deleted. To keep everything, choose or renew a plan in Plan and billing; moving back up restores everything at once.",
         );
         const e = moveDownEmail({
             businessName: "Rye & Co.",
@@ -366,6 +367,40 @@ describe("the words (#801)", () => {
             "Rye &amp; Co. moves from the Grow plan to the Free plan on 25 Nov 2026.",
         );
         expect(e.html).toContain("Open Plan and billing");
+    });
+
+    it("a move already made says 'your plan's limits'; one still ahead, 'the new plan's'", () => {
+        const now = moveDownEmail({
+            businessName: "Rye",
+            mode: "now",
+            planName: "Free",
+            nextPlanName: null,
+            movesOn: null,
+            pausesOn: "27 Nov 2026",
+            lines,
+            url: "https://app.example.com/settings/billing#change-plan",
+        });
+        expect(now.html).toContain(
+            "On 27 Nov 2026, what&#39;s over your plan&#39;s limits becomes read-only:",
+        );
+        expect(now.html).not.toContain("new plan");
+        const ahead = moveDownNotice({
+            mode: "scheduled",
+            planName: "Grow",
+            nextPlanName: "Free",
+            movesOn: "25 Nov 2026",
+            pausesOn: "27 Nov 2026",
+            lines,
+        });
+        expect(ahead.body).toContain(
+            "On 27 Nov 2026, what's over the new plan's limits becomes read-only:",
+        );
+        expect(pausesParagraphs({ pausesOn: "1 Dec", lines }, "yours")[0]).toBe(
+            "On 1 Dec, what's over your plan's limits becomes read-only:",
+        );
+        expect(pausesParagraphs({ pausesOn: "1 Dec", lines })[0]).toBe(
+            "On 1 Dec, what's over the new plan's limits becomes read-only:",
+        );
     });
 
     it("the plan-ending and term-ending notices list the pauses only when there are any", () => {

@@ -55,3 +55,26 @@ export async function siteTakingBookings(
     const paused = await overLimit.pausedNow(organizationId);
     return !paused?.siteIds.has(siteId);
 }
+
+/**
+ * Whether a website takes orders for class packs and plans bought online
+ * (#800): not on a paused site, which refuses them with
+ * `NOT_TAKING_ORDERS` as its checkout does. The same set as bookings: a
+ * paused website stops taking orders and bookings alike.
+ */
+export const siteTakingOrders = siteTakingBookings;
+
+/**
+ * A packs or plans read on a website that isn't taking orders (#800): the
+ * packs and plans still show, Buy and Join don't (`payOnline` false), and
+ * the site says it isn't taking orders. `notTakingOrders` is added only
+ * then, so an older site ignores it. Pure.
+ */
+export function withPause<T extends { payOnline: boolean }>(
+    read: T,
+    taking: boolean,
+): T & { notTakingOrders?: true } {
+    return taking
+        ? read
+        : { ...read, payOnline: false, notTakingOrders: true as const };
+}
