@@ -147,6 +147,9 @@ const envSchema = z.object({
     // KTD-10). A fine-grained GitHub token allowed only to run this repo's
     // Actions, and which environment to build (`main` for production,
     // `development` for development). Both set, they win over the hook above.
+    // With the token, Platform Owners deploy any Cloudflare app from the admin
+    // console's Deployments page (#886), but only to this API's own
+    // SITE_DEPLOY_ENVIRONMENT; unset, the console deploys nothing (DEC-107).
     // The token is never logged.
     SITE_DEPLOY_GITHUB_TOKEN: z.string().min(20).optional(),
     SITE_DEPLOY_ENVIRONMENT: z.enum(["development", "production"]).optional(),

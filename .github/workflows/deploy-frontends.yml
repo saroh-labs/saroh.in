@@ -11,7 +11,9 @@ name: Build and deploy apps on Cloudflare
 #                            dated today appears (the site is static)
 #   manual / the API      -> one app (or all) in one environment, always
 #                            deployed; the API starts the marketing site's build
-#                            when pricing is published
+#                            when pricing is published, and Platform Owners
+#                            start any app's from the admin console's
+#                            Deployments page (#886)
 #
 # What deploys (scripts/cf-plan.mjs): every deploy labels its Worker with the
 # app's build fingerprint (BUILD_FINGERPRINT, Turbo's hash of what the build
@@ -24,6 +26,15 @@ name: Build and deploy apps on Cloudflare
 # environments `cloudflare-development` and `cloudflare-production`: they are
 # passed to the build and copied onto the Worker on every deploy, and never
 # printed (the repo, and so this log, is public).
+
+# A manual run says which app and where, so the admin console's Deployments
+# page (#886) can tell its runs apart before their deploy jobs exist. Other
+# runs keep GitHub's usual title.
+run-name: >-
+    ${{ github.event_name == 'workflow_dispatch'
+    && format('Deploy {0} to {1}', inputs.app, inputs.environment)
+    || github.event_name == 'schedule' && 'Nightly marketing site build'
+    || github.event.head_commit.message }}
 
 on:
     push:
