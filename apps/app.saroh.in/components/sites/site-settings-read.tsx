@@ -24,7 +24,7 @@ import type { SiteAddress } from "@/lib/sites/share-links";
 
 import { AddressGroup } from "./settings/address-group";
 import { PublishBar } from "./settings/publish-bar";
-import { SettingsTabs } from "./settings/settings-tabs";
+import { SettingsSections } from "./settings/settings-sections";
 
 /**
  * The site's settings, for someone who may read them and not change them
@@ -66,7 +66,7 @@ export function SiteSettingsRead({
                 them. A connected domain isn&apos;t shown: reading it needs the
                 domain permission.
             </ReadOnlyNote>
-            <SettingsTabs
+            <SettingsSections
                 groups={groups}
                 steps={shareReadiness(site)}
                 live={live}

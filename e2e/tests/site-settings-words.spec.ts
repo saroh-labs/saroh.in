@@ -42,13 +42,43 @@ test("the site's settings say web address, posts path and your online shop", asy
     const read = await api.get<SiteRead>(`/sites/${site.id}`);
 
     await page.goto(`/sites/${site.id}/settings`);
-    // In tabs, as Settings › Business (owner, 9 Oct): Address opens first.
-    const tabs = page.getByRole("tablist", { name: "Website settings" });
-    const tab = (name: string) => tabs.getByRole("tab", { name, exact: true });
-    await expect(tab("Address")).toHaveAttribute("aria-selected", "true");
-    for (const name of ["Search and sharing", "Menu and footer", "Tracking"]) {
-        await expect(tab(name)).toBeVisible();
+    // The groups are chosen from a side list from 1024px, and from a
+    // "Section" select below it; never a second strip of underline tabs
+    // under the Website screen's own (owner, 9 Oct).
+    const wide = (page.viewportSize()?.width ?? 0) >= 1024;
+    const list = page.getByRole("tablist", { name: "Settings sections" });
+    const section = page.getByRole("combobox", { name: "Section" });
+    const isOpen = async (name: string) => {
+        if (wide) {
+            await expect(
+                list.getByRole("tab", { name, exact: true }),
+            ).toHaveAttribute("aria-selected", "true");
+        } else {
+            await expect(section).toHaveText(name);
+        }
+    };
+    const choose = async (name: string) => {
+        if (wide) {
+            await list.getByRole("tab", { name, exact: true }).click();
+        } else {
+            await section.click();
+            await page.getByRole("option", { name, exact: true }).click();
+        }
+    };
+    if (wide) {
+        await expect(list).toBeVisible();
+        await expect(list).toHaveAttribute("aria-orientation", "vertical");
+        await expect(section).toBeHidden();
+    } else {
+        await expect(section).toBeVisible();
+        await expect(list).toBeHidden();
     }
+    // Only the Website screen's own tabs are an underline strip.
+    await expect(
+        page.getByRole("tablist").filter({ visible: true }),
+    ).toHaveCount(wide ? 1 : 0);
+    await isOpen("Address");
+
     await expect(
         page
             .getByText("Web address", { exact: true })
@@ -63,18 +93,11 @@ test("the site's settings say web address, posts path and your online shop", asy
             /Live as soon as it's saved|Goes live with your next publish/,
         ),
     ).toHaveCount(0);
-    // The old in-page list is gone.
-    await expect(
-        page.getByRole("navigation", { name: "Settings sections" }),
-    ).toHaveCount(0);
 
-    // A tab is in the address: chosen, it says so; Back returns.
-    await tab("Menu and footer").click();
+    // The group is in the address: chosen, it says so; Back returns.
+    await choose("Menu and footer");
     await expect(page).toHaveURL(/[?&]section=menu-and-footer\b/);
-    await expect(tab("Menu and footer")).toHaveAttribute(
-        "aria-selected",
-        "true",
-    );
+    await isOpen("Menu and footer");
     await expect(
         page.getByText("Posts path", { exact: true }).filter({ visible: true }),
     ).toHaveCount(1);
@@ -84,13 +107,13 @@ test("the site's settings say web address, posts path and your online shop", asy
             .filter({ visible: true }),
     ).not.toHaveCount(0);
     await page.goBack();
-    await expect(tab("Address")).toHaveAttribute("aria-selected", "true");
+    await isOpen("Address");
 
-    // A link opens its tab.
+    // A link opens its group.
     const sellsFrom = read.sellsFrom?.storefront?.name;
     if (sellsFrom) {
         await page.goto(`/sites/${site.id}/settings?section=shop`);
-        await expect(tab("Shop")).toHaveAttribute("aria-selected", "true");
+        await isOpen("Shop");
         await expect(
             page
                 .getByText(`Your online shop sells from ${sellsFrom}`)
