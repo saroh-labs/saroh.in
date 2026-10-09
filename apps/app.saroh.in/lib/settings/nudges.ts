@@ -141,9 +141,9 @@ function pipeline(modules: readonly ModuleView[] | null): Nudge | null {
         ?.blockers.find((b) => b.code === "CRM_NO_PIPELINE");
     return {
         key: "pipeline",
-        label: "Create a pipeline",
-        why: "So enquiries don't get lost.",
-        cta: "Set up",
+        label: "Add your first lead",
+        why: "So enquiries don't get lost. Your pipeline starts with it.",
+        cta: "Add a lead",
         href: blocker?.actionHref ?? "/settings/modules",
         broken: false,
         left: blocker !== undefined,
