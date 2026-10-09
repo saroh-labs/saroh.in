@@ -84,7 +84,12 @@ is authorised. A business whose owner chose Free or cancelled for the
 period's end (`Subscription.freeChosenAt`, set by Plan and billing's move
 to Free and by cancel, cleared wherever `cancelAtPeriodEnd` is) is told
 its plan moves to Free then, as it chose, and never asked to pay; the
-term run out (`term-end.ts`) sets `cancelAtPeriodEnd` without it. Rules in `PRICING_ROLLOUT.md` › "Checkout and term
+term run out (`term-end.ts`) sets `cancelAtPeriodEnd` without it.
+Between, each autopay charge is announced 3 days ahead by email (#804,
+the Terms' "We email you 3 days before"; `renewal-reminder.ts`): the
+amount as its invoice will add it up (`renewalTotalPaise`) and the date in
+the business's zone, once per period end, and only when the charge will
+happen as named (`renewalDecision` lists the silent cases). Rules in `PRICING_ROLLOUT.md` › "Checkout and term
 (DEC-093)".
 
 **First month, not trial (DEC-093).** A TRIAL checkout that took a charge

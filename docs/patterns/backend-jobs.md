@@ -376,7 +376,9 @@ overrideId, reason }`. Re-read, then decide
 - **`billing.email`** (U17) is Saroh's own mail to a business: an
   invoice with its PDF (queued with the invoice), a failed charge (queued by
   the webhook on `pending` or `halted`), a first month or a free trial
-  ending (U16 queues it, `enqueueBillingEmail`), a plan that ends (#805)
+  ending (U16 queues it, `enqueueBillingEmail`), a plan about to renew
+  (#804: `RENEWAL`, queued by the hourly sweep 3 days before each autopay
+  charge, below), a plan that ends (#805)
   and a 12-month term that ends (DEC-100: `TERM_ENDING`, queued by the
   hourly sweep with an inbox notice, claimed once per subscription, end and
   stage, and silent once a renewal is authorised). To everyone whose role has `billing:manage`, in
@@ -394,4 +396,17 @@ overrideId, reason }`. Re-read, then decide
 - **`billing.moves.apply`** is the hourly self-rescheduling sweep (one
   PENDING run, a partial unique index): due pending moves that are ready
   (`plan-moves.ts`) and OPEN checkouts past `expiresAt`. A paid
-  subscription's move is applied by its renewal webhook first.
+  subscription's move is applied by its renewal webhook first. Its last
+  step is the renewal reminder (#804, `renewal-reminder.ts`,
+  `renewal-reminder-notice.ts`): an ACTIVE paid autopay subscription whose
+  period ends within 3 days is claimed once per subscription and period
+  end (`CustomerNotice` `RENEWAL_REMINDER`,
+  `renewal-reminder:<subscriptionId>:<periodEnd>`) and queues a `RENEWAL`
+  email on the same transaction: the charge with GST (coupon and add-ons
+  owed on it included), the date in the business's zone, and Plan and
+  billing. Silent, in the sweep and again when the email runs
+  (`renewalReminderOf`), for Free, TRIALING (the trial-ending email names
+  that charge), PAST_DUE, a period that ends the plan
+  (`cancelAtPeriodEnd`), a move due by then, a SCHEDULED checkout starting
+  by then, a year paid once, and a monthly term's end (DEC-100's notices).
+  Email only: no inbox notice for a routine charge.

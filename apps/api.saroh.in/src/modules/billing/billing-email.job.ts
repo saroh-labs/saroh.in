@@ -22,6 +22,7 @@ import {
 } from "./billing-emails";
 import { paidFirstMonth } from "./offers";
 import { MOVE_DOWN_CLAIM_KIND } from "./over-limit";
+import { composeRenewalReminder } from "./renewal-reminder";
 import { renderSarohInvoicePdf } from "./saroh-invoice-paper";
 import { paiseToRupees, SAROH_TIMEZONE } from "./saroh-invoice-terms";
 import { sarohSeller } from "./saroh-seller";
@@ -32,8 +33,9 @@ type Tx = Prisma.TransactionClient;
 /**
  * Saroh's own billing mail to a business (pricing catalogue U17): the
  * invoice for a charge with its PDF, a payment that failed, a first month
- * or a free trial ending (queued by U16), a plan that ends on a date
- * (#805), a 12-month term that ends (DEC-100) and a move to a lower plan
+ * or a free trial ending (queued by U16), a plan about to renew (#804), a
+ * plan that ends on a date (#805), a 12-month term that ends (DEC-100) and
+ * a move to a lower plan
  * that pauses things (#801), all queued by the billing sweep. Written on the caller's transaction (the outbox),
  * so the invoice or the failed charge and its email commit together, and a
  * mail provider that is down never undoes either: a send that fails throws,
@@ -41,8 +43,9 @@ type Tx = Prisma.TransactionClient;
  *
  * Re-read, then decide. An invoice already emailed (`emailedAt`) is not
  * sent again. A failed payment that has since been paid, a trial that is
- * no longer one, a plan whose end was moved or taken away, or a term
- * renewed or moved since, says nothing. Each kind sends at most once per event,
+ * no longer one, a renewal that no longer charges as told, a plan whose
+ * end was moved or taken away, or a term renewed or moved since, says
+ * nothing. Each kind sends at most once per event,
  * claimed as a `CustomerNotice` once its email has left.
  *
  * Who hears: everyone on the team whose role manages billing
@@ -132,6 +135,19 @@ export class BillingEmailHandler {
         if (p.kind === "PLAN_ENDING") return this.planEnding(job, p);
         if (p.kind === "TERM_ENDING") return this.termEnding(job, p);
         if (p.kind === "MOVE_DOWN") return this.moveDown(job, p);
+        if (p.kind === "RENEWAL") {
+            // 3 days before an autopay charge (#804), re-read as the sweep
+            // read it (`renewal-reminder.ts`).
+            const key = `saroh-billing:renewal:${p.subscriptionId}:${p.renewsAt}`;
+            return this.once(job, p.organizationId, key, () =>
+                composeRenewalReminder(
+                    prisma,
+                    p,
+                    new Date(),
+                    `${appBase()}/settings/billing`,
+                ),
+            );
+        }
         return this.notice(job, p);
     };
 

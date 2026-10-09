@@ -19,6 +19,7 @@ import type { ParsedBillingEvent } from "./providers/billing-provider.port";
 import { renderSarohInvoicePdf } from "./saroh-invoice-paper";
 import type { SarohInvoiceSource, SarohLineInput } from "./saroh-invoice-terms";
 import {
+    FIRST_MONTH_KEY,
     samePeriodWindow,
     sarohInvoiceNumber,
     sarohSeries,
@@ -605,9 +606,6 @@ function buyerName(
     }
     return "Your business";
 }
-
-/** The charge key of a nominal first month (DEC-093), before its checkout. */
-const FIRST_MONTH_KEY = "first-month:";
 
 function periodKey(
     provider: string,
