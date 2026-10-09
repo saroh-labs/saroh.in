@@ -296,7 +296,7 @@ function StorefrontDetail({
      * returned, not what was asked for, so a value the server normalised
      * ("18" → "18.00") or refused is what the merchant sees afterwards.
      */
-    const save: Saver = (input, said, onFail, inline) => {
+    const save: Saver = (input, said, onFail, inline, onSaved) => {
         startTransition(async () => {
             const res = await updateStorefront(store.id, input);
             if (!res.ok) {
@@ -306,6 +306,7 @@ function StorefrontDetail({
                 return;
             }
             setStore(res.data);
+            onSaved?.();
             showSuccess(said);
             // The title, the line under it and the list on the left show
             // the name, the kind, the address and the pause.

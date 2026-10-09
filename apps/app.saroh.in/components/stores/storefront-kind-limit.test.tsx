@@ -182,8 +182,9 @@ describe("the location limit, by the radio (UX-036)", () => {
 });
 
 describe("Pick-up needs a counter (UX-025)", () => {
-    const pickup = () =>
-        host.querySelector<HTMLButtonElement>("#storefront-way-pickup");
+    const pickupSays = () =>
+        host.querySelector('[data-testid="delivery-pickup-summary"]')
+            ?.textContent;
 
     it("saved on with no counter: shown as it is, says why, and turns off", async () => {
         update.mockImplementation((_id: string, input: object) =>
@@ -192,21 +193,20 @@ describe("Pick-up needs a counter (UX-025)", () => {
         address.section = "delivery";
         draw();
         expect(host.textContent).toContain(
-            "Not on your website: it needs a counter.",
+            "Not on your website: customers can't visit this location.",
         );
         // Drawing it changed nothing.
         expect(update).not.toHaveBeenCalled();
-        expect(pickup()?.getAttribute("aria-checked")).toBe("true");
-        expect(pickup()?.disabled).toBe(false);
+        expect(pickupSays()).toMatch(/late after/);
 
-        await press(pickup());
+        await press(item("Turn off"));
         expect(update).toHaveBeenCalledWith(online.id, {
             fulfilmentTypes: [],
         });
         expect(showSuccess).toHaveBeenCalledWith("Pick-up turned off");
         // Off now, and with no counter it can't come back on.
-        expect(pickup()?.disabled).toBe(true);
-        expect(host.textContent).toContain("Needs a counter");
+        expect(pickupSays()).toBe("Not offered");
+        expect(item("Add an address")).toBeDefined();
     });
 
     it("The place offers turning Pick-up off in one press when there is no counter", async () => {
@@ -272,7 +272,7 @@ describe("the tabs", () => {
         await press(tab("Delivery"));
         expect(tab("Delivery")?.getAttribute("aria-selected")).toBe("true");
         expect(window.location.search).toBe("?section=delivery");
-        expect(host.querySelector("#storefront-way-pickup")).not.toBeNull();
+        expect(host.querySelector("#delivery-pickup")).not.toBeNull();
         expect(host.querySelector("#storefront-name")).toBeNull();
         // Back to The place: the page's own address, with no section.
         await press(tab("The place"));
@@ -328,7 +328,7 @@ describe("the tabs", () => {
         ).toBe(true);
     });
 
-    it("Add address on Delivery opens The place on its address field", async () => {
+    it("Add an address on Delivery opens The place on its address field", async () => {
         address.section = "delivery";
         act(() =>
             root.render(
@@ -354,13 +354,13 @@ describe("the tabs", () => {
                 />,
             ),
         );
-        await press(item("Add address"));
+        await press(item("Add an address"));
         expect(tab("The place")?.getAttribute("aria-selected")).toBe("true");
         expect(document.activeElement?.id).toBe("storefront-address");
     });
 });
 
-describe("a delivery row", () => {
+describe("a way's Edit panel", () => {
     const shop: StorefrontSettings = {
         ...online,
         kind: "SHOP",
@@ -368,8 +368,10 @@ describe("a delivery row", () => {
         fulfilmentTypes: ["PICKUP", "LOCAL_DELIVERY"],
         siteShop: true,
         localDeliveryFee: null,
+        freeShippingThreshold: null,
+        lateAfterMinutes: { PICKUP: 120, LOCAL_DELIVERY: 1440, SHIPPING: 2880 },
     };
-    const drawShop = () => {
+    const drawShop = (over: Partial<StorefrontSettings> = {}) => {
         address.section = "delivery";
         act(() =>
             root.render(
@@ -384,7 +386,7 @@ describe("a delivery row", () => {
                             paused: false,
                         },
                     ]}
-                    selected={shop}
+                    selected={{ ...shop, ...over }}
                     canCreate
                     canEdit
                     canClose
@@ -392,15 +394,92 @@ describe("a delivery row", () => {
             ),
         );
     };
+    const labelled = (name: string) =>
+        host.querySelector<HTMLButtonElement>(`[aria-label="${name}"]`);
+    const chip = (name: string) =>
+        Array.from(
+            host.querySelectorAll<HTMLButtonElement>("[role=radio]"),
+        ).find((b) => b.textContent === name);
+    const field = (id: string) =>
+        host.querySelector<HTMLInputElement>(`#${id}`);
 
-    it("saves a late time alone in its own words", async () => {
+    it("nothing is open until Edit, and then one way at a time", async () => {
+        drawShop();
+        expect(
+            host.querySelector("form#delivery-local_delivery-panel"),
+        ).toBeNull();
+        await press(labelled("Edit local delivery"));
+        expect(
+            host.querySelector("#delivery-local_delivery-panel"),
+        ).not.toBeNull();
+        // The others wait: one edit at a time.
+        expect(labelled("Edit pick-up")?.disabled).toBe(true);
+    });
+
+    it("the current late time is the chosen preset; a time between is Other…", async () => {
+        drawShop({
+            lateAfterMinutes: {
+                PICKUP: 90,
+                LOCAL_DELIVERY: 1440,
+                SHIPPING: 2880,
+            },
+        });
+        await press(labelled("Edit local delivery"));
+        expect(chip("24 h")?.getAttribute("data-state")).toBe("on");
+        await press(item("Cancel"));
+        await press(labelled("Edit pick-up"));
+        expect(chip("Other…")?.getAttribute("data-state")).toBe("on");
+        expect(field("delivery-pickup-late")?.value).toBe("90");
+    });
+
+    it("one Save sends the switch, the fee, the free-over amount and the late time together", async () => {
         update.mockResolvedValue({ ok: true, data: shop });
         drawShop();
-        const field = host.querySelector<HTMLInputElement>(
-            "#storefront-way-pickup-late",
+        await press(labelled("Edit local delivery"));
+        await press(item("Charge"));
+        type(field("delivery-local_delivery-fee"), "40");
+        type(field("delivery-local_delivery-over"), "999");
+        await press(chip("4 h"));
+        expect(host.textContent).toContain(
+            "At checkout: Local delivery · ₹40, free over ₹999",
         );
-        expect(field?.value).toBe("2");
-        type(field, "3");
+        expect(host.textContent).toContain("Also applies to shipping.");
+        // Nothing saved yet: no switch or field here saves on its own.
+        expect(update).not.toHaveBeenCalled();
+        await press(item("Save"));
+        expect(update).toHaveBeenCalledTimes(1);
+        expect(update).toHaveBeenCalledWith(shop.id, {
+            localDeliveryFee: "40",
+            freeShippingThreshold: "999",
+            lateAfterMinutes: { LOCAL_DELIVERY: 240 },
+        });
+        expect(showSuccess).toHaveBeenCalledWith("Local delivery saved");
+        // Saved: the panel closes.
+        expect(host.querySelector("#delivery-local_delivery-panel")).toBeNull();
+    });
+
+    it("turning a way on or off is part of the same Save", async () => {
+        update.mockResolvedValue({ ok: true, data: shop });
+        drawShop();
+        await press(labelled("Edit shipping"));
+        await press(
+            host.querySelector<HTMLButtonElement>("#delivery-shipping-on"),
+        );
+        expect(update).not.toHaveBeenCalled();
+        await press(chip("2 days"));
+        await press(item("Save"));
+        expect(update).toHaveBeenCalledWith(shop.id, {
+            fulfilmentTypes: ["PICKUP", "LOCAL_DELIVERY", "SHIPPING"],
+        });
+        expect(showSuccess).toHaveBeenCalledWith("Shipping turned on");
+    });
+
+    it("a late time alone keeps its own words", async () => {
+        update.mockResolvedValue({ ok: true, data: shop });
+        drawShop();
+        await press(labelled("Edit pick-up"));
+        await press(chip("Other…"));
+        type(field("delivery-pickup-late"), "3");
         await press(item("Save"));
         expect(update).toHaveBeenCalledWith(shop.id, {
             lateAfterMinutes: { PICKUP: 180 },
@@ -410,36 +489,42 @@ describe("a delivery row", () => {
         );
     });
 
-    it("saves a fee and a late time together", async () => {
-        update.mockResolvedValue({ ok: true, data: shop });
+    it("Cancel drops the draft and saves nothing", async () => {
         drawShop();
-        type(
-            host.querySelector<HTMLInputElement>(
-                "#storefront-way-local_delivery-fee",
-            ),
-            "40",
-        );
-        type(
-            host.querySelector<HTMLInputElement>(
-                "#storefront-way-local_delivery-late",
-            ),
-            "12",
-        );
-        await press(item("Save"));
-        expect(update).toHaveBeenCalledWith(shop.id, {
-            localDeliveryFee: "40",
-            lateAfterMinutes: { LOCAL_DELIVERY: 720 },
-        });
-        expect(showSuccess).toHaveBeenCalledWith("Local delivery saved");
+        await press(labelled("Edit local delivery"));
+        await press(item("Charge"));
+        type(field("delivery-local_delivery-fee"), "40");
+        await press(item("Cancel"));
+        expect(update).not.toHaveBeenCalled();
+        expect(
+            host.querySelector(
+                '[data-testid="delivery-local_delivery-summary"]',
+            )?.textContent,
+        ).toBe("Free · late after 24 h");
+        // Opened again, it starts from what is saved.
+        await press(labelled("Edit local delivery"));
+        expect(item("Free")?.getAttribute("data-state")).toBe("on");
     });
 
-    it("refuses a late time out of bounds before it is sent", () => {
+    it("says what to fix in place, and sends nothing", async () => {
         drawShop();
-        type(
-            host.querySelector<HTMLInputElement>("#storefront-way-pickup-late"),
-            "0",
-        );
+        await press(labelled("Edit local delivery"));
+        await press(item("Charge"));
+        await press(item("Save"));
+        expect(host.textContent).toContain("Enter what customers pay");
+        await press(chip("Other…"));
+        type(field("delivery-local_delivery-late"), "0");
         expect(host.textContent).toContain("Between 5 minutes and 30 days.");
-        expect(item("Save")?.disabled).toBe(true);
+        expect(update).not.toHaveBeenCalled();
+    });
+
+    it("a refusal keeps the panel open with what was typed", async () => {
+        update.mockResolvedValue({ ok: false, error: "Could not save that." });
+        drawShop();
+        await press(labelled("Edit local delivery"));
+        await press(chip("8 h"));
+        await press(item("Save"));
+        expect(showError).toHaveBeenCalledWith("Could not save that.");
+        expect(chip("8 h")?.getAttribute("data-state")).toBe("on");
     });
 });

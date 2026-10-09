@@ -44,6 +44,8 @@ export const PROVIDERS_HREF = "/settings/providers";
 /** The fields a readiness action can jump to and focus. */
 export const ADDRESS_FIELD_ID = "storefront-address";
 export const HOURS_FIELD_ID = "storefront-hours";
+/** "Do customers come here?": where a place without a counter gets one. */
+export const KIND_FIELD_ID = "location-kind";
 
 type Store = Pick<
     StorefrontSettings,
@@ -83,7 +85,12 @@ export function locationSubtitle(
  * The ways it offers, as saved. An API from before B17's chips sends none,
  * so they are read from its two switches.
  */
-export function savedWays(store: Store): StorefrontFulfilmentType[] {
+export function savedWays(
+    store: Pick<
+        Store,
+        "kind" | "fulfilmentTypes" | "collectionEnabled" | "shippingEnabled"
+    >,
+): StorefrontFulfilmentType[] {
     if (store.fulfilmentTypes) return [...store.fulfilmentTypes];
     return STOREFRONT_FULFILMENT_TYPES.filter((t) =>
         t === "PICKUP"

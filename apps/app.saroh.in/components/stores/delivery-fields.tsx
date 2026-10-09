@@ -1,7 +1,6 @@
 "use client";
 
 import { Input } from "@saroh/ui/input";
-import { Label } from "@saroh/ui/label";
 import { cn } from "@saroh/ui/lib/utils";
 import {
     Select,
@@ -10,52 +9,14 @@ import {
     SelectTrigger,
     SelectValue,
 } from "@saroh/ui/select";
-import type { ReactNode } from "react";
 
 import { currencySymbol } from "@/lib/format/money";
 import type { LateUnit } from "@/lib/stores/late-after";
 
 /**
- * The Delivery tab's columns: the way (its switch and name), Fee, Late
- * after, and the row's Save. One template for the header and every row, so
- * the columns line up; below `sm` a row stacks instead (the way, then its
- * fields side by side) and the header isn't drawn.
+ * The Delivery edit panel's two fields. A money amount with its
+ * currency's sign inside the box: "[ 40  ₹ ]".
  */
-export function deliveryGrid(withFee: boolean): string {
-    return withFee
-        ? "sm:grid-cols-[minmax(0,1fr)_8.5rem_11.5rem_4.5rem]"
-        : "sm:grid-cols-[minmax(0,1fr)_11.5rem_4.5rem]";
-}
-
-/** Where a row's name starts: past the switch's column (44px + 12px). */
-export const PAST_SWITCH = "sm:pl-14";
-
-/**
- * A field's label: the column header says it at the desk, so it is read
- * there and shown only on a phone, where the header isn't drawn. `way`
- * goes before it for a screen reader ("Local delivery Fee").
- */
-export function CellLabel({
-    htmlFor,
-    way,
-    children,
-}: {
-    htmlFor: string;
-    way: string;
-    children: ReactNode;
-}) {
-    return (
-        <Label
-            htmlFor={htmlFor}
-            className="text-[11px] font-semibold uppercase tracking-[0.1em] text-muted-foreground sm:sr-only"
-        >
-            <span className="sr-only">{way} </span>
-            {children}
-        </Label>
-    );
-}
-
-/** A money amount with its currency's sign inside the box: "[ Free  ₹ ]". */
 export function MoneyField({
     id,
     value,

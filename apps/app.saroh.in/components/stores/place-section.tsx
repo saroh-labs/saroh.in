@@ -15,6 +15,7 @@ import {
 } from "@/lib/stores/links";
 import {
     ADDRESS_FIELD_ID,
+    KIND_FIELD_ID,
     LOCATION_SECTIONS,
 } from "@/lib/stores/location-readiness";
 import type { StorefrontKind } from "@/lib/stores/storefronts";
@@ -140,6 +141,7 @@ export function PlaceSection({
                         if (v === "SHOP" || v === "ONLINE") setKind(v);
                     }}
                     disabled={!canEdit || pending}
+                    id={KIND_FIELD_ID}
                     aria-labelledby="location-kind-label"
                     aria-describedby={
                         kindError ? "location-kind-error" : undefined

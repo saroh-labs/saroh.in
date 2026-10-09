@@ -179,7 +179,7 @@ describe("StorefrontsScreen as a location's own page", () => {
 
     it("opens the tab the address names, and The place for one it doesn't", () => {
         expect(tabsOf(screen({}, "delivery")).open).toBe("Delivery");
-        expect(screen({}, "delivery")).toContain('id="storefront-way-pickup"');
+        expect(screen({}, "delivery")).toContain('id="delivery-pickup"');
         expect(tabsOf(screen({}, "nonsense")).open).toBe("The place");
         // A tab the page doesn't offer falls back too.
         expect(
@@ -454,106 +454,120 @@ describe("Delivery", () => {
     const delivery = (
         props: Partial<Parameters<typeof StorefrontsScreen>[0]>,
     ) => screen(props, "delivery");
+    const summaryOf = (html: string, way: string) =>
+        text(
+            new RegExp(
+                `data-testid="delivery-${way}-summary"[^>]*>(.*?)</span>`,
+            ).exec(html)?.[1] ?? "",
+        ).trim();
 
-    it("a row per way; Pick-up off with no counter is off, and says why", () => {
-        const html = delivery({
-            storefronts: [summary(online)],
-            selected: online,
-        });
-        const t = text(html);
-        expect(t).toContain("Pick-up Needs a counter");
-        expect(t).toContain("Local delivery");
-        expect(t).toContain("Shipping");
-        expect(html).toMatch(
-            /id="storefront-way-pickup"[^>]*disabled=""|disabled=""[^>]*id="storefront-way-pickup"/,
-        );
-        // The 35-word warning is gone.
-        expect(t).not.toContain("Choose Customers visit and add the address");
-    });
-
-    it("Pick-up saved on for a No counter location shows as it is, and why the website skips it", () => {
-        const html = delivery({
-            storefronts: [summary(online)],
-            selected: { ...online, fulfilmentTypes: ["PICKUP"] },
-        });
-        expect(text(html)).toContain(
-            "Not on your website: it needs a counter.",
-        );
-        // On, and can be turned off: nothing is changed for it on render.
-        expect(html).toMatch(
-            /id="storefront-way-pickup"[^>]*aria-checked="true"|aria-checked="true"[^>]*id="storefront-way-pickup"/,
-        );
-        expect(html).not.toMatch(
-            /id="storefront-way-pickup"[^>]*disabled=""|disabled=""[^>]*id="storefront-way-pickup"/,
-        );
-    });
-
-    it("a fee per delivery way while the online shop is open, and late after per way", () => {
+    it("reads first: a sentence per way, with Edit, and no open fields", () => {
         const html = delivery({
             selected: {
                 ...hill,
                 fulfilmentTypes: ["PICKUP", "LOCAL_DELIVERY", "SHIPPING"],
                 siteShop: true,
                 localDeliveryFee: "40.00",
+                freeShippingThreshold: "999.00",
+                lateAfterMinutes: {
+                    PICKUP: 120,
+                    LOCAL_DELIVERY: 1440,
+                    SHIPPING: 2880,
+                },
             },
         });
-        expect(html).toContain('id="storefront-way-local_delivery-fee"');
-        expect(html).toContain('id="storefront-way-shipping-fee"');
-        expect(html).not.toContain('id="storefront-way-pickup-fee"');
-        expect(html).toContain('id="storefront-way-pickup-late"');
-        // One line of help under the list, no more.
+        expect(summaryOf(html, "local_delivery")).toBe(
+            "₹40 · free over ₹999 · late after 24 h",
+        );
+        expect(summaryOf(html, "shipping")).toBe("Free · late after 2 days");
+        expect(summaryOf(html, "pickup")).toBe("Free · late after 2 h");
+        expect(html).not.toContain("<input");
+        expect(html).not.toContain('role="switch"');
+        expect(html.match(/>Edit</g)).toHaveLength(3);
         expect(text(html)).toContain("Your website checkout offers these.");
-        expect(text(html)).not.toContain("Bookings and digital products");
-        expect(text(html)).not.toContain("Late counts from");
-    });
-
-    it("no card, no frame: no visible heading repeating the tab, hairlines only", () => {
-        const html = delivery({
-            selected: {
-                ...hill,
-                fulfilmentTypes: ["LOCAL_DELIVERY"],
-                siteShop: true,
-            },
-        });
-        // The heading is for the outline only.
-        expect(html).toMatch(/<h2[^>]*class="sr-only"[^>]*>Delivery<\/h2>/);
-        expect(panel(html)).not.toMatch(/rounded-xl/);
-        expect(panel(html)).not.toMatch(/rounded-lg border border-border/);
-        // The column headers once, for the screen; fields named per way.
-        expect(html.match(/>Fee</g)).toHaveLength(2); // header + LD's label
-        expect(html).toContain("Local delivery </span>Fee");
-    });
-
-    it("the switch leads each row, named by its way, in one column", () => {
-        const html = delivery({
-            selected: {
-                ...hill,
-                fulfilmentTypes: ["PICKUP", "LOCAL_DELIVERY", "SHIPPING"],
-                siteShop: true,
-            },
-        });
-        for (const way of ["pickup", "local_delivery", "shipping"]) {
-            // The switch comes before its label in each row.
-            expect(html).toMatch(
-                new RegExp(
-                    `role="switch"[^>]*id="storefront-way-${way}"[^]*?<label[^>]*for="storefront-way-${way}"`,
-                ),
-            );
-        }
-    });
-
-    it("late after is one joined control: the amount and its unit in one box", () => {
-        const html = delivery({});
-        expect(html).toMatch(
-            /focus-within:ring-2[^"]*"><input[^>]*id="storefront-way-pickup-late"[^]*?aria-label="Pick-up late after, unit"/,
+        expect(text(html)).toContain(
+            "Bookings and digital products need none of these.",
         );
     });
 
-    it("every Location tab draws its part without a card or a visible title", () => {
+    it("a way that is off says Off", () => {
+        const html = delivery({
+            selected: { ...hill, fulfilmentTypes: ["PICKUP"] },
+        });
+        expect(summaryOf(html, "shipping")).toBe("Off");
+    });
+
+    it("Pick-up where customers can't visit: Not offered, and the way to a counter", () => {
+        const html = delivery({
+            storefronts: [summary(online)],
+            selected: online,
+        });
+        const t = text(html);
+        expect(summaryOf(html, "pickup")).toBe("Not offered");
+        expect(t).toContain("Customers can't visit this location.");
+        expect(t).toContain("Add an address");
+        // No Edit for it: there is nothing it could be turned on to.
+        expect(html.match(/>Edit</g)).toHaveLength(2);
+        // The 35-word warning is gone.
+        expect(t).not.toContain("Choose Customers visit and add the address");
+    });
+
+    it("Pick-up saved on where customers can't visit: says so, and offers Turn off", () => {
+        const html = delivery({
+            storefronts: [summary(online)],
+            selected: { ...online, fulfilmentTypes: ["PICKUP"] },
+        });
+        expect(text(html)).toContain(
+            "Not on your website: customers can't visit this location.",
+        );
+        expect(text(html)).toContain("Turn off");
+    });
+
+    it("no fee to say while the online shop is closed", () => {
+        const html = delivery({
+            selected: {
+                ...hill,
+                fulfilmentTypes: ["SHIPPING"],
+                shippingFee: "60.00",
+            },
+        });
+        expect(summaryOf(html, "shipping")).toBe("On · late after 2 days");
+        expect(text(html)).not.toContain("Your website checkout offers these");
+    });
+
+    it("the free-over amount isn't a way of its own", () => {
+        const t = text(
+            delivery({
+                selected: {
+                    ...hill,
+                    fulfilmentTypes: ["LOCAL_DELIVERY"],
+                    freeShippingThreshold: "999.00",
+                    siteShop: true,
+                },
+            }),
+        );
+        expect(t).not.toContain("Free delivery over");
+    });
+
+    it("keeps the late-after anchor Orders' notice links to", () => {
+        expect(delivery({})).toContain('id="late-after"');
+    });
+
+    it("read-only: the sentences, without Edit or Turn off", () => {
+        const html = delivery({
+            canEdit: false,
+            storefronts: [summary(online)],
+            selected: { ...online, fulfilmentTypes: ["PICKUP", "SHIPPING"] },
+        });
+        expect(html).not.toContain(">Edit<");
+        expect(html).not.toContain(">Turn off<");
+        expect(text(html)).not.toContain("Add an address");
+    });
+
+    it("the other Location tabs draw no card or visible title", () => {
         for (const section of [
             null,
             "payments",
-            "delivery",
             "customers",
             "pause-or-close",
         ]) {
@@ -561,35 +575,6 @@ describe("Delivery", () => {
             expect(panel(html)).not.toMatch(/rounded-xl/);
             expect(html).toMatch(/<h2[^>]*class="sr-only"/);
         }
-    });
-
-    it("no fee to set while the online shop is closed", () => {
-        const html = delivery({
-            selected: { ...hill, fulfilmentTypes: ["SHIPPING"] },
-        });
-        expect(html).not.toContain('id="storefront-way-shipping-fee"');
-        expect(text(html)).not.toContain("Your website checkout offers these");
-    });
-
-    it("free delivery over is one amount, and says what website orders get (DEC-117)", () => {
-        const t = text(
-            delivery({
-                selected: {
-                    ...hill,
-                    fulfilmentTypes: ["LOCAL_DELIVERY"],
-                    freeShippingThreshold: "999.00",
-                },
-            }),
-        );
-        expect(t).toContain("Free delivery over");
-        expect(t).toContain(
-            "Website orders at or above this, after any code, pay no delivery fee. Empty: always charge.",
-        );
-        expect(t).not.toContain("doesn't apply it yet");
-    });
-
-    it("keeps the late-after anchor Orders' notice links to", () => {
-        expect(delivery({})).toContain('id="late-after"');
     });
 });
 

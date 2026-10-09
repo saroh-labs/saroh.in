@@ -18,6 +18,8 @@ export type Saver = (
      * the location limit, by the radio it stopped.
      */
     inline?: (error: string) => void,
+    /** After the API took it: an edit panel closes. */
+    onSaved?: () => void,
 ) => void;
 
 export interface SectionProps {
