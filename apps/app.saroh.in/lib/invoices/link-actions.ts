@@ -19,7 +19,9 @@ import { forgetLink, rememberLink } from "./minted-links";
 /** A new pay link, remembered. `updatedAt`: the invoice's, as known now. */
 export async function newPayLink(id: string, updatedAt?: string | null) {
     const res = await createPayLink(id);
-    if (res.ok) rememberLink(id, res.data.url, updatedAt);
+    if (res.ok) {
+        rememberLink(id, res.data.url, updatedAt, res.data.payLinkMadeAt);
+    }
     return res;
 }
 

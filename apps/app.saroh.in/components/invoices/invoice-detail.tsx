@@ -129,6 +129,8 @@ export function InvoiceDetail({
     online: {
         providerConnected: boolean;
         payLinkActive: boolean;
+        /** When the link out was made (#870); absent from an older API. */
+        payLinkMadeAt?: string | null;
         /** An autopay charge under way (D13): the pay link is held. */
         autopayCharge?: { at: string } | null;
         /** Why its link can't take payment (#835); absent from an older API. */
@@ -177,6 +179,7 @@ export function InvoiceDetail({
     const payUrl = mintedLink(invoice.id, {
         standing: s,
         updatedAt: invoice.updatedAt,
+        payLinkMadeAt: online?.payLinkMadeAt,
     });
     const url = viewUrl ?? payUrl;
     // A view link (#833) or a pay link: what the copied address opens.
@@ -426,6 +429,7 @@ export function InvoiceDetail({
                                 // be shown, only replaced (UX-048).
                                 <UnseenLinkNote
                                     sendable={sendable}
+                                    madeAt={online.payLinkMadeAt}
                                     className="mt-2"
                                 />
                             ) : null

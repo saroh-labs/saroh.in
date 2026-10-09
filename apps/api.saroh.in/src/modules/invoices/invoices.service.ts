@@ -80,6 +80,15 @@ export interface LinkOptions {
     requireProvider: boolean;
 }
 const PAY_LINK: LinkOptions = { requireProvider: true };
+
+/**
+ * A link just made: its token, seen this once, and when it was made, which
+ * the invoice keeps beside the token's hash (#870).
+ */
+export interface MadeLink {
+    token: string;
+    payLinkCreatedAt: Date;
+}
 const VIEW_LINK: LinkOptions = { requireProvider: false };
 
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -217,7 +226,7 @@ export class InvoicesService {
     async createPayLink(
         ctx: OrganizationContext,
         id: string,
-    ): Promise<{ token: string }> {
+    ): Promise<MadeLink> {
         return this.payLink(prisma, ctx, id, PAY_LINK);
     }
 
@@ -233,7 +242,7 @@ export class InvoicesService {
     async createViewLink(
         ctx: OrganizationContext,
         id: string,
-    ): Promise<{ token: string }> {
+    ): Promise<MadeLink> {
         return this.payLink(prisma, ctx, id, VIEW_LINK);
     }
 
@@ -251,7 +260,7 @@ export class InvoicesService {
         ctx: OrganizationContext,
         id: string,
         options: LinkOptions = PAY_LINK,
-    ): Promise<{ token: string }> {
+    ): Promise<MadeLink> {
         return this.payLink(tx, ctx, id, options);
     }
 
@@ -260,7 +269,7 @@ export class InvoicesService {
         ctx: OrganizationContext,
         id: string,
         options: LinkOptions,
-    ): Promise<{ token: string }> {
+    ): Promise<MadeLink> {
         authorize(ctx, "invoice:write");
         // A link asks to be paid: the business details first (DEC-068). A
         // member's own "Pay now" is never refused for it.
@@ -294,7 +303,7 @@ export class InvoicesService {
         db: Tx,
         organizationId: string,
         id: string,
-    ): Promise<{ token: string }> {
+    ): Promise<MadeLink> {
         return this.mintInvoiceLink(db, organizationId, id, PAY_LINK);
     }
 
@@ -309,7 +318,7 @@ export class InvoicesService {
         organizationId: string,
         id: string,
         options: LinkOptions,
-    ): Promise<{ token: string }> {
+    ): Promise<MadeLink> {
         const ctx = { organizationId };
         const current = await this.read(ctx.organizationId, id, db);
         this.assertOwnPaper(current, "given a pay link");
@@ -332,6 +341,7 @@ export class InvoicesService {
             throw autopayChargeInProgress();
         }
         const { token, tokenHash } = mintPayToken();
+        const payLinkCreatedAt = new Date();
         const { count } = await db.invoice.updateMany({
             where: {
                 id,
@@ -340,12 +350,12 @@ export class InvoicesService {
                 orderId: null,
                 kind: { not: "CREDIT_NOTE" },
             },
-            data: { payTokenHash: tokenHash },
+            data: { payTokenHash: tokenHash, payLinkCreatedAt },
         });
         if (count === 0) {
             throw new ConflictException("This invoice changed. Reload it.");
         }
-        return { token };
+        return { token, payLinkCreatedAt };
     }
 
     /**
@@ -1006,6 +1016,7 @@ export class InvoicesService {
                 voidedAt: new Date(),
                 voidReason: reason,
                 payTokenHash: null,
+                payLinkCreatedAt: null,
             },
         });
         if (count === 0) {
@@ -1028,7 +1039,11 @@ export class InvoicesService {
             }),
             prisma.invoice.findFirst({
                 where: { id: invoiceId, organizationId },
-                select: { payTokenHash: true, subscriptionId: true },
+                select: {
+                    payTokenHash: true,
+                    payLinkCreatedAt: true,
+                    subscriptionId: true,
+                },
             }),
             prisma.paymentIntent.findMany({
                 where: { organizationId, invoiceId, status: "SUCCEEDED" },
@@ -1062,6 +1077,11 @@ export class InvoicesService {
             onlineBlocker,
             providerConnected: connected > 0,
             payLinkActive: Boolean(link?.payTokenHash),
+            // When the link that is out was made; never the token (#870).
+            payLinkMadeAt:
+                link?.payTokenHash && link.payLinkCreatedAt
+                    ? link.payLinkCreatedAt.toISOString()
+                    : null,
             payments: intents.map((i) => ({
                 id: i.id,
                 provider: i.provider,

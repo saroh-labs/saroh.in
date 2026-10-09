@@ -140,11 +140,13 @@ export function InvoiceQuickLook({
 
     // A link made for this invoice earlier in this tab: shown again as it
     // is, never replaced by a new one — unless the full read says it can't
-    // be the one out any more: paid or void, or changed since (#870).
+    // be the one out any more: paid or void, or another link made since
+    // (#870).
     const remembered = canLink
         ? mintedLink(i.id, {
               standing: full?.standing,
               updatedAt: full?.updatedAt,
+              payLinkMadeAt: full?.online?.payLinkMadeAt,
           })
         : null;
     // One out that this tab didn't make (after a reload, or on another
@@ -379,7 +381,12 @@ export function InvoiceQuickLook({
             <p className="text-[12.5px] leading-[1.5] text-foreground">
                 {payLine(i, money)}
             </p>
-            {unseen ? <UnseenLinkNote sendable={false} /> : null}
+            {unseen ? (
+                <UnseenLinkNote
+                    sendable={false}
+                    madeAt={full?.online?.payLinkMadeAt}
+                />
+            ) : null}
 
             <NewLinkConfirm
                 open={confirming}

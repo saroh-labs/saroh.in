@@ -11,14 +11,17 @@
  */
 
 /**
- * A link this tab made, and how the invoice stood around it: `before` is
- * the invoice's `updatedAt` as this tab knew it when the link was made, and
- * `seen` the first one read after. Making a link changes the invoice, so
- * that first later read is the link's own; any later change means
- * something else may have replaced the token (UX-048, #870).
+ * A link this tab made. `madeAt` is when the API says it was made (#870):
+ * the invoice keeps that date beside the token's hash, and a read naming
+ * another date means another token is out. Without it (an older API) the
+ * invoice's `updatedAt` stands in: `before` is the one this tab knew when
+ * the link was made, and `seen` the first one read after. Making a link
+ * changes the invoice, so that first later read is the link's own; any
+ * later change means something else may have replaced the token.
  */
 interface Held {
     url: string;
+    madeAt: number | null;
     before: number | null;
     seen: number | null;
 }
@@ -32,6 +35,11 @@ const LIVE = new Set(["ISSUED", "OVERDUE"]);
 export interface LinkState {
     standing?: string | null;
     updatedAt?: string | null;
+    /**
+     * When the link that is out was made (#870); null when none is out or
+     * its date wasn't kept; absent from an older API.
+     */
+    payLinkMadeAt?: string | null;
 }
 
 function time(iso: string | null | undefined): number | null {
@@ -43,9 +51,13 @@ function time(iso: string | null | undefined): number | null {
 /**
  * The address made for this invoice in this tab, or null. Given how the
  * invoice stands now, it is forgotten once it can't be the link that is
- * out: the invoice is paid, void or cancelled, or it changed after the
- * link was made — a send, a reminder, a view link, or the customer's own
- * "Pay now" on their account each make a new one and end this one.
+ * out: the invoice is paid, void or cancelled, or another link replaced it
+ * — a send, a reminder, a view link, or the customer's own "Pay now" on
+ * their account each make a new one and end this one.
+ *
+ * Where both dates are known, the link's own date decides (#870): any
+ * other change to the invoice, an edited note or a payment recorded
+ * elsewhere, leaves the token alone and the link shown.
  */
 export function mintedLink(invoiceId: string, now?: LinkState): string | null {
     const held = minted.get(invoiceId);
@@ -55,6 +67,10 @@ export function mintedLink(invoiceId: string, now?: LinkState): string | null {
         minted.delete(invoiceId);
         return null;
     }
+    if (held.madeAt !== null && now.payLinkMadeAt !== undefined) {
+        return byMadeAt(invoiceId, held, held.madeAt, now);
+    }
+    // An older API, or a link made before the date was answered.
     const at = time(now.updatedAt);
     // Read from before the link was made, or nothing to compare.
     if (at === null || (held.before !== null && at <= held.before)) {
@@ -73,15 +89,45 @@ export function mintedLink(invoiceId: string, now?: LinkState): string | null {
 }
 
 /**
+ * The link's date against the read's (#870). The same date: it is the one
+ * out. A later one: something made another. An earlier one, or none, is a
+ * read from before this link was made — unless the invoice changed after
+ * it, when the link was cleared (a deleted contact, say).
+ */
+function byMadeAt(
+    invoiceId: string,
+    held: Held,
+    made: number,
+    now: LinkState,
+): string | null {
+    const out = time(now.payLinkMadeAt);
+    if (out === made) return held.url;
+    const changedSince =
+        (time(now.updatedAt) ?? Number.NEGATIVE_INFINITY) > made;
+    if ((out !== null && out > made) || (out === null && changedSince)) {
+        minted.delete(invoiceId);
+        return null;
+    }
+    return held.url;
+}
+
+/**
  * Keep the address just made; it replaces any made before. `updatedAt` is
- * the invoice's as this tab knew it before the link was made.
+ * the invoice's as this tab knew it before the link was made; `madeAt` the
+ * link's date as the API answered it (#870), when it did.
  */
 export function rememberLink(
     invoiceId: string,
     url: string,
     updatedAt?: string | null,
+    madeAt?: string | null,
 ): void {
-    minted.set(invoiceId, { url, before: time(updatedAt), seen: null });
+    minted.set(invoiceId, {
+        url,
+        madeAt: time(madeAt),
+        before: time(updatedAt),
+        seen: null,
+    });
 }
 
 /**
@@ -146,9 +192,17 @@ export const UNSEEN_LINK = {
 /**
  * Why the link that is out isn't shown, and what a new one costs. Sending
  * the invoice makes a new link too, so where it can be sent, that is said.
+ * `madeOn` is the day it was made, already written (#870); without one the
+ * line says only that a link is out.
  */
-export function unseenLinkLine(state: { sendable: boolean }): string {
-    return `A pay link is out and still works. Its full address is shown only once, when it's made, so it can't be shown again here or on another device. ${
+export function unseenLinkLine(state: {
+    sendable: boolean;
+    madeOn?: string | null;
+}): string {
+    const lead = state.madeOn
+        ? `A pay link was made on ${state.madeOn} and still works.`
+        : "A pay link is out and still works.";
+    return `${lead} Its full address is shown only once, when it's made, so it can't be shown again here or on another device. ${
         state.sendable
             ? "Making a new link, or sending the invoice, ends the old one."
             : "Making a new link ends the old one."

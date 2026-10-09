@@ -99,6 +99,82 @@ describe("a remembered link that was replaced or ended", () => {
     });
 });
 
+/**
+ * #870, owner 8 Oct: the invoice keeps when its link was made. A new date
+ * means a new token; any other change leaves the link that is out alone.
+ */
+describe("a remembered link, judged by its own date", () => {
+    beforeEach(() => forgetLinks());
+    const url = "https://rye.saroh.app/pay/a";
+    const BEFORE = "2026-10-08T09:00:00.000Z";
+    const MADE = "2026-10-08T10:00:00.000Z";
+    const LATER = "2026-10-08T10:30:00.000Z";
+    const LATEST = "2026-10-08T11:00:00.000Z";
+
+    it("is shown again however often the invoice changes otherwise", () => {
+        rememberLink("inv_1", url, BEFORE, MADE);
+        for (const updatedAt of [MADE, LATER, LATEST]) {
+            expect(
+                mintedLink("inv_1", {
+                    standing: "ISSUED",
+                    updatedAt,
+                    payLinkMadeAt: MADE,
+                }),
+            ).toBe(url);
+        }
+    });
+
+    it("is forgotten when a read names a later link: another was made", () => {
+        rememberLink("inv_1", url, BEFORE, MADE);
+        expect(
+            mintedLink("inv_1", {
+                standing: "ISSUED",
+                updatedAt: LATER,
+                payLinkMadeAt: LATER,
+            }),
+        ).toBeNull();
+        expect(mintedLink("inv_1")).toBeNull();
+    });
+
+    it("survives a read from before it was made", () => {
+        rememberLink("inv_1", url, BEFORE, MADE);
+        // No link yet, or the one it replaced.
+        expect(
+            mintedLink("inv_1", {
+                standing: "ISSUED",
+                updatedAt: BEFORE,
+                payLinkMadeAt: null,
+            }),
+        ).toBe(url);
+        expect(
+            mintedLink("inv_1", {
+                standing: "ISSUED",
+                updatedAt: BEFORE,
+                payLinkMadeAt: BEFORE,
+            }),
+        ).toBe(url);
+    });
+
+    it("is forgotten when the link was cleared after it was made", () => {
+        rememberLink("inv_1", url, BEFORE, MADE);
+        expect(
+            mintedLink("inv_1", {
+                standing: "ISSUED",
+                updatedAt: LATER,
+                payLinkMadeAt: null,
+            }),
+        ).toBeNull();
+    });
+
+    it("falls back to the invoice's changes when a read has no date (older API)", () => {
+        rememberLink("inv_1", url, BEFORE, MADE);
+        mintedLink("inv_1", { standing: "ISSUED", updatedAt: MADE });
+        expect(
+            mintedLink("inv_1", { standing: "ISSUED", updatedAt: LATER }),
+        ).toBeNull();
+    });
+});
+
 describe("copyLinkLabel", () => {
     const base = { busy: false, shown: false, linkOut: false };
 
@@ -145,6 +221,15 @@ describe("the unseen link's words", () => {
     it("says why the address isn't shown, and that a new link ends the old one", () => {
         expect(unseenLinkLine({ sendable: false })).toBe(
             "A pay link is out and still works. Its full address is shown only once, when it's made, so it can't be shown again here or on another device. Making a new link ends the old one.",
+        );
+    });
+
+    it("names the day it was made when that is known (#870)", () => {
+        expect(unseenLinkLine({ sendable: false, madeOn: "8 Oct 2026" })).toBe(
+            "A pay link was made on 8 Oct 2026 and still works. Its full address is shown only once, when it's made, so it can't be shown again here or on another device. Making a new link ends the old one.",
+        );
+        expect(unseenLinkLine({ sendable: false, madeOn: null })).toMatch(
+            /^A pay link is out and still works\./,
         );
     });
 

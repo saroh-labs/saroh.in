@@ -79,6 +79,29 @@ describe("actions that replace the link", () => {
         expect(mintedLink("inv_1")).toBe("https://rye.saroh.app/pay/new");
     });
 
+    it("a new pay link keeps the date the API made it on (#870)", async () => {
+        const made = "2026-10-08T10:00:00.000Z";
+        vi.mocked(createPayLink).mockResolvedValue({
+            ok: true,
+            data: { url: "https://rye.saroh.app/pay/new", payLinkMadeAt: made },
+        } as never);
+        await newPayLink("inv_1", "2026-10-08T09:00:00.000Z");
+        // A later edit to the invoice doesn't end it; a later link does.
+        const read = {
+            standing: "ISSUED",
+            updatedAt: "2026-10-08T11:00:00.000Z",
+        };
+        expect(mintedLink("inv_1", { ...read, payLinkMadeAt: made })).toBe(
+            "https://rye.saroh.app/pay/new",
+        );
+        expect(
+            mintedLink("inv_1", {
+                ...read,
+                payLinkMadeAt: "2026-10-08T11:00:00.000Z",
+            }),
+        ).toBeNull();
+    });
+
     it("only the invoice acted on forgets", async () => {
         rememberLink("inv_2", OLD);
         vi.mocked(sendInvoice).mockResolvedValue(sent as never);

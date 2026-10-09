@@ -5901,7 +5901,10 @@ model Invoice {
   // The pay link (U13): the SHA-256 of a random token, never the token.
   // Minted when a link is first asked for, replaced by a new one, cleared on
   // void and when the contact is deleted. Null means no link works.
-  payTokenHash String? @unique
+  // `payLinkCreatedAt` is when the current token was made, set and cleared
+  // with it (#870): the workspace names the date of a link it can't show.
+  payTokenHash     String?   @unique
+  payLinkCreatedAt DateTime?
 
   lines          InvoiceLine[]
   paymentIntents PaymentIntent[]

@@ -127,7 +127,10 @@ beforeEach(() => {
 
 describe("making a pay link", () => {
     it("keeps only the token's hash and hands the token back once", async () => {
-        const { token } = await service.createPayLink(owner, "inv_1");
+        const { token, payLinkCreatedAt } = await service.createPayLink(
+            owner,
+            "inv_1",
+        );
 
         expect(token).toMatch(/^[A-Za-z0-9_-]{43}$/); // 256 bits, base64url
         expect(db.invoice.updateMany).toHaveBeenCalledWith({
@@ -139,8 +142,10 @@ describe("making a pay link", () => {
                 orderId: null,
                 kind: { not: "CREDIT_NOTE" },
             },
-            data: { payTokenHash: hashPayToken(token) },
+            // When it was made is kept beside the hash (#870).
+            data: { payTokenHash: hashPayToken(token), payLinkCreatedAt },
         });
+        expect(payLinkCreatedAt).toBeInstanceOf(Date);
         expect(JSON.stringify(db.invoice.updateMany?.mock.calls)).not.toContain(
             token,
         );
@@ -156,6 +161,25 @@ describe("making a pay link", () => {
         expect(hashes).toEqual([
             hashPayToken(first.token),
             hashPayToken(second.token),
+        ]);
+    });
+
+    it("dates each new token, so a replaced link reads as a new date (#870)", async () => {
+        jest.useFakeTimers({ now: new Date("2026-10-08T09:00:00Z") });
+        try {
+            await service.createPayLink(owner, "inv_1");
+            jest.setSystemTime(new Date("2026-10-08T10:30:00Z"));
+            await service.createPayLink(owner, "inv_1");
+        } finally {
+            jest.useRealTimers();
+        }
+        const dates = db.invoice.updateMany?.mock.calls.map(
+            (c: [{ data: { payLinkCreatedAt: Date } }]) =>
+                c[0].data.payLinkCreatedAt.toISOString(),
+        );
+        expect(dates).toEqual([
+            "2026-10-08T09:00:00.000Z",
+            "2026-10-08T10:30:00.000Z",
         ]);
     });
 
@@ -250,7 +274,10 @@ describe("making a pay link", () => {
         );
         expect(own.invoice.updateMany).toHaveBeenCalledWith(
             expect.objectContaining({
-                data: { payTokenHash: hashPayToken(token) },
+                data: {
+                    payTokenHash: hashPayToken(token),
+                    payLinkCreatedAt: expect.any(Date),
+                },
             }),
         );
         expect(db.invoice.findFirst).not.toHaveBeenCalled();
@@ -323,7 +350,10 @@ describe("a pay link on a plan without online payments", () => {
         expect(token).toMatch(/^[A-Za-z0-9_-]{43}$/);
         expect(db.invoice.updateMany).toHaveBeenCalledWith(
             expect.objectContaining({
-                data: { payTokenHash: hashPayToken(token) },
+                data: {
+                    payTokenHash: hashPayToken(token),
+                    payLinkCreatedAt: expect.any(Date),
+                },
             }),
         );
     });
@@ -453,6 +483,8 @@ describe("revoking a pay link", () => {
             data: expect.objectContaining({
                 status: "VOID",
                 payTokenHash: null,
+                // Its date goes with it (#870).
+                payLinkCreatedAt: null,
             }),
         });
     });
@@ -464,7 +496,12 @@ describe("the invoice read", () => {
             (args: { select: Record<string, unknown> }) =>
                 Promise.resolve(
                     "payTokenHash" in args.select
-                        ? { payTokenHash: "abc123" }
+                        ? {
+                              payTokenHash: "abc123",
+                              payLinkCreatedAt: new Date(
+                                  "2026-10-08T09:00:00Z",
+                              ),
+                          }
                         : row(),
                 ),
         );
@@ -473,11 +510,46 @@ describe("the invoice read", () => {
             autopayCharge: null,
             providerConnected: true,
             payLinkActive: true,
+            // When it was made (#870); the token never comes back.
+            payLinkMadeAt: "2026-10-08T09:00:00.000Z",
             payments: [],
             // #835: its provider opens a checkout, so nothing stands in the way.
             onlineBlocker: null,
         });
         expect(JSON.stringify(view)).not.toContain("abc123");
+    });
+
+    it("names no date when no link is out, even if one was kept (#870)", async () => {
+        db.invoice.findFirst?.mockImplementation(
+            (args: { select: Record<string, unknown> }) =>
+                Promise.resolve(
+                    "payTokenHash" in args.select
+                        ? {
+                              payTokenHash: null,
+                              payLinkCreatedAt: new Date(
+                                  "2026-10-08T09:00:00Z",
+                              ),
+                          }
+                        : row(),
+                ),
+        );
+        const view = await service.get(owner, "inv_1");
+        expect(view.online?.payLinkActive).toBe(false);
+        expect(view.online?.payLinkMadeAt).toBeNull();
+    });
+
+    it("names no date for a link made before the date was kept (#870)", async () => {
+        db.invoice.findFirst?.mockImplementation(
+            (args: { select: Record<string, unknown> }) =>
+                Promise.resolve(
+                    "payTokenHash" in args.select
+                        ? { payTokenHash: "abc123", payLinkCreatedAt: null }
+                        : row(),
+                ),
+        );
+        const view = await service.get(owner, "inv_1");
+        expect(view.online?.payLinkActive).toBe(true);
+        expect(view.online?.payLinkMadeAt).toBeNull();
     });
 
     it("marks a payment taken after the invoice was settled as owed back", async () => {

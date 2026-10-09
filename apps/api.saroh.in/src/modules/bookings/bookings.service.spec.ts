@@ -2350,7 +2350,7 @@ describe("cancelling inside the free-cancellation window (U3)", () => {
                 status: "ISSUED",
                 payTokenHash: { not: null },
             },
-            data: { payTokenHash: null },
+            data: { payTokenHash: null, payLinkCreatedAt: null },
         });
     });
 });

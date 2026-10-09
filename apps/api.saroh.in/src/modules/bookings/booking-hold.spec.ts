@@ -164,6 +164,7 @@ describe("createHoldInvoiceInTx", () => {
         expect(String(data.total)).toBe("1180.00");
         // Only the hash is stored; the token goes back once.
         expect(data.payTokenHash).toBe(hashPayToken(made.payToken));
+        expect(data.payLinkCreatedAt).toEqual(expect.any(Date));
         expect(made.invoiceId).toBe("inv_1");
         const lines = tx.invoiceLine.createMany.mock.calls[0][0].data;
         expect(lines).toHaveLength(1);
@@ -207,7 +208,11 @@ describe("renewHoldTokenInTx", () => {
                 source: "BOOKING",
                 status: "DRAFT",
             },
-            data: { payTokenHash: hashPayToken(token ?? "") },
+            data: {
+                payTokenHash: hashPayToken(token ?? ""),
+                // Dated with the token (#870).
+                payLinkCreatedAt: expect.any(Date),
+            },
         });
     });
 
@@ -265,6 +270,7 @@ describe("releaseHoldInTx", () => {
                 voidedAt: NOW,
                 voidReason: HOLD_RELEASED_REASON,
                 payTokenHash: null,
+                payLinkCreatedAt: null,
             },
         });
     });

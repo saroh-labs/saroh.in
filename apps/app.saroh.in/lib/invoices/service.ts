@@ -51,6 +51,11 @@ export interface InvoiceOnlinePayment {
 export interface InvoiceOnline {
     providerConnected: boolean;
     payLinkActive: boolean;
+    /**
+     * When the link that is out was made (#870); null when none is out or
+     * its date wasn't kept; absent from an older API.
+     */
+    payLinkMadeAt?: string | null;
     payments: InvoiceOnlinePayment[];
     /**
      * An autopay charge is under way on it (D13), `at` being when the debit
@@ -446,7 +451,7 @@ export function recordPayment(id: string, input: PaymentInput) {
  * one shared before stops working.
  */
 export function createPayLink(id: string) {
-    return send<{ url: string }>(
+    return send<{ url: string; payLinkMadeAt?: string }>(
         `${at(id)}/pay-link`,
         "POST",
         {},
@@ -460,7 +465,7 @@ export function createPayLink(id: string) {
  * a pay link it is seen once, and replaces the one before.
  */
 export function createViewLink(id: string) {
-    return send<{ url: string }>(
+    return send<{ url: string; payLinkMadeAt?: string }>(
         `${at(id)}/view-link`,
         "POST",
         {},

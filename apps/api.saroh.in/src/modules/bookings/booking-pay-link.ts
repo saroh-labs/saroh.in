@@ -154,7 +154,7 @@ export async function bookingPayLinkInTx(
     if (existing) {
         await tx.invoice.update({
             where: { id: existing.id },
-            data: { payTokenHash: tokenHash },
+            data: { payTokenHash: tokenHash, payLinkCreatedAt: now },
         });
         return { invoiceId: existing.id, token };
     }
@@ -196,6 +196,7 @@ export async function bookingPayLinkInTx(
             // Due by the session; a booking already under way, today.
             dueAt: booking.startAt > now ? booking.startAt : now,
             payTokenHash: tokenHash,
+            payLinkCreatedAt: now,
             createdByUserId: input.actorUserId,
         },
         select: { id: true },
@@ -241,6 +242,6 @@ export async function retirePayLinkInTx(
             status: "ISSUED",
             payTokenHash: { not: null },
         },
-        data: { payTokenHash: null },
+        data: { payTokenHash: null, payLinkCreatedAt: null },
     });
 }

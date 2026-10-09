@@ -1236,7 +1236,11 @@ describe("GST (ADR-008)", () => {
         expect(data.number).toMatch(/^RCCN\//);
         expect(tx.invoice!.updateMany).toHaveBeenCalledWith({
             where: { id: "inv_1", status: { in: ["ISSUED", "PAID"] } },
-            data: { status: "CREDITED", payTokenHash: null },
+            data: {
+                status: "CREDITED",
+                payTokenHash: null,
+                payLinkCreatedAt: null,
+            },
         });
     });
 
