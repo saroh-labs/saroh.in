@@ -550,6 +550,35 @@ describe("SitesService.getSite", () => {
         expect(site.footerPreview?.value).not.toMatch(/script|onerror/i);
     });
 
+    it("dates each page by its last change, page or sections (#908)", async () => {
+        siteFindFirst.mockResolvedValue({
+            id: "site_1",
+            pages: [
+                {
+                    id: "page_1",
+                    path: "/",
+                    title: "Home",
+                    isHome: true,
+                    hidden: false,
+                    kind: "FREE",
+                    inMenu: true,
+                    updatedAt: new Date("2026-10-01T09:00:00Z"),
+                    versions: [{ updatedAt: new Date("2026-10-05T12:00:00Z") }],
+                },
+            ],
+        });
+        (prisma.site.findMany as jest.Mock).mockResolvedValue([]);
+        const site = await service.getSite(ctx(), "site_1");
+        expect(site.pages[0]).toEqual(
+            expect.objectContaining({
+                id: "page_1",
+                updatedAt: new Date("2026-10-05T12:00:00Z"),
+            }),
+        );
+        // The draft is read for its date only; it never leaves the API.
+        expect(site.pages[0]).not.toHaveProperty("versions");
+    });
+
     it("has no footer preview when there is no footer", async () => {
         siteFindFirst.mockResolvedValue({ id: "site_1", pages: [] });
         (prisma.site.findMany as jest.Mock).mockResolvedValue([]);

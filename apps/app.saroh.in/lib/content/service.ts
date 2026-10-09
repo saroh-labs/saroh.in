@@ -29,6 +29,11 @@ export interface Post {
     image: string | null;
     publishedAt: string | null;
     createdAt: string;
+    /**
+     * When the post was last changed (#908). Absent from an API older than
+     * #908; `postUpdatedIso` falls back to `createdAt`.
+     */
+    updatedAt?: string;
     category: { id: string; name: string } | null;
     author: string | null;
     /**

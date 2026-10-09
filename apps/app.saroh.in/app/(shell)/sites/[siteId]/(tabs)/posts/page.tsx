@@ -15,6 +15,7 @@ import { listPosts } from "@/lib/content/service";
 import { pausedOrNull } from "@/lib/saroh-billing/service";
 import { requireSession } from "@/lib/session";
 import { getSite } from "@/lib/sites/service";
+import { postUpdatedIso } from "@/lib/sites/updated";
 
 export const metadata = { title: "Posts · Website" };
 
@@ -95,7 +96,7 @@ export default async function SitePostsPage({
             <PlanLimitNotice moduleId="blog" className="mb-4" />
             <ListCard
                 main="Post"
-                end="Date"
+                end="Updated"
                 note="Drafts are visible to the team and to nobody else."
             >
                 {posts.map((post) => {
@@ -145,10 +146,7 @@ export default async function SitePostsPage({
                                     end={
                                         <span className="whitespace-nowrap text-[12px] tabular-nums text-muted-foreground">
                                             <ViewerDate
-                                                iso={
-                                                    post.publishedAt ??
-                                                    post.createdAt
-                                                }
+                                                iso={postUpdatedIso(post)}
                                             />
                                         </span>
                                     }

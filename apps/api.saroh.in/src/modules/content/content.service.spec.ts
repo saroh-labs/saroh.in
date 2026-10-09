@@ -139,6 +139,25 @@ describe("Content: posts & categories (dev DB)", () => {
         expect(post.author).toBe("Wri Ter");
     });
 
+    it("lists each post with when it was last changed (#908)", async () => {
+        const before = (await posts.list(owner(), siteId)).find(
+            (p) => p.id === draftId,
+        );
+        expect(before?.updatedAt).toBeInstanceOf(Date);
+        await posts.update(owner(), siteId, draftId, {
+            title: "Hello World",
+            slug: "hello-world",
+            excerpt: "Edited",
+        });
+        const after = (await posts.list(owner(), siteId)).find(
+            (p) => p.id === draftId,
+        );
+        expect(after?.updatedAt.getTime()).toBeGreaterThanOrEqual(
+            before?.updatedAt.getTime() ?? Infinity,
+        );
+        expect(after?.status).toBe("DRAFT");
+    });
+
     it("rejects a duplicate slug per site", async () => {
         await expect(
             posts.create(owner(), siteId, {
