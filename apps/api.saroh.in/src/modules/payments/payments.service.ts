@@ -25,6 +25,7 @@ import {
 import { assertBusinessDetails } from "../invoices/business-details";
 import { creditNoteForRefund } from "../invoices/order-invoicing";
 import { NOT_PAID_ONLINE } from "../invoices/pay-online";
+import { assertWithinOrderLeftInTx } from "../orders/hand-refund";
 import { finishCancelInTx, isCancelRefundKey } from "../orders/order-cancel";
 import type {
     LineRefundRequest,
@@ -1159,6 +1160,17 @@ export class PaymentsService {
             // The order-level cap: never more than was taken and not yet
             // handed back, whatever the lines add up to.
             const split = allocateAcrossPayments(refundable, amountCents);
+            // And never more than is left on the order once refunds
+            // recorded by hand count (#865, DEC-116). An edit's difference
+            // is the order costing less, not a refund of what it kept.
+            if (!opts.forEdit) {
+                await assertWithinOrderLeftInTx(
+                    tx,
+                    order.id,
+                    amountCents,
+                    refundable[0].intent.currency,
+                );
+            }
             // Each line rides on the part its money comes back from, so a
             // part the provider refuses frees only its own lines.
             const partLines = apportionLines(

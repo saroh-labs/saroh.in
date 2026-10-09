@@ -1084,6 +1084,60 @@ export async function creditRestOfOrder(
 }
 
 /**
+ * Part of an order handed back by hand (#865, DEC-116): a credit note for
+ * `amountCents` against the order's invoice, spread over its invoiced lines
+ * in proportion to each line's amount, each share's GST worked out of it at
+ * the line's own rate and the original's split (CGST + SGST or IGST) — what
+ * any credit note that names no line does ({@link issueCreditNote}). Like
+ * {@link creditRestOfOrder}, a payment on a replaced charge still owed back
+ * is left out of the spread and never credited here, and the amount is
+ * capped at what is left to credit besides it. The invoice stays PAID
+ * unless this credits the last of it.
+ *
+ * Nothing when the order has no invoice (placed before U5) or nothing is
+ * left to credit.
+ */
+export async function creditPartOfOrder(
+    tx: Tx,
+    orderId: string,
+    amountCents: number,
+    note: string,
+    createdByUserId: string | null,
+): Promise<{ id: string; number: string | null } | null> {
+    const invoice = await tx.invoice.findFirst({
+        where: { orderId, kind: "INVOICE" },
+        select: { id: true },
+    });
+    if (!invoice) return null;
+    await tx.$queryRaw`SELECT id FROM "Invoice" WHERE id = ${invoice.id} FOR UPDATE`;
+    const held = await owedBackPayments(tx, orderId);
+    const original = await tx.invoice.findUnique({
+        where: { id: invoice.id },
+        select: ORIGINAL_SELECT,
+    });
+    if (!original) return null;
+    const heldCents = held.reduce((s, h) => s + h.heldCents, 0);
+    const rest = (await creditable(tx, original)) - heldCents;
+    const amount = Math.min(amountCents, rest);
+    if (amount <= 0) return null;
+    return issueCreditNote(tx, {
+        invoiceId: invoice.id,
+        amountCents: amount,
+        note,
+        createdByUserId,
+        ...(held.length > 0
+            ? {
+                  spreadOver: await invoicedLines(
+                      tx,
+                      original,
+                      held.map((h) => h.invoiceId),
+                  ),
+              }
+            : {}),
+    });
+}
+
+/**
  * The order's payments on replaced charges that are invoiced and not yet
  * all handed back: each one's supplementary invoice, and what of it no
  * refund's credit note has offset.

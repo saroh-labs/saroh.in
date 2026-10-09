@@ -9,7 +9,7 @@ import { PAYMENT_METHODS } from "../invoices/invoice-state";
 import type { InvoiceTitle } from "../invoices/invoice-title";
 import type { FulfilmentView, LateThresholds, LateView } from "./fulfilment";
 import { fulfilmentView, lateOf } from "./fulfilment";
-import { handPaidCents } from "./hand-payments";
+import { handPaidCents, leftToRefundCents } from "./hand-payments";
 import type { OrderAttention } from "./order-attention";
 import type { ChangeOptions } from "./order-change-types";
 import type { RawOrderInvoice } from "./order-invoice-title";
@@ -125,8 +125,18 @@ export interface OrderMoneyDto {
      * payment recorded by hand (`hand-payments.ts`).
      */
     paid: string;
-    /** Handed back (pending or settled). */
+    /**
+     * Handed back (pending or settled): online refunds and every amount
+     * recorded as refunded by hand.
+     */
     refunded: string;
+    /** Of `refunded`, what was handed back outside Saroh (#865). */
+    refundedByHand: string;
+    /**
+     * What a refund recorded by hand can still hand back (#865, DEC-116):
+     * what was paid less every refund. 0 once refunded in full.
+     */
+    leftToRefund: string;
     /** Still to collect: an order edited up, or never paid. */
     due: string;
     /**
@@ -295,6 +305,8 @@ export interface RawOrderRead {
     total: DecimalLike;
     /** Taken outside Saroh and recorded on it (`hand-payments.ts`). */
     paidByHand?: DecimalLike | null;
+    /** Handed back outside Saroh and recorded on it (`hand-refund.ts`). */
+    refundedByHand?: DecimalLike | null;
     notes: string | null;
     trackingUrl: string | null;
     courierName: string | null;
@@ -467,10 +479,15 @@ export function serializeOrderRead(
         (s, p) => s + p.amountCents,
         0,
     );
-    const refundedCents = order.paymentIntents.reduce(
-        (s, p) => s + p.refunds.reduce((r, x) => r + x.amountCents, 0),
-        0,
-    );
+    const byHandRefundCents = order.refundedByHand
+        ? Math.round(Number(order.refundedByHand.toString()) * 100)
+        : 0;
+    // Online refunds, and what was recorded as handed back by hand (#865).
+    const refundedCents =
+        order.paymentIntents.reduce(
+            (s, p) => s + p.refunds.reduce((r, x) => r + x.amountCents, 0),
+            0,
+        ) + byHandRefundCents;
     // Recorded by hand: marked paid with no provider payment behind it.
     const byHand =
         (order.paymentStatus === "PAID" ||
@@ -512,7 +529,7 @@ export function serializeOrderRead(
         paymentStatus: order.paymentStatus,
         refundStanding: refundStanding(
             order.paymentStatus,
-            capturedCents,
+            capturedCents + handPaidCents(order),
             refundedCents,
         ),
         stage: order.stage,
@@ -648,6 +665,8 @@ export function serializeOrderRead(
                       ? toMoneyString(order.total)
                       : money(capturedCents + handPaidCents(order)),
                   refunded: money(refundedCents),
+                  refundedByHand: money(byHandRefundCents),
+                  leftToRefund: money(leftToRefundCents(order)),
                   due: money(amountDueCents(order, capturedCents)),
                   recordedByHand: byHand,
                   paidHow: byHand ? handPaidHow(order.invoices) : null,

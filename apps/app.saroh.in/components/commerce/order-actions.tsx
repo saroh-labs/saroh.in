@@ -14,6 +14,7 @@ import { useRouter } from "next/navigation";
 import { ConfirmDialog } from "@/components/shared/confirm-dialog";
 import type { PaymentMethod } from "@/lib/invoices/service";
 import { updateOrder } from "@/lib/orders/actions";
+import { handRefundDone } from "@/lib/orders/hand-refund";
 import {
     canCancel,
     PAYMENT_LABEL,
@@ -49,6 +50,8 @@ export function OrderActions({
     withCancel = true,
     canRecord = true,
     canRefund = true,
+    refundLeft,
+    format,
 }: {
     storeId: string;
     orderId: string;
@@ -69,6 +72,12 @@ export function OrderActions({
      * neither is drawn: the API would refuse them.
      */
     canRefund?: boolean;
+    /**
+     * What is left to refund, in major units (#865): with `format`, Record
+     * as refunded offers another amount up to it.
+     */
+    refundLeft?: number;
+    format?: (amount: number) => string;
 }) {
     const router = useRouter();
     const setPending = onPendingChange;
@@ -81,7 +90,7 @@ export function OrderActions({
     );
     const cancellable = withCancel && canRefund && canCancel(status);
 
-    async function commit(p: Pending, how?: PaymentMethod) {
+    async function commit(p: Pending, how?: PaymentMethod, amount?: string) {
         const res = await updateOrder(
             storeId,
             orderId,
@@ -93,6 +102,10 @@ export function OrderActions({
                               ? { refundedHow: how }
                               : { paidHow: how }
                           : {}),
+                      // Another amount handed back (#865).
+                      ...(p.to === "REFUNDED" && amount
+                          ? { refundAmount: amount }
+                          : {}),
                   }
                 : { status: "CANCELLED" },
         );
@@ -100,10 +113,19 @@ export function OrderActions({
             showError(res.error);
             return;
         }
+        // In part, the order stays paid: the toast says how much went back.
+        const part =
+            amount !== undefined &&
+            format !== undefined &&
+            (refundLeft === undefined || Number(amount) < refundLeft)
+                ? Number(amount)
+                : null;
         showSuccess(
             p.kind === "cancel"
                 ? `${orderRef} cancelled — its stock is back on the shelves`
-                : `${orderRef} marked ${PAYMENT_LABEL[p.to].toLowerCase()}`,
+                : p.to === "REFUNDED" && format
+                  ? handRefundDone(orderRef, part, format)
+                  : `${orderRef} marked ${PAYMENT_LABEL[p.to].toLowerCase()}`,
         );
         router.refresh();
     }
@@ -161,9 +183,11 @@ export function OrderActions({
                     }}
                     initial={recordingPaid.how}
                     refund={recordingPaid.to === "REFUNDED"}
-                    onRecord={(how) => {
+                    left={refundLeft}
+                    format={format}
+                    onRecord={(how, amount) => {
                         setPending(null);
-                        void commit(recordingPaid, how);
+                        void commit(recordingPaid, how, amount);
                     }}
                 />
             ) : null}

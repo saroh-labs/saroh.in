@@ -117,7 +117,21 @@ export function MoneyCard({
     const refund = refundLines(money, refundStanding, format);
     if (n(money.paid) > 0) pay.push(["Taken", format(n(money.paid))]);
     if (n(money.refunded) > 0) {
-        pay.push(["Refunded", format(n(money.refunded))]);
+        // Refunded so far; "· by hand" when all of it went back outside
+        // Saroh (#865).
+        const byHand = n(money.refundedByHand ?? "0");
+        pay.push([
+            "Refunded",
+            byHand > 0 && byHand >= n(money.refunded)
+                ? `${format(n(money.refunded))} · by hand`
+                : format(n(money.refunded)),
+        ]);
+        // In part: what a refund can still hand back (#865).
+        const left =
+            money.leftToRefund === undefined ? 0 : n(money.leftToRefund);
+        if (paymentStatus === "PAID" && left > 0) {
+            pay.push(["Left to refund", format(left)]);
+        }
     } else if (paymentStatus === "REFUNDED" && n(money.paid) > 0) {
         // Recorded as refunded by hand (UX-061): what was taken went back
         // outside Saroh, so it reads as refunded, not still taken.
