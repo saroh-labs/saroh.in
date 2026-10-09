@@ -107,12 +107,10 @@ export function withDevAccess(next: Middleware): Middleware {
         if (!isRead || !production) {
             return noIndex(new NextResponse("Not found", { status: 404 }));
         }
+        // An empty DEV_REDIRECT_PATH keeps the page, as an unset one does.
+        let target = `${url.pathname}${url.search}`;
         const fixed = process.env.DEV_REDIRECT_PATH?.trim();
-        return noIndex(
-            NextResponse.redirect(
-                new URL(fixed || `${url.pathname}${url.search}`, production),
-                307,
-            ),
-        );
+        if (fixed) target = fixed;
+        return noIndex(NextResponse.redirect(new URL(target, production), 307));
     };
 }

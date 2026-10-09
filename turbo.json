@@ -81,6 +81,7 @@
         "DEV_ACCESS_KEY",
         "DEV_ACCESS_COOKIE_DOMAIN",
         "DEV_REDIRECT_ORIGIN",
+        "DEV_REDIRECT_PATH",
         "VERCEL_GIT_COMMIT_REF",
         "NEXT_PUBLIC_GA_MEASUREMENT_ID",
         // saroh.in's launch switch (plan KTD-16): Pricing, its links and the
