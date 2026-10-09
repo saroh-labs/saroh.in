@@ -9,7 +9,6 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useTransition } from "react";
 
-import { SAVES_WORDS } from "@/components/sites/settings-rows";
 import type { SearchTrackingSave } from "@/lib/sites/search-tracking";
 import { SUPPORT_EMAIL, SWITCHED_OFF_LINE } from "@/lib/sites/search-tracking";
 import type { TrackersLock } from "@/lib/sites/trackers-lock";
@@ -31,44 +30,22 @@ export type SaveOutcome =
 
 export type SaveSection = (input: SearchTrackingSave) => Promise<SaveOutcome>;
 
-export const SECTION_TITLE = "Search and tracking";
+export const SECTION_TITLE = "Tracking";
 
-export const SECTION_DESCRIPTION =
-    "Show Google and others this site is yours, and connect your own analytics and ad tools.";
-
-/** The section's heading, then its cards. */
+/**
+ * The section's cards, inside the settings' Tracking group (which draws
+ * the heading). Everything here applies as soon as it's saved, the
+ * settings' default, so it carries no "Next publish".
+ */
 export function SearchTrackingFrame({
     children,
 }: {
     children: React.ReactNode;
 }) {
     return (
-        <section
-            aria-labelledby="search-tracking-title"
-            className="space-y-3"
-            data-section="search-and-tracking"
-        >
-            <div className="space-y-1">
-                <div className="flex flex-wrap items-center gap-x-2">
-                    <h2
-                        id="search-tracking-title"
-                        className="text-sm font-semibold"
-                    >
-                        {SECTION_TITLE}
-                    </h2>
-                    <span
-                        data-saves="now"
-                        className="text-xs text-muted-foreground"
-                    >
-                        · {SAVES_WORDS.now}
-                    </span>
-                </div>
-                <p className="text-sm text-muted-foreground">
-                    {SECTION_DESCRIPTION}
-                </p>
-            </div>
-            <div className="space-y-4">{children}</div>
-        </section>
+        <div className="space-y-4" data-section="search-and-tracking">
+            {children}
+        </div>
     );
 }
 
@@ -105,7 +82,7 @@ export function SearchTrackingFailed() {
     const [pending, startTransition] = useTransition();
     return (
         <FailedState
-            title="Search and tracking couldn't be loaded"
+            title="Tracking couldn't be loaded"
             description="Your codes and trackers are unchanged. Try again in a moment."
             action={
                 <Button

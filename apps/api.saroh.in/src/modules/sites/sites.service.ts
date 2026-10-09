@@ -133,6 +133,7 @@ import {
     publicationTemplate,
     siteTemplate,
     templateFooterLine,
+    templateFormerFooterLines,
 } from "./site-template-record";
 
 /**
@@ -2978,6 +2979,7 @@ export class SitesService {
             // The footer still in its template's words (round 2).
             footer: parseSiteFooter(site.footer),
             templateFooterLine: templateFooterLine(site),
+            formerTemplateFooterLines: templateFormerFooterLines(site),
             pages: site.pages.map((page) => ({
                 id: page.id,
                 path: page.path,

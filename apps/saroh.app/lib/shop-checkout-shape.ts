@@ -110,6 +110,15 @@ function isLine(v: unknown): boolean {
     );
 }
 
+/** "Free delivery over" on the quote; absent from an older API. */
+function isFreeDelivery(v: unknown): boolean {
+    return (
+        v === undefined ||
+        v === null ||
+        (isRecord(v) && isString(v.over) && isStringOrNull(v.short))
+    );
+}
+
 /** A code's answer on the quote (DEC-104); absent from an older API. */
 function isDiscount(v: unknown): boolean {
     if (v === undefined || v === null) return true;
@@ -132,6 +141,7 @@ export function isQuote(v: unknown): v is CheckoutQuote {
         isString(v.subtotal) &&
         isString(v.delivery) &&
         isDiscount(v.discount) &&
+        isFreeDelivery(v.freeDelivery) &&
         isString(v.total) &&
         typeof v.ready === "boolean" &&
         // Absent from an API before offline payment: online only.

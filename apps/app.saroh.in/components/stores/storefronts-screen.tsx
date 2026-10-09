@@ -338,7 +338,7 @@ function StorefrontDetail({
         LOCATION_TAB_PARAM,
         tabs.map((t) => t.id),
         "the-place",
-        { push: true },
+        { history: "push" },
     );
     // A field to put the keyboard on once its tab has drawn.
     const focusNext = useRef<string | null>(null);

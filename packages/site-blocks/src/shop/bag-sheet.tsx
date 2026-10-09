@@ -91,6 +91,32 @@ export function lineNote(line: QuoteLine): string | null {
     return null;
 }
 
+/**
+ * The small line under the bag's delivery row for the location's "Free
+ * delivery over" (the server's `freeDelivery`): how much more makes
+ * delivery free while the items are under it, or that it is free once they
+ * reach it. Nothing for Pick-up, nothing when no amount is set, and no
+ * nudge for a way that has no fee to waive.
+ */
+export function freeDeliveryNote(
+    quote: Pick<CheckoutQuote, "currency" | "ways" | "freeDelivery">,
+    way: ShopWay | null,
+): string | null {
+    const free = quote.freeDelivery;
+    if (!free || way === "PICKUP") return null;
+    if (free.short) {
+        const charged = way
+            ? quote.ways.some((w) => w.type === way && w.fee)
+            : quote.ways.some((w) => w.fee);
+        return charged
+            ? `Add ${formatAmount(free.short, quote.currency)} more for free delivery.`
+            : null;
+    }
+    return needsAddress(way)
+        ? `Free delivery on orders of ${formatAmount(free.over, quote.currency)} or more.`
+        : null;
+}
+
 /** A bag line's key: its listing and variant. */
 const lineKey = (l: Pick<QuoteLine, "listingId" | "variantId">) =>
     `${l.listingId}:${l.variantId ?? ""}`;
@@ -350,6 +376,7 @@ export function BagSheet({
         settled &&
         !busy;
     const total = quote ? formatAmount(quote.total, quote.currency) : "";
+    const freeNote = quote ? freeDeliveryNote(quote, way) : null;
     const held = busy
         ? null
         : holdReason({ quote, way, addressOk, payable: pay !== null });
@@ -528,6 +555,11 @@ export function BagSheet({
                                 : "—"}
                         </span>
                     </div>
+                    {freeNote ? (
+                        <p className="text-site-muted -mt-1 pb-2 text-[12.5px]">
+                            {freeNote}
+                        </p>
+                    ) : null}
                     {applied && discount?.applied ? (
                         <div className="border-site-border flex items-center gap-2.5 border-t py-2.5 text-sm">
                             <span className="min-w-0 flex-1">

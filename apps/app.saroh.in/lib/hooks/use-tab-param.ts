@@ -13,21 +13,16 @@ import { tabFromParam } from "@/lib/settings/search";
  * back with `replaceState` — no history entry per tab, and no fetch — and an
  * address that changes underneath (a search hit on the same page) moves the
  * tab to match. The first tab is the page's own address, with no query.
+ *
+ * `history: "push"` gives each tab its own history entry instead, so Back
+ * and Forward step between them (Website › Settings); Next follows a
+ * native `pushState` into `useSearchParams`, and the tab follows it.
  */
 export function useTabParam<K extends string>(
     param: string,
     keys: readonly K[],
     fallback: K,
-    {
-        push = false,
-    }: {
-        /**
-         * Each tab its own history entry, so Back returns to the last one
-         * (a location's page). Still no fetch: Next follows a native
-         * `pushState` into `useSearchParams`.
-         */
-        push?: boolean;
-    } = {},
+    { history = "replace" }: { history?: "replace" | "push" } = {},
 ): [K, (key: K) => void] {
     const fromUrl = tabFromParam(useSearchParams().get(param), keys, fallback);
     const [tab, setLocal] = useState(fromUrl);
@@ -45,7 +40,7 @@ export function useTabParam<K extends string>(
         if (key === fallback) url.searchParams.delete(param);
         else url.searchParams.set(param, key);
         if (url.href === window.location.href) return;
-        if (push) window.history.pushState(null, "", url);
+        if (history === "push") window.history.pushState(null, "", url);
         else window.history.replaceState(null, "", url);
     };
     return [tab, setTab];

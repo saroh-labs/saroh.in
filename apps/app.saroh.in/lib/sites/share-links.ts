@@ -26,6 +26,11 @@ export interface WebAddressLinks {
         shop: string | null;
         book: string | null;
     };
+    /**
+     * Whether this person may change the address now: the owner, with
+     * `WEB_ADDRESS_CHANGE` on. Absent from an older API: not offered.
+     */
+    canChange?: boolean;
 }
 
 export type ShareKind = "shop" | "site" | "book";

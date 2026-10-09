@@ -1319,3 +1319,12 @@ Also decided 9 Oct (#886): each admin console deploys only its own environment; 
 - Decision: "Record as refunded" offers **Full amount** (the default) or **Another amount**. Another amount is any amount above zero up to what is left unrefunded on the order: what it was paid less every refund already made, online ones and line refunds included, and earlier refunds by hand. Not limited to whole lines.
 - A part refund issues a credit note for that amount, spread over the invoice's lines as any credit note that names no line is. It adds a "What happened" step with the amount and how it went back. The money panel shows refunded so far and what is left. Home's "taken", Spent and takings read it net. The order stays **Paid** (partly refunded) and becomes **Refunded** only when the whole amount has gone back. No new payment status.
 - Consequences: `Order.refundedByHand` keeps what was handed back by hand (migration `20261103100000_order_refunded_by_hand`). Insights' `order.refunded` is still written only for a full refund, since that figure is net of full refunds by design (#867). An online refund, by line or another amount, is capped at what is left on the order with refunds by hand counted, so money handed back by hand is never sent back again online. `docs/patterns/backend-billing-and-classes.md` → "Orders and the shelf".
+
+## DEC-117 The website checkout applies a location's "Free delivery over"
+
+**Status: Accepted — 2026-10-09** · owner
+
+- Context: each location saved a "Free delivery over" amount (`StoreSettings.freeShippingThreshold`), but nothing read it: the website checkout added the Local delivery or Shipping fee whatever the order came to.
+- Decision: on the website checkout, when the items come to the amount or more, Local delivery and Shipping add nothing. "The items" is the bag's Subtotal less any code, before delivery: what the customer sees above the delivery row. Prices already include GST (ADR-008), so no tax sits between them. Pick-up never has a fee. No amount (or 0) means the fee is always charged. Integer minor units throughout (`checkout-quote.ts` `deliveryCents`).
+- The quote carries `freeDelivery` (`over`, and `short` while under it), and the bag says "Add ₹X more for free delivery." under the delivery row, or that delivery is free once reached. The order records the delivery the quote showed (`Order.shipping` 0), so the confirmation, order detail and invoice read it as free.
+- Consequences: the counter's New order still fills the way's flat fee for staff to keep or change; it doesn't apply the amount.

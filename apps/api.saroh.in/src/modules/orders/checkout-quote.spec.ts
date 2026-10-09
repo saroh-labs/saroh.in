@@ -7,6 +7,7 @@ import type { BagLine, QuoteListing, QuoteShelf } from "./checkout-quote";
 import {
     buildQuote,
     checkoutWays,
+    deliveryCents,
     feeCents,
     MAX_LINE_QUANTITY,
     quoteLines,
@@ -295,5 +296,131 @@ describe("buildQuote", () => {
                 asked: "PICKUP",
             }).ready,
         ).toBe(false);
+    });
+});
+
+/**
+ * "Free delivery over" (`StoreSettings.freeShippingThreshold`): at or above
+ * it, judged on the items after any code and before delivery, Local
+ * delivery and Shipping add nothing. Pick-up never adds anything.
+ */
+describe("free delivery over an amount", () => {
+    const bread = listing("l1", { price: "250.00" });
+    const FEES = {
+        localDeliveryFee: "60.00",
+        shippingFee: "120.00",
+        freeOver: "1000.00" as string | null,
+    };
+    const quoteFor = (
+        quantity: number,
+        asked: "PICKUP" | "LOCAL_DELIVERY" | "SHIPPING",
+        fees: {
+            localDeliveryFee: string | null;
+            shippingFee: string | null;
+            freeOver: string | null;
+        } = FEES,
+        discountCents?: number,
+    ) =>
+        buildQuote({
+            currency: "INR",
+            lines: quoteLines([line("l1", quantity)], [bread], [], true),
+            storefrontWays: ["PICKUP", "LOCAL_DELIVERY", "SHIPPING"],
+            fees,
+            asked,
+            discount:
+                discountCents === undefined
+                    ? null
+                    : {
+                          view: { code: "TEN", applied: true, amount: "x" },
+                          cents: discountCents,
+                      },
+        });
+
+    it("charges the fee below the amount, and says how much more is needed", () => {
+        const quote = quoteFor(3, "LOCAL_DELIVERY"); // 750.00
+        expect(quote).toMatchObject({
+            subtotal: "750.00",
+            delivery: "60.00",
+            total: "810.00",
+            freeDelivery: { over: "1000.00", short: "250.00" },
+        });
+        expect(quote.ways.map((w) => w.fee)).toEqual([null, "60.00", "120.00"]);
+    });
+
+    it("is free at the amount exactly, for Local delivery and Shipping", () => {
+        const local = quoteFor(4, "LOCAL_DELIVERY"); // 1000.00
+        expect(local).toMatchObject({
+            delivery: "0.00",
+            total: "1000.00",
+            freeDelivery: { over: "1000.00", short: null },
+        });
+        expect(local.ways.map((w) => w.fee)).toEqual([null, null, null]);
+        expect(quoteFor(4, "SHIPPING")).toMatchObject({
+            delivery: "0.00",
+            total: "1000.00",
+        });
+    });
+
+    it("is free above the amount", () => {
+        expect(quoteFor(5, "SHIPPING")).toMatchObject({
+            subtotal: "1250.00",
+            delivery: "0.00",
+            total: "1250.00",
+        });
+    });
+
+    it("charges the fee whatever the total with no amount set", () => {
+        expect(
+            quoteFor(8, "LOCAL_DELIVERY", { ...FEES, freeOver: null }),
+        ).toMatchObject({
+            delivery: "60.00",
+            total: "2060.00",
+            freeDelivery: null,
+        });
+    });
+
+    it("leaves pick-up free either way", () => {
+        expect(quoteFor(1, "PICKUP")).toMatchObject({
+            delivery: "0.00",
+            total: "250.00",
+        });
+        expect(quoteFor(5, "PICKUP")).toMatchObject({
+            delivery: "0.00",
+            total: "1250.00",
+        });
+    });
+
+    it("says nothing about it when no way offered carries a fee", () => {
+        expect(
+            quoteFor(1, "PICKUP", { ...NO_FEES, freeOver: "1000.00" })
+                .freeDelivery,
+        ).toBeNull();
+    });
+
+    it("judges the amount on the items after a code, not before", () => {
+        // 1000.00 of items, 100.00 off: 900.00 is under the amount.
+        expect(quoteFor(4, "LOCAL_DELIVERY", FEES, 10000)).toMatchObject({
+            subtotal: "1000.00",
+            delivery: "60.00",
+            total: "960.00",
+            freeDelivery: { over: "1000.00", short: "100.00" },
+        });
+        // 1250.00 less 100.00 is 1150.00: still free.
+        expect(quoteFor(5, "LOCAL_DELIVERY", FEES, 10000)).toMatchObject({
+            delivery: "0.00",
+            total: "1150.00",
+            freeDelivery: { short: null },
+        });
+    });
+
+    it("works in whole minor units: a paisa short is still charged", () => {
+        const fees = { ...FEES, freeOver: "1000.01" };
+        expect(deliveryCents("LOCAL_DELIVERY", fees, 100000)).toBe(6000);
+        expect(deliveryCents("LOCAL_DELIVERY", fees, 100001)).toBe(0);
+        expect(deliveryCents("PICKUP", fees, 0)).toBe(0);
+        // Zero is no amount: the fee is charged.
+        expect(
+            deliveryCents("SHIPPING", { ...FEES, freeOver: "0.00" }, 500000),
+        ).toBe(12000);
     });
 });
