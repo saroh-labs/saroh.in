@@ -34,6 +34,7 @@ row an earlier seed left, never touching one with real keys. The DISABLED
 Razorpay row stays: it is honest anywhere.
 **Check**: `stand-in-providers.test.ts`. Re-seed the dev environment to
 clear its old rows.
+
 ## API — a site checkout answered 500 with only its request line in the log
 
 **Symptom**: 9 Oct 2026, on dev: `POST /public/sites/:siteId/checkout`
@@ -3709,3 +3710,23 @@ spec is the pattern the skill bans (#718); five remain in `e2e/tests` and a
 grep in `scripts/prepush.sh` could refuse new ones.
 **Category**: tests · `e2e/tests/ux-polish-874.spec.ts`,
 `.agents/skills/saroh-browser-tests/SKILL.md` → Waiting
+
+## A bakery's footer said "when the studio is open"
+
+**Symptom**: a new business, Rehearsal Bakery, started its site from Store
+and got "Your area and town — and when the studio is open" saved as its
+footer, shown in Website › Settings › Footer and on the site.
+**Cause**: Store (`ceramics`, offered to every shop and creator) was
+designed as a ceramics studio, and its footer line kept the design's
+"studio". The footer is saved to `Site.footer` at creation, so the words
+read as the merchant's own, on any kind of shop.
+**Fix**: the line names no kind of business ("Your area and town · when you
+are open"). The old line moves to `footer.formerLines`, so the pre-publish
+check still flags a site made with it and never changed; saved data is
+untouched. `frame.test.ts` now fails any template whose footer names a kind
+of business its own name does not, and any template for anyone (no
+`kinds`) that names one anywhere. Store's page body (clay, glaze, firing,
+"The studio", "Throwing since") is still ceramics-specific and left for an
+owner decision.
+**Category**: templates · `packages/templates/src/frame.test.ts`,
+`packages/templates/src/manifest.ts` → `TemplateFooter.formerLines`
