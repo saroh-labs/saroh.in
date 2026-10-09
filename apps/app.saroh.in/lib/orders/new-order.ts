@@ -7,6 +7,7 @@
  */
 
 import type { CustomerPick } from "@/lib/customers/picker";
+import { METHOD_WORD } from "@/lib/payments/method-words";
 
 /** How it is paid, as the API takes it. */
 export type NewOrderPay = "CASH" | "UPI" | "CARD" | "LINK" | "LATER";
@@ -104,9 +105,10 @@ export function payOptions(input: {
 }): { key: NewOrderPay; label: string; off: string | null }[] {
     const reach = reachOf(input.pick);
     return [
-        { key: "CASH", label: "Cash", off: null },
-        { key: "UPI", label: "UPI at the counter", off: null },
-        { key: "CARD", label: "Card machine", off: null },
+        // One word each (UX-078); where it's taken is the note's to say.
+        { key: "CASH", label: METHOD_WORD.CASH, off: null },
+        { key: "UPI", label: METHOD_WORD.UPI, off: null },
+        { key: "CARD", label: METHOD_WORD.CARD, off: null },
         ...(input.online === false
             ? []
             : [

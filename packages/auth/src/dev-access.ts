@@ -61,13 +61,16 @@ function noIndex(response: Response): Response {
 /**
  * Keeps the dev environment to people who have its key.
  *
- * Off unless `DEV_ACCESS_KEY` is set, which only the dev environment's
- * deployments have, so production and local development never run it.
+ * Off unless `DEV_ACCESS_KEY` is set, which the dev environment's
+ * deployments have, and production's accounts.saroh.in until early access
+ * opens (`PRELAUNCH_GATE` in its wrangler.jsonc); local development never
+ * runs it.
  * `?access=<key>` on any page sets a cookie (on `DEV_ACCESS_COOKIE_DOMAIN`, so
  * one visit opens every dev app) and reloads the page without the key. A
  * visitor without the cookie is sent to the same page on production
- * (`DEV_REDIRECT_ORIGIN`); a form post is refused instead, so it is never
- * replayed there. The cookie holds the key's digest, so changing the key
+ * (`DEV_REDIRECT_ORIGIN`), or to `DEV_REDIRECT_PATH` there when the page
+ * has no twin (accounts' `/login` on the marketing site); a form post is
+ * refused instead, so it is never replayed there. The cookie holds the key's digest, so changing the key
  * shuts out every browser let in with the old one.
  */
 export function withDevAccess(next: Middleware): Middleware {
@@ -104,11 +107,10 @@ export function withDevAccess(next: Middleware): Middleware {
         if (!isRead || !production) {
             return noIndex(new NextResponse("Not found", { status: 404 }));
         }
-        return noIndex(
-            NextResponse.redirect(
-                new URL(`${url.pathname}${url.search}`, production),
-                307,
-            ),
-        );
+        // An empty DEV_REDIRECT_PATH keeps the page, as an unset one does.
+        let target = `${url.pathname}${url.search}`;
+        const fixed = process.env.DEV_REDIRECT_PATH?.trim();
+        if (fixed) target = fixed;
+        return noIndex(NextResponse.redirect(new URL(target, production), 307));
     };
 }

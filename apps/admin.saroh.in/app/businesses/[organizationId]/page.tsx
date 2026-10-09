@@ -6,7 +6,10 @@ import { PageHeader } from "@saroh/ui/page-header";
 import { notFound } from "next/navigation";
 
 import { AdminShell } from "@/components/admin-shell";
-import { CatalogueActions } from "@/components/business/catalogue-actions";
+import {
+    CatalogueActions,
+    PlanOverrideDialog,
+} from "@/components/business/catalogue-actions";
 import { CataloguePlan } from "@/components/business/catalogue-plan";
 import { CloseAccess } from "@/components/business/close-access";
 import { LifecycleActions } from "@/components/business/lifecycle-actions";
@@ -22,6 +25,7 @@ import { NotesPanel } from "@/components/business/notes-panel";
 import { OpenAccess } from "@/components/business/open-access";
 import { PlanActions, RevokeLimit } from "@/components/business/plan-actions";
 import { SiteTrackers } from "@/components/business/site-trackers";
+import { WhatTheySee } from "@/components/business/what-they-see";
 import { Facts, Panel } from "@/components/panel";
 import {
     ChangeRole,
@@ -50,6 +54,7 @@ import {
     plural,
 } from "@/lib/format";
 import { moduleLabel } from "@/lib/modules";
+import { planLine } from "@/lib/plan-words";
 
 export const metadata = { title: "Business" };
 
@@ -126,8 +131,8 @@ export default async function BusinessPage({
                                 a reason, and the details open read-only for
                                 thirty minutes, written into the audit trail
                                 with your name and reason. You see what an
-                                operator needs — people, modules, plan,
-                                trackers, activity — and never the
+                                operator needs — what they see, people, modules,
+                                plan, trackers, activity — and never the
                                 business&rsquo;s own customers.
                             </p>
                             <OpenAccess organizationId={organizationId} />
@@ -149,7 +154,7 @@ function SummaryStrip({ summary }: { summary: BusinessRow }) {
                 </Badge>
             ))}
             <span className="text-muted-foreground">
-                {summary.plan ? summary.plan.name : "No plan"} ·{" "}
+                {planLine(summary.effectivePlan ?? null, summary.plan?.name)} ·{" "}
                 {plural(summary.members, "person", "people")} · last active{" "}
                 {formatRelative(summary.lastActiveAt)}
             </span>
@@ -181,6 +186,13 @@ function Business({
     return (
         <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_380px]">
             <div className="grid min-w-0 content-start gap-6">
+                <Panel
+                    title="What they see"
+                    description="Their live site, and what they can use now."
+                >
+                    {() => <WhatTheySee view={view} />}
+                </Panel>
+
                 <Panel
                     title="People"
                     description="Who belongs to this business, and their role in it."
@@ -520,8 +532,24 @@ function Business({
                                         plan.subscription?.status ?? null
                                     }
                                     numericLimits={raisableLimits(plan)}
+                                    catalogueLive={Boolean(plan.liveCatalogue)}
                                 />
                             )}
+                            {pricingOverride &&
+                                plan.legacyReason === "no-plan" &&
+                                plan.liveCatalogue && (
+                                    <div className="flex flex-wrap gap-2">
+                                        <PlanOverrideDialog
+                                            organizationId={id}
+                                            plans={plan.liveCatalogue.plans}
+                                            current={null}
+                                            defaultPlanId={
+                                                plan.liveCatalogue.plans[0]
+                                                    ?.id ?? ""
+                                            }
+                                        />
+                                    </div>
+                                )}
                             {pricingOverride && plan.catalogue && (
                                 <CatalogueActions
                                     organizationId={id}

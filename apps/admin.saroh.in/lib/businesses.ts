@@ -1,6 +1,7 @@
 import { cookies } from "next/headers";
 
 import { adminFetch, getJson } from "./control-plane";
+import type { EffectivePlan, UsageNote } from "./plan-words";
 
 /**
  * Businesses on the instance, as the console reads them (plan U3–U5).
@@ -21,7 +22,13 @@ export interface BusinessRow {
     createdAt: string;
     members: number;
     enabledModules: string[];
+    /** Its subscription's plan row (what the Plan filter matches). */
     plan: { key: string; name: string } | null;
+    /**
+     * The plan it is on now, a plan override winning (UX-087). Null off the
+     * catalogue, or from an older API: `plan` is the plan then.
+     */
+    effectivePlan?: EffectivePlan | null;
     subscriptionStatus: string | null;
     lastActiveAt: string | null;
     attention: AttentionReason[];
@@ -51,12 +58,16 @@ export interface CatalogueModuleRow {
     state: "on" | "locked" | "hidden";
     limit: number | null;
     per: "" | "month";
+    /** A soft cap: counted and told, never refused. Absent from an older API. */
+    soft?: boolean;
     /** Its plan's own cell, before overrides and add-ons. */
     planState: "on" | "locked" | "hidden";
     planLimit: number | null;
     /** Why it differs from the plan, in words; empty when it doesn't. */
     override: string;
     usage: number | null;
+    /** Why the count reads as it does. Absent from an older API. */
+    usageNote?: UsageNote | null;
     /** Whether it has a limit an operator can set. */
     limitable: boolean;
 }
@@ -93,6 +104,13 @@ export interface BusinessCatalogue {
 }
 
 export interface BusinessPlan {
+    /** The plan it is on now (UX-087); null off the catalogue. */
+    effective?: EffectivePlan | null;
+    /** The live catalogue's plans, whether or not it reaches the business. */
+    liveCatalogue?: {
+        version: number;
+        plans: { id: string; name: string }[];
+    } | null;
     subscription: {
         status: string;
         plan: {
@@ -203,6 +221,30 @@ export interface BusinessView {
     >;
     /** Each site's tracker switch (#897). Absent from an older API. */
     sites?: Panel<SiteTrackersRow[]>;
+    /** Where its sites are live, and payments yes or no. Absent from an older API. */
+    presence?: Panel<BusinessPresence>;
+}
+
+/** One web address a site is live on (the API's `PresenceAddress`). */
+export interface PresenceAddress {
+    kind: "web-address" | "own-domain";
+    url: string;
+}
+
+/** What the business's customers can reach (owner, 9 Oct). Never a key. */
+export interface BusinessPresence {
+    sites: {
+        id: string;
+        name: string;
+        published: boolean;
+        /** Empty while nothing is published. */
+        addresses: PresenceAddress[];
+    }[];
+    payments: {
+        provider: string;
+        connected: boolean;
+        needsAttention: boolean;
+    }[];
 }
 
 /** One site and whether Saroh has switched its trackers off. */

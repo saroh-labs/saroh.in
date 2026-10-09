@@ -81,6 +81,7 @@
         "DEV_ACCESS_KEY",
         "DEV_ACCESS_COOKIE_DOMAIN",
         "DEV_REDIRECT_ORIGIN",
+        "DEV_REDIRECT_PATH",
         "VERCEL_GIT_COMMIT_REF",
         "NEXT_PUBLIC_GA_MEASUREMENT_ID",
         // saroh.in's launch switch (plan KTD-16): Pricing, its links and the
@@ -104,6 +105,18 @@
         "TMPDIR",
         // Runs the site shop's e2e (G13) where the stack has the shop on.
         "E2E_SITE_SHOP",
+        // Runs the own-domain hosting states' e2e (#861) where the stack's
+        // api has a fake verifier and hosting provider: DOMAIN_HOSTING_FAKE,
+        // the api's test-only switch for them (refused in production).
+        "E2E_DOMAIN_HOSTING",
+        "DOMAIN_HOSTING_FAKE",
+        // Runs the workspace's paused-by-plan e2e (#800) against a business
+        // the stack was prepared to have paused (its id).
+        "E2E_PAUSED_ORG",
+        // The merchant site in the paused state (#800), for its e2e.
+        "E2E_PAUSED_SITE",
+        // A page on that site with a Class packs or Plans block (#800).
+        "E2E_PAUSED_PRICES_PATH",
         "npm_package_version"
     ],
     "tasks": {

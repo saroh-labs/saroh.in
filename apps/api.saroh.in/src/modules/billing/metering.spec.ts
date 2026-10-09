@@ -245,7 +245,11 @@ describe("what each count asks", () => {
                 status: "PENDING",
                 expiresAt: { gt: now },
             },
-            select: { role: true },
+            // With the diary person an invite names (#868).
+            select: {
+                role: true,
+                staffMember: { select: { status: true, membershipId: true } },
+            },
         });
     });
 

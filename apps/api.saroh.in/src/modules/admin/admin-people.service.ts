@@ -14,6 +14,17 @@ import { AdminAuditOutcome, AdminAuditService } from "./admin-audit.service";
 import { AdminPermission } from "./admin-permissions";
 
 const SEARCH_LIMIT = 25;
+/** How many accounts "Newest sign-ups" lists (owner, 9 Oct). */
+export const RECENT_LIMIT = 25;
+
+/** One account in "Newest sign-ups", with the businesses it belongs to. */
+export interface RecentSignup {
+    id: string;
+    name: string | null;
+    email: string;
+    createdAt: Date;
+    businesses: { id: string; name: string }[];
+}
 
 export interface PersonRow {
     id: string;
@@ -82,6 +93,40 @@ export class AdminPeopleService {
             take: SEARCH_LIMIT,
         });
         return Promise.all(users.map((user) => this.row(user)));
+    }
+
+    /**
+     * The newest accounts on the instance, newest first: who they are and
+     * which businesses they belong to. Same personal data as a search, so the
+     * route in front of it needs the same permission and records each read.
+     */
+    async recent(): Promise<RecentSignup[]> {
+        const users = await prisma.user.findMany({
+            select: {
+                id: true,
+                name: true,
+                email: true,
+                createdAt: true,
+                memberships: {
+                    select: {
+                        organization: { select: { id: true, name: true } },
+                    },
+                    orderBy: { organization: { name: "asc" } },
+                },
+            },
+            orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+            take: RECENT_LIMIT,
+        });
+        return users.map((user) => ({
+            id: user.id,
+            name: user.name,
+            email: user.email,
+            createdAt: user.createdAt,
+            businesses: user.memberships.map((row) => ({
+                id: row.organization.id,
+                name: row.organization.name,
+            })),
+        }));
     }
 
     async detail(userId: string): Promise<PersonDetail> {

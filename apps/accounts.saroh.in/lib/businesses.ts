@@ -20,6 +20,27 @@ export interface Business {
     /** A role the business invented, in its own words; null for a built-in. */
     roleLabel: string | null;
     lifecycleStatus: string;
+    /**
+     * Their access is paused (#800): the business moved to a lower plan
+     * with fewer team seats than people. Absent from an older API.
+     */
+    paused?: boolean;
+}
+
+/** The line under a business whose door is paused for this person (#800). */
+export const PAUSED_DETAIL =
+    "Paused — this business's plan has no room for you right now. Nothing of yours is lost.";
+
+/** The badge on a business's row: its paused door, else an operator's state. */
+export function businessBadge(
+    business: Pick<Business, "lifecycleStatus" | "paused">,
+): { label: string; variant: "warning" | "error" } | undefined {
+    if (business.paused) return { label: "Paused", variant: "warning" };
+    if (business.lifecycleStatus === "SUSPENDED")
+        return { label: "Suspended", variant: "warning" };
+    if (business.lifecycleStatus === "PENDING_DELETION")
+        return { label: "Closing", variant: "error" };
+    return undefined;
 }
 
 function apiBase(): string {

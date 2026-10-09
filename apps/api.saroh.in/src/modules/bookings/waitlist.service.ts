@@ -19,6 +19,7 @@ import { isValidSlotStart } from "./availability";
 import { requireBookingPower } from "./booking-access";
 import { refuseIfClosed, toAvailabilityService } from "./booking-slots";
 import { openingFor, refuseOutsideOpening } from "./opening-hours";
+import { ownDiaryOf } from "./own-diary";
 import type { SignedInCustomer } from "./public-bookings.service";
 import {
     alreadyBooked,
@@ -330,6 +331,11 @@ export class WaitlistService {
             select: { id: true },
         });
         if (!service) throw new NotFoundException("Service not found");
+        // Calendar only (#868): the line for a class they take, no other.
+        const own = await ownDiaryOf(prisma, ctx);
+        if (own && !own.serviceIds.includes(serviceId)) {
+            throw new NotFoundException("Service not found");
+        }
         const rows = await prisma.classWaitlistEntry.findMany({
             where: {
                 organizationId: ctx.organizationId,

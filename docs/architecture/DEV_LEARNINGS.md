@@ -12,6 +12,57 @@ mistaken for bureaucracy and removed.
 
 ---
 
+## Deploy — the merchant sites' production Worker didn't know it was production
+
+**Symptom**: none reported. Found 9 Oct 2026 in a review after Vercel was
+retired (DEC-107): saroh.app's production build had never run its
+required-variables check, and the template renders' "not in production" lock
+read as open.
+**Cause**: the apps keep Vercel's names for the environment (`VERCEL_ENV`,
+`NEXT_PUBLIC_VERCEL_ENV`, `VERCEL_GIT_COMMIT_REF`). On Vercel the platform
+set them; on Cloudflare each app's `wrangler.jsonc` vars must, and the deploy
+workflow builds with them (`scripts/cf-env.mjs`). saroh.in, app, accounts and
+admin had them; `apps/saroh.app/wrangler.jsonc` set none, in either
+environment. So next.config skipped its `REQUIRED_IN_PRODUCTION` check,
+`templateRendersAllowed` saw no production (only `TEMPLATE_RENDERS` staying
+off kept the page shut), and the relay's `visitorAddress` thought it was off
+the platform and would have stood in the loopback address for a request
+without `cf-connecting-ip`. Nothing failed, because a missing marker turns
+checks off rather than on.
+**Fix**: saroh.app sets `VERCEL_ENV`, `NEXT_PUBLIC_VERCEL_ENV` and
+`VERCEL_GIT_COMMIT_REF` (`production`/`main` in `env.production.vars`,
+`preview`/`development` at the top), as the other apps do; app.saroh.in got
+`NEXT_PUBLIC_VERCEL_ENV` too, since its env.ts declares it. A production
+build with exactly the workflow's settings passed next.config's check
+(`API_URL`, `NEXT_PUBLIC_API_URL` and `NEXT_PUBLIC_ROOT_DOMAIN` from wrangler
+vars, `SITE_RELAY_SECRET` from the workflow's Secrets step).
+**Check**: `pnpm run check:deploy-env` (prepush and CI). For every app and
+both environments it requires the markers in wrangler vars, loads the app's
+next.config with only what the deploy build gets (those vars plus the
+workflow's secrets, as placeholders) and fails if it refuses, and fails if a
+config with only the marker set loads (its check is gone).
+**Rule**: a guard keyed on an environment variable is off wherever that
+variable is missing, and nothing says so. When a platform moves, list every
+variable the old one set for you and set each one on the new one.
+**Category**: deploy · `apps/*/wrangler.jsonc`, `scripts/check-deploy-env.mjs`
+
+## Security — the visitor's address and country fell back to headers a visitor can write
+
+**Symptom**: none reported. Found 9 Oct 2026 in the same review.
+**Cause**: the 7 and 8 Oct fixes (below) put Cloudflare's headers first but
+kept the old platform's as fallbacks: saroh.in's waitlist read `x-real-ip`
+and `x-vercel-ip-country`, and saroh.app's relay `x-real-ip` and
+`x-forwarded-for`. On a Worker those arrive as the visitor sent them, so had
+Cloudflare's header ever been missing, a visitor could have chosen the key
+the API's per-visitor limits count them by, or their country.
+**Fix**: only `cf-connecting-ip` and `cf-ipcountry` are read; without them
+the address or country is unknown. The browser tests stand in for Cloudflare
+by sending `cf-connecting-ip` (`e2e/tests/site-codes.ts`, `link-preview.spec.ts`).
+**Check**: `pnpm run check:edge-headers` now fails on any `x-real-ip`,
+`x-forwarded-for` or `x-vercel-ip-*` string in app or package code (tests
+and the API's `common/trust-proxy.ts` aside).
+**Category**: security · `apps/saroh.in/lib/waitlist-forward.ts`, `apps/saroh.app/lib/site-relay.ts`
+
 ## Secrets scan — a fake key in a test fails the gate, and fixing the file isn't enough
 
 **Symptom** (8 Oct, batch-2026-10-08-6): `pnpm prepush`'s `secrets` step failed twice on test data: a fake `sk_live_…` in a validator test (stripe-access-token), then a test idempotency key and a fake `phx_…` (generic-api-key).
@@ -3432,3 +3483,62 @@ same-origin). Merchant sites' HSTS has no `includeSubDomains`: on a merchant's
 own domain it would reach subdomains Saroh doesn't serve.
 **Check**: `pnpm run check:security-headers` (prepush and CI).
 **Category**: security · `apps/*/next.config.*`
+
+## Storage — an upload could skip the byte check, and an SVG was a 500
+
+**Symptom**: found 8 Oct 2026 building #873 (UX-037). On R2, a photo whose
+object was never stored passed the completion check and became READY; and
+the app's pickers take any `image/*`, so an SVG or HEIC reached the storage
+port's allowlist and came back as a 500, "Something went wrong", instead of
+a reason.
+**Root cause**: the completion check let unreadable bytes through for every
+photo, because the in-memory adapter of local development never sees the
+browser's PUT; nothing told the service which storage it had. The type was
+only checked inside the port, where a refusal is a thrown zod error.
+**Fix**: the port says whether it `seesUploads` (R2 yes, memory no), and
+where it does, no bytes is a FAILED upload. `media/upload-checks.ts` refuses
+a type outside the allowlist, and a logo outside PNG, JPG and WebP, before
+signing, in the words the screens already show.
+**Check**: `upload-checks.spec.ts` (real PNG/JPEG/WebP headers, a text file
+renamed `.png`, a type mismatch, an SVG) and `media.service.spec.ts`.
+**Rule**: `docs/patterns/backend-integrations.md` → "Media storage".
+**Category**: security · storage · `apps/api.saroh.in/src/modules/media/`
+
+## Access — store access alone still read a storefront's totals (#868)
+
+**Symptom**: found in the 7 Oct UX audit follow-ups. A business role with
+"See locations" (`store:read`) and no order read could open the store-scoped
+order list and read (`GET stores/:id/orders`) and customer list, with every
+order's total and what each customer had spent.
+**Root cause**: `requireOrderRead` refused the kitchen's roles (`order:stage`
+without `order:read`) and, since DEC-106, a storefront role alone, but let
+anyone in whose business role carried `store:read`. Store access was read as
+a money grant, which DEC-098 rules out. The money scans only looked for role
+names, so they couldn't see it.
+**Fix**: the store-scoped reads that send amounts take `order:read` on the
+business role (`StoresService.moneyAllows`; the storefront's owner on the
+older per-store path), never `store:read`. The workspace no longer reads the
+store-scoped order list, and the customer page already falls back when the
+store-scoped customer read is refused.
+**Check**: `organizations/money-by-permission.spec.ts` → "store access grants
+no amounts" fails on `store:read` in `order-read-access.ts`, and on a
+store-scoped orders or customers method that serializes amounts without
+asking `requireOrderRead` first. `stores/order-read-access.authorization.spec.ts`
+pins Member, store-only, `order:read`, Owner and Admin.
+**Category**: access · `apps/api.saroh.in/src/modules/stores/order-read-access.ts`
+
+## The quick gate skipped the api's unit tests on a batch that changed the api
+
+**Symptom**: on batch-2026-10-09-1 (93 changed api files) `pnpm prepush`
+printed "api-unit:changed PASS (the api is not affected)".
+**Cause**: `affected()` in `scripts/prepush.sh` asks `turbo ls` which
+packages changed, with its errors sent to `/dev/null`, and read an empty
+answer as "nothing affected". Run right after a fresh `pnpm install` in a new
+worktree, the query came back empty, and every "only if affected" step
+skipped silently.
+**Fix**: a failed query counts every package as affected, and an empty answer
+counts only if git agrees that nothing under `apps/` or `packages/` changed.
+Otherwise every package is affected and the step runs.
+**Check**: the helper fails closed in both cases. A gate that can't tell what
+changed runs everything.
+**Category**: tooling · `scripts/prepush.sh` → `affected()`

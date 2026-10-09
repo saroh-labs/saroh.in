@@ -37,7 +37,8 @@ import type {
 
 import type { OrganizationContext } from "../../common/types/organization-context";
 import { planMeter } from "../billing/metering.service";
-import { MediaService, NOT_AN_IMAGE_MESSAGE } from "./media.service";
+import { MediaService } from "./media.service";
+import { NOT_AN_IMAGE_MESSAGE } from "./upload-checks";
 
 const create = prisma.media.create as jest.Mock;
 const findUnique = prisma.media.findUnique as jest.Mock;
@@ -66,6 +67,8 @@ function fakeStorage(over: Partial<ObjectStorage> = {}): ObjectStorage {
         deleteObject: jest.fn().mockResolvedValue(undefined),
         headObject: jest.fn().mockResolvedValue(null),
         readObjectStart: jest.fn().mockResolvedValue(null),
+        // Local development's storage unless a test says otherwise.
+        seesUploads: false,
         ...over,
     };
 }
@@ -465,6 +468,44 @@ describe("MediaService — a file is what its type says (#517)", () => {
                 data: expect.objectContaining({ status: "READY" }),
             }),
         );
+    });
+
+    it("marks a photo nothing was stored for FAILED, where storage sees uploads (#873)", async () => {
+        const deleteObject = jest.fn().mockResolvedValue(undefined);
+        const service = new MediaService(
+            fakeStorage({ seesUploads: true, deleteObject }),
+        );
+        findUnique.mockResolvedValue(photo("m4"));
+        await expect(service.completeUpload(ctx(), "m4")).rejects.toThrow(
+            "That upload didn't go through. Upload the file again.",
+        );
+        expect(update).toHaveBeenCalledWith({
+            where: { id: "m4" },
+            data: { status: "FAILED" },
+        });
+        expect(update).not.toHaveBeenCalledWith(
+            expect.objectContaining({
+                data: expect.objectContaining({ status: "READY" }),
+            }),
+        );
+        expect(deleteObject).toHaveBeenCalledWith("a.png");
+    });
+
+    it("refuses an SVG logo before signing anything (#873)", async () => {
+        const createSignedUploadUrl = jest.fn();
+        const service = new MediaService(
+            fakeStorage({ createSignedUploadUrl }),
+        );
+        await expect(
+            service.createUpload(ctx(), {
+                contentType: "image/svg+xml",
+                contentLength: 2048,
+                filename: "logo.svg",
+                purpose: "business-logo",
+            }),
+        ).rejects.toThrow("That file isn't a PNG, JPG or WebP image.");
+        expect(createSignedUploadUrl).not.toHaveBeenCalled();
+        expect(create).not.toHaveBeenCalled();
     });
 
     function photo(id: string) {

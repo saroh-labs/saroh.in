@@ -1,4 +1,4 @@
-// @covers accounts:/login app:/open app:/customers app:/commerce/orders app:/commerce/orders/new app:/billing/invoices app:/billing/subscriptions app:/settings/people api:customer-workspace api:contacts api:customers api:orders api:payments api:invoices api:subscriptions api:organizations
+// @covers accounts:/login app:/open app:/customers app:/contacts app:/commerce/orders app:/commerce/orders/new app:/billing/invoices app:/billing/subscriptions app:/settings/people api:customer-workspace api:contacts api:customers api:orders api:payments api:invoices api:subscriptions api:organizations
 import type { Locator, Page, TestInfo } from "@playwright/test";
 import { expect, test } from "@playwright/test";
 

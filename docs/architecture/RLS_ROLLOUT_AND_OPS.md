@@ -8,8 +8,11 @@ table, through its parent (the B2 shape). The last 16 went in with
 table arrives without a policy or an allow-list entry with a reason
 (`packages/database/src/rls-coverage.test.ts`).
 
-It is still a **dark rollout** in every environment: the API connects as the
-database owner, which bypasses RLS, and `RLS_ENFORCEMENT` is off. Switching it
+**On in development since 2026-10-09** (§4); still dark in production, where
+`RLS_ENFORCEMENT` is off. With it off the proxy never sets the GUC, so every
+query takes the policies' permissive branch. Because every table is `FORCE`d,
+that flag, not the role, is what keeps it dark: the owner role is not
+`BYPASSRLS`. The separate runtime role adds least privilege (no DDL) on top. Switching it
 on is the operator runbook in §1 below. The whole API integration suite now
 runs in CI the way production will run once it's switched on (§0.2), and it
 passes.
@@ -249,7 +252,15 @@ lost.
 
 ## 4. Enablement log
 
-| Date | Environment | Pre-flight 2c (NULL-org rows) | Probe (step 3) | Smoke (step 5) | By  |
-| ---- | ----------- | ----------------------------- | -------------- | -------------- | --- |
-| —    | development | not run                       | not run        | not run        |     |
-| —    | production  | not run                       | not run        | not run        |     |
+Runtime role name on development: `saroh_runtime`. Check §1's example name
+against production's existing roles before reusing it there; pick one that
+doesn't clash with the owner.
+Pre-flight 2b on development also lists five platform-wide tables beyond the
+allow-list above, each correctly not org-scoped: `PricingCatalogDraft`,
+`PricingCatalogVersion`, `PricingCoupon`, `PricingProviderPlan`,
+`SarohInvoiceSequence`.
+
+| Date       | Environment | Pre-flight 2c (NULL-org rows) | Probe (step 3)                                                                                      | Smoke (step 5)                                                                                                                                                                                                                                                                                                                                                                                                          | By             |
+| ---------- | ----------- | ----------------------------- | --------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------- |
+| 2026-10-09 | development | 0 in all four tables          | real org: own 500 of 667 orders, 10 modules; bogus org: 0 Order, SavedView, ApiKey; no context: 667 | read-only pass: Home, Sell (orders, customers, location), Bookings, Contacts, Website, Settings › Team, business switch, public site. Writes on Northwind: product edit and back, a Reviewer invitation sent and cancelled, a public enquiry, Website › Sells from saved, the shop and bag, booking times. Booking and checkout stop at customer sign-in (emailed code), not exercised. 0 RLS/P2028/pool errors in logs | Claude + owner |
+| —          | production  | not run                       | not run                                                                                             | not run                                                                                                                                                                                                                                                                                                                                                                                                                 |                |

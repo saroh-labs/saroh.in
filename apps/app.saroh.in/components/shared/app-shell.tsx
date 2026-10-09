@@ -1,8 +1,10 @@
 import { getServerSession } from "@saroh/auth/next";
 import { cookies, headers } from "next/headers";
 
+import { PausedBanner } from "@/components/billing/paused-banner";
 import { PlanEndingBanner } from "@/components/billing/plan-ending-banner";
 import { PlanRefusalHost } from "@/components/billing/plan-refusal";
+import { AccessDenied } from "@/components/shared/access-denied";
 import { AppHeader } from "@/components/shared/app-header";
 import { AppSidebar } from "@/components/shared/app-sidebar";
 import { BusinessZoneProvider } from "@/components/shared/business-zone";
@@ -14,16 +16,18 @@ import {
     planLockedModuleKeys,
 } from "@/components/shared/nav-locks";
 import { TabBar } from "@/components/shared/tab-bar";
+import { accountsUrl } from "@/lib/accounts";
 import { businessZone } from "@/lib/format/business-zone";
 import { getHome } from "@/lib/home/service";
 import { listModules } from "@/lib/modules/service";
 import { RAIL_COLLAPSED, RAIL_COOKIE } from "@/lib/nav/rail-cookie";
 import { unreadNotificationCount } from "@/lib/notifications/service";
+import { MEMBER_PAUSED_BODY } from "@/lib/organizations/choose";
 import {
     listOrganizations,
     resolveActiveOrganization,
 } from "@/lib/organizations/service";
-import { billingAccessOrNull } from "@/lib/saroh-billing/service";
+import { billingAccessOrNull, pausedOrNull } from "@/lib/saroh-billing/service";
 import { listSites } from "@/lib/sites/service";
 import { getStockTracking } from "@/lib/stock/service";
 import { getStorefrontAllowance } from "@/lib/stores/storefronts";
@@ -60,6 +64,25 @@ export async function AppShell({ children }: { children: React.ReactNode }) {
     // Reuse the already-fetched list instead of re-fetching it (#102).
     const activeOrg = await resolveActiveOrganization(organizations);
 
+    // Every business they're in has paused their access (#800): the API
+    // would refuse each read, so say why once instead of a page of denials.
+    if (activeOrg?.paused) {
+        return (
+            <div className="flex min-h-screen flex-col">
+                <AppHeader onboarding user={session.user} />
+                <main id="main-content" className="flex-1">
+                    <AccessDenied
+                        title={`Your access to ${activeOrg.name} is paused`}
+                        description={MEMBER_PAUSED_BODY}
+                        note={null}
+                        backHref={`${accountsUrl}/apps`}
+                        backLabel="Your businesses"
+                    />
+                </main>
+            </div>
+        );
+    }
+
     // Concurrently, because none of the three depends on another. They used to
     // run one after the next, which cost the sum of three round trips on every
     // page in the app rather than the slowest one.
@@ -73,7 +96,7 @@ export async function AppShell({ children }: { children: React.ReactNode }) {
     // a transient API error never blanks the shell; a successful fetch that
     // returns nothing is "nothing is enabled yet", which a new Organization
     // should see reflected in its nav rather than papered over.
-    const [unread, modules, home, sites, storefronts, stock, billing] =
+    const [unread, modules, home, sites, storefronts, stock, billing, paused] =
         await Promise.all([
             unreadNotificationCount(),
             listModules().catch(() => null),
@@ -111,6 +134,9 @@ export async function AppShell({ children }: { children: React.ReactNode }) {
              * API still say so).
              */
             billingAccessOrNull(),
+            // What a move to a lower plan paused, or will (#800): the banner.
+            // An aid; null when unread, and the API still refuses.
+            pausedOrNull(),
         ]);
     // Available modules, plus those shut only by the plan: locked, not off,
     // so they stay in the rail with a lock and a way up (U14).
@@ -251,6 +277,8 @@ export async function AppShell({ children }: { children: React.ReactNode }) {
                         <BusinessZoneProvider zone={businessZone(activeOrg)}>
                             {/* A plan that ends within 30 days (#805). */}
                             <PlanEndingBanner ending={billing?.planEnding} />
+                            {/* What a lower plan paused, or will (#800). */}
+                            <PausedBanner view={paused} />
                             {children}
                         </BusinessZoneProvider>
                     </div>

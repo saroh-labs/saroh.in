@@ -58,7 +58,7 @@ first.
 2. **Uptime: an off-host check on `https://api.saroh.in/health/ready`**, every
    1–3 minutes, alerting e-mail and one chat channel after 2 consecutive
    failures. Also a check on each public front door (`app.saroh.in`, a
-   merchant site on `saroh.app`), which catches a Vercel or DNS outage the API
+   merchant site on `saroh.app`), which catches a Cloudflare Workers or DNS outage the API
    probe can't see. It must run **off** the Coolify host: a monitor on the
    same box goes down with it. Better Stack's free tier covers this, and so
    does Sentry's single uptime monitor (for the API only).

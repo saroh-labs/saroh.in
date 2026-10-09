@@ -21,6 +21,7 @@ import {
     moduleLabel,
     moduleRoute,
 } from "@/lib/module-pages";
+import { dontCachePage } from "@/lib/page-cache/site-rules";
 import { getSiteForHost } from "@/lib/publication";
 import { getSignInOptions } from "@/lib/sign-in";
 import { shareable } from "@/lib/test-metadata";
@@ -123,6 +124,8 @@ export default async function BookPage({
             ? move.trim().slice(0, 64)
             : null;
     if (moving) {
+        // One customer's own booking: never kept (#863).
+        dontCachePage("moving a booking");
         return (
             <MoveClass
                 row={await getMyBooking(moving)}
@@ -163,6 +166,8 @@ export default async function BookPage({
     ]);
     if (!lookup.ok) {
         if (lookup.reason === "missing") notFound();
+        // A failed read is not kept by the page cache (#863).
+        dontCachePage("booking unavailable");
         return <BookingUnavailable business={resolved.snapshot.site.name} />;
     }
     return (

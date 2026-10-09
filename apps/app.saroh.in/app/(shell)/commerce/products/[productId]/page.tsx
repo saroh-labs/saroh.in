@@ -2,6 +2,7 @@ import { Lock } from "lucide-react";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 
+import { PausedNote } from "@/components/billing/paused-banner";
 import { ProductCollectionsTab } from "@/components/commerce/collections/collections-tab";
 import { ArchivedBanner } from "@/components/commerce/product-page/archived-banner";
 import { CustomerView } from "@/components/commerce/product-page/customer-view";
@@ -21,6 +22,7 @@ import { ProductPhotosTab } from "@/components/commerce/product-page/photos-tab"
 import { ProductReviewsTab } from "@/components/commerce/product-page/reviews-tab";
 import { ProductStockTab } from "@/components/commerce/product-page/stock-tab";
 import { ProductTabs } from "@/components/commerce/product-page/tabs";
+import { activeCut, pausedByCut, pausedWords } from "@/lib/billing/paused";
 import { listCollections } from "@/lib/collections/service";
 import { resolveActiveOrganization } from "@/lib/organizations/service";
 import { productHref, productTabOf } from "@/lib/products/links";
@@ -32,6 +34,7 @@ import { stockBadge } from "@/lib/products/overview-rules";
 import { accessLine, shopProductUrl } from "@/lib/products/overview-words";
 import { listCategories } from "@/lib/products/service";
 import { countsStock, trackingControl } from "@/lib/products/tracking";
+import { pausedOrNull } from "@/lib/saroh-billing/service";
 import { requireSession } from "@/lib/session";
 import { readWebAddressLinks } from "@/lib/sites/share-links-read";
 import type { ProductStock } from "@/lib/stock/product-stock";
@@ -108,7 +111,7 @@ export default async function ProductPage({
     const view = query.view === "customer" ? "customer" : "team";
     // The business's product (#531), as the storefront in the address sees
     // it — or the first that sells it.
-    const [overview, business, web] = await Promise.all([
+    const [read, business, web, paused] = await Promise.all([
         withStorefrontFallback(query.storefront, (at) =>
             getProductOverview(at, productId),
         ),
@@ -117,8 +120,14 @@ export default async function ProductPage({
         getStockTracking().catch(() => null),
         // Whether the online shop is live (UX-082): null when unread.
         readWebAddressLinks(),
+        // Past the plan's products limit (#800): read-only, and why.
+        pausedOrNull(),
     ]);
-    if (!overview) notFound();
+    if (!read) notFound();
+    const isPaused = pausedByCut(read.product, activeCut(paused, "products"));
+    // Read-only as the Editor is (#800): nothing on the page changes it,
+    // while stock can still be counted (`canStock` is kept).
+    const overview = isPaused ? { ...read, canWrite: false } : read;
     const shopUrl = shopProductUrl(web?.links.shop, overview.product);
     const tracking = {
         counts: countsStock(
@@ -185,8 +194,15 @@ export default async function ProductPage({
                 overview={overview}
                 storeId={store.id}
                 photosHref={href("photos")}
+                paused={isPaused}
             />
-            {access ? <AccessLine line={access} /> : null}
+            {isPaused ? (
+                <div className="border-b border-border px-4 py-2.5 sm:px-[22px]">
+                    <PausedNote>{pausedWords("product")}</PausedNote>
+                </div>
+            ) : access ? (
+                <AccessLine line={access} />
+            ) : null}
             {overview.product.status === "ARCHIVED" ? (
                 <ArchivedBanner
                     storeId={store.id}

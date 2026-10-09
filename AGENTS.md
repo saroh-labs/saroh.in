@@ -31,8 +31,8 @@ pnpm (`pnpm@9`) + Turborepo monorepo.
   unreleased pricing designs, anything the user calls internal. Read the file
   list before every push.
 - **Never push a unit branch or open a PR per unit.** Work lands in a local
-  `batch-<date>-<n>` branch and goes up once per batch — every push burns five
-  Vercel builds. `docs/patterns/devops-tooling-and-deploy.md`.
+  `batch-<date>-<n>` branch and goes up once per batch — every pushed PR is a
+  full CI run. `docs/patterns/devops-tooling-and-deploy.md`.
 - Shared tokens live in `packages/ui/src/globals.css` and
   `tooling/tailwind-config`. `--accent` is a shadcn neutral, not a brand
   accent — renaming it breaks components.
@@ -62,6 +62,7 @@ the right-hand files **before** writing code.
 | Agree a product or architecture decision with the user — write it down the same day                        | `docs/architecture/DECISIONS.md` · `docs/architecture/adr/` · `00-universal.md` §13            |
 | Add a route, page, layout, component or `lib/` module in a Next app                                        | `docs/patterns/frontend-app-structure.md` · `.agents/skills/saroh-architecture/SKILL.md`       |
 | Read or write API data from a Next app, or add client or URL state                                         | `docs/patterns/frontend-data-and-state.md`                                                     |
+| Add a merchant-site page or read, or an API write that changes what a published page shows                 | `docs/patterns/frontend-data-and-state.md` → page cache · `docs/patterns/backend-jobs.md`      |
 | Build or change a form                                                                                     | `docs/patterns/frontend-forms.md`                                                              |
 | Show a toast, an error, or an empty, loading or failed state                                               | `docs/patterns/frontend-error-feedback.md` · `.agents/skills/saroh-product-states/SKILL.md`    |
 | Touch session handling, `packages/auth`, or anything that redirects to sign-in                             | `docs/patterns/frontend-error-feedback.md` · `docs/patterns/backend-auth-and-access.md`        |
@@ -99,8 +100,8 @@ A new browser spec owns its data — it runs beside every other test — and
 tags a business-wide change `@serial` (`saroh-browser-tests` skill).
 
 `git push` runs the quick gate itself (`.husky/pre-push`); `--no-verify`
-is for emergencies only. CI is the last net, not the first: every CI round trip is a push, five
-Vercel builds and twenty minutes. `scripts/prepush.sh` runs what CI runs.
+is for emergencies only. CI is the last net, not the first: every CI round trip is a push
+and twenty minutes. `scripts/prepush.sh` runs what CI runs.
 
 ## Learn from every miss
 

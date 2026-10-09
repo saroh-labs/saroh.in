@@ -34,6 +34,12 @@ export interface AccountPacksOnSale {
      */
     payOnline: boolean;
     packs: AccountPackOnSale[];
+    /**
+     * True on a website a move to a lower plan paused (#800): nothing is
+     * sold here online, and the sheet says the business isn't taking
+     * orders. Absent otherwise.
+     */
+    notTakingOrders?: true;
 }
 
 /** A started purchase: what is being paid, and the provider's handoff. */

@@ -57,6 +57,21 @@ export function planMeter(
 }
 
 /**
+ * What the header beside the create button says of the limit (#874): the
+ * count and Upgrade, unless the screen's limit banner (`PlanLimitNotice`,
+ * from 80%) already says it — then once is enough, and the banner, with its
+ * words and its way up, is the one kept. The create button stays off at the
+ * limit either way.
+ */
+export function meterBeside(
+    meter: PlanMeter | null,
+    bannerShown: boolean,
+): { label: string | null; upgrade: boolean } {
+    if (!meter || bannerShown) return { label: null, upgrade: false };
+    return { label: meter.label, upgrade: meter.full };
+}
+
+/**
  * What an import of `rows` new things can bring in under the limit
  * (UX-036): all of them, or the first `fits` — said before the import, not
  * refused after it. Null when nothing limits it.

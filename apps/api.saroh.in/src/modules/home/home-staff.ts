@@ -1,8 +1,10 @@
 import type { prisma } from "@saroh/database";
 import { Prisma } from "@saroh/database";
 
+import { isDiaryScoped } from "../bookings/own-diary";
 import { isLocationScoped } from "../orders/order-location";
 import type { HomeInput, HomeStaff } from "./home-model";
+import { holds } from "./home-model";
 
 /**
  * The staff landing (round 2, F11): a Member, or someone in a role the
@@ -99,13 +101,17 @@ export async function readStaffNarrow(
             : null;
     const member = membership?.staffMember;
     // An archived staff member takes no bookings; their Home is the diary's.
+    // Calendar only (#868) is never the whole diary's: off it, or archived,
+    // they see no bookings rather than everyone's.
     const staff =
         member?.status === "ACTIVE"
             ? {
                   id: member.id,
                   serviceIds: member.services.map((s) => s.serviceId),
               }
-            : null;
+            : isDiaryScoped(input.organizationRoleKey)
+              ? NO_DIARY
+              : null;
 
     // A Storefront team holder's orders are their storefronts' only
     // (DEC-074, as the Orders API narrows them): on none, Home shows none,
@@ -117,8 +123,27 @@ export async function readStaffNarrow(
           : null;
     return {
         narrow: { storeIds, staff },
-        staff: { stores, ownDiary: staff !== null },
+        staff: { stores, ownDiary: staff !== null && staff !== NO_DIARY },
     };
+}
+
+/**
+ * A diary that matches no booking: Calendar only (#868) with no active
+ * staff member behind them. No staff member's id is empty, so the
+ * `staffId` it narrows to is never anyone's.
+ */
+const NO_DIARY: NonNullable<HomeNarrow["staff"]> = { id: "", serviceIds: [] };
+
+/**
+ * Whether Home may count the business's bookings for this viewer (this
+ * week, since yesterday): `booking:read`, and not Calendar only, whose
+ * bookings are their own diary's (#868) — Today shows those.
+ */
+export function seesBusinessBookings(input: HomeInput): boolean {
+    return (
+        holds(input, "booking:read") &&
+        !isDiaryScoped(input.organizationRoleKey)
+    );
 }
 
 /** A where on `storeId` for the narrowed storefronts; empty for all. */

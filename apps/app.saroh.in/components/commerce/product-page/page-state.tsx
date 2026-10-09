@@ -24,18 +24,7 @@ export function ProductPageState({
 }) {
     return (
         <main className="w-full">
-            <div className="flex flex-wrap items-center gap-2 border-b border-border px-3.5 py-[9px]">
-                <Link
-                    href="/commerce/products"
-                    className="flex items-center gap-[7px] rounded-lg px-[9px] py-1.5 text-[12.5px] text-neutral-700 hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring coarse:min-h-11 dark:text-muted-foreground"
-                >
-                    <span aria-hidden>‹</span> Products
-                </Link>
-                <span aria-hidden className="text-[15px] text-muted-foreground">
-                    /
-                </span>
-                <span className="text-[13.5px] font-semibold">Product</span>
-            </div>
+            <ProductPageBar />
             <div className="px-4 py-[60px] sm:px-[22px]">
                 <div
                     role={role}
@@ -60,6 +49,24 @@ export function ProductPageState({
                 </div>
             </div>
         </main>
+    );
+}
+
+/** The "‹ Products / Product" bar every whole-page state sits under. */
+export function ProductPageBar() {
+    return (
+        <div className="flex flex-wrap items-center gap-2 border-b border-border px-3.5 py-[9px]">
+            <Link
+                href="/commerce/products"
+                className="flex items-center gap-[7px] rounded-lg px-[9px] py-1.5 text-[12.5px] text-neutral-700 hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring active:bg-accent-active coarse:min-h-11 dark:text-muted-foreground"
+            >
+                <span aria-hidden>‹</span> Products
+            </Link>
+            <span aria-hidden className="text-[15px] text-muted-foreground">
+                /
+            </span>
+            <span className="text-[13.5px] font-semibold">Product</span>
+        </div>
     );
 }
 

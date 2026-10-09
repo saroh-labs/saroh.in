@@ -7,6 +7,7 @@ import { ApiError } from "@/lib/api/errors";
 import { toFailure } from "@/lib/api/failure";
 import type { PlanRefusal } from "@/lib/billing/refusal";
 import type { BusinessDetail } from "@/lib/organizations/business-details";
+import { pickActive } from "@/lib/organizations/choose";
 
 import { env } from "@/env";
 
@@ -54,17 +55,21 @@ export type CrmResult<T> =
  * active org through this function, and going through it would recurse.
  * Request-cached, so the reconciliation below costs one call per render pass.
  */
-const memberOrgIds = cache(async (): Promise<string[] | null> => {
-    const cookie = (await headers()).get("cookie") ?? "";
-    const res = await fetch(`${API_URL}/organizations`, {
-        headers: { "content-type": "application/json", cookie },
-        cache: "no-store",
-    });
-    if (!res.ok) return null;
-    const orgs = (await res.json().catch(() => null)) as
-        { id: string }[] | null;
-    return Array.isArray(orgs) ? orgs.map((o) => o.id) : null;
-});
+const memberOrgIds = cache(
+    async (): Promise<{ id: string; paused?: boolean }[] | null> => {
+        const cookie = (await headers()).get("cookie") ?? "";
+        const res = await fetch(`${API_URL}/organizations`, {
+            headers: { "content-type": "application/json", cookie },
+            cache: "no-store",
+        });
+        if (!res.ok) return null;
+        const orgs = (await res.json().catch(() => null)) as
+            { id: string; paused?: boolean }[] | null;
+        return Array.isArray(orgs)
+            ? orgs.map((o) => ({ id: o.id, paused: o.paused === true }))
+            : null;
+    },
+);
 
 /**
  * The active organization id: the `active_org` cookie when the caller is still
@@ -82,10 +87,11 @@ const memberOrgIds = cache(async (): Promise<string[] | null> => {
  */
 export const getActiveOrgId = cache(async (): Promise<string | null> => {
     const cookieId = (await cookies()).get(ACTIVE_ORG_COOKIE)?.value ?? null;
-    const ids = await memberOrgIds();
-    if (ids === null) return cookieId;
-    if (cookieId && ids.includes(cookieId)) return cookieId;
-    return ids[0] ?? null;
+    const orgs = await memberOrgIds();
+    if (orgs === null) return cookieId;
+    // A business whose door is paused for them (#800) is passed over while
+    // another opens, the chrome's own rule (`pickActive`).
+    return pickActive(orgs, cookieId)?.id ?? null;
 });
 
 /** Base path for the active org, or null when no org is active. */

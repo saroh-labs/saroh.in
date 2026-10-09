@@ -120,4 +120,13 @@ export interface ObjectStorage {
      * the key does not exist or its bytes cannot be read.
      */
     readObjectStart(key: string, length: number): Promise<Uint8Array | null>;
+
+    /**
+     * Does {@link readObjectStart} see what a browser PUT to a signed URL?
+     * True for R2, where no bytes means nothing was stored, so the upload is
+     * refused. False for the in-memory adapter of local development, which
+     * never receives the browser's PUT: there a photo with no bytes to read
+     * is let through rather than block local work (#478, #873).
+     */
+    readonly seesUploads: boolean;
 }

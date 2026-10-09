@@ -3,10 +3,10 @@
  * would refuse.
  *
  * Websites: one per business on every plan (ADR-006, DEC-094), mirrored
- * here — never an offer of more. Storefronts: up to the
- * plan (ADR-010) — the API says how many there are and how many the plan
- * allows (`GET …/storefronts/allowance`), so the number is never copied into
- * the app. A business that already has more keeps them all; pickers appear
+ * here — never an offer of more. Storefronts: up to Saroh's ceiling
+ * (ADR-010; a new one is online, which no plan caps, DEC-109) — the API says
+ * how many there are and how many may be (`GET …/storefronts/allowance`), so
+ * the number is never copied into the app. A business that already has more keeps them all; pickers appear
  * only when there is more than one to pick from.
  */
 export const MAX_WEBSITES = 1;

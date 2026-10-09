@@ -52,7 +52,7 @@ export interface PackTabRow extends Pick<
     name: string;
     /** Its Pack Detail. */
     href: string;
-    /** "Bought 1 Sep · ₹3,000 · UPI at the desk". */
+    /** "Bought 1 Sep · ₹3,000 · UPI". */
     bought: string;
     expiresAt: string;
     /** "classes" or "sessions". */

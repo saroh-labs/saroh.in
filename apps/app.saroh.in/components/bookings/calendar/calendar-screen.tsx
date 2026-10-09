@@ -2,12 +2,13 @@
 
 import { PartialNotice } from "@saroh/ui/data-state";
 import { cn } from "@saroh/ui/lib/utils";
-import { showError, showUndo } from "@saroh/ui/toast";
+import { showError, showInfo, showUndo } from "@saroh/ui/toast";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import type { ReactNode } from "react";
 import { useMemo, useState } from "react";
 
+import { diaryPausedWords } from "@/lib/billing/paused";
 import { formatMoney } from "@/lib/format/money";
 import type { NoticeChannels } from "@/lib/messages/notice-reach";
 import {
@@ -421,6 +422,12 @@ export function CalendarScreen({
     function bookGap(column: Column, free: Span) {
         const person = staffById.get(column.key);
         if (!person) return;
+        // Past the plan's team limit (#800): no new bookings with them, and
+        // why, rather than a form the API would refuse.
+        if (person.paused) {
+            showInfo(diaryPausedWords([person.name]));
+            return;
+        }
         setGap({ staff: person, date, free });
     }
 
@@ -463,8 +470,12 @@ export function CalendarScreen({
         staff === null
             ? null
             : columns
-                  // The services' own hours have nobody to book with a tap.
-                  .filter((c) => staffById.has(c.key))
+                  // The services' own hours have nobody to book with a tap,
+                  // and someone paused by the plan takes no new booking.
+                  .filter((c) => {
+                      const person = staffById.get(c.key);
+                      return person !== undefined && !person.paused;
+                  })
                   .flatMap((c) =>
                       (c.day?.free ?? []).map((f) => ({
                           key: `${c.key}${f[0]}`,
@@ -758,7 +769,7 @@ function Legend({ classes }: { classes: boolean }) {
         <ul className="mb-3 flex flex-wrap gap-x-3.5 gap-y-1.5 text-[11.5px] text-muted-foreground">
             <li className="inline-flex items-center gap-1.5">
                 <span aria-hidden className={cn(sw, "bg-diary-one")} />
-                {classes ? "One-to-one" : "Appointment"}
+                {classes ? "One-to-one" : "Booking"}
             </li>
             {classes ? (
                 <li className="inline-flex items-center gap-1.5">

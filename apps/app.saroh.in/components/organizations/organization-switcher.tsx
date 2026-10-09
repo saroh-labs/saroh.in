@@ -10,6 +10,7 @@ import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 
 import { setActiveOrganization } from "@/lib/organizations/actions";
+import { PAUSED_LABEL } from "@/lib/organizations/choose";
 import type {
     Organization,
     OrganizationRole,
@@ -121,6 +122,8 @@ export function OrganizationSwitcher({
                     </span>
                     <span className="block text-[11px] text-muted-foreground">
                         {org.roleLabel ?? ROLE_LABEL[org.role]}
+                        {/* Their access is paused (#800); choosing it says why. */}
+                        {org.paused ? ` · ${PAUSED_LABEL}` : null}
                     </span>
                 </span>
                 {on ? <Check aria-hidden className="size-4 shrink-0" /> : null}

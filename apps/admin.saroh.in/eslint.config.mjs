@@ -6,7 +6,9 @@ import reactConfig from "@saroh/eslint-config/react";
 export default [
     {
         // .open-next and .wrangler are the Cloudflare build output (cf:build).
-        ignores: [".next/**", ".open-next/**", ".wrangler/**"],
+        // worker.ts imports the Cloudflare build output (cf:build), so it
+        // is outside tsconfig and the typed lint, as in saroh.app.
+        ignores: [".next/**", ".open-next/**", ".wrangler/**", "worker.ts"],
     },
     ...baseConfig,
     ...reactConfig,

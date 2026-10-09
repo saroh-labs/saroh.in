@@ -116,6 +116,8 @@ const ROLES: Record<string, OrgAction[]> = {
     "shopfitter-b16": ["store:read", "store:write"],
     // Sees customers and nothing of orders.
     "desk-b16": ["contact:read", "store:read"],
+    // Sees the storefronts and reads their orders, money included (#868).
+    "location-reader-b16": ["store:read", "order:read"],
 };
 type RoleKey = keyof typeof ROLES;
 
@@ -280,6 +282,39 @@ describe("reading orders: order:read or order:stage", () => {
         const read = await controller.read(as("kitchen-b16"), id);
         expect(read.money).toBeNull();
         expect(read.customer?.email).toBe(`b16-buyer-${tag}@example.in`);
+    });
+});
+
+/**
+ * The older store-scoped list and read send every order's totals, so they
+ * take a money permission (`order:read`), never store access alone (#868,
+ * DEC-098): the kitchen and a role that sees the storefronts but reads no
+ * orders are refused.
+ */
+describe("the store-scoped order reads, which send totals: order:read (#868)", () => {
+    it.each<[RoleKey, "allowed" | "refused"]>([
+        ["location-reader-b16", "allowed"],
+        ["kitchen-b16", "refused"],
+        ["desk-b16", "refused"],
+        ["shopfitter-b16", "refused"],
+    ])("%s → the storefront's orders: %s", async (key, want) => {
+        const id = await freshOrder();
+        // Every one of them reaches the storefront itself.
+        await expect(
+            stores.getForUser(storeId, users[key]),
+        ).resolves.toBeTruthy();
+        expect(await storeGate(() => orders.list(storeId, users[key]))).toBe(
+            want,
+        );
+        expect(await storeGate(() => orders.get(storeId, id, users[key]))).toBe(
+            want,
+        );
+    });
+
+    it("sends the totals to a role carrying order:read", async () => {
+        const id = await freshOrder();
+        const list = await orders.list(storeId, users["location-reader-b16"]);
+        expect(list.find((o) => o.id === id)?.total).toMatch(/^\d+\.\d{2}$/);
     });
 });
 

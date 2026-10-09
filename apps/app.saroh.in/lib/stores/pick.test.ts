@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { pickStorefront } from "./pick";
+import { locationsWord, pickStorefront } from "./pick";
 
 const HILL = { id: "st_hill", name: "Hill Road" };
 const ONLINE = { id: "st_online", name: "Online" };
@@ -23,5 +23,19 @@ describe("pickStorefront — a page at one storefront", () => {
 
     it("has nothing to use in a business with none", () => {
         expect(pickStorefront([], undefined)).toBeUndefined();
+    });
+});
+
+describe("locationsWord — the row's name follows the count (UX-078)", () => {
+    it("is singular for one, none or an unknown count", () => {
+        expect(locationsWord(1)).toBe("Location");
+        expect(locationsWord(0)).toBe("Location");
+        expect(locationsWord(null)).toBe("Location");
+        expect(locationsWord(undefined)).toBe("Location");
+    });
+
+    it("is plural for several", () => {
+        expect(locationsWord(2)).toBe("Locations");
+        expect(locationsWord(5)).toBe("Locations");
     });
 });

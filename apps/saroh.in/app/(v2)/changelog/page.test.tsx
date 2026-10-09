@@ -3,7 +3,12 @@ import { cleanup, render, screen } from "@testing-library/react";
 import type { AnchorHTMLAttributes } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { CHANGELOG, COMING_NEXT, changelogView } from "@/content/changelog";
+import {
+    CHANGELOG,
+    CHANGELOG_ENTRIES,
+    COMING_NEXT,
+    changelogView,
+} from "@/content/changelog";
 
 import ChangelogPage from "./page";
 
@@ -95,6 +100,18 @@ describe("/changelog", () => {
                 li.textContent.includes(CHANGELOG.notYet),
             ),
         ).toBe(true);
+    });
+
+    it("lists CSV import as shipped, never as coming (#816)", () => {
+        expect(COMING_NEXT.map((item) => item.name)).not.toContain(
+            "CSV import",
+        );
+        const launch = CHANGELOG_ENTRIES.find(
+            (e) => e.slug === "saroh-is-open",
+        );
+        expect(launch?.sections.map((s) => s.name)).toContain(
+            "Bring your lists in",
+        );
     });
 
     it("has the email field that joins the list", () => {

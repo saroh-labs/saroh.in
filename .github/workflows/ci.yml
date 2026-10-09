@@ -178,6 +178,11 @@ jobs:
       - name: Security headers on every page
         run: pnpm run check:security-headers
 
+      # Each Worker's wrangler.jsonc says which environment it is, and its
+      # deploy build would pass next.config's required-variables check.
+      - name: Deploy environment markers
+        run: pnpm run check:deploy-env
+
       # Merchant sites render off the --site-* layer only, and there is exactly
       # one renderer — gates G2 and G6 (#252).
       - name: Site blocks gate
@@ -190,6 +195,11 @@ jobs:
       # Shell scripts' mktemp templates carry X's, so prepush runs on Linux.
       - name: mktemp templates
         run: pnpm run check:mktemp
+
+      # One word each (UX-078): no "Reschedule", "Shut" or "reservation" in
+      # what merchants and customers read.
+      - name: One word each
+        run: pnpm run check:words
 
       # Every browser spec names what it exercises (`// @covers …`), so the
       # local gate can run only the specs a batch reaches. CI still runs all.
@@ -547,6 +557,12 @@ jobs:
       # API's SSRF guard refuses; this test-only list lets it reach them.
       # The API refuses to boot with it under NODE_ENV=production.
       LINK_PREVIEW_TEST_HOSTS: 127.0.0.1
+      # Custom domains on fakes (#861): a `.example.com` hostname verifies
+      # without DNS, and hosting puts it in the state its first label names
+      # (`live-…`, `problem-…`), so the own-domain spec's hosting states run.
+      # Test only, as above; E2E_DOMAIN_HOSTING tells the spec they're here.
+      DOMAIN_HOSTING_FAKE: "1"
+      E2E_DOMAIN_HOSTING: fake
       # Every real environment has a payments key, and sending an invoice
       # seals its pay link with it (D17): without one, Send answered 500 on
       # this stack. The same throwaway key the API specs use; it opens

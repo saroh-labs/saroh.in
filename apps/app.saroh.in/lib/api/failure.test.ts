@@ -89,4 +89,22 @@ describe("toFailure", () => {
             cta: "See your plan",
         });
     });
+
+    it("shows a paused item's refusal in its own words, not a generic error (#800)", () => {
+        const words =
+            "This product is paused. Your plan includes fewer products than you have, so your oldest are hidden from your site and read-only. Choose a plan in Plan and billing to bring it back.";
+        const f = toFailure(
+            {
+                error: {
+                    code: "CONFLICT",
+                    message: words,
+                    details: { code: "PAUSED_BY_PLAN", kind: "product" },
+                },
+            },
+            "Could not save",
+        );
+        expect(f.error).toBe(words);
+        // Not a limit notice: nothing to add, so no upgrade sheet.
+        expect(f.plan).toBeUndefined();
+    });
 });

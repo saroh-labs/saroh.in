@@ -1,6 +1,6 @@
 /**
  * The Privacy Policy, as the owner agreed it (Claude Doc "Saroh Privacy
- * Policy and Terms", settled 4 Oct 2026, rev 32; email provider rev 42, 6 Oct). Published VERBATIM at
+ * Policy and Terms", settled 4 Oct 2026, rev 32; email provider rev 42, 6 Oct; merchants' own trackers, owner's wording 8 Oct, rev 44; Vercel removed, 9 Oct, rev 45). Published VERBATIM at
  * /privacy: do not reword it here. A change comes from the owner's text,
  * and moves `publishOn`, which is the "Last updated" date the page shows.
  *
@@ -27,6 +27,8 @@ This policy covers saroh.in, app.saroh.in, accounts.saroh.in and the emails we s
 - **Yours, as a Saroh user.** Your account, your business details and how you pay us. For this, we decide how it is used.
 - **Your customers', inside Saroh.** The bookings, orders, contacts and invoices your business keeps in Saroh, and the people who use your website on saroh.app or your own domain. **Your business decides how this is used; we only process it for you, on your instructions.** We never use it for our own marketing and never sell it. If one of your customers writes to us, we pass the request to you.
 
+If your website uses analytics or advertising tools that you connect (such as Google Analytics, Meta Pixel or Microsoft Clarity), they run on your site on your behalf. Your business chose them and decides how what they collect is used. Saroh asks your visitors before any of them sets cookies, never loads them on checkout, payment or account pages, and stores only the tools' public IDs.
+
 ## What we collect
 
 | What | Examples | Why |
@@ -37,7 +39,7 @@ This policy covers saroh.in, app.saroh.in, accounts.saroh.in and the emails we s
 | Waitlist and tool emails | Email, kind of business, where you heard of us, your country (worked out from your connection, never asked); for the link preview tool, the link you checked | To send what you asked for: the launch invite, or the link report |
 | Messages | What you write to contact@saroh.in | To help you |
 | Security logs | IP address, browser, sign-in times, errors | To keep accounts safe and fix problems. Kept 90 days |
-| Website visits | Pages visited on saroh.in, rough location, device, through Google Analytics cookies | To learn which pages help people. Only on saroh.in, never on your customers' sites |
+| Website visits | Pages visited on saroh.in, rough location, device, through Google Analytics cookies | To learn which pages help people. Only on saroh.in. Your customers' sites run only the tools you connect yourself |
 
 ## Why we're allowed to
 
@@ -54,8 +56,7 @@ Only the companies that help us run Saroh, each for its own job, and only what t
 | Amazon Web Services (SES) | Sending the emails Saroh sends, from India |
 | Google (Workspace) | Our mailboxes, when you write to us |
 | Hostinger | Running our servers and database |
-| Vercel | Serving our websites |
-| Cloudflare | Network security and speed |
+| Cloudflare | Serving our websites and apps, network security and speed |
 | Google Analytics | Visits to saroh.in |
 
 We don't sell personal data. We share it with authorities only when the law requires it.

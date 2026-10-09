@@ -24,6 +24,7 @@ import { prisma } from "@saroh/database";
 import type { OrganizationContext } from "../../common/types/organization-context";
 import { planMeter } from "../billing/metering.service";
 import { authorize } from "../organizations/organization-policy";
+import { enqueuePageRevalidation } from "./page-cache-revalidate";
 import { assertSiteInOrg } from "./site-access";
 
 /**
@@ -297,6 +298,12 @@ export class SiteTrackingService {
                     update: { privacyUrl: input.privacyUrl },
                 });
             }
+            // Pages kept with the old head (#863); they'd go within a
+            // minute anyway, this makes it the next visit.
+            await enqueuePageRevalidation(tx, {
+                cause: "trackers",
+                siteIds: [siteId],
+            });
         });
 
         return this.view(organizationId, siteId);

@@ -200,7 +200,7 @@ describe("queueTransactional through Saroh (DEC-086)", () => {
         };
         expect(data.template).toBe("BOOKING_CONFIRMED");
         // Names cleaned, Saroh's footer added.
-        expect(data.subject).toBe("Your booking with Rye & Co. is confirmed");
+        expect(data.subject).toBe("You're booked with Rye & Co.");
         expect(`${data.subject} ${data.body}`).not.toContain("rye.example");
         expect(data.body).toContain("Sent for Rye &amp; Co. by Saroh.");
     });

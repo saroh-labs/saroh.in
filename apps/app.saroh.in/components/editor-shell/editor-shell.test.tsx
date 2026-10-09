@@ -274,6 +274,28 @@ describe("the editor shell", () => {
         );
     });
 
+    it("keeps the address at /new while they type, and moves it once they stop (UX-080)", async () => {
+        adapter.create.mockResolvedValue(
+            ok(rec({ values: { name: "Monthly", price: "" } })),
+        );
+        render(null);
+        const name = field("Name");
+        act(() => name.focus());
+        type(name, "Monthly");
+        await wait(800);
+        expect(adapter.create).toHaveBeenCalled();
+        // Still typing: the address hasn't jumped.
+        expect(window.location.pathname).toBe("/billing/plans/new");
+        // Into the price is still typing.
+        act(() => field("Price").focus());
+        await wait(0);
+        expect(window.location.pathname).toBe("/billing/plans/new");
+        // Out of every field: the draft's own address.
+        act(() => field("Price").blur());
+        await wait(0);
+        expect(window.location.pathname).toBe("/billing/plans/pl-1/edit");
+    });
+
     it("says why a nameless draft can't save, and sends nothing", async () => {
         render(null);
         type(field("Price"), "1200");

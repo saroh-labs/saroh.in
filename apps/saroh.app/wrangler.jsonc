@@ -7,7 +7,9 @@
 {
     "$schema": "node_modules/wrangler/config-schema.json",
     "name": "saroh-sites-dev",
-    "main": ".open-next/worker.js",
+    // OpenNext's handler behind the page cache (#863): worker.ts wraps
+    // .open-next/worker.js, which `pnpm cf:build` writes.
+    "main": "worker.ts",
     "compatibility_date": "2026-10-01",
     // Off: esbuild's name-keeping wraps functions in __name(), which breaks
     // functions Next turns into inline <script>s ("__name is not defined").
@@ -26,6 +28,20 @@
     "images": {
         "binding": "IMAGES",
     },
+    // The page cache (#863, lib/page-cache/worker.ts). SITE_PAGE_TAGS holds
+    // when each tag was last revalidated, one Durable Object per site; the
+    // migration below makes the class, so a deploy creates it and nothing
+    // has to be made in Cloudflare first. CF_VERSION_METADATA names the
+    // deploy, so a page kept by an older one is never served after it.
+    "durable_objects": {
+        "bindings": [
+            { "name": "SITE_PAGE_TAGS", "class_name": "SitePageTags" },
+        ],
+    },
+    "migrations": [
+        { "tag": "v1-site-page-tags", "new_sqlite_classes": ["SitePageTags"] },
+    ],
+    "version_metadata": { "binding": "CF_VERSION_METADATA" },
     // Run the Worker next to the API (Mumbai, where api.saroh.in is), not
     // where the visitor connected: each page calls the API several times,
     // and India's traffic often arrives through Singapore or Hong Kong.
@@ -48,10 +64,25 @@
     ],
     // Settings that aren't secret; the build reads them too (scripts/cf-env.mjs).
     // SITE_RELAY_SECRET is a Worker secret, from GitHub.
+    // VERCEL_ENV, NEXT_PUBLIC_VERCEL_ENV and VERCEL_GIT_COMMIT_REF keep the
+    // names Vercel used (DEC-107). next.config's required-variables check,
+    // the template renders' production lock and the relay's "no loopback
+    // stand-in on the platform" rule read them; `pnpm run check:deploy-env`
+    // fails if one goes missing.
+    // SITE_PAGE_CACHE (on | off) keeps rendered pages (#863), on in dev;
+    // SITE_PAGE_CACHE_TTL is how long one is kept, in seconds.
+    // SITE_ACCOUNT_AREA (on | off) shows Sign in / My account and /account,
+    // on in dev (9 Oct); the api's own switch must be on first.
     "vars": {
+        "VERCEL_ENV": "preview",
+        "NEXT_PUBLIC_VERCEL_ENV": "preview",
+        "VERCEL_GIT_COMMIT_REF": "development",
         "API_URL": "https://api.saroh.io",
         "NEXT_PUBLIC_API_URL": "https://api.saroh.io",
         "NEXT_PUBLIC_ROOT_DOMAIN": "saroh.dev",
+        "SITE_PAGE_CACHE": "on",
+        "SITE_PAGE_CACHE_TTL": "300",
+        "SITE_ACCOUNT_AREA": "on",
     },
     "env": {
         // Production (`wrangler deploy --env production`, from main):
@@ -59,7 +90,7 @@
         // api.saroh.in (cut over 2026-10-07). A deploy replaces the Worker's
         // routes with these, so they live here, not only in the dashboard;
         // deploy-frontends.yml then sets them to fail open, so a failing Worker
-        // falls through to the origin (Vercel) instead of an error page.
+        // falls through to the origin instead of an error page.
         // Bindings and vars are not inherited, so each is repeated.
         "production": {
             "name": "saroh-sites",
@@ -79,10 +110,29 @@
             "images": {
                 "binding": "IMAGES",
             },
+            "durable_objects": {
+                "bindings": [
+                    { "name": "SITE_PAGE_TAGS", "class_name": "SitePageTags" },
+                ],
+            },
+            "migrations": [
+                {
+                    "tag": "v1-site-page-tags",
+                    "new_sqlite_classes": ["SitePageTags"],
+                },
+            ],
+            "version_metadata": { "binding": "CF_VERSION_METADATA" },
+            // The page cache starts off in production: switch it on here
+            // once it has run on dev (#863).
             "vars": {
+                "VERCEL_ENV": "production",
+                "NEXT_PUBLIC_VERCEL_ENV": "production",
+                "VERCEL_GIT_COMMIT_REF": "main",
                 "API_URL": "https://api.saroh.in",
                 "NEXT_PUBLIC_API_URL": "https://api.saroh.in",
                 "NEXT_PUBLIC_ROOT_DOMAIN": "saroh.app",
+                "SITE_PAGE_CACHE": "off",
+                "SITE_PAGE_CACHE_TTL": "300",
             },
         },
     },

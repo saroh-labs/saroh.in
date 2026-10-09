@@ -1,34 +1,41 @@
 "use client";
 
-import { Button } from "@saroh/ui/button";
+import { ErrorPage } from "@saroh/ui/error-page";
 import { reportError } from "@saroh/ui/lib/report-error";
+import { Wordmark } from "@saroh/ui/wordmark";
 import { useEffect } from "react";
 
 /**
- * App-root error boundary. A thrown data fetch (e.g. the API is down) lands
- * here with a retry affordance instead of Next's default unstyled error screen
- * — and, paired with services that THROW on real failures (#101), a genuine
- * outage no longer masquerades as an empty state.
+ * App-root error boundary, outside the workspace shell. A thrown data fetch
+ * (the API down or restarting) lands here with Try again instead of Next's
+ * default unstyled screen — and, paired with services that THROW on real
+ * failures (#101), a genuine outage no longer masquerades as an empty state.
+ * Pages inside the shell have their own boundaries (`SectionError`), which
+ * keep the rail; this one has no rail, so the wordmark says where you are.
+ *
+ * A read failed, so nothing the merchant had saved is touched: the sentence
+ * says so. The digest is the reference support can look up.
  */
 export default function Error({
     error,
-    reset,
+    retry,
 }: {
     error: Error & { digest?: string };
-    reset: () => void;
+    retry: () => void;
 }) {
     useEffect(() => {
         reportError(error, { boundary: "app/root", digest: error.digest });
     }, [error]);
 
     return (
-        <main className="mx-auto flex max-w-4xl flex-col items-center gap-4 p-16 text-center">
-            <h1 className="text-2xl font-semibold">Something went wrong</h1>
-            <p className="max-w-md text-sm text-muted-foreground">
-                We couldn&apos;t load this page. This is usually temporary —
-                please try again.
-            </p>
-            <Button onClick={reset}>Try again</Button>
+        <main className="flex min-h-screen items-center justify-center bg-background">
+            <ErrorPage
+                mark={<Wordmark />}
+                description="This page didn’t load. Anything you’d already saved is safe. It’s usually temporary, so try again."
+                onRetry={retry}
+                home={{ href: "/", label: "Back to Home" }}
+                digest={error.digest}
+            />
         </main>
     );
 }

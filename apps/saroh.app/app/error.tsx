@@ -1,8 +1,10 @@
 "use client";
 
-import { ctaClasses, SiteTheme } from "@saroh/site-blocks";
+import { SiteTheme } from "@saroh/site-blocks";
 import { reportError } from "@saroh/ui/lib/report-error";
 import { useEffect } from "react";
+
+import { SiteError } from "@/components/site-error";
 
 /**
  * Root error boundary for the renderer.
@@ -17,14 +19,15 @@ import { useEffect } from "react";
  * defaults. That is the honest ground for this page: a visitor who typed a
  * merchant's domain must never be shown Saroh's brand — they did not come to
  * Saroh and have no reason to learn it exists — and guessing at a palette we
- * could not load would be worse than not having one.
+ * could not load would be worse than not having one. No "Back to home": the
+ * home page goes through the same layout that just failed.
  */
 export default function Error({
     error,
-    reset,
+    retry,
 }: {
     error: Error & { digest?: string };
-    reset: () => void;
+    retry: () => void;
 }) {
     useEffect(() => {
         reportError(error, { boundary: "sites/root", digest: error.digest });
@@ -33,25 +36,12 @@ export default function Error({
     return (
         <>
             <SiteTheme />
-            <main className="mx-auto flex min-h-screen w-full max-w-screen-sm flex-col items-center justify-center px-5 py-16 text-center">
-                <h1 className="text-3xl font-bold tracking-tight text-site-fg sm:text-4xl">
-                    This page isn&rsquo;t loading
-                </h1>
-                <p className="mt-3 text-base text-site-body">
-                    Something went wrong on our side. It is usually temporary.
-                </p>
-                {error.digest && (
-                    <p className="mt-4 font-mono text-xs text-site-muted">
-                        Reference: {error.digest}
-                    </p>
-                )}
-                <button
-                    onClick={reset}
-                    className={`${ctaClasses("primary")} mt-8`}
-                >
-                    Try again
-                </button>
-            </main>
+            <SiteError
+                onRetry={retry}
+                home={false}
+                ground
+                digest={error.digest}
+            />
         </>
     );
 }

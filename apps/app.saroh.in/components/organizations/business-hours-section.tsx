@@ -347,7 +347,7 @@ export function BusinessHoursSection({
                             id="business-closed-on-hint"
                             className="mt-[5px] text-[11.5px] leading-normal text-muted-foreground"
                         >
-                            Dates you&apos;re shut. Separate them with commas.
+                            Dates you&apos;re closed. Separate them with commas.
                         </p>
                     </div>
                     <div className="min-w-0 basis-full">

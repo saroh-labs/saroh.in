@@ -262,6 +262,8 @@ Unless an entry says otherwise, its status is **Proposed — requires audit revi
 
 **Status: Superseded by DEC-107 — 2026-10-08** (was Accepted 2026-09-24) — see [ADR-009](./adr/ADR-009-vercel-managed-multi-tenant-sites.md)
 
+> **Note, 2026-10-09:** Vercel is retired. The merchant sites run on the Cloudflare Worker `saroh-sites` (`*.saroh.app` and custom domains) and every other web app on its own Worker, deployed from GitHub Actions (DEC-107). The tenancy and API boundary below still hold; the Vercel hosting does not.
+
 - Context: businesses need customer-facing sites using Saroh modules without managing hosting accounts or repositories.
 - Decision: one Saroh-owned Vercel project serves `*.saroh.app` and verified custom domains from the shared Next.js application. Customer-facing server routes call the Saroh business API; only that API accesses the database. R2 remains the storage integration.
 - Consequences: content publishing is tenant-specific; runtime releases are shared. Sessions, caches and authorization must isolate tenants. Customer authentication and portal APIs still need implementation. Client-owned hosting is an optional future path, not a prerequisite; fully independent client backends are not selected.
@@ -994,6 +996,7 @@ Unless an entry says otherwise, its status is **Proposed — requires audit revi
     - A `development`-branch build refuses to start without the dev environment's variables, as a production build does without production's.
 - For now Vercel's preview protection (a Vercel team login) stays on in front of the dev apps, since only the owner uses them, and the key is the second lock. When others need dev, the saroh.io domains come out from behind Vercel's login (a Deployment Protection Exception, or protection off for those projects) and the key alone decides.
 - Consequences: the dev API and merchant sites stay reachable without the key. A new Vercel app joining the dev environment needs the gate in its middleware and its variables on the `development` branch.
+- **Amended 2026-10-09:** Vercel is retired (DEC-107), and its preview protection with it: the access key alone keeps the dev apps private. A new app joining the dev environment needs the gate in its middleware and its dev Worker's variables in `wrangler.jsonc` (secrets in the `cloudflare-development` GitHub environment).
 
 ## DEC-082 An issued invoice prints the seller as it was at issue
 
@@ -1219,8 +1222,10 @@ Unless an entry says otherwise, its status is **Proposed — requires audit revi
     - **The marketing site, workspace, accounts and admin move too.** Each app is one Worker per environment (`saroh-<app>` and `saroh-<app>-dev`), built with OpenNext. Vercel is no longer used once the move is done.
     - **GitHub Actions builds and deploys** (`deploy-frontends.yml`, all five Cloudflare apps): `development` → the dev Workers, `main` → production. Each deploy labels its Worker with the app's build fingerprint (Turbo's hash of what its build reads, tests and docs excluded); a push deploys only the apps whose fingerprint differs from the live one (`scripts/cf-plan.mjs`). A manual run, the API's pricing-publish trigger and the nightly marketing rebuild always deploy. Settings that aren't secret live in each app's `wrangler.jsonc` and feed the build too; secrets live in the GitHub environments `cloudflare-development` (branch `development` only) and `cloudflare-production` (`main` only) and are copied onto the Worker on every deploy, never printed.
     - **Dev stays private.** The dev apps keep the access-key gate (DEC-081): without the key a visitor lands on the same page in production. A dev app without its key is never deployed.
-    - **The marketing site is fully static.** Every page is built at deploy time and served from the build; nothing regenerates at request time (a Worker can't read `content/` or compile MDX while serving). Pricing and the launch offer are read when the site is built, and a deployment's build fails rather than publish the placeholder. Dated pages appear through a nightly rebuild at 00:00 IST; a pricing publish starts a build (`SITE_DEPLOY_GITHUB_TOKEN` on the API).
+    - **Deploys can be started from the admin console** (#886, owner 8 Oct). Platform Owners only (`deployments:run`, on no other role), for one app. **Each console deploys only its own environment** (owner, 9 Oct): the dev console (admin.saroh.io, dev API) deploys dev, the production console (admin.saroh.in, prod API) deploys production. The API decides from its `SITE_DEPLOY_ENVIRONMENT`: it shows only that environment and refuses a start for the other (403, in the audit trail as refused); with none set, it refuses every start. Dev starts at once; production asks for confirmation naming the app (its Worker's name, typed back and checked by the API). The API starts `deploy-frontends.yml` through `workflow_dispatch` with the token it already holds (`SITE_DEPLOY_GITHUB_TOKEN`, Actions-only on this repo), so only code already on `development` or `main` can deploy. Every start, and every one refused for its environment, by the rate limit or by GitHub, is in the admin audit trail (who, which app, which environment, when), and starts are rate-limited per app and environment and per operator. A console deploy always builds; pushes still deploy only changed apps. The page reads live state from GitHub Actions only, until the API holds a Cloudflare read token.
+    - **The marketing site is fully static.** Every page is built at deploy time and served from the build; nothing regenerates at request time (a Worker can't read `content/` or compile MDX while serving). Pricing and the launch offer are read when the site is built, and a deployment's build fails rather than publish the placeholder. A pricing publish starts a build (`SITE_DEPLOY_GITHUB_TOKEN` on the API). **Amended 2026-10-09 (owner): nothing deploys on a schedule.** A dated page (Help and Templates on 17 Oct) appears at the next deploy: a merge, or a Platform Owner starting one from admin's Deployments page.
 - Consequences: the visitor's address comes from `cf-connecting-ip` behind Cloudflare. Routes are set to fail open, so a failing Worker falls through to the origin while Vercel is still there. `VERCEL_ENV` / `VERCEL_GIT_COMMIT_REF` keep their names for now: the apps' checks read them and the deploy sets them.
+- **Amended 2026-10-09:** the move is done and Vercel is retired. Every Saroh web app (saroh.in, app, accounts, admin and the merchant sites on saroh.app) runs on Cloudflare Workers; no Vercel project serves any Saroh domain, and the Privacy Policy no longer lists Vercel as a processor.
 
 ## DEC-108 Merchants verify their site and connect their own trackers by public ID only; nothing they enter runs code
 
@@ -1242,6 +1247,65 @@ Unless an entry says otherwise, its status is **Proposed — requires audit revi
         - Trackers that need consent load only after the visitor accepts a banner in the site's own look. Accept and Reject are equal, GPC counts as Reject, and the banner always links to a notice.
         - Trackers never load on checkout, autopay, order-status, account or pay pages, test releases or previews.
         - Customer details in booking, enquiry, sign-in and checkout forms are masked from session recordings, and Meta's automatic form matching is off.
-    - **Responsibility.** The merchant is responsible for their visitors' data for the tools they connect; Saroh acts on their behalf. Staff can switch off a site's trackers from admin, and the terms forbid malicious use.
+    - **Responsibility.** The merchant is responsible for their visitors' data for the tools they connect; Saroh acts on their behalf. Staff can switch off a site's trackers from admin, and the terms forbid malicious use. The staff permission is `organization:trackers:write`, held by Support and Platform Owner (confirmed by the owner, 8 Oct).
     - **Later.** Shop and booking events, and sending purchases from Saroh's server, are a later plan. Any secret that plan needs is stored encrypted on the API like payment keys, never served.
 - Consequences: new tables hold codes and trackers, separate from the snapshot-bound `Site` fields, and never count as unpublished changes. Each page view makes one more live API read. A catalogue row gates trackers. Every merchant site also gets `sitemap.xml` and `robots.txt`.
+
+## DEC-109 An online-only storefront is 0 locations, on every plan path
+
+**Status: Accepted — 2026-10-08** · owner · amends ADR-010 · #875
+
+- Context: the catalogue's `locations` row already counted only places customers visit (`shopLocations`). Where the catalogue doesn't govern a business (the `PLAN_ENFORCEMENT` switch off, or a business it doesn't reach yet), the old `storefronts` floor still counted every storefront, online-only included, and refused creating one past it.
+- Decision: only a physical place (a storefront whose settings say `SHOP`) is a location. The old floor counts what metering counts (`countUsage(…, "shopLocations")`) and is asked where a storefront becomes a SHOP: created as one (Sell's setup starting from the registered address) or its kind changed to one. Creating an online storefront asks only the product's ceiling (25).
+- Consequences: `billing/legacy-location-floor.ts` holds the floor; its refusal uses the catalogue's words ("Your plan includes N places customers visit"). The workspace's storefront allowance is the ceiling. Sell's setup on a plan with no room starts the location online rather than refusing. The admin console's `storefronts` usage is the shop count.
+
+## DEC-110 Invoice pay links stay hash-only; the screen names when the link was made
+
+**Status: Accepted — 2026-10-08** · owner · #870
+
+- Context: an invoice's pay link was shown in full only in the tab that made it. Storing the token encrypted would let "Show link again" work anywhere, at the cost of a readable token if the database leaked.
+- Decision: keep storing only the token's hash. After a reload or on another device, the invoice says plainly that the full address is shown only once and that a new link ends the old one, and asks before making one. Invoices record when their current link was made (`payLinkCreatedAt`), and the screen names that date.
+- Consequences: the tab forgets a remembered link once anything replaces or closes it (send, reminder, view link, paid, void, credit), so it never shows a dead link.
+
+## DEC-111 A diary person given a login starts as "Calendar only", which uses a seat
+
+**Status: Accepted — 2026-10-08** · owner · amends DEC-105 · #868
+
+- Context: bookable staff can be on the diary without a login (DEC-105). Nothing said what access they get when they are given one.
+- Decision: by default they join as **Calendar only**: their own bookings and diary, and the services they take; no customers, team, set-up, settings or money actions. The owner can pick another role in the invite. It counts as a seat, because it books. On booking detail they still see that booking's price and paid status, as a Member does (DEC-039: the price is part of the booking).
+- Consequences: a built-in, editable `calendar-only` role; own-diary scoping on bookings, calendar, waitlist, Home and alerts; one seat per person whether on the diary, invited or joined.
+
+## DEC-112 One page per person, with tabs
+
+**Status: Accepted — 2026-10-08** · owner · #869 (UX-050)
+
+- Decision: a person has one page, `/contacts/<id>`, with tabs for leads, enquiries, orders, bookings, packs, courses, subscriptions, invoices, reviews, messages and notes. `/customers/<id>` redirects to it. Each tab follows its module, plan and permissions; amounts follow money permissions (DEC-098). The delete confirmation lists what deleting ends, and unpaid invoices keep Record payment on the page. DEC-097 (merge suggestions, never automatic) and DEC-049 stand.
+
+## DEC-113 One word for each thing a merchant sees
+
+**Status: Accepted — 2026-10-09** · owner · #874 (UX-078)
+
+- Decision: **booking** (not appointment or reservation), **Move** (not Reschedule), **Booked** for a confirmed booking and **To confirm** for a pending one, payment methods **Cash, UPI, Card, Bank transfer, Other** ("at the counter" only as a hint), **Closed** (not Shut), and "Location" or "Locations" following the count everywhere. Classes vs credits is not decided yet.
+- Consequences: the list lives in `docs/patterns/saroh-product.md`; code identifiers, routes and stored values keep their names.
+
+Also decided 9 Oct (#886): each admin console deploys only its own environment; see DEC-107.
+
+## DEC-114 A move to a lower plan pauses what's over its limits, 7 days after we say what
+
+**Status: Accepted — 2026-10-09** · owner · #800 #801 #802 · matches the Terms' "Moving to a lower plan"
+
+- Context: the published Terms promise that on a move to a lower plan, what's over the new plan's limits becomes read-only, with an email 7 days before, nothing deleted, and moving back up restoring everything at once. Before this, nothing paused; only adding more was refused.
+- Decision:
+    - What's over the limits is worked out from the plan the business reads now and a fixed order; nothing is stored per item. Team (seats as DEC-105 and DEC-111 count them, view-only people against their own limit): the owner always stays, then the earliest to join, then open invitations. Products and posts: the newest stay. Locations (SHOP storefronts, DEC-109) and websites (DEC-094): the first made stay.
+    - Paused people can't open the business, and take no new bookings (diary people with no login and paused members' own diary rows). Paused products and posts are hidden from the site and read-only. A paused location stops taking orders; a paused website stops orders, bookings, class packs and plans sold online. Invoices, orders, customers and payment records are never touched, and bookings already made are kept.
+    - **The pause waits 7 days after a notice (owner, 9 Oct).** Moves known ahead (an offer's end, a term's end, a chosen move) are told at 30, 7 and 1 days; moves that happen at once (a failed payment the provider gave up on, cancelling now, an operator change) are told within the hour and pause 7 days later. The billing moves themselves are unchanged.
+    - **Locations and bookings (owner, 9 Oct):** bookings belong to the business, not a location, so a paused location stops orders and a paused website stops bookings; the Terms stand as written.
+    - Moving back up restores everything at once. Behind `PLAN_ENFORCEMENT`; nothing pauses with it off or off the catalogue, and a failed read pauses nothing.
+- Consequences: one stored clock, a `CustomerNotice` of kind `MOVE_DOWN` per set of limits told; `Membership.createdAt` added (migration `20261101100000_membership_joined_at`, backfilled from the accepted invitation). The admin limit-override warning says what will pause and when (#802). When `PLAN_ENFORCEMENT` turns on, every business already over its limits is told at once and pauses 7 days later. `docs/patterns/backend-billing-and-classes.md` → "Moving to a lower plan".
+## DEC-115 Every error page is drawn by the apps, not by Cloudflare
+
+**Status: Accepted — 2026-10-09** · owner
+
+- Context: the owner asked for every error page to be custom (404, 5xx). Our zones are on Cloudflare's Free plan, where Cloudflare's own edge error pages can't be replaced.
+- Decision: stay on the Free plan. Every error page comes from the Next.js apps: `not-found.tsx` (`@saroh/ui/not-found`), `error.tsx` (`@saroh/ui/error-page`), and `global-error.tsx` (`@saroh/ui/crash-page`, self-styled because the root layout's CSS is gone). Each Worker's entry (`worker.ts`) wraps OpenNext's handler in `withCrashPage`, so an exception before Next renders returns the same page as static HTML with a 500. Merchant sites (`saroh.app`) use their `--site-*` palette, and the neutral, unbranded page where the palette is unknown.
+- Consequences: what the apps can't draw stays Cloudflare's: a Worker stopped for CPU or memory, an error after a streamed response has started, and edge errors when a host can't be reached (502, 521, 522, …, including api.saroh.in seen directly). A page whose API read fails still renders our own error page, because the Worker, not the visitor, calls the API.

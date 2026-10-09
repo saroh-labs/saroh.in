@@ -192,6 +192,45 @@ describe("Sell (COMMERCE)", () => {
         });
     });
 
+    it("on a plan with no place customers visit, starts the location online rather than refusing (8 Oct)", async () => {
+        const ctx = await business();
+        // A legacy plan of its own: the old floor allows no shop at all.
+        const plan = await prisma.plan.create({
+            data: {
+                key: `no-shop-${tag}-${seq}`,
+                version: 1,
+                name: "No shop",
+                priceCents: 0,
+                interval: "month",
+                entitlements: { storefronts: 0 },
+            },
+        });
+        await prisma.subscription.create({
+            data: {
+                organizationId: ctx.organizationId,
+                planId: plan.id,
+                status: "ACTIVE",
+            },
+        });
+        await prisma.businessProfile.create({
+            data: {
+                organizationId: ctx.organizationId,
+                addressLine1: "12 Hill Road",
+                city: "Mumbai",
+                postalCode: "400050",
+            },
+        });
+        const out = await setup.enable(ctx, "COMMERCE", {
+            storefrontName: "Hill Road",
+            fulfilment: ["PICKUP"],
+        });
+        const settings = await prisma.storeSettings.findUniqueOrThrow({
+            where: { storeId: out.created.storefrontId },
+        });
+        expect(settings.kind).toBe("ONLINE");
+        expect(settings.address).toBeNull();
+    });
+
     it("renames the first storefront there is and sets its ways; none added", async () => {
         const ctx = await business();
         const first = await prisma.store.create({
@@ -276,7 +315,7 @@ describe("Contacts, Bookings and what needs what", () => {
             }),
             BadRequestException,
         );
-        expect(r.message).toBe("Appointments needs CRM. Turn on CRM first.");
+        expect(r.message).toBe("Bookings needs CRM. Turn on CRM first.");
         expect(await status(ctx, "APPOINTMENTS")).toBeNull();
         expect(await status(ctx, "CRM")).toBeNull();
         expect(

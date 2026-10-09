@@ -7,6 +7,8 @@ import {
 import type { Prisma } from "@saroh/database";
 import { prisma, runInOrgContext } from "@saroh/database";
 
+import { keptByCut } from "../billing/over-limit";
+import { overLimit } from "../billing/over-limit.service";
 import { FixedWindowRateLimiter } from "../bookings/rate-limiter";
 import { MODULE_BY_KEY } from "../capabilities/module-registry";
 import { FeatureFlagService } from "../feature-flags/feature-flags.service";
@@ -118,6 +120,11 @@ function image(row: ImageRow): PublicImage {
 interface ShopScope {
     organizationId: string;
     storefront: { id: string; name: string };
+    /**
+     * The products a move to a lower plan keeps on the site (#800): spread
+     * into every product read, so a paused one is in no list, grid or page.
+     */
+    kept: Prisma.ProductWhereInput;
 }
 
 /** What a card needs of a listing and its product. */
@@ -223,7 +230,7 @@ export class PublicCatalogueService {
                     where: {
                         organizationId: scope.organizationId,
                         storeId: scope.storefront.id,
-                        product: { status: "PUBLISHED" },
+                        product: { status: "PUBLISHED", ...scope.kept },
                     },
                     orderBy: [{ product: { name: "asc" } }, { id: "asc" }],
                     take: MAX_PRODUCTS,
@@ -248,7 +255,7 @@ export class PublicCatalogueService {
         const sold = {
             organizationId: scope.organizationId,
             storeId: scope.storefront.id,
-            product: { status: "PUBLISHED" },
+            product: { status: "PUBLISHED", ...scope.kept },
         } satisfies Prisma.ProductListingWhereInput;
 
         if (grid.source === "newest") {
@@ -307,23 +314,26 @@ export class PublicCatalogueService {
             const p = listing.product;
             const tracked = p.stockTracked && businessTracks;
             const markedSoldOut = listing.soldOutAt !== null;
-            const words =
+            const stocks =
                 offered.length > 0
-                    ? offered.map(
-                          (v) =>
-                              publicStock({
-                                  tracked,
-                                  markedSoldOut,
-                                  row: shelfFor(rows, p.id, v.id),
-                              }).word,
+                    ? offered.map((v) =>
+                          publicStock({
+                              tracked,
+                              markedSoldOut,
+                              row: shelfFor(rows, p.id, v.id),
+                          }),
                       )
                     : [
                           publicStock({
                               tracked,
                               markedSoldOut,
                               row: shelfFor(rows, p.id, null),
-                          }).word,
+                          }),
                       ];
+            const words = stocks.map((s) => s.word);
+            // The option the card's Add to bag adds: the first that can be
+            // sold now (or the product itself, without options).
+            const bagAt = words.findIndex((w) => w !== "SOLD_OUT");
             const base = {
                 price: money(p.price) ?? "0.00",
                 mrp: money(p.mrp),
@@ -356,7 +366,13 @@ export class PublicCatalogueService {
                 // shop card): the first option on offer that can be sold
                 // now, or null for a product without options.
                 bagVariantId:
-                    offered.find((_, i) => words[i] !== "SOLD_OUT")?.id ?? null,
+                    bagAt >= 0 && offered.length > 0
+                        ? (offered[bagAt]?.id ?? null)
+                        : null,
+                // How many of it can go in the bag, when the page would say
+                // "Only N left" (UX-058, #874): the card's Add another stops
+                // there, as the product page's does. Null: not counted out.
+                bagLeft: bagAt >= 0 ? (stocks[bagAt]?.left ?? null) : null,
             };
         });
     }
@@ -373,6 +389,7 @@ export class PublicCatalogueService {
                     organizationId: scope.organizationId,
                     slug,
                     status: "PUBLISHED",
+                    ...scope.kept,
                     listings: { some: { storeId: scope.storefront.id } },
                 },
                 select: {
@@ -452,6 +469,7 @@ export class PublicCatalogueService {
             const maker = madeByLine(p);
 
             return {
+                productId: p.id,
                 slug: p.slug,
                 // What the bag holds (G13): the listing, never a price.
                 listingId: listing.id,
@@ -552,7 +570,11 @@ export class PublicCatalogueService {
             if (!(await commerceRolledOut(organizationId))) notFound();
             const storefront = await effectiveStorefront(prisma, site);
             if (!storefront) notFound();
-            return fn({ organizationId, storefront });
+            const paused = await overLimit.pausedNow(organizationId);
+            const kept: Prisma.ProductWhereInput = keptByCut(
+                paused?.products ?? null,
+            );
+            return fn({ organizationId, storefront, kept });
         });
     }
 

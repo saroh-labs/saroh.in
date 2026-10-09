@@ -11,6 +11,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
 
+import { PausedNote } from "@/components/billing/paused-banner";
 import { showPlanRefusal } from "@/components/billing/plan-refusal";
 import { useBusinessZone } from "@/components/shared/business-zone";
 import { ConfirmDialog } from "@/components/shared/confirm-dialog";
@@ -18,6 +19,7 @@ import { OptionSelect } from "@/components/shared/option-select";
 import { MediaPicker } from "@/components/sites/media-picker";
 import { useLeaveGuard } from "@/components/sites/use-leave-guard";
 import { accountSettingsUrl } from "@/lib/accounts";
+import { pausedWords } from "@/lib/billing/paused";
 import {
     createPost,
     deletePost,
@@ -76,11 +78,18 @@ export function PostEditor({
     siteId,
     categories,
     post,
+    paused = false,
 }: {
     siteId: string;
     categories: PostCategory[];
     /** Absent when writing a new post. */
     post?: PostDetail;
+    /**
+     * Past the plan's blog posts limit (#800): hidden from the site and
+     * read-only. Save and Publish are off and the note says why; taking
+     * it off the site stays, as that only ever lowers the count.
+     */
+    paused?: boolean;
 }) {
     const zone = useBusinessZone();
     const router = useRouter();
@@ -328,7 +337,7 @@ export function PostEditor({
                         variant="ghost"
                         size="sm"
                         className="h-7 text-xs"
-                        disabled={saving || !dirty}
+                        disabled={paused || saving || !dirty}
                         onClick={() => void save()}
                     >
                         Save draft
@@ -348,7 +357,7 @@ export function PostEditor({
                         size="sm"
                         variant="brand"
                         className="h-7 text-xs"
-                        disabled={publishing || !title.trim()}
+                        disabled={paused || publishing || !title.trim()}
                         onClick={() => void onPublish()}
                     >
                         {publishing
@@ -359,6 +368,11 @@ export function PostEditor({
                     </Button>
                 </div>
             </header>
+            {paused ? (
+                <PausedNote className="mx-4 mt-3 sm:mx-6">
+                    {pausedWords("post")}
+                </PausedNote>
+            ) : null}
 
             <div className="flex min-h-0 flex-1">
                 <div className="min-w-0 flex-1">

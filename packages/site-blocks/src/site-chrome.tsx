@@ -4,6 +4,7 @@ import type { ReactNode } from "react";
 import { withoutShadowedInPageEntries } from "@saroh/block-contract";
 
 import { CookieChoicesButton } from "./consent-banner";
+import { phoneText } from "./lib/phone";
 import type { SiteHeaderAction, SiteNavItem } from "./site-header-menu";
 import { SiteMenu, SiteNavRow } from "./site-header-menu";
 import { trimTrailingSlashes } from "./url-path";
@@ -183,7 +184,9 @@ export function SiteFooter({
                                 href={`tel:${phone.replace(/[^\d+]/g, "")}`}
                                 className={FOOTER_LINK}
                             >
-                                Call {phone}
+                                {/* "+91 98450 12345", as Visit us
+                                    writes it (DEC-053, #874). */}
+                                Call {phoneText(phone)}
                             </a>
                         ) : null}
                         {email ? (

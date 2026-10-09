@@ -2,7 +2,9 @@ import { PlanLimitNotice } from "@/components/billing/plan-limit-notice";
 import { TeamScreen } from "@/components/organizations/team-screen";
 import { SettingsPanel } from "@/components/settings/settings-panel";
 import { rowNotice } from "@/lib/billing/access";
+import { pausedTeam, teamOverLimit } from "@/lib/billing/paused";
 import { modulesOrUnknown } from "@/lib/modules/guard";
+import { diaryPeopleToInvite } from "@/lib/organizations/calendar-only";
 import { shownCatalogue } from "@/lib/organizations/catalogue-shown";
 import { bookableWithNoLogin } from "@/lib/organizations/invitations";
 import {
@@ -13,7 +15,7 @@ import {
 import { getRoleCatalogue, listRoles } from "@/lib/organizations/roles";
 import { rolesLock } from "@/lib/organizations/roles-lock";
 import { resolveActiveOrganization } from "@/lib/organizations/service";
-import { billingAccessOrNull } from "@/lib/saroh-billing/service";
+import { billingAccessOrNull, pausedOrNull } from "@/lib/saroh-billing/service";
 import { requireSession } from "@/lib/session";
 import { listSites } from "@/lib/sites/service";
 import { listStaff } from "@/lib/staff/service";
@@ -58,6 +60,7 @@ export default async function PeoplePage() {
         joinedFromStorefronts,
         modules,
         staff,
+        paused,
     ] = await Promise.all([
         listMembers(),
         // Empty for anyone who may not see them, rather than an error: this is
@@ -79,6 +82,8 @@ export default async function PeoplePage() {
         // Who takes bookings with no login: a team seat each (DEC-105,
         // UX-053). Unread (no diary, or no right to it), nobody is added.
         canManage ? listStaff().catch(() => null) : Promise.resolve(null),
+        // Past the plan's team limit (#800): who is paused, and why.
+        pausedOrNull(),
     ]);
     // The plan, for whoever changes the team or its roles.
     const access =
@@ -102,6 +107,7 @@ export default async function PeoplePage() {
               }
             : null;
     const catalogue = shownCatalogue(fullCatalogue, modules);
+    const pausedPeople = pausedTeam(paused);
 
     return (
         <SettingsPanel>
@@ -118,9 +124,22 @@ export default async function PeoplePage() {
                 joinedFromStorefronts={joinedFromStorefronts}
                 teamLimit={teamLimit}
                 bookableNoLogin={bookableWithNoLogin(staff?.staff ?? null)}
+                // Who of them can be given a login, as Calendar only by
+                // default (#868).
+                diaryPeople={diaryPeopleToInvite(
+                    staff?.staff ?? null,
+                    invitations,
+                )}
                 rolesLock={canEditRoles ? rolesLock(access) : null}
+                paused={pausedPeople}
+                // Over the limit (#800), the paused notes say it and link
+                // to Plan and billing; the "reached your limit" card would
+                // say it a third time, and its "everyone already on the
+                // team keeps access" is no longer true.
                 limitNotice={
-                    canManage ? <PlanLimitNotice moduleId="members" /> : null
+                    canManage && !teamOverLimit(pausedPeople) ? (
+                        <PlanLimitNotice moduleId="members" />
+                    ) : null
                 }
             />
         </SettingsPanel>

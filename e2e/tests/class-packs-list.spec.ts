@@ -189,10 +189,10 @@ test.describe("class packs list", () => {
             ).trim();
             await first.click();
             await dialog
-                .getByRole("radio", { name: "UPI at the desk" })
+                .getByRole("radio", { name: "UPI", exact: true })
                 .click();
             await expect(
-                dialog.getByRole("radio", { name: "UPI at the desk" }),
+                dialog.getByRole("radio", { name: "UPI", exact: true }),
             ).toHaveAttribute("aria-checked", "true");
             await expect(sell).toHaveText("Take ₹1,500");
             await sell.click();

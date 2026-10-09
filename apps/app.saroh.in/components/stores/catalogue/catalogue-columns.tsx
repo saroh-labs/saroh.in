@@ -110,14 +110,26 @@ export function catalogueColumns({
             header: "Status",
             priority: "secondary",
             width: "118px",
-            cell: (r) => (
-                <Badge
-                    variant={STATUS_VARIANT[r.status]}
-                    className="px-[9px] py-[3px] text-[11px] font-medium"
-                >
-                    {STATUS_LABEL[r.status]}
-                </Badge>
-            ),
+            cell: (r) =>
+                // Past the plan's limit (#800): hidden from the site, so its
+                // status there is not what the list would otherwise say.
+                // The notice above the list says why, in words.
+                r.paused ? (
+                    <Badge
+                        variant="warning"
+                        className="px-[9px] py-[3px] text-[11px] font-medium"
+                        title="Hidden from your site and read-only: past your plan's products limit"
+                    >
+                        Paused
+                    </Badge>
+                ) : (
+                    <Badge
+                        variant={STATUS_VARIANT[r.status]}
+                        className="px-[9px] py-[3px] text-[11px] font-medium"
+                    >
+                        {STATUS_LABEL[r.status]}
+                    </Badge>
+                ),
         },
         {
             id: "inventory",

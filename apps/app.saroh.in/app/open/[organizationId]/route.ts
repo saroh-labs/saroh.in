@@ -1,7 +1,11 @@
 import { redirect } from "next/navigation";
 
-import { accountsUrl } from "@/lib/accounts";
 import { setActiveOrganization } from "@/lib/organizations/actions";
+import {
+    NOT_YOURS_HREF,
+    PAUSED_ERROR,
+    PAUSED_HREF,
+} from "@/lib/organizations/choose";
 
 /**
  * Open one business: the door accounts.saroh.in's "Your businesses" list
@@ -13,6 +17,10 @@ import { setActiveOrganization } from "@/lib/organizations/actions";
  * against the API, so a hand-typed id for someone else's business is refused
  * and the person is sent back to choose again. Nothing but the choice of
  * business changes, and only among businesses they already belong to.
+ *
+ * Refused, it says so (UX-084): the workspace's own chooser, with a line
+ * that the link opens a business they're not in. It used to send them to
+ * accounts' business list, which is parked, with no word of why.
  */
 export async function GET(
     _request: Request,
@@ -20,5 +28,12 @@ export async function GET(
 ) {
     const { organizationId } = await params;
     const result = await setActiveOrganization(organizationId);
-    redirect(result.ok ? "/" : `${accountsUrl}/businesses`);
+    // A business whose door is paused for them (#800) says so on the chooser.
+    redirect(
+        result.ok
+            ? "/"
+            : result.error === PAUSED_ERROR
+              ? PAUSED_HREF
+              : NOT_YOURS_HREF,
+    );
 }

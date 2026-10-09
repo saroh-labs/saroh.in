@@ -1,5 +1,6 @@
 import { clock } from "@/lib/calendar/layers";
 import { goesToAddress } from "@/lib/orders/lifecycle";
+import { methodLabel } from "@/lib/payments/method-words";
 import type { Review } from "@/lib/product-reviews/service";
 import { dayText, money, shortPrice } from "@/lib/subscriptions/view";
 
@@ -41,8 +42,23 @@ export function kindOf(d: Pick<CustomerDetail, "orders" | "bookings">): Kind {
         : "commerce";
 }
 
+/**
+ * A tab's key in `?tab=`. Leads, Enquiries and Courses are the person
+ * page's own (`lib/contacts/person.ts`, #869), not in this read.
+ */
 export type TabKey =
-    "over" | "ord" | "bk" | "pk" | "sub" | "inv" | "rev" | "msg" | "notes";
+    | "over"
+    | "lead"
+    | "enq"
+    | "ord"
+    | "bk"
+    | "pk"
+    | "crs"
+    | "sub"
+    | "inv"
+    | "rev"
+    | "msg"
+    | "notes";
 
 export interface Tab {
     key: TabKey;
@@ -488,15 +504,6 @@ export function crumbsUnderSell(
     return sells && (d.linkedCustomers?.length ?? 0) > 0;
 }
 
-/** A way of paying, in words; online when it wasn't recorded by hand. */
-const PAID_BY: Record<string, string> = {
-    CASH: "Cash",
-    UPI: "UPI",
-    CARD: "Card",
-    BANK_TRANSFER: "Bank transfer",
-    OTHER: "Other",
-};
-
 /**
  * Money in for a booking, in words (UX-049): "Paid ₹800 · Cash", or
  * "Paid · Online" to a viewer who doesn't see the amount. Null while
@@ -504,7 +511,8 @@ const PAID_BY: Record<string, string> = {
  */
 export function paidText(paid: DetailBooking["paid"]): string | null {
     if (!paid) return null;
-    const how = (paid.method && PAID_BY[paid.method]) ?? "Online";
+    // A way of paying, in words; online when it wasn't recorded by hand.
+    const how = methodLabel(paid.method) ?? "Online";
     const amount =
         paid.amount && paid.currency
             ? ` ${money(paid.amount, paid.currency)}`
@@ -783,6 +791,20 @@ export function invoiceRow(
         tone: v.standing === "PAID" && !credit ? "ok" : "off",
         total: money(v.total, v.currency),
     };
+}
+
+/**
+ * An invoice still owed — issued or overdue, and not a credit note — on
+ * which the Invoices tab offers "Record payment" (#869), as Invoice Detail
+ * offers Mark paid.
+ */
+export function isPayable(
+    v: Pick<DetailInvoice, "kind" | "standing">,
+): boolean {
+    return (
+        v.kind !== "CREDIT_NOTE" &&
+        (v.standing === "ISSUED" || v.standing === "OVERDUE")
+    );
 }
 
 function invoiceFrom(v: DetailInvoice, kind: Kind): string {

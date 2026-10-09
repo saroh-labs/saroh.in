@@ -132,7 +132,8 @@ There is no step-by-step self-hosting guide yet. What it takes:
 - **The API** as a container: from the repository root,
   `docker build -f apps/api.saroh.in/Dockerfile -t saroh-api .`. It reports
   readiness at `/health/ready`.
-- **The Next.js apps** on any Node host (Saroh's own run on Vercel). At least
+- **The Next.js apps** on any Node host (Saroh's own run on Cloudflare
+  Workers, built with OpenNext). At least
   `accounts`, `app` and `saroh.app` for a working business; the rest are
   optional.
 - **The environment** for each, listed with what happens when a value is unset

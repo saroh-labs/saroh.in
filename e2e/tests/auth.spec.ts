@@ -81,8 +81,8 @@ test.describe("cross-origin session", () => {
          *
          * This used to check for the "Bookings" heading, which passed locally
          * and failed in CI — because a freshly seeded database has no
-         * `MODULE_*` rollout flags, so Appointments is unavailable and
-         * `/bookings` correctly renders "Appointments is turned off". That is
+         * `MODULE_*` rollout flags, so Bookings is unavailable and
+         * `/bookings` correctly renders "Bookings is turned off". That is
          * still the page the visitor asked for, which is the whole of #222;
          * tying the test to one module's content made it a test of the seed.
          */

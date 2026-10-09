@@ -8,6 +8,7 @@ import { openProviderCheckout } from "../booking-flow/checkout";
 import { PayOption } from "../booking-flow/steps/pay-option";
 import { cn } from "../lib/utils";
 import type { PackKind } from "../prices/pack-words";
+import { NOT_TAKING_ORDERS_TEXT } from "../shop/not-taking-orders";
 import { accountMoney } from "./model";
 import type {
     AccountPackCheckout,
@@ -206,6 +207,26 @@ function BuyPack({
         );
         return () => clearTimeout(timer);
     }, [phase]);
+
+    if (onSale.notTakingOrders) {
+        return (
+            <>
+                <p
+                    role="status"
+                    className="text-site-body mt-3 text-sm leading-normal"
+                >
+                    {NOT_TAKING_ORDERS_TEXT}
+                </p>
+                <button
+                    type="button"
+                    onClick={onClose}
+                    className={sheetButton(false)}
+                >
+                    OK
+                </button>
+            </>
+        );
+    }
 
     if (!onSale.payOnline) {
         return (

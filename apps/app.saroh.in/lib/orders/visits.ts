@@ -116,7 +116,7 @@ export function visitsNextNote(
     return v.done ? "All visits are done." : null;
 }
 
-/** The heading's "how": "Appointment, in person · next visit today, 18:00". */
+/** The heading's "how": "Booking, in person · next visit today, 18:00". */
 export function visitsHow(
     label: string,
     v: OrderVisits | null | undefined,

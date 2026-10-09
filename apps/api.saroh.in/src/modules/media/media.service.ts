@@ -8,13 +8,9 @@ import {
 import { prisma } from "@saroh/database";
 import type { ObjectStorage } from "@saroh/object-storage";
 import {
-    DEFAULT_MAX_VIDEO_UPLOAD_BYTES,
-    hasImageSignature,
-    hasIsoBmffSignature,
     IMAGE_SNIFF_BYTES,
     ISO_BMFF_SNIFF_BYTES,
     isVideoContentType,
-    VIDEO_UPLOAD_PURPOSE,
 } from "@saroh/object-storage";
 
 import type { OrganizationContext } from "../../common/types/organization-context";
@@ -22,46 +18,12 @@ import { BYTES_PER_GB } from "../billing/metering";
 import { planMeter } from "../billing/metering.service";
 import { authorize } from "../organizations/organization-policy";
 import { OBJECT_STORAGE } from "./object-storage.provider";
-
-/** What a merchant reads when a file is neither a photo nor a video. */
-export const NOT_PHOTO_OR_VIDEO_MESSAGE =
-    "That is not a photo or a video. Choose a JPG, PNG, WebP, MP4 or MOV.";
-/** What a merchant reads when a video is over the cap. */
-export const VIDEO_TOO_BIG_MESSAGE =
-    "That video is over 50 MB. Keep it under a minute, or export it smaller.";
-/** What a merchant reads when a "video" turns out not to be one. */
-export const NOT_A_VIDEO_MESSAGE =
-    "That file is not a video we can show. Choose an MP4 or MOV.";
-/** What a merchant reads when a "photo" turns out not to be one. */
-export const NOT_AN_IMAGE_MESSAGE =
-    "That file is not a photo we can show. Choose a JPG, PNG, WebP, GIF or AVIF.";
-
-/**
- * A video goes through the video purpose, is an MP4 or MOV, and is at most
- * 50 MB (#517) — said in the merchant's words here, before the storage port's
- * own check would refuse it less kindly.
- */
-function assertVideoUpload(input: CreateUploadInput): void {
-    const video = isVideoContentType(input.contentType);
-    if (!video && input.purpose !== VIDEO_UPLOAD_PURPOSE) return;
-    if (!video) throw new BadRequestException(NOT_PHOTO_OR_VIDEO_MESSAGE);
-    if (input.purpose !== VIDEO_UPLOAD_PURPOSE) {
-        throw new BadRequestException(
-            "Videos go on a product. Add it under the product's Photos and videos.",
-        );
-    }
-    if (input.contentLength > DEFAULT_MAX_VIDEO_UPLOAD_BYTES) {
-        throw new BadRequestException(VIDEO_TOO_BIG_MESSAGE);
-    }
-}
-
-/** Input for issuing an upload URL — the validated {@link CreateUploadDto} shape. */
-export interface CreateUploadInput {
-    contentType: string;
-    contentLength: number;
-    filename: string;
-    purpose?: string;
-}
+import type { CreateUploadInput } from "./upload-checks";
+import {
+    assertUploadType,
+    NOTHING_UPLOADED_MESSAGE,
+    storedBytesProblem,
+} from "./upload-checks";
 
 /** What the client needs to PUT the file directly to storage. */
 export interface CreateUploadResult {
@@ -103,7 +65,7 @@ export class MediaService {
         input: CreateUploadInput,
     ): Promise<CreateUploadResult> {
         authorize(ctx, "media:write");
-        assertVideoUpload(input);
+        assertUploadType(input);
 
         const signed = await this.storage.createSignedUploadUrl({
             organizationId: ctx.organizationId,
@@ -139,12 +101,10 @@ export class MediaService {
     /**
      * Confirm an upload landed and flip the row PENDING → READY.
      *
-     * `headObject` verifies the bytes exist in storage and lets us reconcile the
-     * true size. NOTE: the in-memory dev/test adapter's `headObject` only knows
-     * about objects it minted a URL for and cannot observe an out-of-band PUT —
-     * so in dev/memory this is effectively a "trust the client" no-op when the
-     * head misses; we still flip to READY rather than block local development.
-     * The real R2 adapter performs an actual HEAD against the bucket.
+     * The stored bytes must be the file the upload said; `headObject` then
+     * reconciles the true size. The in-memory adapter of local development
+     * never sees the browser's PUT, so there a photo goes through unread and
+     * keeps the size it was recorded with; R2 reads the real object.
      */
     async completeUpload(
         ctx: OrganizationContext,
@@ -160,42 +120,34 @@ export class MediaService {
 
         const media = await this.requireOwned(ctx, mediaId);
         if (media.status === "FAILED") {
-            throw new BadRequestException(
-                "That upload didn't go through. Upload the file again.",
-            );
+            throw new BadRequestException(NOTHING_UPLOADED_MESSAGE);
         }
 
         /*
-         * A file is checked for what it is, not what it was labelled (#517).
-         * The type on the upload is the client's word, and the bucket is
-         * public by address: a page or a script sent as video/mp4 or
-         * image/png would otherwise be served from our storage. Each format
-         * opens with its own magic number, so the first bytes — one ranged
-         * GET — settle it. Anything else is marked FAILED and its object
-         * deleted, so nothing can put it on a product or a page.
-         *
-         * A video whose bytes can't be read fails. A photo's unreadable bytes
-         * mean nothing was stored (R2 reads `null` only for a missing object)
-         * or the in-memory storage of local development, which never sees the
-         * browser's PUT, so it goes on as before.
+         * A file is checked for what it is, not what it was labelled (#517,
+         * #873): its first bytes, one ranged GET, must be the format its
+         * type says (`upload-checks.ts`). Anything else is marked FAILED and
+         * its object deleted, so nothing can put it on a product, a page or
+         * the logo.
          */
-        const video = isVideoContentType(media.contentType);
         const start = await this.storage.readObjectStart(
             media.key,
-            video ? ISO_BMFF_SNIFF_BYTES : IMAGE_SNIFF_BYTES,
+            isVideoContentType(media.contentType)
+                ? ISO_BMFF_SNIFF_BYTES
+                : IMAGE_SNIFF_BYTES,
         );
-        const isWhatItSays = video
-            ? start !== null && hasIsoBmffSignature(start)
-            : start === null || hasImageSignature(media.contentType, start);
-        if (!isWhatItSays) {
+        const problem = storedBytesProblem(
+            media,
+            start,
+            this.storage.seesUploads,
+        );
+        if (problem) {
             await prisma.media.update({
                 where: { id: media.id },
                 data: { status: "FAILED" },
             });
             await this.storage.deleteObject(media.key);
-            throw new BadRequestException(
-                video ? NOT_A_VIDEO_MESSAGE : NOT_AN_IMAGE_MESSAGE,
-            );
+            throw new BadRequestException(problem);
         }
 
         const head = await this.storage.headObject(media.key);

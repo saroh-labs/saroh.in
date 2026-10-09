@@ -27,6 +27,7 @@ import { assertPaymentsOn } from "../invoices/payments-on";
 import { enqueueTeamAlert } from "../notifications/team-alerts";
 import { requireOrderRead } from "../stores/order-read-access";
 import { StoresService } from "../stores/stores.service";
+import { assertLocationTakingOrders } from "./checkout-paused";
 import type {
     CreateOrderDto,
     OrderStatus,
@@ -206,6 +207,10 @@ export class OrdersService {
         // is priced, so a request that can't be served costs nothing.
         assertOneParty(dto);
         await this.assertNewOrderAllowed(storeId, userId, organizationId, dto);
+        // A location a move to a lower plan paused takes no new order (#800).
+        if (organizationId) {
+            await assertLocationTakingOrders(organizationId, storeId);
+        }
         // Either vocabulary in; only what this release may write is stored
         // (fulfilment.ts: SHIPPING and the rest are refused until B2c).
         const type = typeOf(dto.fulfilment ?? "PICKUP");

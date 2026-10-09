@@ -140,6 +140,9 @@ export function createR2Storage(config: R2StorageConfig): ObjectStorage {
     const presign = config.presign ?? defaultPresigner;
 
     return {
+        // A browser's PUT lands in the bucket, so a missing object is real.
+        seesUploads: true,
+
         async createSignedUploadUrl(
             input: CreateSignedUploadUrlInput,
         ): Promise<SignedUploadUrl> {

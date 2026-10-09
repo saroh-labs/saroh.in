@@ -60,8 +60,8 @@ describe("ClassWaitlist", () => {
             "bina@example.in",
             "Since 28 Sep",
         ]);
-        expect(html).toContain('href="/customers/c_bina"');
-        expect(html).toContain('href="/customers/c_chetan"');
+        expect(html).toContain('href="/contacts/c_bina"');
+        expect(html).toContain('href="/contacts/c_chetan"');
     });
 
     it("says nobody is waiting", () => {

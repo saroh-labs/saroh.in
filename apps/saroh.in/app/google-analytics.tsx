@@ -26,7 +26,7 @@ import { isPreviewPath } from "@/lib/pricing-preview";
 
 /**
  * Google Analytics, given a measurement id — which the layout passes only
- * on a Vercel production deployment (`lib/ga.ts`). Without one nothing
+ * on a production deployment (`lib/ga.ts`). Without one nothing
  * loads and no notice shows, so previews, local dev and the browser tests
  * never reach GA. Never on a pricing draft preview (KTD-10): a staff member
  * checking a draft is not a visit, and the preview address must not reach a

@@ -3,6 +3,7 @@ import { apiFetch, getActiveOrgId } from "@/lib/api/http";
 import { businessZone } from "@/lib/format/business-zone";
 import { shownRoleLabel } from "@/lib/organizations/storefront-team";
 
+import { pickActive } from "./choose";
 import type { OrganizationKind } from "./kind";
 
 /**
@@ -52,6 +53,19 @@ export interface Organization {
      * calls either India's.
      */
     timeZone?: string | null;
+    /**
+     * `ACTIVE`, or the state an operator put it in (`SUSPENDED`,
+     * `PENDING_DELETION`, `DELETED_RETAINED`): read-only, not gone. The
+     * chooser lists one that isn't open apart (UX-084). Absent from an
+     * older API, which reads as open.
+     */
+    lifecycleStatus?: string;
+    /**
+     * This person's access is paused (#800): the business moved to a lower
+     * plan with fewer team seats than people. The API refuses its reads
+     * (`MEMBER_PAUSED`); the chooser and the shell say so instead.
+     */
+    paused?: boolean;
 }
 
 export interface OrganizationProfileInput {
@@ -124,8 +138,9 @@ export async function resolveActiveOrganization(
 ): Promise<Organization | null> {
     const orgs = organizations ?? (await listOrganizations());
     if (orgs.length === 0) return null;
-    const activeOrgId = await getActiveOrgId();
-    return orgs.find((o) => o.id === activeOrgId) ?? orgs[0];
+    // One whose door is paused for them is passed over while another opens
+    // (#800); with every one paused the shell says so.
+    return pickActive(orgs, await getActiveOrgId());
 }
 
 /**

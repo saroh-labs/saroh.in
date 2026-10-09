@@ -45,14 +45,15 @@ let visitors = Math.floor(Math.random() * 254);
  * customers would share the public booking limit (5 a minute for a service,
  * per address) and the sign-in code limits, and the sixth booking of a run
  * would be refused as "a lot of tries at once". Each test here is a new
- * customer with a new email; this gives them a new address too, the way the
- * platform's edge would. The limits themselves are the API's unit tests'.
+ * customer with a new email; this gives them a new address too, in the one
+ * header the renderer reads (`cf-connecting-ip`), the way Cloudflare's edge
+ * would. The limits themselves are the API's unit tests'.
  */
 export async function asNewVisitor(page: Page): Promise<void> {
     visitors += 1;
     const worker = test.info().parallelIndex % 256;
     const address = `198.18.${worker}.${(visitors % 254) + 1}`;
-    await page.setExtraHTTPHeaders({ "x-real-ip": address });
+    await page.setExtraHTTPHeaders({ "cf-connecting-ip": address });
 }
 
 /** The code the API just sent to `email`. */

@@ -1,5 +1,6 @@
 import type { Prisma } from "@prisma/client";
 
+import { ensureCalendarOnlyRole } from "../../calendar-only-role";
 import type { Db } from "../helpers";
 import type { SeededService } from "./appointments";
 import type {
@@ -174,6 +175,8 @@ export async function upsertPulseStaff(
 ): Promise<PulseStaff[]> {
     const { orgId, now, id } = options;
     const ids = PULSE_STAFF.map((s) => id("staff", s.key));
+    // Someone on the diary can be given a login as Calendar only (#868).
+    await ensureCalendarOnlyRole(prisma, orgId);
 
     // One staff member per membership: if someone put the owner on the diary
     // by hand, that row keeps the link and the seeded one goes without.

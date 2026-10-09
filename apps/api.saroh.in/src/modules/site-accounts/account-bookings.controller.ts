@@ -10,10 +10,12 @@ import {
     UseGuards,
 } from "@nestjs/common";
 
+import { notTakingOrders } from "../billing/paused-errors";
 import type { PublicCredit } from "../bookings/booking-credit";
 import type { PublicBookingResult } from "../bookings/public-bookings.controller";
 import { publicBookingResult } from "../bookings/public-bookings.controller";
 import { PublicBookingsService } from "../bookings/public-bookings.service";
+import { siteTakingBookings } from "../orders/checkout-paused";
 import type { PayInstructionsView } from "../organizations/business-pay-instructions";
 import { businessPayInstructionsOf } from "../organizations/business-pay-instructions";
 import type { CustomerContext } from "./customer-context.decorator";
@@ -52,6 +54,15 @@ export class AccountBookingsController {
     ): Promise<
         PublicBookingResult & { payInstructions?: PayInstructionsView | null }
     > {
+        // A website a move to a lower plan paused takes no bookings (#800).
+        if (
+            !(await siteTakingBookings(
+                customer.organizationId,
+                customer.siteId,
+            ))
+        ) {
+            throw notTakingOrders("bookings");
+        }
         const { booking, payToken } = await this.bookings.bookOnline(
             dto.serviceId,
             {

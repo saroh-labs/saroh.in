@@ -1,6 +1,7 @@
 import type { PlansFeed } from "@saroh/site-blocks";
 import {
     plansAutopayMethods,
+    plansNotTakingOrders,
     plansOf,
     plansPayOnline,
 } from "@saroh/site-blocks";
@@ -28,6 +29,8 @@ export async function getPublicPlans(siteId: string): Promise<PlansRead> {
         payOnline: plansPayOnline(body),
         // D12: the join sheet's "Pay with"; none from an older API.
         autopayMethods: plansAutopayMethods(body),
+        // #800: a website its plan paused takes no orders.
+        ...(plansNotTakingOrders(body) ? { notTakingOrders: true } : {}),
     };
 }
 

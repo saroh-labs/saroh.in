@@ -316,6 +316,13 @@ module.exports = {
         "<rootDir>/src/modules/subscriptions/dto.spec.ts",
         "<rootDir>/src/modules/orders/orders.service.discount.spec.ts",
         "<rootDir>/src/modules/products/products.remove.spec.ts",
+        // A move to a lower plan pauses what is past its limits (#800).
+        "<rootDir>/src/modules/products/product-paused.spec.ts",
+        "<rootDir>/src/modules/content/post-paused.spec.ts",
+        "<rootDir>/src/modules/orders/checkout-paused.spec.ts",
+        // …and a paused website sells no packs or plans online.
+        "<rootDir>/src/modules/class-packs/pack-paused.spec.ts",
+        "<rootDir>/src/modules/subscriptions/plan-join-paused.spec.ts",
         "<rootDir>/src/modules/product-reviews/**/*.spec.ts",
         // S5-002 payments: AES-256-GCM credential crypto (round-trip, tamper,
         // missing-key) and PaymentsService specs with a jest-mocked Prisma
@@ -372,6 +379,9 @@ module.exports = {
         // Link preview tool (resources plan U2): the SSRF guard, the head
         // parser, the report and the gate, with fake DNS and transports.
         "<rootDir>/src/modules/link-preview/**/*.spec.ts",
+        // Which social sign-in buttons the accounts pages show: only
+        // providers with both keys set. Pure; no DB.
+        "<rootDir>/src/modules/sign-in-options/**/*.spec.ts",
         "<rootDir>/test/**/*.spec.ts",
         // #90 (S0-011) API bootstrap smoke test: compiles the full AppModule DI
         // graph so "the app doesn't even start" (the 0fc8f72 boot crash class)

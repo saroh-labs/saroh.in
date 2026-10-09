@@ -1,4 +1,4 @@
-// @covers accounts:/login app:/open app:/billing/subscriptions app:/billing/plans app:/billing/plans/new app:/customers api:subscriptions api:customer-workspace
+// @covers accounts:/login app:/open app:/billing/subscriptions app:/billing/plans app:/billing/plans/new app:/customers app:/contacts api:subscriptions api:customer-workspace
 import type { Page, TestInfo } from "@playwright/test";
 import { expect, test } from "@playwright/test";
 
@@ -427,6 +427,10 @@ test.describe("the Plan Editor (D7)", () => {
         await expect(
             page.getByText(/^Saved as a draft — nobody can join it yet/),
         ).toBeVisible();
+        // The address waits while you type, and moves once you leave the
+        // field (UX-080), so the page never jumps under the cursor.
+        await expect(page).toHaveURL(/\/billing\/plans\/new$/);
+        await page.getByLabel("Name").blur();
         await expect(page).toHaveURL(/\/billing\/plans\/[^/]+\/edit$/);
         await expect(
             page

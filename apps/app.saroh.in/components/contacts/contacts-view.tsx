@@ -11,6 +11,7 @@ import type {
     DataFilter,
 } from "@/components/shared/data-view/types";
 import { ViewerDate } from "@/components/shared/viewer-date";
+import { personHref } from "@/lib/contacts/person-href";
 import type { ContactListItem } from "@/lib/contacts/service";
 import { contactSourceLabel } from "@/lib/contacts/source";
 import { contactName, openLeadsLabel, shownEmail } from "@/lib/crm/format";
@@ -287,7 +288,7 @@ export function ContactsView({
             rows={contacts}
             columns={columns}
             rowKey={(c) => c.id}
-            rowHref={(c) => `/contacts/${c.id}`}
+            rowHref={(c) => personHref(c.id)}
             modes={["table", "grid", "list"]}
             defaultMode="table"
             filters={FILTERS}
@@ -295,7 +296,7 @@ export function ContactsView({
             searchableColumnIds={["name", "email", "company", "source"]}
             empty="Contacts appear here as enquiries come in, or when you create a lead by hand."
             renderCard={(c) => (
-                <Link href={`/contacts/${c.id}`} className="block">
+                <Link href={personHref(c.id)} className="block">
                     {/* `wk-surface`, not a brand-tinted hover edge: the card is a
                         surface, not a link, and the link colour on its border
                         read as though the outline itself were clickable. The

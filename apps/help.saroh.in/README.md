@@ -1,8 +1,8 @@
 # help.saroh.in
 
-> **Not deployed. help.saroh.in is served by the saroh.in project** (owner,
-> 6 Oct 2026): this app was never on Vercel, so the domain points at the
-> saroh.in project, whose `proxy.ts` sends it to the home page until Help
+> **Not deployed. help.saroh.in is served by the saroh.in Worker** (owner,
+> 6 Oct 2026; DEC-107): this app was never deployed, so the domain is a route
+> of the saroh.in Worker (`saroh-web`), whose `proxy.ts` sends it to the home page until Help
 > publishes (17 Oct) and to saroh.in/help after (`apps/saroh.in/lib/help-host.ts`,
 > the old-to-new map). This app's own `proxy.ts` does the same and is kept only
 > while the app is; the two maps are tested against the app's help links.

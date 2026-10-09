@@ -46,6 +46,11 @@ export interface StaffView {
     weeklyMinutes: number;
     extraHours: ExtraHours[];
     timeOff: TimeOff[];
+    /**
+     * On the diary with no login and past the plan's team limit (#800):
+     * takes no new bookings; theirs are kept. Absent when not paused.
+     */
+    paused?: true;
 }
 
 /**

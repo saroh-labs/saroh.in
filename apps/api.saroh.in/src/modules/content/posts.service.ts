@@ -9,10 +9,12 @@ import { prisma } from "@saroh/database";
 import type { OrganizationContext } from "../../common/types/organization-context";
 import { planMeter } from "../billing/metering.service";
 import { authorize } from "../organizations/organization-policy";
+import { enqueuePageRevalidation } from "../sites/page-cache-revalidate";
 import { sanitizeRichHtml } from "../sites/sanitize";
 import { assertSiteInOrg, reviewerScope } from "../sites/site-access";
 import { slugify } from "../stores/slug";
 import type { CreatePostDto, PostStatus, UpdatePostDto } from "./dto";
+import { assertPostEditable } from "./post-paused";
 import { postPath } from "./posts-prefix";
 
 /**
@@ -156,6 +158,8 @@ export class PostsService {
         if (!current) {
             throw new NotFoundException("Post not found");
         }
+        // A live post the plan paused is read-only (#800).
+        await assertPostEditable(ctx.organizationId, postId);
 
         const slug = slugify(dto.slug);
         if (current.slug !== slug) await this.assertSlugFree(siteId, slug);
@@ -207,6 +211,11 @@ export class PostsService {
         }
         // Comments cascade-delete via Comment.post onDelete: Cascade.
         await prisma.post.delete({ where: { id: postId } });
+        // A live post was on the site's kept pages (#863).
+        await enqueuePageRevalidation(prisma, {
+            cause: "publish",
+            siteIds: [siteId],
+        });
         return { id: postId };
     }
 
@@ -250,6 +259,8 @@ export class PostsService {
         if (!post) {
             throw new NotFoundException("Post not found");
         }
+        // Republishing a live post the plan paused is an edit (#800).
+        await assertPostEditable(ctx.organizationId, postId);
 
         const publishedAt = new Date();
         const path = postPath(site.postsPrefix, post.slug);
@@ -300,6 +311,11 @@ export class PostsService {
                     publishedAt: post.publishedAt ?? publishedAt,
                 },
             });
+            // The post's page and every list of posts on the site (#863).
+            await enqueuePageRevalidation(tx, {
+                cause: "publish",
+                siteIds: [siteId],
+            });
             return {
                 publicationId: publication.id,
                 publishedAt: publication.publishedAt,
@@ -328,6 +344,10 @@ export class PostsService {
         await prisma.post.update({
             where: { id: post.id },
             data: { currentPublicationId: null, status: "DRAFT" },
+        });
+        await enqueuePageRevalidation(prisma, {
+            cause: "publish",
+            siteIds: [siteId],
         });
         return { id: post.id, live: false };
     }

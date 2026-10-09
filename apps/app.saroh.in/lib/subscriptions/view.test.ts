@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import type { Plan, Subscription, SubscriptionCharge } from "./service";
 import {
     autopayLine,
+    chargeHref,
     chargeRow,
     chargingText,
     classesText,
@@ -250,6 +251,10 @@ describe("collectionRows", () => {
 });
 
 describe("charges", () => {
+    it("each opens its invoice (UX-080)", () => {
+        expect(chargeHref("inv_1")).toBe("/billing/invoices/inv_1");
+    });
+
     it("says a paid renewal, its period and how it was paid", () => {
         expect(chargeRow(charge(), TZ, NOW)).toMatchObject({
             date: "1 Sep",

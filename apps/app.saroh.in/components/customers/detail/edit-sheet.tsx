@@ -12,6 +12,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useId, useState } from "react";
 
+import { personHref } from "@/lib/contacts/person-href";
 import { saveDetailsAction } from "@/lib/customer-workspace/actions";
 import type { CustomerDetail } from "@/lib/customer-workspace/detail";
 import type {
@@ -136,7 +137,7 @@ export function EditSheet({
             </button>
         ) : holder ? (
             <Link
-                href={`/customers/${encodeURIComponent(holder.contactId)}`}
+                href={personHref(holder.contactId)}
                 className="rounded-sm font-medium text-foreground underline underline-offset-2 hover:no-underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring active:opacity-70"
             >
                 See {holder.name ?? "their record"}

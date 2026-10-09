@@ -100,6 +100,68 @@ checkout, and an add-on is a line on the charge after the period it covers
 invoice's lines are worked out by one rule each, so they agree. Rules in
 `PRICING_ROLLOUT.md` › "Trials, yearly, coupons and add-ons (U16)".
 
+## Moving to a lower plan — **Current** (#800, #801, #802; the Terms' "Moving to a lower plan")
+
+What is over the plan's limits becomes read-only; nothing is deleted, and
+moving back up restores everything at once.
+
+- **Derived, never stored** (`billing/over-limit.ts`, pure;
+  `over-limit.service.ts`, the reads). What is paused is worked out on every
+  ask from the plan the business reads (`CatalogueAccessService.resolve`)
+  and a fixed order. Nothing marks a row paused, so a move back up un-pauses
+  everything the moment the plan reads higher, with no job. Behind
+  `PLAN_ENFORCEMENT` and the catalogue path, as metering is (off: nothing
+  pauses); fails open (`over_limit_unresolved`).
+- **The order** (the owner can't pick): team — the owner always, then team
+  members and diary people with no login by when they joined
+  (`Membership.createdAt`), then open invitations, against `members`;
+  view-only people against `reviewers` (DEC-105, DEC-111). Products and
+  blog posts — the newest by `createdAt` stay (a `Cut`: the oldest kept,
+  spread as `keptByCut` into a read). Locations (`SHOP` only, DEC-109) and
+  websites (DEC-094) — the first made stay.
+- **The one stored thing is the clock.** Nothing pauses until 7 days after
+  the business was told what would pause: the grace claim, a
+  `CustomerNotice` of kind `MOVE_DOWN` keyed by the limits it was told
+  about (`moveDownClaimKey`). Whichever notice first lists the pauses writes
+  it. A claim the business left behind (moved up, back under) is cleared by
+  the sweep (`claimStands`), so the next move down is told and waited for
+  again.
+- **Every way down is told** (`move-down-notice.ts`, the hourly sweep's
+  last step): a plan override's end and a term's end through their own
+  30/7/1-day notices, which now list the pauses; a move chosen for the
+  period's end (Free, a cheaper plan, a cancel) 30/7/1 days ahead; and a
+  move that happened at once (a payment that failed for good, a cancel now,
+  a trial dropped, a limit or add-on taken away) within the hour, pausing 7
+  days on. The plan itself moves on its date as before; only the pause
+  waits.
+- **Where it is enforced** — ask `pausedNow(org)` (cached 30 s): a paused
+  product's or post's writes refuse with `pausedByPlan` (409
+  `PAUSED_BY_PLAN`; archive, delete and unpublish stay open); the public
+  catalogue and blog hide them; a paused location or website refuses
+  checkout and booking with `notTakingOrders` (409 `NOT_TAKING_ORDERS`,
+  customer words, no plan named) and the site says it isn't taking orders —
+  class packs and plans bought online too (`siteTakingOrders`, and the
+  packs and plans reads carry `notTakingOrders` via `withPause`, so the
+  blocks show no Buy, Join or "Ask about"); a diary person with no login
+  past the team limit takes no new bookings (`bookings/diary-paused.ts`:
+  `loadStaffing` splits them out, so the slot engine, the booking page,
+  "with whom" and booking by hand never offer them; the team hears who and
+  why, a customer only that they aren't taking bookings; their bookings
+  already made are kept); a paused team member can't open the business
+  (403 `MEMBER_PAUSED`, `organizations/member-paused.ts`) — asked at the
+  organization context, by the storefront authorizer (`StoresService
+.orgAllows`, before the legacy fallback) and passed through by the
+  module gate's store-scoped context, so no route answers them with a
+  generic denial — and a paused invitation can't be accepted;
+  `GET …/billing/paused` feeds the workspace's marks and banner (products
+  list, product page and quick look, posts, locations, websites, Team and
+  its diary people, the calendar). **Never touched:** invoices, orders,
+  customers, payment records — no pause reads them.
+- **Notice words:** a move still ahead says "the new plan's limits"; a move
+  already made (`now`) says "your plan's limits" (`pausesParagraphs`).
+- **The admin limit override** says what then happens
+  (`admin/limit-override-warning.ts`, #802).
+
 ## Business details before money — **Current** (DEC-068, M3)
 
 Every invoice prints the business's registered address, and a

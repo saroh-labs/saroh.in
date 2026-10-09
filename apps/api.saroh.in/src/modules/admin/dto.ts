@@ -16,6 +16,9 @@ import {
     MinLength,
 } from "class-validator";
 
+import type { DeployApp, DeployEnvironment } from "./admin-deployments";
+import { DEPLOY_APPS, DEPLOY_ENVIRONMENTS } from "./admin-deployments";
+
 const trim = ({ value }: { value: unknown }) =>
     typeof value === "string" ? value.trim() : value;
 
@@ -470,4 +473,37 @@ export class PlanOverrideDto extends OperatorReasonDto {
 export class CatalogueMoveDto extends OperatorReasonDto {
     @IsIn(["now", "renewal"])
     when!: "now" | "renewal";
+}
+
+/**
+ * Start a deploy of one Cloudflare app in one environment (#886). `confirm`
+ * is the production Worker's name typed back, and the service refuses a
+ * production deploy without it; a dev deploy needs none. The reason is
+ * optional: the ledger records who, which app, which environment and when
+ * regardless.
+ */
+export class StartDeploymentDto {
+    @IsIn(DEPLOY_APPS)
+    app!: DeployApp;
+
+    @IsIn(DEPLOY_ENVIRONMENTS)
+    environment!: DeployEnvironment;
+
+    @IsOptional()
+    @Transform(trim)
+    @IsString()
+    @MaxLength(100)
+    confirm?: string;
+
+    @IsOptional()
+    @Transform(trim)
+    @IsString()
+    @MaxLength(500)
+    reason?: string;
+
+    @Transform(trim)
+    @IsString()
+    @MinLength(8)
+    @MaxLength(200)
+    idempotencyKey!: string;
 }

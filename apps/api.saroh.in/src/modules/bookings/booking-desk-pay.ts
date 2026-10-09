@@ -222,7 +222,7 @@ export async function takeDeskPaymentInTx(
         // link stops working with it.
         const { count } = await tx.invoice.updateMany({
             where: { id: issued.id, organizationId, status: "ISSUED" },
-            data: { ...paid, payTokenHash: null },
+            data: { ...paid, payTokenHash: null, payLinkCreatedAt: null },
         });
         if (count === 0) {
             throw new ConflictException("This invoice changed. Reload it.");

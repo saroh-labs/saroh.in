@@ -161,19 +161,19 @@ describe("Home", () => {
         plan: { ok: true, value: PLAN },
     };
 
-    it("shows the next appointment and the plan, under the header's greeting", () => {
+    it("shows the next booking and the plan, under the header's greeting", () => {
         render(<AccountHome account={ACCOUNT} home={home} />);
         // "Hi, Farah" is the account header's title now (DEC-073 #10).
         expect(screen.queryByRole("heading", { level: 1 })).toBeNull();
         expect(
-            screen.getByRole("heading", { name: "Next appointment" }),
+            screen.getByRole("heading", { name: "Next booking" }),
         ).toBeInTheDocument();
         expect(
             screen.getByText("Check-up · Mon 5 Oct, 10:00"),
         ).toBeInTheDocument();
         expect(screen.getByText("With Dr. Rao")).toBeInTheDocument();
         expect(
-            screen.getByRole("link", { name: "Book an appointment" }),
+            screen.getByRole("link", { name: "Make a booking" }),
         ).toHaveAttribute("href", "/book");
         expect(
             screen.getByText("Unlimited · ₹2,500 / month"),
@@ -515,7 +515,7 @@ describe("the header's account entry", () => {
         verifyCode: vi.fn(),
     };
 
-    it("a signed-in customer's initials open the account", () => {
+    it('a signed-in customer\'s initials and "My account" open the account', () => {
         render(
             <AccountEntry
                 customer={{ email: "farah@example.in", name: "Farah Khan" }}
@@ -527,6 +527,9 @@ describe("the header's account entry", () => {
         const link = screen.getByRole("link", { name: "My account" });
         expect(link).toHaveAttribute("href", "/account");
         expect(link).toHaveTextContent("FK");
+        // Named in words, not only by the initials (a phone hides the words
+        // from sight, not from a screen reader).
+        expect(link).toHaveTextContent("My account");
     });
 
     async function signInThrough(variant: "header" | "page") {

@@ -469,7 +469,7 @@ describe("module pages (G14, real database)", () => {
         expect(body.message).toBe(
             "A Book page isn't available for this business.",
         );
-        expect(body.message).not.toMatch(/Appointments|ROLLOUT/);
+        expect(body.message).not.toMatch(/Appointments|Bookings|ROLLOUT/);
 
         const detail = await sites.getSite(b.ctx, b.siteId);
         expect(detail.addablePageKinds).toEqual([

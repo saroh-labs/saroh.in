@@ -29,6 +29,26 @@ const labels = (over: Partial<DetailActionState>) =>
 const primary = (over: Partial<DetailActionState>) =>
     detailActions({ ...base, ...over }).find((a) => a.primary)?.label;
 
+describe("detailActions' pay link after a reload (UX-048)", () => {
+    it("says Make a new link when the link out can't be shown", () => {
+        const got = labels({ linkUnseen: true });
+        expect(got).toContain("Make a new link");
+        expect(got).not.toContain("Copy pay link");
+    });
+
+    it("still says it is working while the link is made", () => {
+        expect(labels({ linkUnseen: true, linkBusy: true })).toContain(
+            "Making a link…",
+        );
+    });
+
+    it("offers no link at all while autopay is charging", () => {
+        expect(labels({ linkUnseen: true, charging: true })).not.toContain(
+            "Make a new link",
+        );
+    });
+});
+
 describe("detailActions", () => {
     it("an unpaid invoice that pays online: Send with pay link and Copy pay link, as today", () => {
         expect(labels({})).toEqual([
@@ -104,17 +124,15 @@ describe("detailActions", () => {
         expect(labels({ payOnline: false, canWrite: false })).not.toContain(
             "Copy view link",
         );
-        expect(labels({ payOnline: false, standing: "PAID" })).not.toContain(
-            "Copy view link",
-        );
         expect(labels({ payOnline: false, linkBusy: true })).toContain(
             "Making a link…",
         );
     });
 
-    it("paid: Print and Refund, or Refund on the order", () => {
+    it("paid: Print, Copy view link and Refund, or Refund on the order", () => {
         expect(labels({ standing: "PAID" })).toEqual([
             "Print",
+            "Copy view link",
             "Download PDF",
             "Refund…",
         ]);
@@ -125,6 +143,21 @@ describe("detailActions", () => {
             "Print",
             "Download PDF",
         ]);
+    });
+
+    it("a paid invoice keeps Copy view link, online payment or not (UX-080)", () => {
+        expect(labels({ standing: "PAID" })).toContain("Copy view link");
+        expect(labels({ standing: "PAID", payOnline: false })).toContain(
+            "Copy view link",
+        );
+        // An order's paper is handed over on the order; a credit note
+        // isn't paid.
+        expect(labels({ standing: "PAID", fromOrder: true })).not.toContain(
+            "Copy view link",
+        );
+        expect(labels({ standing: "PAID", credit: true })).not.toContain(
+            "Copy view link",
+        );
     });
 
     it("a role that only reads an owed invoice sees Mark paid disabled, with why (FB-1, DEC-098)", () => {

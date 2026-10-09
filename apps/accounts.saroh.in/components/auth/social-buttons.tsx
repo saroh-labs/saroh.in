@@ -6,44 +6,45 @@ import { FaGithub, FaGoogle } from "react-icons/fa";
 
 import { AuthDivider, AuthError } from "@/components/auth/field";
 import { authClient } from "@/lib/auth.client";
+import type { SocialProvider } from "@/lib/sign-in-options";
 
 /**
  * The other routes to the same account.
  *
- * Both providers, on log in AND on sign up. The server has registered GitHub
- * and Google since the auth package landed, account linking trusts both, and
- * all four credentials are declared in the build's environment — but only
- * GitHub was ever drawn, and only on log in. A provider that is configured,
- * trusted and never offered is a feature nobody can use.
- *
- * A provider with no credentials in this environment still renders. Hiding it
- * would make a misconfigured deployment look identical to a removed feature;
- * failing at the round-trip at least says something went wrong, and says it
- * to the person who can tell someone about it.
+ * Both providers, on log in AND on sign up — but only those whose keys are set
+ * on the API (`providers`, from `lib/sign-in-options.ts`). A provider without
+ * keys failed at the round-trip on the live sign-in page, so it isn't drawn
+ * (owner, 9 Oct); setting its keys brings it back. With none, nothing is
+ * drawn, not even the divider: email and password are the whole page.
  */
 
 const PROVIDERS = [
-    { id: "github", label: "GitHub", Icon: FaGithub },
     { id: "google", label: "Google", Icon: FaGoogle },
+    { id: "github", label: "GitHub", Icon: FaGithub },
 ] as const;
 
 export function SocialButtons({
+    providers,
     callbackURL,
     disabled,
 }: {
+    /** The providers with keys set; only these are drawn. */
+    providers: readonly SocialProvider[];
     /** Where the round-trip should land — already vetted by the server. */
     callbackURL?: string;
     disabled?: boolean;
 }) {
     const [error, setError] = useState<string | null>(null);
     const [pending, setPending] = useState<string | null>(null);
+    const shown = PROVIDERS.filter((p) => providers.includes(p.id));
+    if (shown.length === 0) return null;
 
     return (
         <>
             <AuthDivider />
             {error ? <AuthError>{error}</AuthError> : null}
             <div className="grid gap-2">
-                {PROVIDERS.map(({ id, label, Icon }) => (
+                {shown.map(({ id, label, Icon }) => (
                     <Button
                         key={id}
                         type="button"

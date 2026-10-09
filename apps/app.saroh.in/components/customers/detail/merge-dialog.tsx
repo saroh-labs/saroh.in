@@ -11,6 +11,7 @@ import { showSuccess } from "@saroh/ui/toast";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 
+import { personHref } from "@/lib/contacts/person-href";
 import {
     mergeAction,
     mergePreviewAction,
@@ -69,7 +70,7 @@ export function MergeDialog({
     target,
     open,
     onOpenChange,
-    survivorHref = (id) => `/customers/${encodeURIComponent(id)}`,
+    survivorHref = (id) => personHref(id),
 }: {
     hereId: string;
     /** The other record; null to search for it first. */

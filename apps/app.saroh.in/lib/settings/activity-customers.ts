@@ -1,3 +1,5 @@
+import { personHref } from "@/lib/contacts/person-href";
+
 import { counted, countOf, fieldsOf, record } from "./activity-changes";
 
 /**
@@ -19,7 +21,7 @@ export function customerPlace(contactId: string | null): {
     return contactId
         ? {
               label: "Customer",
-              href: `/customers/${encodeURIComponent(contactId)}`,
+              href: personHref(contactId),
           }
         : { label: "Customers", href: "/commerce/customers" };
 }

@@ -33,11 +33,29 @@ export class InviteMemberDto {
     @MaxLength(320)
     email!: string;
 
+    /**
+     * Optional only with `staffId`: someone on the diary given a login joins
+     * as Calendar only unless another role is picked (#868). Without a
+     * diary person the service refuses a missing role.
+     */
+    @IsOptional()
     @Transform(trim)
     @IsString()
     @MinLength(1, { message: "Choose a role" })
     @MaxLength(64)
-    role!: string;
+    role?: string;
+
+    /**
+     * The person on the diary this invite gives a login to (#868): someone
+     * taking bookings with no login. Accepting links them to the new
+     * membership. Checked by the service: this business's, and not linked.
+     */
+    @IsOptional()
+    @Transform(trim)
+    @IsString()
+    @MinLength(1)
+    @MaxLength(64)
+    staffId?: string;
 
     /**
      * Sites a REVIEWER invite grants. Required for REVIEWER and rejected for

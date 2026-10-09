@@ -9,6 +9,8 @@ import { JobHandlerRegistry } from "../jobs/job-handler.registry";
 import { JobsModule } from "../jobs/jobs.module";
 import { OrganizationsModule } from "../organizations/organizations.module";
 import { GoLiveHandler, SITE_GO_LIVE_TYPE } from "./go-live.handler";
+import { SITE_PAGES_REVALIDATE_TYPE } from "./page-cache-revalidate";
+import { PageCacheRevalidateHandler } from "./page-cache.job";
 import { PublicFooterService } from "./public-footer.service";
 import { PublicHeadService } from "./public-head.service";
 import { PublicSitesController } from "./public-sites.controller";
@@ -29,7 +31,9 @@ import { TestReleasesService } from "./test-releases.service";
  * Sections) atomically.
  *
  * It also consumes `site.go_live` (DEC-071, T10): a test release's
- * scheduled go-live, registered with the {@link JobHandlerRegistry} on boot.
+ * scheduled go-live, and `site.pages.revalidate` (#863): telling the merchant
+ * sites' Worker which kept pages changed. Both registered with the
+ * {@link JobHandlerRegistry} on boot.
  */
 @Module({
     imports: [
@@ -54,6 +58,7 @@ import { TestReleasesService } from "./test-releases.service";
         PublicFooterService,
         PublicHeadService,
         GoLiveHandler,
+        PageCacheRevalidateHandler,
         OrganizationGuard,
     ],
     exports: [SitesService],
@@ -62,10 +67,15 @@ export class SitesModule implements OnModuleInit {
     constructor(
         private readonly registry: JobHandlerRegistry,
         private readonly goLive: GoLiveHandler,
+        private readonly pageCache: PageCacheRevalidateHandler,
     ) {}
 
-    /** Wire the scheduled go-live into the job worker at boot. */
+    /** Wire the scheduled go-live and the page cache into the job worker. */
     onModuleInit(): void {
         this.registry.register(SITE_GO_LIVE_TYPE, this.goLive.handle);
+        this.registry.register(
+            SITE_PAGES_REVALIDATE_TYPE,
+            this.pageCache.handle,
+        );
     }
 }

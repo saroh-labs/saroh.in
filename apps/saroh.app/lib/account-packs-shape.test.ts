@@ -55,6 +55,16 @@ describe("the packs on sale", () => {
         expect(packsOnSaleResult(null)).toBeNull();
     });
 
+    it("keeps a paused website's not-taking-orders, with Buy off (#800)", () => {
+        expect(
+            packsOnSaleResult({
+                payOnline: true,
+                packs: [PACK],
+                notTakingOrders: true,
+            }),
+        ).toEqual({ payOnline: false, packs: [PACK], notTakingOrders: true });
+    });
+
     it("keeps a pack's kind, so the sheet can say sessions (A11)", () => {
         const pt = { ...PACK, kind: "ONE_TO_ONE" };
         expect(

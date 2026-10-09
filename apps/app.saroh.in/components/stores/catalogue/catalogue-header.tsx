@@ -13,6 +13,7 @@ import { ChevronDown, Plus, Store } from "lucide-react";
 import Link from "next/link";
 
 import type { PlanMeter } from "@/lib/billing/meter";
+import { meterBeside } from "@/lib/billing/meter";
 import { newProductHref, productSettingsHref } from "@/lib/products/links";
 import { importProductsHref } from "@/lib/stores/links";
 
@@ -31,6 +32,7 @@ export function CatalogueHeader({
     storeId,
     canWrite,
     meter = null,
+    bannerShown = false,
 }: {
     stores: { id: string; name: string }[];
     /** The storefront filter, if one is picked. */
@@ -38,7 +40,13 @@ export function CatalogueHeader({
     canWrite: boolean;
     /** The plan's product limit, when one stops the business. */
     meter?: PlanMeter | null;
+    /**
+     * The page's limit banner says it already (from 80%): the count and
+     * Upgrade aren't said twice (#874).
+     */
+    bannerShown?: boolean;
 }) {
+    const beside = meterBeside(meter, bannerShown);
     const first = stores.at(0);
     const many = stores.length > 1;
     const here = stores.find((s) => s.id === storeId) ?? null;
@@ -69,7 +77,7 @@ export function CatalogueHeader({
                         </DropdownMenuItem>
                     </DropdownMenuContent>
                 </DropdownMenu>
-                {meter ? (
+                {meter && beside.label ? (
                     <span
                         className={
                             meter.full
@@ -77,7 +85,7 @@ export function CatalogueHeader({
                                 : "text-[12.5px] text-muted-foreground"
                         }
                     >
-                        {meter.label}
+                        {beside.label}
                     </span>
                 ) : null}
                 {meter?.full ? (
@@ -87,13 +95,15 @@ export function CatalogueHeader({
                             New product
                         </Button>
                         <span className="sr-only">{meter.reason}</span>
-                        <Button asChild variant="outline">
-                            <Link href={meter.href}>
-                                {meter.upgradeTo
-                                    ? `Upgrade to ${meter.upgradeTo}`
-                                    : "See plans"}
-                            </Link>
-                        </Button>
+                        {beside.upgrade ? (
+                            <Button asChild variant="outline">
+                                <Link href={meter.href}>
+                                    {meter.upgradeTo
+                                        ? `Upgrade to ${meter.upgradeTo}`
+                                        : "See plans"}
+                                </Link>
+                            </Button>
+                        ) : null}
                     </>
                 ) : many && !here ? (
                     <DropdownMenu>

@@ -1,3 +1,4 @@
+import { METHOD_WORD } from "@/lib/payments/method-words";
 import { isSince } from "@/lib/views/since";
 
 import type {
@@ -310,11 +311,8 @@ const PAID_BY: Record<string, string> = {
     // An order's paper records how the order was paid, not a method.
     ORDER: "With the order",
     RECORDED: "Recorded by hand",
-    CASH: "Cash",
-    UPI: "UPI",
-    BANK_TRANSFER: "Bank transfer",
-    CARD: "Card",
-    OTHER: "Another way",
+    // One word each, as every picker says them (UX-078).
+    ...METHOD_WORD,
 };
 
 /** How it was paid; an order's paper may name a way this list doesn't know. */

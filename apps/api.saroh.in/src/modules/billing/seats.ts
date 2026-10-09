@@ -83,3 +83,16 @@ export function seatModule(kind: SeatKind): "members" | "reviewers" {
 
 /** A diary person who takes bookings (`StaffMember.status`). */
 export const BOOKABLE_STAFF = "ACTIVE";
+
+/**
+ * Whether an open invite is already counted as the diary person it names
+ * (#868): they take bookings with no login, so they hold a seat of their
+ * own (`metering.ts`, `loginlessStaff`), and the invite is them, not one
+ * more. Counting it again would leave a team at its cap unable to give
+ * someone already on it a login.
+ */
+export function countedOnDiary(
+    staff: { status: string; membershipId: string | null } | null | undefined,
+): boolean {
+    return staff?.status === BOOKABLE_STAFF && staff.membershipId === null;
+}

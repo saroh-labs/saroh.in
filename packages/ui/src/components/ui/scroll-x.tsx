@@ -39,6 +39,114 @@ export function edgeMask(edges: { left: boolean; right: boolean }) {
     return `linear-gradient(to right, ${edges.left ? "transparent" : "#000"}, #000 ${l}px, #000 calc(100% - ${r}px), ${edges.right ? "transparent" : "#000"})`;
 }
 
+/**
+ * How far to scroll a strip so its current item is in view, with `pad` px of
+ * the next one showing beyond it (so the fade never sits over the current
+ * one). Null when it is in view already. Pure: the caller measures.
+ */
+export function revealOffset(
+    strip: { scrollLeft: number; clientWidth: number },
+    item: { offsetLeft: number; offsetWidth: number },
+    pad = FADE,
+): number | null {
+    const start = item.offsetLeft - pad;
+    const end = item.offsetLeft + item.offsetWidth + pad;
+    if (start < strip.scrollLeft) return Math.max(0, start);
+    if (end > strip.scrollLeft + strip.clientWidth) {
+        return end - strip.clientWidth;
+    }
+    return null;
+}
+
+/**
+ * The fade of `ScrollX` for a row that scrolls itself (UX-079): a tab strip
+ * on a phone, where a wrapping box would add nothing. Put the returned
+ * `style` on the scrolling element; it fades the side with more, and moves
+ * as the merchant scrolls. `current` (a selector inside the strip) is
+ * scrolled into view on mount and whenever `revealKey` changes, so the open
+ * tab is never the one hidden off the edge.
+ *
+ * Sideways only: a strip that turns into a column at a wider width measures
+ * as fitting there, and gets no fade.
+ */
+export function useEdgeFade<T extends HTMLElement>(
+    ref: React.RefObject<T | null>,
+    { current, revealKey }: { current?: string; revealKey?: unknown } = {},
+): React.CSSProperties | undefined {
+    const [edges, setEdges] = React.useState({ left: false, right: false });
+
+    React.useEffect(() => {
+        const el = ref.current;
+        if (!el) return;
+        const measure = () => {
+            const next = overflowEdges(el);
+            setEdges((prev) =>
+                prev.left === next.left && prev.right === next.right
+                    ? prev
+                    : next,
+            );
+        };
+        const ro =
+            typeof ResizeObserver === "undefined"
+                ? null
+                : new ResizeObserver(measure);
+        ro?.observe(el);
+        measure();
+        el.addEventListener("scroll", measure, { passive: true });
+        return () => {
+            ro?.disconnect();
+            el.removeEventListener("scroll", measure);
+        };
+    }, [ref]);
+
+    React.useEffect(() => {
+        const el = ref.current;
+        if (!el || !current) return;
+        const item = el.querySelector<HTMLElement>(current);
+        if (!item) return;
+        const reveal = () => {
+            const to = revealOffset(el, item);
+            // `scrollLeft`, not `scrollIntoView`: that would scroll the page too.
+            if (to !== null) el.scrollLeft = to;
+        };
+        reveal();
+        // Widths settle after the first paint (web fonts, late styles), which
+        // can push the open item back out of view: reveal it again as they
+        // do, until the person scrolls the strip themselves.
+        let touched = false;
+        const stop = () => {
+            touched = true;
+        };
+        const again = () => {
+            if (!touched) reveal();
+        };
+        const ro =
+            typeof ResizeObserver === "undefined"
+                ? null
+                : new ResizeObserver(again);
+        ro?.observe(el);
+        ro?.observe(item);
+        // Not every environment (jsdom) has the font loading API.
+        if ("fonts" in document) void document.fonts.ready.then(again);
+        const opts = { passive: true } as const;
+        el.addEventListener("pointerdown", stop, opts);
+        el.addEventListener("wheel", stop, opts);
+        el.addEventListener("touchstart", stop, opts);
+        el.addEventListener("keydown", stop);
+        return () => {
+            touched = true;
+            ro?.disconnect();
+            el.removeEventListener("pointerdown", stop);
+            el.removeEventListener("wheel", stop);
+            el.removeEventListener("touchstart", stop);
+            el.removeEventListener("keydown", stop);
+        };
+    }, [ref, current, revealKey]);
+
+    const mask = edgeMask(edges);
+    return mask ? { maskImage: mask, WebkitMaskImage: mask } : undefined;
+}
+
 function claimHint(): boolean {
     if (hintShown) return false;
     try {

@@ -1,8 +1,7 @@
 #!/bin/bash
 # The local gate before a batch is pushed (docs/patterns/devops-tooling-and-deploy.md
 # → Branches, batches and pull requests). It runs what CI runs, on this machine,
-# so a failure costs minutes here instead of a push, five Vercel builds and a
-# CI round trip. Every step here exists because CI once caught it first —
+# so a failure costs minutes here instead of a push and a CI round trip. Every step here exists because CI once caught it first —
 # docs/architecture/DEV_LEARNINGS.md has the stories.
 #
 #   pnpm prepush                 secrets, private prices, lint, types, checks, and the unit
@@ -214,11 +213,24 @@ bg_report() {
 AFFECTED_LIST=""
 affected() {
     if [ -z "$AFFECTED_LIST" ]; then
-        AFFECTED_LIST=$(pnpm -s exec turbo ls --filter="...[$MB]" 2>/dev/null |
-            sed -nE 's/^  ([^ ]+) .*/\1/p')
-        [ -n "$AFFECTED_LIST" ] || AFFECTED_LIST="(none)"
+        # A failed query counts every package as affected: an empty answer
+        # once skipped the api's unit tests on a batch that changed the api.
+        if AFFECTED_RAW=$(pnpm -s exec turbo ls --filter="...[$MB]" 2>/dev/null); then
+            AFFECTED_LIST=$(echo "$AFFECTED_RAW" | sed -nE 's/^  ([^ ]+) .*/\1/p')
+            # "Nothing affected" must agree with git: code changed under
+            # apps/ or packages/ means the query is wrong, so run them all.
+            if [ -z "$AFFECTED_LIST" ]; then
+                if git diff --name-only "$MB" HEAD | grep -qE '^(apps|packages)/'; then
+                    AFFECTED_LIST="(all)"
+                else
+                    AFFECTED_LIST="(none)"
+                fi
+            fi
+        else
+            AFFECTED_LIST="(all)"
+        fi
     fi
-    echo "$AFFECTED_LIST" | grep -qx "$1"
+    [ "$AFFECTED_LIST" = "(all)" ] || echo "$AFFECTED_LIST" | grep -qx "$1"
 }
 TURBO="pnpm -s exec turbo run --output-logs=errors-only $TURBO_FORCE"
 # Builds what the affected packages' tests import: the packages they depend
@@ -325,6 +337,11 @@ e2e_stack() {
     # the API's SSRF guard refuses; this test-only list lets it reach them.
     # The API won't boot with it under NODE_ENV=production.
     export LINK_PREVIEW_TEST_HOSTS=127.0.0.1
+    # Custom domains on fakes (#861): `.example.com` verifies without DNS and
+    # hosting puts a hostname in the state its first label names, so the
+    # own-domain spec's hosting states run. Test only, as above; the spec
+    # runs them when E2E_DOMAIN_HOSTING says the API has them.
+    export DOMAIN_HOSTING_FAKE=1 E2E_DOMAIN_HOSTING=fake
     export PAYMENTS_ENC_KEY=0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef # gitleaks:allow (test key, as in the API specs)
 
     # The run's database is a copy of a seeded template, "<name>-template",
@@ -803,11 +820,13 @@ bg_step routes pnpm run check:routes
 bg_step catalog-lock pnpm run check:catalog-lock
 bg_step edge-headers pnpm run check:edge-headers
 bg_step security-headers pnpm run check:security-headers
+bg_step deploy-env pnpm run check:deploy-env
 bg_step blocks pnpm run check:blocks
 bg_step cycles pnpm run check:cycles
 bg_step e2e-covers pnpm run check:e2e-covers
 bg_step migration-ids pnpm run check:migration-ids
 bg_step mktemp pnpm run check:mktemp
+bg_step words pnpm run check:words
 
 # Unit tests. The quick run takes only the specs the change reaches; --int and
 # --all run the full suites. As CI: the api's unit tests mock the environment,

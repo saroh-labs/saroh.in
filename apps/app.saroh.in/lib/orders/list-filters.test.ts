@@ -25,7 +25,7 @@ const options: OrderFilterOptions = {
     types: [
         { type: "PICKUP", label: "Pick-up" },
         { type: "SHIPPING", label: "Shipping" },
-        { type: "APPOINTMENT_ONLINE", label: "Appointment, online" },
+        { type: "APPOINTMENT_ONLINE", label: "Booking, online" },
     ],
     steps: [
         { key: "new", label: "New", types: ["PICKUP", "SHIPPING"] },
@@ -290,7 +290,7 @@ describe("the empty state for filters", () => {
                 readOrdersQuery({ fulfilment: "appointment_online" }),
                 options,
             ),
-        ).toBe("No online appointment orders");
+        ).toBe("No online booking orders");
     });
 
     it("leaves out what it has no words for, rather than guess", () => {

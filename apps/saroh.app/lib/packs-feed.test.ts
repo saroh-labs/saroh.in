@@ -14,6 +14,26 @@ const PACK = {
     singlePrice: "600.00",
 };
 
+describe("the Class packs block on a paused website (#800)", () => {
+    it("tells the block the site isn't taking orders, only when it isn't", async () => {
+        const paused = await packsFeed([{ type: "packs" }], "/contact", () =>
+            Promise.resolve({
+                packs: [PACK],
+                payOnline: false,
+                notTakingOrders: true,
+            }),
+        );
+        expect(paused).toMatchObject({
+            payOnline: false,
+            notTakingOrders: true,
+        });
+        const open = await packsFeed([{ type: "packs" }], "/contact", () =>
+            Promise.resolve({ packs: [PACK], payOnline: true }),
+        );
+        expect(open).not.toHaveProperty("notTakingOrders");
+    });
+});
+
 describe("the Class packs block's packs on a served page (G20)", () => {
     it("reads nothing for a page without a Class packs block", async () => {
         const read = vi.fn(() =>

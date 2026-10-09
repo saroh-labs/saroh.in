@@ -16,11 +16,8 @@ import { useState } from "react";
 
 import type { InvoiceRef } from "@/components/invoices/invoice-actions";
 import { useBusinessDetailsStep } from "@/components/organizations/use-business-details-step";
-import {
-    issueInvoice,
-    remindInvoice,
-    sendInvoice,
-} from "@/lib/invoices/actions";
+import { issueInvoice } from "@/lib/invoices/actions";
+import { remindWithLink, sendWithLink } from "@/lib/invoices/link-actions";
 import { sendConfirmLine, sendOutcome } from "@/lib/invoices/send";
 import type { InvoiceSend } from "@/lib/invoices/service";
 
@@ -39,6 +36,7 @@ export function SendDialog({
     invoice,
     send,
     mode,
+    onSent,
 }: {
     open: boolean;
     onOpenChange: (open: boolean) => void;
@@ -46,6 +44,8 @@ export function SendDialog({
     send: InvoiceSend;
     /** "draft" issues it first; "reminder" sends reminder words. */
     mode: "send" | "reminder" | "draft";
+    /** It went: the link shown before is dead, so the screen drops it. */
+    onSent?: () => void;
 }) {
     const router = useRouter();
     const [busy, setBusy] = useState(false);
@@ -71,7 +71,7 @@ export function SendDialog({
             number = issued.data.number ?? number;
         }
         const res = await details.run(() =>
-            reminder ? remindInvoice(invoice.id) : sendInvoice(invoice.id),
+            reminder ? remindWithLink(invoice.id) : sendWithLink(invoice.id),
         );
         setBusy(false);
         if (!res) return;
@@ -84,6 +84,7 @@ export function SendDialog({
                     : res.error,
             );
         }
+        onSent?.();
         const out = sendOutcome(
             res.data,
             first,

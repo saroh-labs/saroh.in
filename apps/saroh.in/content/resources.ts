@@ -93,15 +93,18 @@ export const LEGAL_PAGES: readonly ResourcePage[] = [
         name: "Privacy",
         line: "What Saroh collects, why, and what you can ask for.",
         href: "/privacy",
-        publishOn: "2026-10-06",
+        // 8 Oct: merchants' own trackers (DEC-108). 9 Oct: Vercel removed
+        // from the processors; Cloudflare serves every site (DEC-107).
+        publishOn: "2026-10-09",
     },
     {
         id: "terms",
         name: "Terms",
         line: "The agreement for using Saroh.",
         href: "/terms",
-        // 7 Oct: the term ends with a request to pay (DEC-100).
-        publishOn: "2026-10-07",
+        // 7 Oct: the term ends with a request to pay (DEC-100). 8 Oct:
+        // merchants' own trackers (DEC-108).
+        publishOn: "2026-10-08",
     },
     {
         id: "refunds",

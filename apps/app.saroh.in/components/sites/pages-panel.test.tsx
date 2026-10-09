@@ -373,14 +373,14 @@ describe("Add a page (G16)", () => {
     it("says why a module page was refused, in the merchant's words", async () => {
         actions.createPage.mockResolvedValue({
             ok: false,
-            error: "Appointments is switched off. Turn it on in Settings › Modules to add a Book page.",
+            error: "Bookings is switched off. Turn it on in Settings › Modules to add a Book page.",
         });
         render();
         await press(button("Add a page"));
         await press(button(/^Book\/book/));
         const alert = host.querySelector('[role="alert"]');
         expect(alert?.textContent).toBe(
-            "Appointments is switched off. Turn it on in Settings › Modules to add a Book page.",
+            "Bookings is switched off. Turn it on in Settings › Modules to add a Book page.",
         );
         expect(alert?.textContent).not.toMatch(/module_off|409/);
     });

@@ -153,7 +153,7 @@ export function testHostResponse(
         // Absolute, because the edge runtime refuses a relative Location
         // ("Invalid URL"). Built from what the browser asked for: its Host
         // (port kept) and the scheme the proxy in front says it used, since
-        // the server behind portless or Vercel's edge sees plain http.
+        // the server behind portless or the edge sees plain http.
         const location = `${visitorOrigin(req)}${url.pathname}${query ? `?${query}` : ""}`;
         const res = new NextResponse(null, {
             status: 303,

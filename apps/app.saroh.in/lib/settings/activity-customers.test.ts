@@ -44,7 +44,7 @@ describe("Activity — customer records", () => {
         );
         expect(line?.where).toEqual({
             label: "Customer",
-            href: "/customers/c_asha",
+            href: "/contacts/c_asha",
         });
     });
 

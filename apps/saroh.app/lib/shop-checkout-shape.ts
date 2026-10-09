@@ -26,6 +26,12 @@ export interface CheckoutOptions {
     ways: { type: string; label: string; fee: string | null }[];
     /** How it can be paid; absent from an API before offline payment. */
     payments?: { online: boolean; onHandover: boolean };
+    /**
+     * True when the business stopped taking orders on this site for now
+     * (#800): the shop says so instead of offering a bag or an enquiry.
+     * Absent from an older API.
+     */
+    notTakingOrders?: boolean;
 }
 
 function isRecord(v: unknown): v is Record<string, unknown> {

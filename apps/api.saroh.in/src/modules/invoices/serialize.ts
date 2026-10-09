@@ -354,6 +354,11 @@ export interface InvoiceOnlineView {
     providerConnected: boolean;
     /** A link is out; the token itself is never read back. */
     payLinkActive: boolean;
+    /**
+     * When the link that is out was made (#870), or null when none is out
+     * or it was made before the date was kept. Never the token.
+     */
+    payLinkMadeAt: string | null;
     payments: InvoiceOnlinePayment[];
     /**
      * An autopay charge is under way on it (D13): "Autopay charge in

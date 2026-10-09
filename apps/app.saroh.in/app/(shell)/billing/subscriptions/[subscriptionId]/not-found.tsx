@@ -1,10 +1,10 @@
-import Link from "next/link";
+import { NotFound } from "@saroh/ui/not-found";
 
 import { PageContainer } from "@/components/shared/page-container";
 import { PaymentsCrumbs } from "@/components/subscriptions/payments-crumbs";
 
 /** The design's not-found: said plainly, with the way back. */
-export default function NotFound() {
+export default function NotFoundPage() {
     return (
         <PageContainer width="full" className="space-y-0 p-0 sm:p-0">
             <PaymentsCrumbs
@@ -14,19 +14,16 @@ export default function NotFound() {
                     label: "Subscriptions",
                 }}
             />
-            <div className="px-[22px] py-[60px] text-center">
-                <h1 className="font-display text-[18px] font-semibold">
-                    No subscription here
-                </h1>
-                <p className="mt-1 text-[13px] text-muted-foreground">
-                    It may have been removed, or the link is wrong.
-                </p>
-                <Link
-                    href="/billing/subscriptions"
-                    className="mt-2.5 inline-block text-[13px] font-semibold text-brand transition-colors hover:text-foreground active:text-muted-foreground"
-                >
-                    Back to subscriptions
-                </Link>
+            <div className="px-4 py-10 sm:px-6">
+                <NotFound
+                    variant="card"
+                    title="No subscription here"
+                    description="It may have been removed, or the link is wrong."
+                    primary={{
+                        href: "/billing/subscriptions",
+                        label: "Back to subscriptions",
+                    }}
+                />
             </div>
         </PageContainer>
     );

@@ -123,8 +123,8 @@ const FOR_TYPE: Record<FulfilmentType, string> = {
     LOCAL_DELIVERY: "for local delivery",
     SHIPPING: "to be shipped",
     DIGITAL: "to be sent digitally",
-    APPOINTMENT_IN_PERSON: "an appointment in person",
-    APPOINTMENT_ONLINE: "an appointment online",
+    APPOINTMENT_IN_PERSON: "a booking in person",
+    APPOINTMENT_ONLINE: "a booking online",
 };
 
 const said = (cents: number, currency: string) =>

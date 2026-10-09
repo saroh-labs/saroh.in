@@ -63,6 +63,24 @@ describe("catalogueRows (#531, #519)", () => {
         expect(row.lowStockAlert).toBe(5);
     });
 
+    it("marks a row past the plan's cut as paused (#800), and none without one", () => {
+        const old = {
+            ...catalogueProduct({ id: "p_old" }),
+            createdAt: "2026-01-01T00:00:00.000Z",
+        };
+        const kept = {
+            ...catalogueProduct({ id: "p_new" }),
+            createdAt: "2026-06-01T00:00:00.000Z",
+        };
+        const cut = { createdAt: "2026-06-01T00:00:00.000Z", id: "p_new" };
+        const rows = catalogueRows([old, kept], cut);
+        expect(rows.map((r) => [r.id, r.paused])).toEqual([
+            ["p_old", true],
+            ["p_new", false],
+        ]);
+        expect(catalogueRows([old]).map((r) => r.paused)).toEqual([false]);
+    });
+
     it("never merges two products, even with the same SKU", () => {
         const rows = catalogueRows([
             catalogueProduct({ id: "a" }),

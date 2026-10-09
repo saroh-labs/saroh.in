@@ -1,4 +1,4 @@
-// @covers accounts:/login app:/open app:/customers app:/commerce/customers site:/[slug] site:/account/messages api:organizations api:customer-workspace api:contacts api:customers api:orders api:subscriptions api:invoices api:class-packs api:bookings api:enquiry api:site-accounts pkg:site-blocks
+// @covers accounts:/login app:/open app:/customers app:/contacts app:/commerce/customers site:/[slug] site:/account/messages api:organizations api:customer-workspace api:contacts api:customers api:orders api:subscriptions api:invoices api:class-packs api:bookings api:enquiry api:site-accounts pkg:site-blocks
 import type { Page, TestInfo } from "@playwright/test";
 import { expect, test } from "@playwright/test";
 
@@ -139,7 +139,7 @@ test.describe("customer detail", () => {
     }) => {
         await signIn(page, RYE);
         await page.goto(`/commerce/customers/${PRIYA_STORE}`);
-        await expect(page).toHaveURL(new RegExp(`/customers/${PRIYA}$`));
+        await expect(page).toHaveURL(new RegExp(`/contacts/${PRIYA}$`));
         await expect(
             page.getByRole("heading", { name: "Priya Raman" }),
         ).toBeVisible();
@@ -174,8 +174,9 @@ test.describe("customer detail", () => {
     test("an unknown customer is not found", async ({ page }) => {
         await signIn(page, RYE);
         await page.goto("/customers/not_a_contact");
+        await expect(page).toHaveURL(/\/contacts\/not_a_contact$/);
         await expect(
-            page.getByRole("heading", { name: "This customer isn't here" }),
+            page.getByRole("heading", { name: "This person isn't here" }),
         ).toBeVisible();
     });
 
@@ -290,15 +291,18 @@ test.describe("customer detail, as a Member", () => {
             page.getByRole("heading", { name: "Priya Raman" }),
         ).toBeVisible();
         await expect(tab(page, /^Notes/)).toBeVisible();
-        // Sell › Customers follows contact:read (B16), a Member's included:
-        // the crumb leads back there, as the rail does.
+        // One person page (#869): the crumb leads to Contacts, which a
+        // Member's rail holds (contact:read).
         const crumbs = page.getByRole("navigation", { name: "Breadcrumb" });
         await expect(
-            crumbs.getByRole("link", { name: "Customers" }),
+            crumbs.getByRole("link", { name: "Contacts" }),
         ).toBeVisible();
         await expect(
-            crumbs.getByRole("link", { name: "Contacts" }),
+            crumbs.getByRole("link", { name: "Customers" }),
         ).toHaveCount(0);
+        // A Member reads no leads: no Leads or Enquiries tab.
+        for (const name of [/^Leads/, /^Enquiries/])
+            await expect(tab(page, name)).toHaveCount(0);
         for (const name of [/^Invoices/, /^Subscriptions/, /^Orders/])
             await expect(tab(page, name)).toHaveCount(0);
         await expect(page.getByRole("main")).not.toContainText("₹");
@@ -374,7 +378,8 @@ test.describe("needs attention", () => {
     }, testInfo) => {
         await signIn(page, NORTHWIND);
         const contact = await aContact(page, testInfo);
-        await page.goto(`/customers/${contact}`);
+        // The person page (#869); the old address redirects here.
+        await page.goto(`/contacts/${contact}`);
         await page
             .getByRole("region", { name: "Needs attention" })
             .getByRole("button", { name: "Add" })
@@ -385,7 +390,7 @@ test.describe("needs attention", () => {
         await sheet.getByRole("radio", { name: "Access" }).click();
         await sheet.getByLabel("Short label for the team").fill("Wheelchair");
         // The Server Action's POST never reaches the server.
-        await page.route(`**/customers/${contact}**`, (route) =>
+        await page.route(`**/contacts/${contact}**`, (route) =>
             route.request().method() === "POST"
                 ? route.abort()
                 : route.continue(),

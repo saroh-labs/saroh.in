@@ -253,6 +253,10 @@ describe("createR2Storage — port shape", () => {
         expect(typeof asPort.deleteObject).toBe("function");
         expect(typeof asPort.headObject).toBe("function");
     });
+
+    it("sees a browser's upload, so no bytes means nothing was stored", () => {
+        expect(setup().storage.seesUploads).toBe(true);
+    });
 });
 
 // The fake presigner above can't see what the real one leaves out: on 5 Oct

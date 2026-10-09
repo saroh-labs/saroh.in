@@ -5,7 +5,7 @@ import {
     NotFoundException,
 } from "@nestjs/common";
 import type { Prisma } from "@saroh/database";
-import { prisma } from "@saroh/database";
+import { ensureCalendarOnlyRole, prisma } from "@saroh/database";
 
 import type { OrganizationContext } from "../../common/types/organization-context";
 import { planMeter } from "../billing/metering.service";
@@ -16,7 +16,9 @@ import type { BookingPaymentView } from "../bookings/booking-payment";
 import { bookingPaymentView } from "../bookings/booking-payment";
 import type { BookingRulesValue } from "../bookings/booking-rules";
 import { bookingPaymentOf, loadBookingRules } from "../bookings/booking-rules";
+import { pausedDiaryIds } from "../bookings/diary-paused";
 import { loadOpeningHours } from "../bookings/opening-hours";
+import { ownDiaryOf } from "../bookings/own-diary";
 import { businessTimezone, dateOnly } from "../bookings/staff-availability";
 import type { ClosureView } from "./closures.service";
 import { closureViews } from "./closures.service";
@@ -78,6 +80,11 @@ export interface StaffView {
         allDay: boolean;
         reason: string | null;
     }[];
+    /**
+     * On the diary with no login and past the plan's team limit (#800):
+     * takes no new bookings; theirs are kept. Absent when not paused.
+     */
+    paused?: true;
 }
 
 /** Staff, and the zone their hours are wall-clock times in. */
@@ -135,8 +142,12 @@ type StaffRow = Prisma.StaffMemberGetPayload<{
     include: ReturnType<typeof staffInclude>;
 }>;
 
-function toView(row: StaffRow): StaffView {
+function toView(
+    row: StaffRow,
+    paused: ReadonlySet<string> = new Set(),
+): StaffView {
     return {
+        ...(paused.has(row.id) ? { paused: true as const } : {}),
         id: row.id,
         name: row.name,
         title: row.title,
@@ -187,19 +198,28 @@ export class StaffService {
     async list(ctx: OrganizationContext, now = new Date()): Promise<StaffList> {
         requireBookingPower(ctx, "service:read");
         const since = new Date(now.getTime() - HISTORY_DAYS * DAY);
-        const [rows, timezone, closures, opening] = await Promise.all([
+        // Calendar only sees its own diary (#868): themselves, not the
+        // team's hours, time off or reasons.
+        const own = await ownDiaryOf(prisma, ctx);
+        const [rows, timezone, closures, opening, paused] = await Promise.all([
             prisma.staffMember.findMany({
-                where: { organizationId: ctx.organizationId },
+                where: {
+                    organizationId: ctx.organizationId,
+                    ...(own ? { id: own.staffId ?? { in: [] } } : {}),
+                },
                 include: staffInclude(since),
                 orderBy: [{ status: "asc" }, { name: "asc" }],
             }),
             businessTimezone(prisma, ctx.organizationId),
             closureViews(ctx.organizationId, since),
             loadOpeningHours(prisma, ctx.organizationId),
+            // Past the plan's team limit (#800): the diary marks them and
+            // offers no new booking with them.
+            pausedDiaryIds(ctx.organizationId),
         ]);
         return {
             timezone,
-            staff: rows.map(toView),
+            staff: rows.map((row) => toView(row, paused)),
             closures,
             openingHours: opening?.windows ?? null,
         };
@@ -211,6 +231,11 @@ export class StaffService {
         now = new Date(),
     ): Promise<StaffView> {
         requireBookingPower(ctx, "service:read");
+        // Calendar only: their own, and nobody else's (#868).
+        const own = await ownDiaryOf(prisma, ctx);
+        if (own && own.staffId !== staffId) {
+            throw new NotFoundException("Staff member not found");
+        }
         return this.read(ctx, staffId, now);
     }
 
@@ -243,6 +268,9 @@ export class StaffService {
                         },
                     ),
                 });
+                // Whoever is on the diary can be given a login as Calendar
+                // only (#868): the business has the role from its first.
+                await ensureCalendarOnlyRole(tx, ctx.organizationId);
                 const person = await tx.staffMember.create({
                     data: {
                         organizationId: ctx.organizationId,

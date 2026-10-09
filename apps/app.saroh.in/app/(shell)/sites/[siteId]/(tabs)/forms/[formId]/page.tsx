@@ -5,6 +5,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 
 import { ViewerDate } from "@/components/shared/viewer-date";
+import { personHref } from "@/lib/contacts/person-href";
 import type { FormField, Submission } from "@/lib/forms/service";
 import { getForm, listSubmissions } from "@/lib/forms/service";
 import { requireSession } from "@/lib/session";
@@ -115,7 +116,9 @@ export default async function FormEntriesPage({
                                         <p className="truncate text-[13.5px] font-medium">
                                             {entry.contact ? (
                                                 <Link
-                                                    href={`/contacts/${entry.contact.id}`}
+                                                    href={personHref(
+                                                        entry.contact.id,
+                                                    )}
                                                     className="hover:underline"
                                                 >
                                                     {entry.contact.name}

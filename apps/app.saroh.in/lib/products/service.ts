@@ -34,6 +34,8 @@ export interface Product {
     /** When it was archived; null unless it is. */
     archivedAt?: string | null;
     category?: { id: string; name: string } | null;
+    /** When it was made; absent from an older API. */
+    createdAt?: string;
 }
 
 /** Which details the shop shows; a key missing means shown. */

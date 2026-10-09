@@ -23,6 +23,8 @@ export interface PlansRead {
     payOnline: boolean;
     /** Every way the provider can take autopay (D12); none when absent. */
     autopayMethods?: AutopayMethod[];
+    /** The business isn't taking orders on this site (#800). */
+    notTakingOrders?: boolean;
 }
 
 export async function plansFeed(
@@ -35,8 +37,19 @@ export async function plansFeed(
     // A failed read, Payments off or no plan on sale is an empty list (the
     // reader never throws), and an empty list draws nothing: the page still
     // serves.
-    const { plans, payOnline, autopayMethods = [] } = await read();
-    return { plans, joinHref, payOnline, autopayMethods };
+    const {
+        plans,
+        payOnline,
+        autopayMethods = [],
+        notTakingOrders,
+    } = await read();
+    return {
+        plans,
+        joinHref,
+        payOnline,
+        autopayMethods,
+        ...(notTakingOrders ? { notTakingOrders: true } : {}),
+    };
 }
 
 /**

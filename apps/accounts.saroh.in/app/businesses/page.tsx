@@ -16,10 +16,12 @@ import { SignOut } from "@/components/businesses/sign-out";
 import { getOnboardingUrl } from "@/lib/app-urls";
 import type { Business } from "@/lib/businesses";
 import {
+    businessBadge,
     consoleUrl,
     isStaff,
     listBusinesses,
     openBusinessUrl,
+    PAUSED_DETAIL,
     ROLE_LABEL,
     ROLE_SHORT,
 } from "@/lib/businesses";
@@ -28,14 +30,6 @@ export const metadata: Metadata = {
     title: "Your businesses | Saroh",
     description:
         "Choose a business to open, see your role in each, and manage your account.",
-};
-
-const STATE: Record<
-    string,
-    { label: string; variant: "warning" | "error" } | undefined
-> = {
-    SUSPENDED: { label: "Suspended", variant: "warning" },
-    PENDING_DELETION: { label: "Closing", variant: "error" },
 };
 
 /**
@@ -164,7 +158,7 @@ function Group({
             </p>
             <ul className="flex flex-col gap-2">
                 {businesses.map((business) => {
-                    const state = STATE[business.lifecycleStatus];
+                    const state = businessBadge(business);
                     return (
                         <li key={business.id}>
                             <Row
@@ -180,9 +174,11 @@ function Group({
                                 }
                                 title={business.name}
                                 detail={
-                                    business.roleLabel
-                                        ? `${business.roleLabel} — a role this business made`
-                                        : `${ROLE_LABEL[business.role]} · ${ROLE_SHORT[business.role]}`
+                                    business.paused
+                                        ? PAUSED_DETAIL
+                                        : business.roleLabel
+                                          ? `${business.roleLabel} — a role this business made`
+                                          : `${ROLE_LABEL[business.role]} · ${ROLE_SHORT[business.role]}`
                                 }
                                 badge={state}
                             />

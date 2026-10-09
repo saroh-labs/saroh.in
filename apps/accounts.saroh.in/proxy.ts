@@ -39,6 +39,12 @@ async function proxy(req: NextRequest) {
         return NextResponse.redirect(new URL("/login", req.url));
     }
 
+    // Accounts has no page at "/": sign-in lands on /apps, so the bare
+    // address goes there too rather than to the 404.
+    if (nextUrl.pathname === "/") {
+        return NextResponse.redirect(new URL("/apps", req.url));
+    }
+
     return NextResponse.next();
 }
 

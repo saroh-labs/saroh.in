@@ -1,5 +1,6 @@
 import { PartialNotice } from "@saroh/ui/data-state";
 
+import { PausedNote } from "@/components/billing/paused-banner";
 import { PlanLimitNotice } from "@/components/billing/plan-limit-notice";
 import { CollectionsPanel } from "@/components/commerce/collections/collections-panel";
 import { PageContainer } from "@/components/shared/page-container";
@@ -8,7 +9,9 @@ import { CatalogueScreen } from "@/components/stores/catalogue-screen";
 import type { ProductsTab } from "@/components/stores/products-tabs";
 import { ProductsTabs } from "@/components/stores/products-tabs";
 import { ReviewsView } from "@/components/stores/reviews-view";
+import { rowNotice } from "@/lib/billing/access";
 import { planMeter } from "@/lib/billing/meter";
+import { activeCut, pausedListWords } from "@/lib/billing/paused";
 import { listCollections } from "@/lib/collections/service";
 import { resolveActiveOrganization } from "@/lib/organizations/service";
 import { reviewEmailNote } from "@/lib/product-reviews/describe";
@@ -27,7 +30,7 @@ import {
 } from "@/lib/products/list-query";
 import type { CataloguePage } from "@/lib/products/service";
 import { listCataloguePage, listCategories } from "@/lib/products/service";
-import { billingAccessOrNull } from "@/lib/saroh-billing/service";
+import { billingAccessOrNull, pausedOrNull } from "@/lib/saroh-billing/service";
 import { requireSession } from "@/lib/session";
 import { getStockTracking } from "@/lib/stock/service";
 import { listBusinessStores } from "@/lib/stores/service";
@@ -93,7 +96,7 @@ export default async function CataloguePage({
         query.storefront = null;
     }
 
-    const [page, reviews, tracking, categories, collections, access] =
+    const [page, reviews, tracking, categories, collections, access, paused] =
         await Promise.all([
             stores.length > 0
                 ? listCataloguePage(
@@ -112,6 +115,8 @@ export default async function CataloguePage({
             // The plan's product limit, shown before the work (UX-036);
             // unread, nothing is shown and the API still refuses.
             billingAccessOrNull(),
+            // What a lower plan paused (#800): the rows' tags and why.
+            pausedOrNull(),
         ]);
     const choices = choicesFrom(categories, collections);
 
@@ -202,6 +207,7 @@ export default async function CataloguePage({
 
     const ratings = canReadReviews ? await reviewSummary().catch(() => []) : [];
     const canWrite = canWriteProducts(organization);
+    const pausedCut = activeCut(paused, "products");
 
     return (
         <PageContainer width="full">
@@ -213,13 +219,33 @@ export default async function CataloguePage({
                 notice={
                     <>
                         {notice}
-                        <PlanLimitNotice moduleId="products" />
+                        {pausedCut ? (
+                            <PausedNote className="mb-3">
+                                {pausedListWords(
+                                    "product",
+                                    paused?.products.count ?? 0,
+                                )}
+                            </PausedNote>
+                        ) : null}
+                        {/* With products paused (#800) the note above says
+                            the limit and links to Plan and billing: the
+                            "reached your limit" card would say it again. */}
+                        {pausedCut ? null : (
+                            <PlanLimitNotice moduleId="products" />
+                        )}
                     </>
                 }
                 ratings={ratings}
                 choices={choices}
                 canWrite={canWrite}
                 meter={canWrite ? planMeter(access, "products") : null}
+                // The banner below the tabs says the limit from 80%, or the
+                // paused note does (#800); the header then doesn't say it
+                // again (#874). New product stays off at the limit.
+                limitBannerShown={
+                    rowNotice(access, "products").on || pausedCut !== null
+                }
+                pausedCut={pausedCut}
                 canStock={canStockProducts(organization)}
                 collectionCount={collections ? collections.length : null}
                 collectionsPanel={

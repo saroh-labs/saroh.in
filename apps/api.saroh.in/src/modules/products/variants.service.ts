@@ -6,6 +6,7 @@ import {
 } from "@nestjs/common";
 import { prisma } from "@saroh/database";
 
+import { enqueuePageRevalidation } from "../sites/page-cache-revalidate";
 import { variantHasHistory, variantHasStock } from "../stock/stock-words";
 import { recordEntry } from "../stock/stock.service";
 import { COUNTING_ROWS } from "../stock/tracking";
@@ -82,11 +83,7 @@ export class VariantsService {
         dto: CreateVariantDto,
     ) {
         return this.createIn(
-            await this.products.access.writeViaStore(
-                storeId,
-                userId,
-                productId,
-            ),
+            await this.products.access.editViaStore(storeId, userId, productId),
             productId,
             dto,
         );
@@ -172,11 +169,7 @@ export class VariantsService {
         dto: UpdateVariantDto,
     ) {
         return this.updateIn(
-            await this.products.access.writeViaStore(
-                storeId,
-                userId,
-                productId,
-            ),
+            await this.products.access.editViaStore(storeId, userId, productId),
             productId,
             variantId,
             dto,
@@ -184,7 +177,7 @@ export class VariantsService {
     }
 
     async updateIn(
-        _scope: ProductScope,
+        scope: ProductScope,
         productId: string,
         variantId: string,
         dto: UpdateVariantDto,
@@ -210,6 +203,12 @@ export class VariantsService {
                     imageId: dto.imageId ?? null,
                 },
             });
+            // Its price is on the product's page and its cards (#863).
+            await enqueuePageRevalidation(prisma, {
+                cause: "product",
+                productIds: [productId],
+                organizationId: scope.organizationId,
+            });
             return { id: variantId };
         } catch (error) {
             if (isUniqueViolation(error))
@@ -226,11 +225,7 @@ export class VariantsService {
         dto: ReorderVariantsDto,
     ) {
         return this.reorderIn(
-            await this.products.access.writeViaStore(
-                storeId,
-                userId,
-                productId,
-            ),
+            await this.products.access.editViaStore(storeId, userId, productId),
             productId,
             dto,
         );
@@ -275,11 +270,7 @@ export class VariantsService {
         userId: string,
     ) {
         return this.removeIn(
-            await this.products.access.writeViaStore(
-                storeId,
-                userId,
-                productId,
-            ),
+            await this.products.access.editViaStore(storeId, userId, productId),
             productId,
             variantId,
         );

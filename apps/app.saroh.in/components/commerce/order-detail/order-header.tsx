@@ -58,7 +58,7 @@ export function OrderHeading({
     age: { text: string; late: boolean; rule: string | null } | null;
     /**
      * How it is fulfilled, in words, where the type says more than
-     * its type's word ("Pick-up at Hill Road"): "Appointment, in person · next visit today,
+     * its type's word ("Pick-up at Hill Road"): "Booking, in person · next visit today,
      * 18:00" (B14).
      */
     how?: string;

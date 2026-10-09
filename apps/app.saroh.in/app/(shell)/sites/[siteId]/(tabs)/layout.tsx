@@ -1,12 +1,15 @@
 import { notFound } from "next/navigation";
 import type { ReactNode } from "react";
 
+import { PausedNote } from "@/components/billing/paused-banner";
 import { navRoleCan } from "@/components/shared/nav-items";
 import { PageContainer } from "@/components/shared/page-container";
 import { WebsiteHeader } from "@/components/sites/website-header";
+import { pausedSiteIds, pausedWords } from "@/lib/billing/paused";
 import { listPosts } from "@/lib/content/service";
 import { listForms } from "@/lib/forms/service";
 import { resolveActiveOrganization } from "@/lib/organizations/service";
+import { pausedOrNull } from "@/lib/saroh-billing/service";
 import { requireSession } from "@/lib/session";
 import { getSite, listSites } from "@/lib/sites/service";
 import { siteAddressOf } from "@/lib/sites/share-links";
@@ -36,19 +39,23 @@ export default async function WebsiteTabsLayout({
     const { siteId } = await params;
     await requireSession();
 
-    const [site, sites, organization, posts, webAddress] = await Promise.all([
-        getSite(siteId),
-        listSites().catch(() => []),
-        resolveActiveOrganization(),
-        // A count is decoration on a tab: without it the tab still opens,
-        // and the Posts tab says for itself what went wrong.
-        listPosts(siteId).catch(() => null),
-        // Where customers reach the business's website — its verified
-        // domain, when it has one (DEC-069, L8). Null falls back to the
-        // site's own subdomain.
-        readWebAddressLinks(),
-    ]);
+    const [site, sites, organization, posts, webAddress, paused] =
+        await Promise.all([
+            getSite(siteId),
+            listSites().catch(() => []),
+            resolveActiveOrganization(),
+            // A count is decoration on a tab: without it the tab still opens,
+            // and the Posts tab says for itself what went wrong.
+            listPosts(siteId).catch(() => null),
+            // Where customers reach the business's website — its verified
+            // domain, when it has one (DEC-069, L8). Null falls back to the
+            // site's own subdomain.
+            readWebAddressLinks(),
+            // Websites a move to a lower plan paused (#800): a tag and why.
+            pausedOrNull(),
+        ]);
     if (!site) notFound();
+    const pausedSites = pausedSiteIds(paused);
 
     // Forms follow `form:read`, which not everyone who can open the site has
     // (#385). The count is this site's entries; a failed read leaves the tab
@@ -72,8 +79,10 @@ export default async function WebsiteTabsLayout({
     ).map((s) => ({
         id: s.id,
         name: s.name.trim() || "Untitled site",
-        state: siteState(s, { domainState: site.can.edit }),
+        state: siteState(s, { domainState: site.can.manageDomain }),
+        paused: pausedSites.includes(s.id),
     }));
+    const thisPaused = pausedSites.includes(site.id);
 
     return (
         <PageContainer width="full">
@@ -88,8 +97,9 @@ export default async function WebsiteTabsLayout({
                         state: siteState(
                             sites.find((s) => s.id === site.id) ?? site,
                             // Domain state only for whoever can fix it.
-                            { domainState: site.can.edit },
+                            { domainState: site.can.manageDomain },
                         ),
+                        paused: thisPaused,
                     }}
                     sites={summaries}
                     address={
@@ -105,6 +115,9 @@ export default async function WebsiteTabsLayout({
                     postCount={posts?.length ?? null}
                     formEntries={formEntries}
                 />
+                {thisPaused ? (
+                    <PausedNote>{pausedWords("site")}</PausedNote>
+                ) : null}
                 {children}
             </div>
         </PageContainer>

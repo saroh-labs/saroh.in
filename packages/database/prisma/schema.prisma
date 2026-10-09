@@ -483,6 +483,12 @@ model Membership {
   // `member:role:update`, within their own reach, never on themselves.
   extraActions String[] @default([])
 
+  // When they joined the business (#800): who stays when a move to a lower
+  // plan leaves fewer seats — the owner, then the earliest to join. Rows
+  // from before the column were backfilled from the invitation they
+  // accepted, else the later of the account's and the business's start.
+  createdAt DateTime @default(now())
+
   @@unique([organizationId, userId])
   @@index([organizationId])
 }
@@ -594,6 +600,13 @@ model OrganizationInvitation {
   // Held here rather than as rows because the invitee has no User row yet.
   siteIds String[]
 
+  // The person on the diary this invite gives a login to (#868): someone
+  // taking bookings with no login (DEC-105). Accepting links them to the new
+  // membership; while it is open they are counted once, as that diary
+  // person. SetNull: a diary person deleted leaves an ordinary invite.
+  staffId     String?
+  staffMember StaffMember? @relation(fields: [staffId], references: [id], onDelete: SetNull)
+
   tokenHash String @unique // sha256 of the token carried in the accept link
   status    String @default("PENDING") // PENDING, ACCEPTED, EXPIRED, REVOKED
 
@@ -608,6 +621,7 @@ model OrganizationInvitation {
 
   @@unique([organizationId, email]) // one live invite per email per org
   @@index([organizationId])
+  @@index([staffId])
 }
 
 // ============================================================================
@@ -3690,6 +3704,18 @@ model Domain {
   lastCheckedAt   DateTime?
   lastCheckResult String?
 
+  // Hosting (#859): once VERIFIED, the hostname is registered as a custom
+  // hostname on the merchant-sites zone (Cloudflare for SaaS). `hostingId` is
+  // Cloudflare's custom-hostname id; `hostingStatus` is PENDING (registered,
+  // waiting for the CNAME and certificate), ACTIVE (serving), FAILED
+  // (Cloudflare reports a problem) or REGISTER_FAILED (the call failed; the
+  // next check retries). `hostingError` says in words what last went wrong,
+  // null once a call works. A failure here never undoes the verification.
+  hostingId        String?
+  hostingStatus    String?
+  hostingError     String?
+  hostingCheckedAt DateTime?
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -4413,6 +4439,8 @@ model StaffMember {
   timeOff    StaffTimeOff[]
   extraHours StaffExtraHours[]
   bookings   Booking[]
+  // Invites that would give them a login (#868).
+  invitations OrganizationInvitation[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -5271,8 +5299,9 @@ model WaitlistSignup {
   kind         String?
   // Optional, free text the visitor typed.
   city         String?
-  // The visitor's country as the site's host saw their connection (Vercel's
-  // `x-vercel-ip-country`, ISO 3166-1 alpha-2, e.g. "IN"), never asked. Null
+  // The visitor's country as the site's host saw their connection
+  // (Cloudflare's `cf-ipcountry`; Vercel's `x-vercel-ip-country` before
+  // 8 Oct 2026; ISO 3166-1 alpha-2, e.g. "IN"), never asked. Null
   // when it wasn't known, and on entries before 5 Oct 2026.
   country      String?
   // The plan a "Get early access · ‹Plan›" button named, if one did.
@@ -5901,7 +5930,10 @@ model Invoice {
   // The pay link (U13): the SHA-256 of a random token, never the token.
   // Minted when a link is first asked for, replaced by a new one, cleared on
   // void and when the contact is deleted. Null means no link works.
-  payTokenHash String? @unique
+  // `payLinkCreatedAt` is when the current token was made, set and cleared
+  // with it (#870): the workspace names the date of a link it can't show.
+  payTokenHash     String?   @unique
+  payLinkCreatedAt DateTime?
 
   lines          InvoiceLine[]
   paymentIntents PaymentIntent[]

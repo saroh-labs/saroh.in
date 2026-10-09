@@ -1,7 +1,4 @@
-import { Button } from "@saroh/ui/button";
-import { EmptyState } from "@saroh/ui/data-state";
-import { SearchX } from "lucide-react";
-import Link from "next/link";
+import { NotFound } from "@saroh/ui/not-found";
 
 import { PageContainer } from "@/components/shared/page-container";
 
@@ -12,16 +9,11 @@ import { PageContainer } from "@/components/shared/page-container";
 export default function OrderNotFound() {
     return (
         <PageContainer>
-            <EmptyState
-                outline="solid"
-                icon={<SearchX />}
+            <NotFound
+                variant="card"
                 title="No order here"
-                description="It may be in another business, or the number is mistyped."
-                action={
-                    <Button asChild variant="outline">
-                        <Link href="/commerce/orders">Back to orders</Link>
-                    </Button>
-                }
+                description="It may have been deleted, or it belongs to another business. Check the number if you typed it."
+                primary={{ href: "/commerce/orders", label: "Back to orders" }}
             />
         </PageContainer>
     );

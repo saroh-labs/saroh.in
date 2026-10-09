@@ -39,6 +39,31 @@ There is no client-side server-state library and no global client store.
 - **Current** — **Never trust the client for the organization.** The header is a
   hint; the API derives membership from the session.
 
+## Merchant sites: the page cache — **Current** (#863)
+
+`saroh.app` on its Worker keeps rendered public pages
+(`apps/saroh.app/lib/page-cache/`, switch `SITE_PAGE_CACHE`), so a page you
+add or change there may be served to the next visitor without rendering.
+
+- **Only a page the render vouches for is kept.** The site layout tags each
+  page with its site (`pageCacheRules`); a page that reads products tags
+  them (`listsProducts`, `showsProduct`). Untagged pages are never kept.
+- **Anything about one visitor, or a read that failed, refuses.** Call
+  `dontCachePage(reason)` (`lib/page-cache/site-rules.ts`) when a page shows
+  a signed-in customer's data or an "unavailable" state drawn from a failed
+  read. The Worker already passes by private paths
+  (`lib/private-paths.ts`), previews, review links, test hosts and any
+  request with a session cookie (`lib/page-cache/request-rules.ts`); a new
+  private path goes in `private-paths.ts`.
+- **A live read outside the publication shortens the page's life.** The
+  head (trackers, codes; DEC-108) keeps it 60 seconds at most
+  (`keepPageAtMost`). Everything else lives `SITE_PAGE_CACHE_TTL` (five
+  minutes) unless the API revalidates its tags: a new API write that
+  changes what a published page shows queues `site.pages.revalidate`
+  (`backend-jobs.md` → Site page cache).
+- **Outside the Worker** (`next dev`, a test) none of it runs: pages render
+  per request, as before.
+
 ## If you think you need React Query
 
 You probably need a Server Component read plus `router.refresh()`. Genuine

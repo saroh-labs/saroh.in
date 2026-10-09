@@ -1,3 +1,4 @@
+import { moduleName } from "@/lib/modules/names";
 import { rolledOut, rolledOutKeys } from "@/lib/modules/rollout";
 import type { ModuleView } from "@/lib/modules/schema";
 import type { OrganizationKind } from "@/lib/organizations/kind";
@@ -118,17 +119,8 @@ export interface InvoiceJobFacts {
  * says Contacts, and a toast pointing at a row that does not exist sends the
  * merchant looking for nothing.
  */
-const SIDEBAR_NAME: Partial<Record<string, string>> = {
-    CRM: "Contacts",
-    COMMERCE: "Sell",
-    APPOINTMENTS: "Bookings",
-    WEBSITE: "Website",
-};
-
 export function sidebarName(modules: ModuleView[], key: string): string {
-    return (
-        SIDEBAR_NAME[key] ?? modules.find((m) => m.key === key)?.label ?? key
-    );
+    return moduleName(key, modules);
 }
 
 /**

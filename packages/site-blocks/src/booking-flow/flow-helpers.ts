@@ -52,8 +52,8 @@ export function zoneName(zone: string): string {
 export function kicker(services: BookingService[]): string {
     const classes = services.some((s) => s.kind === "class");
     const ones = services.some((s) => s.kind === "one");
-    if (classes && ones) return "Classes and appointments";
-    return classes ? "Classes" : "Appointments";
+    if (classes && ones) return "Classes and bookings";
+    return classes ? "Classes" : "Bookings";
 }
 
 /**
@@ -83,11 +83,11 @@ export function nextChosenText(start: BookingStart, zone: string): string {
 
 // ── The header's facts (E6) ─────────────────────────────────────────────
 
-/** The page's title: a session where classes are offered, else an appointment. */
+/** The page's title: a session where classes are offered, else a booking. */
 export function pageTitle(services: BookingService[]): string {
     return services.some((s) => s.kind === "class")
         ? "Book your next session"
-        : "Book your appointment";
+        : "Make a booking";
 }
 
 /** What the header says about the business, from G8's public visit read. */
