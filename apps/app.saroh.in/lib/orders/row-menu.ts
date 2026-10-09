@@ -1,6 +1,7 @@
 import type { OrderRow } from "./business-service";
 import { STEP_LABEL } from "./lifecycle";
 import { orderHref } from "./links";
+import { onlinePaymentWords } from "./online-payment";
 import type { FulfilmentType, KitchenStage, OrderRead } from "./read";
 
 /**
@@ -332,11 +333,13 @@ export function quickSteps(
 
 /**
  * The quick view's Payment line, only with money: "Refund on its way"
- * (B9), "Refunded", "₹480 not
- * paid yet", "Payment failed", "Paid by hand", "Partly refunded" or "Paid".
+ * (B9), "Refunded", "Waiting for Razorpay · ₹480 to collect" (#122),
+ * "₹480 not paid yet", "Payment failed", "Paid by hand", "Partly refunded"
+ * or "Paid".
  */
 export function quickPayment(
-    order: Pick<OrderRead, "paymentStatus" | "refundStanding" | "money">,
+    order: Pick<OrderRead, "paymentStatus" | "refundStanding" | "money"> &
+        Partial<Pick<OrderRead, "onlinePayment">>,
     format: (amount: string) => string,
 ): string | null {
     const m = order.money;
@@ -344,6 +347,12 @@ export function quickPayment(
     // Accepted by the provider, not confirmed yet (B9, DEC-067).
     if ((m.refundsOnTheWay ?? []).length > 0) return "Refund on its way";
     if (order.refundStanding === "REFUNDED") return "Refunded";
+    // Failed, waiting for the provider or not finished (#122): the API
+    // sends it only while something is owed.
+    if (order.onlinePayment) {
+        const words = onlinePaymentWords(order.onlinePayment, true);
+        return `${words.word} · ${format(m.due)} to collect`;
+    }
     if (order.paymentStatus === "FAILED") {
         return `Payment failed · ${format(m.due)} to collect`;
     }

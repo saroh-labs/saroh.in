@@ -16,6 +16,7 @@ import {
     rowProgress,
     rowSubline,
 } from "@/lib/orders/list-row";
+import { onlinePaymentLine } from "@/lib/orders/online-payment";
 
 import { AgeText, StepBar, StepPill } from "./step-pill";
 
@@ -127,7 +128,38 @@ function rowView(row: OrderRow, showStore: boolean) {
         age: rowAge(row),
         money: rowMoney(row),
         attention: rowAttention(row),
+        // "Payment failed — send a new pay link" (#122); a pay link is
+        // the money reader's, so the kitchen reads "not paid yet".
+        payment: onlinePaymentLine(row.onlinePayment, row.total !== undefined),
     };
+}
+
+/**
+ * Where its online payment stands (#122), in words: something to act on in
+ * the unpaid line's tone, a wait in the muted one.
+ */
+function OnlinePaymentText({
+    payment,
+    className,
+}: {
+    payment: ReturnType<typeof onlinePaymentLine>;
+    className?: string;
+}) {
+    if (!payment) return null;
+    return (
+        <div
+            data-online-payment
+            className={cn(
+                "text-pretty",
+                payment.tone === "act"
+                    ? "font-bold text-destructive-subtle-foreground"
+                    : "font-semibold text-muted-foreground",
+                className,
+            )}
+        >
+            {payment.text}
+        </div>
+    );
 }
 
 /** The design's Needs attention tag; words, never colour alone. */
@@ -256,6 +288,10 @@ export function OrderGridRow({
                         {v.money.unpaid}
                     </div>
                 ) : null}
+                <OnlinePaymentText
+                    payment={v.payment}
+                    className="text-[11.5px]"
+                />
             </div>
             <div className="min-w-0 truncate text-[12.5px] text-neutral-700 dark:text-muted-foreground">
                 <BusinessDate iso={row.placedAt} variant="moment" />
@@ -399,10 +435,18 @@ export function OrderCard({
                 </>
             }
             footer={
-                v.money.unpaid ? (
-                    <div className="text-[12px] font-bold text-destructive-subtle-foreground">
-                        {v.money.unpaid}
-                    </div>
+                v.money.unpaid || v.payment ? (
+                    <>
+                        {v.money.unpaid ? (
+                            <div className="text-[12px] font-bold text-destructive-subtle-foreground">
+                                {v.money.unpaid}
+                            </div>
+                        ) : null}
+                        <OnlinePaymentText
+                            payment={v.payment}
+                            className="text-[12px]"
+                        />
+                    </>
                 ) : null
             }
         />
