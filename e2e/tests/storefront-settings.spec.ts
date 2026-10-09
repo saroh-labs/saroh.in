@@ -70,6 +70,47 @@ test.describe("Locations (DEC-069)", () => {
         );
     });
 
+    test("the tabs keep the open one in the address, and Back returns to the last", async ({
+        page,
+    }) => {
+        await signIn(page);
+        await page.goto(`/open/${ORG}`);
+        const one = (await locations(page)).at(0);
+        expect(one).toBeDefined();
+        if (!one) return;
+        await page.goto(`/commerce/locations?storefront=${one.id}`);
+
+        const tabs = page.getByRole("tablist", { name: "Location settings" });
+        const placeTab = tabs.getByRole("tab", { name: "The place" });
+        await expect(placeTab).toHaveAttribute("aria-selected", "true");
+        // Pressed until it answers: a press before hydration does nothing.
+        await expect(async () => {
+            await tabs.getByRole("tab", { name: "Payments" }).click();
+            await expect(page).toHaveURL(/[?&]section=payments/, {
+                timeout: 2_000,
+            });
+        }).toPass({ timeout: 20_000 });
+        await expect(
+            page.getByRole("tabpanel").getByText("Online payments"),
+        ).toBeVisible();
+        // The title and the readiness line stay above every tab.
+        await expect(
+            page.getByRole("heading", { level: 1, name: one.name }),
+        ).toBeVisible();
+
+        await page.goBack();
+        await expect(page).not.toHaveURL(/section=/);
+        await expect(placeTab).toHaveAttribute("aria-selected", "true");
+
+        // A link straight to a tab opens it.
+        await page.goto(
+            `/commerce/locations?storefront=${one.id}&section=delivery`,
+        );
+        await expect(
+            tabs.getByRole("tab", { name: "Delivery" }),
+        ).toHaveAttribute("aria-selected", "true");
+    });
+
     test("the rail names the row Location, or Locations once there are several", async ({
         page,
     }, testInfo) => {
@@ -163,7 +204,10 @@ test.describe(
                     kind: "SHOP",
                     fulfilmentTypes: ["PICKUP"],
                 });
-                await page.goto(`/commerce/locations?storefront=${first.id}`);
+                // The Delivery tab, opened by its address.
+                await page.goto(
+                    `/commerce/locations?storefront=${first.id}&section=delivery`,
+                );
                 const card = page.getByRole("region", { name: "Delivery" });
                 await expect(
                     card.getByRole("switch", { name: "Pick-up", exact: true }),
