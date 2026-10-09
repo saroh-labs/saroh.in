@@ -622,6 +622,66 @@ describe("starting a checkout and paying (G13)", () => {
         ).toBe(1);
     });
 
+    it("says online payment is down when the stored keys won't open, and a retry pays once they do", async () => {
+        // A seeded business holds placeholder keys that don't open under
+        // the server's key: a bare 500 before, with the order already made.
+        const s = await shop();
+        const row = await prisma.merchantPaymentProvider.findUniqueOrThrow({
+            where: {
+                organizationId_provider: {
+                    organizationId: s.organizationId,
+                    provider: "RAZORPAY",
+                },
+            },
+        });
+        await prisma.merchantPaymentProvider.update({
+            where: { id: row.id },
+            data: { credentialsAuthTag: "AAA=" },
+        });
+        const { token } = await signIn(s.host);
+        const key = `unreadable_${next()}`.replace(/[^A-Za-z0-9_-]/g, "_");
+
+        const res = await start(s, token, { key });
+
+        expect(res.status).toBe(503);
+        expect(errorOf(res.body)).toMatchObject({
+            message:
+                "The business can't take payment online right now. Please try again later, or pay them another way.",
+            details: { reason: "provider-unavailable" },
+        });
+        // The checkout waits unpaid, as one nobody paid for: nothing was
+        // charged, no intent exists, Orders leaves it out, and its close
+        // is queued.
+        const order = await prisma.order.findFirstOrThrow({
+            where: { storeId: s.storeId },
+            select: { id: true, status: true, paymentStatus: true },
+        });
+        expect(order).toMatchObject({
+            status: "PENDING",
+            paymentStatus: "UNPAID",
+        });
+        expect(
+            await prisma.paymentIntent.count({ where: { orderId: order.id } }),
+        ).toBe(0);
+        expect(
+            await prisma.job.count({
+                where: {
+                    type: CLOSE_ABANDONED_CHECKOUT_TYPE,
+                    payload: { equals: { orderId: order.id } },
+                },
+            }),
+        ).toBe(1);
+
+        // The keys are fixed; the same bag's retry pays the same order.
+        await prisma.merchantPaymentProvider.update({
+            where: { id: row.id },
+            data: { credentialsAuthTag: row.credentialsAuthTag },
+        });
+        const again = await start(s, token, { key });
+        expect(again.status).toBe(201);
+        expect(again.body.orderId).toBe(order.id);
+    });
+
     it("refuses to start with no provider, or a paused storefront, and makes nothing", async () => {
         for (const s of [
             await shop({ provider: false }),

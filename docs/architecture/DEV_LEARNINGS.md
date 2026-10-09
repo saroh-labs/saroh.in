@@ -34,6 +34,38 @@ row an earlier seed left, never touching one with real keys. The DISABLED
 Razorpay row stays: it is honest anywhere.
 **Check**: `stand-in-providers.test.ts`. Re-seed the dev environment to
 clear its old rows.
+## API — a site checkout answered 500 with only its request line in the log
+
+**Symptom**: 9 Oct 2026, on dev: `POST /public/sites/:siteId/checkout`
+answered 500, the shopper read "Something went wrong on our side", and the
+API log showed only the `http_request` line at error level, with no cause.
+**Cause**: the business's stored payment keys didn't open under the
+server's key (seeded placeholder credentials), so `decryptSecret` threw
+inside `createIntentFor`, outside the try that turns a failed provider call
+into the handled 503 (UX-012). The checkout order was already written,
+PENDING and unpaid. On logging: `AllExceptionsFilter` does call
+`reportError`, which writes `unhandled_exception`; a reproduction with a
+real crypto error wrote it, but with `errorName: "object"` and no stack,
+because `reportError` read the error with `instanceof Error`, which is false
+for an error from another realm (Node's crypto binding under Jest's VM).
+Why the dev log stream showed no cause line at all was not confirmed from
+the code.
+**Fix**: keys that won't open are now the same handled 503 as a failed
+provider (`credentialsUnreadable` in `payments/provider-keys.ts`, reason
+`provider-unavailable`), logged at ERROR with the provider and business,
+never the secret; a credential blob that isn't JSON no longer quotes itself
+in a parse error. The PENDING order is left as an abandoned checkout:
+nothing was charged, a retry with the same key pays it, and its close job
+ends it after a day. The site says "The business can't take payment online
+right now…" (`payments-down`) instead of our trouble. `reportError` reads
+errors by shape (`errorFacts`), keeps name, message, code and stack with
+emails, numbers and tokens masked, and the visitor's address headers are
+redacted; `structuredLogger` can no longer throw on a field JSON can't hold.
+**Check**: `all-exceptions.filter.spec.ts` → "an unexpected error";
+`payments.service.spec.ts` → "keys that won't open"; `public-checkout.db.spec.ts`
+→ "says online payment is down when the stored keys won't open".
+**Category**: observability · payments ·
+`apps/api.saroh.in/src/common/observability/report-error.ts`
 
 ---
 

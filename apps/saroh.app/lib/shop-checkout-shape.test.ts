@@ -163,6 +163,26 @@ describe("the API's answers", () => {
     it("says each refusal in the page's words", () => {
         expect(problemOf(401, {}).reason).toBe("signed-out");
         expect(problemOf(403, {}).reason).toBe("cant-order");
+        // The business's payments down: said as that, not as our trouble.
+        for (const reason of [
+            "provider-unavailable",
+            "provider-keys-refused",
+        ]) {
+            expect(
+                problemOf(503, {
+                    error: {
+                        message: "Internal words",
+                        details: { reason },
+                    },
+                }),
+            ).toEqual({
+                ok: false,
+                reason: "payments-down",
+                message:
+                    "The business can't take payment online right now. Please try again later, or pay them another way.",
+            });
+        }
+        expect(problemOf(503, {}).reason).toBe("error");
         expect(
             problemOf(409, {
                 error: {

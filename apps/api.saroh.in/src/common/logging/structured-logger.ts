@@ -21,7 +21,21 @@ function write(level: LogLevel, event: string, fields: LogFields): void {
         correlationId: getCorrelationId(),
         ...fields,
     };
-    const line = `${JSON.stringify(record)}\n`;
+    // A field JSON can't hold (a BigInt, a cycle) must not throw out of a
+    // logger: the exception filter logs before it answers, so a throw here
+    // would cost the line and the response. The event and id still go out.
+    let line: string;
+    try {
+        line = `${JSON.stringify(record)}\n`;
+    } catch {
+        line = `${JSON.stringify({
+            timestamp: record.timestamp,
+            level,
+            event,
+            correlationId: record.correlationId,
+            logError: "Fields could not be written as JSON",
+        })}\n`;
+    }
     if (level === "error") {
         process.stderr.write(line);
     } else {

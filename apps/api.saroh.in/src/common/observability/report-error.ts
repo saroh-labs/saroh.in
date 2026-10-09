@@ -51,13 +51,60 @@ export function setErrorSink(next: ErrorSink | null): void {
 
 const MAX_MESSAGE = 500;
 
-/** Mask what an error message should never carry to a third party. */
-export function scrubMessage(message: string): string {
-    return message
+/** Mask what an error's words should never carry: emails, numbers, tokens. */
+function scrub(text: string): string {
+    return text
         .replace(/[\w.+-]+@[\w-]+(\.[\w-]+)+/g, "[email]")
         .replace(/\bBearer\s+[\w.~+/-]+=*/gi, "Bearer [token]")
-        .replace(/\+?\d[\d\s-]{8,}\d/g, "[number]")
-        .slice(0, MAX_MESSAGE);
+        .replace(/\+?\d[\d\s-]{8,}\d/g, "[number]");
+}
+
+/** Mask what an error message should never carry to a third party. */
+export function scrubMessage(message: string): string {
+    return scrub(message).slice(0, MAX_MESSAGE);
+}
+
+/** What can be said about a thrown value. */
+export interface ErrorFacts {
+    name: string;
+    message: string;
+    stack?: string;
+    code?: string;
+}
+
+/**
+ * A thrown value's name, message, stack and code, read by shape rather than
+ * `instanceof Error`. That check is false for an error made in another realm
+ * (a VM context, as under Jest, or a native binding's), and such an error
+ * was logged with its type, "object", for a name and no stack at all. A
+ * value that isn't error-shaped is never stringified: it may be a body.
+ */
+export function errorFacts(exception: unknown): ErrorFacts {
+    if (
+        typeof exception === "object" &&
+        exception !== null &&
+        typeof (exception as { message?: unknown }).message === "string"
+    ) {
+        const e = exception as {
+            name?: unknown;
+            message: string;
+            stack?: unknown;
+            code?: unknown;
+        };
+        return {
+            name: typeof e.name === "string" ? e.name : "Error",
+            message: e.message,
+            ...(typeof e.stack === "string" ? { stack: e.stack } : {}),
+            ...(typeof e.code === "string" ? { code: e.code } : {}),
+        };
+    }
+    return {
+        name: "Error",
+        message:
+            typeof exception === "string"
+                ? exception
+                : "A non-Error value was thrown",
+    };
 }
 
 /** The path alone: no query string, where tokens and emails turn up. */
@@ -70,18 +117,11 @@ export function toServerErrorEvent(
     exception: unknown,
     ctx: ServerErrorContext,
 ): ServerErrorEvent {
-    const error =
-        exception instanceof Error
-            ? exception
-            : new Error(
-                  typeof exception === "string"
-                      ? exception
-                      : "A non-Error value was thrown",
-              );
+    const error = errorFacts(exception);
     return {
         name: error.name,
         message: scrubMessage(error.message),
-        ...(error.stack ? { stack: error.stack } : {}),
+        ...(error.stack ? { stack: scrub(error.stack) } : {}),
         correlationId: ctx.correlationId,
         statusCode: ctx.statusCode,
         ...(ctx.method ? { method: ctx.method } : {}),
@@ -90,18 +130,25 @@ export function toServerErrorEvent(
     };
 }
 
-/** Log an unhandled error, and forward it when a tracker is installed. */
+/**
+ * Log an unhandled error once, and forward it when a tracker is installed.
+ *
+ * The line carries the error's name, message, stack and code (emails, long
+ * numbers and bearer tokens masked), the request's correlation id, method,
+ * path and status, and its headers redacted by `redact.ts`; never a body.
+ */
 export function reportError(exception: unknown, ctx: ServerErrorContext): void {
+    const error = errorFacts(exception);
     structuredLogger.error("unhandled_exception", {
         correlationId: ctx.correlationId,
         method: ctx.method,
         path: ctx.url ? redactUrl(ctx.url) : undefined,
         statusCode: ctx.statusCode,
-        errorName:
-            exception instanceof Error ? exception.name : typeof exception,
-        errorMessage:
-            exception instanceof Error ? exception.message : String(exception),
-        stack: exception instanceof Error ? exception.stack : undefined,
+        ...(ctx.organizationId ? { organizationId: ctx.organizationId } : {}),
+        errorName: error.name,
+        errorMessage: scrub(error.message),
+        ...(error.code ? { errorCode: error.code } : {}),
+        stack: error.stack ? scrub(error.stack) : undefined,
         headers: ctx.headers ? redactHeaders(ctx.headers) : undefined,
     });
     if (!sink) return;

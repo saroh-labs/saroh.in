@@ -219,6 +219,115 @@ describe("AllExceptionsFilter", () => {
         expect(res.json).not.toHaveBeenCalled();
     });
 
+    // A checkout answered 500 on dev (9 Oct) and the log showed only its
+    // request line. The cause line must carry what went wrong, once.
+    describe("an unexpected error", () => {
+        let lines: string[];
+        let stderr: jest.SpyInstance;
+
+        beforeEach(() => {
+            lines = [];
+            stderr = jest
+                .spyOn(process.stderr, "write")
+                .mockImplementation((chunk: string | Uint8Array) => {
+                    lines.push(String(chunk));
+                    return true;
+                });
+        });
+        afterEach(() => stderr.mockRestore());
+
+        const events = () =>
+            lines.map((l) => JSON.parse(l) as Record<string, unknown>);
+        const req = () => ({
+            method: "POST",
+            originalUrl: "/public/sites/site_1/checkout",
+            correlationId: "cid-500",
+            startTime: Date.now(),
+            headers: {
+                "x-customer-session": "session-secret",
+                "x-forwarded-for": "203.0.113.9",
+                "user-agent": "jest",
+            },
+        });
+
+        it("logs its name, message and stack once at error level, with the correlation id", () => {
+            const res = makeResponse();
+            const err = new TypeError("Invalid authentication tag length: 2");
+
+            filter.catch(err, makeHost(res, req()));
+
+            const unhandled = events().filter(
+                (e) => e.event === "unhandled_exception",
+            );
+            expect(unhandled).toHaveLength(1);
+            expect(unhandled[0]).toMatchObject({
+                level: "error",
+                correlationId: "cid-500",
+                method: "POST",
+                path: "/public/sites/site_1/checkout",
+                statusCode: 500,
+                errorName: "TypeError",
+                errorMessage: "Invalid authentication tag length: 2",
+            });
+            expect(unhandled[0].stack).toEqual(
+                expect.stringContaining("TypeError: Invalid authentication"),
+            );
+            // The request line too, once; the client still gets the
+            // generic envelope.
+            expect(
+                events().filter((e) => e.event === "http_request"),
+            ).toHaveLength(1);
+            expect(envelope(res).message).toBe("Internal server error");
+        });
+
+        it("keeps the name and stack of an error made in another realm", () => {
+            // `instanceof Error` is false for these (a VM context, a native
+            // binding); they were logged as "object" with no stack.
+            const foreign = {
+                name: "TypeError",
+                message: "Invalid authentication tag length: 2",
+                stack: "TypeError: Invalid authentication tag length: 2\n    at Decipheriv.setAuthTag",
+                code: "ERR_CRYPTO_INVALID_AUTH_TAG",
+            };
+
+            filter.catch(foreign, makeHost(makeResponse(), req()));
+
+            const [line] = events().filter(
+                (e) => e.event === "unhandled_exception",
+            );
+            expect(line).toMatchObject({
+                errorName: "TypeError",
+                errorCode: "ERR_CRYPTO_INVALID_AUTH_TAG",
+                stack: expect.stringContaining("Decipheriv.setAuthTag"),
+            });
+        });
+
+        it("never writes a session, the visitor's address or an email into the line", () => {
+            filter.catch(
+                new Error("no customer for asha@example.com"),
+                makeHost(makeResponse(), req()),
+            );
+            const text = lines.join("");
+            expect(text).not.toContain("session-secret");
+            expect(text).not.toContain("203.0.113.9");
+            expect(text).not.toContain("asha@example.com");
+        });
+
+        it("leaves a deliberate 503 to the code that threw it, which logged it", () => {
+            filter.catch(
+                new ServiceUnavailableException({
+                    message:
+                        "The business can't take payment online right now.",
+                    details: { reason: "provider-unavailable" },
+                }),
+                makeHost(makeResponse(), req()),
+            );
+            expect(
+                events().filter((e) => e.event === "unhandled_exception"),
+            ).toHaveLength(0);
+        });
+    });
+
     // Guards run BEFORE interceptors, so LoggingInterceptor never sees a guard
     // rejection: every 401/403 (incl. the module-enforcement guard once the
     // rollout flips) was invisible in the request log, which is precisely the
