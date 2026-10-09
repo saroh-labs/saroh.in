@@ -111,7 +111,8 @@ describe("OrganizationContextService.resolve", () => {
                     userId: "user_1",
                 },
             },
-            select: { role: true, extraActions: true },
+            // The id: a paused team member is refused by it (#800).
+            select: { id: true, role: true, extraActions: true },
         });
         // Success path is a single query — no org existence lookup.
         expect(organizationFindUnique).not.toHaveBeenCalled();

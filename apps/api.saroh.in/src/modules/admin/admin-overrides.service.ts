@@ -4,6 +4,7 @@ import {
     ForbiddenException,
     Injectable,
     NotFoundException,
+    Optional,
 } from "@nestjs/common";
 import type { Prisma } from "@saroh/database";
 import {
@@ -22,6 +23,8 @@ import {
 import { mapEntry } from "../billing/catalogue-access";
 import { CatalogueAccessService } from "../billing/catalogue-access.service";
 import { enqueuePlanChangeNotice } from "../billing/plan-change-notice.handler";
+import { FeatureFlagService } from "../feature-flags/feature-flags.service";
+import { FlagKey } from "../feature-flags/flags";
 import type { MoveNoticePayload } from "../pricing/moves.service";
 import {
     pendingFromFor,
@@ -38,6 +41,7 @@ import {
 } from "./admin-lifecycle.service";
 import { AdminPermission } from "./admin-permissions";
 import { catalogueUsage } from "./catalogue-usage";
+import { limitOverrideWarning } from "./limit-override-warning";
 
 type Tx = Prisma.TransactionClient;
 
@@ -101,6 +105,8 @@ export class AdminOverridesService {
     constructor(
         private readonly audit: AdminAuditService,
         private readonly access: CatalogueAccessService,
+        @Optional()
+        private readonly flags: FeatureFlagService = new FeatureFlagService(),
     ) {}
 
     /** Grant, remove, or set the limit of one catalogue row. */
@@ -149,8 +155,18 @@ export class AdminOverridesService {
             const used = (
                 await catalogueUsage(command.organizationId, [row.id])
             ).usage[row.id];
-            if (typeof used === "number" && used > value) {
-                warning = `It has ${used} already. They stay, read-only; it can't add more until it is under ${value}.`;
+            if (typeof used === "number") {
+                // What happens to what is over it (#802, #800's rules).
+                warning = limitOverrideWarning({
+                    rowId: row.id,
+                    used,
+                    value,
+                    monthly: now.per === "month",
+                    enforced: await this.flags.isEnabled(
+                        FlagKey.PLAN_ENFORCEMENT,
+                        command.organizationId,
+                    ),
+                });
             }
         }
 

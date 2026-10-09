@@ -68,6 +68,24 @@ describe("the Plans block's plans on a served page (G9)", () => {
         expect(feed?.autopayMethods).toEqual(["UPI", "CARD"]);
     });
 
+    it("tells the block the site isn't taking orders, only when it isn't (#800)", async () => {
+        const paused = await plansFeed([{ type: "plans" }], "/contact", () =>
+            Promise.resolve({
+                plans: [PLAN],
+                payOnline: false,
+                notTakingOrders: true,
+            }),
+        );
+        expect(paused).toMatchObject({
+            payOnline: false,
+            notTakingOrders: true,
+        });
+        const open = await plansFeed([{ type: "plans" }], "/contact", () =>
+            Promise.resolve({ plans: [PLAN], payOnline: true }),
+        );
+        expect(open).not.toHaveProperty("notTakingOrders");
+    });
+
     it("knows a Plans block when it sees one", () => {
         expect(hasPlans([])).toBe(false);
         expect(hasPlans([{ type: "plans" }])).toBe(true);

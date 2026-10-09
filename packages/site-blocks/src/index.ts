@@ -105,7 +105,12 @@ export {
     default as ProductGridSection,
 } from "./blocks/product-grid";
 export { PROJECTS_LINK, default as ProjectsSection } from "./blocks/projects";
-export { plansAutopayMethods, plansOf, plansPayOnline } from "./lib/plans-read";
+export {
+    plansAutopayMethods,
+    plansNotTakingOrders,
+    plansOf,
+    plansPayOnline,
+} from "./lib/plans-read";
 // Called by saroh.app's server: from a module with no "use client".
 export type { ProductGridFeed } from "./blocks/product-grid";
 export { default as RichTextSection } from "./blocks/rich-text";
@@ -184,6 +189,10 @@ export type {
 } from "./shop/api";
 export { AskAboutOrdering, askAboutHref } from "./shop/ask-about-ordering";
 export { ShopBag } from "./shop/bag";
+export {
+    NOT_TAKING_ORDERS_TEXT,
+    NotTakingOrders,
+} from "./shop/not-taking-orders";
 // The order confirmation page after a shop payment (P4).
 export type { ShopBagProps } from "./shop/bag";
 export type { BagItem } from "./shop/bag-store";

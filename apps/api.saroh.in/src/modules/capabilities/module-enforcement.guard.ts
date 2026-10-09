@@ -9,6 +9,7 @@ import { prisma } from "@saroh/database";
 
 import type { OrganizationContext } from "../../common/types/organization-context";
 import type { AuthUser } from "../../common/types/store-context";
+import { isMemberPaused } from "../billing/paused-errors";
 import { OrganizationContextService } from "../organizations/organization-context.service";
 import { ModuleAvailabilityService } from "./module-availability.service";
 import type { ModuleKey } from "./module-registry";
@@ -148,7 +149,11 @@ export class ModuleEnforcementGuard implements CanActivate {
                 user.id,
                 store.organizationId,
             );
-        } catch {
+        } catch (err) {
+            // A team member past the plan's limit (#800) hears why, in the
+            // paused words, before any module question — not "not enforced",
+            // which handed them to the service's generic answer.
+            if (isMemberPaused(err)) throw err;
             return null;
         }
     }

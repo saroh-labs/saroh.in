@@ -1,7 +1,9 @@
 import { PageContainer } from "@/components/shared/page-container";
 import { StorefrontsScreen } from "@/components/stores/storefronts-screen";
+import { pausedLocationIds } from "@/lib/billing/paused";
 import { mayAddStorefront } from "@/lib/business-limits";
 import { resolveActiveOrganization } from "@/lib/organizations/service";
+import { pausedOrNull } from "@/lib/saroh-billing/service";
 import { requireSession } from "@/lib/session";
 import { readSiteSelling } from "@/lib/stores/location-selling";
 import { locationsWord } from "@/lib/stores/pick";
@@ -33,18 +35,26 @@ export default async function StorefrontsPage({
     searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
     await requireSession();
-    const [organization, storefronts, allowance, siteSelling, { storefront }] =
-        await Promise.all([
-            resolveActiveOrganization(),
-            listStorefronts(),
-            // How many the plan allows; unreadable offers New and lets the
-            // API decide.
-            getStorefrontAllowance().catch(() => null),
-            // Which location the online shop sells from, for each one's
-            // "Sells in person only / and online" line (DEC-069).
-            readSiteSelling(),
-            searchParams,
-        ]);
+    const [
+        organization,
+        storefronts,
+        allowance,
+        siteSelling,
+        { storefront },
+        paused,
+    ] = await Promise.all([
+        resolveActiveOrganization(),
+        listStorefronts(),
+        // How many the plan allows; unreadable offers New and lets the
+        // API decide.
+        getStorefrontAllowance().catch(() => null),
+        // Which location the online shop sells from, for each one's
+        // "Sells in person only / and online" line (DEC-069).
+        readSiteSelling(),
+        searchParams,
+        // Which locations a lower plan stopped taking orders (#800).
+        pausedOrNull(),
+    ]);
 
     const chosen =
         storefronts.find((s) => s.id === storefront) ?? storefronts.at(0);
@@ -81,6 +91,8 @@ export default async function StorefrontsPage({
                 // How customers who share an email are linked is a
                 // customer-record call too (C15): the API asks for both.
                 canLinkCustomers={may("store:write") && may("contact:write")}
+                // Past the plan's locations limit (#800).
+                notTakingOrders={pausedLocationIds(paused)}
             />
         </PageContainer>
     );

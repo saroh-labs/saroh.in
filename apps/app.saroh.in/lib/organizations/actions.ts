@@ -6,6 +6,7 @@ import { redirect } from "next/navigation";
 import { env } from "@/env";
 import { ACTIVE_ORG_COOKIE } from "@/lib/api/http";
 
+import { PAUSED_ERROR, PAUSED_HREF } from "./choose";
 import { ACTIVE_ORG_NAME_COOKIE } from "./left-business";
 
 import type {
@@ -67,6 +68,10 @@ export async function setActiveOrganization(
             error: "You are not a member of that organization.",
         };
     }
+    // Their access is paused (#800): the API would refuse every read.
+    if (chosen.paused) {
+        return { ok: false, error: PAUSED_ERROR };
+    }
     await writeActiveOrgCookie(organizationId, chosen.name);
     return { ok: true, data: { id: organizationId } };
 }
@@ -88,7 +93,13 @@ export async function chooseOrganization(formData: FormData): Promise<void> {
     // Sending them back to the chooser is the honest outcome: the list is
     // re-read there, so a membership that ended while they looked at it simply
     // is not on the page the second time.
-    redirect(result.ok ? "/" : "/choose");
+    redirect(
+        result.ok
+            ? "/"
+            : result.error === PAUSED_ERROR
+              ? PAUSED_HREF
+              : "/choose",
+    );
 }
 
 /** Setup's live address check. Read-only; the create re-checks. */

@@ -9,10 +9,12 @@ import { prisma } from "@saroh/database";
 
 import { toMoneyString } from "../../common/money";
 import { planStartsSubscriptions } from "../billing/online-payments-plan";
+import { notTakingOrders } from "../billing/paused-errors";
 import { takesOnlinePayment } from "../bookings/public-booking-page";
 import { FixedWindowRateLimiter } from "../bookings/rate-limiter";
 import { contactEmailForDisplay } from "../contacts/contact-email";
 import { contactName } from "../invoices/serialize";
+import { siteTakingOrders } from "../orders/checkout-paused";
 import { assertOrganizationOpen } from "../organizations/organization-lifecycle.gate";
 import type { AutopayStart } from "../payments/autopay.service";
 import { AutopayService } from "../payments/autopay.service";
@@ -144,6 +146,15 @@ export class PublicPlanJoinService {
             );
         }
         await assertOrganizationOpen(organizationId);
+        // A website a move to a lower plan paused takes no orders (#800),
+        // as its checkout and booking page don't: refused before anything
+        // is drafted or a payment opened.
+        if (
+            customer.siteId &&
+            !(await siteTakingOrders(organizationId, customer.siteId))
+        ) {
+            throw notTakingOrders();
+        }
         if (!(await paymentsOffered(organizationId))) notFound();
         // The published columns only: never `pendingChanges`.
         const plan = await prisma.subscriptionPlan.findFirst({

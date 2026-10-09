@@ -7,6 +7,9 @@ import { Input } from "@saroh/ui/input";
 import { Label } from "@saroh/ui/label";
 import { cn } from "@saroh/ui/lib/utils";
 import { PageHeader } from "@saroh/ui/page-header";
+
+import { PausedNote } from "@/components/billing/paused-banner";
+import { pausedWords } from "@/lib/billing/paused";
 import {
     Select,
     SelectContent,
@@ -125,6 +128,7 @@ export function StorefrontsScreen({
     canEdit,
     canClose,
     canLinkCustomers = false,
+    notTakingOrders = [],
 }: {
     businessName: string;
     storefronts: StorefrontSummary[];
@@ -142,6 +146,11 @@ export function StorefrontsScreen({
     canClose: boolean;
     /** May change how customers who share an email are linked (C15). */
     canLinkCustomers?: boolean;
+    /**
+     * Past the plan's locations limit (#800): these stopped taking orders,
+     * stock and history kept. Not the payments "Paused" switch.
+     */
+    notTakingOrders?: string[];
 }) {
     // A business with one location sees "Location"; the list appears once
     // there are several (ADR-010), and New while the plan allows another
@@ -191,6 +200,7 @@ export function StorefrontsScreen({
                     <StorefrontList
                         storefronts={storefronts}
                         selectedId={selected?.id ?? null}
+                        notTakingOrders={notTakingOrders}
                     />
                 ) : null}
                 <div
@@ -199,6 +209,9 @@ export function StorefrontsScreen({
                         !many && "max-w-[860px]",
                     )}
                 >
+                    {selected && notTakingOrders.includes(selected.id) ? (
+                        <PausedNote>{pausedWords("location")}</PausedNote>
+                    ) : null}
                     {selected ? (
                         // Keyed by storefront, so picking another one starts
                         // from its own values rather than the last one's edits.
@@ -226,9 +239,11 @@ export function StorefrontsScreen({
 function StorefrontList({
     storefronts,
     selectedId,
+    notTakingOrders,
 }: {
     storefronts: StorefrontSummary[];
     selectedId: string | null;
+    notTakingOrders: string[];
 }) {
     return (
         <nav
@@ -262,12 +277,26 @@ function StorefrontList({
                                         {ordersLabel(s.orderCount)}
                                     </span>
                                 </span>
-                                <Badge
-                                    variant={s.paused ? "warning" : "neutral"}
-                                    className="shrink-0"
-                                >
-                                    {s.paused ? "Paused" : KIND_LABEL[s.kind]}
-                                </Badge>
+                                {notTakingOrders.includes(s.id) ? (
+                                    // Past the plan's locations limit (#800).
+                                    <Badge
+                                        variant="warning"
+                                        className="shrink-0"
+                                    >
+                                        Not taking orders
+                                    </Badge>
+                                ) : (
+                                    <Badge
+                                        variant={
+                                            s.paused ? "warning" : "neutral"
+                                        }
+                                        className="shrink-0"
+                                    >
+                                        {s.paused
+                                            ? "Paused"
+                                            : KIND_LABEL[s.kind]}
+                                    </Badge>
+                                )}
                             </Link>
                         </li>
                     );

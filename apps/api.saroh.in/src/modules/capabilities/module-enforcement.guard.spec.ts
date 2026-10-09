@@ -8,6 +8,7 @@ import type { Reflector } from "@nestjs/core";
 
 import { prisma } from "@saroh/database";
 
+import { isMemberPaused, memberPaused } from "../billing/paused-errors";
 import type { OrganizationContextService } from "../organizations/organization-context.service";
 import type { ModuleAvailabilityService } from "./module-availability.service";
 import { ModuleEnforcementGuard } from "./module-enforcement.guard";
@@ -273,6 +274,23 @@ describe("ModuleEnforcementGuard", () => {
             await expect(
                 guard.canActivate(execContext(STORE_REQUEST)),
             ).resolves.toBe(true);
+            expect(evaluate).not.toHaveBeenCalled();
+        });
+
+        it("answers a paused team member with MEMBER_PAUSED first, not a module refusal (#800)", async () => {
+            process.env.MODULE_ENFORCEMENT = "1";
+            const paused = memberPaused("Rye Bakery");
+            const { guard, evaluate } = build({
+                moduleKey: "COMMERCE",
+                resolveError: paused,
+                blockers: [{ code: "ORG_MODULE_DISABLED" }],
+            });
+            const err = await guard
+                .canActivate(execContext(STORE_REQUEST))
+                .catch((e: unknown) => e);
+            expect(err).toBe(paused);
+            expect(isMemberPaused(err)).toBe(true);
+            // Asked before any module question.
             expect(evaluate).not.toHaveBeenCalled();
         });
 

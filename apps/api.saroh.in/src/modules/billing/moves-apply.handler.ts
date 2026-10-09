@@ -9,6 +9,8 @@ import { enqueueBillingEmail } from "./billing-email.job";
 import { planEndingNotice } from "./billing-emails";
 import { isOneTime } from "./billing-term";
 import { CatalogueAccessService } from "./catalogue-access.service";
+import { noticeMoveDowns, pausesForMoveInTx } from "./move-down-notice";
+import { overLimit, OverLimitService } from "./over-limit.service";
 import {
     PLAN_ENDING_NOTICE_KIND,
     PLAN_ENDING_NOTIFICATION_TYPE,
@@ -43,6 +45,10 @@ import { remindEndingTerms } from "./term-ending-notice";
  * 4. **Terms that end** (DEC-100). A 12-month term in its last 30 days is
  *    asked to pay for the next term, 30, 7 and 1 days ahead, the same way
  *    (`term-ending.ts`, `term-ending-notice.ts`).
+ * 5. **Moves to a lower plan** (#800, #801). Steps 3 and 4 list what the
+ *    move pauses; a move the business chose for its period's end, or one
+ *    that already happened, is told here (`move-down-notice.ts`). Each
+ *    notice that lists what pauses starts the 7-day clock (`over-limit.ts`).
  */
 export const BILLING_MOVES_APPLY_TYPE = "billing.moves.apply";
 
@@ -66,6 +72,8 @@ export class MovesApplyHandler {
     constructor(
         @Optional()
         private readonly access: CatalogueAccessService = new CatalogueAccessService(),
+        @Optional()
+        private readonly paused: OverLimitService = overLimit,
     ) {}
 
     readonly handle = async (_job: Job): Promise<void> => {
@@ -128,7 +136,13 @@ export class MovesApplyHandler {
         }
         out.lapsed = await this.lapseCheckouts(now);
         out.reminded = await this.remindEndingPlans(now);
-        out.reminded += await remindEndingTerms(now, this.logger);
+        out.reminded += await remindEndingTerms(now, this.logger, this.paused);
+        out.reminded += await noticeMoveDowns(
+            now,
+            this.logger,
+            this.paused,
+            this.access,
+        );
         return out;
     }
 
@@ -257,11 +271,11 @@ export class MovesApplyHandler {
         );
         const zone = await businessTimezone(prisma, organizationId);
         const endsOn = paperDay(ending.endsAt.toISOString(), zone);
-        const words = planEndingNotice({
-            planName: ending.planName,
-            nextPlanName: ending.nextPlanName,
-            endsOn,
-        });
+        // What the end pauses (#801), read as the business will be then.
+        const measure = await this.paused.previewAt(
+            organizationId,
+            ending.endsAt,
+        );
         return prisma.$transaction(async (tx) => {
             const claim = await tx.customerNotice.createMany({
                 data: [
@@ -274,6 +288,20 @@ export class MovesApplyHandler {
                 skipDuplicates: true,
             });
             if (claim.count === 0) return false;
+            const pauses = await pausesForMoveInTx(
+                tx,
+                organizationId,
+                measure,
+                ending.endsAt,
+                zone,
+                now,
+            );
+            const words = planEndingNotice({
+                planName: ending.planName,
+                nextPlanName: ending.nextPlanName,
+                endsOn,
+                pauses,
+            });
             const notice = await tx.notification.create({
                 data: {
                     organizationId,
@@ -296,6 +324,7 @@ export class MovesApplyHandler {
                 planName: ending.planName,
                 nextPlanName: ending.nextPlanName,
                 endsOn,
+                pauses,
             });
             return true;
         });

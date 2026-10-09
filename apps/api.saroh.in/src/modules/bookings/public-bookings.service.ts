@@ -52,6 +52,7 @@ import {
     resolvePerson,
     toAvailabilityService,
 } from "./booking-slots";
+import { pausedDiaryIds, splitPaused } from "./diary-paused";
 import type { BookPay } from "./dto";
 import { openingFor, refuseOutsideOpening } from "./opening-hours";
 import type {
@@ -179,13 +180,20 @@ export class PublicBookingsService {
     /**
      * Who takes a public service, for the booking page's "with whom" step
      * (U3): a display name and an opaque id per person, nothing else.
+     * Nobody past the plan's team limit (#800): they take no new bookings.
      */
     async publicServiceStaff(serviceId: string): Promise<PublicStaff[]> {
-        await loadBookableService(serviceId, {
+        const { service } = await loadBookableService(serviceId, {
             bookingPage: true,
         });
-        const people = await serviceStaff(prisma, serviceId);
-        return people.map(({ id, name }) => ({ id, name }));
+        const [people, paused] = await Promise.all([
+            serviceStaff(prisma, serviceId),
+            pausedDiaryIds(service.organizationId),
+        ]);
+        return splitPaused(people, paused).taking.map(({ id, name }) => ({
+            id,
+            name,
+        }));
     }
 
     /** The booking page's next two weeks for one service — see {@link publicDays}. */

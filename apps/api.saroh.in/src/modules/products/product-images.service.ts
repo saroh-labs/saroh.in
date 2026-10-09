@@ -109,11 +109,7 @@ export class ProductImagesService {
         dto: ReplaceProductImagesDto,
     ): Promise<ProductImageDto[]> {
         return this.replaceIn(
-            await this.products.access.writeViaStore(
-                storeId,
-                userId,
-                productId,
-            ),
+            await this.products.access.editViaStore(storeId, userId, productId),
             productId,
             dto,
         );

@@ -31,6 +31,11 @@ export interface AccountPacksOnSale {
     /** False: the business takes no payment online; buy at the desk. */
     payOnline: boolean;
     packs: AccountPackOnSale[];
+    /**
+     * The business isn't taking orders on this site just now (#800): the
+     * sheet says so, and sells nothing.
+     */
+    notTakingOrders?: true;
 }
 
 /** A started purchase: what is being paid, and the provider's handoff. */

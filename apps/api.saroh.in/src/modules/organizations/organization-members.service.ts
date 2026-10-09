@@ -21,6 +21,8 @@ import {
 } from "../audit/audit.service";
 import { openInvitations } from "../billing/metering";
 import { planMeter } from "../billing/metering.service";
+import { overLimit } from "../billing/over-limit.service";
+import { invitationPaused } from "../billing/paused-errors";
 import type { SeatKind } from "../billing/seats";
 import {
     BOOKABLE_STAFF,
@@ -639,6 +641,12 @@ export class OrganizationMembersService {
             throw new ForbiddenException(
                 `That invitation was sent to ${invitation.email}. Sign in as that person to accept it.`,
             );
+        }
+        // Past the plan's limit after a move to a lower plan (#800): the
+        // invitation waits, kept, until the business moves up again.
+        const paused = await overLimit.pausedNow(invitation.organizationId);
+        if (paused?.invitationIds.has(invitation.id)) {
+            throw invitationPaused(invitation.organization.name);
         }
 
         // The role as invited: a built-in, or a role the business made

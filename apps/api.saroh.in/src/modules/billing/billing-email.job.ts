@@ -14,12 +14,14 @@ import type { RenderedEmail } from "./billing-emails";
 import {
     firstMonthEndingEmail,
     invoiceEmail,
+    moveDownEmail,
     paymentFailedEmail,
     planEndingEmail,
     termEndingEmail,
     trialEndingEmail,
 } from "./billing-emails";
 import { paidFirstMonth } from "./offers";
+import { MOVE_DOWN_CLAIM_KIND } from "./over-limit";
 import { renderSarohInvoicePdf } from "./saroh-invoice-paper";
 import { paiseToRupees, SAROH_TIMEZONE } from "./saroh-invoice-terms";
 import { sarohSeller } from "./saroh-seller";
@@ -31,8 +33,8 @@ type Tx = Prisma.TransactionClient;
  * Saroh's own billing mail to a business (pricing catalogue U17): the
  * invoice for a charge with its PDF, a payment that failed, a first month
  * or a free trial ending (queued by U16), a plan that ends on a date
- * (#805) and a 12-month term that ends (DEC-100), both queued by the
- * billing sweep. Written on the caller's transaction (the outbox),
+ * (#805), a 12-month term that ends (DEC-100) and a move to a lower plan
+ * that pauses things (#801), all queued by the billing sweep. Written on the caller's transaction (the outbox),
  * so the invoice or the failed charge and its email commit together, and a
  * mail provider that is down never undoes either: a send that fails throws,
  * and the queue retries it with backoff.
@@ -62,7 +64,8 @@ export async function enqueueBillingEmail(
         data: {
             type: BILLING_EMAIL_TYPE,
             organizationId: payload.organizationId,
-            payload,
+            // Plain JSON: strings, numbers, booleans, nulls and lists of them.
+            payload: payload as unknown as Prisma.InputJsonObject,
             ...(runAt ? { runAt } : {}),
         },
     });
@@ -128,6 +131,7 @@ export class BillingEmailHandler {
         if (p.kind === "INVOICE") return this.invoice(job, p);
         if (p.kind === "PLAN_ENDING") return this.planEnding(job, p);
         if (p.kind === "TERM_ENDING") return this.termEnding(job, p);
+        if (p.kind === "MOVE_DOWN") return this.moveDown(job, p);
         return this.notice(job, p);
     };
 
@@ -313,6 +317,7 @@ export class BillingEmailHandler {
                 planName: p.planName,
                 nextPlanName: p.nextPlanName,
                 endsOn: p.endsOn,
+                pauses: p.pauses,
             });
         });
     }
@@ -355,6 +360,45 @@ export class BillingEmailHandler {
                         : money(ending.nextPricePaise),
                 payUrl: `${appBase()}/settings/billing#change-plan`,
                 chosenFree: ending.chosenFree,
+                pauses: p.pauses,
+            });
+        });
+    }
+
+    /**
+     * A move to a lower plan that pauses things (#801): what the sweep
+     * listed, sent once. Re-read: once its grace claim is gone (the
+     * business moved back up, or is no longer over), it says nothing.
+     */
+    private moveDown(
+        job: Job,
+        p: Extract<BillingEmailPayload, { kind: "MOVE_DOWN" }>,
+    ): Promise<void> {
+        const eventKey = `saroh-billing:${p.eventKey}`;
+        return this.once(job, p.organizationId, eventKey, async () => {
+            const claim = await prisma.customerNotice.findUnique({
+                where: {
+                    organizationId_eventKey: {
+                        organizationId: p.organizationId,
+                        eventKey: p.graceKey,
+                    },
+                },
+                select: { kind: true },
+            });
+            if (claim?.kind !== MOVE_DOWN_CLAIM_KIND) return "moved_up_since";
+            const org = await prisma.organization.findUnique({
+                where: { id: p.organizationId },
+                select: { name: true },
+            });
+            return moveDownEmail({
+                businessName: org?.name ?? "your business",
+                mode: p.mode,
+                planName: p.planName,
+                nextPlanName: p.nextPlanName,
+                movesOn: p.movesOn,
+                pausesOn: p.pausesOn,
+                lines: p.lines,
+                url: `${appBase()}/settings/billing#change-plan`,
             });
         });
     }

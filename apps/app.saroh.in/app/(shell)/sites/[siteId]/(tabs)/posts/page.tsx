@@ -5,11 +5,14 @@ import { NotebookPen } from "lucide-react";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 
+import { PausedNote } from "@/components/billing/paused-banner";
 import { PlanLimitNotice } from "@/components/billing/plan-limit-notice";
 import { ListCard, ListRow } from "@/components/shared/list-card";
 import { ViewerDate } from "@/components/shared/viewer-date";
+import { activeCut, pausedListWords, postPaused } from "@/lib/billing/paused";
 import type { Post } from "@/lib/content/service";
 import { listPosts } from "@/lib/content/service";
+import { pausedOrNull } from "@/lib/saroh-billing/service";
 import { requireSession } from "@/lib/session";
 import { getSite } from "@/lib/sites/service";
 
@@ -52,7 +55,14 @@ export default async function SitePostsPage({
     const site = await getSite(siteId);
     if (!site) notFound();
 
-    const posts = await listPosts(siteId);
+    const [posts, paused] = await Promise.all([
+        listPosts(siteId),
+        // Past the plan's blog posts limit (#800): marked, and why.
+        pausedOrNull(),
+    ]);
+    const cut = activeCut(paused, "posts");
+    const isPaused = (p: Post) => postPaused(p, cut);
+    const pausedHere = posts.filter(isPaused).length;
     const base = `/sites/${siteId}/posts`;
     const prefix = site.postsPrefix ?? "blog";
 
@@ -77,6 +87,11 @@ export default async function SitePostsPage({
 
     return (
         <>
+            {pausedHere > 0 ? (
+                <PausedNote className="mb-4">
+                    {pausedListWords("post", pausedHere)}
+                </PausedNote>
+            ) : null}
             <PlanLimitNotice moduleId="blog" className="mb-4" />
             <ListCard
                 main="Post"
@@ -92,7 +107,7 @@ export default async function SitePostsPage({
                         >
                             <Link
                                 href={`${base}/${post.id}`}
-                                aria-label={`${post.title}, ${pill.label.toLowerCase()}`}
+                                aria-label={`${post.title}, ${pill.label.toLowerCase()}${isPaused(post) ? ", paused" : ""}`}
                                 className="block bg-card transition-colors duration-fast hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
                             >
                                 <ListRow
@@ -102,6 +117,11 @@ export default async function SitePostsPage({
                                             <Badge variant={pill.variant}>
                                                 {pill.label}
                                             </Badge>
+                                            {isPaused(post) ? (
+                                                <Badge variant="warning">
+                                                    Paused
+                                                </Badge>
+                                            ) : null}
                                             {post.featured ? (
                                                 <Badge variant="neutral">
                                                     Featured

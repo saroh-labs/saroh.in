@@ -89,8 +89,9 @@ export async function lockMeter(
  * failure is logged (`plan_meter_unresolved`) — a business keeps what it has
  * rather than being refused because a lookup failed.
  *
- * "Over" after a downgrade is not refused for what exists: existing things
- * stay readable and editable, and only adding more is refused.
+ * "Over" after a move down: adding more is refused here at once; what
+ * already exists past the cap becomes read-only 7 days after the business
+ * is told (#800, `over-limit.ts`), never here.
  */
 @Injectable()
 export class MeteringService {

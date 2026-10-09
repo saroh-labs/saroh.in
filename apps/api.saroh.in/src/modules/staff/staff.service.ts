@@ -16,6 +16,7 @@ import type { BookingPaymentView } from "../bookings/booking-payment";
 import { bookingPaymentView } from "../bookings/booking-payment";
 import type { BookingRulesValue } from "../bookings/booking-rules";
 import { bookingPaymentOf, loadBookingRules } from "../bookings/booking-rules";
+import { pausedDiaryIds } from "../bookings/diary-paused";
 import { loadOpeningHours } from "../bookings/opening-hours";
 import { ownDiaryOf } from "../bookings/own-diary";
 import { businessTimezone, dateOnly } from "../bookings/staff-availability";
@@ -79,6 +80,11 @@ export interface StaffView {
         allDay: boolean;
         reason: string | null;
     }[];
+    /**
+     * On the diary with no login and past the plan's team limit (#800):
+     * takes no new bookings; theirs are kept. Absent when not paused.
+     */
+    paused?: true;
 }
 
 /** Staff, and the zone their hours are wall-clock times in. */
@@ -136,8 +142,12 @@ type StaffRow = Prisma.StaffMemberGetPayload<{
     include: ReturnType<typeof staffInclude>;
 }>;
 
-function toView(row: StaffRow): StaffView {
+function toView(
+    row: StaffRow,
+    paused: ReadonlySet<string> = new Set(),
+): StaffView {
     return {
+        ...(paused.has(row.id) ? { paused: true as const } : {}),
         id: row.id,
         name: row.name,
         title: row.title,
@@ -191,7 +201,7 @@ export class StaffService {
         // Calendar only sees its own diary (#868): themselves, not the
         // team's hours, time off or reasons.
         const own = await ownDiaryOf(prisma, ctx);
-        const [rows, timezone, closures, opening] = await Promise.all([
+        const [rows, timezone, closures, opening, paused] = await Promise.all([
             prisma.staffMember.findMany({
                 where: {
                     organizationId: ctx.organizationId,
@@ -203,10 +213,13 @@ export class StaffService {
             businessTimezone(prisma, ctx.organizationId),
             closureViews(ctx.organizationId, since),
             loadOpeningHours(prisma, ctx.organizationId),
+            // Past the plan's team limit (#800): the diary marks them and
+            // offers no new booking with them.
+            pausedDiaryIds(ctx.organizationId),
         ]);
         return {
             timezone,
-            staff: rows.map(toView),
+            staff: rows.map((row) => toView(row, paused)),
             closures,
             openingHours: opening?.windows ?? null,
         };

@@ -80,6 +80,7 @@ const scope = {
 const products = {
     access: {
         writeViaStore: jest.fn().mockResolvedValue(scope),
+        editViaStore: jest.fn().mockResolvedValue(scope),
         readViaStore: jest.fn().mockResolvedValue(scope),
     },
 } as unknown as ProductsService;

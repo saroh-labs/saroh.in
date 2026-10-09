@@ -17,6 +17,7 @@ import { ModuleEnforcementGuard } from "../capabilities/module-enforcement.guard
 import { RequireModule } from "../capabilities/require-module.decorator";
 import { ListingsService } from "./listings.service";
 import { ProductAccess } from "./product-access";
+import { assertProductEditable } from "./product-paused";
 
 /** Sell it at a storefront: every variant, or the ones named. */
 export class ListProductDto {
@@ -56,14 +57,17 @@ export class OrganizationListingsController {
 
     /** List it at the storefront, or change which variants it sells there. */
     @Put(":storeId")
-    list(
+    async list(
         @OrgContext() ctx: OrganizationContext,
         @Param("productId") productId: string,
         @Param("storeId") storeId: string,
         @Body() dto: ListProductDto,
     ) {
+        const organizationId = this.access.writeBusiness(ctx);
+        // A product the plan paused is read-only (#800); unlisting isn't.
+        await assertProductEditable(organizationId, productId);
         return this.listings.list(
-            this.access.writeBusiness(ctx),
+            organizationId,
             productId,
             storeId,
             dto.variantIds,
