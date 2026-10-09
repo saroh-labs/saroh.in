@@ -49,10 +49,12 @@ export class CashfreeWebhookProvider implements WebhookProvider {
         const body = (payload ?? {}) as {
             type?: string;
             data?: {
-                order?: { order_id?: string };
+                order?: { order_id?: string; order_currency?: string };
                 payment?: {
                     cf_payment_id?: string | number;
                     payment_status?: string;
+                    payment_amount?: number | string;
+                    payment_currency?: string;
                     charges_details?: CashfreeCharges;
                 };
                 charges_details?: CashfreeCharges;
@@ -103,6 +105,12 @@ export class CashfreeWebhookProvider implements WebhookProvider {
             providerPaymentRef,
             feeCents: feeOf(
                 body.data?.charges_details ?? payment?.charges_details,
+            ),
+            // `payment_amount` is in rupees (a number or decimal text):
+            // read as paise without float arithmetic (PAY-06).
+            capturedAmountCents: majorToMinor(payment?.payment_amount),
+            capturedCurrency: nonEmptyText(
+                payment?.payment_currency ?? body.data?.order?.order_currency,
             ),
             providerRefundId,
             refundAmountCents: majorToMinor(refund?.refund_amount),
@@ -166,6 +174,12 @@ function majorToMinor(amount: number | string | undefined): number | undefined {
     if (!match) return undefined;
     const [, whole, fraction = ""] = match;
     return Number(whole) * 100 + Number(fraction.padEnd(2, "0"));
+}
+
+function nonEmptyText(value: unknown): string | undefined {
+    return typeof value === "string" && value.trim() !== ""
+        ? value.trim()
+        : undefined;
 }
 
 /** Constant-time compare of two base64 strings. */

@@ -317,14 +317,87 @@ describe("the checkout's signed return (P1)", () => {
             }),
         ).resolves.toEqual({ confirmed: false });
         expect(await bookingStatus(booking.id)).toBe("PENDING");
+        // Not paid; the money is owed back and the attempt failed, so the
+        // customer can pay again (PAY-06).
         expect(
             (
                 await prisma.paymentIntent.findUniqueOrThrow({
                     where: { id: intent.paymentIntentId },
                 })
             ).status,
-        ).toBe("REQUIRES_PAYMENT");
+        ).toBe("FAILED");
+        expect(
+            (
+                await prisma.invoice.findFirstOrThrow({
+                    where: { bookingId: booking.id },
+                })
+            ).status,
+        ).not.toBe("PAID");
+        expect(await attempts(intent.paymentIntentId)).toEqual([
+            { status: "CAPTURED_NEEDS_REFUND", providerRef: "pay_short" },
+        ]);
         expect(warn).toHaveBeenCalledWith(expect.stringContaining("pay_short"));
+
+        // Its webhook, later, at the same short amount: recorded once.
+        jest.spyOn(Logger.prototype, "error").mockImplementation(
+            () => undefined,
+        );
+        await webhook({
+            eventType: "payment.captured",
+            outcome: "SUCCEEDED",
+            providerIntentId: orderId,
+            providerPaymentRef: "pay_short",
+            capturedAmountCents: PRICE - 100,
+            capturedCurrency: "INR",
+        });
+        expect(await attempts(intent.paymentIntentId)).toEqual([
+            { status: "CAPTURED_NEEDS_REFUND", providerRef: "pay_short" },
+        ]);
+        expect(await bookingStatus(booking.id)).toBe("PENDING");
+    });
+
+    it("a webhook capture at another amount never confirms the hold (PAY-06)", async () => {
+        const error = jest
+            .spyOn(Logger.prototype, "error")
+            .mockImplementation(() => undefined);
+        const { booking, intent, orderId } = await hold("over@example.in");
+
+        const out = await webhook({
+            eventType: "payment.captured",
+            outcome: "SUCCEEDED",
+            providerIntentId: orderId,
+            providerPaymentRef: "pay_over",
+            capturedAmountCents: PRICE + 1,
+            capturedCurrency: "INR",
+        });
+        expect(out).toEqual({ status: "processed", changed: true });
+        expect(await bookingStatus(booking.id)).toBe("PENDING");
+        const invoice = await prisma.invoice.findFirstOrThrow({
+            where: { bookingId: booking.id },
+        });
+        expect(invoice.status).toBe("DRAFT");
+        expect(
+            (
+                await prisma.paymentIntent.findUniqueOrThrow({
+                    where: { id: intent.paymentIntentId },
+                })
+            ).status,
+        ).toBe("FAILED");
+        expect(await attempts(intent.paymentIntentId)).toEqual([
+            { status: "CAPTURED_NEEDS_REFUND", providerRef: "pay_over" },
+        ]);
+        expect(error).toHaveBeenCalledWith(expect.stringContaining("pay_over"));
+
+        // The right amount on the same order afterwards still settles it.
+        await webhook({
+            eventType: "payment.captured",
+            outcome: "SUCCEEDED",
+            providerIntentId: orderId,
+            providerPaymentRef: "pay_right",
+            capturedAmountCents: PRICE,
+            capturedCurrency: "INR",
+        });
+        expect(await bookingStatus(booking.id)).toBe("CONFIRMED");
     });
 
     it("a payment not yet captured leaves the page waiting", async () => {

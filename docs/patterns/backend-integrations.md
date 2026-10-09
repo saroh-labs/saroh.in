@@ -114,12 +114,26 @@ a note saying so.
   (`webhookSecretMissing`, readiness `PAYMENTS_WEBHOOK_SECRET_MISSING`) and
   builds the webhook URL setup shows. A new provider declares its signing
   scheme there.
-- **Current** — **Inboxes are idempotent.** `(provider, providerEventId)` is
-  unique, so a duplicate delivery hits P2002 and returns 200 without moving state
-  twice. Reconciliation follows a state machine that rejects illegal
+- **Current** — **Inboxes are idempotent, per business.** The merchant inbox
+  (`WebhookEvent`) is unique on `(organizationId, provider, providerEventId)`
+  (PAY-05), so a duplicate delivery hits P2002 and returns 200 without moving
+  state twice, and another business can never claim an event id first. Saroh's
+  own billing inbox (`BillingWebhookEvent`) has no business in its URL and
+  stays `(provider, providerEventId)`. Reconciliation follows a state machine that rejects illegal
   transitions.
 - **Current** — **Stored provider payloads are for verification and audit,**
   never read on a serving path (`WebhookEvent.payload`).
+- **Current** — **A capture is compared before it pays anything** (PAY-06).
+  Adapters normalise what the provider captured in paise
+  (`capturedAmountCents`, Razorpay's `amount` as is, Cashfree's rupee
+  `payment_amount` read as decimal text) and its currency. A webhook, a
+  checkout return, the pending sweep or an autopay charge's look-up whose
+  amount or currency differs from the intent's never marks the order or
+  invoice paid: the capture is recorded once as `CAPTURED_NEEDS_REFUND`
+  (`rawResponse.invoiceStatus` AMOUNT_MISMATCH, both figures), logged, and an
+  open intent fails as a decline does (`payments/capture-mismatch.ts`). A
+  look-up must report the amount; a signed webhook that carries none is
+  settled on the provider order's own amount.
 - **Current** — **The server derives amounts.** A payment intent's amount comes
   from the Order or, for an invoice pay link, the Invoice — never from the
   request. The public invoice intent route reads its body by hand, so an

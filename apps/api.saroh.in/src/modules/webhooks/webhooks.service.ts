@@ -39,10 +39,18 @@ import {
     captureCheckInTx,
     failCheckInTx,
 } from "../payments/authorisation-check";
+import type { CapturedAmount } from "../payments/capture-mismatch";
+import {
+    AMOUNT_MISMATCH,
+    captureDiffers,
+    describeMismatch,
+    recordCaptureMismatchInTx,
+} from "../payments/capture-mismatch";
 import {
     OPEN_INTENT_STATUSES,
     SUPERSEDED_INTENT,
 } from "../payments/intent-state";
+import type { ChargeFailure } from "../payments/mandate-charge-outcome";
 import { recordChargeEventInTx } from "../payments/mandate-charge-outcome";
 import {
     applyMandateChangeInTx,
@@ -72,7 +80,8 @@ type Tx = Parameters<Parameters<PrismaClient["$transaction"]>[0]>[0];
 export interface WebhookResult {
     /**
      * - `processed` — verified, first delivery, reconciled.
-     * - `duplicate` — a re-delivery (same `(provider, providerEventId)`); no-op.
+     * - `duplicate` — a re-delivery (same business, provider and
+     *   `providerEventId`); no-op.
      * - `ignored`   — verified but not a money event / no matching intent.
      * - `failed`    — verified but reconciliation errored (recorded for replay).
      */
@@ -118,8 +127,11 @@ const PROVIDER_LABEL: Record<string, string> = {
  *     is parsed or trusted. A missing secret or bad signature is a 401 and
  *     records/changes NOTHING (a forged event never touches state).
  *  2. IDEMPOTENT INBOX — the verified event is written to `WebhookEvent` whose
- *     `(provider, providerEventId)` is UNIQUE. A duplicate delivery hits P2002
- *     and returns a 200 no-op — this is the exactly-once guarantee.
+ *     `(organizationId, provider, providerEventId)` is UNIQUE. A duplicate
+ *     delivery hits P2002 and returns a 200 no-op — this is the exactly-once
+ *     guarantee. The key is per business (PAY-05): another business, which
+ *     signs its own endpoint's bodies, can never claim an id first and have
+ *     this one's real delivery answered "duplicate".
  *  3. RECONCILE — inside a `$transaction`, the event is mapped to a PaymentIntent
  *     and applied: SUCCEEDED→PAID, FAILED, refund→REFUNDED once refunded in
  *     full (a partial refund leaves the order PAID — ADR-008). Every Order
@@ -186,8 +198,9 @@ export class WebhooksService {
 
         const event = provider.parseEvent({ payload, headers });
 
-        // Idempotent inbox. A duplicate `(provider, providerEventId)` → P2002 →
-        // 200 no-op: the exactly-once guarantee. Any OTHER error propagates.
+        // Idempotent inbox. A duplicate `(organizationId, provider,
+        // providerEventId)` → P2002 → 200 no-op: the exactly-once guarantee,
+        // per business (PAY-05). Any OTHER error propagates.
         let inboxId: string;
         try {
             const row = await prisma.webhookEvent.create({
@@ -419,9 +432,90 @@ export class WebhooksService {
         );
         if (!intent) return { applied: false };
 
+        // PAY-06: a capture is compared with what Saroh asked for before
+        // anything is marked paid. A signed event that reports no amount
+        // is settled on the provider order's own amount, as before.
+        if (
+            event.outcome === "SUCCEEDED" &&
+            captureDiffers(intent, capturedOf(event), { strict: false })
+        ) {
+            return this.applyCaptureMismatch(tx, intent, event);
+        }
+
         const result = await this.applyOutcome(tx, intent, event);
         const feeRecorded = await recordFee(tx, intent, event);
         return { applied: result.applied || feeRecorded };
+    }
+
+    /**
+     * A look-up found a captured payment whose amount or currency is not
+     * the intent's (PAY-06): recorded as {@link applyCaptureMismatch}
+     * records a webhook's, so whichever sees it first writes it once.
+     */
+    async recordLookedUpMismatch(
+        provider: string,
+        organizationId: string,
+        event: NormalizedWebhookEvent,
+    ): Promise<{ applied: boolean }> {
+        return prisma.$transaction(async (tx) => {
+            const intent = await this.findIntent(
+                tx,
+                provider,
+                organizationId,
+                event,
+            );
+            if (!intent) return { applied: false };
+            return this.applyCaptureMismatch(tx, intent, event);
+        });
+    }
+
+    /**
+     * Money captured at an amount or currency Saroh didn't ask for (PAY-06):
+     * the order or invoice is never marked paid. The capture is recorded as
+     * owed back (`CAPTURED_NEEDS_REFUND`, reason AMOUNT_MISMATCH) once per
+     * provider payment, and an intent still open fails as a declined
+     * payment does — an order UNPAID moves to FAILED, an invoice's team
+     * hears "Payment failed" (and an autopay renewal logs RENEWAL_FAILED),
+     * an autopay check fails — so the customer can pay again. An intent
+     * already settled or superseded keeps its status; the record alone
+     * says the extra money is owed back.
+     */
+    private async applyCaptureMismatch(
+        tx: Tx,
+        found: IntentRow,
+        event: NormalizedWebhookEvent,
+    ): Promise<{ applied: boolean }> {
+        const intent = { ...found, status: await lockIntent(tx, found) };
+        const captured = capturedOf(event);
+        const recorded = await recordCaptureMismatchInTx(
+            tx,
+            intent,
+            event.providerPaymentRef ?? null,
+            captured,
+        );
+        if (recorded) {
+            this.logger.error(
+                `Payment ${event.providerPaymentRef ?? "(no id)"} on intent ${intent.id} (${intent.provider}, business ${intent.organizationId}): ${describeMismatch(intent, captured)}; not marked paid, recorded as needing a refund`,
+            );
+        }
+
+        let failed = false;
+        if (intent.purpose === AUTHORISATION_PURPOSE) {
+            failed = (await failCheckInTx(tx, intent)).applied;
+        } else if (intent.invoiceId) {
+            failed = (
+                await this.applyInvoiceFailure(
+                    tx,
+                    intent,
+                    intent.invoiceId,
+                    AMOUNT_MISMATCH,
+                )
+            ).applied;
+        } else if (intent.orderId) {
+            failed = (await this.applyFailure(tx, intent, intent.orderId))
+                .applied;
+        }
+        return { applied: recorded || failed };
     }
 
     /** The money effect of one event on the intent it matched. */
@@ -756,6 +850,7 @@ export class WebhooksService {
         tx: Tx,
         intent: IntentRow,
         invoiceId: string,
+        reason: ChargeFailure = "DECLINED",
     ): Promise<{ applied: boolean }> {
         const result = await this.applyIntentFailure(tx, intent);
         if (result.applied) {
@@ -767,7 +862,7 @@ export class WebhooksService {
                     intent.organizationId,
                     invoiceId,
                     "RENEWAL_FAILED",
-                    { reason: "DECLINED" },
+                    { reason },
                 );
             }
             await enqueueTeamAlert(tx, intent.organizationId, {
@@ -1407,6 +1502,14 @@ export class WebhooksService {
  * against it (a foreign key's KEY SHARE) under the order's lock. Falls back
  * to the status already read when the row is gone.
  */
+/** What an event says was captured (PAY-06). */
+function capturedOf(event: NormalizedWebhookEvent): CapturedAmount {
+    return {
+        amountCents: event.capturedAmountCents,
+        currency: event.capturedCurrency,
+    };
+}
+
 async function lockIntent(tx: Tx, intent: IntentRow): Promise<string> {
     const rows = await tx.$queryRaw<{ status: string }[]>`
         SELECT status FROM "PaymentIntent" WHERE id = ${intent.id} FOR NO KEY UPDATE`;

@@ -1095,6 +1095,82 @@ describe("an unsure answer", () => {
         ).toHaveLength(1);
     });
 
+    it("a capture Retry finds at another amount never pays the invoice; it is owed back (PAY-06)", async () => {
+        const who = await autopayMember();
+        const invoice = await renew(who.subscriptionId);
+        await runDue(invoice.id);
+        const [intent] = await intentsOf(invoice.id);
+        const orderId = intent.providerIntentId ?? "";
+        fake.settlePreDebit(orderId, "DELIVERED");
+        clock = new Date(clock.getTime() + 27 * HOUR);
+        fake.failNextMandateCall("charge", "UNKNOWN", { madeAnyway: true });
+        await runDue(invoice.id);
+
+        // The bank took less than was asked; its webhook was lost.
+        const answered = fake.answerCharge(orderId, "SUCCEEDED");
+        answered.capturedAmountCents = intent.amountCents - 100;
+        await prisma.invoice.update({
+            where: { id: invoice.id },
+            data: { dueAt: new Date(Date.now() - DAY) },
+        });
+        const retried = await subscriptions.retryPayment(
+            owner,
+            who.subscriptionId,
+            "PAY_LINK",
+        );
+        expect(retried).toMatchObject({ via: "PAY_LINK" });
+        expect(retried).not.toMatchObject({ paid: true });
+        expect(
+            (
+                await prisma.invoice.findUniqueOrThrow({
+                    where: { id: invoice.id },
+                })
+            ).status,
+        ).toBe("ISSUED");
+        expect((await intentsOf(invoice.id))[0].status).toBe("FAILED");
+        const owed = await prisma.paymentAttempt.findMany({
+            where: {
+                paymentIntentId: intent.id,
+                status: "CAPTURED_NEEDS_REFUND",
+            },
+        });
+        expect(owed).toHaveLength(1);
+        expect(owed[0].rawResponse).toMatchObject({
+            invoiceStatus: "AMOUNT_MISMATCH",
+            askedAmountCents: intent.amountCents,
+            capturedAmountCents: intent.amountCents - 100,
+        });
+        const events = await eventsOf(who.subscriptionId);
+        expect(events).toContain("RENEWAL_FAILED");
+        expect(events).not.toContain("CHARGED");
+
+        // The late webhook, at the same short amount: recorded once.
+        await webhook({
+            eventType: "payment.captured",
+            outcome: "SUCCEEDED",
+            providerIntentId: orderId,
+            providerPaymentRef: answered.providerPaymentRef,
+            capturedAmountCents: intent.amountCents - 100,
+            capturedCurrency: intent.currency,
+        });
+        expect(
+            await prisma.paymentAttempt.count({
+                where: {
+                    paymentIntentId: intent.id,
+                    status: "CAPTURED_NEEDS_REFUND",
+                },
+            }),
+        ).toBe(1);
+        expect(
+            (
+                await prisma.invoice.findUniqueOrThrow({
+                    where: { id: invoice.id },
+                })
+            ).status,
+        ).toBe("ISSUED");
+        await offHome(invoice.id);
+    });
+
     it("the job's look-up asks for the debit again when the provider made none", async () => {
         const who = await autopayMember();
         const invoice = await renew(who.subscriptionId);
