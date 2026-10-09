@@ -95,6 +95,8 @@ export function CustomerDetailScreen({
     actions = {},
     overviewExtra = null,
     crumbsSell,
+    deleteWords,
+    canRecordPayment = false,
 }: {
     d: CustomerDetail;
     initialTab: TabKey;
@@ -139,6 +141,13 @@ export function CustomerDetailScreen({
     overviewExtra?: ReactNode;
     /** Crumbs under Sell › Customers; by default, `crumbsUnderSell`. */
     crumbsSell?: boolean;
+    /**
+     * The delete confirm's paragraph, with what deleting them ends
+     * (`deleteQuestion`); by default the plain one, no counts.
+     */
+    deleteWords?: string;
+    /** `invoice:write`: Record payment on each unpaid invoice (#869). */
+    canRecordPayment?: boolean;
 }) {
     const router = useRouter();
     const now = new Date(nowIso);
@@ -162,6 +171,7 @@ export function CustomerDetailScreen({
         canRemove,
         suggestions,
         duplicates,
+        deleteWords,
     });
     const first = d.contact.firstName?.trim()
         ? d.contact.firstName.trim()
@@ -249,6 +259,7 @@ export function CustomerDetailScreen({
                         kind={kind}
                         timeZone={d.timezone}
                         now={now}
+                        payer={canRecordPayment ? name : null}
                     />
                 ) : (
                     <Failed what="Invoices" />

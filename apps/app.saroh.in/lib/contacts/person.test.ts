@@ -133,10 +133,23 @@ describe("personTabActions — money follows permissions (DEC-098)", () => {
         );
     });
 
+    it("offers Record payment with invoice:write, as Invoice Detail does", () => {
+        const both = viewer("invoice:read", "invoice:write");
+        expect(
+            personTabActions(both, modules({ PAYMENTS: "DISABLED" }))
+                .recordPayment,
+        ).toBe(true);
+        expect(personTabActions(viewer("invoice:read"), on).recordPayment).toBe(
+            false,
+        );
+        expect(personTabActions(null, on).recordPayment).toBe(false);
+    });
+
     it("never grants by role name", () => {
         expect(personTabActions({ role: "OWNER" }, on)).toEqual({
             subscribe: false,
             newInvoice: false,
+            recordPayment: false,
         });
     });
 });

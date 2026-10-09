@@ -7,7 +7,11 @@ import { useState } from "react";
 
 import { ConfirmDialog } from "@/components/shared/confirm-dialog";
 import { deleteContact } from "@/lib/contacts/actions";
-import { deletedLine, REMOVED_TOAST } from "@/lib/contacts/removal";
+import {
+    deletedLine,
+    deleteQuestion,
+    REMOVED_TOAST,
+} from "@/lib/contacts/removal";
 import {
     unlinkAccountAction,
     unlinkPreviewAction,
@@ -47,6 +51,7 @@ export function useMoreActions({
     canRemove,
     suggestions,
     duplicates,
+    deleteWords = deleteQuestion(null, {}),
 }: {
     d: CustomerDetail;
     name: string;
@@ -57,6 +62,8 @@ export function useMoreActions({
     canRemove: boolean;
     suggestions: IdentitySuggestion[];
     duplicates: DuplicateSuggestion[];
+    /** The delete confirm's paragraph; by default the plain one. */
+    deleteWords?: string;
 }): {
     menu: MoreItem[];
     edit: () => void;
@@ -190,7 +197,7 @@ export function useMoreActions({
                 open={removing}
                 onOpenChange={setRemoving}
                 title={`Delete ${name}?`}
-                description={`Their notes, leads, subscriptions and class packs go with them, and future classes paid with those packs are cancelled. Orders, bookings and invoices stay on record under the name they gave, and a location's record of a customer with the same email is kept. This cannot be undone.`}
+                description={deleteWords}
                 confirmLabel="Delete record"
                 cancelLabel="Keep them"
                 onConfirm={() => void remove()}

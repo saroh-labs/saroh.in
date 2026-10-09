@@ -800,6 +800,20 @@ export function invoiceRow(
     };
 }
 
+/**
+ * An invoice still owed — issued or overdue, and not a credit note — on
+ * which the Invoices tab offers "Record payment" (#869), as Invoice Detail
+ * offers Mark paid.
+ */
+export function isPayable(
+    v: Pick<DetailInvoice, "kind" | "standing">,
+): boolean {
+    return (
+        v.kind !== "CREDIT_NOTE" &&
+        (v.standing === "ISSUED" || v.standing === "OVERDUE")
+    );
+}
+
 function invoiceFrom(v: DetailInvoice, kind: Kind): string {
     switch (v.source) {
         case "ORDER": {

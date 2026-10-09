@@ -19,6 +19,7 @@ import {
     personTabActions,
     personTabGates,
 } from "@/lib/contacts/person";
+import { deleteQuestion, heldCounts } from "@/lib/contacts/removal";
 import type { ContactDetail } from "@/lib/contacts/service";
 import { getContact } from "@/lib/contacts/service";
 import { contactSourceLabel } from "@/lib/contacts/source";
@@ -264,6 +265,20 @@ export default async function PersonPage({
             : null;
     // Linked store customers are read only where the business sells.
     const sells = detail.linkedCustomers !== undefined;
+    const now = new Date();
+    // The delete confirm names what deleting them ends, from what this page
+    // read; a kind it couldn't read keeps the sentence general.
+    const deleteWords = deleteQuestion(
+        crm ? crm.leads.length : null,
+        heldCounts(
+            {
+                subscriptions: detail.subscriptions?.rows,
+                packs: detail.packs?.rows,
+                courses: holdings.courses,
+            },
+            now,
+        ),
+    );
 
     return (
         <PageContainer width="full" className="space-y-0 p-0 sm:p-0">
@@ -297,9 +312,11 @@ export default async function PersonPage({
                 canReplyReviews={may("product-review:write")}
                 packSale={packSale}
                 canExtendPacks={packsShown && canWritePacks(organization)}
-                nowIso={new Date().toISOString()}
+                nowIso={now.toISOString()}
                 extra={extra}
                 actions={actions}
+                deleteWords={deleteWords}
+                canRecordPayment={acts.recordPayment}
                 overviewExtra={
                     removed ? null : (
                         <PersonFacts

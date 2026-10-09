@@ -1,4 +1,4 @@
-// @covers accounts:/login app:/open app:/contacts app:/customers app:/leads api:customer-workspace api:contacts api:leads
+// @covers accounts:/login app:/open app:/contacts app:/customers app:/leads app:/billing/invoices api:customer-workspace api:contacts api:leads api:invoices
 import type { Page } from "@playwright/test";
 import { expect, test } from "@playwright/test";
 
@@ -112,6 +112,90 @@ test.describe("the person page", () => {
         await expect(page).toHaveURL(new RegExp(`/contacts/${who.id}$`));
         await expect(tab(page, /^Leads/)).toBeVisible();
     });
+
+    test("the delete confirm says what deleting them ends", async ({
+        page,
+    }, testInfo) => {
+        await signIn(page, NORTHWIND);
+        const s = stamp(testInfo);
+        const who = await makeContact(page.request, {
+            firstName: "Ends",
+            lastName: s,
+        });
+        await northwind(page.request).post("/leads", {
+            contactId: who.id,
+            title: `Birthday order ${s}`,
+        });
+
+        await page.goto(`/contacts/${who.id}`);
+        await page
+            .getByRole("main")
+            .getByRole("button", { name: "More actions" })
+            .click();
+        await page
+            .getByRole("menuitem", { name: "Delete their record…" })
+            .click();
+        const confirm = page.getByRole("alertdialog", {
+            name: `Delete ${who.name}?`,
+        });
+        // Their one lead is counted; what they hold is named, or said in
+        // general where a kind couldn't be read — never left out.
+        await expect(confirm).toContainText(
+            "Their notes and 1 lead go with them.",
+        );
+        await expect(confirm).toContainText("This cannot be undone.");
+        // Nothing is deleted here.
+        await confirm.getByRole("button", { name: "Keep them" }).click();
+        await expect(confirm).toBeHidden();
+        await expect(
+            page.getByRole("heading", { level: 1, name: who.name }),
+        ).toBeVisible();
+    });
+
+    test("Record payment on an unpaid invoice, from their Invoices tab", async ({
+        page,
+    }, testInfo) => {
+        await signIn(page, NORTHWIND);
+        const s = stamp(testInfo);
+        const nw = northwind(page.request);
+        const who = await makeContact(page.request, {
+            firstName: "Pays",
+            lastName: s,
+        });
+        const made = await nw.post<{ id: string }>("/invoices", {
+            contactId: who.id,
+            currency: "INR",
+            lines: [
+                { description: `Cake (${s})`, quantity: 1, unitPrice: "1200" },
+            ],
+            dueAt: new Date(Date.now() + 7 * 86_400_000).toISOString(),
+        });
+        await nw.post(`/invoices/${made.id}/issue`);
+
+        await page.goto(`/contacts/${who.id}?tab=inv`);
+        await page.getByRole("button", { name: "Record payment" }).click();
+        const dialog = page.getByRole("dialog", { name: "Record a payment" });
+        await expect(dialog).toContainText(who.name);
+        await dialog.getByRole("combobox", { name: "How it was paid" }).click();
+        await page.getByRole("option", { name: "Cash" }).click();
+        await dialog.getByRole("button", { name: "Mark it paid" }).click();
+        await expect(dialog).toBeHidden();
+        await expect
+            .poll(
+                async () =>
+                    (await nw.get<{ status: string }>(`/invoices/${made.id}`))
+                        .status,
+                { timeout: 15_000 },
+            )
+            .toBe("PAID");
+        // The tab refreshes: the row reads Paid and offers nothing more.
+        await expect(
+            page.getByRole("tabpanel").getByText("Paid", { exact: true }),
+        ).toBeVisible();
+        await expect(
+            page.getByRole("button", { name: "Record payment" }),
+        ).toHaveCount(0);
+    });
 });
 
 test.describe("the person page, as a Member", () => {
@@ -125,5 +209,13 @@ test.describe("the person page, as a Member", () => {
         for (const name of [/^Leads/, /^Enquiries/])
             await expect(tab(page, name)).toHaveCount(0);
         await expect(page.getByRole("main")).not.toContainText("₹");
+        // No invoices to read, so nothing to mark paid (DEC-098).
+        await page.goto(`/contacts/${PRIYA}?tab=inv`);
+        await expect(
+            page.getByRole("heading", { name: "Priya Raman" }),
+        ).toBeVisible();
+        await expect(
+            page.getByRole("button", { name: "Record payment" }),
+        ).toHaveCount(0);
     });
 });

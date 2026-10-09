@@ -1,13 +1,18 @@
 "use client";
 
+import { Button } from "@saroh/ui/button";
+import { cn } from "@saroh/ui/lib/utils";
 import Link from "next/link";
+import { useState } from "react";
 
+import type { InvoiceRef } from "@/components/invoices/invoice-actions";
+import { RecordPaymentDialog } from "@/components/invoices/invoice-actions";
 import type {
     DetailInvoice,
     DetailSubscription,
 } from "@/lib/customer-workspace/detail";
 import type { Kind } from "@/lib/customer-workspace/view";
-import { invoiceRow, subRow } from "@/lib/customer-workspace/view";
+import { invoiceRow, isPayable, subRow } from "@/lib/customer-workspace/view";
 
 import { Empty, ROW_LINK, RowPill } from "./parts";
 
@@ -70,6 +75,10 @@ export function SubscriptionsTab({
 /**
  * Every invoice that is theirs — billed to them, and their linked orders'
  * own paper — with what is still owed on top. Each opens Invoice Detail.
+ *
+ * To whoever may write invoices, each one still owed offers "Record
+ * payment" (#869): Invoice Detail's own dialog, which refreshes the page
+ * once it's marked paid, so the row turns Paid in place.
  */
 export function InvoicesTab({
     rows,
@@ -77,13 +86,20 @@ export function InvoicesTab({
     kind,
     timeZone,
     now,
+    payer = null,
 }: {
     rows: DetailInvoice[];
     owed: string | null;
     kind: Kind;
     timeZone: string;
     now: Date;
+    /**
+     * Who pays, for the dialog's line, when this viewer may record a
+     * payment (`invoice:write`, DEC-098); null when they may not.
+     */
+    payer?: string | null;
 }) {
+    const [paying, setPaying] = useState<InvoiceRef | null>(null);
     return (
         <>
             {owed ? (
@@ -98,12 +114,9 @@ export function InvoicesTab({
             <div className="flex flex-col gap-2">
                 {rows.map((v) => {
                     const r = invoiceRow(v, kind, timeZone, now);
-                    return (
-                        <Link
-                            key={v.id}
-                            href={`/billing/invoices/${v.id}`}
-                            className={ROW_LINK}
-                        >
+                    const href = `/billing/invoices/${v.id}`;
+                    const facts = (
+                        <>
                             <div className="min-w-0 flex-[1_1_120px]">
                                 <div className="font-mono text-[12.5px]">
                                     {r.number}
@@ -122,10 +135,63 @@ export function InvoicesTab({
                             <span aria-hidden className="text-muted-foreground">
                                 →
                             </span>
-                        </Link>
+                        </>
+                    );
+                    if (payer === null || !isPayable(v)) {
+                        return (
+                            <Link key={v.id} href={href} className={ROW_LINK}>
+                                {facts}
+                            </Link>
+                        );
+                    }
+                    // A button may not sit inside a link: the row's facts
+                    // open the invoice, and Record payment sits beside
+                    // them, dropping to a line of its own on a phone.
+                    return (
+                        <div
+                            key={v.id}
+                            className="flex flex-wrap items-center rounded-xl border border-border bg-card"
+                        >
+                            <Link
+                                href={href}
+                                className={cn(
+                                    ROW_LINK,
+                                    "min-w-0 flex-[1_1_260px] border-transparent hover:border-transparent",
+                                )}
+                            >
+                                {facts}
+                            </Link>
+                            <div className="ml-auto px-3.5 pb-3 pt-0 min-[465px]:py-2">
+                                <Button
+                                    size="sm"
+                                    variant="outline"
+                                    className="coarse:h-11"
+                                    onClick={() =>
+                                        setPaying({
+                                            id: v.id,
+                                            number: v.number,
+                                            standing: v.standing,
+                                            who: payer,
+                                            total: r.total,
+                                        })
+                                    }
+                                >
+                                    Record payment
+                                </Button>
+                            </div>
+                        </div>
                     );
                 })}
             </div>
+            {paying ? (
+                <RecordPaymentDialog
+                    open
+                    onOpenChange={(o) => {
+                        if (!o) setPaying(null);
+                    }}
+                    invoice={paying}
+                />
+            ) : null}
         </>
     );
 }

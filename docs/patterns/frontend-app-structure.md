@@ -69,7 +69,13 @@ components/shared/             app shell, navigation, command menu
   `personHref` (`lib/contacts/person-href.ts`); `/customers/<id>` only
   redirects, resolving a linked store customer's id to its contact. The
   Contacts list's CRM gate sits on the `(list)` route group, so the person
-  page opens with CRM off and drops only the CRM tabs.
+  page opens with CRM off and drops only the CRM tabs. Two things the old
+  contact page did stay (owner, 9 Oct): its delete confirm names what
+  deleting ends (`deleteQuestion` and `heldCounts` in
+  `lib/contacts/removal.ts`, counted from what the page read; a kind it
+  couldn't read is said in general terms), and each unpaid invoice on the
+  Invoices tab offers Record payment — Invoice Detail's own
+  `RecordPaymentDialog`, on `invoice:write` as there (DEC-098).
 - **Adopted** — **Every app has `app/error.tsx` and `app/loading.tsx`,** and a
   route group that can fail on its own gets its own boundary. Gap: templates,
   saroh.in and ui have neither.

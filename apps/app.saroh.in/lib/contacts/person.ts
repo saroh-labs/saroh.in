@@ -58,22 +58,24 @@ export function personTabGates(
 
 /**
  * What the Subscriptions and Invoices tabs offer, beside what they list:
- * Subscribe (`subscription:write`, Payments on) and New invoice
- * (`invoice:write`; invoicing needs no module, DEC-070). Money follows the
- * role's permissions only, never its name (DEC-098).
+ * Subscribe (`subscription:write`, Payments on), New invoice, and Record
+ * payment on each unpaid invoice (`invoice:write`, as Invoice Detail asks
+ * it; invoicing needs no module, DEC-070). Money follows the role's
+ * permissions only, never its name (DEC-098).
  */
 export function personTabActions(
     viewer: Viewer,
     modules: ModuleStates,
-): { subscribe: boolean; newInvoice: boolean } {
+): { subscribe: boolean; newInvoice: boolean; recordPayment: boolean } {
+    const invoices =
+        viewerCan(viewer, "invoice:read") && viewerCan(viewer, "invoice:write");
     return {
+        recordPayment: invoices,
         subscribe:
             moduleOn(modules, "PAYMENTS") &&
             viewerCan(viewer, "subscription:read") &&
             viewerCan(viewer, "subscription:write"),
-        newInvoice:
-            viewerCan(viewer, "invoice:read") &&
-            viewerCan(viewer, "invoice:write"),
+        newInvoice: invoices,
     };
 }
 
