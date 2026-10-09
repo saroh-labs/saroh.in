@@ -71,6 +71,7 @@ waits while holding one.
 | ----------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------- |
 | `first-pack:<organizationId>:<contactId>` | Selling a "first pack only" pack to one person                                                                                                              | `class-packs/first-pack.ts`                                                                                                                     |
 | `subscription-plan-name:<organizationId>` | Saving a subscription plan's name in one business                                                                                                           | `subscriptions/plans.ts` (`lockPlanNames`)                                                                                                      |
+| `provider-alert:<providerId>`             | Telling the team one payment or email connection stopped or works again (#555)                                                                              | `notifications/provider-alerts.ts` (`wordProvider`)                                                                                             |
 | `plan-meter:<organizationId>:<limitKey>`  | Writes that add to one plan limit (a product, a booking…); a booking notice Saroh will email takes `…:sarohEmailsPerMonth` before its first write (DEC-086) | `billing/metering.service.ts` (`lockMeter`, U13); `customer-notify.handler.ts` (the one notice site; `booking.notify` writes nothing before it) |
 
 Race tests wait on an advisory lock with `waitUntilAdvisoryBlockedBy`
@@ -251,6 +252,14 @@ nobody was told. Round-2 A14 closed it (`bookings/booking-notify.handler.ts`).
   (`emailReviewersOf`), email its reviewers, who have no bell (UX-043). A
   provider that refused its keys (UX-012) is emailed too, email providers
   included: Saroh sends it, not the refused key.
+- **A provider that stops and starts again** (#555,
+  `notifications/provider-alerts.ts`) is told once per incident: "down"
+  when a live call's 401/403 flags the connection, "back" when keys entered
+  again or a live call accepted on the flagged connection clear it. Each
+  is claimed as `team:provider:<id>:<down|back>:<at>`, and the last one
+  told decides what may follow ("down" only after none or "back", "back"
+  only after "down"), under the `provider-alert:<id>` lock. A claim made
+  before #555 (`team:provider:<id>:<at>`) reads as "down".
 - **Review alerts** (`team.alert` `{ event: "review" }`,
   `notifications/review-alerts.ts`, UX-043), queued on the review write's
   transaction (`sites/review-alert-queue.ts`): a request or a new test

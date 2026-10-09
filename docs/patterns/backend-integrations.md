@@ -89,7 +89,14 @@ a note saying so.
   view sends as `attention: { reason, since } | null` and provider health
   reads as FAILED, and queues the team's `provider` alert on the same
   transaction, only when the row wasn't flagged already. Entering keys
-  again clears it. A provider order that fails at checkout is a deliberate
+  again clears it, and so does a live call the provider accepts on the
+  flagged row (`paymentProviderWorks`, `commsProviderWorks`); either
+  queues the team's "working again" alert on the same transaction, told
+  only when the stop was (#555, `notifications/provider-alerts.ts`: once
+  per incident, bell and Saroh's email on the Payment failed row, fixed
+  words, Settings › Providers). Only these two live calls flag today: a
+  checkout's provider order and an email's send. A refund, a mandate call
+  or a payment look-up that gets a 401 flags nothing yet. A provider order that fails at checkout is a deliberate
   503 in the customer's words (`provider-keys-refused` or
   `provider-unavailable`), never an unhandled 500
   (`payments/provider-keys.ts`).
