@@ -60,6 +60,7 @@ export class CashfreeWebhookProvider implements WebhookProvider {
                 charges_details?: CashfreeCharges;
                 refund?: {
                     cf_refund_id?: string | number;
+                    cf_payment_id?: string | number;
                     refund_id?: string;
                     order_id?: string;
                     refund_amount?: number | string;
@@ -76,10 +77,11 @@ export class CashfreeWebhookProvider implements WebhookProvider {
         // A refund webhook carries its order id on the refund, not `order`.
         const orderRef = body.data?.order?.order_id ?? refund?.order_id;
 
+        // A refund names the payment it refunds on `data.refund`: how a
+        // dashboard refund of a mismatched capture finds it (PAY-06).
+        const paymentId = payment?.cf_payment_id ?? refund?.cf_payment_id;
         const providerPaymentRef =
-            payment?.cf_payment_id != null
-                ? String(payment.cf_payment_id)
-                : undefined;
+            paymentId != null ? String(paymentId) : undefined;
         const providerRefundId =
             refund?.cf_refund_id != null
                 ? String(refund.cf_refund_id)

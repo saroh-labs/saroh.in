@@ -439,6 +439,8 @@ function home(
         paymentIntent: empty(),
         // B9's failed refunds: none.
         paymentRefund: empty(),
+        // PAY-06's captures at the wrong amount: none.
+        paymentAttempt: empty(),
         subscriptionEvent: empty(),
         invoice: {
             ...empty(),

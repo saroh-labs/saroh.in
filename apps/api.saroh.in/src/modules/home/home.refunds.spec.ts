@@ -1,3 +1,5 @@
+import { Prisma } from "@saroh/database";
+
 import { quietLastDay } from "../../../test/home-quiet-db";
 import type { ModuleAvailabilityService } from "../capabilities/module-availability.service";
 import type { OrgAction } from "../organizations/organization-actions";
@@ -36,7 +38,7 @@ function owedFor(invoiceStatus: unknown): Owed {
     return { ...OWED, attempts: [{ rawResponse: { invoiceStatus } }] };
 }
 
-function build(rows: Owed[], count = rows.length) {
+function build(rows: Owed[], count = rows.length, attempts: unknown[] = []) {
     const availability = {
         listViews: jest.fn().mockResolvedValue([
             {
@@ -52,6 +54,9 @@ function build(rows: Owed[], count = rows.length) {
             count: jest.fn().mockResolvedValue(count),
             findMany: jest.fn().mockResolvedValue(rows),
         },
+        // Captures taken at the wrong amount (PAY-06): none, unless given.
+        paymentAttempt: { findMany: jest.fn().mockResolvedValue(attempts) },
+        paymentRefund: { findMany: jest.fn().mockResolvedValue([]) },
         // Failed renewals and overdue invoices (F1) read here too: none.
         invoice: {
             count: jest.fn().mockResolvedValue(0),
@@ -96,11 +101,77 @@ describe("HomeService refunds owed on invoices", () => {
                 organizationId: "org_1",
                 invoiceId: { not: null },
                 status: "SUCCEEDED",
-                attempts: { some: { status: "CAPTURED_NEEDS_REFUND" } },
+                // A mismatch is listed by its own capture (PAY-06).
+                attempts: {
+                    some: {
+                        status: "CAPTURED_NEEDS_REFUND",
+                        OR: [
+                            { rawResponse: { equals: Prisma.AnyNull } },
+                            {
+                                rawResponse: {
+                                    path: ["invoiceStatus"],
+                                    equals: Prisma.AnyNull,
+                                },
+                            },
+                            {
+                                NOT: {
+                                    rawResponse: {
+                                        path: ["invoiceStatus"],
+                                        equals: "AMOUNT_MISMATCH",
+                                    },
+                                },
+                            },
+                        ],
+                    },
+                },
                 refunds: {
                     none: { status: { in: ["PENDING", "SUCCEEDED"] } },
                 },
             },
+        });
+    });
+
+    it("lists a capture taken at the wrong amount on its own row, at what it took, whatever its intent (PAY-06)", async () => {
+        const mismatch = {
+            id: "att_1",
+            createdAt: new Date("2026-09-09T08:00:00Z"),
+            rawResponse: {
+                invoiceStatus: "AMOUNT_MISMATCH",
+                capturedAmountCents: 45000,
+                capturedCurrency: "INR",
+            },
+            paymentIntent: {
+                currency: "INR",
+                amountCents: 48000,
+                invoice: null,
+                order: {
+                    id: "ord_1",
+                    orderId: "ORD-007",
+                    walkInName: null,
+                    customer: {
+                        firstName: "Farah",
+                        lastName: "Khan",
+                        email: null,
+                    },
+                },
+            },
+        };
+        const { service } = build([OWED], 1, [mismatch]);
+        const home = await service.build(OWNER);
+        const action = home.actions[0];
+        expect(action?.count).toBe(2);
+        expect(action?.title).toBe("Refund 2 payments customers are owed");
+        // Oldest first: the mismatch came a day before.
+        expect(action?.evidence?.map((e) => e.id)).toEqual(["att_1", "pi_1"]);
+        expect(action?.evidence?.[0]).toEqual({
+            id: "att_1",
+            title: "#ORD-007",
+            subtitle:
+                "Farah Khan · Paid online at a different amount than asked",
+            at: "2026-09-09T08:00:00.000Z",
+            amountMinor: 45000,
+            currency: "INR",
+            href: "/commerce/orders/ord_1",
         });
     });
 

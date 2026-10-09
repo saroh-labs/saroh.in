@@ -50,6 +50,13 @@ import { assertOrganizationOpen } from "../organizations/organization-lifecycle.
 import { authorize } from "../organizations/organization-policy";
 import { assertPutBack, returnablePlan, STOCK_HELD } from "../stock/reserve";
 import { decryptSecret, encryptSecret } from "./crypto";
+import {
+    MISMATCH_ATTEMPT_WHERE,
+    MISMATCH_REFUND_REASON,
+    mismatchRefundKey,
+    owedOf,
+    refundsOfAttemptInTx,
+} from "./mismatch-refund";
 import { businessPayLinkProvider, payLinkProvider } from "./pay-link-provider";
 import {
     assertKeysAccepted,
@@ -1095,6 +1102,131 @@ export class PaymentsService {
         return outcome.kind;
     }
 
+    /**
+     * "Refund" on a capture taken at the wrong amount (PAY-06, owner
+     * decision 9 Oct): exactly what the provider captured goes back,
+     * against that payment, through the business's provider. `order:refund`,
+     * the refund permission (`payment:manage` implies it).
+     *
+     * The order or invoice is never touched — it was never paid by this
+     * money — and no credit note, timeline step or stock follows. The
+     * refund is a PaymentRefund on the attempt's intent keyed to the
+     * attempt (`mismatch-refund.ts`), reserved under the intent's lock and
+     * sent after, under its id as Saroh's reference (DEC-026). Idempotent:
+     * a refund on its way or done is returned as it is; one whose answer
+     * was lost is looked for first and sent again only if the provider has
+     * none; after a definite refusal a fresh row is sent.
+     */
+    async refundAmountMismatch(
+        ctx: OrganizationContext,
+        attemptId: string,
+    ): Promise<InitiateRefundResult> {
+        authorize(ctx, "order:refund");
+        const attempt = await prisma.paymentAttempt.findFirst({
+            where: {
+                id: attemptId,
+                organizationId: ctx.organizationId,
+                ...MISMATCH_ATTEMPT_WHERE,
+            },
+            select: {
+                id: true,
+                providerRef: true,
+                rawResponse: true,
+                paymentIntent: {
+                    select: {
+                        id: true,
+                        provider: true,
+                        providerIntentId: true,
+                        currency: true,
+                    },
+                },
+            },
+        });
+        if (!attempt) throw new NotFoundException("Payment not found");
+        const intent = attempt.paymentIntent;
+        const owed = owedOf(attempt.rawResponse, intent.currency);
+        if (!owed) {
+            throw new ConflictException(
+                "We don't know how much this payment took. Refund it from your payment provider's dashboard.",
+            );
+        }
+
+        const { row, fresh } = await prisma.$transaction(async (tx) => {
+            await tx.$queryRaw`SELECT id FROM "PaymentIntent" WHERE id = ${intent.id} FOR NO KEY UPDATE`;
+            const made = await refundsOfAttemptInTx(
+                tx,
+                ctx.organizationId,
+                intent.id,
+                attempt.id,
+            );
+            const holding = made.find((r) => r.status !== "FAILED");
+            if (holding) {
+                return {
+                    row: await tx.paymentRefund.findUniqueOrThrow({
+                        where: { id: holding.id },
+                        include: REFUND_ROW_INCLUDE,
+                    }),
+                    fresh: false,
+                };
+            }
+            return {
+                row: await tx.paymentRefund.create({
+                    data: {
+                        organizationId: ctx.organizationId,
+                        paymentIntentId: intent.id,
+                        amountCents: owed.amountCents,
+                        currency: owed.currency,
+                        status: "PENDING",
+                        reason: MISMATCH_REFUND_REASON,
+                        idempotencyKey: mismatchRefundKey(
+                            attempt.id,
+                            made.length + 1,
+                        ),
+                    },
+                    include: REFUND_ROW_INCLUDE,
+                }),
+                fresh: true,
+            };
+        });
+        // Done, or taken by the provider: its webhook settles it.
+        if (row.status !== "PENDING" || row.providerRefundId) {
+            return refundResult([row]);
+        }
+
+        const paying = { ...intent, currency: row.currency };
+        let found: RefundResult | null = null;
+        if (!fresh) {
+            // Sent before and its answer lost: look before sending again.
+            try {
+                const call = await this.refundCall(
+                    ctx.organizationId,
+                    intent,
+                    attempt.providerRef,
+                );
+                found = await this.factory.get(call.provider).findRefund({
+                    reference: row.id,
+                    providerIntentId: intent.providerIntentId ?? "",
+                    providerPaymentRef: call.providerPaymentRef,
+                    credentials: call.credentials,
+                });
+            } catch {
+                throw new ServiceUnavailableException(
+                    "We couldn't reach the payment provider. Try again in a minute.",
+                );
+            }
+        }
+        const outcome = found
+            ? await this.settleFromProvider(row.id, found)
+            : await this.sendRefund(
+                  ctx.organizationId,
+                  row,
+                  paying,
+                  attempt.providerRef,
+              );
+        if (outcome.kind === "REFUSED") throw refusal(outcome.error);
+        return refundResult([outcome.row]);
+    }
+
     /** The shared two-phase refund core — see {@link initiateRefund}. */
     private async refundOrder(
         ctx: OrganizationContext,
@@ -1305,13 +1437,15 @@ export class PaymentsService {
             providerIntentId: string | null;
             currency: string;
         },
+        /** The payment to refund, when it isn't the intent's latest (PAY-06). */
+        paymentRef?: string | null,
     ): Promise<RefundOutcome> {
         // Setting the call up — the business's provider and its keys — sends
         // nothing: a failure there is a refusal.
         let call: Awaited<ReturnType<PaymentsService["refundCall"]>>;
         let provider: MerchantProvider;
         try {
-            call = await this.refundCall(organizationId, intent);
+            call = await this.refundCall(organizationId, intent, paymentRef);
             provider = this.factory.get(call.provider);
         } catch (err) {
             return {
@@ -1454,6 +1588,7 @@ export class PaymentsService {
     private async refundCall(
         organizationId: string,
         intent: { id: string; provider: string },
+        paymentRef?: string | null,
     ): Promise<{
         provider: string;
         credentials: ProviderCredentials;
@@ -1463,14 +1598,25 @@ export class PaymentsService {
             organizationId,
             intent.provider,
         );
-        const attempt = await prisma.paymentAttempt.findFirst({
-            where: { paymentIntentId: intent.id, providerRef: { not: null } },
-            orderBy: { createdAt: "desc" },
-        });
+        // A mismatch's refund names its own payment (PAY-06): the intent's
+        // latest may be another.
+        const attempt =
+            paymentRef === undefined
+                ? await prisma.paymentAttempt.findFirst({
+                      where: {
+                          paymentIntentId: intent.id,
+                          providerRef: { not: null },
+                      },
+                      orderBy: { createdAt: "desc" },
+                  })
+                : null;
         return {
             provider: providerRow.provider,
             credentials: this.openCredentials(providerRow),
-            providerPaymentRef: attempt?.providerRef ?? null,
+            providerPaymentRef:
+                paymentRef === undefined
+                    ? (attempt?.providerRef ?? null)
+                    : paymentRef,
         };
     }
 

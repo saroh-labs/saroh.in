@@ -149,9 +149,26 @@ carries none is settled on the provider order's amount, as before. Code:
 `webhooks.service.spec.ts` (PAY-06), `payment-lookup.db.spec.ts` and
 `subscriptions.charge.db.spec.ts`.
 
-**Left open:** a mismatch on an intent that is now FAILED doesn't appear on
-Home's "refunds owed" list. That list reads SUCCEEDED intents. The money is
-refunded from the provider's dashboard.
+**Follow-up done** (owner decision 9 Oct): a mismatch on an intent that is
+now FAILED used to miss Home's "refunds owed" list, which read SUCCEEDED
+intents only. Now every mismatch not yet refunded is its own row there,
+whatever its intent's status, at what it captured, with the order or invoice
+it was for (`home/home-mismatch-refunds.ts`), and carries **Refund**
+(`order:refund`, while its provider is connected). Refund sends exactly the
+captured amount against that payment through the provider, as a
+PaymentRefund on the intent keyed to the attempt (`amount-mismatch:<attempt>`,
+`payments/mismatch-refund.ts`, `POST …/payment-attempts/:attemptId/refund`);
+it is idempotent, looks before resending a lost answer, and sends a fresh row
+after a refusal. The order or invoice is left as it is: no credit note, step
+or stock. The provider's refund webhook for such a payment settles that row
+(or, for a refund made in the dashboard, records one keyed to the attempt,
+matched by the payment id Razorpay and Cashfree carry on the refund) before
+the order's refund path, so it is never refused on a FAILED order. Tests:
+`mismatch-refund.spec.ts`, `mismatch-refund.db.spec.ts`,
+`home.refunds.spec.ts`, `home.inline.spec.ts`. Residual: a second capture on
+an intent that had already succeeded (one provider order paid twice, which
+neither provider takes) would have its refund read as part of that payment
+going back.
 
 ## PAY-07: billing reconcile ordering — Risk
 
