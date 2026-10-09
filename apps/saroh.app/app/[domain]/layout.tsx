@@ -23,6 +23,7 @@ import { customerReader } from "@/lib/customer-reader";
 import { getSignedInCustomer } from "@/lib/customer-session";
 import { headerAction } from "@/lib/header-action";
 import { liveMenu } from "@/lib/in-page-menu";
+import { dontCachePage, pageCacheRules } from "@/lib/page-cache/site-rules";
 import { getMovedTo, getSiteForHost, shareImages } from "@/lib/publication";
 import { movedLocation, REQUEST_PATH_HEADER } from "@/lib/request-path";
 import { getCheckoutOptions } from "@/lib/shop-checkout";
@@ -221,6 +222,16 @@ export default async function SiteLayout({
         ]);
     const asksConsent = head.trackers.some((t) => needsConsent(t.kind));
     const shopServes = catalogue?.ok ?? false;
+    // Whose page this is for the page cache (#863), and what limits keeping
+    // it: a live head (DEC-108) keeps it a minute at most, and a test host
+    // or a failed shop read not at all (`lib/page-cache/site-rules.ts`).
+    pageCacheRules({
+        siteId,
+        test: test.mode === "test" || Boolean(resolved.release),
+        liveHead: head.trackers.length > 0 || head.verifications.length > 0,
+        catalogueFailed:
+            catalogue?.ok === false && catalogue.reason === "unavailable",
+    });
     const action = headerAction({ booking, shopServes });
 
     /*
@@ -231,7 +242,14 @@ export default async function SiteLayout({
     const takesOrders = shopServes && checkout?.canOrder === true;
     // Who is signed in, read once per render: the bag and the account
     // entry share it. A read that fails is a visitor signed out.
-    const readCustomer = customerReader(getSignedInCustomer);
+    // A page drawn for someone signed in is theirs alone, never kept (#863).
+    // The cache already passes by any request with a session cookie; this
+    // is the second lock.
+    const readCustomer = customerReader(async () => {
+        const customer = await getSignedInCustomer();
+        if (customer) dontCachePage("signed in");
+        return customer;
+    });
     const [customer, signInOptions] = takesOrders
         ? await Promise.all([
               readCustomer(),

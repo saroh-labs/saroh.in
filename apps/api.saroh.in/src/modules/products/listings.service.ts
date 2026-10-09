@@ -6,6 +6,7 @@ import {
 import type { Prisma } from "@saroh/database";
 import { prisma } from "@saroh/database";
 
+import { enqueuePageRevalidation } from "../sites/page-cache-revalidate";
 import { COUNTING_ROWS } from "../stock/tracking";
 import { assertSameCurrency } from "../stores/currency";
 import type { StockCounts } from "./stock-levels";
@@ -209,6 +210,12 @@ export class ListingsService {
         await this.assertOwned(organizationId, productId, storeId);
         await prisma.productListing.deleteMany({
             where: { organizationId, storeId, productId },
+        });
+        // Off the storefront's shop and grids (#863).
+        await enqueuePageRevalidation(prisma, {
+            cause: "product",
+            productIds: [productId],
+            organizationId,
         });
         return this.at(organizationId, productId, storeId);
     }

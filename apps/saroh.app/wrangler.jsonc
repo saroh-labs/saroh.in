@@ -7,7 +7,9 @@
 {
     "$schema": "node_modules/wrangler/config-schema.json",
     "name": "saroh-sites-dev",
-    "main": ".open-next/worker.js",
+    // OpenNext's handler behind the page cache (#863): worker.ts wraps
+    // .open-next/worker.js, which `pnpm cf:build` writes.
+    "main": "worker.ts",
     "compatibility_date": "2026-10-01",
     // Off: esbuild's name-keeping wraps functions in __name(), which breaks
     // functions Next turns into inline <script>s ("__name is not defined").
@@ -26,6 +28,20 @@
     "images": {
         "binding": "IMAGES",
     },
+    // The page cache (#863, lib/page-cache/worker.ts). SITE_PAGE_TAGS holds
+    // when each tag was last revalidated, one Durable Object per site; the
+    // migration below makes the class, so a deploy creates it and nothing
+    // has to be made in Cloudflare first. CF_VERSION_METADATA names the
+    // deploy, so a page kept by an older one is never served after it.
+    "durable_objects": {
+        "bindings": [
+            { "name": "SITE_PAGE_TAGS", "class_name": "SitePageTags" },
+        ],
+    },
+    "migrations": [
+        { "tag": "v1-site-page-tags", "new_sqlite_classes": ["SitePageTags"] },
+    ],
+    "version_metadata": { "binding": "CF_VERSION_METADATA" },
     // Run the Worker next to the API (Mumbai, where api.saroh.in is), not
     // where the visitor connected: each page calls the API several times,
     // and India's traffic often arrives through Singapore or Hong Kong.
@@ -48,10 +64,14 @@
     ],
     // Settings that aren't secret; the build reads them too (scripts/cf-env.mjs).
     // SITE_RELAY_SECRET is a Worker secret, from GitHub.
+    // SITE_PAGE_CACHE (on | off) keeps rendered pages (#863), on in dev;
+    // SITE_PAGE_CACHE_TTL is how long one is kept, in seconds.
     "vars": {
         "API_URL": "https://api.saroh.io",
         "NEXT_PUBLIC_API_URL": "https://api.saroh.io",
         "NEXT_PUBLIC_ROOT_DOMAIN": "saroh.dev",
+        "SITE_PAGE_CACHE": "on",
+        "SITE_PAGE_CACHE_TTL": "300",
     },
     "env": {
         // Production (`wrangler deploy --env production`, from main):
@@ -79,10 +99,26 @@
             "images": {
                 "binding": "IMAGES",
             },
+            "durable_objects": {
+                "bindings": [
+                    { "name": "SITE_PAGE_TAGS", "class_name": "SitePageTags" },
+                ],
+            },
+            "migrations": [
+                {
+                    "tag": "v1-site-page-tags",
+                    "new_sqlite_classes": ["SitePageTags"],
+                },
+            ],
+            "version_metadata": { "binding": "CF_VERSION_METADATA" },
+            // The page cache starts off in production: switch it on here
+            // once it has run on dev (#863).
             "vars": {
                 "API_URL": "https://api.saroh.in",
                 "NEXT_PUBLIC_API_URL": "https://api.saroh.in",
                 "NEXT_PUBLIC_ROOT_DOMAIN": "saroh.app",
+                "SITE_PAGE_CACHE": "off",
+                "SITE_PAGE_CACHE_TTL": "300",
             },
         },
     },

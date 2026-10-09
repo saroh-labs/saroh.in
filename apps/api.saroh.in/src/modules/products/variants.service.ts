@@ -6,6 +6,7 @@ import {
 } from "@nestjs/common";
 import { prisma } from "@saroh/database";
 
+import { enqueuePageRevalidation } from "../sites/page-cache-revalidate";
 import { variantHasHistory, variantHasStock } from "../stock/stock-words";
 import { recordEntry } from "../stock/stock.service";
 import { COUNTING_ROWS } from "../stock/tracking";
@@ -184,7 +185,7 @@ export class VariantsService {
     }
 
     async updateIn(
-        _scope: ProductScope,
+        scope: ProductScope,
         productId: string,
         variantId: string,
         dto: UpdateVariantDto,
@@ -209,6 +210,12 @@ export class VariantsService {
                     optionValueId: dto.optionValueId ?? null,
                     imageId: dto.imageId ?? null,
                 },
+            });
+            // Its price is on the product's page and its cards (#863).
+            await enqueuePageRevalidation(prisma, {
+                cause: "product",
+                productIds: [productId],
+                organizationId: scope.organizationId,
             });
             return { id: variantId };
         } catch (error) {

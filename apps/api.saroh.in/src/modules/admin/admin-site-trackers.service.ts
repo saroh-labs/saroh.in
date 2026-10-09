@@ -6,6 +6,7 @@ import {
 import type { Prisma } from "@saroh/database";
 import { prisma } from "@saroh/database";
 
+import { enqueuePageRevalidation } from "../sites/page-cache-revalidate";
 import { OrganizationLifecycleStatus } from "./admin-access.service";
 import { AdminAuditOutcome, AdminAuditService } from "./admin-audit.service";
 import type { OperatorCommand } from "./admin-lifecycle.service";
@@ -82,6 +83,12 @@ export class AdminSiteTrackersService {
                 update: off,
             });
             await this.record(tx, command, reason, site, "off");
+            // Saroh's switch takes effect on the next visit, not when a
+            // kept page runs out (#863, DEC-108).
+            await enqueuePageRevalidation(tx, {
+                cause: "trackers",
+                siteIds: [site.id],
+            });
             return { ok: true, changed: true, switchedOff: true };
         });
     }
@@ -106,6 +113,10 @@ export class AdminSiteTrackersService {
                 return { ok: true, changed: false, switchedOff: false };
             }
             await this.record(tx, command, reason, site, "on");
+            await enqueuePageRevalidation(tx, {
+                cause: "trackers",
+                siteIds: [site.id],
+            });
             return { ok: true, changed: true, switchedOff: false };
         });
     }

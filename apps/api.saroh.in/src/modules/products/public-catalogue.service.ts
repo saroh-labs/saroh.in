@@ -452,6 +452,7 @@ export class PublicCatalogueService {
             const maker = madeByLine(p);
 
             return {
+                productId: p.id,
                 slug: p.slug,
                 // What the bag holds (G13): the listing, never a price.
                 listingId: listing.id,

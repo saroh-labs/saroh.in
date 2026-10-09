@@ -216,6 +216,13 @@ const envSchema = z.object({
     // own `SITE_ACCOUNT_AREA`, which hides the header entry and the pages;
     // this one is the server half that keeps it private.
     SITE_ACCOUNT_AREA: z.enum(["on", "off"]).optional(),
+    // The merchant sites' page cache (#863): `on` queues
+    // `site.pages.revalidate` after a publish, a web-address or tracker
+    // change, and stock and price writes, which tells the sites' Worker
+    // (`RENDERER_URL`, signed with SITE_RELAY_SECRET) to stop serving the
+    // pages they changed. Anything else (unset included) queues nothing.
+    // Switch it on before the Worker's own `SITE_PAGE_CACHE`.
+    SITE_PAGE_CACHE: z.enum(["on", "off"]).optional(),
     // TEST ONLY. Hosts the link preview tool may fetch although they resolve
     // to loopback (comma-separated, e.g. `localhost`): the browser tests
     // point it at a page served on the test machine, which the SSRF guard

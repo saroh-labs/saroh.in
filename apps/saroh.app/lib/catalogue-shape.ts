@@ -22,6 +22,13 @@ export type CatalogueProduct = ProductPageData & {
      * Absent from an API before G13; such a page offers no bag.
      */
     listingId?: string;
+    /**
+     * The product's id, which the page cache tags its page with (#863), so
+     * a stock or price change redraws this product's page and not every
+     * other. Absent from an API before #863: the page is then tagged with
+     * the site's products instead.
+     */
+    productId?: string;
     seoTitle: string | null;
     seoDescription: string | null;
 };
