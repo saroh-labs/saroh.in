@@ -55,6 +55,12 @@ vi.mock("@/lib/sites/actions", () => actions);
  * A plain popover: Radix's, once opened in the bar, never let an async
  * `act` settle under jsdom (the Share menu, UX-068). What is tested is what
  * the menus offer, not how they float.
+ *
+ * It also keeps this file fast. With the real one, every test after a menu
+ * was opened in the bar (More, Status) took 2–12 s of jsdom selector
+ * matching instead of ~20 ms, and the phone suite's "opens the rail from the
+ * foot" crossed vitest's 5 s timeout in a loaded gate (#854). Don't raise
+ * the timeout; don't put the real popover back.
  */
 vi.mock("@saroh/ui/popover", async () => {
     const React = await import("react");
