@@ -1,16 +1,8 @@
 "use client";
 
 import { Button } from "@saroh/ui/button";
-import { Input } from "@saroh/ui/input";
 import { Label } from "@saroh/ui/label";
 import { cn } from "@saroh/ui/lib/utils";
-import {
-    Select,
-    SelectContent,
-    SelectItem,
-    SelectTrigger,
-    SelectValue,
-} from "@saroh/ui/select";
 import { Switch } from "@saroh/ui/switch";
 import { useState } from "react";
 
@@ -35,6 +27,12 @@ import type {
     StorefrontSettings,
 } from "@/lib/stores/storefronts";
 
+import {
+    CellLabel,
+    deliveryGrid,
+    LateAfterField,
+    MoneyField,
+} from "./delivery-fields";
 import { FreeOverRow } from "./free-over-row";
 import { LegacyWays } from "./legacy-ways";
 import type { SectionProps } from "./location-save";
@@ -50,24 +48,39 @@ type Way = StorefrontFulfilmentType;
 type Paid = "LOCAL_DELIVERY" | "SHIPPING";
 
 /**
- * Delivery: one row per way an order leaves (Pick-up, Local delivery,
- * Shipping), each with its switch, its fee on the website and when its
- * orders count as late, side by side (the 9 Oct audit; B17, G13).
+ * Delivery: one list, a row per way an order leaves (Pick-up, Local
+ * delivery, Shipping), then Free delivery over; the owner's layout of
+ * 9 Oct:
  *
- * A switch saves when flipped; a row's fee and late time save together
- * with its Save, like every other control on the page. Digital products and
+ *                       Fee            Late after
+ *     ○  Pick-up        needs a counter
+ *     ●  Local delivery [ Free ₹ ]     [ 24 hours ▾ ]
+ *     ─────────────────────────────────────────────
+ *        Free delivery over [ Never ₹ ]
+ *
+ * No card and no frame: hairlines between rows, and the inputs the only
+ * boxes. The switch leads each row and is named by it; the column headers
+ * are said once, and on a phone, where a row stacks, each field carries its
+ * own small label instead.
+ *
+ * A switch saves when flipped; a row's fee and late time save together with
+ * its Save, like every other control on the page. Digital products and
  * bookings have no row: Digital is never late, and a booking follows its
  * visits.
  *
  * Pick-up needs a door (UX-025): a location with no counter can't turn it
- * on, and says why beside the switch. One that already has it on (saved
- * before, or set through the API) shows it as it is, says the website
- * doesn't offer it, and can turn it off. Nothing is changed for it here.
+ * on, and says so where its fields would be. One that already has it on
+ * (saved before, or set through the API) shows it as it is, says the
+ * website doesn't offer it, and can turn it off. Nothing changes on render.
  */
 export function FulfilmentSection(props: SectionProps) {
     const { store } = props;
     const ways = savedWays(store);
     const delivers = ways.some((w) => w !== "PICKUP");
+    // The fee is the website checkout's (G13): a column only while the
+    // business's online shop is open.
+    const withFee = Boolean(store.siteShop);
+    const grid = deliveryGrid(withFee);
 
     return (
         <Section
@@ -76,42 +89,65 @@ export function FulfilmentSection(props: SectionProps) {
         >
             {store.fulfilmentTypes ? (
                 <div id={LATE_AFTER_ANCHOR} className="grid scroll-mt-20 gap-3">
-                    <ul
-                        aria-label="Ways orders leave"
-                        className="overflow-hidden rounded-lg border border-border"
-                    >
-                        {STOREFRONT_FULFILMENT_TYPES.map((type) => (
-                            <WayRow
-                                // A saved value starts the row afresh.
-                                key={`${type}-${String(fee(store, type))}-${store.lateAfterMinutes?.[type] ?? ""}`}
-                                {...props}
-                                type={type}
-                                types={store.fulfilmentTypes ?? []}
-                            />
-                        ))}
-                    </ul>
-                    <Note>
-                        {store.fulfilmentTypes.length === 0
-                            ? "None on: orders from here are only digital products or bookings."
-                            : store.siteShop
-                              ? "Your website checkout offers these. Bookings and digital products follow the product."
-                              : "Bookings and digital products follow the product."}{" "}
-                        Late counts from when an order is placed.
-                    </Note>
+                    <div>
+                        <div
+                            aria-hidden
+                            className={cn(
+                                "hidden gap-x-4 pb-1.5 text-[11px] font-semibold uppercase tracking-[0.1em] text-muted-foreground sm:grid",
+                                grid,
+                            )}
+                        >
+                            <span />
+                            {withFee ? <span>Fee</span> : null}
+                            <span>Late after</span>
+                            <span />
+                        </div>
+                        <ul
+                            aria-label="Ways orders leave"
+                            className="divide-y divide-border border-t border-border"
+                        >
+                            {STOREFRONT_FULFILMENT_TYPES.map((type) => (
+                                <WayRow
+                                    // A saved value starts the row afresh.
+                                    key={`${type}-${String(fee(store, type))}-${store.lateAfterMinutes?.[type] ?? ""}`}
+                                    {...props}
+                                    type={type}
+                                    types={store.fulfilmentTypes ?? []}
+                                    withFee={withFee}
+                                />
+                            ))}
+                            {delivers ? (
+                                <li>
+                                    <FreeOverRow {...props} withFee={withFee} />
+                                </li>
+                            ) : null}
+                        </ul>
+                    </div>
+                    {store.fulfilmentTypes.length === 0 ? (
+                        <Note>
+                            None on: orders from here are only digital products
+                            or bookings.
+                        </Note>
+                    ) : store.siteShop ? (
+                        <Note>Your website checkout offers these.</Note>
+                    ) : null}
                 </div>
             ) : (
-                <LegacyWays {...props} />
+                <>
+                    <LegacyWays {...props} />
+                    {store.shippingEnabled ? (
+                        <FreeOverRow {...props} withFee={withFee} />
+                    ) : null}
+                </>
             )}
-            {delivers || (!store.fulfilmentTypes && store.shippingEnabled) ? (
-                <FreeOverRow {...props} />
-            ) : null}
         </Section>
     );
 }
 
 /**
- * One way an order leaves: "Local delivery [on] Fee [60] Late after [24]
- * [hours ▾] Save". On a phone its parts stack; nothing scrolls sideways.
+ * One way an order leaves: "● Local delivery  [ Free ₹ ]  [ 24 hours ▾ ]
+ * Save". On a phone the switch and name come first, then the two fields
+ * side by side; nothing scrolls sideways.
  */
 function WayRow({
     store,
@@ -122,7 +158,8 @@ function WayRow({
     goTo,
     type,
     types,
-}: SectionProps & { type: Way; types: Way[] }) {
+    withFee,
+}: SectionProps & { type: Way; types: Way[]; withFee: boolean }) {
     const on = types.includes(type);
     const label = FULFILMENT_LABEL[type];
     const id = `storefront-way-${type.toLowerCase()}`;
@@ -131,19 +168,17 @@ function WayRow({
     // site's checkout). Off and with no counter, it can't be turned on.
     const pickup = type === "PICKUP";
     const blocked = pickup && !counter && !on;
-    const reason = pickup
-        ? !counter
-            ? on
-                ? "Not on your website: it needs a counter."
-                : "Needs a counter"
-            : on && !store.address?.trim()
-              ? "Not on your website until the address is added."
+    const reason = !pickup
+        ? null
+        : !counter
+          ? on
+              ? "Not on your website: it needs a counter."
               : null
-        : null;
+          : on && !store.address?.trim()
+            ? "Not on your website until the address is added."
+            : null;
 
-    // The fee, on the website's checkout (G13): only while its shop is open.
-    const paid: Paid | null =
-        type === "PICKUP" || !store.siteShop ? null : type;
+    const paid: Paid | null = type === "PICKUP" || !withFee ? null : type;
     const savedFee = paid ? (fee(store, paid) ?? "") : "";
     const [feeText, setFeeText] = useState(savedFee);
     const typedFee = feeText.trim();
@@ -203,17 +238,35 @@ function WayRow({
         : !read.ok
           ? `${read.error} Between 5 minutes and 30 days.`
           : null;
+    const problemId = problem ? `${id}-problem` : undefined;
 
     return (
-        <li className="border-b border-border px-3 py-3 last:border-b-0">
+        <li>
             <form
-                className="flex flex-wrap items-end gap-x-4 gap-y-3"
+                className={cn(
+                    "grid gap-x-4 gap-y-2.5 py-3 sm:items-center",
+                    deliveryGrid(withFee),
+                )}
                 onSubmit={(e) => {
                     e.preventDefault();
                     submit();
                 }}
             >
-                <div className="flex min-w-0 flex-[1_1_200px] items-center justify-between gap-3 self-center">
+                <div className="flex min-w-0 items-start gap-3">
+                    <Switch
+                        id={id}
+                        checked={on}
+                        disabled={!canEdit || pending || blocked}
+                        aria-describedby={
+                            blocked
+                                ? `${id}-blocked`
+                                : reason
+                                  ? `${id}-reason`
+                                  : undefined
+                        }
+                        onCheckedChange={toggle}
+                        className="mt-px shrink-0"
+                    />
                     <span className="min-w-0">
                         <Label
                             htmlFor={id}
@@ -230,7 +283,7 @@ function WayRow({
                                 className="block text-pretty text-[12px] leading-[1.45] text-muted-foreground"
                             >
                                 {reason}
-                                {pickup && counter && canEdit ? (
+                                {counter && canEdit ? (
                                     <>
                                         {" "}
                                         <button
@@ -254,106 +307,92 @@ function WayRow({
                             </span>
                         ) : null}
                     </span>
-                    <Switch
-                        id={id}
-                        checked={on}
-                        disabled={!canEdit || pending || blocked}
-                        aria-describedby={reason ? `${id}-reason` : undefined}
-                        onCheckedChange={toggle}
-                        className="shrink-0"
-                    />
                 </div>
 
-                {on && paid ? (
-                    <div className="grid w-32 gap-1">
-                        <Label
-                            htmlFor={`${id}-fee`}
-                            className="text-[11px] font-semibold uppercase tracking-[0.1em] text-muted-foreground"
-                        >
-                            <span className="sr-only">{label} </span>Fee
-                            <span className="sr-only">
-                                {" "}
-                                on your website, {store.currency}
-                            </span>
-                        </Label>
-                        <div className="relative">
-                            <Input
-                                id={`${id}-fee`}
-                                inputMode="decimal"
-                                placeholder="Free"
-                                value={feeText}
-                                readOnly={!canEdit}
-                                aria-invalid={!feeOk || undefined}
-                                aria-describedby={
-                                    problem ? `${id}-problem` : undefined
-                                }
-                                onChange={(e) => setFeeText(e.target.value)}
-                                className="pr-11 tabular-nums"
-                            />
-                            <span
-                                aria-hidden
-                                className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 font-mono text-[11.5px] text-muted-foreground"
-                            >
-                                {store.currency}
-                            </span>
-                        </div>
-                    </div>
-                ) : null}
-
-                {on ? (
-                    <div className="grid gap-1">
-                        <Label
-                            htmlFor={`${id}-late`}
-                            className="text-[11px] font-semibold uppercase tracking-[0.1em] text-muted-foreground"
-                        >
-                            <span className="sr-only">{label} </span>Late after
-                        </Label>
-                        <div className="flex items-center gap-1.5">
-                            <Input
-                                id={`${id}-late`}
-                                inputMode="numeric"
-                                value={amount}
-                                readOnly={!canEdit}
-                                aria-invalid={!read.ok || undefined}
-                                aria-describedby={
-                                    problem ? `${id}-problem` : undefined
-                                }
-                                onChange={(e) => setAmount(e.target.value)}
-                                className="w-16 tabular-nums"
-                            />
-                            <Select
-                                value={unit}
-                                onValueChange={(v) => setUnit(v as LateUnit)}
-                                disabled={!canEdit}
-                            >
-                                <SelectTrigger
-                                    aria-label={`${label} late after, unit`}
-                                    className="w-[104px]"
+                {blocked ? (
+                    // Where its fields would be: why there are none.
+                    <p
+                        id={`${id}-blocked`}
+                        className={cn(
+                            "pl-14 text-[12.5px] text-muted-foreground sm:pl-0",
+                            withFee ? "sm:col-span-3" : "sm:col-span-2",
+                        )}
+                    >
+                        Needs a counter
+                    </p>
+                ) : on ? (
+                    <>
+                        {/* On a phone the two fields sit side by side
+                            under the way; at the desk they are its
+                            columns. */}
+                        <div className="grid grid-cols-2 gap-3 sm:contents">
+                            {withFee ? (
+                                <div
+                                    className={cn(
+                                        "grid min-w-0 gap-1",
+                                        // Pick-up has no fee: nothing to
+                                        // show on a phone.
+                                        !paid && "max-sm:hidden",
+                                    )}
                                 >
-                                    <SelectValue />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    <SelectItem value="hours">hours</SelectItem>
-                                    <SelectItem value="minutes">
-                                        minutes
-                                    </SelectItem>
-                                </SelectContent>
-                            </Select>
+                                    {paid ? (
+                                        <>
+                                            <CellLabel
+                                                htmlFor={`${id}-fee`}
+                                                way={label}
+                                            >
+                                                Fee
+                                            </CellLabel>
+                                            <MoneyField
+                                                id={`${id}-fee`}
+                                                value={feeText}
+                                                placeholder="Free"
+                                                currency={store.currency}
+                                                readOnly={!canEdit}
+                                                invalid={!feeOk}
+                                                describedBy={problemId}
+                                                onChange={setFeeText}
+                                            />
+                                        </>
+                                    ) : (
+                                        <span className="text-[12.5px] text-muted-foreground">
+                                            No fee
+                                        </span>
+                                    )}
+                                </div>
+                            ) : null}
+                            <div className="grid min-w-0 gap-1">
+                                <CellLabel htmlFor={`${id}-late`} way={label}>
+                                    Late after
+                                </CellLabel>
+                                <LateAfterField
+                                    id={`${id}-late`}
+                                    way={label}
+                                    amount={amount}
+                                    unit={unit}
+                                    readOnly={!canEdit}
+                                    invalid={!read.ok}
+                                    describedBy={problemId}
+                                    onAmount={setAmount}
+                                    onUnit={setUnit}
+                                />
+                            </div>
                         </div>
-                    </div>
-                ) : null}
-
-                {canEdit && dirty ? (
-                    <Button type="submit" disabled={pending || !ok}>
-                        Save
-                    </Button>
+                        <div className="max-sm:empty:hidden sm:justify-self-end">
+                            {canEdit && dirty ? (
+                                <Button type="submit" disabled={pending || !ok}>
+                                    Save
+                                </Button>
+                            ) : null}
+                        </div>
+                    </>
                 ) : null}
 
                 {on && problem ? (
                     <p
-                        id={`${id}-problem`}
+                        id={problemId}
                         role="alert"
-                        className="basis-full text-pretty text-[12px] leading-[1.5] text-destructive"
+                        className="text-pretty text-[12px] leading-[1.5] text-destructive sm:col-span-full sm:pl-14"
                     >
                         {problem}
                     </p>

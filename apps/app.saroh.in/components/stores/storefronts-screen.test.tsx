@@ -115,6 +115,9 @@ const text = (html: string) =>
         .replace(/&quot;/g, '"')
         .replace(/\s+/g, " ");
 
+/** The open tab's panel, without the page above it. */
+const panel = (html: string) => html.slice(html.indexOf('role="tabpanel"'));
+
 const h1 = (html: string) =>
     text(/<h1[^>]*>(.*?)<\/h1>/.exec(html)?.[1] ?? "").trim();
 
@@ -176,9 +179,7 @@ describe("StorefrontsScreen as a location's own page", () => {
 
     it("opens the tab the address names, and The place for one it doesn't", () => {
         expect(tabsOf(screen({}, "delivery")).open).toBe("Delivery");
-        expect(text(screen({}, "delivery"))).toContain(
-            "Late counts from when an order is placed.",
-        );
+        expect(screen({}, "delivery")).toContain('id="storefront-way-pickup"');
         expect(tabsOf(screen({}, "nonsense")).open).toBe("The place");
         // A tab the page doesn't offer falls back too.
         expect(
@@ -500,9 +501,66 @@ describe("Delivery", () => {
         expect(html).toContain('id="storefront-way-shipping-fee"');
         expect(html).not.toContain('id="storefront-way-pickup-fee"');
         expect(html).toContain('id="storefront-way-pickup-late"');
-        expect(text(html)).toContain(
-            "Your website checkout offers these. Bookings and digital products follow the product.",
+        // One line of help under the list, no more.
+        expect(text(html)).toContain("Your website checkout offers these.");
+        expect(text(html)).not.toContain("Bookings and digital products");
+        expect(text(html)).not.toContain("Late counts from");
+    });
+
+    it("no card, no frame: no visible heading repeating the tab, hairlines only", () => {
+        const html = delivery({
+            selected: {
+                ...hill,
+                fulfilmentTypes: ["LOCAL_DELIVERY"],
+                siteShop: true,
+            },
+        });
+        // The heading is for the outline only.
+        expect(html).toMatch(/<h2[^>]*class="sr-only"[^>]*>Delivery<\/h2>/);
+        expect(panel(html)).not.toMatch(/rounded-xl/);
+        expect(panel(html)).not.toMatch(/rounded-lg border border-border/);
+        // The column headers once, for the screen; fields named per way.
+        expect(html.match(/>Fee</g)).toHaveLength(2); // header + LD's label
+        expect(html).toContain("Local delivery </span>Fee");
+    });
+
+    it("the switch leads each row, named by its way, in one column", () => {
+        const html = delivery({
+            selected: {
+                ...hill,
+                fulfilmentTypes: ["PICKUP", "LOCAL_DELIVERY", "SHIPPING"],
+                siteShop: true,
+            },
+        });
+        for (const way of ["pickup", "local_delivery", "shipping"]) {
+            // The switch comes before its label in each row.
+            expect(html).toMatch(
+                new RegExp(
+                    `role="switch"[^>]*id="storefront-way-${way}"[^]*?<label[^>]*for="storefront-way-${way}"`,
+                ),
+            );
+        }
+    });
+
+    it("late after is one joined control: the amount and its unit in one box", () => {
+        const html = delivery({});
+        expect(html).toMatch(
+            /focus-within:ring-2[^"]*"><input[^>]*id="storefront-way-pickup-late"[^]*?aria-label="Pick-up late after, unit"/,
         );
+    });
+
+    it("every Location tab draws its part without a card or a visible title", () => {
+        for (const section of [
+            null,
+            "payments",
+            "delivery",
+            "customers",
+            "pause-or-close",
+        ]) {
+            const html = screen({}, section);
+            expect(panel(html)).not.toMatch(/rounded-xl/);
+            expect(html).toMatch(/<h2[^>]*class="sr-only"/);
+        }
     });
 
     it("no fee to set while the online shop is closed", () => {
@@ -525,7 +583,7 @@ describe("Delivery", () => {
         );
         expect(t).toContain("Free delivery over");
         expect(t).toContain(
-            "Website orders at or above this, after any discount code, pay no delivery fee. Empty means always charge.",
+            "Website orders at or above this, after any code, pay no delivery fee. Empty: always charge.",
         );
         expect(t).not.toContain("doesn't apply it yet");
     });

@@ -65,7 +65,6 @@ export function ClosingSection({
         <Section
             title={LOCATION_SECTIONS.closing.label}
             id={LOCATION_SECTIONS.closing.id}
-            className="mt-4"
         >
             <Note>
                 {paused

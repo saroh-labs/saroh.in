@@ -5,10 +5,11 @@ import { Switch } from "@saroh/ui/switch";
 import type { ReactNode } from "react";
 
 /**
- * The card each part of a location's page sits in (The place, Payments,
- * Delivery, Customers, Pause or close), and the note under a control. A
- * titled card, then the controls 20px apart. Shared by
- * `storefronts-screen.tsx` and the sections split out of it.
+ * One tab's part of a location's page (The place, Payments, Delivery,
+ * Customers, Pause or close), and the note under a control. No card and no
+ * visible title: the tab strip names it and frames it, so the panel is the
+ * controls alone, 20px apart, with an sr-only heading for the outline.
+ * Shared by `storefronts-screen.tsx` and the sections split out of it.
  */
 export function Section({
     title,
@@ -32,20 +33,14 @@ export function Section({
             aria-labelledby={headingId}
             aria-label={headingId ? undefined : title}
             // Clear of the sticky app header when a link jumps here.
-            className={cn(
-                "scroll-mt-20 rounded-xl border border-border bg-card px-5 py-[18px] max-[480px]:px-4",
-                className,
-            )}
+            className={cn("scroll-mt-20 pt-1", className)}
         >
-            <div className="mb-4 flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
-                <h2
-                    id={headingId}
-                    className="font-display text-[16px] font-semibold tracking-[-0.01em]"
-                >
-                    {title}
-                </h2>
-                {action}
-            </div>
+            {/* The tab already names it on screen; the heading keeps the
+                page's outline for a screen reader. */}
+            <h2 id={headingId} className="sr-only">
+                {title}
+            </h2>
+            {action ? <div className="mb-4">{action}</div> : null}
             <div className="flex flex-col gap-5">{children}</div>
         </section>
     );
