@@ -1,5 +1,6 @@
 "use client";
 
+import { LOCATION_SECTIONS } from "@/lib/stores/location-readiness";
 import type {
     StorefrontInput,
     StorefrontSettings,
@@ -55,22 +56,36 @@ export function SameEmailSection({
     };
 
     return (
-        <Section title="Customers">
+        <Section
+            title={LOCATION_SECTIONS.customers.label}
+            id={LOCATION_SECTIONS.customers.id}
+        >
             <ToggleRow
                 id="storefront-same-email"
                 label="Link customers who share an email"
-                note="When someone pays here with the same email as a customer of another of your locations, their orders go on that customer's record. Off means you link them yourself from Customers."
+                note="Someone paying here with the email of a customer at another of your locations goes on that customer's record."
                 checked={on}
                 disabled={!canEdit || pending}
                 onChange={flip}
             />
-            <Note>
-                Only customers who first bought from one of your locations are
-                linked, never someone you added by hand or an enquiry. If that
-                customer signs in on your website and hasn&rsquo;t confirmed
-                their email, you&rsquo;re asked instead. Customers who already
-                share an email stay as they are.
-            </Note>
+            <details className="group text-[12.5px]">
+                <summary className="w-fit cursor-pointer rounded-sm font-medium text-muted-foreground hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring active:text-foreground coarse:py-2.5">
+                    How linking works
+                </summary>
+                <div className="mt-2 grid gap-1.5">
+                    <Note>
+                        Off, the default: you link them yourself from Customers.
+                    </Note>
+                    <Note>
+                        Only customers who first bought from one of your
+                        locations are linked, never someone you added by hand or
+                        an enquiry. If that customer signs in on your website
+                        and hasn&rsquo;t confirmed their email, you&rsquo;re
+                        asked instead. Customers who already share an email stay
+                        as they are.
+                    </Note>
+                </div>
+            </details>
         </Section>
     );
 }
