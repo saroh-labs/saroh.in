@@ -1,0 +1,106 @@
+---
+# Every label below was checked against the real screens on 8 Oct 2026
+# (R7), in the code and in the captured shots. Sources, from the repo root:
+#   NAV   apps/app.saroh.in/components/shared/nav-items.tsx (Presence ›
+#         Website); components/sites/website-header.tsx (Settings tab);
+#         Search and tracking is the last section of the Settings tab
+#   SECT  apps/app.saroh.in/components/sites/search-tracking/parts.tsx
+#         ("Search and tracking", "· Live as soon as it's saved"
+#         (settings-rows.tsx SAVES_WORDS.now), "Show Google and others this
+#         site is yours, and connect your own analytics and ad tools.")
+#   VERIFY components/sites/site-search-tracking.tsx ("Verify your site",
+#         "Your trackers"); search-tracking/verify-address.tsx ("Your live
+#         address", "Sitemap", "Search consoles ask for it once your site is
+#         verified.", Copy); search-tracking/verification-field.tsx
+#         (placeholder "Paste the tag or the code", Save, Remove, "Code
+#         found:", "View your live page"); lib/sites/search-tracking.ts
+#         (VERIFICATION_WORDS: "Google Search Console": "Add a property,
+#         choose URL prefix, enter {host}, then choose HTML tag. Paste the
+#         tag or just the code."; "Bing Webmaster Tools": "… choose HTML Meta
+#         Tag …"; verificationSavedLine "Added to your live site. Go back to
+#         Search Console and press Verify."; OWN_DOMAIN_NOTE "Meta and
+#         Pinterest verify only a domain of your own. Connect one to add
+#         them."; sitemapUrl ‹address›/sitemap.xml)
+#   TRACK search-tracking/tracker-row.tsx ("Not connected", "On", "Off",
+#         Help link); site-search-tracking.tsx ("Set up", "Change",
+#         "Remove", the on/off switch); search-tracking/tracker-setup-dialog.tsx
+#         ("Connect ‹tool›", "ID or snippet", "ID to save:", "Only the ID is
+#         kept. The rest of a pasted snippet stays on your device.", Cancel,
+#         "Add to your site"); lib/sites/search-tracking.ts (TRACKER_WORDS:
+#         Google Analytics, Google Ads, Meta Pixel, PostHog, Microsoft
+#         Clarity, Plausible, Umami Cloud, and where each ID is found;
+#         PROBLEM_WORDS "This looks like a private key. Never paste it
+#         here.", "Google Tag Manager isn't supported. Connect each tool on
+#         its own."; trackerRunsLine)
+#   ASK   packages/block-contract/src/site-tracking.ts
+#         (CONSENT_FREE_TRACKERS: plausible, umami)
+#   PRIV  search-tracking/privacy-field.tsx ("Your privacy page",
+#         "Optional. The cookie notice links to it. Without one, visitors see
+#         a short notice we write listing your tools.")
+#   SITE  packages/site-blocks/src/consent-banner.tsx ("This site uses
+#         ‹tools› to see how visitors use it. They set cookies only if you
+#         accept.", "What they do", Reject, Accept, "Cookie choices" in the
+#         footer); cookie-notice.tsx ("Cookies and visitor counting"; never
+#         on checkout, payment or account pages)
+#   OLD   apps/help.saroh.in/content/website.mdx "Search engines and your own
+#         analytics" (no Google Tag Manager or pasted code; never a key)
+# Shots 2 and 5 are typed into and never saved. Shot 6 needed a tracker on
+# the live site: Google Analytics (G-NWDEMO2026, a made-up ID) was
+# connected to Northwind through the API on the throwaway database, the
+# shot taken, and the tracker removed again. The address reads
+# northwind.saroh.app because the API ran with RENDERER_URL=https://saroh.app,
+# as for help-own-domain-1. Whether a business may connect trackers at all
+# is a plan's (DEC-078: not said here).
+title: Verify your site and add analytics
+slug: verify-your-site-and-add-analytics
+area: Website
+group: Your website
+order: 30
+intro: "Prove to Google that your site is yours, give it your sitemap, and connect the analytics tool you already use. You do it all in your website's settings, and what you save is on your live site at once: there's nothing to publish. This takes about ten minutes."
+description: "Verify your Saroh site with Google Search Console, submit your sitemap, and connect Google Analytics or another tool, with a cookie notice for visitors."
+readMinutes: 4
+updated: "2026-10-08"
+publishOn: "2026-10-17"
+steps:
+    # NAV, SECT.
+    - title: Open Search and tracking
+      body: "In Saroh, open Website in the sidebar, choose the Settings tab and scroll to the bottom, to Search and tracking. Unlike the rest of your settings, what you save here is live as soon as it's saved. You don't need to publish."
+      shot: help-verify-analytics-1
+      caption: "Search and tracking at Northwind Supply (demo store): its live address, its sitemap and the fields for each search engine's code."
+      marker: Search and tracking
+    # VERIFY.
+    - title: Verify with Google Search Console
+      body: "In Google Search Console, add a property and choose URL prefix. Enter your live address exactly as Saroh shows it, then choose HTML tag and copy the tag Google gives you. Back in Saroh, paste it into Google Search Console (the whole tag or just the code) and press Save. Then go back to Search Console and press Verify."
+      shot: help-verify-analytics-2
+      caption: "Google's tag pasted in at Northwind Supply (demo store), with the code Saroh found in it."
+      tip: "Keep the code saved: Google checks it again from time to time. Bing Webmaster Tools works the same way, with its HTML Meta Tag. Meta and Pinterest verify only a domain of your own, so they appear once you've connected one."
+      marker: Save
+    # VERIFY (sitemap).
+    - title: Give Search Console your sitemap
+      body: "Your sitemap lists your site's pages, so search engines find them all. Once Google has verified your site, press Copy beside Sitemap, open Sitemaps in Search Console, paste the address and submit it."
+      shot: help-verify-analytics-3
+      caption: "The live address and sitemap of Northwind Supply's site (demo store), each with Copy."
+      marker: Copy
+    # TRACK, ASK, PRIV.
+    - title: Choose your analytics tool
+      body: "Under Your trackers, find the tool you use: Google Analytics, Google Ads, Meta Pixel, PostHog, Microsoft Clarity, Plausible or Umami Cloud. Each row says where to find its ID in that tool. Press Set up beside it. If your site has its own privacy page, add its address under Your privacy page."
+      shot: help-verify-analytics-4
+      caption: "Your trackers at Northwind Supply (demo store), none connected yet, each with Set up."
+      tip: "Google Tag Manager and pasted code aren't supported, as they could run anything on your site. Connect each tool on its own."
+      marker: Set up
+    # TRACK (dialog), ASK.
+    - title: Paste the ID and add it to your site
+      body: "Paste the tool's ID, or the whole snippet the tool gives you, under ID or snippet. Saroh finds the ID in it and shows it as ID to save; only that is kept. Check it, then press Add to your site. The tool is on your live site at once, and never on checkout or payment pages. To pause it later, use its switch; to change the ID, press Change."
+      shot: help-verify-analytics-5
+      caption: "Connecting Google Analytics at Northwind Supply (demo store), with the ID to save shown."
+      tip: "Only paste a public ID. Never paste a password or a private key: Saroh refuses anything that looks like one, and doesn't save it."
+      marker: Add to your site
+    # SITE, ASK, PRIV.
+    - title: What your visitors see
+      body: "Every tool except Plausible and Umami Cloud sets cookies, so while one is on, your site asks each new visitor first. The notice names your tools, and they run only after the visitor presses Accept. What they do opens your privacy page, or a short page Saroh writes listing your tools. Visitors can change their answer with Cookie choices at the foot of every page."
+      shot: help-verify-analytics-6
+      caption: "The cookie notice a new visitor sees on the site of Northwind Supply (demo store), with Google Analytics connected."
+      tip: "These tools collect data about your visitors for you, so you decide how it is used, as with your customers' other data."
+      marker: What they do
+next: [connect-your-own-domain, make-your-link-look-right-when-shared]
+---

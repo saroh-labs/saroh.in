@@ -85,6 +85,10 @@ export const HELP_ARTICLES = [
         slug: "make-your-link-look-right-when-shared",
         title: "Make your link look right when shared",
     },
+    {
+        slug: "verify-your-site-and-add-analytics",
+        title: "Verify your site and add analytics",
+    },
 ] as const;
 
 export type HelpArticle = (typeof HELP_ARTICLES)[number]["slug"];
