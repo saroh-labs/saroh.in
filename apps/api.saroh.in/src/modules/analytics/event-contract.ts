@@ -127,6 +127,16 @@ const orderPaidV1: EventValidator = (props) => ({
     amountCents: requireNumber(props, "amountCents"),
 });
 
+/**
+ * The `order.refunded` contract (v1, #867): an order that `order.paid`
+ * counted has had all of its money back, so Insights' orders figure takes
+ * it off again, net as Sales is. `amountCents` is the counted sale's.
+ */
+const orderRefundedV1: EventValidator = (props) => ({
+    orderId: requireString(props, "orderId", 128),
+    amountCents: requireNumber(props, "amountCents"),
+});
+
 /* ------------------------------------------------------------------------- *
  * Activation events (#176 / #119)
  *
@@ -240,11 +250,12 @@ export const ACTIVATION_TYPES: readonly string[] = [
 export const SITE_VIEW_TYPE = "site.view";
 export const ENQUIRY_SUBMITTED_TYPE = "enquiry.submitted";
 export const ORDER_PAID_TYPE = "order.paid";
+export const ORDER_REFUNDED_TYPE = "order.refunded";
 
 /**
  * The set of event types a public visitor may ingest. Only `site.view` is
- * publicly ingestable — org-internal types (`enquiry.submitted`, `order.paid`)
- * are produced server-side and MUST be rejected on the public endpoint.
+ * publicly ingestable — org-internal types (`enquiry.submitted`, `order.paid`,
+ * `order.refunded`) are produced server-side and MUST be rejected on the public endpoint.
  */
 export const PUBLIC_INGESTABLE_TYPES: ReadonlySet<string> = new Set([
     SITE_VIEW_TYPE,
@@ -255,6 +266,7 @@ const REGISTRY = new Map<string, EventValidator>([
     [key(SITE_VIEW_TYPE, 1), siteViewV1],
     [key(ENQUIRY_SUBMITTED_TYPE, 1), enquirySubmittedV1],
     [key(ORDER_PAID_TYPE, 1), orderPaidV1],
+    [key(ORDER_REFUNDED_TYPE, 1), orderRefundedV1],
     // Activation (#176) — server-produced only; absent from
     // PUBLIC_INGESTABLE_TYPES on purpose.
     [key(ORGANIZATION_CREATED_TYPE, 1), organizationCreatedV1],

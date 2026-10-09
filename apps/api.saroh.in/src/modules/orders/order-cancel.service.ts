@@ -10,6 +10,7 @@ import type { Prisma } from "@saroh/database";
 import { prisma } from "@saroh/database";
 
 import type { OrganizationContext } from "../../common/types/organization-context";
+import { recordOrderRefundedInTx } from "../analytics/order-events";
 import { treatmentBegunInTx } from "../bookings/treatment-cancel";
 import { creditRestOfOrder } from "../invoices/order-invoicing";
 import { authorize } from "../organizations/organization-policy";
@@ -109,6 +110,8 @@ export class OrderCancelService {
                     data: { paymentStatus: "REFUNDED" },
                 });
                 await creditRestOfOrder(tx, order.id, "Cancelled", ctx.userId);
+                // Off Insights' orders figure again (#867).
+                await recordOrderRefundedInTx(tx, order.id);
                 // What was taken at the counter goes back from the till:
                 // the amount recorded, which an unpaid edit's difference
                 // never joined (`hand-payments.ts`).

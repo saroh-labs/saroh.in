@@ -22,6 +22,13 @@ jest.mock("../invoices/order-invoicing", () => ({
         .mockResolvedValue({ supplementary: null, creditNote: null }),
 }));
 
+// Insights' orders figure (#867): analytics/order-events has its own specs;
+// here each call is recorded.
+jest.mock("../analytics/order-events", () => ({
+    recordOrderPaidInTx: jest.fn().mockResolvedValue(true),
+    recordOrderRefundedInTx: jest.fn().mockResolvedValue(true),
+}));
+
 jest.mock("@saroh/database", () => {
     const order = {
         findFirst: jest.fn(),
@@ -85,6 +92,10 @@ import {
 import { prisma } from "@saroh/database";
 
 import type { ActivationEvents } from "../analytics/activation-events";
+import {
+    recordOrderPaidInTx,
+    recordOrderRefundedInTx,
+} from "../analytics/order-events";
 import {
     creditRestOfOrder,
     ensureOrderInvoice,
@@ -212,6 +223,13 @@ describe("OrdersService.updateStatus lifecycle guard (mocked Prisma)", () => {
             ORDER,
             { method: "RECORDED" },
         );
+        // Record as paid counts on Insights' orders figure, in the same
+        // transaction (#867).
+        expect(recordOrderPaidInTx).toHaveBeenCalledWith(
+            expect.anything(),
+            ORDER,
+        );
+        expect(recordOrderRefundedInTx).not.toHaveBeenCalled();
         // Paid at the counter: its pay link stops working, so nobody can
         // pay twice (B11, DEC-067).
         expect(
@@ -299,6 +317,12 @@ describe("OrdersService.updateStatus lifecycle guard (mocked Prisma)", () => {
             USER,
         );
         expect(ensureOrderInvoice).not.toHaveBeenCalled();
+        // Refunded by hand: off Insights' orders figure again (#867).
+        expect(recordOrderRefundedInTx).toHaveBeenCalledWith(
+            expect.anything(),
+            ORDER,
+        );
+        expect(recordOrderPaidInTx).not.toHaveBeenCalled();
         // Refunded: its pay link stops working (B11).
         expect(
             (prisma.order as unknown as { updateMany: jest.Mock }).updateMany,
