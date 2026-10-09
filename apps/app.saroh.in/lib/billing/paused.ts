@@ -86,9 +86,18 @@ export interface PausedTeam {
     userIds: string[];
     /** Open invitations, by invitation id. */
     invitationIds: string[];
+    /**
+     * People on the diary with no login, by staff id and name: they take
+     * no new bookings; the bookings already made are kept.
+     */
+    diary: { id: string; label: string }[];
 }
 
-export const NONE_PAUSED: PausedTeam = { userIds: [], invitationIds: [] };
+export const NONE_PAUSED: PausedTeam = {
+    userIds: [],
+    invitationIds: [],
+    diary: [],
+};
 
 /**
  * Who on the Team screen is paused now: team members by user id, open
@@ -103,13 +112,38 @@ export function pausedTeam(view: PausedView | null): PausedTeam {
         invitationIds: view.people
             .filter((p) => p.kind === "invite")
             .map((p) => p.id),
+        diary: view.people
+            .filter((p) => p.kind === "diary")
+            .map((p) => ({ id: p.id, label: p.label })),
     };
+}
+
+function joinNames(names: readonly string[]): string {
+    if (names.length <= 1) return names.join("");
+    return `${names.slice(0, -1).join(", ")} and ${names[names.length - 1]}`;
+}
+
+/**
+ * Why someone on the diary with no login takes no new bookings: the API's
+ * words (`billing/paused-errors.ts` `diaryPausedWords`), so the Team mark,
+ * the calendar and a refused booking say the same.
+ */
+export function diaryPausedWords(names: readonly string[]): string {
+    const who = names.length > 0 ? joinNames(names) : "This person";
+    const are = names.length > 1 ? "are" : "is";
+    return `${who} ${are} paused. Your plan includes fewer team members than you have, so the people who joined most recently take no new bookings. Bookings already made are kept. Choose a plan in Plan and billing to bring them back.`;
 }
 
 /** The ids of locations not taking orders now. */
 export function pausedLocationIds(view: PausedView | null): string[] {
     if (view?.state !== "paused" || !view.locations) return [];
     return view.locations.map((l) => l.id);
+}
+
+/** The ids of websites not taking orders and bookings now. */
+export function pausedSiteIds(view: PausedView | null): string[] {
+    if (view?.state !== "paused" || !view.sites) return [];
+    return view.sites.map((s) => s.id);
 }
 
 /** What a paused thing is, in the business's words. */

@@ -1,6 +1,7 @@
 "use client";
 
 import { PausedNote } from "@/components/billing/paused-banner";
+import { PausedDiary } from "@/components/billing/paused-diary";
 import { showPlanRefusal } from "@/components/billing/plan-refusal";
 import { SettingsPanelHeader } from "@/components/settings/settings-panel";
 import { useBusinessZone } from "@/components/shared/business-zone";
@@ -425,6 +426,9 @@ export function TeamScreen({
                         : ""}
                 </p>
             ) : null}
+
+            {/* Diary people past the plan's team limit (#800). */}
+            {tab === "people" ? <PausedDiary people={paused.diary} /> : null}
 
             {tab === "roles" ? (
                 <RolesTab

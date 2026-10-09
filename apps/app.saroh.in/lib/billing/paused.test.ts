@@ -3,12 +3,14 @@ import { describe, expect, it } from "vitest";
 import type { PausedView } from "./paused";
 import {
     activeCut,
+    diaryPausedWords,
     NONE_PAUSED,
     pausedBanner,
     pausedByCut,
     pausedListWords,
     pausedLocationIds,
     pausedParts,
+    pausedSiteIds,
     pausedTeam,
     pausedWords,
     postPaused,
@@ -85,10 +87,11 @@ describe("what marks rows", () => {
         expect(pausedLocationIds(view({ state: "pending" }))).toEqual([]);
     });
 
-    it("names team members by user and invitations by id", () => {
+    it("names team members by user, invitations by id, and diary people by name", () => {
         expect(pausedTeam(view())).toEqual({
             userIds: ["u_2"],
             invitationIds: ["inv_1"],
+            diary: [{ id: "st_9", label: "Meena" }],
         });
         expect(pausedTeam(view({ people: null }))).toBe(NONE_PAUSED);
     });
@@ -96,6 +99,25 @@ describe("what marks rows", () => {
     it("lists the locations that stopped taking orders", () => {
         expect(pausedLocationIds(view())).toEqual(["s_2"]);
         expect(pausedLocationIds(view({ locations: null }))).toEqual([]);
+    });
+
+    it("lists the websites that stopped taking orders, only while paused", () => {
+        const sites = [{ id: "site_2", name: "Second" }];
+        expect(pausedSiteIds(view({ sites }))).toEqual(["site_2"]);
+        expect(pausedSiteIds(view({ sites, state: "pending" }))).toEqual([]);
+        expect(pausedSiteIds(view({ sites: null }))).toEqual([]);
+        expect(pausedSiteIds(null)).toEqual([]);
+    });
+});
+
+describe("diary people past the team limit (#800)", () => {
+    it("say who, why, and that their bookings are kept, as the API does", () => {
+        expect(diaryPausedWords(["Meena"])).toBe(
+            "Meena is paused. Your plan includes fewer team members than you have, so the people who joined most recently take no new bookings. Bookings already made are kept. Choose a plan in Plan and billing to bring them back.",
+        );
+        expect(diaryPausedWords(["Meena", "Ravi"])).toMatch(
+            /^Meena and Ravi are paused\. /,
+        );
     });
 });
 

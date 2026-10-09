@@ -14,6 +14,8 @@ import { ArrowRight, ChevronDown, ChevronUp, X } from "lucide-react";
 import Link from "next/link";
 import { useEffect } from "react";
 
+import { PausedNote } from "@/components/billing/paused-banner";
+import { pausedWords } from "@/lib/billing/paused";
 import { formatMoneyMajor } from "@/lib/format/money";
 import type { CatalogueRow } from "@/lib/products/catalogue";
 import { productEditHref, productHref } from "@/lib/products/links";
@@ -111,6 +113,15 @@ export function QuickLook({
                             >
                                 {STATUS_LABEL[row.status]}
                             </Badge>
+                            {row.paused ? (
+                                // Past the plan's products limit (#800).
+                                <Badge
+                                    variant="warning"
+                                    className="px-[9px] py-[3px] text-[11px] font-medium"
+                                >
+                                    Paused
+                                </Badge>
+                            ) : null}
                             <span className="text-xs text-muted-foreground">
                                 {position(index, total)}
                             </span>
@@ -148,6 +159,12 @@ export function QuickLook({
                             </SheetClose>
                         </div>
                         <div className="flex-1 overflow-y-auto p-[18px]">
+                            {row.paused ? (
+                                // Why, in words: read-only as the Editor is.
+                                <PausedNote className="mb-[14px]">
+                                    {pausedWords("product")}
+                                </PausedNote>
+                            ) : null}
                             <div className="mb-[18px] flex items-center gap-[13px]">
                                 <ProductThumb
                                     name={row.name}
@@ -210,7 +227,10 @@ export function QuickLook({
                                     </Link>
                                 </Button>
                             ) : null}
-                            {canWrite ? (
+                            {canWrite &&
+                            // Paused (#800): only taking it off sale is
+                            // open, as in the Editor; never Publish.
+                            (!row.paused || row.status === "PUBLISHED") ? (
                                 <SellToggle row={row} onStatus={onStatus} />
                             ) : null}
                         </div>
