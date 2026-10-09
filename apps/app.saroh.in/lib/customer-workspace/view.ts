@@ -41,8 +41,23 @@ export function kindOf(d: Pick<CustomerDetail, "orders" | "bookings">): Kind {
         : "commerce";
 }
 
+/**
+ * A tab's key in `?tab=`. Leads, Enquiries and Courses are the person
+ * page's own (`lib/contacts/person.ts`, #869), not in this read.
+ */
 export type TabKey =
-    "over" | "ord" | "bk" | "pk" | "sub" | "inv" | "rev" | "msg" | "notes";
+    | "over"
+    | "lead"
+    | "enq"
+    | "ord"
+    | "bk"
+    | "pk"
+    | "crs"
+    | "sub"
+    | "inv"
+    | "rev"
+    | "msg"
+    | "notes";
 
 export interface Tab {
     key: TabKey;
@@ -783,6 +798,20 @@ export function invoiceRow(
         tone: v.standing === "PAID" && !credit ? "ok" : "off",
         total: money(v.total, v.currency),
     };
+}
+
+/**
+ * An invoice still owed — issued or overdue, and not a credit note — on
+ * which the Invoices tab offers "Record payment" (#869), as Invoice Detail
+ * offers Mark paid.
+ */
+export function isPayable(
+    v: Pick<DetailInvoice, "kind" | "standing">,
+): boolean {
+    return (
+        v.kind !== "CREDIT_NOTE" &&
+        (v.standing === "ISSUED" || v.standing === "OVERDUE")
+    );
 }
 
 function invoiceFrom(v: DetailInvoice, kind: Kind): string {

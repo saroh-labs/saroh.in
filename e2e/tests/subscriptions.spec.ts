@@ -1,4 +1,4 @@
-// @covers accounts:/login app:/open app:/billing/subscriptions app:/billing/plans app:/billing/plans/new app:/customers api:subscriptions api:customer-workspace
+// @covers accounts:/login app:/open app:/billing/subscriptions app:/billing/plans app:/billing/plans/new app:/customers app:/contacts api:subscriptions api:customer-workspace
 import type { Page, TestInfo } from "@playwright/test";
 import { expect, test } from "@playwright/test";
 

@@ -6,6 +6,7 @@ import Link from "next/link";
 
 import { ViewerDate } from "@/components/shared/viewer-date";
 import { Pill } from "@/components/subscriptions/pill";
+import { personHref } from "@/lib/contacts/person-href";
 import type { CustomerRow, CustomersPage } from "@/lib/customers/list";
 import {
     lastSub,
@@ -104,7 +105,7 @@ function Row({
     const orders = row.orders;
     return (
         <Link
-            href={`/customers/${encodeURIComponent(row.contactId)}`}
+            href={personHref(row.contactId)}
             className={cn(
                 "grid grid-cols-1 items-center gap-x-3 gap-y-1 px-4 py-[11px] text-[13px] text-foreground transition-colors duration-fast hover:bg-neutral-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring dark:hover:bg-muted",
                 !first && "border-t border-foreground/10",

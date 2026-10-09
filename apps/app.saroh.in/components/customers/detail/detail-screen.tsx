@@ -2,8 +2,10 @@
 
 import { showError, showSuccess, showUndo } from "@saroh/ui/toast";
 import { useRouter } from "next/navigation";
+import type { ReactNode } from "react";
 import { useState } from "react";
 
+import { withPersonTabs } from "@/lib/contacts/person";
 import {
     restoreOffersAction,
     stopOffersAction,
@@ -19,6 +21,7 @@ import { signsInLine } from "@/lib/customer-workspace/site-account";
 import type {
     OrderFilter,
     ReviewsRead,
+    Tab,
     TabKey,
     ThreadRead,
 } from "@/lib/customer-workspace/view";
@@ -62,6 +65,11 @@ import { ReviewsTab } from "./reviews-tab";
  *
  * The tab lives in the address (`?tab=`), changed in place so switching is
  * instant and a link opens the same tab.
+ *
+ * The person page (`/contacts/<id>`, #869) adds its own tabs — Leads,
+ * Enquiries, Courses — drawn on the server and handed in as `extra`, the
+ * actions some tabs offer (Subscribe, New invoice) and what Overview adds
+ * (Company, Came from).
  */
 export function CustomerDetailScreen({
     d,
@@ -83,6 +91,12 @@ export function CustomerDetailScreen({
     packSale = null,
     canExtendPacks = false,
     nowIso,
+    extra = [],
+    actions = {},
+    overviewExtra = null,
+    crumbsSell,
+    deleteWords,
+    canRecordPayment = false,
 }: {
     d: CustomerDetail;
     initialTab: TabKey;
@@ -119,11 +133,26 @@ export function CustomerDetailScreen({
     /** `pack:write`: give one of their packs more days (E16). */
     canExtendPacks?: boolean;
     nowIso: string;
+    /** The person page's own tabs, each with its panel (#869). */
+    extra?: (Tab & { panel: ReactNode })[];
+    /** A tab's actions, drawn above its panel. */
+    actions?: Partial<Record<TabKey, ReactNode>>;
+    /** What Overview shows after its own cards. */
+    overviewExtra?: ReactNode;
+    /** Crumbs under Sell › Customers; by default, `crumbsUnderSell`. */
+    crumbsSell?: boolean;
+    /**
+     * The delete confirm's paragraph, with what deleting them ends
+     * (`deleteQuestion`); by default the plain one, no counts.
+     */
+    deleteWords?: string;
+    /** `invoice:write`: Record payment on each unpaid invoice (#869). */
+    canRecordPayment?: boolean;
 }) {
     const router = useRouter();
     const now = new Date(nowIso);
     const kind = kindOf(d);
-    const tabs = tabsFor(d, thread, reviews);
+    const tabs = withPersonTabs(tabsFor(d, thread, reviews), extra);
     const [tab, setTab] = useState<TabKey>(initialTab);
     const [orderFilter, setOrderFilter] = useState<OrderFilter>("all");
     const [stopping, setStopping] = useState(false);
@@ -142,6 +171,7 @@ export function CustomerDetailScreen({
         canRemove,
         suggestions,
         duplicates,
+        deleteWords,
     });
     const first = d.contact.firstName?.trim()
         ? d.contact.firstName.trim()
@@ -182,6 +212,8 @@ export function CustomerDetailScreen({
     }
 
     const panel = () => {
+        const own = extra.find((t) => t.key === tab);
+        if (own) return own.panel;
         switch (tab) {
             case "ord":
                 return d.orders ? (
@@ -227,6 +259,7 @@ export function CustomerDetailScreen({
                         kind={kind}
                         timeZone={d.timezone}
                         now={now}
+                        payer={canRecordPayment ? name : null}
                     />
                 ) : (
                     <Failed what="Invoices" />
@@ -268,31 +301,34 @@ export function CustomerDetailScreen({
                 );
             default:
                 return (
-                    <Overview
-                        d={d}
-                        attention={
-                            d.attention !== undefined ? (
-                                <AttentionCard
-                                    state={attention}
-                                    canWrite={canWrite}
-                                    userId={userId}
-                                    timeZone={d.timezone}
-                                    now={now}
-                                />
-                            ) : null
-                        }
-                        now={now}
-                        canStop={canStopOffers(d.consent)}
-                        stopping={stopping}
-                        canConsent={canConsent}
-                        onStop={() => void stop()}
-                        onOrders={(f) => {
-                            setOrderFilter(f);
-                            go("ord");
-                        }}
-                        onBookings={() => go("bk")}
-                        onSellPack={packs.onSell}
-                    />
+                    <>
+                        <Overview
+                            d={d}
+                            attention={
+                                d.attention !== undefined ? (
+                                    <AttentionCard
+                                        state={attention}
+                                        canWrite={canWrite}
+                                        userId={userId}
+                                        timeZone={d.timezone}
+                                        now={now}
+                                    />
+                                ) : null
+                            }
+                            now={now}
+                            canStop={canStopOffers(d.consent)}
+                            stopping={stopping}
+                            canConsent={canConsent}
+                            onStop={() => void stop()}
+                            onOrders={(f) => {
+                                setOrderFilter(f);
+                                go("ord");
+                            }}
+                            onBookings={() => go("bk")}
+                            onSellPack={packs.onSell}
+                        />
+                        {overviewExtra}
+                    </>
                 );
         }
     };
@@ -300,7 +336,10 @@ export function CustomerDetailScreen({
     return (
         <>
             <div className="px-[26px] pt-5">
-                <Crumbs here={name} sells={crumbsUnderSell(sells, d)} />
+                <Crumbs
+                    here={name}
+                    sells={crumbsSell ?? crumbsUnderSell(sells, d)}
+                />
                 <Header
                     name={name}
                     initials={initials(name)}
@@ -352,6 +391,11 @@ export function CustomerDetailScreen({
                         canLink={canWrite}
                         onLink={more.link}
                     />
+                ) : null}
+                {actions[tab] ? (
+                    <div className="mb-3 flex flex-wrap justify-end gap-2">
+                        {actions[tab]}
+                    </div>
                 ) : null}
                 {panel()}
             </div>

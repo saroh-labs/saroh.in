@@ -1,4 +1,4 @@
-// @covers accounts:/login app:/open app:/bookings app:/bookings/availability app:/services app:/services/new app:/customers api:bookings api:staff api:customer-workspace api:contacts
+// @covers accounts:/login app:/open app:/bookings app:/bookings/availability app:/services app:/services/new app:/customers app:/contacts api:bookings api:staff api:customer-workspace api:contacts
 import type { APIRequestContext, Page } from "@playwright/test";
 import { expect, test } from "@playwright/test";
 
@@ -202,7 +202,7 @@ test.describe("bookings calendar", () => {
             await expect(sheet.getByText("Needs attention")).toBeVisible();
             await expect(sheet.getByText(/Allergy: E2E sesame/)).toBeVisible();
             await sheet.getByRole("link", { name: /^Open .+'s page$/ }).click();
-            await expect(page).toHaveURL(new RegExp(`/customers/${who.id}`));
+            await expect(page).toHaveURL(new RegExp(`/contacts/${who.id}`));
         } finally {
             // Its time, back for everyone else.
             await northwind(page.request).delete(

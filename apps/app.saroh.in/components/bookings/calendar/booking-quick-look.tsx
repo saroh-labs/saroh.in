@@ -17,6 +17,7 @@ import { useEffect, useState } from "react";
 import { NewBookingDialog } from "@/components/bookings/new-booking-dialog";
 import { TakePayment } from "@/components/bookings/take-payment";
 import { TakePaymentLocked } from "@/components/bookings/take-payment-locked";
+import { personHref } from "@/lib/contacts/person-href";
 import { formatMoney } from "@/lib/format/money";
 import {
     bookingChangeText,
@@ -492,7 +493,7 @@ function Links({ booking: b }: { booking: DiaryBooking }) {
     return (
         <>
             {b.contact ? (
-                <Link href={`/customers/${b.contact.id}`} className={link}>
+                <Link href={personHref(b.contact.id)} className={link}>
                     <span className="flex-1">
                         Open {whoFor(b).split(" ")[0]}&apos;s page
                     </span>

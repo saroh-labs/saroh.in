@@ -97,7 +97,7 @@ describe("CustomerMessageNotifyHandler (UX-014)", () => {
         expect(sendEmail).toHaveBeenCalledWith("owner@example.in", {
             customerName: "Priya",
             message: "Hi, any update on my Friday delivery question?",
-            threadUrl: "https://app.saroh.in/customers/contact_1?tab=msg",
+            threadUrl: "https://app.saroh.in/contacts/contact_1?tab=msg",
         });
     });
 

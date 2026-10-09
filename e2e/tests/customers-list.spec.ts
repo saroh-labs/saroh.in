@@ -1,4 +1,4 @@
-// @covers accounts:/login app:/open app:/commerce/customers app:/stores app:/customers api:customer-workspace api:customers api:stores
+// @covers accounts:/login app:/open app:/commerce/customers app:/stores app:/customers app:/contacts api:customer-workspace api:customers api:stores
 import type { Page } from "@playwright/test";
 import { expect, test } from "@playwright/test";
 
@@ -88,7 +88,7 @@ test.describe("customers list", () => {
             .getByRole("link", { name: new RegExp(escape(name)) })
             .first()
             .click();
-        await expect(page).toHaveURL(/\/customers\/[^/?]+$/);
+        await expect(page).toHaveURL(/\/contacts\/[^/?]+$/);
     });
 
     test("a storefront's old address opens the list filtered to it", async ({

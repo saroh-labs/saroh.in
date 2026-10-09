@@ -1,3 +1,5 @@
+import { personHref } from "@/lib/contacts/person-href";
+
 import type { Invoice } from "./service";
 
 /**
@@ -6,9 +8,9 @@ import type { Invoice } from "./service";
  * Pure, so the list, the quick look and the detail link the same way.
  */
 
-/** Customer Detail, rooted on the contact; `?tab=inv` opens their invoices. */
+/** The person page (#869); `?tab=inv` opens their invoices. */
 export function customerHref(contactId: string, invoicesTab = false): string {
-    return `/customers/${encodeURIComponent(contactId)}${invoicesTab ? "?tab=inv" : ""}`;
+    return personHref(contactId, invoicesTab ? "inv" : null);
 }
 
 export function invoiceHref(id: string): string {

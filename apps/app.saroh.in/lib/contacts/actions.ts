@@ -37,7 +37,7 @@ export async function removalPreviewAction(contactId: string) {
 export async function removeDetailsAction(contactId: string) {
     const result = await removeDetails(contactId);
     if (result.ok) {
-        revalidatePath(`/customers/${contactId}`);
+        revalidatePath(`/contacts/${contactId}`);
         revalidatePath("/commerce/customers");
         revalidatePath("/contacts");
     }

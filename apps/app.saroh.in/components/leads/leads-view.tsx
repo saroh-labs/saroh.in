@@ -11,6 +11,7 @@ import type {
     DataFilter,
 } from "@/components/shared/data-view/types";
 import { ViewerDate } from "@/components/shared/viewer-date";
+import { personHref } from "@/lib/contacts/person-href";
 import { contactName } from "@/lib/crm/format";
 import { formatWaiting } from "@/lib/format/datetime";
 import { formatMoney } from "@/lib/format/money";
@@ -76,7 +77,7 @@ export function LeadsView({
             cell: (l) =>
                 l.contact ? (
                     <Link
-                        href={`/contacts/${l.contact.id}`}
+                        href={personHref(l.contact.id)}
                         className="text-muted-foreground underline-offset-4 hover:text-foreground hover:underline"
                     >
                         {contactName(l.contact)}

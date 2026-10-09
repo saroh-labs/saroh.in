@@ -4,6 +4,8 @@ import {
     asSentence,
     confirmMatches,
     deletedLine,
+    deleteQuestion,
+    heldCounts,
     holdingsSentence,
     removalBody,
     REMOVED_TOAST,
@@ -139,6 +141,71 @@ describe("holdingsSentence", () => {
         expect(holdingsSentence({ subscriptions: 2, packs: 1 })).toMatch(
             /^Any subscription, class pack or course seat they hold ends/,
         );
+    });
+});
+
+describe("heldCounts — counted as the delete counts (#869)", () => {
+    const now = new Date("2026-10-09T10:00:00Z");
+
+    it("counts running or paused subscriptions, unexpired packs, held seats", () => {
+        expect(
+            heldCounts(
+                {
+                    subscriptions: [
+                        { status: "ACTIVE" },
+                        { status: "PAUSED" },
+                        { status: "CANCELLED" },
+                    ],
+                    packs: [
+                        { expiresAt: "2026-11-01T00:00:00Z" },
+                        { expiresAt: "2026-10-01T00:00:00Z" },
+                    ],
+                    courses: [{ status: "ACTIVE" }, { status: "CANCELLED" }],
+                },
+                now,
+            ),
+        ).toEqual({ subscriptions: 2, packs: 1, courses: 1 });
+    });
+
+    it("leaves a kind that wasn't read, or failed, unknown", () => {
+        expect(heldCounts({ subscriptions: null, packs: [] }, now)).toEqual({
+            subscriptions: undefined,
+            packs: 0,
+            courses: undefined,
+        });
+    });
+});
+
+describe("deleteQuestion — the person page's delete confirm (#869)", () => {
+    it("lists what deleting ends when every count is known", () => {
+        expect(
+            deleteQuestion(2, { subscriptions: 1, packs: 1, courses: 0 }),
+        ).toBe(
+            "Their notes and 2 leads go with them. Their 1 subscription and 1 class pack go too, and their bookings paid with a pack or for a course are cancelled. Orders, other bookings and invoices stay on record under the name they gave, and a location's record of a customer with the same email is kept. This cannot be undone.",
+        );
+    });
+
+    it("says nothing they don't hold", () => {
+        expect(
+            deleteQuestion(0, { subscriptions: 0, packs: 0, courses: 0 }),
+        ).toBe(
+            "Their notes go with them. Orders, bookings and invoices stay on record under the name they gave, and a location's record of a customer with the same email is kept. This cannot be undone.",
+        );
+        expect(
+            deleteQuestion(1, { subscriptions: 1, packs: 0, courses: 0 }),
+        ).toMatch(
+            /^Their notes and 1 lead go with them\. Their subscription goes too\. Orders, bookings and invoices/,
+        );
+    });
+
+    it("stays a plain sentence when the counts couldn't be read", () => {
+        const plain = deleteQuestion(null, {});
+        expect(plain).toMatch(/^Their notes and any leads go with them\. /);
+        expect(plain).toContain(
+            "Any subscription, class pack or course seat they hold ends",
+        );
+        expect(plain).toMatch(/This cannot be undone\.$/);
+        expect(plain).not.toMatch(/\d/);
     });
 });
 

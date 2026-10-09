@@ -18,6 +18,7 @@ import { ViewerDate } from "@/components/shared/viewer-date";
 import type { PackStanding } from "@/lib/class-packs/balance";
 import { paidByLabel } from "@/lib/class-packs/sell-words";
 import type { ClassPack, PackPurchase } from "@/lib/class-packs/service";
+import { personHref } from "@/lib/contacts/person-href";
 import { invoiceMoney } from "@/lib/invoices/money";
 
 import { ClassPacksTabs } from "./class-packs-tabs";
@@ -172,7 +173,7 @@ export function PurchasesScreen({
                 rows={purchases}
                 columns={columns}
                 rowKey={(p) => p.id}
-                rowHref={(p) => `/contacts/${p.contact.id}`}
+                rowHref={(p) => personHref(p.contact.id)}
                 modes={["table", "list"]}
                 hideModeToggle
                 filters={FILTERS}

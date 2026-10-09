@@ -1,6 +1,7 @@
 import { Badge } from "@saroh/ui/badge";
 import Link from "next/link";
 
+import { personHref } from "@/lib/contacts/person-href";
 import type { ClassWaitlistRow } from "@/lib/services/class-waitlist-words";
 import {
     heldText,
@@ -66,7 +67,7 @@ export function ClassWaitlist({
                             </span>
                             <div className="min-w-0 flex-[1_1_120px]">
                                 <Link
-                                    href={`/customers/${encodeURIComponent(row.contactId)}`}
+                                    href={personHref(row.contactId)}
                                     className="cursor-pointer rounded-sm text-sm font-medium text-foreground underline-offset-2 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring active:text-foreground/70"
                                 >
                                     {row.name ?? row.email ?? "A customer"}

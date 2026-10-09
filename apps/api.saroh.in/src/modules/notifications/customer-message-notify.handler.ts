@@ -135,7 +135,7 @@ export class CustomerMessageNotifyHandler {
         }
 
         const recipients = await this.ownerAdminEmails(message.organizationId);
-        const threadUrl = `${appBase()}/customers/${contactId}?tab=msg`;
+        const threadUrl = `${appBase()}/contacts/${contactId}?tab=msg`;
         for (const to of recipients) {
             await sendCustomerMessageNotificationEmail(to, {
                 customerName: who,

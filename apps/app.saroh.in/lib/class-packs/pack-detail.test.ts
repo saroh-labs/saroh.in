@@ -390,7 +390,7 @@ describe("Who has it", () => {
         );
         expect(row).toMatchObject({
             name: "Asha Rao",
-            href: "/customers/c_1",
+            href: "/contacts/c_1",
             left: "6 of 10",
             pct: 60,
             bar: "ok",
