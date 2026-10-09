@@ -60,6 +60,15 @@ export const CHANGELOG_ENTRIES: readonly ChangelogEntry[] = [
                 link: { label: "See Products", href: "/features/products" },
             },
             {
+                name: "Bring your lists in",
+                // Built 30 Aug 2026 (#175: 663375343, 324ca21e7), so it is
+                // here on day one and no longer in Coming next (#816).
+                // `imports/entities.ts`: products and customers only, from a
+                // CSV file, with a preview before anything is written.
+                // Ledger CL10.
+                body: "Already keep your products or customers in a spreadsheet? Bring them in from a CSV file: match its columns, see what will be added, updated or skipped, then import.",
+            },
+            {
                 name: "Bookings",
                 // Design: "…and get a reminder email." No booking reminder
                 // exists (ledger BK2): dropped.
@@ -140,11 +149,6 @@ export const COMING_NEXT: readonly ComingNext[] = [
         when: "Nov–Dec 2026",
         name: "Google Meet and Zoom links",
         line: "Online appointments get a meeting link made for them automatically.",
-    },
-    {
-        when: "Jan–Mar 2027",
-        name: "CSV import",
-        line: "Bring products and customers in from a spreadsheet.",
     },
     {
         when: "Jan–Mar 2027",

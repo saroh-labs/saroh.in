@@ -146,6 +146,12 @@ describe("the integration pages", () => {
             expect(Object.keys(row).sort()).toEqual(["line", "name", "when"]);
         }
     });
+
+    it("never lists CSV import as planned: it's built (#175, #816)", () => {
+        expect(plannedIntegrations.map((row) => row.name)).not.toContain(
+            "CSV import",
+        );
+    });
 });
 
 describe("the frontmatter check", () => {
