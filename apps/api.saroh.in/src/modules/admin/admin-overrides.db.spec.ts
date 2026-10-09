@@ -218,7 +218,7 @@ describe("business overrides (DB, U11)", () => {
         ).not.toBeNull();
     });
 
-    it("sets a limit below what is in use, and warns that the rest stay read-only", async () => {
+    it("sets a limit below what is in use, and warns what pauses past it, and when", async () => {
         const o = await org("Limited");
         await subscribe(o.id, "grow");
         await prisma.product.createMany({
@@ -235,6 +235,7 @@ describe("business overrides (DB, U11)", () => {
         );
 
         expect(written.warning).toMatch(/3 already/);
+        expect(written.warning).not.toMatch(/They stay, read-only/);
         expect(await row(o.id, "products")).toMatchObject({
             limit: 2,
             override: "Limit set by Saroh",
