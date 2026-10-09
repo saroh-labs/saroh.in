@@ -3,26 +3,30 @@ import type { Prisma } from "@saroh/database";
 import { cancelTreatmentVisitsInTx } from "../bookings/treatment-cancel";
 import type { OrderStage } from "./dto";
 import { isHandedOver, typeOf } from "./fulfilment";
+import { leftToRefundCents } from "./hand-payments";
 import { applyInventoryTransition, phaseOf } from "./order-inventory";
 import { retireOrderPayLinkInTx } from "./order-pay-link";
 import { orderMoneyIntents } from "./treatment-ledger";
 
 /*
- * "Cancel order…" is a refund in full, and the order is kept as cancelled
- * (round-2 B9, R7; DESIGN-NOTES "Orders are never deleted").
+ * "Cancel order…" refunds what is left, and the order is kept as cancelled
+ * (round-2 B9, R7; DESIGN-NOTES "Orders are never deleted"). What is left
+ * counts refunds recorded by hand (#865, #918, DEC-116): after part was
+ * handed back outside Saroh, a cancel sends back only the rest.
  *
  * What was paid online goes back through the order's one refund path
  * (`PaymentsService.refundOrderForCancel`, DEC-026): its rows carry a key
  * that says a cancel asked for them. The order is marked cancelled only
- * once nothing it took online is left and the provider has answered for
- * every refund in flight — so a refund whose answer was lost keeps the
+ * once nothing is left for it to send back and the provider has answered
+ * for every refund in flight — so a refund whose answer was lost keeps the
  * order open, its money held, until the refund webhook or a try-again
  * settles it ({@link finishCancelInTx}, called from each of those paths).
  * Promised stock comes back when the provider confirms each refund
  * (DEC-032, `settleRefundStock`), never earlier.
  *
- * An order with nothing paid online — unpaid, or paid by hand — is
- * cancelled at once ({@link completeCancelInTx}), its stock released there.
+ * An order with nothing to send back online — unpaid, paid by hand, or
+ * all of it already handed back — is cancelled at once
+ * ({@link completeCancelInTx}), its stock released there.
  */
 
 type Tx = Prisma.TransactionClient;
@@ -150,43 +154,82 @@ export async function completeCancelInTx(
     return true;
 }
 
-/** What is still to go back online, and whether a refund awaits its answer. */
+/**
+ * What a cancel sends back online (#918, DEC-116): what is left of the
+ * online payments, but never more than is left on the ORDER once refunds
+ * recorded by hand count. Pure; minor units.
+ */
+export function cancelRefundCents(
+    onlineLeftCents: number,
+    orderLeftCents: number,
+): number {
+    return Math.max(0, Math.min(onlineLeftCents, orderLeftCents));
+}
+
+/**
+ * What a cancel still has to send back online, and whether a refund awaits
+ * its answer. `leftCents` is {@link cancelRefundCents}: part of the order
+ * handed back by hand (#865) is not sent again, so after a refund by hand a
+ * cancel refunds only what is left on the order. `onlineLeftCents` is what
+ * the online payments alone still hold.
+ */
 export async function onlineRefundableInTx(
-    tx: Pick<Tx, "paymentIntent">,
+    tx: Pick<Tx, "paymentIntent" | "order">,
     orderId: string,
-): Promise<{ leftCents: number; unanswered: number }> {
-    const payments = await tx.paymentIntent.findMany({
-        where: { ...orderMoneyIntents(orderId), status: "SUCCEEDED" },
-        select: {
-            amountCents: true,
-            providerIntentId: true,
-            refunds: {
-                where: { status: { not: "FAILED" } },
-                select: {
-                    amountCents: true,
-                    status: true,
-                    providerRefundId: true,
+): Promise<{ leftCents: number; onlineLeftCents: number; unanswered: number }> {
+    const [order, payments] = await Promise.all([
+        tx.order.findUnique({
+            where: { id: orderId },
+            select: {
+                total: true,
+                paymentStatus: true,
+                paidByHand: true,
+                refundedByHand: true,
+            },
+        }),
+        tx.paymentIntent.findMany({
+            where: { ...orderMoneyIntents(orderId), status: "SUCCEEDED" },
+            select: {
+                amountCents: true,
+                providerIntentId: true,
+                refunds: {
+                    where: { status: { not: "FAILED" } },
+                    select: {
+                        amountCents: true,
+                        status: true,
+                        providerRefundId: true,
+                    },
                 },
             },
-        },
-    });
-    let leftCents = 0;
+        }),
+    ]);
+    let onlineLeftCents = 0;
     let unanswered = 0;
     for (const p of payments) {
         const back = p.refunds.reduce((s, r) => s + r.amountCents, 0);
-        if (p.providerIntentId) leftCents += Math.max(0, p.amountCents - back);
+        if (p.providerIntentId) {
+            onlineLeftCents += Math.max(0, p.amountCents - back);
+        }
         unanswered += p.refunds.filter(
             (r) => r.status === "PENDING" && !r.providerRefundId,
         ).length;
     }
-    return { leftCents, unanswered };
+    const orderLeftCents = order
+        ? leftToRefundCents({ ...order, paymentIntents: payments })
+        : onlineLeftCents;
+    return {
+        leftCents: cancelRefundCents(onlineLeftCents, orderLeftCents),
+        onlineLeftCents,
+        unanswered,
+    };
 }
 
 /**
  * Finish a cancel whose money went back online, once it can be: a cancel
- * asked for it (a refund row with its key, not failed), nothing taken
- * online is left, and the provider has answered for every refund in
- * flight. Called under the order's row lock by each path that learns of a
+ * asked for it (a refund row with its key, not failed), nothing is left
+ * for it to send back ({@link onlineRefundableInTx} — online money handed
+ * back by hand already counts as gone), and the provider has answered for
+ * every refund in flight. Called under the order's row lock by each path that learns of a
  * refund — the cancel itself, a try-again, the send job and the refund
  * webhook — so whichever comes last finishes it, once. Returns whether
  * this call cancelled the order.

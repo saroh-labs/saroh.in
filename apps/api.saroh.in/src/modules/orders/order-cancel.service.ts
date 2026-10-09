@@ -16,7 +16,7 @@ import { creditRestOfOrder } from "../invoices/order-invoicing";
 import { authorize } from "../organizations/organization-policy";
 import { PaymentsService } from "../payments/payments.service";
 import { enqueueRefundSendInTx } from "../payments/send-refund.handler";
-import { handPaidCents } from "./hand-payments";
+import { readLeftToRefundInTx } from "./hand-refund";
 import {
     cancelRefundKey,
     cancelRefusal,
@@ -33,8 +33,9 @@ export interface CancelOutcome {
     /** The order is cancelled now. */
     cancelled: boolean;
     /**
-     * What went back online: the whole of what was left. Null when nothing
-     * was paid online (unpaid, or paid by hand).
+     * What went back online: what was left on the order — less than its
+     * payments hold once part was refunded by hand (#918, DEC-116). Null
+     * when nothing went back online (unpaid, paid by hand, or nothing left).
      */
     refund: {
         amountCents: number;
@@ -44,7 +45,11 @@ export interface CancelOutcome {
         /** Part of it was refused: that part is still the customer's. */
         partlyRefused: boolean;
     } | null;
-    /** Paid by hand: the counter gives it back (the order reads refunded). */
+    /**
+     * Paid by hand: what the counter gives back — what is left once any
+     * refund by hand already made is counted (the order reads refunded).
+     * Null when nothing is left to give.
+     */
     byHand: { amountCents: number; currency: string } | null;
     /** A note went into the customer's message thread. */
     told: boolean;
@@ -53,16 +58,19 @@ export interface CancelOutcome {
 type Tx = Prisma.TransactionClient;
 
 /**
- * "Cancel order…" on Order Detail (round-2 B9, R7): a refund in full, and
- * the order kept as cancelled. `order:refund` (B16, matrix §2): a cancel is
- * a refund in full, so it is one power whether or not anything was paid.
+ * "Cancel order…" on Order Detail (round-2 B9, R7): a refund of whatever
+ * is left on the order, and the order kept as cancelled. What is left
+ * counts refunds recorded by hand (#865, #918, DEC-116), so money already
+ * handed back is never sent again; with nothing left, it just cancels.
+ * `order:refund` (B16, matrix §2): a cancel is a refund of the rest, so it
+ * is one power whether or not anything was paid.
  * Refused from its handover on — "Refund it instead".
  *
  * - Nothing paid (or the payment failed): cancelled at once, its promised
  *   stock back on the shelf.
  * - Paid by hand: cancelled at once and marked refunded, what is left of
- *   its invoice credited; the counter hands the money back.
- * - Paid online: everything still refundable goes back through the one
+ *   its invoice credited; the counter hands back what is left.
+ * - Paid online: what is left on the order goes back through the one
  *   refund path (`PaymentsService.refundOrderForCancel`, DEC-026) and the
  *   order is cancelled once the provider has answered for all of it. A
  *   lost answer keeps the order open with the money held; the send job
@@ -104,24 +112,30 @@ export class OrderCancelService {
             // Nothing to hand back online: cancelled now.
             let byHand: CancelOutcome["byHand"] = null;
             if (order.paymentStatus === "PAID") {
+                // What the counter gives back: what was paid, less every
+                // refund already made, by hand among them (#918) — read
+                // before the order reads refunded.
+                const left = await readLeftToRefundInTx(tx, order.id);
                 assertPaymentTransition("PAID", "REFUNDED");
                 await tx.order.update({
                     where: { id: order.id },
                     data: { paymentStatus: "REFUNDED" },
                 });
+                // The rest of its invoice: what an earlier refund by hand
+                // credited is not credited again.
                 await creditRestOfOrder(tx, order.id, "Cancelled", ctx.userId);
                 // Off Insights' orders figure again (#867).
                 await recordOrderRefundedInTx(tx, order.id);
                 // What was taken at the counter goes back from the till:
                 // the amount recorded, which an unpaid edit's difference
-                // never joined (`hand-payments.ts`).
-                byHand = {
-                    amountCents: handPaidCents({
-                        ...order,
-                        paymentIntents: [],
-                    }),
-                    currency: order.currency,
-                };
+                // never joined (`hand-payments.ts`), less what went back.
+                byHand =
+                    left.leftCents > 0
+                        ? {
+                              amountCents: left.leftCents,
+                              currency: left.currency,
+                          }
+                        : null;
             }
             await completeCancelInTx(tx, {
                 orderId: order.id,
@@ -245,9 +259,6 @@ async function lockForCancel(
             paymentStatus: true,
             stage: true,
             fulfilment: true,
-            total: true,
-            paidByHand: true,
-            currency: true,
             customerId: true,
         },
     });

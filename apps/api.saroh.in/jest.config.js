@@ -231,6 +231,10 @@ module.exports = {
         "<rootDir>/src/modules/orders/uncollected.spec.ts",
         // Record as refunded's amount and words (UX-061).
         "<rootDir>/src/modules/orders/hand-payments.spec.ts",
+        // Another amount recorded by hand (#865, DEC-116), pure.
+        "<rootDir>/src/modules/orders/hand-refund.spec.ts",
+        // What a cancel sends back once part went back by hand (#918).
+        "<rootDir>/src/modules/orders/order-cancel.spec.ts",
         // P4: the site's order confirmation, DB-free. Its access rules are
         // in checkout-confirmation.db.spec.ts.
         "<rootDir>/src/modules/orders/checkout-confirmation.spec.ts",

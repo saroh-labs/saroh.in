@@ -525,7 +525,6 @@ export function OrderDetail({
                                 number={number}
                                 first={first}
                                 refundTo={refundTo}
-                                remaining={remaining}
                                 linkable={
                                     can.payLink && (can.payOnline ?? false)
                                 }

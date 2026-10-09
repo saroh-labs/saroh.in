@@ -29,6 +29,7 @@ import {
 } from "../invoices/order-invoicing";
 import { enqueueTeamAlert } from "../notifications/team-alerts";
 import type { PaymentStatus } from "../orders/dto";
+import { leftToRefundCents } from "../orders/hand-payments";
 import { holdsOnPayment } from "../orders/online-checkout";
 import { finishCancelInTx } from "../orders/order-cancel";
 import { RETIRED_PAY_LINK } from "../orders/order-pay-link";
@@ -877,7 +878,10 @@ export class WebhooksService {
     /**
      * Whether every successful payment on an order has been refunded in
      * full — settled refunds only, so a refund still in flight does not
-     * close the order early.
+     * close the order early. Part of it handed back by hand (#865,
+     * DEC-116) and the rest online — a cancel after a refund by hand
+     * (#918), or another amount for the rest — is in full too, once
+     * nothing is left on the order.
      */
     private async fullyRefunded(tx: Tx, orderId: string): Promise<boolean> {
         const payments = await tx.paymentIntent.findMany({
@@ -895,7 +899,22 @@ export class WebhooksService {
             (s, p) => s + p.refunds.reduce((r, x) => r + x.amountCents, 0),
             0,
         );
-        return captured > 0 && refunded >= captured;
+        if (captured <= 0) return false;
+        if (refunded >= captured) return true;
+        const order = await tx.order.findUnique({
+            where: { id: orderId },
+            select: {
+                total: true,
+                paymentStatus: true,
+                paidByHand: true,
+                refundedByHand: true,
+            },
+        });
+        return (
+            order !== null &&
+            Number(order.refundedByHand) > 0 &&
+            leftToRefundCents({ ...order, paymentIntents: payments }) <= 0
+        );
     }
 
     /**
