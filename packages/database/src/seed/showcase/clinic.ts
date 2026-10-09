@@ -1,5 +1,6 @@
 import type { Prisma } from "@prisma/client";
 
+import { ensureCalendarOnlyRole } from "../../calendar-only-role";
 import type { Db } from "../helpers";
 import { writeSite } from "../helpers";
 import { seedPlanId } from "../pricing";
@@ -322,6 +323,8 @@ async function writeDentists(
     a: { orgId: string; createdAt: Date },
 ) {
     const ids = KAVI_DENTISTS.map(staffIdOf);
+    // Someone on the diary can be given a login as Calendar only (#868).
+    await ensureCalendarOnlyRole(prisma, a.orgId);
     for (let i = 0; i < KAVI_DENTISTS.length; i++) {
         const d = KAVI_DENTISTS[i];
         const data = {

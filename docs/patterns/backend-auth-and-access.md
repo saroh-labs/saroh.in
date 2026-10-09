@@ -228,6 +228,38 @@ what the API allows.
   `reviewerScope`: another storefront's order is a 404 to read, and every
   move asks `assertOrdersAtOwnLocation` (a 403). A new order read or move
   spreads the same; Home, the calendar and New order alerts follow it.
+- **Current** (#868, owner decision 2026-10-08) — **A diary person given a
+  login is Calendar only by default.** Someone taking bookings with no login
+  (DEC-105) is invited from Team by naming them (`staffId` on the invite,
+  `OrganizationInvitation.staffId`); with no role picked the invite is at
+  **"Calendar only"** (key `calendar-only`: `org:read`, `module:read`,
+  `booking:read`, `booking:write`, `service:read` — no customers, team,
+  set-up or money), and the owner may pick any role within reach instead.
+  Like Storefront team it is an ordinary role row, made on first use
+  (`ensureCalendarOnlyRole` in `@saroh/database`: a business's first diary
+  person, an invite or accept at it, the seed) and by the migration
+  `20261031100000_calendar_only_role` for businesses already on the diary;
+  with no row the policy resolves the key to that list, never the floor.
+  Accepting links the diary person to the new membership in the accept's
+  transaction (`linkDiaryPerson`; a login already on the diary as someone
+  else keeps that). Linking an existing member to a diary person
+  (`PATCH staff/:id`) changes no role: a role held is never lowered. **What it reaches is narrowed by the key**, like DEC-074's
+  locations: `bookings/own-diary.ts` (`ownDiaryOf`, `ownBookingsWhere`,
+  `assertOwnBooking`, `bookingStaffFor`) gives the person's own bookings —
+  those they take, and nobody's for a service they take — to the bookings
+  list, the bookings calendar, a booking's detail (another's is a 404), the
+  business calendar (others' time off unnamed), a class's waitlist, the
+  diary's people (themselves only) and Home (no business-wide booking
+  counts; off the diary, no bookings rather than everyone's); a move,
+  cancel, outcome or pay link on another's booking is a 403 ("Your role
+  changes only your own bookings."), and a booking by hand is with
+  themselves. They hear no business-wide booking alerts. A new booking read
+  or write spreads the same. **Seats:** the role holds `booking:write`, so
+  it is a seat (DEC-105); an open invite naming a diary person with no login
+  is that person, counted once (`countedOnDiary` in `billing/seats.ts`, read
+  by metering, the invite's meter check and Team's count line).
+  `calendar-only-role.spec.ts`, `diary-invite.spec.ts`, `own-diary.spec.ts`,
+  `organization-members.diary.spec.ts`, `calendar-only.db.spec.ts`.
 - **Current** — **The last OWNER cannot be demoted or removed.** The S1-006
   invariant, enforced in `organization-members.service.ts` inside a serializable
   transaction — it is about the state of the roster, not what a role may do, so

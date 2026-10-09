@@ -8,7 +8,7 @@ import {
 import { realOrderWhere } from "../orders/open-orders";
 import type { HomeInput, HomeLastDay, HomeSinceItem } from "./home-model";
 import { holds } from "./home-model";
-import { onOneStore, storeWhere } from "./home-staff";
+import { onOneStore, seesBusinessBookings, storeWhere } from "./home-staff";
 import { businessDay } from "./home-today";
 
 /**
@@ -67,7 +67,7 @@ export function sinceScope(
         orders:
             commerce &&
             (holds(input, "order:read") || holds(input, "order:stage")),
-        bookings: available.has("APPOINTMENTS") && holds(input, "booking:read"),
+        bookings: available.has("APPOINTMENTS") && seesBusinessBookings(input),
         reviews: commerce && holds(input, "product-review:read"),
         money,
         ...(money && !holds(input, "invoice:read")

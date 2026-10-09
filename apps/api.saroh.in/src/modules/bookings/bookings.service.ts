@@ -65,6 +65,12 @@ import type {
     UpdateServiceDto,
 } from "./dto";
 import { openingFor, refuseOutsideOpening } from "./opening-hours";
+import {
+    assertOwnBooking,
+    bookingStaffFor,
+    ownBookingsWhere,
+    ownDiaryOf,
+} from "./own-diary";
 import type { BookInput, ReserveBy, ReserveWith } from "./reservation";
 import { loadBookableService, reserve, reserveInTx } from "./reservation";
 import type { ServiceView } from "./service-fields";
@@ -585,10 +591,13 @@ export class BookingsService {
             // Ensure the service is owned before filtering by it (404 otherwise).
             await this.requireOwnedService(ctx, serviceId);
         }
+        // Calendar only reads its own diary (#868).
+        const own = await ownDiaryOf(prisma, ctx);
         return prisma.booking.findMany({
             where: {
                 organizationId: ctx.organizationId,
                 ...(serviceId ? { serviceId } : {}),
+                ...ownBookingsWhere(own),
             },
             // A list never carries the booker's note (E7): it is sensitive,
             // and read one booking at a time behind its gate.
@@ -640,29 +649,41 @@ export class BookingsService {
             );
         }
         const organizationId = ctx.organizationId;
-        const staffId = query.staffId;
+        // Calendar only reads its own diary (#868): their column and the
+        // bookings that are theirs; another person's column is a 404.
+        const own = await ownDiaryOf(prisma, ctx);
+        if (own && query.staffId && query.staffId !== own.staffId) {
+            throw new NotFoundException("Staff member not found");
+        }
+        const staffId = own ? (own.staffId ?? undefined) : query.staffId;
         const now = new Date();
         const [people, rows, zone] = await Promise.all([
-            prisma.staffMember.findMany({
-                where: staffId
-                    ? { id: staffId, organizationId }
-                    : { organizationId, status: "ACTIVE" },
-                orderBy: [{ name: "asc" }, { id: "asc" }],
-                select: { id: true, name: true, title: true },
-            }),
+            own && !own.staffId
+                ? Promise.resolve([])
+                : prisma.staffMember.findMany({
+                      where: staffId
+                          ? { id: staffId, organizationId }
+                          : { organizationId, status: "ACTIVE" },
+                      orderBy: [{ name: "asc" }, { id: "asc" }],
+                      select: { id: true, name: true, title: true },
+                  }),
             prisma.booking.findMany({
                 where: {
                     organizationId,
                     startAt: { lt: to },
                     endAt: { gt: from },
-                    ...(staffId ? { staffId } : {}),
+                    ...(own
+                        ? ownBookingsWhere(own)
+                        : staffId
+                          ? { staffId }
+                          : {}),
                 },
                 orderBy: [{ startAt: "asc" }, { createdAt: "asc" }],
                 select: diarySelect,
             }),
             businessZone(prisma, organizationId),
         ]);
-        if (staffId && people.length === 0) {
+        if (staffId && people.length === 0 && !own) {
             throw new NotFoundException("Staff member not found");
         }
         // Whoever may take payment at the desk sees what they take (DEC-098):
@@ -821,7 +842,7 @@ export class BookingsService {
         bookingId: string,
     ): Promise<BookingDetailView> {
         requireBookingPower(ctx, "booking:read");
-        await this.requireOwnedBooking(ctx, bookingId);
+        await this.requireOwnedBooking(ctx, bookingId, "read");
         const booking = await prisma.booking.findUniqueOrThrow({
             where: { id: bookingId },
             include: bookingDetailInclude,
@@ -1118,7 +1139,8 @@ export class BookingsService {
             rules,
             staffing,
             startAt,
-            dto.staffId,
+            // Calendar only books into its own diary (#868).
+            await bookingStaffFor(prisma, ctx, dto.staffId),
             "team",
             undefined,
             opening,
@@ -1214,7 +1236,12 @@ export class BookingsService {
         dto: BookVisitInput,
     ): Promise<Booking> {
         requireBookingPower(ctx, "booking:write");
-        return bookVisit(ctx, orderId, dto);
+        // Calendar only books a visit into its own diary (#868).
+        const staffId = await bookingStaffFor(prisma, ctx, dto.staffId);
+        return bookVisit(ctx, orderId, {
+            ...dto,
+            ...(staffId ? { staffId } : {}),
+        });
     }
 
     /**
@@ -1367,9 +1394,15 @@ export class BookingsService {
         return service;
     }
 
+    /**
+     * The business's booking, or a 404. For Calendar only (#868), also one
+     * on their own diary: someone else's is a 404 to read and a 403 to
+     * change (`own-diary.ts`).
+     */
     private async requireOwnedBooking(
         ctx: OrganizationContext,
         bookingId: string,
+        mode: "read" | "write" = "write",
     ): Promise<Booking> {
         const booking = await prisma.booking.findUnique({
             where: { id: bookingId },
@@ -1377,6 +1410,7 @@ export class BookingsService {
         if (booking?.organizationId !== ctx.organizationId) {
             throw new NotFoundException("Booking not found");
         }
+        await assertOwnBooking(prisma, ctx, booking, mode);
         return booking;
     }
 

@@ -5,6 +5,7 @@ import type {
     OrgRole,
 } from "../../common/types/organization-context";
 import { ORG_ROLES } from "../../common/types/organization-context";
+import { CALENDAR_ONLY_ACTIONS, isCalendarOnly } from "./calendar-only-role";
 import type { OrgAction } from "./organization-actions";
 import { ORG_ACTIONS } from "./organization-actions";
 
@@ -278,7 +279,14 @@ function roleCapabilities(
     if (stored) {
         return withImplied(new Set(stored.filter(isKnownAction)));
     }
-    return isBuiltInRole(roleKey) ? CAPABILITIES[roleKey] : CAPABILITIES.MEMBER;
+    if (isBuiltInRole(roleKey)) return CAPABILITIES[roleKey];
+    // A shipped role whose row isn't there (#868): its own narrow list,
+    // never the floor — the floor reads the whole diary and every
+    // customer, which is exactly what Calendar only keeps from someone.
+    if (isCalendarOnly(roleKey)) {
+        return withImplied(new Set<OrgAction>(CALENDAR_ONLY_ACTIONS));
+    }
+    return CAPABILITIES.MEMBER;
 }
 
 const KNOWN_ACTIONS: ReadonlySet<string> = new Set(ORG_ACTIONS);

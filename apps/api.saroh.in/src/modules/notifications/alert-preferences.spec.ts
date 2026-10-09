@@ -71,6 +71,13 @@ describe("alerts", () => {
         expect(alertEventOfType("site.not_live")).toBe("site");
     });
 
+    it("never offers Calendar only the business's booking alerts (#868)", () => {
+        const diary = holds("booking:read", "booking:write");
+        // A booking alert names whoever booked with anyone.
+        expect(mayHearAbout("booking", diary, "calendar-only")).toBe(false);
+        expect(mayHearAbout("booking", diary, "front-desk")).toBe(true);
+    });
+
     describe("channels", () => {
         const base = {
             seesInbox: true,

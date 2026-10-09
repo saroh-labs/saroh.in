@@ -40,7 +40,7 @@ import { DateTime } from "luxon";
 import { businessTimezone } from "../bookings/staff-availability";
 import { COUNTED_SAROH_DELIVERIES } from "../communications/saroh-delivery";
 import type { SeatKind } from "./seats";
-import { BOOKABLE_STAFF, roleActionsOf, seatOf } from "./seats";
+import { BOOKABLE_STAFF, countedOnDiary, roleActionsOf, seatOf } from "./seats";
 
 /** The limit keys metering counts, in `MODULE_MAP`'s words. */
 export const METERED_LIMIT_KEYS = [
@@ -200,17 +200,31 @@ export function loginlessStaff(): Prisma.StaffMemberWhereInput {
     return { status: BOOKABLE_STAFF, membershipId: null };
 }
 
+/** What an open invitation needs read to be classified (#868). */
+export const SEAT_INVITE_SELECT = {
+    role: true,
+    staffMember: { select: { status: true, membershipId: true } },
+} as const;
+
+/** One open invitation as {@link SEAT_INVITE_SELECT} reads it. */
+export interface SeatInviteRow {
+    role: string;
+    /** The diary person it gives a login to (#868), if any. */
+    staffMember?: { status: string; membershipId: string | null } | null;
+}
+
 /**
  * How many of these people and open invitations are of `kind`: a seat
  * (they can change something, or take bookings) or view-only. `loginless`
  * is the business's bookable staff with no login ({@link loginlessStaff}):
- * seats too.
+ * seats too. An invite that gives one of them a login is that same person
+ * (#868, `countedOnDiary`), so it isn't counted again.
  */
 export function countSeatKind(
     kind: SeatKind,
     roles: readonly { key: string; actions: string[] }[],
     members: readonly SeatMemberRow[],
-    invites: readonly { role: string }[],
+    invites: readonly SeatInviteRow[],
     loginless = 0,
 ): number {
     const lookup = roleActionsOf(roles);
@@ -224,7 +238,8 @@ export function countSeatKind(
             ) === kind,
     ).length;
     const waiting = invites.filter(
-        (i) => seatOf(lookup, i.role) === kind,
+        (i) =>
+            !countedOnDiary(i.staffMember) && seatOf(lookup, i.role) === kind,
     ).length;
     return people + waiting + (kind === "seat" ? loginless : 0);
 }
@@ -336,7 +351,7 @@ export async function countUsage(
                 }),
                 db.organizationInvitation.findMany({
                     where: { organizationId, ...openInvitations(now) },
-                    select: { role: true },
+                    select: SEAT_INVITE_SELECT,
                 }),
                 db.organizationRole.findMany({
                     where: { organizationId },

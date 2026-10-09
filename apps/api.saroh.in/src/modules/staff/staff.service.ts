@@ -5,7 +5,7 @@ import {
     NotFoundException,
 } from "@nestjs/common";
 import type { Prisma } from "@saroh/database";
-import { prisma } from "@saroh/database";
+import { ensureCalendarOnlyRole, prisma } from "@saroh/database";
 
 import type { OrganizationContext } from "../../common/types/organization-context";
 import { planMeter } from "../billing/metering.service";
@@ -17,6 +17,7 @@ import { bookingPaymentView } from "../bookings/booking-payment";
 import type { BookingRulesValue } from "../bookings/booking-rules";
 import { bookingPaymentOf, loadBookingRules } from "../bookings/booking-rules";
 import { loadOpeningHours } from "../bookings/opening-hours";
+import { ownDiaryOf } from "../bookings/own-diary";
 import { businessTimezone, dateOnly } from "../bookings/staff-availability";
 import type { ClosureView } from "./closures.service";
 import { closureViews } from "./closures.service";
@@ -187,9 +188,15 @@ export class StaffService {
     async list(ctx: OrganizationContext, now = new Date()): Promise<StaffList> {
         requireBookingPower(ctx, "service:read");
         const since = new Date(now.getTime() - HISTORY_DAYS * DAY);
+        // Calendar only sees its own diary (#868): themselves, not the
+        // team's hours, time off or reasons.
+        const own = await ownDiaryOf(prisma, ctx);
         const [rows, timezone, closures, opening] = await Promise.all([
             prisma.staffMember.findMany({
-                where: { organizationId: ctx.organizationId },
+                where: {
+                    organizationId: ctx.organizationId,
+                    ...(own ? { id: own.staffId ?? { in: [] } } : {}),
+                },
                 include: staffInclude(since),
                 orderBy: [{ status: "asc" }, { name: "asc" }],
             }),
@@ -211,6 +218,11 @@ export class StaffService {
         now = new Date(),
     ): Promise<StaffView> {
         requireBookingPower(ctx, "service:read");
+        // Calendar only: their own, and nobody else's (#868).
+        const own = await ownDiaryOf(prisma, ctx);
+        if (own && own.staffId !== staffId) {
+            throw new NotFoundException("Staff member not found");
+        }
         return this.read(ctx, staffId, now);
     }
 
@@ -243,6 +255,9 @@ export class StaffService {
                         },
                     ),
                 });
+                // Whoever is on the diary can be given a login as Calendar
+                // only (#868): the business has the role from its first.
+                await ensureCalendarOnlyRole(tx, ctx.organizationId);
                 const person = await tx.staffMember.create({
                     data: {
                         organizationId: ctx.organizationId,

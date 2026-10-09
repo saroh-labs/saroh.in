@@ -16,6 +16,7 @@ import { openInvitations } from "../billing/metering";
 import { planMeter } from "../billing/metering.service";
 import {
     BOOKABLE_STAFF,
+    countedOnDiary,
     onlyViews,
     roleActionsOf,
     seatOf,
@@ -320,7 +321,12 @@ export class OrganizationRolesService {
                     role: key,
                     ...openInvitations(new Date()),
                 },
-                select: { id: true },
+                select: {
+                    id: true,
+                    staffMember: {
+                        select: { status: true, membershipId: true },
+                    },
+                },
             }),
         ]);
         const before = roleActionsOf([{ key, actions: [...from] }]);
@@ -330,7 +336,11 @@ export class OrganizationRolesService {
                 extras: p.extraActions,
                 bookable: p.staffMember?.status === BOOKABLE_STAFF,
             })),
-            ...invites.map(() => ({ extras: [], bookable: false })),
+            // An invite for someone already taking bookings is counted as
+            // them, on a seat whatever the role (#868).
+            ...invites
+                .filter((i) => !countedOnDiary(i.staffMember))
+                .map(() => ({ extras: [], bookable: false })),
         ];
         let toSeat = 0;
         let toViewOnly = 0;

@@ -5,7 +5,7 @@ import {
     Injectable,
     NotFoundException,
 } from "@nestjs/common";
-import { prisma } from "@saroh/database";
+import { ensureCalendarOnlyRole, prisma } from "@saroh/database";
 import { randomBytes } from "node:crypto";
 
 import { sendOrganizationInvitationEmail } from "../../common/email";
@@ -19,17 +19,27 @@ import {
     AuditOutcome,
     AuditService,
 } from "../audit/audit.service";
+import { openInvitations } from "../billing/metering";
 import { planMeter } from "../billing/metering.service";
 import type { SeatKind } from "../billing/seats";
 import {
     BOOKABLE_STAFF,
+    countedOnDiary,
     roleActionsOf,
     seatKindOf,
     seatModule,
     seatOf,
 } from "../billing/seats";
 import { enqueueTeamAlert } from "../notifications/team-alerts";
+import { isCalendarOnly } from "./calendar-only-role";
 import { CAPABILITY_BY_ACTION } from "./capability-catalogue";
+import type { DiaryPerson } from "./diary-invite";
+import {
+    assertDiaryInvitable,
+    inviteRoleFor,
+    joinsBookable,
+    linkDiaryPerson,
+} from "./diary-invite";
 import { hashInviteToken } from "./invite-token";
 import type {
     InviteMemberDto,
@@ -122,8 +132,18 @@ export interface InvitationView {
     status: string;
     expiresAt: Date;
     createdAt: Date;
-    /** Whether the role invited to uses a team seat (DEC-105). */
+    /**
+     * Whether the role invited to uses a team seat (DEC-105) — or the
+     * person does: someone on the diary takes bookings whatever the role.
+     */
     usesSeat: boolean;
+    /** The person on the diary it gives a login to (#868), if any. */
+    staff: { id: string; name: string } | null;
+    /**
+     * Already counted as that diary person, who takes bookings with no
+     * login and so holds a seat (#868): Team doesn't count the invite again.
+     */
+    countedOnDiary: boolean;
 }
 
 /**
@@ -285,6 +305,15 @@ export class OrganizationMembersService {
                     status: true,
                     expiresAt: true,
                     createdAt: true,
+                    // Who on the diary it gives a login to (#868).
+                    staffMember: {
+                        select: {
+                            id: true,
+                            name: true,
+                            status: true,
+                            membershipId: true,
+                        },
+                    },
                 },
             }),
             prisma.organizationRole.findMany({
@@ -295,11 +324,23 @@ export class OrganizationMembersService {
         const roleActions = roleActionsOf(roleRows);
         // No token, hashed or otherwise. It is in the invitee's inbox and
         // nowhere else; a roster screen is not a place to re-read it from.
-        return invitations.map((i) => ({
+        return invitations.map(({ staffMember, ...i }) => ({
             ...i,
             role: toRole(i.role),
             roleKey: i.role,
-            usesSeat: seatOf(roleActions, i.role) === "seat",
+            // Someone joining to take bookings uses a seat whatever the
+            // role (DEC-105).
+            usesSeat:
+                seatOf(
+                    roleActions,
+                    i.role,
+                    undefined,
+                    joinsBookable(staffMember),
+                ) === "seat",
+            staff: staffMember
+                ? { id: staffMember.id, name: staffMember.name }
+                : null,
+            countedOnDiary: countedOnDiary(staffMember),
         }));
     }
 
@@ -310,9 +351,19 @@ export class OrganizationMembersService {
      */
     async invite(ctx: OrganizationContext, dto: InviteMemberDto) {
         authorize(ctx, "member:invite");
-        await this.assertWithinReach(ctx, dto.role, "invite someone as");
+        // Someone on the diary given a login (#868): checked first, and
+        // Calendar only unless another role was picked.
+        const staff = dto.staffId
+            ? await this.diaryPersonToInvite(ctx, dto.staffId, dto.email)
+            : null;
+        const role = inviteRoleFor(dto);
+        if (isCalendarOnly(role)) {
+            // The role the default names exists before it is checked.
+            await ensureCalendarOnlyRole(prisma, ctx.organizationId);
+        }
+        await this.assertWithinReach(ctx, role, "invite someone as");
 
-        const siteIds = await this.resolveSiteIds(ctx, dto.role, dto.siteIds);
+        const siteIds = await this.resolveSiteIds(ctx, role, dto.siteIds);
 
         const existing = await prisma.membership.findFirst({
             where: {
@@ -334,7 +385,14 @@ export class OrganizationMembersService {
         // role can change something (DEC-105): a new invitation is checked;
         // sending a live one again adds nobody. A role that only looks is
         // checked against the plan's view-only people instead, the same way.
-        const kind = await this.seatKindFor(ctx.organizationId, dto.role);
+        // Someone on the diary joins taking bookings, so on a seat whatever
+        // the role — and, with no login yet, already holds it (#868).
+        const kind = await this.seatKindFor(
+            ctx.organizationId,
+            role,
+            undefined,
+            joinsBookable(staff),
+        );
         const invitation = await planMeter.withRoom(
             ctx.organizationId,
             seatModule(kind),
@@ -349,15 +407,19 @@ export class OrganizationMembersService {
                     create: {
                         organizationId: ctx.organizationId,
                         email: dto.email,
-                        role: dto.role,
+                        role,
                         siteIds,
+                        staffId: staff?.id ?? null,
                         tokenHash: hashInviteToken(token),
                         invitedByUserId: ctx.userId,
                         expiresAt,
                     },
                     update: {
-                        role: dto.role,
+                        role,
                         siteIds,
+                        // Sent again without a diary person keeps the one
+                        // it names; with one, names that.
+                        ...(staff ? { staffId: staff.id } : {}),
                         tokenHash: hashInviteToken(token),
                         invitedByUserId: ctx.userId,
                         expiresAt,
@@ -374,6 +436,11 @@ export class OrganizationMembersService {
             {
                 // A live invitation of the same kind already counts this person.
                 addingIn: async (tx) => {
+                    // Taking bookings with no login, they hold a seat
+                    // already: the invite is them, not one more (#868).
+                    if (staff && !staff.membershipId && joinsBookable(staff)) {
+                        return 0;
+                    }
                     const live = await tx.organizationInvitation.findFirst({
                         where: {
                             organizationId: ctx.organizationId,
@@ -413,7 +480,12 @@ export class OrganizationMembersService {
             targetId: invitation.id,
             outcome: AuditOutcome.Success,
             // The role and how many sites, never the invitee's address.
-            metadata: { role: dto.role, siteCount: siteIds.length },
+            metadata: {
+                role,
+                siteCount: siteIds.length,
+                // That it names someone on the diary; not who.
+                ...(staff ? { onDiary: true } : {}),
+            },
         });
 
         return {
@@ -541,6 +613,7 @@ export class OrganizationMembersService {
                 siteIds: true,
                 status: true,
                 expiresAt: true,
+                staffId: true,
                 organization: { select: { name: true, slug: true } },
             },
         });
@@ -587,8 +660,15 @@ export class OrganizationMembersService {
             select: { id: true },
         });
 
+        let linkedStaff = false;
         await prisma.$transaction(async (tx) => {
-            await tx.membership.upsert({
+            // Calendar only exists before anyone holds it (#868): a key
+            // with no row would read as the role's list, but Team names a
+            // role by its row.
+            if (isCalendarOnly(roleKey)) {
+                await ensureCalendarOnlyRole(tx, invitation.organizationId);
+            }
+            const membership = await tx.membership.upsert({
                 where: {
                     organizationId_userId: {
                         organizationId: invitation.organizationId,
@@ -601,7 +681,17 @@ export class OrganizationMembersService {
                     role: roleKey,
                 },
                 update: { role: roleKey },
+                select: { id: true },
             });
+            // The diary person this login is for (#868): theirs now.
+            if (invitation.staffId) {
+                linkedStaff = await linkDiaryPerson(
+                    tx,
+                    invitation.organizationId,
+                    invitation.staffId,
+                    membership.id,
+                );
+            }
             for (const site of sites) {
                 await tx.siteReviewer.upsert({
                     where: {
@@ -639,7 +729,11 @@ export class OrganizationMembersService {
             targetType: "membership",
             targetId: user.id,
             outcome: AuditOutcome.Success,
-            metadata: { role: roleKey, siteCount: sites.length },
+            metadata: {
+                role: roleKey,
+                siteCount: sites.length,
+                ...(invitation.staffId ? { linkedStaff } : {}),
+            },
         });
 
         return {
@@ -1157,6 +1251,35 @@ export class OrganizationMembersService {
     }
 
     /**
+     * The diary person an invite gives a login to (#868): this business's,
+     * with no login yet, and no other invite out for them. Refused in
+     * words otherwise.
+     */
+    private async diaryPersonToInvite(
+        ctx: OrganizationContext,
+        staffId: string,
+        email: string,
+    ): Promise<DiaryPerson> {
+        const person = await prisma.staffMember.findFirst({
+            where: { id: staffId, organizationId: ctx.organizationId },
+            select: { id: true, name: true, status: true, membershipId: true },
+        });
+        const other = person
+            ? await prisma.organizationInvitation.findFirst({
+                  where: {
+                      organizationId: ctx.organizationId,
+                      staffId,
+                      email: { not: email },
+                      ...openInvitations(new Date()),
+                  },
+                  select: { email: true },
+              })
+            : null;
+        assertDiaryInvitable(person, other?.email ?? null);
+        return person as DiaryPerson;
+    }
+
+    /**
      * Whether someone at this role, with these extras, uses a team seat or
      * is view-only (DEC-105): by what they can do, never the role's name.
      */
@@ -1237,6 +1360,9 @@ export async function invitedRoleKey(
     invited: string,
 ): Promise<string> {
     if (isBuiltInRole(invited)) return invited;
+    // Shipped, and made in the accept's transaction if it isn't there
+    // (#868): never the floor, which reads the whole diary.
+    if (isCalendarOnly(invited)) return invited;
     const made = await prisma.organizationRole.findUnique({
         where: { organizationId_key: { organizationId, key: invited } },
         select: { key: true },

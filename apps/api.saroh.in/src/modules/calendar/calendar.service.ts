@@ -13,6 +13,7 @@ import { holdsPlace } from "../bookings/booking-hold";
 import { bookingDueCents, bookingPrice } from "../bookings/booking-money";
 import type { BookingPaperRow } from "../bookings/desk-take";
 import { paidAtDesk } from "../bookings/desk-take";
+import { ownBookingsWhere, ownDiaryOf } from "../bookings/own-diary";
 import type { ZoneSource } from "../bookings/staff-availability";
 import { businessZone } from "../bookings/staff-availability";
 import { ModuleAvailabilityService } from "../capabilities/module-availability.service";
@@ -319,6 +320,10 @@ export class CalendarService {
         const joinedAt = created ? dayOf(created, zone.zone) : null;
         assertWithinReach(span, reachOf(joinedAt, dayOf(now, zone.zone)));
         const window = windowOf(span, zone.zone);
+        // Calendar only sees its own diary (#868): its bookings and classes,
+        // and who else is off but not who or why.
+        const own = await ownDiaryOf(this.db, ctx);
+        const mine = ownBookingsWhere(own);
 
         const money =
             allows(ctx, "payment:read") && allows(ctx, "invoice:read");
@@ -397,10 +402,10 @@ export class CalendarService {
                 ),
             ),
             attempt("bookings", sees.bookings, () =>
-                this.readBookings(organizationId, window, zone.zone, now),
+                this.readBookings(organizationId, window, zone.zone, now, mine),
             ),
             attempt("classes", sees.classes, () =>
-                this.readClasses(organizationId, window, zone.zone, now),
+                this.readClasses(organizationId, window, zone.zone, now, mine),
             ),
             attempt("payments", sees.payments, () =>
                 readPayments(this.db, organizationId, window, zone.zone),
@@ -410,7 +415,7 @@ export class CalendarService {
                 window,
                 zone.zone,
                 on.has("APPOINTMENTS"),
-                allows(ctx, "booking:read"),
+                allows(ctx, "booking:read") && own === null,
             ),
         ]);
 
@@ -1222,6 +1227,7 @@ export class CalendarService {
         window: { start: Date; end: Date },
         zone: string,
         now: Date,
+        mine: Prisma.BookingWhereInput = {},
     ): Promise<DatedItem[]> {
         const rows = await this.db.booking.findMany({
             where: {
@@ -1229,6 +1235,7 @@ export class CalendarService {
                 ...holdsPlace(now),
                 startAt: { gte: window.start, lt: window.end },
                 service: { capacity: { lte: 1 } },
+                ...mine,
             },
             orderBy: { startAt: "asc" },
             select: {
@@ -1371,6 +1378,7 @@ export class CalendarService {
         window: { start: Date; end: Date },
         zone: string,
         now: Date,
+        mine: Prisma.BookingWhereInput = {},
     ): Promise<DatedItem[]> {
         const rows = await this.db.booking.findMany({
             where: {
@@ -1378,6 +1386,7 @@ export class CalendarService {
                 ...holdsPlace(now),
                 startAt: { gte: window.start, lt: window.end },
                 service: { capacity: { gt: 1 } },
+                ...mine,
             },
             orderBy: { startAt: "asc" },
             select: {
