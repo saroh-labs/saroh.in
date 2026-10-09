@@ -4,7 +4,7 @@ Developer documentation for the Saroh monorepo — for people contributing to th
 codebase, not for people using the product. (End-user guides live in
 [`help.saroh.in`](../help.saroh.in).)
 
-Dev port **3006** · package name `docs` (`pnpm --filter docs …`)
+Runs at `https://docs.saroh.localhost` under portless · package name `docs` (`pnpm --filter docs …`)
 
 ## What's here
 

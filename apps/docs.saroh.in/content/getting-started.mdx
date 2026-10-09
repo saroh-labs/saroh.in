@@ -9,15 +9,18 @@ a PostgreSQL database.
 
 ## Prerequisites
 
-- **Node.js 22+** and **pnpm 9+**
+- **Node.js 24+** and **pnpm 9.9+**
+- **[portless](https://www.npmjs.com/package/portless)**, installed once per
+  machine (it asks for `sudo`):
+  `npm install -g portless && portless service install --wildcard`
 - **PostgreSQL 14+** — local, or a hosted branch (Neon, Supabase, RDS). The API
   is the only thing that connects to it.
 
 ## 1. Install
 
 ```bash
-git clone https://github.com/saroh-io/saroh.io.git
-cd saroh.io
+git clone https://github.com/saroh-labs/saroh.in.git
+cd saroh.in
 pnpm install
 ```
 
@@ -31,12 +34,12 @@ cp apps/api.saroh.in/.env.example apps/api.saroh.in/.env
 
 The four that must be set for anything to start:
 
-| Key                    | What it is                                                       |
-| ---------------------- | ---------------------------------------------------------------- |
-| `DATABASE_URL`         | Your Postgres connection string.                                  |
-| `BETTER_AUTH_SECRET`   | 32+ characters. Identical anywhere a session is validated.        |
-| `BETTER_AUTH_URL`      | The API's own origin — `http://localhost:3333` locally.           |
-| `APP_URL`              | The workspace origin, for links the API emails.                   |
+| Key                  | What it is                                                    |
+| -------------------- | ------------------------------------------------------------- |
+| `DATABASE_URL`       | Your Postgres connection string.                              |
+| `BETTER_AUTH_SECRET` | 32+ characters. Identical anywhere a session is validated.    |
+| `BETTER_AUTH_URL`    | The API's own origin — `https://api.saroh.localhost` locally. |
+| `APP_URL`            | The workspace origin, for links the API emails.               |
 
 Object storage, SMTP and OAuth are all optional locally. With storage unset,
 media uploads fall back to an in-memory adapter; with SMTP unset, verification
@@ -60,13 +63,14 @@ directly.
 
 ### Trusted origins on localhost
 
-Better Auth rejects mutating requests — including same-origin Next.js server
-actions — whose `Origin` is not trusted, and the default list is `*.saroh.in`.
-On localhost that excludes you, so store and site writes return 403 with nothing
-obviously wrong. Set this in the `.env` of the API **and** each frontend you run:
+Unset, `BETTER_AUTH_TRUSTED_ORIGINS` falls back to the `*.saroh.in` production
+list. Locally that refuses your `.localhost` origins: server actions answer
+`403 Untrusted request origin`, and sign-in lands on the app launcher instead
+of the page you asked for. Set it in the API's `.env` **and** each frontend you
+run — the root `.env.example` has the value:
 
 ```bash
-BETTER_AUTH_TRUSTED_ORIGINS=http://localhost:3000,http://localhost:3001,http://localhost:3003
+BETTER_AUTH_TRUSTED_ORIGINS=https://accounts.saroh.localhost,https://admin.saroh.localhost,https://app.saroh.localhost
 ```
 
 Production does not need it: the real origins are already in the default list.
@@ -106,34 +110,35 @@ The password is for a database on your own machine only: seeding any other datab
 pnpm dev
 ```
 
-| App                | Port   |
-| ------------------ | ------ |
-| `accounts` sign-in | `3000` |
-| `admin`            | `3001` |
-| `app` (workspace)  | `3003` |
-| `docs`             | `3006` |
-| `help`             | `3007` |
-| `saroh.in`         | `3008` |
-| `sites`            | `3009` |
-| `templates`        | `3010` |
-| `ui`               | `3011` |
-| `api`              | `3333` |
+Every app runs under portless at its production hostname with `.localhost`
+added — `https://accounts.saroh.localhost`, `https://app.saroh.localhost`,
+`https://api.saroh.localhost`, `https://docs.saroh.localhost` and so on. A
+merchant's site is `https://<slug>.saroh.app.localhost` (the seeded one is
+`northwind`).
 
-The API's port comes from its `.env` (`PORT`), not from a CLI flag.
+**Do not start an app on a bare port** (`next dev -p 3003`, or `nest start`
+with a `PORT`). The API's CORS allowlist is built from the `.localhost` names
+and the session cookie is scoped to their shared parent domain, so on bare
+ports sign-in is refused or never sticks — with nothing in the API log.
 
 To run only what you need:
 
 ```bash
-pnpm dev --filter=@saroh/api --filter=app
+pnpm dev:app        # API, accounts and the workspace
+pnpm dev:api-auth   # API and accounts
+pnpm portless:status
 ```
 
 ## 6. Check it is actually up
 
 ```bash
-curl localhost:3333/health/live     # process is running
-curl localhost:3333/health/ready    # database, migrations and queue are usable
+curl https://api.saroh.localhost/health/live     # process is running
+curl https://api.saroh.localhost/health/ready    # database, migrations and queue are usable
 ```
 
 `ready` fails on an unreachable database, an unapplied migration, or an
 unreadable job queue — so a 503 here tells you which of the three to look at
 before you start guessing in the UI.
+
+The full local guide, kept current, is
+[`docs/architecture/LOCAL_DEV.md`](https://github.com/saroh-labs/saroh.in/blob/main/docs/architecture/LOCAL_DEV.md).

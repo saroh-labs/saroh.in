@@ -465,8 +465,12 @@ values and module keys keep their names (`APPOINTMENTS`, `/appointments`,
   start button then goes to accounts `/signup?plan=&cycle=`, the plan rides
   through verification to onboarding, is checked there against the live
   catalogue, and a paid one goes on to its checkout once the business exists
-  (Free otherwise, and an unknown plan says so). Flipping the switch is
-  launch; until then no CTA points at sign-up. Social publishing is not a
+  (Free otherwise, and an unknown plan says so). The second switch is
+  production accounts' prelaunch key gate (`PRELAUNCH_GATE` in
+  `apps/accounts.saroh.in/wrangler.jsonc`), which keeps sign-in and
+  sign-up to key holders and sends everyone else to www.saroh.in. Flipping
+  both is launch, on the owner's judgement (`PRODUCT.md`); until then no CTA
+  points at sign-up or Sign in. Social publishing is not a
   current priority and must not be exposed as production-ready (§22). AI
   features are deferred (DEC-015).
 - **Current** — The name Saroh and its wordmark are fixed; palette, type, shape,
