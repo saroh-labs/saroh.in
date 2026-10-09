@@ -247,6 +247,60 @@ export class DomainsService {
     }
 
     /**
+     * A deleted business's domains go offline (#921): each hostname is
+     * deleted at the host (Cloudflare for SaaS), then its claim is released
+     * as {@link remove} releases one, so the hostname is free to be claimed
+     * again. Run by `organization.deletion.cleanup` with no caller context.
+     *
+     * One domain at a time, host first: a host that doesn't answer leaves
+     * that domain (and its row) as it was, the others go on, and the call
+     * throws at the end so the clean-up is retried. Idempotent: a released
+     * domain has no row, and a hostname the host doesn't have is a success.
+     */
+    async releaseForDeletedBusiness(
+        organizationId: string,
+    ): Promise<{ released: number; failed: number }> {
+        const domains = await prisma.domain.findMany({
+            where: { organizationId },
+            select: {
+                id: true,
+                hostname: true,
+                status: true,
+                hostingId: true,
+                siteId: true,
+            },
+        });
+        let released = 0;
+        let failed = 0;
+        for (const domain of domains) {
+            try {
+                await this.removeFromHosting(domain);
+            } catch {
+                failed += 1;
+                continue;
+            }
+            await prisma.$transaction(async (tx) => {
+                if (domain.siteId) {
+                    await tx.site.updateMany({
+                        where: { id: domain.siteId, customDomainId: domain.id },
+                        data: { customDomainId: null },
+                    });
+                }
+                await tx.domain.deleteMany({
+                    where: { id: domain.id, organizationId },
+                });
+            });
+            released += 1;
+        }
+        if (failed > 0) {
+            throw new Error(
+                `domains_release_incomplete released=${released} failed=${failed}`,
+            );
+        }
+        return { released, failed };
+    }
+
+    /**
      * Delete the domain's hostname at the host. Only a domain that may be
      * registered is looked at: one with a hosting id, or a VERIFIED one whose
      * register may have worked with its answer lost. Hosting off with a

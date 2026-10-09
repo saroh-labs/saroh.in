@@ -14,6 +14,7 @@ import { BILLING_EMAIL_TYPE, BillingEmailHandler } from "./billing-email.job";
 import { BillingWebhookController } from "./billing-webhook.controller";
 import { BillingWebhookService } from "./billing-webhook.service";
 import { BillingController, PlansController } from "./billing.controller";
+import { DeletedBusinessBilling } from "./business-closing";
 import { CatalogueAccessService } from "./catalogue-access.service";
 import { CheckoutConfirmService } from "./checkout-confirm.service";
 import { CheckoutService } from "./checkout.service";
@@ -116,10 +117,13 @@ const CHAIN_CHECK_MS = 6 * 60 * 60 * 1000;
         AddonsService,
         AddonsSyncHandler,
         FreeRowsHandler,
+        // A deleted business's billing, ended by its clean-up (#921).
+        DeletedBusinessBilling,
         billingProviderFactoryProvider,
         OrganizationGuard,
     ],
     exports: [
+        DeletedBusinessBilling,
         CatalogueAccessService,
         EntitlementService,
         MeteringService,

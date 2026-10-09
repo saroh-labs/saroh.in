@@ -12,6 +12,7 @@ import { planMeter } from "../billing/metering.service";
 import { bookingsPaused } from "../billing/plan-limit-errors";
 import { phoneToFill } from "../customer-workspace/contact-phone-fill";
 import { resolveContact } from "../customer-workspace/resolve-contact";
+import { publicSiteOnlineFor } from "../organizations/organization-lifecycle.gate";
 import { appointmentsOpen } from "./appointments-open";
 import type { AvailabilityRuleWindow } from "./availability";
 import { guarded, guardMinutes } from "./availability";
@@ -210,6 +211,10 @@ export async function loadBookableService(
     }
     if (bookingPage && !service.showOnBookingPage) {
         throw new GoneException("This service isn't booked online");
+    }
+    // A deleted business's booking page is offline with its site (#921).
+    if (bookingPage && !(await publicSiteOnlineFor(service.organizationId))) {
+        throw new NotFoundException("Service not found");
     }
     if (!(await appointmentsOpen(service.organizationId))) {
         throw new GoneException(

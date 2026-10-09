@@ -22,6 +22,12 @@ jest.mock("@saroh/database", () => {
     const webhookEvent = { create: jest.fn() };
     return {
         prisma: {
+            // An active business may be charged (#921).
+            organization: {
+                findUnique: jest
+                    .fn()
+                    .mockResolvedValue({ lifecycleStatus: "ACTIVE" }),
+            },
             plan,
             subscription,
             merchantPaymentProvider,

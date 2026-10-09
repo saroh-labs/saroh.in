@@ -26,6 +26,11 @@ import {
 } from "./subscription-renew.handler";
 import type { SubscriptionsService } from "./subscriptions.service";
 
+/** Only a business that may be charged renews (#921). */
+const CHARGEABLE = {
+    lifecycleStatus: { in: ["ACTIVE", "SUSPENDED"] },
+};
+
 const findMany = prisma.customerSubscription.findMany as jest.Mock;
 const jobCreate = prisma.job.create as jest.Mock;
 const jobCount = prisma.job.count as jest.Mock;
@@ -70,6 +75,9 @@ describe("subscription.renew", () => {
                             currentPeriodEnd: { lte: now },
                             status: "ACTIVE",
                             organization: {
+                                // A closing or deleted business renews
+                                // nothing (#921).
+                                ...CHARGEABLE,
                                 organizationModules: {
                                     none: {
                                         moduleKey: "PAYMENTS",
@@ -84,7 +92,11 @@ describe("subscription.renew", () => {
                             cancelAtPeriodEnd: true,
                         },
                         // D8: a pause whose end date has come.
-                        { status: "PAUSED", pausedUntil: { lte: now } },
+                        {
+                            status: "PAUSED",
+                            pausedUntil: { lte: now },
+                            organization: CHARGEABLE,
+                        },
                     ],
                 },
                 take: RENEW_BATCH,
@@ -196,6 +208,7 @@ describe("subscription.renew", () => {
             status: "PAUSED",
             pausedUntil: { lte: now },
             id: { notIn: ["parked_1", "parked_2"] },
+            organization: CHARGEABLE,
         });
     });
 

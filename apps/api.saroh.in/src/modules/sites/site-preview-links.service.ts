@@ -3,6 +3,7 @@ import { prisma } from "@saroh/database";
 import { createHash, randomBytes } from "node:crypto";
 
 import type { OrganizationContext } from "../../common/types/organization-context";
+import { publicSiteOnline } from "../organizations/organization-lifecycle.policy";
 import { authorize } from "../organizations/organization-policy";
 import type { PublicModulePageStates } from "./module-pages";
 import { publicModulePageStates } from "./module-pages";
@@ -397,9 +398,11 @@ export class SitePreviewLinksService {
                 organizationId: true,
                 expiresAt: true,
                 revokedAt: true,
+                organization: { select: { lifecycleStatus: true } },
             },
         });
-        if (!link) {
+        // Offline with its business (#921): as if the link never was.
+        if (!link || !publicSiteOnline(link.organization.lifecycleStatus)) {
             throw new NotFoundException("No preview at this address");
         }
         const state = previewLinkState(link);
@@ -425,6 +428,11 @@ export class SitePreviewLinksService {
             })
             .catch(() => undefined);
 
-        return link;
+        return {
+            id: link.id,
+            siteId: link.siteId,
+            organizationId: link.organizationId,
+            expiresAt: link.expiresAt,
+        };
     }
 }

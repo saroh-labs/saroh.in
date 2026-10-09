@@ -10,6 +10,7 @@ import { prisma } from "@saroh/database";
 import type { PlatformAdminInfo } from "../../common/decorators/platform-admin-context.decorator";
 import type { OrganizationContext } from "../../common/types/organization-context";
 import { PLATFORM_OPERATOR_ROLE_KEY } from "../audit/audit.service";
+import { stopRenewalsInTx } from "../billing/business-closing";
 import { EntitlementService } from "../billing/entitlement.service";
 import { backfillOneOrganization } from "../capabilities/module-backfill";
 import { ModuleLifecycleService } from "../capabilities/module-lifecycle.service";
@@ -59,7 +60,9 @@ export interface OperatorCommand {
  *
  * Nothing here deletes a business. Scheduling deletion starts a retention
  * window that can be cancelled; the business is refused new activity during
- * it, exactly as when suspended. When the window ends the daily sweep
+ * it, as when suspended, and is charged no renewal: its Saroh provider
+ * subscription is told to end with the period paid, on the same
+ * transaction (#921). When the window ends the daily sweep
  * (`organization-deletion.handler.ts`, #907) takes it to `DELETED_RETAINED`.
  */
 @Injectable()
@@ -129,6 +132,12 @@ export class AdminLifecycleService {
                 }),
                 action: "organization.deletion.scheduled",
                 metadata: { retentionDays: days },
+                // No renewal is charged during the window (owner, 9 Oct,
+                // #921): Saroh's provider subscription ends with the period
+                // already paid, on this transaction.
+                inTx: async (tx, organizationId) => ({
+                    ...(await stopRenewalsInTx(tx, organizationId)),
+                }),
             },
         );
     }
@@ -510,6 +519,11 @@ export class AdminLifecycleService {
             data: (now: Date) => Prisma.OrganizationUpdateManyMutationInput;
             action: string;
             metadata?: Record<string, unknown>;
+            /** More of the same change, on its transaction; counts for the ledger. */
+            inTx?: (
+                tx: Tx,
+                organizationId: string,
+            ) => Promise<Record<string, unknown>>;
         },
     ) {
         const reason = requireReason(command.reason);
@@ -562,7 +576,10 @@ export class AdminLifecycleService {
                 );
             }
 
-            const metadata = { from, to, ...options.metadata };
+            const effects = options.inTx
+                ? await options.inTx(tx, organization.id)
+                : {};
+            const metadata = { from, to, ...options.metadata, ...effects };
             await this.ledger(tx, {
                 command: { ...command, reason },
                 permission: AdminPermission.OrganizationLifecycleWrite,

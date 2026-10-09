@@ -36,7 +36,10 @@ describe("OrganizationContextService.resolve", () => {
     });
 
     it("resolves an invented role from what the business stored", async () => {
-        membershipFindUnique.mockResolvedValue({ role: "stock-clerk" });
+        membershipFindUnique.mockResolvedValue({
+            organization: { lifecycleStatus: "ACTIVE" },
+            role: "stock-clerk",
+        });
         (prisma.organizationRole.findUnique as jest.Mock).mockResolvedValueOnce(
             { actions: ["order:read", "order:write"] },
         );
@@ -53,6 +56,7 @@ describe("OrganizationContextService.resolve", () => {
 
     it("adds a person's extra permissions to their role, with implied holds (F17)", async () => {
         membershipFindUnique.mockResolvedValue({
+            organization: { lifecycleStatus: "ACTIVE" },
             role: "MEMBER",
             extraActions: ["order:refund", "not:real", "org:delete"],
         });
@@ -75,6 +79,7 @@ describe("OrganizationContextService.resolve", () => {
                 role: "MEMBER",
                 extraActions: ["payment:read"],
                 organization: {
+                    lifecycleStatus: "ACTIVE",
                     id: "org_1",
                     name: "Rye",
                     slug: "rye",
@@ -90,7 +95,10 @@ describe("OrganizationContextService.resolve", () => {
     });
 
     it("returns a context when the user is a member", async () => {
-        membershipFindUnique.mockResolvedValue({ role: "ADMIN" });
+        membershipFindUnique.mockResolvedValue({
+            organization: { lifecycleStatus: "ACTIVE" },
+            role: "ADMIN",
+        });
 
         const ctx = await service.resolve("user_1", "org_1");
 
@@ -111,11 +119,73 @@ describe("OrganizationContextService.resolve", () => {
                     userId: "user_1",
                 },
             },
-            // The id: a paused team member is refused by it (#800).
-            select: { id: true, role: true, extraActions: true },
+            // The id: a paused team member is refused by it (#800). The
+            // business's state: a deleted one is closed to them (#921).
+            select: {
+                id: true,
+                role: true,
+                extraActions: true,
+                organization: { select: { lifecycleStatus: true } },
+            },
         });
         // Success path is a single query — no org existence lookup.
         expect(organizationFindUnique).not.toHaveBeenCalled();
+    });
+
+    it.each(["OWNER", "ADMIN", "MEMBER"])(
+        "refuses a %s of a deleted business (#921)",
+        async (role) => {
+            membershipFindUnique.mockResolvedValue({
+                id: "m_1",
+                role,
+                organization: { lifecycleStatus: "DELETED_RETAINED" },
+            });
+            await expect(
+                service.resolve("user_1", "org_1"),
+            ).rejects.toMatchObject({
+                response: { error: "ORGANIZATION_DELETED" },
+            });
+        },
+    );
+
+    it("lets a member into a business inside its deletion window (#921)", async () => {
+        membershipFindUnique.mockResolvedValue({
+            id: "m_1",
+            role: "OWNER",
+            organization: { lifecycleStatus: "PENDING_DELETION" },
+        });
+        await expect(service.resolve("user_1", "org_1")).resolves.toMatchObject(
+            { organizationId: "org_1" },
+        );
+    });
+
+    it("leaves a deleted business out of the person's list (#921)", async () => {
+        membershipFindMany.mockResolvedValue([
+            {
+                id: "m_1",
+                role: "OWNER",
+                extraActions: [],
+                organization: {
+                    id: "org_live",
+                    name: "Live",
+                    slug: "live",
+                    lifecycleStatus: "ACTIVE",
+                },
+            },
+            {
+                id: "m_2",
+                role: "OWNER",
+                extraActions: [],
+                organization: {
+                    id: "org_gone",
+                    name: "Gone",
+                    slug: "gone",
+                    lifecycleStatus: "DELETED_RETAINED",
+                },
+            },
+        ]);
+        const listed = await service.listForUser("user_1");
+        expect(listed.map((o) => o.id)).toEqual(["org_live"]);
     });
 
     it("throws NotFound when the organization does not exist", async () => {
@@ -137,13 +207,19 @@ describe("OrganizationContextService.resolve", () => {
     });
 
     it("narrows a valid role string to OrgRole", async () => {
-        membershipFindUnique.mockResolvedValue({ role: "OWNER" });
+        membershipFindUnique.mockResolvedValue({
+            organization: { lifecycleStatus: "ACTIVE" },
+            role: "OWNER",
+        });
         const ctx = await service.resolve("user_1", "org_1");
         expect(ctx.role).toBe("OWNER");
     });
 
     it("fails closed to MEMBER for an unknown role value", async () => {
-        membershipFindUnique.mockResolvedValue({ role: "SUPERUSER" });
+        membershipFindUnique.mockResolvedValue({
+            organization: { lifecycleStatus: "ACTIVE" },
+            role: "SUPERUSER",
+        });
         const ctx = await service.resolve("user_1", "org_1");
         expect(ctx.role).toBe("MEMBER");
     });
@@ -160,11 +236,17 @@ describe("OrganizationContextService.listForUser", () => {
         membershipFindMany.mockResolvedValue([
             {
                 role: "OWNER",
-                organization: { id: "org_1", name: "Acme", slug: "acme" },
+                organization: {
+                    lifecycleStatus: "ACTIVE",
+                    id: "org_1",
+                    name: "Acme",
+                    slug: "acme",
+                },
             },
             {
                 role: "MEMBER",
                 organization: {
+                    lifecycleStatus: "ACTIVE",
                     id: "org_2",
                     name: "Beta",
                     slug: "beta",
@@ -212,7 +294,12 @@ describe("OrganizationContextService.listForUser", () => {
         membershipFindMany.mockResolvedValue([
             {
                 role: "stock-clerk",
-                organization: { id: "org_1", name: "Acme", slug: "acme" },
+                organization: {
+                    lifecycleStatus: "ACTIVE",
+                    id: "org_1",
+                    name: "Acme",
+                    slug: "acme",
+                },
             },
         ]);
         (prisma.organizationRole.findMany as jest.Mock).mockResolvedValueOnce([

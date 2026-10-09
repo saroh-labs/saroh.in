@@ -130,11 +130,26 @@ nobody was told. Round-2 A14 closed it (`bookings/booking-notify.handler.ts`).
   (`Job_one_pending_organization_deletion`). It takes a business whose
   `PENDING_DELETION` window has ended (`deletionScheduledAt` passed) to
   `DELETED_RETAINED`, stamping `deletedRetainedAt` — the lifecycle's own
-  last step (`admin-access.service.ts`). Nothing else: no row, file or
-  provider record is removed, because no complete safe path exists yet
-  (`Store`, `Order`, `Customer`, `Cart` and `Inventory` hold the business
-  without a cascade; issued invoices are kept; media, custom hostnames and
-  Saroh's billing subscription have no clean-up). The gaps are on #907.
+  last step (`admin-access.service.ts`) — and queues its clean-up on the
+  same transaction. Its rows are never deleted (`Store`, `Order`,
+  `Customer`, `Cart` and `Inventory` hold the business without a cascade;
+  orders, invoices, credit notes, customers and the audit trails are
+  records, ADR-008).
+- **`organization.deletion.cleanup`** (#921, one per business,
+  `admin/organization-deletion-cleanup.handler.ts`) clears what a deleted
+  business leaves behind, each step idempotent and tried whatever the others
+  did: its pending jobs cancelled (but the clean-up itself,
+  `billing.provider.cancel` and `subscription.charge`, which stands aside on
+  its own), Saroh's subscription cancelled at the provider and then recorded
+  CANCELLED (provider first: no answer writes nothing), custom hostnames
+  deleted at Cloudflare and the claims released, media out of storage and
+  their rows deleted, payment-provider keys deleted. A failing step is
+  logged by name and the run throws, so the queue retries it (24 attempts,
+  about an hour and a half); from its first failure the business is flagged
+  "Deletion clean-up unfinished" (`DELETION_CLEANUP`) in the console's
+  directory, and once FAILED an operator retries it from Jobs. It can't be
+  cancelled (`CANCEL_REFUSED`). The daily sweep queues one for any deleted
+  business without one.
 - **Re-read inside the transaction, fenced on `lifecycleVersion`**: a
   business reinstated, suspended or given a new window between the list
   and the write is left alone, and one inside its window is never touched

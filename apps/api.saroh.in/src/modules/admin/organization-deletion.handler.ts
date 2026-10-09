@@ -9,6 +9,10 @@ import {
 } from "./admin-access.service";
 import { AdminAuditOutcome, AdminAuditService } from "./admin-audit.service";
 import { AdminPermission } from "./admin-permissions";
+import {
+    enqueueDeletionCleanup,
+    ORGANIZATION_DELETION_CLEANUP_TYPE,
+} from "./organization-deletion-cleanup.handler";
 
 /** The daily sweep that deletes a business whose deletion window ended (#907). */
 export const ORGANIZATION_DELETION_TYPE = "organization.deletion";
@@ -37,14 +41,17 @@ export interface DeletionSweep {
  * window (`AdminLifecycleService.scheduleDeletion`, 7–90 days); until it
  * ends the business can be reinstated. When it ends, this takes the
  * lifecycle's own last step: `PENDING_DELETION` → `DELETED_RETAINED`,
- * stamping `deletedRetainedAt`.
+ * stamping `deletedRetainedAt`, and queues the business's clean-up.
  *
- * That is all it does, on purpose. There is no complete, safe way to remove
- * a business's rows today: `Store`, `Order`, `Customer`, `Cart` and
- * `Inventory` hold the business without a cascade (a delete is refused), an
- * issued invoice is never deleted (ADR-008), and media in storage, its
- * custom hostnames at Cloudflare and its billing-provider subscription have
- * no clean-up path. Those are listed as gaps in #907, not guessed at here.
+ * Its rows are never deleted: `Store`, `Order`, `Customer`, `Cart` and
+ * `Inventory` hold the business without a cascade, and orders, invoices,
+ * credit notes, customers and the audit trails are records (ADR-008, GST).
+ * What "deleted" means everywhere else is the lifecycle table
+ * (`organization-lifecycle.policy.ts`, #921): billed for nothing, its site
+ * offline, closed to its members. What it leaves behind — its Saroh
+ * subscription at the provider, custom hostnames, media, payment keys and
+ * pending jobs — is cleared by `organization.deletion.cleanup`, queued on
+ * the same transaction (`organization-deletion-cleanup.handler.ts`).
  *
  * Conservative by construction: it lists only businesses still
  * `PENDING_DELETION` whose `deletionScheduledAt` has passed, then re-checks
@@ -77,6 +84,18 @@ export class OrganizationDeletionHandler {
         } catch (error) {
             this.logger.error(
                 `organization_deletion sweep failed before it finished: ${errorName(error)}`,
+            );
+        }
+        try {
+            const queued = await this.queueMissingCleanups();
+            if (queued > 0) {
+                this.logger.log(
+                    `organization_deletion_cleanups_queued count=${queued}`,
+                );
+            }
+        } catch (error) {
+            this.logger.error(
+                `organization_deletion could not queue clean-ups: ${errorName(error)}`,
             );
         }
         const next = new Date(Date.now() + ORGANIZATION_DELETION_EVERY_MS);
@@ -208,8 +227,31 @@ export class OrganizationDeletionHandler {
                     },
                 },
             });
+            // What it leaves behind is cleared next (#921), queued with the
+            // change so a deleted business always has its clean-up.
+            await enqueueDeletionCleanup(tx, organization.id);
             return true;
         });
+    }
+
+    /**
+     * A deleted business without a clean-up job gets one (#921): one deleted
+     * before the clean-up existed. Idempotent: any clean-up row, whatever
+     * its state, counts. Returns how many were queued.
+     */
+    async queueMissingCleanups(): Promise<number> {
+        const missing = await prisma.organization.findMany({
+            where: {
+                lifecycleStatus: OrganizationLifecycleStatus.DeletedRetained,
+                jobs: { none: { type: ORGANIZATION_DELETION_CLEANUP_TYPE } },
+            },
+            select: { id: true },
+            take: BATCH,
+        });
+        for (const { id } of missing) {
+            await enqueueDeletionCleanup(prisma, id);
+        }
+        return missing.length;
     }
 
     /**

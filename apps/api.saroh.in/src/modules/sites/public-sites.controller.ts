@@ -8,9 +8,11 @@ import {
     Ip,
     Param,
     Query,
+    UseGuards,
 } from "@nestjs/common";
 
 import { hashClientIp } from "../../common/client-ip";
+import { PublicSiteOnlineGuard } from "../../common/guards/public-site-online.guard";
 import { FixedWindowRateLimiter } from "../enquiry/rate-limiter";
 import { SITE_RELAY_HEADER, visitorKey } from "../site-accounts/site-relay";
 import type { PublicFooter } from "./public-footer.service";
@@ -41,6 +43,7 @@ import { resolveTestRelease, TEST_TOKEN_HEADER } from "./test-release-lookup";
  * unpublished or unknown site is a 404.
  */
 @Controller("public/sites")
+@UseGuards(PublicSiteOnlineGuard)
 export class PublicSitesController {
     /**
      * A speed bump on the test-host lookup, per visitor when the renderer

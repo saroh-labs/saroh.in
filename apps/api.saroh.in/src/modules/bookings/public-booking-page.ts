@@ -4,6 +4,7 @@ import { DateTime } from "luxon";
 
 import { planMeter } from "../billing/metering.service";
 import { siteTakingBookings } from "../orders/checkout-paused";
+import { SITE_ONLINE_ORGANIZATION } from "../organizations/organization-lifecycle.policy";
 import { APPOINTMENTS_OPEN, appointmentsOpen } from "./appointments-open";
 import type { OpeningHours, Slot } from "./availability";
 import {
@@ -530,7 +531,8 @@ export async function publicServices(ids: string[]): Promise<PublicService[]> {
             showOnBookingPage: true,
             // The same rule public booking closes on (#327), so a list
             // never offers a service its booking block would refuse.
-            organization: APPOINTMENTS_OPEN,
+            // Offline with a deleted business's site (#921).
+            organization: { ...APPOINTMENTS_OPEN, ...SITE_ONLINE_ORGANIZATION },
             // Nothing to book yet (UX-024): no hours, nobody to take it.
             ...HAS_BOOKABLE_HOURS,
         },

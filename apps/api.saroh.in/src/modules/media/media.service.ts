@@ -285,6 +285,62 @@ export class MediaService {
     }
 
     /**
+     * A deleted business's media go (#921): every object out of storage,
+     * then its row, as {@link remove} does one — object first, so a row
+     * never outlives nothing, and `deleteObject` is idempotent. The checks
+     * `remove` makes for a live business (on a published site, on a
+     * product, the logo) don't apply: its site is offline and its products
+     * and logo are no longer shown. A product photo or the logo pointing at
+     * one loses it (`SetNull`); the invoices keep their records, printed
+     * without the logo.
+     *
+     * Run by `organization.deletion.cleanup` with no caller context, in
+     * batches; a storage failure leaves that row for the retry (and out of
+     * this run's next batch), the rest go on, and the call throws at the end.
+     */
+    async removeAllForDeletedBusiness(
+        organizationId: string,
+    ): Promise<{ removed: number; failed: number }> {
+        // A row removed is gone from the next read; only failures are kept
+        // out of it, so a batch that always fails can't loop.
+        const failedIds: string[] = [];
+        let removed = 0;
+        for (;;) {
+            const batch = await prisma.media.findMany({
+                where: {
+                    organizationId,
+                    ...(failedIds.length > 0
+                        ? { id: { notIn: failedIds } }
+                        : {}),
+                },
+                select: { id: true, key: true },
+                orderBy: { id: "asc" },
+                take: 100,
+            });
+            if (batch.length === 0) break;
+            for (const media of batch) {
+                try {
+                    await this.storage.deleteObject(media.key);
+                } catch {
+                    failedIds.push(media.id);
+                    continue;
+                }
+                await prisma.media.deleteMany({
+                    where: { id: media.id, organizationId },
+                });
+                removed += 1;
+            }
+        }
+        const failed = failedIds.length;
+        if (failed > 0) {
+            throw new Error(
+                `media_remove_incomplete removed=${removed} failed=${failed}`,
+            );
+        }
+        return { removed, failed };
+    }
+
+    /**
      * The address a READY library object is served from, for another module
      * that stores a reference to it (a product photo). Tenant-scoped: another
      * organization's id, or one still uploading, is not found. Null when

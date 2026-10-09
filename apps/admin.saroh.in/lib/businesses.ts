@@ -12,7 +12,12 @@ import type { EffectivePlan, UsageNote } from "./plan-words";
 export type LifecycleStatus =
     "ACTIVE" | "SUSPENDED" | "PENDING_DELETION" | "DELETED_RETAINED";
 
-export type AttentionReason = "PAST_DUE" | "FAILED_JOBS" | "FAILED_WEBHOOKS";
+export type AttentionReason =
+    | "PAST_DUE"
+    | "FAILED_JOBS"
+    | "FAILED_WEBHOOKS"
+    /** A deleted business whose clean-up has failed and isn't done (#921). */
+    | "DELETION_CLEANUP";
 
 export interface BusinessRow {
     id: string;
