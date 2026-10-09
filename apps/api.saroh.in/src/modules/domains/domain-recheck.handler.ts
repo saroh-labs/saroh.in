@@ -133,9 +133,9 @@ export class DomainRecheckHandler {
                     : 0;
                 if (this.wentDown(domain, after)) {
                     summary.wentDown += 1;
-                    // No notice is sent (#860): there is no domain alert
-                    // yet, and the Domains screen shows the problem. A
-                    // steady line here is the signal to build one.
+                    // The check itself queued the team's alert with its
+                    // write (#917, once per incident); this line is for
+                    // us, so a wave of them (a host outage) shows.
                     this.logger.warn(
                         `domain_hosting_went_down domain=${after.id} org=${after.organizationId} status=${after.hostingStatus ?? "-"}`,
                     );

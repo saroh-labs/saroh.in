@@ -1,12 +1,18 @@
 import { Injectable, Logger, Optional } from "@nestjs/common";
 import { prisma } from "@saroh/database";
 
-import { InvoiceSendService } from "../invoices/invoice-send.service";
+import { fromMinor } from "../../common/money";
+import {
+    formatMoney,
+    InvoiceSendService,
+} from "../invoices/invoice-send.service";
 import type { OrderStage } from "../orders/dto";
 import { nextStages } from "../orders/order-stage";
 import { chargesUnderWay } from "../payments/charge-under-way";
 import { MandateChargesService } from "../payments/mandate-charges.service";
+import { providerName } from "../payments/mandate-rules";
 import { MandateSetupService } from "../payments/mandate-setup.service";
+import { MISMATCH_ATTEMPT_WHERE, owedOf } from "../payments/mismatch-refund";
 import { accountAreaOn } from "../site-accounts/account-area";
 import { orderContactId } from "../site-accounts/customer-notify.handler";
 import type { NoticeReach } from "../site-accounts/notice-reach";
@@ -15,6 +21,7 @@ import { orderNoticeKind } from "../site-accounts/notify-templates";
 import {
     firstNameOf,
     markSentWords,
+    refundMismatchWords,
     reminderWords,
     replyWords,
     retryMandateWords,
@@ -127,6 +134,9 @@ export class HomeInlineService {
             ),
             this.step("Reply", () =>
                 this.reply(of("CRM_UNANSWERED_MESSAGES"), input),
+            ),
+            this.step("Refund", () =>
+                this.refundMismatch(of("PAYMENTS_REFUNDS_OWED"), input),
             ),
             this.step("Reply to review", () => {
                 reviewReplyOn(of("COMMERCE_LOW_STAR_REVIEWS"), input);
@@ -361,6 +371,78 @@ export class HomeInlineService {
                 };
             }),
         );
+    }
+
+    /**
+     * Refund (PAY-06): on a capture taken at a different amount than asked,
+     * exactly what it captured goes back (`payment-attempts/:id/refund`).
+     * `order:refund`, the refund permission; only while the provider it was
+     * paid through is connected, since the refund is sent through it, and
+     * only when the capture recorded its amount. Other refunds owed stay
+     * links to their invoice.
+     */
+    private async refundMismatch(
+        evidence: HomeEvidence[],
+        input: HomeInput,
+    ): Promise<void> {
+        if (evidence.length === 0 || !holds(input, "order:refund")) return;
+        const attempts = await this.db.paymentAttempt.findMany({
+            where: {
+                organizationId: input.organizationId,
+                id: { in: evidence.map((ev) => ev.id) },
+                ...MISMATCH_ATTEMPT_WHERE,
+            },
+            select: {
+                id: true,
+                rawResponse: true,
+                paymentIntent: {
+                    select: {
+                        provider: true,
+                        currency: true,
+                        orderId: true,
+                        invoiceId: true,
+                    },
+                },
+            },
+        });
+        if (attempts.length === 0) return;
+        const connected = await this.db.merchantPaymentProvider.findMany({
+            where: {
+                organizationId: input.organizationId,
+                status: "CONNECTED",
+            },
+            select: { provider: true },
+        });
+        const live = new Set(connected.map((c) => c.provider));
+        const byId = new Map(attempts.map((a) => [a.id, a]));
+        for (const ev of evidence) {
+            const attempt = byId.get(ev.id);
+            if (!attempt) continue;
+            const intent = attempt.paymentIntent;
+            if (!live.has(intent.provider)) continue;
+            const owed = owedOf(attempt.rawResponse, intent.currency);
+            if (!owed) continue;
+            // The row's line is "Name · what happened", or only the latter.
+            const person = ev.subtitle?.includes(" · ")
+                ? firstNameOf(ev.subtitle.split(" · ")[0])
+                : null;
+            ev.inline = {
+                kind: "REFUND",
+                ...refundMismatchWords(
+                    person,
+                    formatMoney(fromMinor(owed.amountCents), owed.currency),
+                    providerName(intent.provider),
+                    intent.orderId
+                        ? "order"
+                        : intent.invoiceId
+                          ? "invoice"
+                          : null,
+                ),
+                undoable: false,
+                target: attempt.id,
+                person,
+            };
+        }
     }
 
     /**

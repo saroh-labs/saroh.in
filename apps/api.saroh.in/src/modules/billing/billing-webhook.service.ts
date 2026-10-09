@@ -21,6 +21,7 @@ import {
 } from "./addon-charges";
 import { enqueueBillingEmail } from "./billing-email.job";
 import { isOneTime } from "./billing-term";
+import { billingMayChargeFor } from "./business-closing";
 import { periodEnd, periodStart } from "./checkout-quote";
 import { redeemCouponInTx, trialNoticeAt } from "./offers";
 import { applyDueMoveInTx } from "./plan-moves";
@@ -777,6 +778,24 @@ export class BillingWebhookService {
                 event,
                 now,
             });
+            // A closing or deleted business is never charged (#921): one the
+            // provider charged anyway (its cancel hadn't reached it) is
+            // recorded and invoiced above — the money moved — and ended now,
+            // with no add-ons owed for a period it won't be billed for.
+            if (!(await billingMayChargeFor(tx, before.organizationId))) {
+                if (before.provider && before.providerSubscriptionId) {
+                    await enqueueProviderCancel(tx, {
+                        organizationId: before.organizationId,
+                        provider: before.provider,
+                        providerSubscriptionId: before.providerSubscriptionId,
+                        atCycleEnd: false,
+                    });
+                }
+                this.logger.warn(
+                    `billing_renewal_business_closed org=${before.organizationId} subscription=${subscriptionId}`,
+                );
+                return { result: { status: "processed", changed: true } };
+            }
             await this.afterCharge(tx, subscriptionId, before, event);
         }
         return { result: { status: "processed", changed: true } };

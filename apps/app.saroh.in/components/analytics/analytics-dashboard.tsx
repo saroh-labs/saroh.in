@@ -6,9 +6,11 @@ import type {
     DailyPoint,
     TopPage,
 } from "@/lib/analytics/service";
+import { ordersHref } from "@/lib/analytics/takings-words";
 import {
     dayReadout,
     dayTick,
+    ordersLine,
     pageTitle,
     tickEvery,
 } from "@/lib/analytics/website-words";
@@ -152,20 +154,41 @@ function TopPages({ pages }: { pages: TopPage[] }) {
     );
 }
 
-export function AnalyticsDashboard({ view }: { view: AnalyticsView }) {
+/** The days the website's figures cover, as the range buttons chose them. */
+export interface WebsiteRange {
+    /** First day, `YYYY-MM-DD`. */
+    from: string;
+    /** Last day (today), `YYYY-MM-DD`. */
+    to: string;
+    /** "30 days". */
+    label: string;
+}
+
+export function AnalyticsDashboard({
+    view,
+    range,
+}: {
+    view: AnalyticsView;
+    range: WebsiteRange;
+}) {
     const { summary, daily, topPages } = view;
+    const ordersNote = ordersLine({
+        orders: summary.orders,
+        from: range.from,
+        rangeLabel: range.label,
+    });
     return (
         // One column that may shrink: a grid item's min-content (thirty
         // day columns, a long page path) otherwise widened the page at 320px.
         <div className="grid grid-cols-[minmax(0,1fr)] gap-4">
             {/*
-             * No "Orders" tile here (DEC-075): Sales above counts paid
-             * orders from Orders itself. Every payment now writes
-             * `order.paid` too (#867), net of full refunds in
-             * `summary.orders`, but one page says it once.
-             * Three across on a phone too (F11): three numbers, one row.
+             * Orders is back (#919, amending DEC-075): every payment writes
+             * `order.paid` since #867, net of full refunds. It isn't Sales'
+             * "Orders, 4 weeks" again: it covers the days the range buttons
+             * chose, beside the visits and enquiries of those same days.
+             * Two by two on a phone: four labels don't fit across 320px.
              */}
-            <div className="grid grid-cols-3 gap-2 sm:gap-[11px]">
+            <div className="grid grid-cols-2 gap-2 sm:grid-cols-4 sm:gap-[11px]">
                 <Tile label="Visits" value={summary.siteViews} />
                 <Tile label="Visitors" value={summary.uniqueVisitors} />
                 <Tile
@@ -173,7 +196,20 @@ export function AnalyticsDashboard({ view }: { view: AnalyticsView }) {
                     value={summary.enquiries}
                     href="/leads"
                 />
+                <Tile
+                    label="Orders"
+                    value={summary.orders}
+                    href={ordersHref(range.from, range.to)}
+                />
             </div>
+            {ordersNote ? (
+                <p
+                    data-testid="website-orders-note"
+                    className="-mt-1 max-w-[68ch] text-[13px] leading-[1.5] text-muted-foreground"
+                >
+                    {ordersNote}
+                </p>
+            ) : null}
             <DailyVisits daily={daily} />
             <TopPages pages={topPages} />
         </div>

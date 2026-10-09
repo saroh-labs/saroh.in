@@ -1150,6 +1150,14 @@ describe("SitesService public read (drafts never leak)", () => {
                 AND: [
                     { subdomain: "acme", deletedAt: null },
                     { currentPublication: { kind: "LIVE" } },
+                    // Offline with a deleted business (#921).
+                    {
+                        organization: {
+                            lifecycleStatus: {
+                                in: ["ACTIVE", "SUSPENDED", "PENDING_DELETION"],
+                            },
+                        },
+                    },
                 ],
             },
             select: {

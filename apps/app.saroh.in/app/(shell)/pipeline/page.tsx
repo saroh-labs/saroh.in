@@ -41,12 +41,17 @@ export default async function PipelinePage() {
     const pipelines = await listPipelines();
 
     if (pipelines.length === 0) {
+        // Adding a lead makes the pipeline (the API's `ensureDefault`), so
+        // the empty board offers that rather than a pipeline to create —
+        // Home's CRM step ("Add your first lead") lands here (#352).
+        const addLead = await loadAddLead(pipelines);
         return (
             <PageContainer width="wide">
                 <Header />
                 <EmptyState
-                    title="No pipeline yet"
-                    description="One is created automatically with your first enquiry or hand-created lead."
+                    title="No leads yet"
+                    description="Add your first lead and your pipeline starts with it. Enquiries from your site arrive here too."
+                    action={<AddLeadDialog {...addLead} />}
                 />
             </PageContainer>
         );

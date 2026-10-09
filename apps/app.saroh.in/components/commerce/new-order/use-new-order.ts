@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 
 import { readCustomerAttention } from "@/lib/customers/actions";
 import type { CustomerPick } from "@/lib/customers/picker";
+import { isOpeningPick } from "@/lib/customers/prefill";
 import { formatMoney } from "@/lib/format/money";
 import type {
     AddressDraft,
@@ -45,6 +46,7 @@ export function useNewOrder({
     canLink,
     online = true,
     canSearch,
+    initialPick = null,
 }: {
     initialStoreId: string;
     /** May make a pay link (`order:create`, B16). */
@@ -53,6 +55,8 @@ export function useNewOrder({
     online?: boolean;
     /** Holds `contact:read`: search, and read a picked person's notes. */
     canSearch: boolean;
+    /** Who it is for, already chosen (#247); null starts with no one. */
+    initialPick?: CustomerPick | null;
 }) {
     const [storeId, setStoreId] = useState(initialStoreId);
     const [catalogue, setCatalogue] = useState<{
@@ -61,7 +65,7 @@ export function useNewOrder({
     } | null>(null);
     const [retry, setRetry] = useState(0);
     const [lines, setLines] = useState<CartLine[]>([]);
-    const [pick, setPick] = useState<CustomerPick | null>(null);
+    const [pick, setPick] = useState<CustomerPick | null>(initialPick);
     const [attention, setAttention] = useState<{
         id: string;
         read: PeekAttention | null;
@@ -244,7 +248,8 @@ export function useNewOrder({
         problem,
         reach: reachOf(pick),
         delivers: goesToAddress(way),
-        dirty: lines.length > 0 || pick !== null,
+        // The customer it opened with is nothing to lose (#247).
+        dirty: lines.length > 0 || !isOpeningPick(pick, initialPick),
     };
 }
 

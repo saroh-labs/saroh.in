@@ -1,3 +1,4 @@
+import { membershipsWarning } from "@/lib/payments/memberships-warning";
 import { providerName } from "@/lib/payments/providers";
 import type { ProviderHealth } from "@/lib/provider-health/service";
 
@@ -273,6 +274,18 @@ export function needsWebhookSecret(p: ConnectedPaymentProvider): boolean {
 const PAYMENTS_CONSEQUENCE =
     "Checkout stops taking online payments through it straight away. Orders already paid are not affected. Connecting again means entering the keys again — they cannot be read back.";
 
+/**
+ * Disconnecting a payment provider, in the confirm: what stops, and what it
+ * doesn't cancel at the provider — the customers' autopay memberships there,
+ * with how many are active (owner, 9 Oct, #921).
+ */
+export function paymentsConsequence(p: {
+    provider: string;
+    activeMemberships?: number;
+}): string {
+    return `${PAYMENTS_CONSEQUENCE} ${membershipsWarning(p.provider, p.activeMemberships ?? 0)}`;
+}
+
 export function buildProvidersView(input: ProviderRowsInput): ProvidersView {
     const has = (key: ProviderHealth["key"]) =>
         input.health.find((h) => h.key === key);
@@ -391,7 +404,7 @@ function paymentEntry(
         manageHref: live ? dashboardFor(p.provider) : null,
         target: live ? { kind: "payments", provider: p.provider } : null,
         setup: { kind: "payments", provider: p.provider },
-        consequence: PAYMENTS_CONSEQUENCE,
+        consequence: paymentsConsequence(p),
         // Connecting it again is one more of the business's own accounts:
         // the plan's to allow, as the API asks it (UX-017).
         lock: live

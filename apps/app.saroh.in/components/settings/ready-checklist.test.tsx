@@ -142,7 +142,7 @@ describe("one checklist on Home and Settings (UX-019)", () => {
                 {
                     ...logo,
                     key: "pipeline",
-                    label: "Create a pipeline",
+                    label: "Add your first lead",
                     done: true,
                 },
             ],
@@ -150,7 +150,7 @@ describe("one checklist on Home and Settings (UX-019)", () => {
         const html = renderToStaticMarkup(<ReadyChecklist list={done} />);
         expect(html).not.toContain("of 2 done");
         expect(html).toContain("Add your logo");
-        expect(html).not.toContain("Create a pipeline");
+        expect(html).not.toContain("Add your first lead");
     });
 });
 

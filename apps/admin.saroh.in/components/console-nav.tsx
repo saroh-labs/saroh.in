@@ -5,6 +5,7 @@ import {
     Cable,
     CloudUpload,
     Cog,
+    HardDrive,
     Rocket,
     ScrollText,
     ShieldCheck,
@@ -49,6 +50,12 @@ const GROUPS: ConsoleNavGroup[] = [
                 href: "/businesses",
                 label: "Businesses",
                 icon: Building2,
+                permission: "organization:read",
+            },
+            {
+                href: "/usage",
+                label: "Usage",
+                icon: HardDrive,
                 permission: "organization:read",
             },
             {

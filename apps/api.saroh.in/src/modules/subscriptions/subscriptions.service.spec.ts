@@ -67,6 +67,8 @@ jest.mock("@saroh/database", () => {
         // D20: a subscription's autopay ends with it.
         paymentMandate: { findMany: jest.fn(), updateMany: jest.fn() },
         job: { create: jest.fn() },
+        // An active business renews (#921).
+        organization: { findUnique: jest.fn() },
     };
     return {
         ...actual,
@@ -217,6 +219,9 @@ beforeEach(() => {
     tx.$queryRaw.mockResolvedValue([]);
     tx.subscriptionEvent!.create!.mockResolvedValue({});
     tx.organizationModule!.findFirst!.mockResolvedValue(null);
+    tx.organization!.findUnique!.mockResolvedValue({
+        lifecycleStatus: "ACTIVE",
+    });
     issueInTx.mockResolvedValue({ id: "inv_new", number: "INV-0001" });
 });
 
@@ -659,6 +664,20 @@ describe("renewal", () => {
             }),
         );
     });
+
+    it.each(["PENDING_DELETION", "DELETED_RETAINED"])(
+        "renews nothing for a %s business: the period waits (#921)",
+        async (lifecycleStatus) => {
+            tx.organization!.findUnique!.mockResolvedValue({
+                lifecycleStatus,
+            });
+            await expect(service.renewOne("sub_1", now)).resolves.toBe(
+                "skipped",
+            );
+            expect(tx.customerSubscription!.update).not.toHaveBeenCalled();
+            expect(issueInTx).not.toHaveBeenCalled();
+        },
+    );
 
     it("still renews on a plan without online payments, never asking the plan (ADR-003)", async () => {
         const spy = onPlanWithoutPayments();

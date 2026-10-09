@@ -16,6 +16,8 @@ import { loadContactHoldings } from "@/lib/contacts/holdings";
 import { contactPanels, moduleOn, sellPacksOnly } from "@/lib/contacts/panels";
 import {
     crumbsToSell,
+    personNewActions,
+    personStarts,
     personTabActions,
     personTabGates,
 } from "@/lib/contacts/person";
@@ -45,6 +47,7 @@ import type {
 import { tabFromQuery, tabsFor } from "@/lib/customer-workspace/view";
 import { loadAddLead } from "@/lib/leads/add-lead-data";
 import { modulesOrUnknown } from "@/lib/modules/guard";
+import { sellsProducts } from "@/lib/orders/sells-products";
 import { listRoles } from "@/lib/organizations/roles";
 import { resolveActiveOrganization } from "@/lib/organizations/service";
 import { contactReviews } from "@/lib/product-reviews/service";
@@ -115,6 +118,9 @@ export default async function PersonPage({
     const canRemove = may("customer:remove");
     const gates = personTabGates(organization, modules);
     const acts = personTabActions(organization, modules);
+    // New order and New booking for them (#247): the module on and the
+    // role allowed, each as its own flow's button asks.
+    const opens = personNewActions(organization, modules);
     // Courses and what Subscribe offers come from the contact's holdings;
     // the rest is in the detail read.
     const panels = contactPanels(organization, modules);
@@ -130,7 +136,7 @@ export default async function PersonPage({
     };
     const packsShown = detail.packs !== undefined;
 
-    const [suggestions, thread, reviews, packSale, crm, holdings] =
+    const [suggestions, thread, reviews, packSale, crm, holdings, products] =
         await Promise.all([
             // Only whoever may link or merge reads what they'd be offered.
             canWrite || canMerge
@@ -165,6 +171,8 @@ export default async function PersonPage({
                 ? getContact(contactId).catch((): ContactDetail | null => null)
                 : Promise.resolve(null),
             loadContactHoldings(contactId, holdingsPlan),
+            // New order is for a business that sells products (B13).
+            opens.newOrder ? sellsProducts() : Promise.resolve(false),
         ]);
 
     const name = detail.contact.name;
@@ -317,6 +325,10 @@ export default async function PersonPage({
                 actions={actions}
                 deleteWords={deleteWords}
                 canRecordPayment={acts.recordPayment}
+                starts={personStarts(contactId, opens, {
+                    removed,
+                    sellsProducts: products,
+                })}
                 overviewExtra={
                     removed ? null : (
                         <PersonFacts

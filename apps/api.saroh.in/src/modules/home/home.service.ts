@@ -12,6 +12,10 @@ import { overdueFollowUps } from "./home-crm-sources";
 import { noEmailProvider } from "./home-email-setup";
 import { HomeInlineService } from "./home-inline";
 import { lastDayHeader, readLastDay } from "./home-last-day";
+import {
+    invoiceRefundsOwedWhere,
+    mismatchesOwed,
+} from "./home-mismatch-refunds";
 import type {
     HomeAction,
     HomeEvidence,
@@ -762,10 +766,17 @@ export class HomeService {
     }
 
     /**
-     * Invoice payments captured but not applied — the invoice was already
-     * paid or void when the money arrived — and not yet refunded, oldest
-     * first. A refund the provider has reported (or one Saroh started)
-     * takes the row off the list.
+     * Payments customers are owed back, oldest first:
+     *
+     * - invoice payments captured but not applied — the invoice was already
+     *   paid or void when the money arrived — and not yet refunded; a
+     *   refund the provider has reported (or one Saroh started) takes the
+     *   row off the list;
+     * - captures taken at a different amount than asked (PAY-06), each on
+     *   its own row at what it captured, whatever its intent's status — the
+     *   order or invoice it failed to pay is FAILED — until a refund of it
+     *   is on its way or done (`home-mismatch-refunds.ts`). These rows
+     *   carry "Refund" (`home-inline.ts`).
      */
     private async refundsOwed(organizationId: string): Promise<{
         count: number;
@@ -773,14 +784,8 @@ export class HomeService {
         /** The oldest row's reason, for the action's title. */
         reason?: RefundReason;
     }> {
-        const where = {
-            organizationId,
-            invoiceId: { not: null },
-            status: "SUCCEEDED",
-            attempts: { some: { status: CAPTURED_NEEDS_REFUND } },
-            refunds: { none: { status: { in: ["PENDING", "SUCCEEDED"] } } },
-        };
-        const [count, rows] = await Promise.all([
+        const where = invoiceRefundsOwedWhere(organizationId);
+        const [count, rows, mismatches] = await Promise.all([
             this.db.paymentIntent.count({ where }),
             this.db.paymentIntent.findMany({
                 where,
@@ -806,29 +811,45 @@ export class HomeService {
                     },
                 },
             }),
+            mismatchesOwed(this.db, organizationId),
         ]);
-        const evidence: HomeEvidence[] = [];
-        let reason: RefundReason | undefined;
+        const owed: {
+            row: HomeEvidence;
+            sortAt: Date;
+            why: RefundReason;
+        }[] = [];
         for (const row of rows) {
             if (!row.invoice) continue;
             // Why, as recorded when the money came (K-1): the invoice's
             // status now can't tell a cancelled booking's pay link from an
             // invoice never paid.
             const why = refundReason(row.attempts[0]?.rawResponse);
-            reason ??= why;
             const after = refundReasonWords(why);
-            evidence.push({
-                id: row.id,
-                title: row.invoice.number ?? "Invoice",
-                subtitle: row.invoice.billToName
-                    ? `${row.invoice.billToName} · ${after}`
-                    : after,
-                at: row.updatedAt.toISOString(),
-                amountMinor: row.amountCents,
-                currency: row.currency,
-                href: `/billing/invoices/${row.invoice.id}`,
+            owed.push({
+                row: {
+                    id: row.id,
+                    title: row.invoice.number ?? "Invoice",
+                    subtitle: row.invoice.billToName
+                        ? `${row.invoice.billToName} · ${after}`
+                        : after,
+                    at: row.updatedAt.toISOString(),
+                    amountMinor: row.amountCents,
+                    currency: row.currency,
+                    href: `/billing/invoices/${row.invoice.id}`,
+                },
+                sortAt: row.updatedAt,
+                why,
             });
         }
-        return { count, evidence, reason };
+        for (const { sortAt, ...row } of mismatches.rows) {
+            owed.push({ row, sortAt, why: "AMOUNT_MISMATCH" });
+        }
+        owed.sort((a, b) => a.sortAt.getTime() - b.sortAt.getTime());
+        const shown = owed.slice(0, EVIDENCE_LIMIT);
+        return {
+            count: count + mismatches.count,
+            evidence: shown.map((o) => o.row),
+            reason: shown[0]?.why,
+        };
     }
 }

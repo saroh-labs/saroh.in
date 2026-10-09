@@ -554,7 +554,11 @@ describe("WebhooksService refund settlement", () => {
 
     it("arriving before the refund path stored the provider's id, it settles Saroh's row by its reference and writes the REFUND step once", async () => {
         // No row carries the provider id yet; the reference names Saroh's row.
+        // Asked twice: first whether it is a mismatch's refund (PAY-06; its
+        // key says it isn't), then by the order's own refund path.
         refundFindFirst
+            .mockResolvedValueOnce(null)
+            .mockResolvedValueOnce({ id: "rf_1", providerRefundId: null })
             .mockResolvedValueOnce(null)
             .mockResolvedValueOnce({ id: "rf_1", providerRefundId: null });
         refundFindUnique.mockResolvedValue(
@@ -954,5 +958,132 @@ describe("DefaultWebhookProviderFactory", () => {
         const factory = new DefaultWebhookProviderFactory();
         expect(factory.get("razorpay").name).toBe("RAZORPAY");
         expect(factory.get("cashfree").name).toBe("CASHFREE");
+    });
+});
+
+describe("the captured amount is compared with the intent (PAY-06)", () => {
+    function arrange() {
+        const { service } = makeService();
+        providerFindUnique.mockResolvedValue(providerRow());
+        whCreate.mockResolvedValue({ id: "wh_1" });
+        intentFindFirst.mockResolvedValue({ ...INTENT });
+        // Nothing recorded on the intent yet (an earlier spec may have set one).
+        (prisma.paymentAttempt.findFirst as jest.Mock).mockResolvedValue(null);
+        orderFindUnique.mockResolvedValue({
+            paymentStatus: "UNPAID",
+            placedOnline: false,
+            payOnHandover: false,
+        });
+        return service;
+    }
+
+    async function deliver(
+        service: WebhooksService,
+        over: Record<string, unknown>,
+    ) {
+        const raw = bodyOf({ providerPaymentRef: "pay_1", ...over });
+        return service.handle("razorpay", "org_1", raw, {
+            "x-fake-signature": sign(raw),
+        });
+    }
+
+    const paidMoves = () =>
+        orderUpdate.mock.calls.filter(
+            ([arg]) =>
+                (arg as { data?: { paymentStatus?: string } }).data
+                    ?.paymentStatus === "PAID",
+        );
+
+    it("a short capture never marks the order paid; it is owed back and the payment fails", async () => {
+        const service = arrange();
+        const error = jest
+            .spyOn(Logger.prototype, "error")
+            .mockImplementation(() => undefined);
+
+        const result = await deliver(service, {
+            capturedAmountCents: 4000,
+            capturedCurrency: "INR",
+            feeCents: 100,
+        });
+
+        expect(result).toEqual({ status: "processed", changed: true });
+        expect(paidMoves()).toHaveLength(0);
+        expect(ensureOrderInvoice).not.toHaveBeenCalled();
+        expect(intentUpdate).not.toHaveBeenCalledWith({
+            where: { id: "pi_1" },
+            data: { status: "SUCCEEDED" },
+        });
+        // Failed as a declined payment is: only an open intent, and the
+        // order UNPAID → FAILED.
+        expect(intentUpdateMany).toHaveBeenCalledWith({
+            where: {
+                id: "pi_1",
+                status: { in: ["CREATED", "REQUIRES_PAYMENT", "PROCESSING"] },
+            },
+            data: { status: "FAILED" },
+        });
+        expect(orderUpdate).toHaveBeenCalledWith(
+            expect.objectContaining({
+                where: { id: "order_1" },
+                data: expect.objectContaining({ paymentStatus: "FAILED" }),
+            }),
+        );
+        expect(attemptCreate).toHaveBeenCalledWith({
+            data: expect.objectContaining({
+                paymentIntentId: "pi_1",
+                providerRef: "pay_1",
+                status: "CAPTURED_NEEDS_REFUND",
+                rawResponse: expect.objectContaining({
+                    invoiceStatus: "AMOUNT_MISMATCH",
+                    askedAmountCents: 4250,
+                    capturedAmountCents: 4000,
+                }),
+            }),
+        });
+        // No fee is kept on money that wasn't applied.
+        expect(intentUpdateMany).not.toHaveBeenCalledWith(
+            expect.objectContaining({ data: { feeCents: 100 } }),
+        );
+        expect(error).toHaveBeenCalledWith(
+            expect.stringContaining("captured 4000 INR, asked 4250 INR"),
+        );
+    });
+
+    it("an over-capture or another currency is a mismatch too", async () => {
+        for (const over of [
+            { capturedAmountCents: 4251, capturedCurrency: "INR" },
+            { capturedAmountCents: 4250, capturedCurrency: "USD" },
+        ]) {
+            jest.clearAllMocks();
+            const service = arrange();
+            jest.spyOn(Logger.prototype, "error").mockImplementation(
+                () => undefined,
+            );
+            await deliver(service, over);
+            expect(paidMoves()).toHaveLength(0);
+            expect(attemptCreate).toHaveBeenCalledWith({
+                data: expect.objectContaining({
+                    status: "CAPTURED_NEEDS_REFUND",
+                }),
+            });
+        }
+    });
+
+    it("the asked amount, in any case of currency, settles as before", async () => {
+        const service = arrange();
+        await deliver(service, {
+            capturedAmountCents: 4250,
+            capturedCurrency: "inr",
+        });
+        expect(paidMoves()).toHaveLength(1);
+        expect(attemptCreate).toHaveBeenCalledWith({
+            data: expect.objectContaining({ status: "CAPTURED" }),
+        });
+    });
+
+    it("an event that reports no amount is settled on the provider order's amount", async () => {
+        const service = arrange();
+        await deliver(service, {});
+        expect(paidMoves()).toHaveLength(1);
     });
 });

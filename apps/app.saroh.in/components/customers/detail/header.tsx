@@ -8,7 +8,7 @@ import {
     DropdownMenuTrigger,
 } from "@saroh/ui/dropdown-menu";
 import { cn } from "@saroh/ui/lib/utils";
-import { Globe, MoreHorizontal } from "lucide-react";
+import { Globe, MoreHorizontal, Plus } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useRef } from "react";
 
@@ -70,7 +70,7 @@ export function Crumbs({ here, sells }: { here: string; sells: boolean }) {
 /**
  * Who they are: initials, name and its word (Returning, Member), what the
  * team must know (Needs attention's tags), since when, and how to reach
- * them — then Edit details (`contact:write`) and ⋯ More actions (edit,
+ * them — then New order and New booking for them (#247), Edit details (`contact:write`) and ⋯ More actions (edit,
  * merge or remove, each on its own permission). A role that only reads is
  * told so.
  */
@@ -87,6 +87,7 @@ export function Header({
     canMore = canEdit,
     onEdit,
     menu,
+    starts = [],
 }: {
     name: string;
     initials: string;
@@ -104,6 +105,12 @@ export function Header({
     onEdit: () => void;
     /** What More holds; empty hides it. */
     menu: MoreItem[];
+    /**
+     * New order, New booking (#247): each opens its flow with this person
+     * already chosen. Only the ones this role may use, with their module
+     * on, are passed; none draws nothing.
+     */
+    starts?: { label: string; href: string }[];
 }) {
     return (
         <>
@@ -161,7 +168,22 @@ export function Header({
                         </div>
                     ) : null}
                 </div>
-                <div className="flex flex-wrap gap-2">
+                {/* On a phone the group drops under the name and wraps a
+                    button to its own line, full size, rather than shrink. */}
+                <div className="flex min-w-0 flex-wrap gap-2">
+                    {starts.map((s) => (
+                        <Button
+                            key={s.href}
+                            variant="outline"
+                            className={HEAD_BTN}
+                            asChild
+                        >
+                            <Link href={s.href}>
+                                <Plus aria-hidden className="mr-1 size-3.5" />
+                                {s.label}
+                            </Link>
+                        </Button>
+                    ))}
                     <Button
                         variant="outline"
                         className={HEAD_BTN}

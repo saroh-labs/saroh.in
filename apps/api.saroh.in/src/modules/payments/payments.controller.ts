@@ -114,6 +114,21 @@ export class PaymentsController {
         });
     }
 
+    /**
+     * Refund a payment taken at a different amount than asked (PAY-06):
+     * exactly what was captured, against that payment. The order or
+     * invoice is left as it is. No module gate: money already taken stays
+     * refundable.
+     */
+    @Post("payment-attempts/:attemptId/refund")
+    @HttpCode(201)
+    refundMismatch(
+        @OrgContext() ctx: OrganizationContext,
+        @Param("attemptId") attemptId: string,
+    ) {
+        return this.payments.refundAmountMismatch(ctx, attemptId);
+    }
+
     /** Try again a refund whose provider answer was lost — it looks first (#508). */
     @Post("orders/:orderId/refunds/:refundId/retry")
     @HttpCode(200)

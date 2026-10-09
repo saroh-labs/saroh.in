@@ -14,6 +14,7 @@ import {
     AuditService,
 } from "../audit/audit.service";
 import { authorize } from "../organizations/organization-policy";
+import { assertBillingMayStart } from "./business-closing";
 import type { CancelSubscriptionDto, SubscribeDto } from "./dto";
 import { PlansService } from "./plans.service";
 import type { BillingProviderFactory } from "./providers/billing-provider.port";
@@ -175,6 +176,8 @@ export class SubscriptionsService {
                 "A paid plan requires a billing provider",
             );
         }
+        // A closing or deleted business starts nothing that charges (#921).
+        await assertBillingMayStart(prisma, ctx.organizationId);
 
         const result = await this.providers.get(provider).createSubscription({
             planKey: plan.key,

@@ -23,6 +23,7 @@ import {
     checkoutReadiness,
     readinessMessage,
 } from "../orders/checkout-readiness";
+import { SITE_ONLINE_ORGANIZATION } from "../organizations/organization-lifecycle.policy";
 import { allows, authorize } from "../organizations/organization-policy";
 import type {
     CreateApprovalDto,
@@ -2127,7 +2128,11 @@ export class SitesService {
             where: {
                 siteId,
                 currentPublicationId: { not: null },
-                site: { deletedAt: null },
+                // Offline with its business (#921).
+                site: {
+                    deletedAt: null,
+                    organization: SITE_ONLINE_ORGANIZATION,
+                },
                 AND: [kept],
             },
             orderBy: { publishedAt: "desc" },
@@ -2151,7 +2156,11 @@ export class SitesService {
                 siteId,
                 slug,
                 currentPublicationId: { not: null },
-                site: { deletedAt: null },
+                // Offline with its business (#921).
+                site: {
+                    deletedAt: null,
+                    organization: SITE_ONLINE_ORGANIZATION,
+                },
                 AND: [kept],
             },
             select: {
@@ -2194,7 +2203,15 @@ export class SitesService {
         const site = await prisma.site.findFirst({
             // A second lock (DEC-071, KTD-2): the live pointer only ever names
             // a LIVE row, and a real host is never served anything else.
-            where: { AND: [where, { currentPublication: { kind: "LIVE" } }] },
+            // A deleted business's site is offline (#921): it reads as never
+            // published, from every address.
+            where: {
+                AND: [
+                    where,
+                    { currentPublication: { kind: "LIVE" } },
+                    { organization: SITE_ONLINE_ORGANIZATION },
+                ],
+            },
             select: {
                 id: true,
                 organizationId: true,

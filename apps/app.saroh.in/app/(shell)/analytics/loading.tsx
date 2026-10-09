@@ -39,8 +39,11 @@ export default function Loading() {
                     <Skeleton className="h-24 w-full md:h-40" />
                 </div>
             </div>
-            <div className="grid grid-cols-3 gap-2 sm:gap-[11px]" aria-hidden>
-                {Array.from({ length: 3 }, (_, i) => (
+            <div
+                className="grid grid-cols-2 gap-2 sm:grid-cols-4 sm:gap-[11px]"
+                aria-hidden
+            >
+                {Array.from({ length: 4 }, (_, i) => (
                     <Skeleton key={i} className="h-[72px] rounded-[11px]" />
                 ))}
             </div>

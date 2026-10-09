@@ -15,9 +15,10 @@ import type { HomeInline, HomeNeed } from "./service";
  *   Undo. When the step tells the customer, A14 holds that notice ten
  *   seconds too, so Undo is offered only for the hold; when nothing is
  *   sent, the row keeps its Undo for the stage's own window.
- * - **once** (Retry by pay link, or by autopay): made at once, and nothing
- *   to take back — a new link replaces the old one; an autopay charge is
- *   told to the customer by their bank — so the confirm says so first.
+ * - **once** (Retry by pay link, or by autopay; Refund): made at once, and
+ *   nothing to take back — a new link replaces the old one; an autopay
+ *   charge is told to the customer by their bank; a refund can't be undone
+ *   — so the confirm says so first.
  */
 export type InlineRun = "held" | "undo" | "once";
 
@@ -76,6 +77,7 @@ export function undoneText(inline: HomeInline, told: boolean): string {
         case "REVIEW_REPLY":
             return "Not posted. Your reply is still in the box.";
         case "RETRY":
+        case "REFUND":
             return "Undone.";
     }
 }
@@ -95,6 +97,8 @@ export function failedText(inline: HomeInline): string {
             return "Your reply wasn't sent.";
         case "REVIEW_REPLY":
             return "Your reply wasn't posted.";
+        case "REFUND":
+            return "Nothing was refunded.";
     }
 }
 

@@ -20,12 +20,18 @@ import { orderPayLinkUrlFor } from "../invoices/pay-link-url";
 import { CreateOrderDto, UpdateOrderDto } from "./dto";
 import { OrdersService } from "./orders.service";
 
+/**
+ * A storefront's orders. Commerce gates taking and changing an order, per
+ * handler; reading the orders already taken is history, and stays open
+ * when a business switches Commerce off (#117, `MODULE_ROLLOUT.md`). The
+ * service still asks `order:read` of every read.
+ */
 @Controller("stores/:storeId/orders")
 @UseGuards(BetterAuthGuard, ModuleEnforcementGuard)
-@RequireModule("COMMERCE")
 export class OrdersController {
     constructor(private readonly orders: OrdersService) {}
 
+    /** History: not module-gated. */
     @Get()
     list(@CurrentUser() user: AuthUser, @Param("storeId") storeId: string) {
         return this.orders.list(storeId, user.id);
@@ -37,6 +43,7 @@ export class OrdersController {
      * is kept (B11).
      */
     @Post()
+    @RequireModule("COMMERCE")
     @HttpCode(201)
     @Header("Cache-Control", "no-store")
     async create(
@@ -69,6 +76,7 @@ export class OrdersController {
      * storefront's own ways.
      */
     @Get("new-order")
+    @RequireModule("COMMERCE")
     newOrderLines(
         @CurrentUser() user: AuthUser,
         @Param("storeId") storeId: string,
@@ -82,6 +90,7 @@ export class OrdersController {
         return this.orders.newOrderLines(storeId, user.id, ids);
     }
 
+    /** History: not module-gated. */
     @Get(":orderId")
     get(
         @CurrentUser() user: AuthUser,
@@ -92,6 +101,7 @@ export class OrdersController {
     }
 
     @Patch(":orderId")
+    @RequireModule("COMMERCE")
     update(
         @CurrentUser() user: AuthUser,
         @Param("storeId") storeId: string,

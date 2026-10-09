@@ -197,7 +197,7 @@ export class ModuleReadinessRegistry {
                     return active();
                 return setup(
                     "CRM_NO_PIPELINE",
-                    "Create a pipeline to start tracking leads.",
+                    "Add your first lead to start your pipeline.",
                     "/pipeline",
                 );
             },

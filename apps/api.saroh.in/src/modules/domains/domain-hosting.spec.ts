@@ -3,16 +3,22 @@
 // removal deletes at the host first, and with the env unset hosting is off.
 // DB-free: @saroh/database is mocked, the host is a FakeDomainHosting and
 // the Cloudflare adapter's fetch is a stub. Nothing touches a network.
-jest.mock("@saroh/database", () => ({
-    prisma: {
+jest.mock("@saroh/database", () => {
+    const db: Record<string, unknown> = {
         domain: {
             findUnique: jest.fn(),
             update: jest.fn(),
             delete: jest.fn(),
         },
         site: { update: jest.fn(), updateMany: jest.fn() },
-    },
-}));
+        // #917: a check that moves a domain out of live tells the team on
+        // the same transaction; one client stands in for both.
+        customerNotice: { findFirst: jest.fn().mockResolvedValue(null) },
+        job: { create: jest.fn().mockResolvedValue({}) },
+    };
+    db.$transaction = jest.fn((fn: (tx: unknown) => unknown) => fn(db));
+    return { prisma: db };
+});
 
 // A mutable env, so each test chooses whether hosting is set up.
 jest.mock("../../env", () => ({ env: {} }));
@@ -50,6 +56,7 @@ const domainFindUnique = prisma.domain.findUnique as jest.Mock;
 const domainUpdate = prisma.domain.update as jest.Mock;
 const domainDelete = prisma.domain.delete as jest.Mock;
 const siteUpdateMany = prisma.site.updateMany as jest.Mock;
+const jobCreate = prisma.job.create as jest.Mock;
 
 const ctx: OrganizationContext = {
     organizationId: "org_1",
@@ -310,6 +317,19 @@ describe("verify registers the hostname with the host", () => {
         expect(state.current).toMatchObject({
             hostingId: "ch_1",
             hostingStatus: "PENDING",
+        });
+        // It was live: "Check now" tells the team as the run would (#917),
+        // and whoever pressed it isn't emailed.
+        expect(jobCreate).toHaveBeenCalledWith({
+            data: expect.objectContaining({
+                type: "team.alert",
+                payload: expect.objectContaining({
+                    event: "domain",
+                    domainId: "dom_1",
+                    change: "down",
+                    actorUserId: "user_1",
+                }),
+            }),
         });
     });
 });

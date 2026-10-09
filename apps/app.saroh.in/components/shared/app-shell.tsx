@@ -4,6 +4,7 @@ import { cookies, headers } from "next/headers";
 import { PausedBanner } from "@/components/billing/paused-banner";
 import { PlanEndingBanner } from "@/components/billing/plan-ending-banner";
 import { PlanRefusalHost } from "@/components/billing/plan-refusal";
+import { ClosingBanner } from "@/components/organizations/closing-banner";
 import { AccessDenied } from "@/components/shared/access-denied";
 import { AppHeader } from "@/components/shared/app-header";
 import { AppSidebar } from "@/components/shared/app-sidebar";
@@ -23,6 +24,7 @@ import { listModules } from "@/lib/modules/service";
 import { RAIL_COLLAPSED, RAIL_COOKIE } from "@/lib/nav/rail-cookie";
 import { unreadNotificationCount } from "@/lib/notifications/service";
 import { MEMBER_PAUSED_BODY } from "@/lib/organizations/choose";
+import { closingOrNull } from "@/lib/organizations/closing-service";
 import {
     listOrganizations,
     resolveActiveOrganization,
@@ -96,48 +98,62 @@ export async function AppShell({ children }: { children: React.ReactNode }) {
     // a transient API error never blanks the shell; a successful fetch that
     // returns nothing is "nothing is enabled yet", which a new Organization
     // should see reflected in its nav rather than papered over.
-    const [unread, modules, home, sites, storefronts, stock, billing, paused] =
-        await Promise.all([
-            unreadNotificationCount(),
-            listModules().catch(() => null),
-            // The rail's work counts come from the same ranked read model Home uses,
-            // so the two can never disagree. Non-fatal: a rail without badges is a
-            // working rail, and this renders on every page.
-            getHome().catch(() => null),
-            /*
-             * The merchant's own sites, for the command palette's jump to one.
-             *
-             * Non-fatal like the counts: a palette without them still works, and
-             * this renders on every screen in the app. It joins the same
-             * Promise.all rather than being awaited after, so it costs the slowest
-             * of four round trips instead of adding a fifth in series.
-             */
-            listSites().catch(() => []),
-            /*
-             * How many storefronts, and how many the plan allows (ADR-010):
-             * the palette stops offering "New storefront" at the limit, and
-             * the rail names the row "Storefronts" once there are several.
-             * `null` on failure: the palette then offers it, and the page
-             * says whether another can be made.
-             */
-            getStorefrontAllowance().catch(() => null),
-            /*
-             * The business's Track stock switch (#515): off, Sell › Stock has
-             * nothing to show and the rail leaves it out. `null` on failure
-             * (or a role that can't read stock, which the row's own action
-             * already withholds): the nav fails open.
-             */
-            getStockTracking().catch(() => null),
-            /*
-             * What the plan locks (U14), for the rail's locks. An aid: null
-             * when it can't be read or the role may not (the page and the
-             * API still say so).
-             */
-            billingAccessOrNull(),
-            // What a move to a lower plan paused, or will (#800): the banner.
-            // An aid; null when unread, and the API still refuses.
-            pausedOrNull(),
-        ]);
+    const [
+        unread,
+        modules,
+        home,
+        sites,
+        storefronts,
+        stock,
+        billing,
+        paused,
+        closing,
+    ] = await Promise.all([
+        unreadNotificationCount(),
+        listModules().catch(() => null),
+        // The rail's work counts come from the same ranked read model Home uses,
+        // so the two can never disagree. Non-fatal: a rail without badges is a
+        // working rail, and this renders on every page.
+        getHome().catch(() => null),
+        /*
+         * The merchant's own sites, for the command palette's jump to one.
+         *
+         * Non-fatal like the counts: a palette without them still works, and
+         * this renders on every screen in the app. It joins the same
+         * Promise.all rather than being awaited after, so it costs the slowest
+         * of four round trips instead of adding a fifth in series.
+         */
+        listSites().catch(() => []),
+        /*
+         * How many storefronts, and how many the plan allows (ADR-010):
+         * the palette stops offering "New storefront" at the limit, and
+         * the rail names the row "Storefronts" once there are several.
+         * `null` on failure: the palette then offers it, and the page
+         * says whether another can be made.
+         */
+        getStorefrontAllowance().catch(() => null),
+        /*
+         * The business's Track stock switch (#515): off, Sell › Stock has
+         * nothing to show and the rail leaves it out. `null` on failure
+         * (or a role that can't read stock, which the row's own action
+         * already withholds): the nav fails open.
+         */
+        getStockTracking().catch(() => null),
+        /*
+         * What the plan locks (U14), for the rail's locks. An aid: null
+         * when it can't be read or the role may not (the page and the
+         * API still say so).
+         */
+        billingAccessOrNull(),
+        // What a move to a lower plan paused, or will (#800): the banner.
+        // An aid; null when unread, and the API still refuses.
+        pausedOrNull(),
+        // Scheduled for deletion (#921): the refunds still owed and
+        // the memberships it won't cancel. Read only then.
+        activeOrg?.lifecycleStatus === "PENDING_DELETION"
+            ? closingOrNull()
+            : null,
+    ]);
     // Available modules, plus those shut only by the plan: locked, not off,
     // so they stay in the rail with a lock and a way up (U14).
     const planLocked = modules ? planLockedModuleKeys(modules) : [];
@@ -275,6 +291,8 @@ export async function AppShell({ children }: { children: React.ReactNode }) {
                          * keeps it, on the server's first paint too.
                          */}
                         <BusinessZoneProvider zone={businessZone(activeOrg)}>
+                            {/* Scheduled for deletion (#921). */}
+                            <ClosingBanner view={closing} />
                             {/* A plan that ends within 30 days (#805). */}
                             <PlanEndingBanner ending={billing?.planEnding} />
                             {/* What a lower plan paused, or will (#800). */}
