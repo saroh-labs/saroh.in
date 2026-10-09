@@ -61,7 +61,8 @@ import type { ServiceView } from "./service-fields";
  * `@RequireModule("APPOINTMENTS")`. The three reads of bookings already made
  * — the calendar range, a service's bookings and one booking — are history,
  * and stay readable when a business switches Appointments off
- * (`MODULE_ROLLOUT.md`); the service still asks `booking:read`.
+ * (`MODULE_ROLLOUT.md`); the service still asks `booking:read`. Cancelling a
+ * booking already made is winding down, and stays open too.
  */
 @Controller("organizations/:organizationId/services")
 @UseGuards(BetterAuthGuard, OrganizationGuard, ModuleEnforcementGuard)
@@ -318,9 +319,12 @@ export class BookingsController {
      * the class paid for goes back even inside the free-cancellation window.
      * `?closesClass=true` when the whole class is cancelled: its waitlist is
      * closed rather than offered the place (A12).
+     *
+     * Not gated on Appointments (#117, owner 9 Oct): a business that
+     * switched Appointments off can still cancel a booking already made,
+     * and the refund its policy gives (DEC-058). `booking:*` still applies.
      */
     @Delete("bookings/:bookingId")
-    @RequireModule("APPOINTMENTS")
     cancelBooking(
         @OrgContext() ctx: OrganizationContext,
         @Param("bookingId") bookingId: string,

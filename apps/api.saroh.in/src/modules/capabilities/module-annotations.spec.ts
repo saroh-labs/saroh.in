@@ -71,10 +71,6 @@ const CLASS_LEVEL: Record<string, string> = {
     // #514: stock levels, the log, counts, moves and checks.
     "stock/stock.controller.ts": "COMMERCE",
     "imports/imports.controller.ts": "COMMERCE",
-    "subscriptions/subscriptions.controller.ts": "PAYMENTS",
-    // Both of its controllers: the packs, and using one on a booking (E12).
-    "class-packs/class-packs.controller.ts": "CLASS_PACKS",
-    "courses/courses.controller.ts": "COURSES",
 };
 
 /**
@@ -92,6 +88,21 @@ const METHOD_LEVEL: Record<string, string> = {
     "orders/organization-orders.controller.ts": "COMMERCE",
     "customers/customers.controller.ts": "COMMERCE",
     "bookings/bookings.controller.ts": "APPOINTMENTS",
+    // #117 (owner, 9 Oct): plans, subscriptions, packs and courses keep their
+    // history readable too, and cancelling a subscription or an enrolment is
+    // wind-down, allowed with the module off.
+    "subscriptions/subscriptions.controller.ts": "PAYMENTS",
+    "class-packs/class-packs.controller.ts": "CLASS_PACKS",
+    "courses/courses.controller.ts": "COURSES",
+};
+
+/**
+ * A METHOD_LEVEL file may hold a second controller that is wholly a write and
+ * gated at the class: named here, so no other one is.
+ */
+const CLASS_LEVEL_WITHIN: Record<string, string[]> = {
+    // Using a pack on a booking, or taking it off (E12).
+    "class-packs/class-packs.controller.ts": ["BookingClassPackController"],
 };
 
 /**
@@ -147,6 +158,8 @@ const NEVER: Record<string, string> = {
     "admin/admin-waitlist.controller.ts":
         "staff control plane, not a tenant surface",
     "admin/admin-deployments.controller.ts":
+        "staff control plane, not a tenant surface",
+    "admin/admin-usage.controller.ts":
         "staff control plane, not a tenant surface",
     "organizations/organization-members.controller.ts": "tenancy",
     "health/health.controller.ts": "liveness",
@@ -305,9 +318,14 @@ describe("module enforcement rollout (#117)", () => {
             // If it ever moves to the class, the exempt handlers below it stop
             // being exempt — which is the mistake this file exists to catch.
             const classLevel = new RegExp(
-                `@RequireModule\\("${moduleKey}"\\)\\s*\\nexport class`,
+                `@RequireModule\\("${moduleKey}"\\)\\s*\\n(?:@IgnoreModuleReadiness\\(\\)\\s*\\n)?export class (\\w+)`,
+                "g",
             );
-            expect(text).not.toMatch(classLevel);
+            const gatedWhole = Array.from(
+                text.matchAll(classLevel),
+                (m) => m[1],
+            );
+            expect(gatedWhole).toEqual(CLASS_LEVEL_WITHIN[file] ?? []);
         },
     );
 
@@ -405,9 +423,9 @@ describe("module enforcement rollout (#117)", () => {
         }
     });
 
-    it("gates both Class packs controllers on CLASS_PACKS, not Appointments (E12)", () => {
+    it("gates Class packs on CLASS_PACKS, not Appointments (E12)", () => {
         const text = source("class-packs/class-packs.controller.ts");
-        expect(text.match(/@RequireModule\("CLASS_PACKS"\)/g)).toHaveLength(2);
+        expect(text).toContain('@RequireModule("CLASS_PACKS")');
         expect(text).not.toContain('@RequireModule("APPOINTMENTS")');
     });
 

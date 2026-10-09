@@ -49,11 +49,14 @@ import { SubscriptionsService } from "./subscriptions.service";
  * Billing → Subscriptions → Plans (ADR-007). Under Payments without its
  * provider setup, like invoices: a membership invoiced each period and paid
  * at the desk needs no provider. Authorization is in the service.
+ *
+ * Payments is required per handler, not on the class (#117): every route
+ * that makes or changes a plan carries `@RequireModule("PAYMENTS")` with
+ * `@IgnoreModuleReadiness()`. The plans, one plan and its history stay
+ * readable when a business switches Payments off (`MODULE_ROLLOUT.md`).
  */
 @Controller("organizations/:organizationId/subscription-plans")
 @UseGuards(BetterAuthGuard, OrganizationGuard, ModuleEnforcementGuard)
-@RequireModule("PAYMENTS")
-@IgnoreModuleReadiness()
 export class SubscriptionPlansController {
     constructor(private readonly subscriptions: SubscriptionsService) {}
 
@@ -81,6 +84,8 @@ export class SubscriptionPlansController {
     }
 
     @Post()
+    @RequireModule("PAYMENTS")
+    @IgnoreModuleReadiness()
     @HttpCode(201)
     create(@OrgContext() ctx: OrganizationContext, @Body() dto: PlanInputDto) {
         return this.subscriptions.createPlan(ctx, dto);
@@ -92,6 +97,8 @@ export class SubscriptionPlansController {
 
     /** The editor's first save of a new plan, which makes it a DRAFT. */
     @Post("drafts")
+    @RequireModule("PAYMENTS")
+    @IgnoreModuleReadiness()
     @HttpCode(201)
     createDraft(
         @OrgContext() ctx: OrganizationContext,
@@ -102,6 +109,8 @@ export class SubscriptionPlansController {
 
     /** The plan as the editor reads it, with its draft revision. */
     @Get(":planId/draft")
+    @RequireModule("PAYMENTS")
+    @IgnoreModuleReadiness()
     getDraft(
         @OrgContext() ctx: OrganizationContext,
         @Param("planId") id: string,
@@ -111,6 +120,8 @@ export class SubscriptionPlansController {
 
     /** Autosave: a draft's fields, or a live plan's unpublished changes. */
     @Patch(":planId/draft")
+    @RequireModule("PAYMENTS")
+    @IgnoreModuleReadiness()
     saveDraft(
         @OrgContext() ctx: OrganizationContext,
         @Param("planId") id: string,
@@ -120,6 +131,8 @@ export class SubscriptionPlansController {
     }
 
     @Post(":planId/publish")
+    @RequireModule("PAYMENTS")
+    @IgnoreModuleReadiness()
     @HttpCode(200)
     publish(
         @OrgContext() ctx: OrganizationContext,
@@ -130,6 +143,8 @@ export class SubscriptionPlansController {
     }
 
     @Post(":planId/discard")
+    @RequireModule("PAYMENTS")
+    @IgnoreModuleReadiness()
     @HttpCode(200)
     discard(
         @OrgContext() ctx: OrganizationContext,
@@ -141,6 +156,8 @@ export class SubscriptionPlansController {
 
     /** Delete a draft nobody has bought; a published plan is archived. */
     @Delete(":planId")
+    @RequireModule("PAYMENTS")
+    @IgnoreModuleReadiness()
     @HttpCode(204)
     async remove(
         @OrgContext() ctx: OrganizationContext,
@@ -155,6 +172,8 @@ export class SubscriptionPlansController {
      * business's setting. Straight onto the plan, not its draft.
      */
     @Patch(":planId/autopay-timing")
+    @RequireModule("PAYMENTS")
+    @IgnoreModuleReadiness()
     setChargeTiming(
         @OrgContext() ctx: OrganizationContext,
         @Param("planId") id: string,
@@ -174,6 +193,8 @@ export class SubscriptionPlansController {
      * checkpoint later. Refuses a draft.
      */
     @Patch(":planId")
+    @RequireModule("PAYMENTS")
+    @IgnoreModuleReadiness()
     update(
         @OrgContext() ctx: OrganizationContext,
         @Param("planId") id: string,
@@ -183,6 +204,8 @@ export class SubscriptionPlansController {
     }
 
     @Post(":planId/archive")
+    @RequireModule("PAYMENTS")
+    @IgnoreModuleReadiness()
     @HttpCode(200)
     archive(
         @OrgContext() ctx: OrganizationContext,
@@ -192,6 +215,8 @@ export class SubscriptionPlansController {
     }
 
     @Post(":planId/restore")
+    @RequireModule("PAYMENTS")
+    @IgnoreModuleReadiness()
     @HttpCode(200)
     restore(
         @OrgContext() ctx: OrganizationContext,
@@ -201,11 +226,17 @@ export class SubscriptionPlansController {
     }
 }
 
-/** Billing → Subscriptions: the people on a plan. */
+/**
+ * Billing → Subscriptions: the people on a plan.
+ *
+ * Payments is required per handler (#117). The subscriptions, one
+ * subscription and its history stay readable with Payments off, and
+ * cancelling one already running is winding down, so it stays open too
+ * (`subscription:*` still applies). Everything else — subscribing, pausing,
+ * plan changes, collections, retries and autopay — is gated.
+ */
 @Controller("organizations/:organizationId/subscriptions")
 @UseGuards(BetterAuthGuard, OrganizationGuard, ModuleEnforcementGuard)
-@RequireModule("PAYMENTS")
-@IgnoreModuleReadiness()
 export class SubscriptionsController {
     constructor(
         private readonly subscriptions: SubscriptionsService,
@@ -222,17 +253,23 @@ export class SubscriptionsController {
 
     /** Declared before `:subscriptionId`, or "renewals" would be read as an id. */
     @Get("renewals")
+    @RequireModule("PAYMENTS")
+    @IgnoreModuleReadiness()
     renewals(@OrgContext() ctx: OrganizationContext) {
         return this.subscriptions.renewals(ctx);
     }
 
     /** "Members can pause from their account" (A8); before `:subscriptionId` too. */
     @Get("settings")
+    @RequireModule("PAYMENTS")
+    @IgnoreModuleReadiness()
     settings(@OrgContext() ctx: OrganizationContext) {
         return this.subscriptions.settings(ctx);
     }
 
     @Patch("settings")
+    @RequireModule("PAYMENTS")
+    @IgnoreModuleReadiness()
     updateSettings(
         @OrgContext() ctx: OrganizationContext,
         @Body() dto: SubscriptionSettingsDto,
@@ -246,6 +283,8 @@ export class SubscriptionsController {
      * `:subscriptionId` too.
      */
     @Get("autopay")
+    @RequireModule("PAYMENTS")
+    @IgnoreModuleReadiness()
     autopayOffer(@OrgContext() ctx: OrganizationContext) {
         return this.autopay.offer(ctx);
     }
@@ -270,6 +309,8 @@ export class SubscriptionsController {
 
     /** Subscribe a contact; answers with the subscription and issues its first invoice. */
     @Post()
+    @RequireModule("PAYMENTS")
+    @IgnoreModuleReadiness()
     @HttpCode(201)
     subscribe(
         @OrgContext() ctx: OrganizationContext,
@@ -279,6 +320,8 @@ export class SubscriptionsController {
     }
 
     @Post(":subscriptionId/pause")
+    @RequireModule("PAYMENTS")
+    @IgnoreModuleReadiness()
     @HttpCode(200)
     pause(
         @OrgContext() ctx: OrganizationContext,
@@ -289,6 +332,8 @@ export class SubscriptionsController {
     }
 
     @Post(":subscriptionId/resume")
+    @RequireModule("PAYMENTS")
+    @IgnoreModuleReadiness()
     @HttpCode(200)
     resume(
         @OrgContext() ctx: OrganizationContext,
@@ -309,6 +354,8 @@ export class SubscriptionsController {
 
     /** Undo a cancel-at-period-end. */
     @Post(":subscriptionId/keep")
+    @RequireModule("PAYMENTS")
+    @IgnoreModuleReadiness()
     @HttpCode(200)
     keep(
         @OrgContext() ctx: OrganizationContext,
@@ -319,6 +366,8 @@ export class SubscriptionsController {
 
     /** Set or stop the collection schedule (weekday and what is collected). */
     @Patch(":subscriptionId/collection")
+    @RequireModule("PAYMENTS")
+    @IgnoreModuleReadiness()
     setCollection(
         @OrgContext() ctx: OrganizationContext,
         @Param("subscriptionId") id: string,
@@ -329,6 +378,8 @@ export class SubscriptionsController {
 
     /** Skip one collection still to come. */
     @Post(":subscriptionId/skips")
+    @RequireModule("PAYMENTS")
+    @IgnoreModuleReadiness()
     @HttpCode(200)
     skip(
         @OrgContext() ctx: OrganizationContext,
@@ -340,6 +391,8 @@ export class SubscriptionsController {
 
     /** Undo a skip: the collection is back. */
     @Delete(":subscriptionId/skips/:date")
+    @RequireModule("PAYMENTS")
+    @IgnoreModuleReadiness()
     unskip(
         @OrgContext() ctx: OrganizationContext,
         @Param("subscriptionId") id: string,
@@ -350,6 +403,8 @@ export class SubscriptionsController {
 
     /** Change plan from the next renewal. */
     @Post(":subscriptionId/plan-change")
+    @RequireModule("PAYMENTS")
+    @IgnoreModuleReadiness()
     @HttpCode(200)
     changePlan(
         @OrgContext() ctx: OrganizationContext,
@@ -361,6 +416,8 @@ export class SubscriptionsController {
 
     /** Undo a booked plan change. */
     @Delete(":subscriptionId/plan-change")
+    @RequireModule("PAYMENTS")
+    @IgnoreModuleReadiness()
     cancelPlanChange(
         @OrgContext() ctx: OrganizationContext,
         @Param("subscriptionId") id: string,
@@ -376,6 +433,8 @@ export class SubscriptionsController {
      * one. `paid`: the provider had already captured it.
      */
     @Post(":subscriptionId/retry")
+    @RequireModule("PAYMENTS")
+    @IgnoreModuleReadiness()
     @HttpCode(200)
     @Header("Cache-Control", "no-store")
     async retry(
@@ -399,6 +458,8 @@ export class SubscriptionsController {
      * autopay (its provider can't, or the rollout flag is off).
      */
     @Post(":subscriptionId/autopay/link")
+    @RequireModule("PAYMENTS")
+    @IgnoreModuleReadiness()
     @HttpCode(201)
     @Header("Cache-Control", "no-store")
     autopayLink(
@@ -414,6 +475,8 @@ export class SubscriptionsController {
      * (DEC-026). The subscription goes on, invoiced with a pay link.
      */
     @Post(":subscriptionId/autopay/cancel")
+    @RequireModule("PAYMENTS")
+    @IgnoreModuleReadiness()
     @HttpCode(200)
     cancelAutopay(
         @OrgContext() ctx: OrganizationContext,

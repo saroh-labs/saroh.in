@@ -591,6 +591,7 @@ Unless an entry says otherwise, its status is **Proposed — requires audit revi
 - Decision: **a module whose rollout flag is off (`ROLLOUT_DISABLED`) is not shown to the business anywhere**: not in Settings › Modules, the rail, the command menu, "Also sell", onboarding's module choices, setup checklists or any upsell. Only modules Saroh has rolled out appear, and the business turns those on or off. A raw blocker code is never shown to a merchant.
 - Consequences: the module list the app renders is the set that has passed the rollout gate. Turning a rollout flag off in the admin console hides the module; the business's own setting and its data are kept.
 - Migration: none.
+- Amended 2026-10-09 (owner, #117): **with a module off, its history stays readable and cancelling what was already committed is allowed.** Orders, customers, bookings, plans and subscriptions, class packs and their purchases, and courses and their enrolments can still be read; cancelling an existing order (Sell), booking (Bookings), subscription or course enrolment, including the refund that cancel makes, still works. Role permissions still apply; every other write stays gated (`MODULE_ROLLOUT.md`, `history-reads.gate.spec.ts`).
 
 ## DEC-058 A cancelled booking is refunded by the business's own policy, never beyond what was received
 

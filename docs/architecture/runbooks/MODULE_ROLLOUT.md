@@ -82,10 +82,27 @@ both reads past records and takes new ones carries `@RequireModule` on each
 write or operational handler and none on its history reads, so a business
 that switches the module off still reads what it held (#117). Today:
 Orders (`organizations/:org/orders` list, filters, products and one order;
-`stores/:id/orders` list and one order), store customers (list and one), and
-Bookings (the calendar range, a service's bookings and one booking).
+`stores/:id/orders` list and one order), store customers (list and one),
+Bookings (the calendar range, a service's bookings and one booking), Plans
+(list, one plan, its events), Subscriptions (list, one subscription, its
+events), Class packs (packs, one pack and its holders, uses, sales and events;
+purchases and one purchase) and Courses (list, one course, a person's
+enrolments).
+
+**Wind-down is allowed with the module off** (owner, 9 Oct, #117, DEC-057). A
+business that switched a module off must still be able to undo what it already
+committed to, so cancelling an existing commitment — and the refund the cancel
+makes — carries no `@RequireModule`: `POST organizations/:org/orders/:orderId/cancel`
+(Commerce), `DELETE organizations/:org/bookings/:bookingId` (Appointments),
+`POST organizations/:org/subscriptions/:id/cancel` (Payments) and
+`POST organizations/:org/courses/:id/enrollments/:enrollmentId/cancel`
+(Courses). Role permissions still apply in the service. Everything that starts
+or changes a commitment — selling, subscribing, enrolling, pausing, `keep`,
+using a pack on a booking — stays gated. No route cancels a class pack
+purchase yet; one added would be wind-down.
+
 `capabilities/history-reads.gate.spec.ts` names every handler of those
-controllers as one or the other.
+controllers as a history read, wind-down or gated.
 
 Public booking is the exception to "keep working": it stays unannotated, but
 `BookingsService` answers **410** on availability and booking when the

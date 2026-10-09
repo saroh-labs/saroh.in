@@ -18,10 +18,22 @@ import { ForbiddenException } from "@nestjs/common";
 import { Reflector } from "@nestjs/core";
 
 import { BookingsController } from "../bookings/bookings.controller";
+import {
+    BookingClassPackController,
+    ClassPacksController,
+} from "../class-packs/class-packs.controller";
+import {
+    CourseEnrollmentsController,
+    CoursesController,
+} from "../courses/courses.controller";
 import { CustomersController } from "../customers/customers.controller";
 import { OrdersController } from "../orders/orders.controller";
 import { OrganizationOrdersController } from "../orders/organization-orders.controller";
 import type { OrganizationContextService } from "../organizations/organization-context.service";
+import {
+    SubscriptionPlansController,
+    SubscriptionsController,
+} from "../subscriptions/subscriptions.controller";
 import type { ModuleAvailabilityService } from "./module-availability.service";
 import { ModuleEnforcementGuard } from "./module-enforcement.guard";
 
@@ -31,16 +43,25 @@ import { ModuleEnforcementGuard } from "./module-enforcement.guard";
  * whole, so with enforcement on and Commerce off, Sell → Orders answered
  * 403 for orders the business had already taken.
  *
- * Each controller's handlers are split in two: the history reads, which the
- * guard lets through with the module off, and everything else — taking,
- * changing, moving, charging, cancelling — which it refuses. Every handler
- * must be in one list, so a new route is a decision, not a default.
+ * Each controller's handlers are split in three: the history reads, which the
+ * guard lets through with the module off; the wind-down actions, let through
+ * too; and everything else — taking, changing, moving, charging — which it
+ * refuses. Every handler must be in one list, so a new route is a decision,
+ * not a default.
+ *
+ * Wind-down (owner, 9 Oct, #117; DEC-057): switching a module off must not
+ * trap a business with commitments it can no longer undo. Cancelling an
+ * order, a booking, a subscription or a course enrolment already made — and
+ * the refund that cancel makes — still works with the module off. Role
+ * permissions still apply in the service; only the module gate is lifted.
+ * Anything that starts or changes a commitment stays gated.
  */
 const CASES = [
     {
         controller: OrganizationOrdersController,
         moduleKey: "COMMERCE",
         reads: ["list", "filters", "products", "read"],
+        windDown: ["cancel"],
         gated: [
             "createBatch",
             "readBatch",
@@ -53,7 +74,6 @@ const CASES = [
             "payLink",
             "recordDifference",
             "changeFulfilment",
-            "cancel",
             "edit",
         ],
     },
@@ -61,18 +81,21 @@ const CASES = [
         controller: OrdersController,
         moduleKey: "COMMERCE",
         reads: ["list", "get"],
+        windDown: [],
         gated: ["create", "newOrderLines", "update"],
     },
     {
         controller: CustomersController,
         moduleKey: "COMMERCE",
         reads: ["list", "get"],
+        windDown: [],
         gated: ["create", "remove", "update"],
     },
     {
         controller: BookingsController,
         moduleKey: "APPOINTMENTS",
         reads: ["calendarBookings", "listServiceBookings", "getBooking"],
+        windDown: ["cancelBooking"],
         gated: [
             "createService",
             "listServices",
@@ -90,7 +113,106 @@ const CASES = [
             "payLink",
             "takeDeskPayment",
             "bookVisit",
-            "cancelBooking",
+        ],
+    },
+    {
+        controller: ClassPacksController,
+        moduleKey: "CLASS_PACKS",
+        reads: [
+            "list",
+            "purchases",
+            "purchase",
+            "get",
+            "holders",
+            "used",
+            "sales",
+            "events",
+        ],
+        // No route cancels a pack purchase yet; a new one belongs here.
+        windDown: [],
+        gated: [
+            "selling",
+            "extend",
+            "create",
+            "createDraft",
+            "getDraft",
+            "saveDraft",
+            "publish",
+            "discard",
+            "remove",
+            "update",
+            "archive",
+            "restore",
+            "sell",
+        ],
+    },
+    {
+        // Using a pack on a booking, or taking it off, spends or returns a
+        // class: a change, not history. Cancelling the booking (above) still
+        // gives the class back with Class packs off.
+        controller: BookingClassPackController,
+        moduleKey: "CLASS_PACKS",
+        reads: [],
+        windDown: [],
+        gated: ["use", "remove"],
+    },
+    {
+        controller: CoursesController,
+        moduleKey: "COURSES",
+        reads: ["list", "get"],
+        windDown: ["cancelEnrollment"],
+        gated: ["create", "update", "addSession", "removeSession", "enrol"],
+    },
+    {
+        controller: CourseEnrollmentsController,
+        moduleKey: "COURSES",
+        reads: ["list"],
+        windDown: [],
+        gated: [],
+    },
+    {
+        controller: SubscriptionPlansController,
+        moduleKey: "PAYMENTS",
+        reads: ["list", "get", "events"],
+        windDown: [],
+        gated: [
+            "create",
+            "createDraft",
+            "getDraft",
+            "saveDraft",
+            "publish",
+            "discard",
+            "remove",
+            "setChargeTiming",
+            "update",
+            "archive",
+            "restore",
+        ],
+    },
+    {
+        controller: SubscriptionsController,
+        moduleKey: "PAYMENTS",
+        reads: ["list", "get", "events"],
+        // Ending a membership already running; `keep` (undoing a cancel)
+        // re-commits, so it stays gated.
+        windDown: ["cancel"],
+        gated: [
+            "renewals",
+            "settings",
+            "updateSettings",
+            "autopayOffer",
+            "subscribe",
+            "pause",
+            "resume",
+            "keep",
+            "setCollection",
+            "skip",
+            "unskip",
+            "changePlan",
+            "cancelPlanChange",
+            "retry",
+            "autopayLink",
+            "cancelAutopay",
         ],
     },
 ] as const;
@@ -130,7 +252,7 @@ function contextFor(controller: object, handler: unknown): ExecutionContext {
     } as unknown as ExecutionContext;
 }
 
-describe("history reads survive a module switched off (#117)", () => {
+describe("history reads and wind-down survive a module switched off (#117)", () => {
     beforeEach(() => {
         process.env.MODULE_ENFORCEMENT = "1";
     });
@@ -140,17 +262,20 @@ describe("history reads survive a module switched off (#117)", () => {
 
     describe.each(CASES)(
         "$controller.name",
-        ({ controller, moduleKey, reads, gated }) => {
-            it("names every handler as a history read or a gated route", () => {
+        ({ controller, moduleKey, reads, windDown, gated }) => {
+            it("names every handler as a history read, wind-down or gated", () => {
                 const handlers = Object.getOwnPropertyNames(
                     controller.prototype,
                 ).filter((n) => n !== "constructor");
                 expect([...handlers].sort()).toEqual(
-                    [...reads, ...gated].sort(),
+                    [...reads, ...windDown, ...gated].sort(),
                 );
             });
 
-            it.each([...reads])(
+            // `it.each` refuses an empty table; a controller with nothing
+            // let through (or nothing gated) has a placeholder row skipped.
+            const open: readonly string[] = [...reads, ...windDown];
+            (open.length ? it.each([...open]) : it.skip.each(["(none)"]))(
                 "%s is let through with the module off",
                 async (name) => {
                     const { guard, evaluate } = guardWithModuleOff();
@@ -164,7 +289,8 @@ describe("history reads survive a module switched off (#117)", () => {
                 },
             );
 
-            it.each([...gated])(
+            const shut: readonly string[] = gated;
+            (shut.length ? it.each([...shut]) : it.skip.each(["(none)"]))(
                 `%s is refused 403 with ${moduleKey} off`,
                 async (name) => {
                     const { guard, evaluate } = guardWithModuleOff();

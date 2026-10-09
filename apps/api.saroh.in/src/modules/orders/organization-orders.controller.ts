@@ -70,11 +70,12 @@ function listAccess(ctx: OrganizationContext): boolean {
  * `order:stage` alone. The services authorize; see OrderKitchenService.
  *
  * Commerce is required per handler, not on the class (#117): every route
- * that takes, moves, changes, charges or cancels an order carries
+ * that takes, moves, changes or charges an order carries
  * `@RequireModule("COMMERCE")`. The reads of orders already taken — the
  * list (and its export), its filters, its product search and one order —
  * are history, and stay readable when a business switches Commerce off
- * (`MODULE_ROLLOUT.md`). Refunds stay open too; they live on
+ * (`MODULE_ROLLOUT.md`). Cancelling an order already taken is winding
+ * down, not selling, and stays open too, as do refunds on
  * `payments/orders/:orderId/refund`.
  */
 @Controller("organizations/:organizationId/orders")
@@ -341,9 +342,12 @@ export class OrganizationOrdersController {
      * "Cancel order…" (B9): a refund in full, and the order kept as
      * cancelled. Refused from its handover on. `order:refund` (B16): a
      * cancel is a refund in full.
+     *
+     * Not gated on Commerce (#117, owner 9 Oct): a business that switched
+     * Commerce off can still call off an order it already took, refund
+     * included. Winding down is not selling; `order:refund` still applies.
      */
     @Post(":orderId/cancel")
-    @RequireModule("COMMERCE")
     @HttpCode(200)
     cancel(
         @OrgContext() ctx: OrganizationContext,

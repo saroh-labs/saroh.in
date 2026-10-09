@@ -280,9 +280,11 @@ what the API allows.
   what it would refuse, refusing nothing);
   `module-annotations.spec.ts` pins what is gated and what must never be
   (refunds, consent withdrawal, public checkout, published sites, webhooks).
-  History reads in a gated domain (orders, store customers, bookings) are left
-  off and their writes gated per handler, so a module switched off keeps its
-  records readable (#117, `history-reads.gate.spec.ts`).
+  History reads in a gated domain (orders, store customers, bookings, plans and
+  subscriptions, class packs, courses) are left off and their writes gated per
+  handler, so a module switched off keeps its records readable; cancelling an
+  order, booking, subscription or enrolment already made is wind-down and
+  stays open too (#117, DEC-057, `history-reads.gate.spec.ts`).
 - **Current** (DEC-070) — **What is being set up never decides access.**
   `Organization.kind` (BUSINESS, SOLO, WORK) picks words and defaults only.
   It is served on the `org:read` summary and the organization list, changed
