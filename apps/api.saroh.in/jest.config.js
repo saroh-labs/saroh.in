@@ -379,6 +379,9 @@ module.exports = {
         // Link preview tool (resources plan U2): the SSRF guard, the head
         // parser, the report and the gate, with fake DNS and transports.
         "<rootDir>/src/modules/link-preview/**/*.spec.ts",
+        // Which social sign-in buttons the accounts pages show: only
+        // providers with both keys set. Pure; no DB.
+        "<rootDir>/src/modules/sign-in-options/**/*.spec.ts",
         "<rootDir>/test/**/*.spec.ts",
         // #90 (S0-011) API bootstrap smoke test: compiles the full AppModule DI
         // graph so "the app doesn't even start" (the 0fc8f72 boot crash class)

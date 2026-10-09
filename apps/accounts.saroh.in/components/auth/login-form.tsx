@@ -14,6 +14,7 @@ import {
 } from "@/components/auth/field";
 import { SocialButtons } from "@/components/auth/social-buttons";
 import { isJoining, withCarry } from "@/lib/joining";
+import type { SocialProvider } from "@/lib/sign-in-options";
 
 /**
  * `returnTo` is where this sign-in should land (#222) — the page the visitor
@@ -30,9 +31,12 @@ import { isJoining, withCarry } from "@/lib/joining";
 export function LoginForm({
     returnTo = "/apps",
     invitedEmail,
+    providers = [],
 }: {
     returnTo?: string;
     invitedEmail?: string;
+    /** The social providers with keys set (`lib/sign-in-options.ts`). */
+    providers?: SocialProvider[];
 } = {}) {
     const router = useRouter();
     const { signIn } = authClient;
@@ -133,7 +137,11 @@ export function LoginForm({
                 </AuthSubmit>
             </form>
 
-            <SocialButtons callbackURL={returnTo} disabled={isLoading} />
+            <SocialButtons
+                providers={providers}
+                callbackURL={returnTo}
+                disabled={isLoading}
+            />
 
             <AuthFooter>
                 No account yet?{" "}

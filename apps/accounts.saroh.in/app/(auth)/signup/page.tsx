@@ -5,6 +5,7 @@ import { SIGNUP_PANEL } from "@/components/auth/panel-copy";
 import { SignupForm } from "@/components/auth/signup-form";
 import { onboardingForInvite, onboardingForPlan } from "@/lib/plan-intent";
 import { safeDestination } from "@/lib/return-to";
+import { signInProviders } from "@/lib/sign-in-options";
 
 export const metadata: Metadata = {
     title: "Sign up | Saroh",
@@ -41,11 +42,13 @@ export default async function SignupPage({
         safeDestination(redirect) ??
         onboardingForInvite(invite) ??
         onboardingForPlan(plan, cycle);
+    const providers = await signInProviders();
     return (
         <SplitShell panel={<SplitPanel {...SIGNUP_PANEL} />}>
             <SignupForm
                 returnTo={returnTo}
                 invitedEmail={typeof email === "string" ? email : undefined}
+                providers={providers}
             />
         </SplitShell>
     );
