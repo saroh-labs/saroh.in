@@ -41,6 +41,27 @@ export class AdminPeopleController {
         return rows;
     }
 
+    /**
+     * "Newest sign-ups": the last accounts created. The same personal data
+     * as a search, so the same permission, and each opening is recorded the
+     * same way. Declared before `people/:userId` so "recent" is never read
+     * as an id.
+     */
+    @Get("people/recent")
+    @RequireAdminPermission(AdminPermission.OrganizationPiiRead)
+    async recent(@PlatformAdminContext() staff: PlatformAdminInfo) {
+        const rows = await this.people.recent();
+        await this.adminAudit.recordRead({
+            actorUserId: staff.userId,
+            permission: AdminPermission.OrganizationPiiRead,
+            action: "person.signups.list",
+            targetType: "user",
+            outcome: AdminAuditOutcome.Success,
+            metadata: { resultCount: rows.length },
+        });
+        return rows;
+    }
+
     @Get("people/:userId")
     @RequireAdminPermission(AdminPermission.OrganizationPiiRead)
     async detail(

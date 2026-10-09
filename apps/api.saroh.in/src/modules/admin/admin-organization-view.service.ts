@@ -13,6 +13,8 @@ import { CatalogueAccessService } from "../billing/catalogue-access.service";
 import type { EntitlementMap } from "../billing/entitlement.service";
 import { EntitlementService } from "../billing/entitlement.service";
 import { MODULES } from "../capabilities/module-registry";
+import type { OrganizationPresence } from "./admin-presence";
+import { organizationPresence } from "./admin-presence";
 import type { SiteTrackersRow } from "./admin-site-trackers.service";
 import { siteTrackerStates } from "./admin-site-trackers.service";
 import type { UsageNote } from "./catalogue-usage";
@@ -229,6 +231,11 @@ export interface OrganizationSupportView {
     notes: Panel<OperatorNote[]>;
     /** Each site's tracker switch (#897), with who switched it off, in words. */
     sites: Panel<(SiteTrackersRow & { switchedOffBy: string | null })[]>;
+    /**
+     * Where its sites are live and whether payments are connected, for
+     * "What they see" (owner, 9 Oct). Never a key or credential.
+     */
+    presence: Panel<OrganizationPresence>;
 }
 
 /**
@@ -243,7 +250,9 @@ export interface OrganizationSupportView {
  * What it shows was a product decision (the console plan, R10): the
  * business's facts and lifecycle, its people and their roles, its modules, its
  * plan and limits with usage, its recent activity, the operator actions taken
- * on it, and operator notes. It still returns no customer, contact, order
+ * on it, and operator notes; and, since 9 Oct (owner), where its sites are
+ * live and whether a payment provider is connected, yes or no — never a
+ * key. It still returns no customer, contact, order
  * line, message or site body — the business's own customers are not what a
  * support conversation is about. People's email addresses are personal data
  * and come back only to a caller holding `organization:pii:read`.
@@ -266,50 +275,57 @@ export class AdminOrganizationViewService {
     ): Promise<OrganizationSupportView> {
         const facts = await this.facts(organizationId);
 
-        const [people, modules, plan, activity, operatorActions, notes, sites] =
-            await Promise.all([
-                this.panel("people", () =>
-                    this.people(organizationId, caller.canReadPii),
-                ),
-                this.panel("modules", () => this.modules(organizationId)),
-                this.panel("plan", () =>
-                    this.plan(organizationId, facts.counts),
-                ),
-                this.panel("activity", () =>
-                    this.named(this.activity(organizationId), caller),
-                ),
-                this.panel("operatorActions", () =>
-                    this.named(this.operatorActions(organizationId), caller),
-                ),
-                this.panel("notes", async () => {
-                    const rows = await this.notes(organizationId);
-                    const names = await this.names(
-                        rows.map((row) => row.authorUserId),
-                        caller,
-                    );
-                    return rows.map((row) => ({
-                        ...row,
-                        author: names.get(row.authorUserId) ?? null,
-                    }));
-                }),
-                this.panel("sites", async () => {
-                    const rows = await siteTrackerStates(organizationId);
-                    const names = await this.names(
-                        rows.flatMap((row) =>
-                            row.switchedOff?.byUserId
-                                ? [row.switchedOff.byUserId]
-                                : [],
-                        ),
-                        caller,
-                    );
-                    return rows.map((row) => ({
-                        ...row,
-                        switchedOffBy: row.switchedOff?.byUserId
-                            ? (names.get(row.switchedOff.byUserId) ?? null)
-                            : null,
-                    }));
-                }),
-            ]);
+        const [
+            people,
+            modules,
+            plan,
+            activity,
+            operatorActions,
+            notes,
+            sites,
+            presence,
+        ] = await Promise.all([
+            this.panel("people", () =>
+                this.people(organizationId, caller.canReadPii),
+            ),
+            this.panel("modules", () => this.modules(organizationId)),
+            this.panel("plan", () => this.plan(organizationId, facts.counts)),
+            this.panel("activity", () =>
+                this.named(this.activity(organizationId), caller),
+            ),
+            this.panel("operatorActions", () =>
+                this.named(this.operatorActions(organizationId), caller),
+            ),
+            this.panel("notes", async () => {
+                const rows = await this.notes(organizationId);
+                const names = await this.names(
+                    rows.map((row) => row.authorUserId),
+                    caller,
+                );
+                return rows.map((row) => ({
+                    ...row,
+                    author: names.get(row.authorUserId) ?? null,
+                }));
+            }),
+            this.panel("sites", async () => {
+                const rows = await siteTrackerStates(organizationId);
+                const names = await this.names(
+                    rows.flatMap((row) =>
+                        row.switchedOff?.byUserId
+                            ? [row.switchedOff.byUserId]
+                            : [],
+                    ),
+                    caller,
+                );
+                return rows.map((row) => ({
+                    ...row,
+                    switchedOffBy: row.switchedOff?.byUserId
+                        ? (names.get(row.switchedOff.byUserId) ?? null)
+                        : null,
+                }));
+            }),
+            this.panel("presence", () => organizationPresence(organizationId)),
+        ]);
 
         return {
             facts,
@@ -320,6 +336,7 @@ export class AdminOrganizationViewService {
             operatorActions,
             notes,
             sites,
+            presence,
         };
     }
 
