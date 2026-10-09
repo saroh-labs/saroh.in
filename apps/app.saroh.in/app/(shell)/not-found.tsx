@@ -1,5 +1,4 @@
-import { Button } from "@saroh/ui/button";
-import Link from "next/link";
+import { NotFound } from "@saroh/ui/not-found";
 
 import { PageContainer } from "@/components/shared/page-container";
 
@@ -13,18 +12,11 @@ import { PageContainer } from "@/components/shared/page-container";
 export default function ShellNotFound() {
     return (
         <PageContainer>
-            <div className="mx-auto flex max-w-md flex-col items-center gap-3 py-16 text-center">
-                <h1 className="font-display text-[20px] font-semibold">
-                    Page not found
-                </h1>
-                <p className="text-pretty text-sm text-muted-foreground">
-                    The page you&apos;re looking for doesn&apos;t exist, or you
-                    don&apos;t have access to it.
-                </p>
-                <Button asChild variant="outline" className="wk-press">
-                    <Link href="/">Back to Home</Link>
-                </Button>
-            </div>
+            <NotFound
+                title="Page not found"
+                description="This address isn't a page in your workspace. The link may be old or mistyped."
+                primary={{ href: "/", label: "Back to Home" }}
+            />
         </PageContainer>
     );
 }
