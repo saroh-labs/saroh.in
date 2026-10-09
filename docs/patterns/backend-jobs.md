@@ -114,6 +114,34 @@ nobody was told. Round-2 A14 closed it (`bookings/booking-notify.handler.ts`).
   hands its own `since` on. A fresh chain (boot, or `ensureScheduled` every
   six hours finding none) starts 90 days back, the page's longest range.
 
+## Custom-domain re-check — **Current** (#860)
+
+- **`domains.recheck`** is a self-rescheduling chain, every five minutes
+  (`domains/domain-recheck.handler.ts`), one PENDING run at a time
+  (`Job_one_pending_domains_recheck`). Each run checks the domains due by
+  the ladder in `domains/domain-recheck.ts` through
+  `DomainsService.check`, the same check as "Check now": a verified
+  domain not live yet every 5 minutes for its first hour, hourly to a day,
+  then every 6 hours; a live one daily, so one that stops pointing here is
+  noticed; an unverified claim on the same ladder for its TXT record,
+  never past 7 days. "Check now" stamps the same columns, so it resets the
+  turn.
+- **Kind to Cloudflare.** At most 50 domains a run, oldest-checked first,
+  one or two calls each; three host failures in a row (a 429, an outage)
+  end the run and the rest wait for the next. A failure is written on the
+  row as "Check now" writes it and never undoes the verification.
+- **Off where hosting is off.** No Cloudflare token or zone (dev, local),
+  or the test-only domain fakes on: the chain is never started, a stray
+  run logs `domains_recheck_off` and ends, and domains move only on
+  "Check now".
+- **No notice when a live domain goes down**, only a WARN
+  (`domain_hosting_went_down`): there is no domain alert to send, and the
+  Domains screen shows the problem. A domain alert would be a new
+  `team.alert` event.
+- A domain removed while a run checks it: the run deletes the hostname at
+  the host when no row holds it any more, so a re-registration it raced
+  isn't left serving.
+
 ## Customer notices — **Current** (A14)
 
 - **`booking.notify`** (booked, moved, cancelled, a hold paid) tells the

@@ -16,7 +16,8 @@ import { HostingCallError, hostingCnameTarget } from "./domain-hosting";
  * The rule: hosting never undoes verification. A failed call leaves the row
  * VERIFIED and records what failed in words (`hostingError`), with
  * `hostingStatus` REGISTER_FAILED when nothing is registered yet; the next
- * check (`DomainsService.verify` on a VERIFIED domain) runs this again.
+ * check (`DomainsService.check`: "Check now", or the background
+ * `domains.recheck` run, #860) runs this again.
  */
 
 /** What `Domain.hostingStatus` holds. */
@@ -48,7 +49,7 @@ export interface DomainHostingView {
 
 export const HOSTING_WORDS = {
     unreachable:
-        "We couldn't reach our hosting provider to connect this domain. We'll try again the next time you check.",
+        "We couldn't reach our hosting provider to connect this domain. We'll keep trying, or you can check again now.",
     refused:
         "Our hosting provider didn't accept this domain. Check it's spelled right, or contact support.",
     blocked:
@@ -56,7 +57,7 @@ export const HOSTING_WORDS = {
     certificate:
         "The secure certificate for this domain couldn't be issued. Check the CNAME record points to Saroh, then check again.",
     checkFailed:
-        "We couldn't check this domain with our hosting provider just now. We'll try again the next time you check.",
+        "We couldn't check this domain with our hosting provider just now. We'll keep trying, or you can check again now.",
 } as const;
 
 const PROBLEM_WORDS: Record<HostedProblem, string> = {
