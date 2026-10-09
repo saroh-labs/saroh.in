@@ -48,6 +48,7 @@ import { ProviderHealthModule } from "./modules/provider-health/provider-health.
 import { SavedViewsModule } from "./modules/saved-views/saved-views.module";
 import { SearchModule } from "./modules/search/search.module";
 import { SelfTestModule } from "./modules/self-test/self-test.module";
+import { SignInOptionsModule } from "./modules/sign-in-options/sign-in-options.module";
 import { SiteAccountsModule } from "./modules/site-accounts/site-accounts.module";
 import { SitesModule } from "./modules/sites/sites.module";
 import { StaffModule } from "./modules/staff/staff.module";
@@ -82,6 +83,7 @@ import { WebhooksModule } from "./modules/webhooks/webhooks.module";
             },
         }),
         HealthModule,
+        SignInOptionsModule,
         FeatureFlagModule,
         AdminModule,
         PricingModule,

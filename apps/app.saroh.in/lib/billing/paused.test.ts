@@ -14,6 +14,7 @@ import {
     pausedTeam,
     pausedWords,
     postPaused,
+    teamOverLimit,
 } from "./paused";
 
 const CUT = { createdAt: "2026-06-01T00:00:00.000Z", id: "p_m" };
@@ -163,5 +164,21 @@ describe("the words", () => {
         expect(pending?.body).toContain("choose or renew a plan");
         expect(pausedBanner(view({ state: "none" }))).toBeNull();
         expect(pausedBanner(null)).toBeNull();
+    });
+});
+
+describe("teamOverLimit (#800)", () => {
+    it("is over once anyone on Team is paused, of any kind", () => {
+        expect(teamOverLimit(NONE_PAUSED)).toBe(false);
+        expect(teamOverLimit({ ...NONE_PAUSED, userIds: ["u1"] })).toBe(true);
+        expect(teamOverLimit({ ...NONE_PAUSED, invitationIds: ["i1"] })).toBe(
+            true,
+        );
+        expect(
+            teamOverLimit({
+                ...NONE_PAUSED,
+                diary: [{ id: "s1", label: "Priya" }],
+            }),
+        ).toBe(true);
     });
 });

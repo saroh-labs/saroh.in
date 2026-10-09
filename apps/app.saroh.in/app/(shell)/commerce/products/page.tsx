@@ -227,16 +227,24 @@ export default async function CataloguePage({
                                 )}
                             </PausedNote>
                         ) : null}
-                        <PlanLimitNotice moduleId="products" />
+                        {/* With products paused (#800) the note above says
+                            the limit and links to Plan and billing: the
+                            "reached your limit" card would say it again. */}
+                        {pausedCut ? null : (
+                            <PlanLimitNotice moduleId="products" />
+                        )}
                     </>
                 }
                 ratings={ratings}
                 choices={choices}
                 canWrite={canWrite}
                 meter={canWrite ? planMeter(access, "products") : null}
-                // The banner below the tabs says the limit from 80%; the
-                // header then doesn't say it again (#874).
-                limitBannerShown={rowNotice(access, "products").on}
+                // The banner below the tabs says the limit from 80%, or the
+                // paused note does (#800); the header then doesn't say it
+                // again (#874). New product stays off at the limit.
+                limitBannerShown={
+                    rowNotice(access, "products").on || pausedCut !== null
+                }
                 pausedCut={pausedCut}
                 canStock={canStockProducts(organization)}
                 collectionCount={collections ? collections.length : null}

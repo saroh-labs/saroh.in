@@ -2,6 +2,8 @@ import { NotFoundException } from "@nestjs/common";
 import type { Prisma, StockEntryKind } from "@saroh/database";
 import { prisma } from "@saroh/database";
 
+import { pausedByCut } from "../billing/over-limit";
+import { overLimit } from "../billing/over-limit.service";
 import { businessTimezone } from "../bookings/staff-availability";
 import type { StockWord } from "../products/product-overview";
 import { stockLine } from "../products/product-overview";
@@ -92,6 +94,8 @@ export interface StockLevelsView {
      * (not the search, nor the storefront shown): short, sold out or at
      * their warning level where they are sold (`shelfNeed`). An archived
      * product never counts: nobody can buy it, so nothing needs restocking.
+     * A product a lower plan paused (#800) counts only when short for
+     * orders already placed: it is hidden from the site (`productLines`).
      */
     needsYou: number;
     /** The business's zone, for the screen's "today at 07:12". */
@@ -238,7 +242,7 @@ export async function readLevels(
         organizationId,
         ...(query.product ? { id: query.product } : {}),
     };
-    const [products, levels, tracking, timezone] = await Promise.all([
+    const [products, levels, tracking, timezone, paused] = await Promise.all([
         prisma.product.findMany({
             where: productWhere,
             orderBy: [{ name: "asc" }, { id: "asc" }],
@@ -246,6 +250,7 @@ export async function readLevels(
                 id: true,
                 name: true,
                 status: true,
+                createdAt: true,
                 image: true,
                 stockTracked: true,
                 variants: {
@@ -278,7 +283,11 @@ export async function readLevels(
         }),
         businessTracksStock(prisma, organizationId),
         businessTimezone(prisma, organizationId),
+        // What a lower plan paused (#800): its products need restocking
+        // only for orders already placed, as Products' Needs you says.
+        overLimit.pausedNow(organizationId),
     ]);
+    const cut = paused?.products ?? null;
     // The search, as ids: the rows are worked out for every product (the
     // "Needs you" count is the business's, not the search's).
     const text = query.q?.trim();
@@ -322,6 +331,11 @@ export async function readLevels(
             product,
             shelves,
             everyStorefront.map((s) => s.id),
+            {
+                // An archived product isn't counted, so never paused.
+                paused:
+                    product.status !== ARCHIVED && pausedByCut(product, cut),
+            },
         );
         const rows: StockLevelRow[] = [];
         for (const line of lines) {

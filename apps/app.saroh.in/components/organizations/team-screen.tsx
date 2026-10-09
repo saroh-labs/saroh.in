@@ -6,7 +6,7 @@ import { showPlanRefusal } from "@/components/billing/plan-refusal";
 import { SettingsPanelHeader } from "@/components/settings/settings-panel";
 import { useBusinessZone } from "@/components/shared/business-zone";
 import type { PausedTeam } from "@/lib/billing/paused";
-import { NONE_PAUSED, pausedWords } from "@/lib/billing/paused";
+import { NONE_PAUSED, pausedWords, teamOverLimit } from "@/lib/billing/paused";
 import { zodResolver } from "@hookform/resolvers/zod";
 import {
     Avatar,
@@ -66,6 +66,7 @@ import {
 import type { InviteValues, TeamLimit } from "@/lib/organizations/invitations";
 import {
     invitationMeta,
+    inviteButton,
     inviteRoom,
     inviteSchema,
     teamCountLine,
@@ -283,23 +284,18 @@ export function TeamScreen({
     // DEC-105). With both caps reached, it says why, as the design flashes
     // it: the invite would be refused, invites count too, and where more is.
     const room = inviteRoom(teamLimit);
+    // Past the plan's limit (#800): the team is over it, not just at it.
+    const over = teamOverLimit(paused);
     // Someone already on the diary takes no extra seat (#868), so a full
-    // team can still invite them.
-    const inviteLabel = !teamLimit?.full
-        ? "Invite someone"
-        : room.open
-          ? "Invite someone view-only"
-          : diaryPeople.length > 0
-            ? "Invite someone on the diary"
-            : "Team is full";
+    // team can still invite them — unless it is over, when their login
+    // would be paused (`inviteButton`).
+    const invite = inviteButton(teamLimit, diaryPeople.length, over);
+    const invitableDiary = invite.diary ? diaryPeople : [];
     // What the seats count (DEC-105), from what the API says each uses.
     const counts = teamCounts(members, invitations);
     const openInvite = () => {
-        // Someone already on the diary takes no extra seat (#868).
-        if (!room.open && teamLimit && diaryPeople.length === 0) {
-            showInfo(
-                `${teamLimit.why} (invites count too). See plans in Plan and billing.`,
-            );
+        if (invite.refused) {
+            showInfo(invite.refused);
             return;
         }
         setInviteOpen(true);
@@ -366,7 +362,7 @@ export function TeamScreen({
                         canManage && tab === "people" ? (
                             <Button onClick={openInvite}>
                                 <Plus className="mr-1.5 size-4" />
-                                {inviteLabel}
+                                {invite.label}
                             </Button>
                         ) : undefined
                     }
@@ -421,9 +417,11 @@ export function TeamScreen({
                         counts.viewOnly,
                         bookableNoLogin,
                     )}
-                    {teamLimit.full
-                        ? " — the team is at its plan's limit."
-                        : ""}
+                    {over
+                        ? " — the team is over its plan's limit."
+                        : teamLimit.full
+                          ? " — the team is at its plan's limit."
+                          : ""}
                 </p>
             ) : null}
 
@@ -457,7 +455,7 @@ export function TeamScreen({
                     </p>
                     {canManage ? (
                         <Button className="mt-1" onClick={openInvite}>
-                            {inviteLabel}
+                            {invite.label}
                         </Button>
                     ) : null}
                 </div>
@@ -526,7 +524,7 @@ export function TeamScreen({
                     invitations={invitations}
                     seatReason={room.seatReason}
                     viewOnlyReason={room.viewOnlyReason}
-                    diaryPeople={diaryPeople}
+                    diaryPeople={invitableDiary}
                     // The new invite shows at the top of People.
                     onSent={() => setTab("people")}
                 />

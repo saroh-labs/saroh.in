@@ -238,6 +238,8 @@ const NEVER: Record<string, string> = {
     "enquiry/enquiry.controller.ts": "public forms",
     "organizations/public-invitations.controller.ts":
         "someone reads an invitation before they have an account, let alone a module",
+    "sign-in-options/sign-in-options.controller.ts":
+        "the sign-in pages ask which providers to draw before anyone is signed in",
     "webhooks/webhooks.controller.ts": "provider webhook inbox",
     // P1: the buyer's browser reports a payment the moment the provider's
     // window closes. Never module-gated: a payment already taken is settled

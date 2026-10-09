@@ -14,6 +14,7 @@ import {
 } from "@/components/auth/field";
 import { SocialButtons } from "@/components/auth/social-buttons";
 import { isJoining, withCarry } from "@/lib/joining";
+import type { SocialProvider } from "@/lib/sign-in-options";
 
 /**
  * Creating the account.
@@ -27,9 +28,12 @@ import { isJoining, withCarry } from "@/lib/joining";
 export function SignupForm({
     returnTo,
     invitedEmail,
+    providers = [],
 }: {
     returnTo?: string | null;
     invitedEmail?: string;
+    /** The social providers with keys set (`lib/sign-in-options.ts`). */
+    providers?: SocialProvider[];
 }) {
     const router = useRouter();
     const { signUp } = authClient;
@@ -127,6 +131,7 @@ export function SignupForm({
             </form>
 
             <SocialButtons
+                providers={providers}
                 callbackURL={returnTo ?? undefined}
                 disabled={isLoading}
             />

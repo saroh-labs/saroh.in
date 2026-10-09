@@ -1,39 +1,38 @@
 "use client";
 
-import { Button } from "@saroh/ui/button";
+import { ErrorPage } from "@saroh/ui/error-page";
 import { reportError } from "@saroh/ui/lib/report-error";
+import { Wordmark } from "@saroh/ui/wordmark";
 import { useEffect } from "react";
 
 /**
  * App-root error boundary. The control plane reads everything through
  * api.saroh.in, so an api that is down or restarting is the most likely thing
  * to land here — and it must land as a retry, not as a sign-out or Next's
- * default unstyled screen. See lib/session.ts.
+ * default unstyled screen. See lib/session.ts. Drawn like the console's 404;
+ * a client boundary can't ask who the staff member is, so it is the bare page
+ * with the wordmark.
  */
 export default function Error({
     error,
-    reset,
+    retry,
 }: {
     error: Error & { digest?: string };
-    reset: () => void;
+    retry: () => void;
 }) {
     useEffect(() => {
         reportError(error, { boundary: "admin/root", digest: error.digest });
     }, [error]);
 
     return (
-        <main className="mx-auto flex max-w-4xl flex-col items-center gap-4 p-16 text-center">
-            <h1 className="text-2xl font-semibold">Something went wrong</h1>
-            <p className="max-w-md text-sm text-muted-foreground">
-                We couldn&apos;t load the console. This is usually temporary —
-                please try again.
-            </p>
-            {error.digest && (
-                <p className="font-mono text-xs text-muted-foreground">
-                    Reference: {error.digest}
-                </p>
-            )}
-            <Button onClick={reset}>Try again</Button>
+        <main className="flex min-h-screen items-center justify-center bg-background">
+            <ErrorPage
+                mark={<Wordmark suffix="console" />}
+                description="The console couldn’t load this page. It’s usually temporary, so try again in a moment."
+                onRetry={retry}
+                home={{ href: "/", label: "Back to the console" }}
+                digest={error.digest}
+            />
         </main>
     );
 }

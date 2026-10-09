@@ -12,6 +12,8 @@ import {
     Min,
 } from "class-validator";
 
+import { pausedByCut } from "../billing/over-limit";
+import { overLimit } from "../billing/over-limit.service";
 import { categoryTree } from "../collections/collections.service";
 import { businessTracksStock, COUNTING_ROWS } from "../stock/tracking";
 import type { CatalogueNeed } from "./catalogue-needs";
@@ -294,6 +296,9 @@ export async function cataloguePage(
  * the same scope as the Stock screen's "Needs you". Every shelf is judged
  * where the storefront sells it (and, for a variant, sells that variant);
  * a storefront that sells it with no shelf yet reads 0, as on Stock.
+ * A product a lower plan paused (#800) is hidden from the site: it needs
+ * someone only when short for orders already placed, never for out or
+ * low, so Needs you never asks to restock it.
  */
 export async function catalogueNeeds(
     organizationId: string,
@@ -302,45 +307,54 @@ export async function catalogueNeeds(
 ): Promise<CatalogueNeed[]> {
     if (storefronts.length === 0) return [];
     const storeIds = storefronts.map((s) => s.id);
-    const products = await prisma.product.findMany({
-        where: {
-            AND: [
-                base,
-                { organizationId },
-                COUNTING_ROWS.product,
-                { status: { not: ARCHIVED } },
-                { listings: { some: { storeId: { in: storeIds } } } },
-            ],
-        },
-        select: {
-            id: true,
-            name: true,
-            variants: {
-                orderBy: [{ position: "asc" }, { createdAt: "asc" }],
-                select: { id: true, title: true },
+    const [paused, products] = await Promise.all([
+        overLimit.pausedNow(organizationId),
+        prisma.product.findMany({
+            where: {
+                AND: [
+                    base,
+                    { organizationId },
+                    COUNTING_ROWS.product,
+                    { status: { not: ARCHIVED } },
+                    { listings: { some: { storeId: { in: storeIds } } } },
+                ],
             },
-            listings: {
-                where: { storeId: { in: storeIds } },
-                select: {
-                    storeId: true,
-                    variants: { select: { variantId: true } },
+            select: {
+                id: true,
+                name: true,
+                createdAt: true,
+                variants: {
+                    orderBy: [{ position: "asc" }, { createdAt: "asc" }],
+                    select: { id: true, title: true },
+                },
+                listings: {
+                    where: { storeId: { in: storeIds } },
+                    select: {
+                        storeId: true,
+                        variants: { select: { variantId: true } },
+                    },
+                },
+                // Every shelf: counting per variant or as a whole is the
+                // product's, not one storefront's.
+                stockLevels: {
+                    select: {
+                        storeId: true,
+                        variantId: true,
+                        onHand: true,
+                        promised: true,
+                        lowStockAlert: true,
+                    },
                 },
             },
-            // Every shelf: counting per variant or as a whole is the
-            // product's, not one storefront's.
-            stockLevels: {
-                select: {
-                    storeId: true,
-                    variantId: true,
-                    onHand: true,
-                    promised: true,
-                    lowStockAlert: true,
-                },
-            },
-        },
-    });
+        }),
+    ]);
+    const cut = paused?.products ?? null;
     return needsFrom(
-        products.map((p) => ({ ...p, shelves: p.stockLevels })),
+        products.map((p) => ({
+            ...p,
+            shelves: p.stockLevels,
+            paused: pausedByCut(p, cut),
+        })),
         storefronts,
     );
 }

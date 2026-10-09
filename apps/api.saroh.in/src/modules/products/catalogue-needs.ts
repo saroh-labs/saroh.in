@@ -7,7 +7,10 @@ import { movable, NEED_RANK, shortBy } from "../stock/stock-words";
  * The Products list's "Needs you" (#519), pure. It judges each shelf the
  * way the Stock screen's "Needs you" does (`shelfNeed`, #527), so the two
  * agree on every product: a product needs someone when any shelf where it
- * is sold does, and why is its worst shelf's reason.
+ * is sold does, and why is its worst shelf's reason. A product a lower
+ * plan paused (#800) needs someone only when it is short for orders
+ * already placed (`productLines`): it is hidden from the site, so it is
+ * never "out" or "low" here.
  */
 
 /** A product someone should restock, and why. */
@@ -36,6 +39,8 @@ export interface NeedProduct {
         variants: readonly { variantId: string }[];
     }[];
     shelves: readonly LineShelf[];
+    /** Past the plan's products limit (#800): only short counts. */
+    paused?: boolean;
 }
 
 const EMPTY = { onHand: 0, promised: 0 };
@@ -55,6 +60,7 @@ export function needsFrom(
             p,
             p.shelves,
             storefronts.map((s) => s.id),
+            { paused: p.paused },
         );
         const sold = lines.flatMap((l) =>
             l.cells
