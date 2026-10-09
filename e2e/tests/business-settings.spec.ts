@@ -385,7 +385,16 @@ test.describe("business settings tabs", () => {
         await expect(
             page.getByRole("tab", { name: "Address", exact: true }),
         ).toHaveCount(0);
-        await page.getByRole("tab", { name: "Registered address" }).click();
+        // Pressed until it takes: the tabs are drawn by the server, and a
+        // press before hydration does nothing — the panel stays on Identity,
+        // so there is no "Registered address" region to find (#846).
+        const address = page.getByRole("tab", { name: "Registered address" });
+        await expect(async () => {
+            await address.click();
+            await expect(address).toHaveAttribute("aria-selected", "true", {
+                timeout: 2_000,
+            });
+        }).toPass({ timeout: 20_000 });
         await expect(
             page.getByRole("region", { name: "Registered address" }),
         ).toContainText("Printed under your legal name");
