@@ -126,7 +126,8 @@ export function useEdgeFade<T extends HTMLElement>(
                 : new ResizeObserver(again);
         ro?.observe(el);
         ro?.observe(item);
-        void document.fonts?.ready.then(again);
+        // Not every environment (jsdom) has the font loading API.
+        if ("fonts" in document) void document.fonts.ready.then(again);
         const opts = { passive: true } as const;
         el.addEventListener("pointerdown", stop, opts);
         el.addEventListener("wheel", stop, opts);
