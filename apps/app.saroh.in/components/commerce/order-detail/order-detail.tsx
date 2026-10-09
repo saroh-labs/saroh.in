@@ -272,6 +272,16 @@ export function OrderDetail({
                     withCancel={change.cancel === undefined}
                     canRecord={can.edit}
                     canRefund={can.refund}
+                    refundLeft={
+                        order.money
+                            ? Number(
+                                  order.money.leftToRefund ??
+                                      Number(order.money.paid) -
+                                          Number(order.money.refunded),
+                              )
+                            : undefined
+                    }
+                    format={order.money ? format : undefined}
                 />
             ) : null}
             {next && !hold ? (

@@ -451,6 +451,20 @@ export class UpdateOrderDto {
     @IsOptional()
     @IsIn(PAYMENT_METHODS, { message: "Pick how it was handed back." })
     refundedHow?: PaymentMethod;
+
+    /**
+     * Recorded as refunded by hand, another amount (#865, DEC-116): what
+     * went back, in the order's currency ("50" or "49.50"). Absent: the
+     * full amount left. The API caps it at what is left to refund; less
+     * than that leaves the order PAID. Read only with `paymentStatus`
+     * REFUNDED.
+     */
+    @IsOptional()
+    @IsString({ message: "Type the amount handed back." })
+    @Matches(/^\d+(\.\d{1,2})?$/, {
+        message: "Type an amount like 50 or 49.50.",
+    })
+    refundAmount?: string;
 }
 
 /** A query value that may repeat (`?stage=NEW&stage=READY`) or be a list. */

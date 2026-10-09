@@ -17,6 +17,7 @@ jest.mock("../invoices/order-invoicing", () => ({
     }),
     ensureOrderInvoice: jest.fn().mockResolvedValue(null),
     creditRestOfOrder: jest.fn().mockResolvedValue(undefined),
+    creditPartOfOrder: jest.fn().mockResolvedValue(null),
     correctOrderInvoiceForEdit: jest
         .fn()
         .mockResolvedValue({ supplementary: null, creditNote: null }),
@@ -97,6 +98,7 @@ import {
     recordOrderRefundedInTx,
 } from "../analytics/order-events";
 import {
+    creditPartOfOrder,
     creditRestOfOrder,
     ensureOrderInvoice,
 } from "../invoices/order-invoicing";
@@ -330,6 +332,111 @@ describe("OrdersService.updateStatus lifecycle guard (mocked Prisma)", () => {
             where: { id: ORDER, payTokenHash: { not: null } },
             data: { payTokenHash: null, payLinkCreatedAt: null },
         });
+    });
+
+    // #865, DEC-116: another amount, up to what is left (₹450 paid by hand).
+    it("a part refunded by hand keeps the order PAID and credits that amount", async () => {
+        const service = makeService();
+        orderFindFirst.mockResolvedValue({
+            id: ORDER,
+            organizationId: "org1",
+            status: "DELIVERED",
+            paymentStatus: "PAID",
+            items: [{ productId: "p1", quantity: 1 }],
+        });
+        await service.updateStatus(STORE, ORDER, USER, {
+            paymentStatus: "REFUNDED",
+            refundedHow: "UPI",
+            refundAmount: "120.50",
+        });
+        // The status write leaves the payment alone.
+        expect(orderUpdate).toHaveBeenCalledWith({
+            where: { id: ORDER },
+            data: {},
+        });
+        expect(creditPartOfOrder).toHaveBeenCalledWith(
+            expect.anything(),
+            ORDER,
+            12_050,
+            "Refunded",
+            USER,
+        );
+        expect(creditRestOfOrder).not.toHaveBeenCalled();
+        // What went back by hand grows, for the next refund and the money.
+        expect(orderUpdate).toHaveBeenCalledWith({
+            where: { id: ORDER },
+            data: { refundedByHand: { increment: "120.50" } },
+        });
+        expect(eventCreate).toHaveBeenCalledWith({
+            data: expect.objectContaining({
+                kind: "REFUND",
+                note: "Handed back by UPI",
+                amountCents: 12_050,
+            }),
+        });
+        // Insights' order.refunded is for a full refund only (#867).
+        expect(recordOrderRefundedInTx).not.toHaveBeenCalled();
+        // Still paid: its pay link is left as it was.
+        expect(
+            (prisma.order as unknown as { updateMany: jest.Mock }).updateMany,
+        ).not.toHaveBeenCalled();
+    });
+
+    it("another amount that is all that is left refunds the order in full", async () => {
+        const service = makeService();
+        orderFindFirst.mockResolvedValue({
+            id: ORDER,
+            organizationId: "org1",
+            status: "DELIVERED",
+            paymentStatus: "PAID",
+            items: [{ productId: "p1", quantity: 1 }],
+        });
+        await service.updateStatus(STORE, ORDER, USER, {
+            paymentStatus: "REFUNDED",
+            refundAmount: "450",
+        });
+        expect(orderUpdate).toHaveBeenCalledWith({
+            where: { id: ORDER },
+            data: { paymentStatus: "REFUNDED" },
+        });
+        expect(creditRestOfOrder).toHaveBeenCalled();
+        expect(creditPartOfOrder).not.toHaveBeenCalled();
+        expect(recordOrderRefundedInTx).toHaveBeenCalledWith(
+            expect.anything(),
+            ORDER,
+        );
+    });
+
+    it("refuses more than is left, or nothing, and writes nothing", async () => {
+        const service = makeService();
+        orderFindFirst.mockResolvedValue({
+            id: ORDER,
+            organizationId: "org1",
+            status: "DELIVERED",
+            paymentStatus: "PAID",
+            items: [{ productId: "p1", quantity: 1 }],
+        });
+        await expect(
+            service.updateStatus(STORE, ORDER, USER, {
+                paymentStatus: "REFUNDED",
+                refundAmount: "450.01",
+            }),
+        ).rejects.toBeInstanceOf(ConflictException);
+        await expect(
+            service.updateStatus(STORE, ORDER, USER, {
+                paymentStatus: "REFUNDED",
+                refundAmount: "0",
+            }),
+        ).rejects.toBeInstanceOf(BadRequestException);
+        // An amount alone is not a refund.
+        await expect(
+            service.updateStatus(STORE, ORDER, USER, {
+                status: "DELIVERED",
+                refundAmount: "10",
+            }),
+        ).rejects.toBeInstanceOf(BadRequestException);
+        expect(orderUpdate).not.toHaveBeenCalled();
+        expect(creditPartOfOrder).not.toHaveBeenCalled();
     });
 
     it("is idempotent: re-setting the SAME status is a no-op change, not rejected", async () => {

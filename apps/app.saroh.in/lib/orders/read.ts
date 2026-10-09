@@ -140,7 +140,18 @@ export interface OrderReadMoney {
     discount: string;
     total: string;
     paid: string;
+    /** Online refunds and every amount recorded as refunded by hand. */
     refunded: string;
+    /**
+     * Of `refunded`, what was handed back outside Saroh (#865). Absent from
+     * an API before it.
+     */
+    refundedByHand?: string;
+    /**
+     * What a refund recorded by hand can still hand back (#865): paid less
+     * every refund. Absent from an API before it.
+     */
+    leftToRefund?: string;
     due: string;
     /** Paid outside a provider — cash, a transfer — and recorded by hand. */
     recordedByHand: boolean;

@@ -332,7 +332,24 @@ missing: ["address", "gstin"] }` in merchant words, before anything is
   `takeCounterPaymentInTx`, `confirmHoldInTx` (a treatment paid in full at
   booking) and the cancel of an order paid by hand. A new way to pay or
   refund an order calls them too. Both are keyed on the order and skip a
-  duplicate, so calling them on a replay is safe.
+  duplicate, so calling them on a replay is safe. A part refunded by hand
+  leaves the order PAID and writes no `order.refunded` (below).
+- **A refund recorded by hand is any amount up to what is left** (#865,
+  DEC-116, `orders/hand-refund.ts`). "Record as refunded" sends
+  `paymentStatus: REFUNDED` and, for another amount, `refundAmount`
+  ("49.50"). Under the order's lock the API reads what is left
+  (`leftToRefundCents`: paid by hand and online, less every non-failed
+  refund and `Order.refundedByHand`) and refuses nothing or more than that
+  in the online "another amount"'s words. All of what is left is the full
+  path: REFUNDED, `creditRestOfOrder`, `recordOrderRefundedInTx`. Less
+  keeps the order PAID and writes `creditPartOfOrder`: a credit note for
+  the amount spread over the invoiced lines by their amounts, GST worked
+  out of each share at the line's rate, split as the original was. Both
+  add the amount to `Order.refundedByHand` and a REFUND step with it and
+  how it went back. `refundedByHand` counts in the order read's `refunded`
+  and `leftToRefund`, the list's PARTLY_REFUNDED, and `orderRefundedSql`
+  (Spent and takings); Home's "taken" reads the credit note. An online
+  refund's cap does not read it yet.
 - **One lock order, every flow:** Order → StockLevel rows (sorted by id,
   `lockStockLevels`) → PaymentRefund → payment intent → Invoice → Booking.
   A status change (cancel, fulfil), the kitchen, an edit, a refund request
