@@ -214,11 +214,24 @@ bg_report() {
 AFFECTED_LIST=""
 affected() {
     if [ -z "$AFFECTED_LIST" ]; then
-        AFFECTED_LIST=$(pnpm -s exec turbo ls --filter="...[$MB]" 2>/dev/null |
-            sed -nE 's/^  ([^ ]+) .*/\1/p')
-        [ -n "$AFFECTED_LIST" ] || AFFECTED_LIST="(none)"
+        # A failed query counts every package as affected: an empty answer
+        # once skipped the api's unit tests on a batch that changed the api.
+        if AFFECTED_RAW=$(pnpm -s exec turbo ls --filter="...[$MB]" 2>/dev/null); then
+            AFFECTED_LIST=$(echo "$AFFECTED_RAW" | sed -nE 's/^  ([^ ]+) .*/\1/p')
+            # "Nothing affected" must agree with git: code changed under
+            # apps/ or packages/ means the query is wrong, so run them all.
+            if [ -z "$AFFECTED_LIST" ]; then
+                if git diff --name-only "$MB" HEAD | grep -qE '^(apps|packages)/'; then
+                    AFFECTED_LIST="(all)"
+                else
+                    AFFECTED_LIST="(none)"
+                fi
+            fi
+        else
+            AFFECTED_LIST="(all)"
+        fi
     fi
-    echo "$AFFECTED_LIST" | grep -qx "$1"
+    [ "$AFFECTED_LIST" = "(all)" ] || echo "$AFFECTED_LIST" | grep -qx "$1"
 }
 TURBO="pnpm -s exec turbo run --output-logs=errors-only $TURBO_FORCE"
 # Builds what the affected packages' tests import: the packages they depend

@@ -3452,6 +3452,7 @@ signing, in the words the screens already show.
 renamed `.png`, a type mismatch, an SVG) and `media.service.spec.ts`.
 **Rule**: `docs/patterns/backend-integrations.md` → "Media storage".
 **Category**: security · storage · `apps/api.saroh.in/src/modules/media/`
+
 ## Access — store access alone still read a storefront's totals (#868)
 
 **Symptom**: found in the 7 Oct UX audit follow-ups. A business role with
@@ -3474,3 +3475,19 @@ store-scoped orders or customers method that serializes amounts without
 asking `requireOrderRead` first. `stores/order-read-access.authorization.spec.ts`
 pins Member, store-only, `order:read`, Owner and Admin.
 **Category**: access · `apps/api.saroh.in/src/modules/stores/order-read-access.ts`
+
+## The quick gate skipped the api's unit tests on a batch that changed the api
+
+**Symptom**: on batch-2026-10-09-1 (93 changed api files) `pnpm prepush`
+printed "api-unit:changed PASS (the api is not affected)".
+**Cause**: `affected()` in `scripts/prepush.sh` asks `turbo ls` which
+packages changed, with its errors sent to `/dev/null`, and read an empty
+answer as "nothing affected". Run right after a fresh `pnpm install` in a new
+worktree, the query came back empty, and every "only if affected" step
+skipped silently.
+**Fix**: a failed query counts every package as affected, and an empty answer
+counts only if git agrees that nothing under `apps/` or `packages/` changed.
+Otherwise every package is affected and the step runs.
+**Check**: the helper fails closed in both cases. A gate that can't tell what
+changed runs everything.
+**Category**: tooling · `scripts/prepush.sh` → `affected()`
