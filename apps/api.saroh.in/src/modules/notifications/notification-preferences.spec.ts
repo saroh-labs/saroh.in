@@ -8,6 +8,7 @@ jest.mock("@saroh/database", () => ({
             deleteMany: jest.fn(),
         },
         communicationProvider: { findMany: jest.fn() },
+        domain: { count: jest.fn() },
     },
 }));
 
@@ -30,6 +31,7 @@ import { NotificationPreferencesService } from "./notification-preferences.servi
 const db = prisma as unknown as {
     notificationPreference: Record<string, jest.Mock>;
     communicationProvider: Record<string, jest.Mock>;
+    domain: Record<string, jest.Mock>;
 };
 
 const record = jest.fn();
@@ -76,6 +78,7 @@ beforeEach(() => {
     modules();
     providers();
     db.notificationPreference.findMany.mockResolvedValue([]);
+    db.domain.count.mockResolvedValue(0);
 });
 
 describe("reading your alerts", () => {
@@ -194,7 +197,17 @@ describe("reading your alerts", () => {
         expect(off.alerts.map((a) => a.key)).not.toContain("site");
     });
 
-    it("hides the Website row while the business has no test releases", async () => {
+    it("offers the Website row with test releases off once the business has its own domain (#917)", async () => {
+        releasesOn.mockResolvedValue(false);
+        db.domain.count.mockResolvedValue(1);
+        const view = await service().read(ctx());
+        expect(view.alerts.map((a) => a.key)).toContain("site");
+        expect(db.domain.count).toHaveBeenCalledWith({
+            where: { organizationId: "org_1", status: "VERIFIED" },
+        });
+    });
+
+    it("hides the Website row while the business has no test releases and no domain", async () => {
         releasesOn.mockResolvedValue(false);
         const view = await service().read(ctx());
         expect(view.alerts.map((a) => a.key)).not.toContain("site");

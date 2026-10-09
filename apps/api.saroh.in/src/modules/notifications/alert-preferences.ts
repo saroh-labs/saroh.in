@@ -93,12 +93,15 @@ export const ALERT_NOTIFICATION_TYPES: Record<AlertEvent, readonly string[]> = {
     failed: ["payment.failed", "provider.attention"],
     team: ["team.joined"],
     // UX-043: a reviewer's verdict, or their first note of a round.
+    // #917: a live custom domain that stopped working, and came back.
     site: [
         "site.live",
         "site.not_live",
         "site.review.approved",
         "site.review.changes",
         "site.review.note",
+        "domain.down",
+        "domain.back",
     ],
 };
 

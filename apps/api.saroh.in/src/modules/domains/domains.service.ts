@@ -13,9 +13,11 @@ import { randomBytes } from "node:crypto";
 
 import type { OrganizationContext } from "../../common/types/organization-context";
 import { EntitlementService } from "../billing/entitlement.service";
+import { queueDomainAlert } from "../notifications/domain-alerts";
 import { authorize } from "../organizations/organization-policy";
 import type { DomainHosting } from "./domain-hosting";
 import { DOMAIN_HOSTING, HostingCallError } from "./domain-hosting";
+import type { OnLiveChange } from "./domain-hosting-sync";
 import { hostingView, syncHosting } from "./domain-hosting-sync";
 import type { DomainVerifier, VerificationFailure } from "./domain-verifier";
 import { DOMAIN_VERIFIER, verificationRecordName } from "./domain-verifier";
@@ -145,7 +147,7 @@ export class DomainsService {
         authorize(ctx, "domain:manage");
 
         const domain = await this.requireOwned(ctx, domainId);
-        const result = await this.check(domain);
+        const result = await this.check(domain, ctx.userId);
         return result.verified
             ? { domain: this.withHosting(result.domain), verified: true }
             : {
@@ -162,15 +164,26 @@ export class DomainsService {
      * re-check (`domain-recheck.handler.ts`, #860) calls it for each due
      * domain, so "Check now" and the job never disagree. Never throws for a
      * DNS or host failure: both are recorded on the row.
+     *
+     * A check that moves a live domain to a problem, or back to live, tells
+     * the team (#917, `notifications/domain-alerts.ts`) on the same
+     * transaction as its write, whichever of the two ran it, once per
+     * incident. `actorUserId` pressed "Check now": the screen has told
+     * them, so they aren't emailed.
      */
     async check(
         domain: Domain,
+        actorUserId: string | null = null,
     ): Promise<
         | { domain: Domain; verified: true }
         | { domain: Domain; verified: false; reason: VerificationFailure }
     > {
         if (domain.status === "VERIFIED") {
-            const synced = await syncHosting(this.hosting, domain);
+            const synced = await syncHosting(
+                this.hosting,
+                domain,
+                tellTeam(actorUserId),
+            );
             return { domain: synced, verified: true };
         }
 
@@ -217,7 +230,11 @@ export class DomainsService {
             });
         }
 
-        const hosted = await syncHosting(this.hosting, verified);
+        const hosted = await syncHosting(
+            this.hosting,
+            verified,
+            tellTeam(actorUserId),
+        );
         return { domain: hosted, verified: true };
     }
 
@@ -351,6 +368,12 @@ export class DomainsService {
         }
         return site;
     }
+}
+
+/** Queue the team's alert for a domain that went down or came back (#917). */
+function tellTeam(actorUserId: string | null): OnLiveChange {
+    return (tx, before, after) =>
+        queueDomainAlert(tx, before, after, actorUserId);
 }
 
 /** The 503 a removal answers when the host couldn't delete the hostname. */

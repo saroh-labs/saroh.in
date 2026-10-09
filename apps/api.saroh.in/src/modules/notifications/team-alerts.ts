@@ -46,6 +46,10 @@ export const TEAM_ALERT_TYPE = "team.alert";
  *   test release, emails the site's reviewers (they have no bell); a verdict, or a reviewer's first note of a round, tells
  *   the people who publish, on the Website row. Keyed to the approval, the
  *   release, or the reviewer's round.
+ * - `domain`: a live custom domain stopped reaching its site, or came back
+ *   (#917, `domain-alerts.ts`), queued by the domain's check. `at` is the
+ *   check that saw it; told once per incident, on the Your website row.
+ *   `actorUserId` pressed "Check now" and isn't emailed.
  */
 export type TeamAlertPayload =
     | { event: "order"; orderId: string; actorUserId?: string | null }
@@ -62,6 +66,13 @@ export type TeamAlertPayload =
     | { event: "review"; about: "approval"; approvalId: string }
     | { event: "review"; about: "note"; commentId: string }
     | { event: "review"; about: "release"; testReleaseId: string }
+    | {
+          event: "domain";
+          domainId: string;
+          change: "down" | "back";
+          at: string;
+          actorUserId?: string | null;
+      }
     | {
           event: "site";
           testReleaseId: string;

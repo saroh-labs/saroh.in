@@ -359,7 +359,7 @@ organizations/:org/customers`: everyone who has paid (an order through a
   amended 2026-10-07): sign-in and account mail, team invitations, Saroh's
   billing, the waitlist, alerts to a business's own team (enquiries, and
   the team alerts — new order, booking, failed payment, someone joining, a
-  go-live — for every business, provider or not, in fixed words with the
+  go-live, a custom domain that stopped working (#917) — for every business, provider or not, in fixed words with the
   business's names cleaned; built, #849), a site's customer sign-in codes and the email-changed notice
   with Saroh's built-in customer accounts (ADR-011), and a template test
   sent to the signed-in user's own verified address. A business that brings
