@@ -43,6 +43,7 @@ import {
 } from "./module-pages";
 import type { ModulePageKind } from "./page-kinds";
 import { isModulePageKind, MODULE_PAGE_DEFAULTS } from "./page-kinds";
+import { pageUpdatedAt, pageUpdatedSelect } from "./page-updated";
 import type { SiteChangeKind } from "./pending-changes";
 import {
     countPendingSectionChanges,
@@ -434,6 +435,11 @@ export interface SiteDetailView {
         kind: PageKind;
         /** "Show in menu" (G14). */
         inMenu: boolean;
+        /**
+         * When the page was last changed — renamed, moved, hidden or its
+         * sections saved (#908, `pageUpdatedAt`).
+         */
+        updatedAt: Date;
     }[];
     /**
      * The module pages this caller could add to the site now (G14): kinds
@@ -923,6 +929,8 @@ export class SitesService {
                         hidden: true,
                         kind: true,
                         inMenu: true,
+                        // The Pages tab's Updated column (#908).
+                        ...pageUpdatedSelect,
                     },
                 },
             },
@@ -943,6 +951,7 @@ export class SitesService {
             templateId,
             templateVersion,
             templateStyleId,
+            pages,
             ...rest
         } = site;
         const pending = await this.pendingSectionChanges([site.id]);
@@ -954,6 +963,13 @@ export class SitesService {
             : null;
         return {
             ...rest,
+            pages: pages.map(({ versions, ...page }) => ({
+                ...page,
+                updatedAt: pageUpdatedAt({
+                    updatedAt: page.updatedAt,
+                    versions,
+                }),
+            })),
             // As it applies now (DEC-103): switched on under a plan without
             // the approval row, it reads as off, as publishing treats it.
             publishNeedsApproval: await approvalApplies(

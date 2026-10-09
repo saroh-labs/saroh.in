@@ -20,6 +20,7 @@ import {
 } from "./plan-ending";
 import { applyDueMoveInTx } from "./plan-moves";
 import { enqueueProviderCancel } from "./provider-cancel.job";
+import { remindRenewals } from "./renewal-reminder-notice";
 import { endTermAtInTx } from "./term-end";
 import { remindEndingTerms } from "./term-ending-notice";
 
@@ -49,6 +50,8 @@ import { remindEndingTerms } from "./term-ending-notice";
  *    move pauses; a move the business chose for its period's end, or one
  *    that already happened, is told here (`move-down-notice.ts`). Each
  *    notice that lists what pauses starts the 7-day clock (`over-limit.ts`).
+ * 6. **Renewals** (#804). An autopay charge due within 3 days is told once,
+ *    by email (`renewal-reminder.ts`, `renewal-reminder-notice.ts`).
  */
 export const BILLING_MOVES_APPLY_TYPE = "billing.moves.apply";
 
@@ -143,6 +146,7 @@ export class MovesApplyHandler {
             this.paused,
             this.access,
         );
+        out.reminded += await remindRenewals(now, this.logger);
         return out;
     }
 

@@ -14,8 +14,9 @@ import { Prisma } from "@saroh/database";
  *   "Refunded" says) on a payment that succeeded — the order's own, or a
  *   treatment's payment at booking (E9). Money handed back because the order
  *   was edited down (`forEdit`) is left alone: the order's total already
- *   dropped by it. A refunded order (`REFUNDED`) gave everything back and is
- *   not counted at all.
+ *   dropped by it. Part of it recorded as handed back by hand
+ *   (`refundedByHand`, #865) comes off too. A refunded order (`REFUNDED`)
+ *   gave everything back and is not counted at all.
  * - **An invoice** that is not an order's own counts its total less its
  *   credit notes (ADR-008): a refund of its payment writes one, and so does
  *   money handed back by hand. A draft or void credit note gave nothing back.
@@ -31,11 +32,13 @@ import { Prisma } from "@saroh/database";
 export const PAID_NON_ORDER_INVOICE = Prisma.sql`(i.status = 'PAID' AND i."orderId" IS NULL AND i.kind <> 'CREDIT_NOTE')`;
 
 /**
- * Refunds that took money back from order `o`, in major units. Insights'
- * takings (`analytics/takings.sql.ts`) take them off by the same rule.
+ * Refunds that took money back from order `o`, in major units: online ones
+ * and what was recorded as handed back by hand (`refundedByHand`, #865).
+ * Insights' takings (`analytics/takings.sql.ts`) take them off by the same
+ * rule.
  */
 export function orderRefundedSql(organizationId: string): Prisma.Sql {
-    return Prisma.sql`COALESCE((
+    return Prisma.sql`(o."refundedByHand" + COALESCE((
             SELECT SUM(pr."amountCents")::numeric / 100
             FROM "PaymentRefund" pr
             JOIN "PaymentIntent" pi ON pi.id = pr."paymentIntentId"
@@ -52,7 +55,7 @@ export function orderRefundedSql(organizationId: string): Prisma.Sql {
                       AND bi.kind = 'INVOICE'
                 )
               )
-        ), 0)`;
+        ), 0))`;
 }
 
 /** Credit notes that corrected invoice `i`, in major units. Takings too. */

@@ -1,7 +1,7 @@
 /**
  * The words of Saroh's own billing mail to a business (pricing catalogue
  * U17): the invoice for a charge, a payment that failed, a first month
- * (DEC-093) or a free trial about to end, a plan that ends on a date
+ * (DEC-093) or a free trial about to end, a plan about to renew (#804), a plan that ends on a date
  * (#805), a 12-month term about to end (DEC-100), and what a move to a
  * lower plan pauses (#801). Pure; every value is
  * escaped, since a business's name is text its owner typed. Merchant
@@ -166,6 +166,33 @@ export function firstMonthEndingEmail(input: {
             `${input.businessName}'s first month on the ${input.planName} plan ends on ${input.endsOn}. From then, your autopay pays ${input.total} a month, GST included, and you'll get an invoice for each payment.`,
             "To move to Free instead, change your plan in Settings › Plan before then. Nothing more is charged.",
         ]),
+    };
+}
+
+/**
+ * An autopay charge 3 days ahead (#804, the Terms' promise). `total` is
+ * the charge with GST, add-ons included; `renewsOn` in the business's zone.
+ */
+export function renewalReminderEmail(input: {
+    businessName: string;
+    planName: string;
+    renewsOn: string;
+    total: string;
+    cycle: "month" | "year";
+    withAddons: boolean;
+    url: string;
+}): RenderedEmail {
+    const what = `${input.businessName}'s ${input.planName} plan${input.withAddons ? " and its add-ons" : ""}`;
+    return {
+        subject: `${input.businessName}'s ${input.planName} plan renews on ${input.renewsOn}`,
+        html: wrap(
+            `Your ${input.planName} plan renews on ${input.renewsOn}`,
+            [
+                `On ${input.renewsOn}, your autopay pays ${input.total}, GST included, for another ${input.cycle} of ${what}. You'll get an invoice once it's paid.`,
+                `Nothing to do if you're staying on ${input.planName}. To change your plan, or move to Free so nothing more is charged, open Plan and billing before then.`,
+            ],
+            { label: "Open Plan and billing", href: input.url },
+        ),
     };
 }
 

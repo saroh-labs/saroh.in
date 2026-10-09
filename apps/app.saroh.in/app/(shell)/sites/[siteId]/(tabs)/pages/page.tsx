@@ -6,6 +6,7 @@ import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 
 import { ListCard, ListRow } from "@/components/shared/list-card";
+import { ViewerDate } from "@/components/shared/viewer-date";
 import { requireSession } from "@/lib/session";
 import {
     describePendingChanges,
@@ -13,6 +14,7 @@ import {
 } from "@/lib/sites/pending";
 import { getSite } from "@/lib/sites/service";
 import { pageState } from "@/lib/sites/site-state";
+import { pageUpdatedIso } from "@/lib/sites/updated";
 
 export const metadata = { title: "Pages · Website" };
 
@@ -97,12 +99,14 @@ export default async function SitePagesPage({
             ) : null}
             <ListCard
                 main="Page"
+                middle="Updated"
                 end="On the site"
                 // Plain words (UX-081): where a page is removed, not why it isn't here.
                 note="To remove a page, open it in the editor and choose Delete page in its settings."
             >
                 {pages.map((page) => {
                     const state = pageState(page, site);
+                    const updated = pageUpdatedIso(page);
                     return (
                         <li
                             key={page.id}
@@ -123,9 +127,26 @@ export default async function SitePagesPage({
                                         ) : null
                                     }
                                     sub={
-                                        <span className="font-mono">
-                                            {page.path}
-                                        </span>
+                                        <>
+                                            <span className="font-mono">
+                                                {page.path}
+                                            </span>
+                                            {/* The Updated column is desk
+                                                only; a phone reads it here. */}
+                                            {updated ? (
+                                                <span className="sm:hidden">
+                                                    {" · Updated "}
+                                                    <ViewerDate iso={updated} />
+                                                </span>
+                                            ) : null}
+                                        </>
+                                    }
+                                    middle={
+                                        updated ? (
+                                            <span className="whitespace-nowrap text-[12px] tabular-nums text-muted-foreground">
+                                                <ViewerDate iso={updated} />
+                                            </span>
+                                        ) : null
                                     }
                                     end={
                                         <Badge variant={PILL[state.state]}>

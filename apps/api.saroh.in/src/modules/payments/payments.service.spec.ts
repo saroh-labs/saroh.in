@@ -1154,6 +1154,48 @@ describe("PaymentsService.initiateRefund", () => {
         expect(fake.refundCalls).toHaveLength(0);
     });
 
+    describe("after part was recorded as refunded by hand (#865, DEC-116)", () => {
+        // ₹42.50 paid online; ₹10 of it handed back by hand.
+        beforeEach(() => {
+            orderFindUnique.mockResolvedValue({
+                ...ORDER,
+                total: "42.50",
+                paymentStatus: "PAID",
+                paidByHand: "0.00",
+                refundedByHand: "10.00",
+            });
+        });
+
+        it("refuses the whole online balance: only what is left on the order", async () => {
+            const { service, fake } = makeService();
+            await expect(
+                service.initiateRefund(ctx(), "order_1"),
+            ).rejects.toThrow("At most ₹32.50 can be refunded.");
+            await expect(
+                service.initiateRefund(ctx(), "order_1", {
+                    kind: "goodwill",
+                    reason: "Late",
+                    amountCents: 4250,
+                }),
+            ).rejects.toThrow("At most ₹32.50 can be refunded.");
+            expect(refundCreate).not.toHaveBeenCalled();
+            expect(fake.refundCalls).toHaveLength(0);
+        });
+
+        it("sends what is left", async () => {
+            const { service, fake } = makeService();
+            const result = await service.initiateRefund(ctx(), "order_1", {
+                kind: "goodwill",
+                reason: "Late",
+                amountCents: 3250,
+            });
+            expect(result.amountCents).toBe(3250);
+            expect(fake.refundCalls[0]).toEqual(
+                expect.objectContaining({ amountCents: 3250 }),
+            );
+        });
+    });
+
     describe("split across two payments", () => {
         // ₹30 paid first, ₹12.50 taken later (an edit's difference).
         const FIRST = { ...PAYMENT, id: "pi_1", amountCents: 3000 };

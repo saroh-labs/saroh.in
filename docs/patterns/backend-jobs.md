@@ -114,6 +114,34 @@ nobody was told. Round-2 A14 closed it (`bookings/booking-notify.handler.ts`).
   hands its own `since` on. A fresh chain (boot, or `ensureScheduled` every
   six hours finding none) starts 90 days back, the page's longest range.
 
+## Custom-domain re-check — **Current** (#860)
+
+- **`domains.recheck`** is a self-rescheduling chain, every five minutes
+  (`domains/domain-recheck.handler.ts`), one PENDING run at a time
+  (`Job_one_pending_domains_recheck`). Each run checks the domains due by
+  the ladder in `domains/domain-recheck.ts` through
+  `DomainsService.check`, the same check as "Check now": a verified
+  domain not live yet every 5 minutes for its first hour, hourly to a day,
+  then every 6 hours; a live one daily, so one that stops pointing here is
+  noticed; an unverified claim on the same ladder for its TXT record,
+  never past 7 days. "Check now" stamps the same columns, so it resets the
+  turn.
+- **Kind to Cloudflare.** At most 50 domains a run, oldest-checked first,
+  one or two calls each; three host failures in a row (a 429, an outage)
+  end the run and the rest wait for the next. A failure is written on the
+  row as "Check now" writes it and never undoes the verification.
+- **Off where hosting is off.** No Cloudflare token or zone (dev, local),
+  or the test-only domain fakes on: the chain is never started, a stray
+  run logs `domains_recheck_off` and ends, and domains move only on
+  "Check now".
+- **No notice when a live domain goes down**, only a WARN
+  (`domain_hosting_went_down`): there is no domain alert to send, and the
+  Domains screen shows the problem. A domain alert would be a new
+  `team.alert` event.
+- A domain removed while a run checks it: the run deletes the hostname at
+  the host when no row holds it any more, so a re-registration it raced
+  isn't left serving.
+
 ## Customer notices — **Current** (A14)
 
 - **`booking.notify`** (booked, moved, cancelled, a hold paid) tells the
@@ -376,7 +404,9 @@ overrideId, reason }`. Re-read, then decide
 - **`billing.email`** (U17) is Saroh's own mail to a business: an
   invoice with its PDF (queued with the invoice), a failed charge (queued by
   the webhook on `pending` or `halted`), a first month or a free trial
-  ending (U16 queues it, `enqueueBillingEmail`), a plan that ends (#805)
+  ending (U16 queues it, `enqueueBillingEmail`), a plan about to renew
+  (#804: `RENEWAL`, queued by the hourly sweep 3 days before each autopay
+  charge, below), a plan that ends (#805)
   and a 12-month term that ends (DEC-100: `TERM_ENDING`, queued by the
   hourly sweep with an inbox notice, claimed once per subscription, end and
   stage, and silent once a renewal is authorised). To everyone whose role has `billing:manage`, in
@@ -394,4 +424,17 @@ overrideId, reason }`. Re-read, then decide
 - **`billing.moves.apply`** is the hourly self-rescheduling sweep (one
   PENDING run, a partial unique index): due pending moves that are ready
   (`plan-moves.ts`) and OPEN checkouts past `expiresAt`. A paid
-  subscription's move is applied by its renewal webhook first.
+  subscription's move is applied by its renewal webhook first. Its last
+  step is the renewal reminder (#804, `renewal-reminder.ts`,
+  `renewal-reminder-notice.ts`): an ACTIVE paid autopay subscription whose
+  period ends within 3 days is claimed once per subscription and period
+  end (`CustomerNotice` `RENEWAL_REMINDER`,
+  `renewal-reminder:<subscriptionId>:<periodEnd>`) and queues a `RENEWAL`
+  email on the same transaction: the charge with GST (coupon and add-ons
+  owed on it included), the date in the business's zone, and Plan and
+  billing. Silent, in the sweep and again when the email runs
+  (`renewalReminderOf`), for Free, TRIALING (the trial-ending email names
+  that charge), PAST_DUE, a period that ends the plan
+  (`cancelAtPeriodEnd`), a move due by then, a SCHEDULED checkout starting
+  by then, a year paid once, and a monthly term's end (DEC-100's notices).
+  Email only: no inbox notice for a routine charge.

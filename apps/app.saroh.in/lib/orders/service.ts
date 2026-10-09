@@ -24,6 +24,12 @@ export interface UpdateOrderInput {
     paidHow?: PaymentMethod;
     /** Recorded as refunded by hand: how it went back (UX-061). */
     refundedHow?: PaymentMethod;
+    /**
+     * Recorded as refunded by hand, another amount (#865): what went back,
+     * as money ("49.50"). Absent: the full amount left. Less than is left
+     * keeps the order paid.
+     */
+    refundAmount?: string;
 }
 
 export type OrderResult =

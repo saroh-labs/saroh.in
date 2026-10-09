@@ -1581,15 +1581,21 @@ model Order {
   currency String @default("USD")
 
   // Status
-  status        String  @default("PENDING") // PENDING, PROCESSING, SHIPPED, DELIVERED, CANCELLED
-  paymentStatus String  @default("UNPAID") // UNPAID, PAID, FAILED, REFUNDED
+  status         String  @default("PENDING") // PENDING, PROCESSING, SHIPPED, DELIVERED, CANCELLED
+  paymentStatus  String  @default("UNPAID") // UNPAID, PAID, FAILED, REFUNDED
   // Money taken outside Saroh and recorded on the order: cash, UPI or a
   // card machine at the counter, a payment marked by hand, a difference
   // after an edit recorded as paid — less what an edit handed back from the
   // till. With the order's SUCCEEDED payments, what it has been paid
   // (`orders/hand-payments.ts`). 0 on an order paid by hand before it was
   // kept: such an order counts its total, as it did.
-  paidByHand    Decimal @default(0) @db.Decimal(12, 2)
+  paidByHand     Decimal @default(0) @db.Decimal(12, 2)
+  // Money handed back outside Saroh and recorded on the order ("Record as
+  // refunded", #865, DEC-116): every amount recorded, in full or in part.
+  // What is left to refund is what it was paid less every refund, these
+  // included (`orders/hand-refund.ts`). 0 on an order recorded refunded
+  // before it was kept: that order reads REFUNDED, so nothing is left.
+  refundedByHand Decimal @default(0) @db.Decimal(12, 2)
 
   // Relations
   items        OrderItem[]
@@ -4076,6 +4082,8 @@ model Job {
   @@unique([type], map: "Job_one_pending_billing_moves_apply", where: raw("type = 'billing.moves.apply' AND status = 'PENDING'"))
   // One waiting run of Insights' hourly rollup chain (DEC-075), like the renewal chain.
   @@unique([type], map: "Job_one_pending_analytics_rollup", where: raw("type = 'analytics.rollup' AND status = 'PENDING'"))
+  // One waiting run of the custom-domain re-check chain (#860), like the renewal chain.
+  @@unique([type], map: "Job_one_pending_domains_recheck", where: raw("type = 'domains.recheck' AND status = 'PENDING'"))
   @@index([status, runAt])
   @@index([organizationId])
 }
@@ -4434,11 +4442,11 @@ model StaffMember {
   status     String    @default("ACTIVE") // ACTIVE | ARCHIVED — archived take no new bookings
   archivedAt DateTime?
 
-  services   StaffService[]
-  hours      StaffHours[]
-  timeOff    StaffTimeOff[]
-  extraHours StaffExtraHours[]
-  bookings   Booking[]
+  services    StaffService[]
+  hours       StaffHours[]
+  timeOff     StaffTimeOff[]
+  extraHours  StaffExtraHours[]
+  bookings    Booking[]
   // Invites that would give them a login (#868).
   invitations OrganizationInvitation[]
 

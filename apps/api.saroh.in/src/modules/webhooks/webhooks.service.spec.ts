@@ -29,6 +29,13 @@ jest.mock("../stock/reserve", () => ({
     settleRefundStock: jest.fn().mockResolvedValue(undefined),
 }));
 
+// Insights' orders figure (#867) is written by analytics/order-events,
+// specced on its own and against a real database; here each call is recorded.
+jest.mock("../analytics/order-events", () => ({
+    recordOrderPaidInTx: jest.fn().mockResolvedValue(true),
+    recordOrderRefundedInTx: jest.fn().mockResolvedValue(true),
+}));
+
 jest.mock("@saroh/database", () => {
     const actual = jest.requireActual("@saroh/database");
     const client = {
@@ -71,6 +78,10 @@ import {
 import { prisma } from "@saroh/database";
 import { createHmac } from "node:crypto";
 
+import {
+    recordOrderPaidInTx,
+    recordOrderRefundedInTx,
+} from "../analytics/order-events";
 import {
     creditNoteForRefund,
     creditRestOfOrder,
@@ -201,6 +212,13 @@ describe("WebhooksService signature verification", () => {
                 payLinkCreatedAt: null,
             },
         });
+        // Counted once for Insights' orders figure, in its transaction (#867).
+        expect(recordOrderPaidInTx).toHaveBeenCalledTimes(1);
+        expect(recordOrderPaidInTx).toHaveBeenCalledWith(
+            expect.anything(),
+            "order_1",
+        );
+        expect(recordOrderRefundedInTx).not.toHaveBeenCalled();
         // Intent settled + a CAPTURED attempt records the provider payment id.
         expect(intentUpdate).toHaveBeenCalledWith({
             where: { id: "pi_1" },
@@ -327,6 +345,8 @@ describe("WebhooksService exactly-once", () => {
         expect(second).toEqual({ status: "duplicate", changed: false });
         expect(orderUpdate).not.toHaveBeenCalled();
         expect(intentUpdate).not.toHaveBeenCalled();
+        // Nor is the order counted a second time (#867).
+        expect(recordOrderPaidInTx).not.toHaveBeenCalled();
     });
 
     it("is a state-machine no-op if reconcile sees an already-PAID order + SUCCEEDED intent", async () => {
@@ -345,6 +365,8 @@ describe("WebhooksService exactly-once", () => {
         expect(result).toEqual({ status: "ignored", changed: false });
         expect(orderUpdate).not.toHaveBeenCalled();
         expect(intentUpdate).not.toHaveBeenCalled();
+        // Already paid: already counted, never twice (#867).
+        expect(recordOrderPaidInTx).not.toHaveBeenCalled();
     });
 });
 
@@ -457,6 +479,12 @@ describe("WebhooksService refund settlement", () => {
         });
         // The refund path attached the provider's id and wrote the step.
         expect(orderEventCreate).not.toHaveBeenCalled();
+        // Refunded in full: off Insights' orders figure again (#867).
+        expect(recordOrderRefundedInTx).toHaveBeenCalledTimes(1);
+        expect(recordOrderRefundedInTx).toHaveBeenCalledWith(
+            expect.anything(),
+            "order_1",
+        );
     });
 
     it("a partial refund settles but leaves the order PAID (ADR-008)", async () => {
@@ -478,6 +506,8 @@ describe("WebhooksService refund settlement", () => {
             data: { status: "SUCCEEDED", providerRefundId: "rfnd_1" },
         });
         expect(orderUpdate).not.toHaveBeenCalled();
+        // Partly refunded still counts as an order (#867).
+        expect(recordOrderRefundedInTx).not.toHaveBeenCalled();
     });
 
     it("the refund that settles the last of it moves the order to REFUNDED", async () => {

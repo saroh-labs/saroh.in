@@ -10,6 +10,7 @@ import { nextOrderNumberInTx, Prisma, prisma } from "@saroh/database";
 
 import { isSerializationFailure } from "../../common/prisma-errors";
 import { ActivationEvents } from "../analytics/activation-events";
+import { recordOrderPaidInTx } from "../analytics/order-events";
 import { planMeter } from "../billing/metering.service";
 import { assertPlanTakesOnlinePayment } from "../billing/online-payments-plan";
 import type { AppliedDiscount } from "../discounts/discounts.service";
@@ -19,7 +20,6 @@ import { assertBusinessDetails } from "../invoices/business-details";
 import { formatMoney } from "../invoices/invoice-send.service";
 import { gstInsideOrder } from "../invoices/order-invoice";
 import {
-    creditRestOfOrder,
     ensureOrderInvoice,
     loadTaxProfile,
 } from "../invoices/order-invoicing";
@@ -40,12 +40,12 @@ import {
     storedValueFor,
     typeOf,
 } from "./fulfilment";
+import { markedPaidNote, recordPaidByHandInTx } from "./hand-payments";
 import {
-    heldCents,
-    markedPaidNote,
-    recordPaidByHandInTx,
-    refundedByHandNote,
-} from "./hand-payments";
+    planHandRefund,
+    readLeftToRefundInTx,
+    recordHandRefundInTx,
+} from "./hand-refund";
 import {
     assertHandedOver,
     assertOneParty,
@@ -74,7 +74,6 @@ import { stageForStatus } from "./order-stage";
 import { assertPaymentTransition, assertStatusTransition } from "./order-state";
 import { assertNotPayingOnlineInTx } from "./payment-in-flight";
 import { serializeOrderDetail, serializeOrderSummary } from "./serialize";
-import { orderMoneyIntents } from "./treatment-ledger";
 
 const CUSTOMER_SELECT = {
     select: { email: true, firstName: true, lastName: true },
@@ -615,6 +614,29 @@ export class OrdersService {
                     await assertNotPayingOnlineInTx(tx, orderId);
                 }
             }
+            // Recorded as refunded by hand (#865, DEC-116): the full amount
+            // left, or another amount up to it, judged under the lock before
+            // any write. Less than is left keeps the order PAID.
+            if (dto.refundAmount !== undefined && nextPayment !== "REFUNDED") {
+                throw new BadRequestException({
+                    message: "An amount handed back goes with a refund.",
+                    field: "refundAmount",
+                });
+            }
+            const handRefund =
+                nextPayment === "REFUNDED" &&
+                (nextPayment !== order.paymentStatus ||
+                    dto.refundAmount !== undefined)
+                    ? await readLeftToRefundInTx(tx, orderId).then((left) =>
+                          planHandRefund(
+                              dto.refundAmount,
+                              left.leftCents,
+                              left.currency,
+                          ),
+                      )
+                    : null;
+            const writtenPayment =
+                handRefund && !handRefund.full ? undefined : dto.paymentStatus;
 
             // The kitchen stage follows a status set here, so the next
             // kitchen step is not refused as out of step (ADR-008). Worked
@@ -640,8 +662,8 @@ export class OrdersService {
                 where: { id: orderId },
                 data: {
                     ...(dto.status ? { status: dto.status } : {}),
-                    ...(dto.paymentStatus
-                        ? { paymentStatus: dto.paymentStatus }
+                    ...(writtenPayment
+                        ? { paymentStatus: writtenPayment }
                         : {}),
                     ...(kitchen ?? {}),
                 },
@@ -651,7 +673,8 @@ export class OrdersService {
             // would have made (ADR-008). Refunded by hand: what is left of
             // it is credited.
             const paymentChanging =
-                nextPayment != null && nextPayment !== order.paymentStatus;
+                writtenPayment != null &&
+                writtenPayment !== order.paymentStatus;
             if (paymentChanging && nextPayment === "PAID") {
                 const byHandCents = await recordPaidByHandInTx(tx, orderId);
                 // How it was paid (#834) is kept on the invoice, the
@@ -659,6 +682,8 @@ export class OrdersService {
                 await ensureOrderInvoice(tx, orderId, {
                     method: dto.paidHow ?? "RECORDED",
                 });
+                // Insights' orders figure (#867), with the payment.
+                await recordOrderPaidInTx(tx, orderId);
                 if (order.organizationId) {
                     // On the timeline, with no amount in the note; the
                     // step's amount says it to a money reader.
@@ -676,45 +701,16 @@ export class OrdersService {
                     });
                 }
             }
-            if (paymentChanging && nextPayment === "REFUNDED") {
-                // What it held, read before the credit note: the step on the
-                // timeline says how much went back, and how (UX-061).
-                const [held, paid] = await Promise.all([
-                    tx.order.findUniqueOrThrow({
-                        where: { id: orderId },
-                        select: { total: true, paidByHand: true },
-                    }),
-                    tx.paymentIntent.findMany({
-                        where: {
-                            ...orderMoneyIntents(orderId),
-                            status: "SUCCEEDED",
-                        },
-                        select: {
-                            amountCents: true,
-                            refunds: {
-                                where: { status: { not: "FAILED" } },
-                                select: { amountCents: true },
-                            },
-                        },
-                    }),
-                ]);
-                await creditRestOfOrder(tx, orderId, "Refunded", userId);
-                if (order.organizationId) {
-                    await tx.orderEvent.create({
-                        data: {
-                            organizationId: order.organizationId,
-                            orderId,
-                            kind: "REFUND",
-                            actorUserId: userId,
-                            note: refundedByHandNote(dto.refundedHow),
-                            amountCents: heldCents({
-                                ...held,
-                                paymentStatus: order.paymentStatus,
-                                paymentIntents: paid,
-                            }),
-                        },
-                    });
-                }
+            if (handRefund) {
+                // Refunded by hand: the rest of its invoice credited, or
+                // this amount; on the timeline with how it went back.
+                await recordHandRefundInTx(tx, {
+                    orderId,
+                    organizationId: order.organizationId,
+                    userId,
+                    how: dto.refundedHow,
+                    plan: handRefund,
+                });
             }
             // Cancelled, refunded or paid at the counter: its pay link stops
             // working (B11, DEC-067), so nobody can pay twice. The page says

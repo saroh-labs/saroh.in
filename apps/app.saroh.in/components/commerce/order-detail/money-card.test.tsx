@@ -105,3 +105,50 @@ describe("MoneyCard after Record as refunded (UX-061)", () => {
         expect(out).toContain("₹480.00 · by hand");
     });
 });
+
+describe("MoneyCard after part of it was recorded as refunded (#865)", () => {
+    it("says what went back by hand and what is left to refund", () => {
+        const out = renderToStaticMarkup(
+            <MoneyCard
+                money={money({
+                    paid: "480.00",
+                    due: "0.00",
+                    refunded: "100.00",
+                    refundedByHand: "100.00",
+                    leftToRefund: "380.00",
+                })}
+                delivery={false}
+                paymentStatus="PAID"
+                refundStanding="PARTLY_REFUNDED"
+                invoices={null}
+                payments={null}
+                format={(n) => `₹${n.toFixed(2)}`}
+            />,
+        );
+        expect(out).toContain("₹100.00 · by hand");
+        expect(out).toContain("Left to refund");
+        expect(out).toContain("₹380.00");
+    });
+
+    it("says nothing is left once it is all refunded", () => {
+        const out = renderToStaticMarkup(
+            <MoneyCard
+                money={money({
+                    paid: "480.00",
+                    due: "0.00",
+                    refunded: "480.00",
+                    refundedByHand: "480.00",
+                    leftToRefund: "0.00",
+                })}
+                delivery={false}
+                paymentStatus="REFUNDED"
+                refundStanding="REFUNDED"
+                invoices={null}
+                payments={null}
+                format={(n) => `₹${n.toFixed(2)}`}
+            />,
+        );
+        expect(out).toContain("₹480.00 · by hand");
+        expect(out).not.toContain("Left to refund");
+    });
+});

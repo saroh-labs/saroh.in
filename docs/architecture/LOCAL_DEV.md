@@ -71,7 +71,11 @@ pnpm --filter @saroh/database db:seed        # "Northwind Supply"
 
 Sign in as the owner `demo@saroh.dev` / `demo-password-123`, or as
 `reviewer@saroh.dev` (same password) to see the Reviewer role — fixture values
-for a throwaway database, from `packages/database/src/seed/data.ts`. The seed lays down 24
+for a throwaway database, from `packages/database/src/seed/data.ts`. They
+are used only when the database is on this machine (localhost, as here and on
+CI); seeding any other database needs `SEED_PASSWORD` (12+ characters, kept
+out of the repo), and the seed refuses the documented one there
+(`seedPassword()`). The seed lays down 24
 contacts, 16 leads, 3 services, 10 bookings, 12 products, 10 orders and 3 sites
 — enough for every operational surface to have something on it. Northwind has
 two storefronts: "Northwind Supply Store" (`seed_store`) and "Online"
@@ -218,7 +222,8 @@ for Mirror & Co. and the earlier Rye & Co. (`seed_sc_rye_`; today's is
 
 #### Demo accounts
 
-Every account's password is `demo-password-123`, and every email is verified.
+Every account's password is `demo-password-123` on a local database (the
+`SEED_PASSWORD` you set anywhere else), and every email is verified.
 
 | Email                | Business and role                                                                                                                                                                                                                                                                                                                                                                                    |
 | -------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |

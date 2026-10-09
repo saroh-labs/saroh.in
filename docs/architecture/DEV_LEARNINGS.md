@@ -3542,3 +3542,72 @@ Otherwise every package is affected and the step runs.
 **Check**: the helper fails closed in both cases. A gate that can't tell what
 changed runs everything.
 **Category**: tooling · `scripts/prepush.sh` → `affected()`
+
+## The dev environment's demo login used the password written in the repo
+
+**Symptom**: the demo owner on the dev environment (saroh.io), and every
+other seeded login there, signed in with the fixture password the public
+repo documents (owner, 9 Oct).
+**Cause**: every seeded login took one hard-coded fixture password, and the
+seed upserts it on every run (`update: { password }`), so any seed of a
+shared database put, and kept putting, a published password on it.
+**Fix**: `seedPassword()` in `packages/database/src/seed/data.ts`. The
+fixture is used only when the database is on this machine (localhost, as on
+CI and a local stack). Anywhere else the seed needs `SEED_PASSWORD`
+(12+ characters, never in the repo) and refuses the fixture, and it never
+prints a password it didn't get from the docs. Passwords already on the dev
+database were changed by hand.
+**Check**: the seed throws before writing anything to a database that isn't
+on this machine without `SEED_PASSWORD`; `seed/seed-password.test.ts`.
+**Category**: secrets · `packages/database/src/seed/data.ts` → `seedPassword()`
+## Insights — the orders figure read 0 because nothing wrote order.paid (#867)
+
+**Symptom**: Insights' orders figure was always empty for a real business,
+however many orders it was paid for. Seeded businesses looked fine, because
+the seed writes the daily rollups directly.
+**Cause**: the analytics contract declared `order.paid` (S7-002), but no
+payment path ever wrote one. A declared type with no writer validates, rolls
+up and reads as zero, so nothing failed.
+**Fix**: `analytics/order-events.ts` writes `order.paid` once per order in the
+transaction that made it PAID: `moveOrderPayment` (checkout, pay link,
+webhook or lookup), Record as paid, the counter payment and a treatment paid
+in full at booking. `dedupeKey` is the order's and the insert skips
+duplicates, so a replay never aborts the payment's transaction. An order
+refunded in full writes `order.refunded`, dated at the sale, and Insights
+subtracts it. An order paid before the change is never taken off.
+**Check**: `analytics/event-contract.spec.ts` → "every declared type is used"
+fails for any `*_TYPE` the contract exports that no other source file names.
+**Category**: analytics · `apps/api.saroh.in/src/modules/analytics/order-events.ts`
+## Flaky tests — a timestamp, a real popover and a lost click (#846, #847, #854)
+
+**Symptom**: three tests failed now and then and passed on a re-run. (1)
+`order-kitchen.service.spec.ts` → "a Member gets the kitchen view" failed
+with `not "360"` (#847). (2) `site-editor.test.tsx` → "opens the rail from
+the foot" timed out at 5 s in two loaded `prepush --all` gates (#854). (3)
+`business-settings.spec.ts` → "the address tab is Registered address"
+couldn't find the region, on desk and phone, in CI (#846).
+**Cause**: (1) The no-money check searched the whole read for `360`, the
+fixture's total, and the read carries wall-clock timestamps. One ending in
+`.360Z` matched. (2) The test is synchronous and takes ~20 ms. On the
+batches that failed (cut before 07c263d8), the bar's menus were the real
+Radix popover. Once a test opened one, every later test in the file spent
+2–12 s in jsdom selector matching (profiled: `nwsapi` `matches`). Under load,
+the foot test crossed the timeout. (3) The settings page is server-rendered,
+so the tab is visible before React hydrates. A click before hydration does
+nothing, so the panel stays on Identity and there's no "Registered address"
+region. The serial and parallel phases don't overlap (`e2e/run.mjs` runs them
+one after the other, and each CI shard has its own Postgres), and what
+Northwind is set up as never renames that region or changes its lead.
+**Fix**: (1) Cut ISO timestamps out of the JSON before the check. (2) Keep
+the plain Popover mock (07c263d8). With it the file runs in ~1.5 s, and
+under 8 concurrent copies the foot test stays under 50 ms. No timeout was
+raised. (3) The spec clicks the tab until it shows `aria-selected=true`
+(`expect(…).toPass`), like the other "a press before hydration does
+nothing" specs, and then reads the region.
+**Check**: a browser spec that clicks a server-drawn control and then expects
+something new waits for the control's own state (`aria-selected`,
+`aria-expanded`) inside `toPass`. A unit test asserts on the text of a
+serialized read only after stripping the timestamps.
+**Category**: tests · `e2e/tests/business-settings.spec.ts`,
+`apps/app.saroh.in/components/sites/site-editor.test.tsx`,
+`apps/api.saroh.in/src/modules/orders/order-kitchen.service.spec.ts`

@@ -646,6 +646,11 @@ export interface SitePage {
     kind?: PageKind;
     /** "Show in menu" (G14). Absent means on, as it was before G14. */
     inMenu?: boolean;
+    /**
+     * When the page was last changed — renamed, moved, hidden or its sections
+     * saved (#908). Absent from an API older than #908.
+     */
+    updatedAt?: string;
 }
 
 /**

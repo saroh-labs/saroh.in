@@ -19,14 +19,14 @@ import {
     ORG_NAME,
     ORG_SLUG,
     OWNER_EMAIL,
-    OWNER_PASSWORD,
+    passwordHint,
     PIPELINE_STAGES,
     POSTS,
     PRODUCTS,
     REVIEWER_EMAIL,
-    REVIEWER_PASSWORD,
     SEED_PREFIX,
     SEEDED_FOOTER,
+    seedPassword,
     SERVICES,
     SIDE_BUSINESSES,
     SITES,
@@ -71,6 +71,8 @@ import { seedStorefrontTeammate } from "./storefront-teammate";
 export async function seed(): Promise<void> {
     const target = assertDatabaseTarget();
     console.log(`[seed] target: ${target.database} on ${target.host}`);
+    // Before any write: a shared database needs its own password.
+    seedPassword();
 
     // Imported after the guard so nothing connects to a database we refuse.
     const { prisma } = await import("../client");
@@ -96,13 +98,13 @@ export async function seed(): Promise<void> {
     // source of truth that silently rots when better-auth changes it.
     await prisma.account.upsert({
         where: { id: id("account", "owner") },
-        update: { password: await hashPassword(OWNER_PASSWORD) },
+        update: { password: await hashPassword(seedPassword()) },
         create: {
             id: id("account", "owner"),
             accountId: user.id,
             providerId: "credential",
             userId: user.id,
-            password: await hashPassword(OWNER_PASSWORD),
+            password: await hashPassword(seedPassword()),
         },
     });
 
@@ -1160,13 +1162,13 @@ async function seedReviewer(
     // credential built any other way is a second source of truth.
     await prisma.account.upsert({
         where: { id: id("account", "reviewer") },
-        update: { password: await hashPassword(REVIEWER_PASSWORD) },
+        update: { password: await hashPassword(seedPassword()) },
         create: {
             id: id("account", "reviewer"),
             accountId: reviewer.id,
             providerId: "credential",
             userId: reviewer.id,
-            password: await hashPassword(REVIEWER_PASSWORD),
+            password: await hashPassword(seedPassword()),
         },
     });
 
@@ -1684,9 +1686,11 @@ async function report(prisma: Db, organizationId: string) {
             `analytics-aggregates:${aggregates} providers: payment:${providers[0]} ` +
             `comms:${providers[1]} domains:${providers[2]}`,
     );
-    console.log(`[seed] sign in: ${OWNER_EMAIL} / ${OWNER_PASSWORD}`);
+    console.log(
+        `[seed] sign in: ${OWNER_EMAIL} / ${passwordHint(seedPassword())}`,
+    );
     // Printed because a role nobody can sign in as is a role nobody looks at.
     console.log(
-        `[seed] or as a reviewer of the first site: ${REVIEWER_EMAIL} / ${REVIEWER_PASSWORD}`,
+        `[seed] or as a reviewer of the first site: ${REVIEWER_EMAIL} / ${passwordHint(seedPassword())}`,
     );
 }

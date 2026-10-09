@@ -1,6 +1,7 @@
 import type { Prisma } from "@saroh/database";
 import { DateTime } from "luxon";
 
+import { recordOrderPaidInTx } from "../analytics/order-events";
 import { suggestFromBookingNoteInTx } from "../customer-workspace/attention-suggest";
 import { rateToBps } from "../invoices/gst";
 import { buildManualInvoice } from "../invoices/order-invoice";
@@ -475,7 +476,7 @@ export async function confirmHoldInTx(
     // A treatment paid in full at booking (E9): its order is paid. A
     // deposit leaves the rest due on the order.
     if (invoice.orderId) {
-        await tx.order.updateMany({
+        const { count } = await tx.order.updateMany({
             where: {
                 id: invoice.orderId,
                 paymentStatus: "UNPAID",
@@ -483,6 +484,8 @@ export async function confirmHoldInTx(
             },
             data: { paymentStatus: "PAID", paidAt: now },
         });
+        // Insights' orders figure (#867), only when this made it paid.
+        if (count > 0) await recordOrderPaidInTx(tx, invoice.orderId, now);
     }
     return "confirmed";
 }

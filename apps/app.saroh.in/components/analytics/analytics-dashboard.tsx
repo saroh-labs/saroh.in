@@ -159,9 +159,10 @@ export function AnalyticsDashboard({ view }: { view: AnalyticsView }) {
         // day columns, a long page path) otherwise widened the page at 320px.
         <div className="grid grid-cols-[minmax(0,1fr)] gap-4">
             {/*
-             * No "Orders" tile here any more (DEC-075): it counted
-             * `order.paid` events, which nothing emits, so it read 0 beside
-             * the real orders the takings above count from Orders itself.
+             * No "Orders" tile here (DEC-075): Sales above counts paid
+             * orders from Orders itself. Every payment now writes
+             * `order.paid` too (#867), net of full refunds in
+             * `summary.orders`, but one page says it once.
              * Three across on a phone too (F11): three numbers, one row.
              */}
             <div className="grid grid-cols-3 gap-2 sm:gap-[11px]">

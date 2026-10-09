@@ -1,6 +1,16 @@
 import { cn } from "@saroh/ui/lib/utils";
 import type { ReactNode } from "react";
 
+/*
+ * An optional column between the title and the right-hand edge (the Pages
+ * tab's Updated, #908). Fixed widths, the heading's and every row's alike, so
+ * the column lines up whatever the end holds. Desk only: below `sm` there is
+ * no room beside the title, and the page says the same thing in the row's
+ * sub line instead.
+ */
+const MIDDLE = "hidden w-[88px] shrink-0 text-right sm:block";
+const END_BESIDE_MIDDLE = "sm:w-[136px] sm:justify-end";
+
 /**
  * The workspace design's list: one bordered card, a row of column headings,
  * then a row per item with its title, a line under it, and whatever belongs
@@ -9,6 +19,7 @@ import type { ReactNode } from "react";
  */
 export function ListCard({
     main,
+    middle,
     end,
     note,
     children,
@@ -16,6 +27,8 @@ export function ListCard({
 }: {
     /** The left column's heading: "Provider", "Notification". */
     main: string;
+    /** A column's heading between the two: "Updated". Desk only. */
+    middle?: string;
     /** The right column's heading: "Status", "When". */
     end: string;
     /** A line under the card about what the list is. */
@@ -31,7 +44,15 @@ export function ListCard({
                     className="flex items-center gap-3 border-b border-border bg-muted/40 px-[18px] py-[9px] text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground"
                 >
                     <span className="min-w-0 flex-1">{main}</span>
-                    <span>{end}</span>
+                    {middle ? <span className={MIDDLE}>{middle}</span> : null}
+                    <span
+                        className={cn(
+                            middle && "text-right",
+                            middle && END_BESIDE_MIDDLE,
+                        )}
+                    >
+                        {end}
+                    </span>
                 </div>
                 <ul>{children}</ul>
             </div>
@@ -49,6 +70,7 @@ export function ListRow({
     title,
     sub,
     tag,
+    middle,
     end,
     muted,
     className,
@@ -57,6 +79,11 @@ export function ListRow({
     sub?: ReactNode;
     /** A pill beside the title: "Unread", a state. */
     tag?: ReactNode;
+    /**
+     * The cell under ListCard's `middle` heading. Desk only, so whatever it
+     * says must also be in `sub` for a phone.
+     */
+    middle?: ReactNode;
     /** The right-hand column. */
     end?: ReactNode;
     /** A read notification, a disabled provider: the title steps back. */
@@ -88,8 +115,18 @@ export function ListRow({
                     </p>
                 ) : null}
             </div>
+            {middle !== undefined ? (
+                <div className={MIDDLE}>{middle}</div>
+            ) : null}
             {end ? (
-                <div className="flex shrink-0 items-center gap-2">{end}</div>
+                <div
+                    className={cn(
+                        "flex shrink-0 items-center gap-2",
+                        middle !== undefined && END_BESIDE_MIDDLE,
+                    )}
+                >
+                    {end}
+                </div>
             ) : null}
         </div>
     );

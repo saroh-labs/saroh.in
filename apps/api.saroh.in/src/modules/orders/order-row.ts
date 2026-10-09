@@ -132,6 +132,8 @@ export interface RawOrderRow {
     total: DecimalLike;
     /** Taken outside Saroh and recorded on it (`hand-payments.ts`). */
     paidByHand?: DecimalLike | null;
+    /** Handed back outside Saroh and recorded on it (#865). */
+    refundedByHand?: DecimalLike | null;
     createdAt: Date;
     courierName: string | null;
     trackingNumber: string | null;
@@ -190,10 +192,15 @@ export function serializeOrderRow(
         (s, p) => s + p.amountCents,
         0,
     );
-    const refunded = order.paymentIntents.reduce(
-        (s, p) => s + p.refunds.reduce((r, x) => r + x.amountCents, 0),
-        0,
-    );
+    // Online refunds, and what was recorded as handed back by hand (#865).
+    const refunded =
+        order.paymentIntents.reduce(
+            (s, p) => s + p.refunds.reduce((r, x) => r + x.amountCents, 0),
+            0,
+        ) +
+        (order.refundedByHand
+            ? Math.round(Number(order.refundedByHand.toString()) * 100)
+            : 0);
     const names: string[] = [];
     for (const item of order.items) {
         const name = lineName(item);

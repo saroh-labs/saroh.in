@@ -84,7 +84,12 @@ is authorised. A business whose owner chose Free or cancelled for the
 period's end (`Subscription.freeChosenAt`, set by Plan and billing's move
 to Free and by cancel, cleared wherever `cancelAtPeriodEnd` is) is told
 its plan moves to Free then, as it chose, and never asked to pay; the
-term run out (`term-end.ts`) sets `cancelAtPeriodEnd` without it. Rules in `PRICING_ROLLOUT.md` › "Checkout and term
+term run out (`term-end.ts`) sets `cancelAtPeriodEnd` without it.
+Between, each autopay charge is announced 3 days ahead by email (#804,
+the Terms' "We email you 3 days before"; `renewal-reminder.ts`): the
+amount as its invoice will add it up (`renewalTotalPaise`) and the date in
+the business's zone, once per period end, and only when the charge will
+happen as named (`renewalDecision` lists the silent cases). Rules in `PRICING_ROLLOUT.md` › "Checkout and term
 (DEC-093)".
 
 **First month, not trial (DEC-093).** A TRIAL checkout that took a charge
@@ -318,6 +323,38 @@ missing: ["address", "gstin"] }` in merchant words, before anything is
 
 ## Orders and the shelf — **Current** (#511, DEC-032)
 
+- **An order that becomes paid is counted for Insights in the same
+  transaction** (#867, DEC-012): every place `Order.paymentStatus` moves to
+  PAID calls `recordOrderPaidInTx` (`analytics/order-events.ts`), and every
+  place it moves to REFUNDED calls `recordOrderRefundedInTx`. Today they are
+  `moveOrderPayment` in the webhook service (checkout, pay link, webhook and
+  lookup), `updateStatus` (Record as paid, refunded by hand),
+  `takeCounterPaymentInTx`, `confirmHoldInTx` (a treatment paid in full at
+  booking) and the cancel of an order paid by hand. A new way to pay or
+  refund an order calls them too. Both are keyed on the order and skip a
+  duplicate, so calling them on a replay is safe. A part refunded by hand
+  leaves the order PAID and writes no `order.refunded` (below).
+- **A refund recorded by hand is any amount up to what is left** (#865,
+  DEC-116, `orders/hand-refund.ts`). "Record as refunded" sends
+  `paymentStatus: REFUNDED` and, for another amount, `refundAmount`
+  ("49.50"). Under the order's lock the API reads what is left
+  (`leftToRefundCents`: paid by hand and online, less every non-failed
+  refund and `Order.refundedByHand`) and refuses nothing or more than that
+  in the online "another amount"'s words. All of what is left is the full
+  path: REFUNDED, `creditRestOfOrder`, `recordOrderRefundedInTx`. Less
+  keeps the order PAID and writes `creditPartOfOrder`: a credit note for
+  the amount spread over the invoiced lines by their amounts, GST worked
+  out of each share at the line's rate, split as the original was. Both
+  add the amount to `Order.refundedByHand` and a REFUND step with it and
+  how it went back. `refundedByHand` counts in the order read's `refunded`
+  and `leftToRefund`, the list's PARTLY_REFUNDED, and `orderRefundedSql`
+  (Spent and takings); Home's "taken" reads the credit note. An online
+  refund (by line, everything left, or another amount) is capped by it
+  too: after its per-payment split, the refund core calls
+  `assertWithinOrderLeftInTx` under the same order lock and transaction
+  that create the refund rows, and refuses more than the order has left
+  ("At most ₹X can be refunded."). An edit's difference (`forEdit`) is
+  not checked: it is the order costing less.
 - **One lock order, every flow:** Order → StockLevel rows (sorted by id,
   `lockStockLevels`) → PaymentRefund → payment intent → Invoice → Booking.
   A status change (cancel, fulfil), the kitchen, an edit, a refund request
