@@ -3,6 +3,7 @@ import type { Job, Prisma } from "@saroh/database";
 import { prisma } from "@saroh/database";
 import { catalogPlanIdForKey, withGstPaise } from "@saroh/pricing-catalog";
 
+import { billingMayCharge } from "../organizations/organization-lifecycle.policy";
 import type { AddonChargeLine } from "./offers";
 import { addonPeriodLine, catalogueOfVersion } from "./offers";
 import type { BillingProviderFactory } from "./providers/billing-provider.port";
@@ -266,9 +267,22 @@ export class AddonsSyncHandler {
         }
         const sub = await prisma.subscription.findUnique({
             where: { id: p.subscriptionId },
-            select: { provider: true, providerSubscriptionId: true },
+            select: {
+                provider: true,
+                providerSubscriptionId: true,
+                organization: { select: { lifecycleStatus: true } },
+            },
         });
         if (!sub?.provider || !sub.providerSubscriptionId) return;
+        // A closing or deleted business is sent nothing to be charged
+        // (#921). Its rows wait QUEUED: a reinstated business's go with its
+        // next charge; a deleted one's are dropped with its subscription.
+        if (!billingMayCharge(sub.organization.lifecycleStatus)) {
+            this.logger.warn(
+                `billing_addons_sync_business_closed job=${job.id} subscription=${p.subscriptionId}`,
+            );
+            return;
+        }
         const provider = this.providers.get(sub.provider);
         if (!provider.charges) {
             this.logger.warn(

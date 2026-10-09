@@ -12,6 +12,7 @@ import { siteRootDomain } from "../sites/site-host-mode";
 import { OPERATOR_LIFECYCLE_ACTIONS } from "./admin-lifecycle.service";
 import type { EffectivePlan } from "./effective-plan";
 import { effectivePlan } from "./effective-plan";
+import { UNFINISHED_CLEANUP_JOB } from "./organization-deletion-cleanup.handler";
 import {
     domainSearchTerms,
     domainSearchWhere,
@@ -33,7 +34,12 @@ export interface OrganizationDirectoryQuery {
 }
 
 /** Why a business is flagged for attention. Words, not codes, on screen. */
-export type AttentionReason = "PAST_DUE" | "FAILED_JOBS" | "FAILED_WEBHOOKS";
+export type AttentionReason =
+    | "PAST_DUE"
+    | "FAILED_JOBS"
+    | "FAILED_WEBHOOKS"
+    /** A deleted business whose clean-up has failed and isn't done (#921). */
+    | "DELETION_CLEANUP";
 
 export interface OrganizationDirectoryRow {
     id: string;
@@ -242,6 +248,8 @@ export class AdminOrganizationsService {
                             },
                         },
                     },
+                    // However long ago: a half-cleared business stays flagged.
+                    { jobs: { some: UNFINISHED_CLEANUP_JOB } },
                 ],
             });
         }
@@ -261,8 +269,8 @@ export class AdminOrganizationsService {
         const since = new Date(Date.now() - ATTENTION_WINDOW_MS);
 
         const now = new Date();
-        const [activity, failedJobs, failedWebhooks, plans] = await Promise.all(
-            [
+        const [activity, failedJobs, failedWebhooks, plans, cleanups] =
+            await Promise.all([
                 prisma.auditEvent.groupBy({
                     by: ["organizationId"],
                     where: {
@@ -294,9 +302,19 @@ export class AdminOrganizationsService {
                 // override can't be read in a grouped query without deciding
                 // again here what wins, which only the resolver may do.
                 Promise.all(ids.map((id) => this.effective(id, now))),
-            ],
-        );
+                // A deleted business's clean-up that has failed (#921).
+                prisma.job.findMany({
+                    where: {
+                        organizationId: { in: ids },
+                        ...UNFINISHED_CLEANUP_JOB,
+                    },
+                    select: { organizationId: true },
+                }),
+            ]);
         const effective = new Map(ids.map((id, i) => [id, plans[i]]));
+        const cleanupUnfinished = new Set(
+            cleanups.map((row) => row.organizationId),
+        );
 
         const lastActive = new Map(
             activity.map((row) => [row.organizationId, row._max.createdAt]),
@@ -316,6 +334,9 @@ export class AdminOrganizationsService {
             if (jobsFailing.has(record.id)) attention.push("FAILED_JOBS");
             if (webhooksFailing.has(record.id)) {
                 attention.push("FAILED_WEBHOOKS");
+            }
+            if (cleanupUnfinished.has(record.id)) {
+                attention.push("DELETION_CLEANUP");
             }
 
             return {

@@ -12,6 +12,7 @@ import { FeatureFlagModule } from "../feature-flags/feature-flags.module";
 import { HealthModule } from "../health/health.module";
 import { JobHandlerRegistry } from "../jobs/job-handler.registry";
 import { JobsModule } from "../jobs/jobs.module";
+import { MediaStorageModule } from "../media/media-storage.module";
 import { OrganizationsModule } from "../organizations/organizations.module";
 import { AdminPricingController } from "../pricing/admin-pricing.controller";
 import { CatalogueWritesService } from "../pricing/catalogue-writes.service";
@@ -46,6 +47,10 @@ import { AdminWaitlistService } from "./admin-waitlist.service";
 import { AdminController } from "./admin.controller";
 import { OrganizationAccessSessionGuard } from "./organization-access-session.guard";
 import {
+    ORGANIZATION_DELETION_CLEANUP_TYPE,
+    OrganizationDeletionCleanupHandler,
+} from "./organization-deletion-cleanup.handler";
+import {
     ORGANIZATION_DELETION_TYPE,
     OrganizationDeletionHandler,
 } from "./organization-deletion.handler";
@@ -70,6 +75,8 @@ const CHAIN_CHECK_MS = 6 * 60 * 60 * 1000;
         PricingModule,
         WaitlistModule,
         JobsModule,
+        // A deleted business's files, removed by its clean-up (#921).
+        MediaStorageModule,
     ],
     controllers: [
         AdminController,
@@ -107,8 +114,10 @@ const CHAIN_CHECK_MS = 6 * 60 * 60 * 1000;
         PlatformAdminGuard,
         PlatformPermissionGuard,
         OrganizationAccessSessionGuard,
-        // The daily sweep that deletes a business past its window (#907).
+        // The daily sweep that deletes a business past its window (#907),
+        // and what a deleted business leaves behind (#921).
         OrganizationDeletionHandler,
+        OrganizationDeletionCleanupHandler,
     ],
 })
 export class AdminModule implements OnModuleInit, OnModuleDestroy {
@@ -117,6 +126,7 @@ export class AdminModule implements OnModuleInit, OnModuleDestroy {
     constructor(
         private readonly registry: JobHandlerRegistry,
         private readonly deletion: OrganizationDeletionHandler,
+        private readonly cleanup: OrganizationDeletionCleanupHandler,
     ) {}
 
     /**
@@ -128,6 +138,10 @@ export class AdminModule implements OnModuleInit, OnModuleDestroy {
         this.registry.register(
             ORGANIZATION_DELETION_TYPE,
             this.deletion.handle,
+        );
+        this.registry.register(
+            ORGANIZATION_DELETION_CLEANUP_TYPE,
+            this.cleanup.handle,
         );
         if (env.NODE_ENV === "test") return;
         await this.deletion.schedule(new Date());

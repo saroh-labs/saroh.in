@@ -1,5 +1,6 @@
 import { Controller, Get, Header, Param, UseGuards } from "@nestjs/common";
 
+import { PublicSiteOnlineGuard } from "../../common/guards/public-site-online.guard";
 import type { CustomerContext } from "../site-accounts/customer-context.decorator";
 import { CurrentCustomer } from "../site-accounts/customer-context.decorator";
 import { CustomerSessionGuard } from "../site-accounts/customer-session.guard";
@@ -15,6 +16,7 @@ import { CheckoutConfirmationService } from "./checkout-confirmation";
  * not `SITE_ACCOUNT_AREA` is on. Never cached.
  */
 @Controller("public/sites")
+@UseGuards(PublicSiteOnlineGuard)
 @UseGuards(CustomerSessionGuard)
 export class CheckoutConfirmationController {
     constructor(private readonly confirmations: CheckoutConfirmationService) {}

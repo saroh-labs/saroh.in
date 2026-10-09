@@ -3,6 +3,7 @@ import type { Prisma } from "@saroh/database";
 import { prisma } from "@saroh/database";
 
 import { FixedWindowRateLimiter } from "../bookings/rate-limiter";
+import { publicSiteOnline } from "../organizations/organization-lifecycle.policy";
 import { platformOrigin } from "./site-origin";
 
 /**
@@ -69,6 +70,7 @@ export async function siteMovedTo(
                     organizationId: true,
                     subdomain: true,
                     deletedAt: true,
+                    organization: { select: { lifecycleStatus: true } },
                 },
             },
         },
@@ -76,6 +78,8 @@ export async function siteMovedTo(
     const site = row?.site;
     if (!row?.redirectUntil || row.redirectUntil <= now || !site) notFound();
     if (site.deletedAt) notFound();
+    // Offline with its business (#921): an old address leads nowhere.
+    if (!publicSiteOnline(site.organization.lifecycleStatus)) notFound();
 
     const domain = await db.domain.findFirst({
         where: {

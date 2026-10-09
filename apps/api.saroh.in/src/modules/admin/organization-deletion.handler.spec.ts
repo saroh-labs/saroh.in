@@ -16,6 +16,7 @@ import type { Job } from "@saroh/database";
 import { prisma } from "@saroh/database";
 
 import type { AdminAuditService } from "./admin-audit.service";
+import { ORGANIZATION_DELETION_CLEANUP_TYPE } from "./organization-deletion-cleanup.handler";
 import {
     ORGANIZATION_DELETION_ACTOR,
     ORGANIZATION_DELETION_TYPE,
@@ -111,6 +112,14 @@ describe("OrganizationDeletionHandler.sweep (#907)", () => {
                 actorUserId: ORGANIZATION_DELETION_ACTOR,
             }),
         });
+        // Its clean-up, queued on the same transaction (#921).
+        expect(jobCreate).toHaveBeenCalledWith({
+            data: expect.objectContaining({
+                type: ORGANIZATION_DELETION_CLEANUP_TYPE,
+                organizationId: "o1",
+                payload: { organizationId: "o1" },
+            }),
+        });
     });
 
     it.each([
@@ -135,6 +144,7 @@ describe("OrganizationDeletionHandler.sweep (#907)", () => {
             expect(write).not.toHaveBeenCalled();
             expect(audit.write).not.toHaveBeenCalled();
             expect(history).not.toHaveBeenCalled();
+            expect(jobCreate).not.toHaveBeenCalled();
         },
     );
 
@@ -170,6 +180,29 @@ describe("OrganizationDeletionHandler.sweep (#907)", () => {
             where: { id: { notIn: string[] } };
         };
         expect(second.where.id.notIn).toHaveLength(50);
+    });
+});
+
+describe("OrganizationDeletionHandler.queueMissingCleanups (#921)", () => {
+    it("queues a clean-up for a deleted business that has none", async () => {
+        list.mockResolvedValueOnce([{ id: "gone_1" }]);
+        expect(await build().handler.queueMissingCleanups()).toBe(1);
+        expect(list).toHaveBeenCalledWith(
+            expect.objectContaining({
+                where: {
+                    lifecycleStatus: "DELETED_RETAINED",
+                    jobs: {
+                        none: { type: ORGANIZATION_DELETION_CLEANUP_TYPE },
+                    },
+                },
+            }),
+        );
+        expect(jobCreate).toHaveBeenCalledWith({
+            data: expect.objectContaining({
+                type: ORGANIZATION_DELETION_CLEANUP_TYPE,
+                organizationId: "gone_1",
+            }),
+        });
     });
 });
 

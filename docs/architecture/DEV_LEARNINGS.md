@@ -3631,3 +3631,38 @@ those controllers as a history read or a gated route and runs the real guard
 on each; `module-annotations.spec.ts` (now in the unit project) lists them as
 method-level, so a class-level gate fails it.
 **Category**: access · `apps/api.saroh.in/src/modules/capabilities/module-enforcement.guard.ts`
+## Lifecycle — "deleted" changed only a label (#921)
+
+**Symptom**: found 9 Oct 2026 building the deletion runner (#907). A
+business past its deletion window was marked `DELETED_RETAINED`, and nothing
+else changed: Saroh's billing subscription went on renewing, its website and
+custom domains stayed online, its members could still sign in and read, and
+its media, Cloudflare hostnames, payment keys and pending jobs stayed.
+**Cause**: the lifecycle states (`SUSPENDED`, `PENDING_DELETION`,
+`DELETED_RETAINED`) were added for the admin console (DEC-021) with one
+consumer, the "no new activity" gate, which lumped all three together.
+Billing, the public site reads and the member's door never read the state at
+all, and nothing asked them to: a state could be added, or given a new
+meaning, without a decision for each place it touches.
+**Fix**: one decision table, `organizations/organization-lifecycle.policy.ts`
+(`Record<state, { activity, billing, publicSite, members }>`), which every
+consumer reads instead of its own list of names. Billing refuses to start or
+send a charge for `PENDING_DELETION` and `DELETED_RETAINED`
+(`billing/business-closing.ts`; the merchant's renewals and autopay too), and
+scheduling deletion ends Saroh's provider subscription with the period paid.
+A deleted business's site answers 404 from every address
+(`SITE_ONLINE_ORGANIZATION`, `PublicSiteOnlineGuard`) and its members are
+refused (`assertMembersMayOpen`, `ORGANIZATION_DELETED`). The runner queues
+`organization.deletion.cleanup`, which cancels the subscription at the
+provider, removes custom hostnames, media and payment keys and cancels
+pending jobs, keeping orders, invoices, credit notes, customers and the audit
+trails (ADR-008). DEC-021 amended.
+**Check**: `organizations/organization-lifecycle.policy.spec.ts` — the
+states in the database's `Organization_lifecycleStatus_check` must equal the
+table's rows (and the `Record` type fails to compile without one); every
+billing charge path, public site read and membership door listed there must
+still ask the table; every `@Controller("public/sites")` must carry
+`PublicSiteOnlineGuard`; every file that asks for a paused member must also
+ask `assertMembersMayOpen`. A new state, site controller or member door fails
+it until it is decided.
+**Category**: lifecycle · `apps/api.saroh.in/src/modules/organizations/organization-lifecycle.policy.ts`

@@ -2,7 +2,11 @@ jest.mock("@saroh/database", () => ({
     prisma: {
         organization: { findMany: jest.fn(), findUnique: jest.fn() },
         auditEvent: { groupBy: jest.fn(async () => []) },
-        job: { groupBy: jest.fn(async () => []) },
+        job: {
+            groupBy: jest.fn(async () => []),
+            // Deleted businesses whose clean-up failed (#921).
+            findMany: jest.fn(async () => []),
+        },
         webhookEvent: { groupBy: jest.fn(async () => []) },
     },
 }));
@@ -177,6 +181,17 @@ describe("AdminOrganizationsService.directory", () => {
         const page = await service.directory({}, { canReadPii: false });
         expect(page.items[0]?.attention).toEqual(["PAST_DUE", "FAILED_JOBS"]);
         expect(page.items[0]?.plan).toEqual({ key: "pro", name: "Pro" });
+    });
+
+    it("flags a deleted business whose clean-up has failed (#921)", async () => {
+        findMany.mockResolvedValue([
+            record("gone", { lifecycleStatus: "DELETED_RETAINED" }),
+        ]);
+        (prisma.job.findMany as jest.Mock).mockResolvedValueOnce([
+            { organizationId: "gone" },
+        ]);
+        const page = await service.directory({}, { canReadPii: false });
+        expect(page.items[0]?.attention).toEqual(["DELETION_CLEANUP"]);
     });
 
     it("filters to businesses without a plan", async () => {

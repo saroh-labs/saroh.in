@@ -21,6 +21,7 @@
 | Is this person Saroh staff?          | The API                         | `PlatformAdminGuard`, `PlatformPermissionGuard`                                                                |
 | May this operator do this?           | The permission vocabulary       | `admin-permissions.ts` (code); grants in `PlatformAdminRoleAssignment` (data)                                  |
 | Is this business open for activity?  | Its lifecycle                   | `assertOrganizationOpen` (`organization-lifecycle.gate.ts`), in `OrganizationGuard` and public writes          |
+| What does its state close?           | The lifecycle table             | `organization-lifecycle.policy.ts` (#921): activity, billing, public site, members' door                       |
 
 The frontends, `admin.saroh.in` included, decide none of these. They render
 what the API allows.
@@ -447,6 +448,21 @@ orgId)` (`organizations/organization-kind.ts`).
   `OrganizationGuard` refuses writes and the public enquiry, booking and
   payment paths refuse outright; reads still pass and the site stays up, so its
   people can see what happened and take their data.
+- **Current** (#921, DEC-021 amended) — **What each lifecycle state does is
+  one table**, `organization-lifecycle.policy.ts`: activity, billing, the
+  public site and the members' door, per state. Read it through its
+  accessors (`activityOpen`, `billingMayCharge`, `publicSiteOnline`,
+  `membersMayOpen`, `SITE_ONLINE_ORGANIZATION`, `BILLING_ORGANIZATION`),
+  never a list of state names of your own. **A deleted business
+  (`DELETED_RETAINED`) is closed to its members** — owners too, 403
+  `ORGANIZATION_DELETED` from `assertMembersMayOpen`, asked wherever a
+  membership becomes access (the organization context, the storefront
+  authorizer) and left out of the person's list of businesses — and **its
+  site is offline**: every public site read filters on
+  `SITE_ONLINE_ORGANIZATION` or sits behind `PublicSiteOnlineGuard` (every
+  `public/sites` controller). A new state, a new `public/sites` controller or
+  a new membership door fails `organization-lifecycle.policy.spec.ts` until it
+  is decided.
 - **Adopted** (2026-09-26, ADR-011) — **A business's customers are not
   users.** A customer account on a merchant site is a per-business
   `CustomerAccount` linked to a Contact, never a Better Auth `User`. Its

@@ -9,10 +9,12 @@ import {
     Param,
     Post,
     Query,
+    UseGuards,
 } from "@nestjs/common";
 import type { Booking } from "@saroh/database";
 
 import { hashClientIp } from "../../common/client-ip";
+import { PublicSiteOnlineGuard } from "../../common/guards/public-site-online.guard";
 import type { HoldState } from "./booking-hold";
 import { holdState } from "./booking-hold";
 import type { AvailableSlot } from "./booking-slots";
@@ -197,6 +199,7 @@ export type PublicBookingResult = PublicBooking & {
  * the services it offers, who takes them by name, the booking rules.
  */
 @Controller("public/sites")
+@UseGuards(PublicSiteOnlineGuard)
 export class PublicBookingPageController {
     constructor(
         private readonly bookings: PublicBookingsService,

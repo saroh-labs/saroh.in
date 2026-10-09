@@ -15,7 +15,9 @@ export const JOB_CANCELLED = "CANCELLED";
  *   cancelled step strands the charge between them (D13);
  * - `site.go_live`: the release keeps its schedule, so the merchant would
  *   see "scheduled" for a go-live that never comes. The business cancels it
- *   from its Website, which deletes the job under the release's lock.
+ *   from its Website, which deletes the job under the release's lock;
+ * - `organization.deletion.cleanup` (#921): a deleted business would keep
+ *   its billing, domains, files and keys, and nothing queues it again.
  *
  * The types are written out rather than imported so the console does not
  * load every module's handler; `job-cancel.spec.ts` pins them to the
@@ -40,6 +42,8 @@ export const CANCEL_REFUSED: Readonly<Record<string, string>> = {
         "A step of an autopay charge; cancelling it would strand the charge",
     "site.go_live":
         "A scheduled go-live; the business cancels it from its Website, which keeps the release in step",
+    "organization.deletion.cleanup":
+        "A deleted business's clean-up; cancelling it would leave its billing, domains, files and keys behind",
 };
 
 export interface CancelVerdict {
