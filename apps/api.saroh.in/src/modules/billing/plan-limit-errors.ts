@@ -4,8 +4,9 @@
  * app branches on (U14 renders the limit notice from `details.notice`, never
  * the raw message in a toast):
  *
- * - `PLAN_LIMIT_REACHED` (403): one more would pass the plan's cap. Existing
- *   things stay readable and editable; only adding is refused.
+ * - `PLAN_LIMIT_REACHED` (403): one more would pass the plan's cap. Only
+ *   adding is refused here; what is already past a lower cap pauses on its
+ *   own rule (#800, `over-limit.ts`, `paused-errors.ts`).
  * - `MODULE_LOCKED` (403): the business's plan leaves the row off.
  * - `BOOKINGS_PAUSED` (409): the booking page at the monthly cap. Said to a
  *   customer, so it names no plan, limit or price; the merchant hears why

@@ -2,10 +2,13 @@
  * The words of Saroh's own billing mail to a business (pricing catalogue
  * U17): the invoice for a charge, a payment that failed, a first month
  * (DEC-093) or a free trial about to end, a plan that ends on a date
- * (#805), and a 12-month term about to end (DEC-100). Pure; every value is
+ * (#805), a 12-month term about to end (DEC-100), and what a move to a
+ * lower plan pauses (#801). Pure; every value is
  * escaped, since a business's name is text its owner typed. Merchant
  * voice: say what happened and what happens next.
  */
+
+import { KEEP_EVERYTHING } from "./over-limit";
 
 export interface RenderedEmail {
     subject: string;
@@ -40,6 +43,33 @@ function wrap(
 ${paragraphs.map((p) => `  <p>${esc(p)}</p>`).join("\n")}
 ${button}  <p style="color:#666;font-size:12px">You're getting this because you look after billing for your business on Saroh.</p>
 </div>`;
+}
+
+/**
+ * What pauses when a move to a lower plan takes effect (#801): the date,
+ * then one line per kind of thing (`pauseLines`), in the order a notice
+ * lists them. Given only when something pauses.
+ */
+export interface PausesWords {
+    /** When it pauses, in the business's words ("16 Nov 2026"). */
+    pausesOn: string;
+    /** `pauseLines(summary)`: never empty when given. */
+    lines: string[];
+}
+
+/** The paragraphs a notice adds for what pauses; none when nothing does. */
+export function pausesParagraphs(pauses?: PausesWords | null): string[] {
+    if (!pauses || pauses.lines.length === 0) return [];
+    return [
+        `On ${pauses.pausesOn}, what's over the new plan's limits becomes read-only:`,
+        ...pauses.lines,
+    ];
+}
+
+/** The same, run together for an inbox notice's body. */
+export function pausesSentence(pauses?: PausesWords | null): string {
+    const p = pausesParagraphs(pauses);
+    return p.length ? ` ${p.join(" ")}` : "";
 }
 
 /** The invoice for a charge, with its PDF attached. */
@@ -134,11 +164,14 @@ export function planEndingEmail(input: {
     planName: string;
     nextPlanName: string;
     endsOn: string;
+    /** What pauses then (#801), when anything does. */
+    pauses?: PausesWords | null;
 }): RenderedEmail {
     return {
         subject: `${input.businessName}'s ${input.planName} plan ends on ${input.endsOn}`,
         html: wrap(`Your ${input.planName} plan ends on ${input.endsOn}`, [
             `${input.businessName} is on the ${input.planName} plan until ${input.endsOn}. After that it moves to the ${input.nextPlanName} plan.`,
+            ...pausesParagraphs(input.pauses),
             `Everything you made is kept. To stay on ${input.planName}, choose a plan in Settings › Plan before then.`,
         ]),
     };
@@ -149,10 +182,11 @@ export function planEndingNotice(input: {
     planName: string;
     nextPlanName: string;
     endsOn: string;
+    pauses?: PausesWords | null;
 }): { title: string; body: string } {
     return {
         title: `Your ${input.planName} plan ends on ${input.endsOn}`,
-        body: `After that, your business moves to the ${input.nextPlanName} plan. Everything you made is kept. To stay on ${input.planName}, choose a plan in Settings › Plan.`,
+        body: `After that, your business moves to the ${input.nextPlanName} plan.${pausesSentence(input.pauses)} Everything you made is kept. To stay on ${input.planName}, choose a plan in Settings › Plan.`,
     };
 }
 
@@ -175,6 +209,8 @@ export function termEndingEmail(input: {
     payUrl: string;
     /** The owner chose Free for the end: say so, ask nothing. */
     chosenFree?: boolean;
+    /** What pauses on Free (#801), when anything does. */
+    pauses?: PausesWords | null;
 }): RenderedEmail {
     if (input.chosenFree) return freeChosenEmail(input);
     const done =
@@ -194,6 +230,7 @@ export function termEndingEmail(input: {
                 done,
                 `To keep ${input.planName}, pay for the next term in Plan and billing. Paying starts your next term when this one ends.${price}`,
                 `If you don't pay, ${input.businessName} moves to the Free plan on ${input.endsOn}. Everything you made is kept.`,
+                ...pausesParagraphs(input.pauses),
             ],
             { label: "Pay for the next term", href: input.payUrl },
         ),
@@ -209,6 +246,7 @@ export function freeChosenEmail(input: {
     planName: string;
     endsOn: string;
     payUrl: string;
+    pauses?: PausesWords | null;
 }): RenderedEmail {
     return {
         subject: `${input.businessName} moves to the Free plan on ${input.endsOn}`,
@@ -216,6 +254,7 @@ export function freeChosenEmail(input: {
             `Your plan moves to Free on ${input.endsOn}, as you chose`,
             [
                 `${input.businessName}'s ${input.planName} plan ends on ${input.endsOn}, and the business moves to the Free plan, as you chose. Everything you made is kept.`,
+                ...pausesParagraphs(input.pauses),
                 `Changed your mind? Choose ${input.planName} again in Plan and billing before then.`,
             ],
             { label: "Open Plan and billing", href: input.payUrl },
@@ -224,23 +263,91 @@ export function freeChosenEmail(input: {
 }
 
 /** The same in the business's inbox (`plan.ending`). */
-export function freeChosenNotice(input: { planName: string; endsOn: string }): {
+export function freeChosenNotice(input: {
+    planName: string;
+    endsOn: string;
+    pauses?: PausesWords | null;
+}): {
     title: string;
     body: string;
 } {
     return {
         title: `Your plan moves to Free on ${input.endsOn}, as you chose`,
-        body: `Your ${input.planName} plan ends then. Everything you made is kept. To keep ${input.planName}, choose it again in Plan and billing.`,
+        body: `Your ${input.planName} plan ends then.${pausesSentence(input.pauses)} Everything you made is kept. To keep ${input.planName}, choose it again in Plan and billing.`,
     };
 }
 
 /** The same request in the business's inbox (`plan.ending`). */
-export function termEndingNotice(input: { planName: string; endsOn: string }): {
+export function termEndingNotice(input: {
+    planName: string;
+    endsOn: string;
+    pauses?: PausesWords | null;
+}): {
     title: string;
     body: string;
 } {
     return {
         title: `Your ${input.planName} term ends on ${input.endsOn}`,
-        body: `To keep ${input.planName}, pay for the next term in Plan and billing. If you don't, your business moves to Free on ${input.endsOn}. Everything you made is kept.`,
+        body: `To keep ${input.planName}, pay for the next term in Plan and billing. If you don't, your business moves to Free on ${input.endsOn}.${pausesSentence(input.pauses)} Everything you made is kept.`,
+    };
+}
+
+/**
+ * A move to a lower plan that pauses things (#801): one the business chose
+ * for its period's end (`scheduled`: a cheaper plan, or Free), or one that
+ * already happened (`now`: a payment that failed for good, a cancel now, a
+ * limit Saroh lowered). Either way the pause waits at least 7 days from
+ * this notice. Lists exactly what pauses, and how to keep everything.
+ */
+export interface MoveDownWords {
+    businessName: string;
+    mode: "scheduled" | "now";
+    /** The plan it is on now (`now`), or moves from (`scheduled`). */
+    planName: string;
+    /** The plan it moves to (`scheduled`). */
+    nextPlanName: string | null;
+    /** When the move takes effect (`scheduled`). */
+    movesOn: string | null;
+    pausesOn: string;
+    lines: string[];
+    url: string;
+}
+
+function moveDownLead(w: MoveDownWords): string {
+    return w.mode === "scheduled"
+        ? `${w.businessName} moves from the ${w.planName} plan to the ${w.nextPlanName ?? "Free"} plan on ${w.movesOn ?? w.pausesOn}.`
+        : `${w.businessName} is now on the ${w.planName} plan, and has more than the plan includes.`;
+}
+
+/** The email for {@link MoveDownWords}. */
+export function moveDownEmail(w: MoveDownWords): RenderedEmail {
+    return {
+        subject: `What pauses at ${w.businessName} on ${w.pausesOn}`,
+        html: wrap(
+            `Some things pause on ${w.pausesOn}`,
+            [
+                moveDownLead(w),
+                ...pausesParagraphs({ pausesOn: w.pausesOn, lines: w.lines }),
+                KEEP_EVERYTHING,
+            ],
+            { label: "Open Plan and billing", href: w.url },
+        ),
+    };
+}
+
+/** The same in the business's inbox (`plan.ending`). */
+export function moveDownNotice(
+    w: Omit<MoveDownWords, "businessName" | "url">,
+): {
+    title: string;
+    body: string;
+} {
+    const lead =
+        w.mode === "scheduled"
+            ? `Your plan moves to ${w.nextPlanName ?? "Free"} on ${w.movesOn ?? w.pausesOn}.`
+            : `Your business is now on the ${w.planName} plan, and has more than it includes.`;
+    return {
+        title: `Some things pause on ${w.pausesOn}`,
+        body: `${lead}${pausesSentence({ pausesOn: w.pausesOn, lines: w.lines })} ${KEEP_EVERYTHING}`,
     };
 }
