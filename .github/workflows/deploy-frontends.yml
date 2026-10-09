@@ -140,6 +140,7 @@ jobs:
             - name: Secrets
               env:
                   DEV_ACCESS_KEY: ${{ secrets.DEV_ACCESS_KEY }}
+                  PRELAUNCH_ACCESS_KEY: ${{ secrets.PRELAUNCH_ACCESS_KEY }}
                   SITE_RELAY_SECRET: ${{ secrets.SITE_RELAY_SECRET }}
               run: |
                   set -euo pipefail
@@ -148,6 +149,20 @@ jobs:
                   if [ "${{ matrix.env }}" = development ] && [ "${{ matrix.pkg }}" != sites ]; then
                     [ -n "$DEV_ACCESS_KEY" ] || { echo "::error::DEV_ACCESS_KEY is missing: a dev app would be public"; exit 1; }
                     names+=(DEV_ACCESS_KEY)
+                  fi
+                  # A production app whose wrangler.jsonc says PRELAUNCH_GATE=on
+                  # (accounts, until early access opens) is gated the same way,
+                  # on its own key. Set to "off" (17 Oct), the key is taken off
+                  # the Worker: a secret outlives the deploys that stop setting it.
+                  echo "" > "$RUNNER_TEMP/prelaunch-off"
+                  if [ "${{ matrix.env }}" = production ]; then
+                    if [ "${PRELAUNCH_GATE:-}" = on ]; then
+                      [ -n "$PRELAUNCH_ACCESS_KEY" ] || { echo "::error::PRELAUNCH_ACCESS_KEY is missing: a gated app would be public"; exit 1; }
+                      DEV_ACCESS_KEY="$PRELAUNCH_ACCESS_KEY"
+                      names+=(DEV_ACCESS_KEY)
+                    elif [ "${PRELAUNCH_GATE:-}" = off ]; then
+                      echo off > "$RUNNER_TEMP/prelaunch-off"
+                    fi
                   fi
                   if [ "${{ matrix.pkg }}" = web ] || [ "${{ matrix.pkg }}" = sites ]; then
                     [ -n "$SITE_RELAY_SECRET" ] || { echo "::error::SITE_RELAY_SECRET is missing"; exit 1; }
@@ -179,6 +194,10 @@ jobs:
                       ${{ matrix.env == 'production' && '--env production' || '' }} > /dev/null
                   fi
                   rm -f "$RUNNER_TEMP/worker-secrets.json"
+                  if [ "$(cat "$RUNNER_TEMP/prelaunch-off")" = off ]; then
+                    pnpm exec wrangler secret delete DEV_ACCESS_KEY --env production \
+                      > /dev/null 2>&1 <<<"y" || true
+                  fi
 
             # OpenNext's deploy, not wrangler's: it first copies the prebuilt
             # pages into the Worker's static files. The fingerprint label is how

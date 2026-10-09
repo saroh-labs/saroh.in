@@ -30,6 +30,7 @@ const CURRENT =
  * (a two-column menu with lines), Solutions, Pricing (once the site's launch
  * switch is open; before that it would only bounce to the waitlist),
  * Resources (plan U1; only when some Resources page is live), then Sign in
+ * (once the launch switch is open; until then accounts.saroh.in is closed)
  * and the start button. Below 760px: the logo, the start button and a Menu
  * button that opens `MobileMenu`.
  *
@@ -158,19 +159,26 @@ export function SiteNav({ resources = [] }: { resources?: NavItem[] }) {
                     />
                 ) : null}
             </div>
-            <a
-                href={SIGN_IN_URL}
-                className={cn(
-                    TOP,
-                    "ml-auto hidden text-mk-nav min-[760px]:flex",
-                )}
-            >
-                Sign in
-            </a>
+            {/* Sign in waits for early access, as Pricing does: until then
+                accounts.saroh.in is closed to anyone without the key. */}
+            {LAUNCH_MODE === "open" ? (
+                <a
+                    href={SIGN_IN_URL}
+                    className={cn(
+                        TOP,
+                        "ml-auto hidden text-mk-nav min-[760px]:flex",
+                    )}
+                >
+                    Sign in
+                </a>
+            ) : null}
             <CtaLink
                 src="nav"
                 size="sm"
-                className="hidden min-[760px]:inline-flex"
+                className={cn(
+                    "hidden min-[760px]:inline-flex",
+                    LAUNCH_MODE !== "open" && "ml-auto",
+                )}
             />
 
             {/* Below 760px wide. */}

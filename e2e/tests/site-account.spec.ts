@@ -56,7 +56,9 @@ test.describe("the account area (A5)", () => {
         await signInOnSheet(page, email);
 
         await expect(page).toHaveURL(/\/account$/);
-        await expect(page.getByRole("heading", { level: 1 })).toHaveText("Hi");
+        await expect(page.getByRole("heading", { level: 1 })).toHaveText(
+            "Hi there",
+        );
         const tabs = page.getByRole("navigation", { name: "Account" });
         await expect(tabs.getByRole("link", { name: "Home" })).toHaveAttribute(
             "aria-current",

@@ -515,7 +515,7 @@ describe("the header's account entry", () => {
         verifyCode: vi.fn(),
     };
 
-    it("a signed-in customer's initials open the account", () => {
+    it('a signed-in customer\'s initials and "My account" open the account', () => {
         render(
             <AccountEntry
                 customer={{ email: "farah@example.in", name: "Farah Khan" }}
@@ -527,6 +527,9 @@ describe("the header's account entry", () => {
         const link = screen.getByRole("link", { name: "My account" });
         expect(link).toHaveAttribute("href", "/account");
         expect(link).toHaveTextContent("FK");
+        // Named in words, not only by the initials (a phone hides the words
+        // from sight, not from a screen reader).
+        expect(link).toHaveTextContent("My account");
     });
 
     async function signInThrough(variant: "header" | "page") {

@@ -17,7 +17,7 @@ const LINK =
 /**
  * The footer (Footer design): Saroh and who it is for, then Features,
  * Solutions, Resources (plan U1, when any is live), Saroh (Pricing once the launch
- * switch is open, Questions, Contact, Sign in) and Follow Saroh (Saroh's accounts and its public
+ * switch is open, Questions, Contact, Sign in once it is open too) and Follow Saroh (Saroh's accounts and its public
  * code), in columns that wrap at 150px (180px before Resources made six). Under them, who makes Saroh and the
  * legal pages that are published (R6): Privacy from its date, and "Cookie
  * choices" where the cookie notice can appear. No Terms until they're
@@ -85,9 +85,11 @@ export function SiteFooter({
                 <a href={`mailto:${SAROH_CONTACT_EMAIL}`} className={LINK}>
                     Contact
                 </a>
-                <a href={SIGN_IN_URL} className={LINK}>
-                    Sign in
-                </a>
+                {LAUNCH_MODE === "open" ? (
+                    <a href={SIGN_IN_URL} className={LINK}>
+                        Sign in
+                    </a>
+                ) : null}
             </Column>
             <Column title="Follow Saroh">
                 {SAROH_SOCIAL.map((link) => (

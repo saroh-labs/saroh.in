@@ -36,7 +36,9 @@ export function accountTitle(
     const tab = currentTab(path === "" ? null : path, tabs);
     if (tab === "home") {
         const first = firstName(name);
-        return first ? `Hi, ${first}` : "Hi";
+        // No name yet (a first sign-in from the header asks for none):
+        // "Hi there" rather than a bare "Hi" that reads unfinished.
+        return first ? `Hi, ${first}` : "Hi there";
     }
     const label = tabs.find((t) => t.key === tab)?.label;
     return label ?? "Your account";

@@ -33,7 +33,7 @@ beforeEach(() => {
 describe("accountTitle", () => {
     it("greets the customer by first name on Home", () => {
         expect(accountTitle("/account", TABS, "Farah Khan")).toBe("Hi, Farah");
-        expect(accountTitle("/account/", TABS, null)).toBe("Hi");
+        expect(accountTitle("/account/", TABS, null)).toBe("Hi there");
     });
 
     it("names the current tab as this business calls it", () => {
