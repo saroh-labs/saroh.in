@@ -84,6 +84,17 @@ describe("withDevAccess — the dev environment's key", () => {
         );
     });
 
+    it("sends anyone else to one page when it is told to (accounts before early access)", async () => {
+        vi.stubEnv("DEV_REDIRECT_ORIGIN", "https://www.saroh.in");
+        vi.stubEnv("DEV_REDIRECT_PATH", "/");
+        const res = await gate(
+            request("https://accounts.saroh.in/login?returnTo=x"),
+        );
+        expect(next).not.toHaveBeenCalled();
+        expect(res.status).toBe(307);
+        expect(res.headers.get("location")).toBe("https://www.saroh.in/");
+    });
+
     it("a wrong key is treated as none, and is not carried to production", async () => {
         const res = await gate(
             request("https://app.saroh.io/orders?access=guess"),
