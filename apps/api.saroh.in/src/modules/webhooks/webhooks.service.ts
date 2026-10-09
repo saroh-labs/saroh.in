@@ -9,6 +9,10 @@ import type { Prisma, PrismaClient } from "@saroh/database";
 import { prisma } from "@saroh/database";
 
 import { toMinor } from "../../common/money";
+import {
+    recordOrderPaidInTx,
+    recordOrderRefundedInTx,
+} from "../analytics/order-events";
 import { confirmHoldInTx } from "../bookings/booking-hold";
 import { markBookingPaidInTx } from "../bookings/booking-pay-link";
 import { completePackDraftInTx } from "../class-packs/pack-checkout";
@@ -1388,6 +1392,11 @@ export class WebhooksService {
                     : {}),
             },
         });
+        // Insights' orders figure (#867), in the payment's transaction:
+        // paid online, by pay link or confirmed by a lookup, it counts;
+        // every rupee of it back, it is taken off again.
+        if (target === "PAID") await recordOrderPaidInTx(tx, orderId);
+        if (target === "REFUNDED") await recordOrderRefundedInTx(tx, orderId);
         return true;
     }
 }

@@ -10,6 +10,10 @@ import { nextOrderNumberInTx, Prisma, prisma } from "@saroh/database";
 
 import { isSerializationFailure } from "../../common/prisma-errors";
 import { ActivationEvents } from "../analytics/activation-events";
+import {
+    recordOrderPaidInTx,
+    recordOrderRefundedInTx,
+} from "../analytics/order-events";
 import { planMeter } from "../billing/metering.service";
 import { assertPlanTakesOnlinePayment } from "../billing/online-payments-plan";
 import type { AppliedDiscount } from "../discounts/discounts.service";
@@ -659,6 +663,8 @@ export class OrdersService {
                 await ensureOrderInvoice(tx, orderId, {
                     method: dto.paidHow ?? "RECORDED",
                 });
+                // Insights' orders figure (#867), with the payment.
+                await recordOrderPaidInTx(tx, orderId);
                 if (order.organizationId) {
                     // On the timeline, with no amount in the note; the
                     // step's amount says it to a money reader.
@@ -699,6 +705,8 @@ export class OrdersService {
                     }),
                 ]);
                 await creditRestOfOrder(tx, orderId, "Refunded", userId);
+                // Off Insights' orders figure again (#867).
+                await recordOrderRefundedInTx(tx, orderId);
                 if (order.organizationId) {
                     await tx.orderEvent.create({
                         data: {

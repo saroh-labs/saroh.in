@@ -3560,3 +3560,21 @@ database were changed by hand.
 **Check**: the seed throws before writing anything to a database that isn't
 on this machine without `SEED_PASSWORD`; `seed/seed-password.test.ts`.
 **Category**: secrets · `packages/database/src/seed/data.ts` → `seedPassword()`
+## Insights — the orders figure read 0 because nothing wrote order.paid (#867)
+
+**Symptom**: Insights' orders figure was always empty for a real business,
+however many orders it was paid for. Seeded businesses looked fine, because
+the seed writes the daily rollups directly.
+**Cause**: the analytics contract declared `order.paid` (S7-002), but no
+payment path ever wrote one. A declared type with no writer validates, rolls
+up and reads as zero, so nothing failed.
+**Fix**: `analytics/order-events.ts` writes `order.paid` once per order in the
+transaction that made it PAID: `moveOrderPayment` (checkout, pay link,
+webhook or lookup), Record as paid, the counter payment and a treatment paid
+in full at booking. `dedupeKey` is the order's and the insert skips
+duplicates, so a replay never aborts the payment's transaction. An order
+refunded in full writes `order.refunded`, dated at the sale, and Insights
+subtracts it. An order paid before the change is never taken off.
+**Check**: `analytics/event-contract.spec.ts` → "every declared type is used"
+fails for any `*_TYPE` the contract exports that no other source file names.
+**Category**: analytics · `apps/api.saroh.in/src/modules/analytics/order-events.ts`

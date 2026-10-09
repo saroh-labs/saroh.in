@@ -375,6 +375,67 @@ describe("confirmHoldInTx — the money arrived", () => {
         expect(tx.contactAttention.create).not.toHaveBeenCalled();
     });
 
+    it("a treatment paid in full at booking is paid, and counted once for Insights (#867)", async () => {
+        const tx = makeTx();
+        wire(tx, heldBooking());
+        tx.invoice.findFirst.mockResolvedValue({
+            id: "inv_1",
+            bookingId: "bk_1",
+            orderId: "ord_1",
+            total: "1500.00",
+        });
+        const order = {
+            updateMany: jest.fn().mockResolvedValue({ count: 1 }),
+            findUnique: jest.fn().mockResolvedValue({
+                total: "1500.00",
+                organizationId: "org_1",
+                store: { organizationId: "org_1" },
+            }),
+        };
+        const analyticsEvent = {
+            createMany: jest.fn().mockResolvedValue({ count: 1 }),
+        };
+        const withOrder = { ...tx, order, analyticsEvent };
+
+        await confirmHoldInTx(asTx(withOrder as FakeTx), {
+            invoiceId: "inv_1",
+            organizationId: "org_1",
+            now: NOW,
+            payment,
+        });
+
+        expect(order.updateMany).toHaveBeenCalledWith(
+            expect.objectContaining({
+                data: { paymentStatus: "PAID", paidAt: NOW },
+            }),
+        );
+        expect(analyticsEvent.createMany).toHaveBeenCalledTimes(1);
+        expect(analyticsEvent.createMany.mock.calls[0][0]).toMatchObject({
+            data: [
+                {
+                    organizationId: "org_1",
+                    type: "order.paid",
+                    properties: { orderId: "ord_1", amountCents: 150_000 },
+                    occurredAt: NOW,
+                    dedupeKey: "order.paid:ord_1",
+                },
+            ],
+            skipDuplicates: true,
+        });
+
+        // A deposit, or an order paid already: not made paid here, so not
+        // counted here either.
+        order.updateMany.mockResolvedValue({ count: 0 });
+        analyticsEvent.createMany.mockClear();
+        await confirmHoldInTx(asTx(withOrder as FakeTx), {
+            invoiceId: "inv_1",
+            organizationId: "org_1",
+            now: NOW,
+            payment,
+        });
+        expect(analyticsEvent.createMany).not.toHaveBeenCalled();
+    });
+
     it("puts the booker's note on their record as a suggestion once paid (C12)", async () => {
         const tx = makeTx();
         wire(

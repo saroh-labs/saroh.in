@@ -323,6 +323,16 @@ missing: ["address", "gstin"] }` in merchant words, before anything is
 
 ## Orders and the shelf — **Current** (#511, DEC-032)
 
+- **An order that becomes paid is counted for Insights in the same
+  transaction** (#867, DEC-012): every place `Order.paymentStatus` moves to
+  PAID calls `recordOrderPaidInTx` (`analytics/order-events.ts`), and every
+  place it moves to REFUNDED calls `recordOrderRefundedInTx`. Today they are
+  `moveOrderPayment` in the webhook service (checkout, pay link, webhook and
+  lookup), `updateStatus` (Record as paid, refunded by hand),
+  `takeCounterPaymentInTx`, `confirmHoldInTx` (a treatment paid in full at
+  booking) and the cancel of an order paid by hand. A new way to pay or
+  refund an order calls them too. Both are keyed on the order and skip a
+  duplicate, so calling them on a replay is safe.
 - **One lock order, every flow:** Order → StockLevel rows (sorted by id,
   `lockStockLevels`) → PaymentRefund → payment intent → Invoice → Booking.
   A status change (cancel, fulfil), the kitchen, an edit, a refund request

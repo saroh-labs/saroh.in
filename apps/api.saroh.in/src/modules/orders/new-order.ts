@@ -3,6 +3,7 @@ import type { Prisma } from "@saroh/database";
 import { prisma } from "@saroh/database";
 
 import { fromMinor, toMinor } from "../../common/money";
+import { recordOrderPaidInTx } from "../analytics/order-events";
 import { isReservedContactEmail } from "../contacts/contact-email";
 import { normalisePhone } from "../customer-workspace/duplicates";
 import { resolveContact } from "../customer-workspace/resolve-contact";
@@ -425,6 +426,8 @@ export async function takeCounterPaymentInTx(
         },
     });
     await ensureOrderInvoice(tx, orderId, { at, method: kind });
+    // Insights' orders figure (#867), with the payment.
+    await recordOrderPaidInTx(tx, orderId, at);
     if (!organizationId) return;
     await tx.orderEvent.create({
         data: {
