@@ -46,7 +46,20 @@ export function plansOf(body: unknown): PublicPlan[] | null {
 
 /** Whether a read says Join works (G20); an older API that doesn't say: no. */
 export function plansPayOnline(body: unknown): boolean {
-    return (body as { payOnline?: unknown } | null)?.payOnline === true;
+    return (
+        (body as { payOnline?: unknown } | null)?.payOnline === true &&
+        !plansNotTakingOrders(body)
+    );
+}
+
+/**
+ * Whether the read says the business isn't taking orders on this site
+ * (#800: a website past its plan's limit). Only an explicit `true`.
+ */
+export function plansNotTakingOrders(body: unknown): boolean {
+    return (
+        (body as { notTakingOrders?: unknown } | null)?.notTakingOrders === true
+    );
 }
 
 /**

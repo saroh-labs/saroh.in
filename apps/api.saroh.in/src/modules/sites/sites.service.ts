@@ -17,6 +17,7 @@ import { isDeepStrictEqual } from "node:util";
 import type { OrganizationContext } from "../../common/types/organization-context";
 import { EntitlementService } from "../billing/entitlement.service";
 import { planMeter } from "../billing/metering.service";
+import { keptPostsOnSite } from "../content/post-paused";
 import { parsePostsPrefix } from "../content/posts-prefix";
 import {
     checkoutReadiness,
@@ -2104,11 +2105,14 @@ export class SitesService {
      * page reads give. The snapshot each row carries is what publish wrote.
      */
     async getPublicPosts(siteId: string): Promise<{ posts: unknown[] }> {
+        // A post a move to a lower plan paused is hidden (#800).
+        const kept = await keptPostsOnSite(siteId);
         const posts = await prisma.post.findMany({
             where: {
                 siteId,
                 currentPublicationId: { not: null },
                 site: { deletedAt: null },
+                AND: [kept],
             },
             orderBy: { publishedAt: "desc" },
             select: { currentPublication: { select: { snapshot: true } } },
@@ -2125,12 +2129,14 @@ export class SitesService {
      * exist, is not live, or belongs to another site.
      */
     async getPublicPost(siteId: string, slug: string): Promise<PublicSiteView> {
+        const kept = await keptPostsOnSite(siteId);
         const post = await prisma.post.findFirst({
             where: {
                 siteId,
                 slug,
                 currentPublicationId: { not: null },
                 site: { deletedAt: null },
+                AND: [kept],
             },
             select: {
                 currentPublication: {

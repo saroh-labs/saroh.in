@@ -107,11 +107,6 @@ export const plannedIntegrations: readonly PlannedIntegration[] = [
         line: "A meeting link for each online appointment.",
     },
     {
-        name: "CSV import",
-        when: "Jan–Mar 2027",
-        line: "Bring in products and customers from a spreadsheet.",
-    },
-    {
         name: "Shopify import",
         when: "Jan–Mar 2027",
         line: "Move products, customers and past orders over in one go.",

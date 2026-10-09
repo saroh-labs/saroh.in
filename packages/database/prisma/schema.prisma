@@ -483,6 +483,12 @@ model Membership {
   // `member:role:update`, within their own reach, never on themselves.
   extraActions String[] @default([])
 
+  // When they joined the business (#800): who stays when a move to a lower
+  // plan leaves fewer seats — the owner, then the earliest to join. Rows
+  // from before the column were backfilled from the invitation they
+  // accepted, else the later of the account's and the business's start.
+  createdAt DateTime @default(now())
+
   @@unique([organizationId, userId])
   @@index([organizationId])
 }

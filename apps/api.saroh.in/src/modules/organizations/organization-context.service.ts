@@ -11,6 +11,8 @@ import type {
     OrgRole,
 } from "../../common/types/organization-context";
 import { ORG_ROLES } from "../../common/types/organization-context";
+import { overLimit } from "../billing/over-limit.service";
+import { assertMemberNotPaused } from "./member-paused";
 import type { OrganizationKind } from "./organization-kind";
 import { kindRead } from "./organization-kind";
 import { isBuiltInRole, resolveCapabilities } from "./organization-policy";
@@ -48,6 +50,12 @@ export interface UserOrganization {
      * Null when it was never set; the app then reads India's.
      */
     timeZone: string | null;
+    /**
+     * Past the business's plan limit after a move to a lower plan (#800):
+     * they can't open it until it moves up again, so the chooser says
+     * "Paused" rather than opening into a refusal.
+     */
+    paused: boolean;
 }
 
 /** Minimal Organization identity returned alongside a resolved context. */
@@ -94,10 +102,11 @@ export class OrganizationContextService {
     ): Promise<OrganizationContext> {
         const membership = await prisma.membership.findUnique({
             where: { organizationId_userId: { organizationId, userId } },
-            select: { role: true, extraActions: true },
+            select: { id: true, role: true, extraActions: true },
         });
 
         if (membership) {
+            await this.assertNotPaused(organizationId, membership);
             /*
              * The role's own permissions, when the business has stored any.
              *
@@ -153,6 +162,7 @@ export class OrganizationContextService {
         const memberships = await prisma.membership.findMany({
             where: { userId },
             select: {
+                id: true,
                 role: true,
                 extraActions: true,
                 organization: {
@@ -197,8 +207,19 @@ export class OrganizationContextService {
         const byOrgAndKey = new Map(
             stored.map((r) => [`${r.organizationId}:${r.key}`, r]),
         );
+        // Each business's paused people (#800), cached per business by the
+        // service; an owner is never paused.
+        const paused = await Promise.all(
+            memberships.map((m) =>
+                m.role === "OWNER"
+                    ? Promise.resolve(false)
+                    : overLimit
+                          .pausedNow(m.organization.id)
+                          .then((p) => p?.memberIds.has(m.id) ?? false),
+            ),
+        );
 
-        return memberships.map((membership) => {
+        return memberships.map((membership, i) => {
             const orgId = membership.organization.id;
             const own = byOrgAndKey.get(`${orgId}:${membership.role}`);
             return {
@@ -225,8 +246,21 @@ export class OrganizationContextService {
                 kind: kindRead(membership.organization.kind),
                 timeZone:
                     membership.organization.businessProfile?.timezone ?? null,
+                paused: paused[i],
             };
         });
+    }
+
+    /**
+     * A team member past the plan's limit (#800) can't open the business:
+     * 403 `MEMBER_PAUSED` (`member-paused.ts`, shared with the storefront
+     * authorizer and the module gate).
+     */
+    private assertNotPaused(
+        organizationId: string,
+        membership: { id: string; role: string },
+    ): Promise<void> {
+        return assertMemberNotPaused(organizationId, membership);
     }
 
     /**

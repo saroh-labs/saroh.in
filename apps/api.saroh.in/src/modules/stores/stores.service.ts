@@ -8,6 +8,7 @@ import { prisma } from "@saroh/database";
 import { FeatureFlagService } from "../feature-flags/feature-flags.service";
 import { FlagKey } from "../feature-flags/flags";
 import { MAX_STOREFRONTS_PER_BUSINESS } from "../organizations/business-limits";
+import { assertMemberNotPaused } from "../organizations/member-paused";
 import type { OrgAction } from "../organizations/organization-policy";
 import {
     isBuiltInRole,
@@ -304,7 +305,16 @@ export class StoresService {
         }
     }
 
-    /** True if the caller's Organization membership role permits `action`. */
+    /**
+     * True if the caller's Organization membership role permits `action`.
+     *
+     * A team member past the plan's limit (#800) is refused here as they
+     * are at the organization context: 403 `MEMBER_PAUSED`, before their
+     * role is asked and before the legacy dual-read fallback, so a
+     * storefront route that never builds the context neither lets them in
+     * nor answers with a generic denial (`member-paused.ts`). The legacy
+     * path (ORG_AUTHORIZATION off) never reads membership, and is unchanged.
+     */
     private async orgAllows(
         organizationId: string,
         userId: string,
@@ -312,9 +322,10 @@ export class StoresService {
     ): Promise<boolean> {
         const membership = await prisma.membership.findUnique({
             where: { organizationId_userId: { organizationId, userId } },
-            select: { role: true, extraActions: true },
+            select: { id: true, role: true, extraActions: true },
         });
         if (!membership) return false;
+        await assertMemberNotPaused(organizationId, membership);
         // Resolved from the business's own role, not from the role's name. A
         // role the business invented maps to MEMBER by name, and MEMBER's floor
         // includes `store:read` — so judging by name handed every invented role

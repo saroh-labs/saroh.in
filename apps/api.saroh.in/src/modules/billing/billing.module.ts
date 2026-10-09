@@ -24,6 +24,7 @@ import {
     BILLING_MOVES_APPLY_TYPE,
     MovesApplyHandler,
 } from "./moves-apply.handler";
+import { OverLimitService } from "./over-limit.service";
 import {
     PLAN_CHANGE_NOTICE_TYPE,
     PlanChangeNoticeHandler,
@@ -101,6 +102,7 @@ const CHAIN_CHECK_MS = 6 * 60 * 60 * 1000;
         CatalogueAccessService,
         EntitlementService,
         MeteringService,
+        OverLimitService,
         PlanLimitNoticeHandler,
         PlanChangeNoticeHandler,
         BillingWebhookService,
@@ -121,6 +123,7 @@ const CHAIN_CHECK_MS = 6 * 60 * 60 * 1000;
         CatalogueAccessService,
         EntitlementService,
         MeteringService,
+        OverLimitService,
         SubscriptionsService,
         PlansService,
     ],

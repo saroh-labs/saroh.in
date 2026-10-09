@@ -10,6 +10,7 @@ import type { PublicPlan } from "../lib/plans-read";
 import {
     isPublicPlan,
     plansAutopayMethods,
+    plansNotTakingOrders,
     plansOf,
     plansOffered,
     plansPayOnline,
@@ -21,6 +22,7 @@ import type { JoinablePlan } from "../prices/join-sheet";
 import { JoinSheet } from "../prices/join-sheet";
 import { planEvery, planPrice } from "../prices/plan-words";
 import { askAboutHref } from "../shop/ask-about-ordering";
+import { NotTakingOrders } from "../shop/not-taking-orders";
 
 /**
  * `plans` v1 — the business's subscription plans on sale, read live (G9).
@@ -54,7 +56,13 @@ import { askAboutHref } from "../shop/ask-about-ordering";
  */
 
 // The read's checks live beside the server's use of them (lib/plans-read).
-export { isPublicPlan, plansAutopayMethods, plansOf, plansPayOnline };
+export {
+    isPublicPlan,
+    plansAutopayMethods,
+    plansNotTakingOrders,
+    plansOf,
+    plansPayOnline,
+};
 export type { PublicPlan };
 
 /** The plans to show and where their button goes. */
@@ -75,6 +83,11 @@ export interface PlansFeed {
      * join sheet's "Pay with". Absent or empty: autopay isn't offered.
      */
     autopayMethods?: AutopayMethod[];
+    /**
+     * The business isn't taking orders on this site just now (#800): the
+     * plans show, with no button, and the section says so.
+     */
+    notTakingOrders?: boolean;
 }
 
 /** What the section is called when the merchant left the title empty. */
@@ -344,7 +357,10 @@ function PlanCards({
     /** Drawn in the editor: the button shows its words but goes nowhere. */
     canvas?: boolean;
 }) {
-    const joins = prices !== null && feed.payOnline === true;
+    // Not taking orders (#800): nothing to click that cannot work, not even
+    // "Ask about joining".
+    const stopped = !canvas && feed.notTakingOrders === true;
+    const joins = !stopped && prices !== null && feed.payOnline === true;
     const flow = useSignInFirst(joins ? prices : null);
     const [joining, setJoining] = useState<JoinablePlan | null>(null);
     const [done, setDone] = useState<string | null>(null);
@@ -370,6 +386,7 @@ function PlanCards({
             {done && prices ? (
                 <PricesDone message={done} accountHref={prices.accountHref} />
             ) : null}
+            {stopped ? <NotTakingOrders /> : null}
             <ul
                 className={cn(
                     "grid",
@@ -432,7 +449,7 @@ function PlanCards({
                                     >
                                         {label}
                                     </button>
-                                ) : feed.joinHref ? (
+                                ) : feed.joinHref && !stopped ? (
                                     <a
                                         href={joinHref(
                                             feed.joinHref,

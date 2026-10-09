@@ -7,11 +7,13 @@ import {
 } from "@nestjs/common";
 import { prisma } from "@saroh/database";
 
+import { notTakingOrders } from "../billing/paused-errors";
 import { takesOnlinePayment } from "../bookings/public-booking-page";
 import { FixedWindowRateLimiter } from "../bookings/rate-limiter";
 import { contactEmailForDisplay } from "../contacts/contact-email";
 import { FeatureFlagService } from "../feature-flags/feature-flags.service";
 import { contactName } from "../invoices/serialize";
+import { siteTakingOrders, withPause } from "../orders/checkout-paused";
 import { assertOrganizationOpen } from "../organizations/organization-lifecycle.gate";
 import { PaymentsService } from "../payments/payments.service";
 import { OPENS_CHECKOUT } from "../payments/public-key";
@@ -103,7 +105,7 @@ export class PublicPackPurchaseService {
         if (!(await packsOffered(organizationId, this.flags))) {
             return { payOnline: false, packs: [] };
         }
-        const [packs, payOnline] = await Promise.all([
+        const [packs, payOnline, taking] = await Promise.all([
             prisma.classPack.findMany({
                 where: { organizationId, ...PACKS_ON_SALE },
                 orderBy: [{ price: "asc" }, { createdAt: "asc" }],
@@ -120,8 +122,13 @@ export class PublicPackPurchaseService {
                 },
             }),
             takesOnlinePayment(organizationId),
+            // A website a lower plan paused sells nothing online (#800).
+            siteTakingOrders(organizationId, customer.siteId),
         ]);
-        return { payOnline, packs: packs.map(packOnSaleView) };
+        return withPause(
+            { payOnline, packs: packs.map(packOnSaleView) },
+            taking,
+        );
     }
 
     /**
@@ -143,6 +150,11 @@ export class PublicPackPurchaseService {
             );
         }
         await assertOrganizationOpen(organizationId);
+        // A website a move to a lower plan paused takes no orders (#800),
+        // as its checkout doesn't: refused before anything is drafted.
+        if (!(await siteTakingOrders(organizationId, customer.siteId))) {
+            throw notTakingOrders();
+        }
         if (!(await packsOffered(organizationId, this.flags))) notFound();
         const pack = await prisma.classPack.findFirst({
             where: { id: ref, organizationId },

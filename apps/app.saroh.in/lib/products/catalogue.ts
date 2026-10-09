@@ -1,3 +1,6 @@
+import type { PausedCut } from "@/lib/billing/paused";
+import { pausedByCut } from "@/lib/billing/paused";
+
 import type {
     CatalogueListing,
     CatalogueProduct,
@@ -50,10 +53,16 @@ export interface CatalogueRow {
     categoryId: string | null;
     /** Where it is sold; empty when no storefront sells it just now. */
     places: CataloguePlace[];
+    /**
+     * Past the plan's products limit (#800): hidden from the site and
+     * read-only. From the API's cut (`GET …/billing/paused`).
+     */
+    paused: boolean;
 }
 
 export function catalogueRows(
     products: readonly CatalogueProduct[],
+    pausedCut: PausedCut = null,
 ): CatalogueRow[] {
     return products.map((p) => {
         const inv = p.inventory;
@@ -77,6 +86,7 @@ export function catalogueRows(
             updatedAt: p.updatedAt,
             categoryId: p.categoryId,
             places: p.listings,
+            paused: pausedByCut(p, pausedCut),
         };
     });
 }

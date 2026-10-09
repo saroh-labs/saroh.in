@@ -160,10 +160,16 @@ export function ProductHeader({
     overview,
     storeId,
     photosHref,
+    paused = false,
 }: {
     overview: ProductOverview;
     storeId: string;
     photosHref: string;
+    /**
+     * Past the plan's products limit (#800): hidden from the site and
+     * read-only. The note under the header says why.
+     */
+    paused?: boolean;
 }) {
     const { product, price } = overview;
     const money = (amount: string) =>
@@ -229,6 +235,14 @@ export function ProductHeader({
                     >
                         {status.label}
                     </Badge>
+                    {paused ? (
+                        <Badge
+                            variant="warning"
+                            className="rounded-full px-2 py-0.5 text-[11px] font-semibold uppercase tracking-[0.04em]"
+                        >
+                            Paused
+                        </Badge>
+                    ) : null}
                 </div>
                 <p className="mt-1 text-pretty text-[13px] tabular-nums text-muted-foreground">
                     {meta} · Changed{" "}

@@ -25,6 +25,11 @@ export interface WebsiteHeaderSite {
     id: string;
     name: string;
     state: { label: string; tone: SiteStateTone };
+    /**
+     * Past the plan's websites limit (#800): stopped taking orders and
+     * bookings. The note under the header says why.
+     */
+    paused?: boolean;
 }
 
 type TabId = "pages" | "posts" | "forms" | "settings" | "review";
@@ -152,6 +157,15 @@ export function WebsiteHeader({
                         )}
                         <span className="font-mono text-[12px]">{address}</span>
                         <StateBadge state={site.state} />
+                        {site.paused ? (
+                            <span
+                                className={badgeVariants({
+                                    variant: "warning",
+                                })}
+                            >
+                                Paused
+                            </span>
+                        ) : null}
                     </span>
                 }
                 actions={
@@ -328,6 +342,9 @@ function SitePicker({
                                     </span>
                                     <span className="block text-[11px] text-muted-foreground">
                                         {s.state.label}
+                                        {s.paused
+                                            ? " · Paused, not taking orders"
+                                            : ""}
                                     </span>
                                 </span>
                                 {on ? <Check aria-hidden /> : null}

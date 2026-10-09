@@ -12,6 +12,7 @@ import { takesOnlinePayment } from "../bookings/public-booking-page";
 import { FixedWindowRateLimiter } from "../bookings/rate-limiter";
 import { MODULE_BY_KEY } from "../capabilities/module-registry";
 import { FeatureFlagService } from "../feature-flags/feature-flags.service";
+import { siteTakingOrders, withPause } from "../orders/checkout-paused";
 import { AutopayService } from "../payments/autopay.service";
 import type { MandateMethod } from "../payments/providers/provider.port";
 import { PLANS_ON_SALE } from "./plan-on-sale";
@@ -91,6 +92,12 @@ export interface PublicPlans {
      * ignores it (an empty list draws nothing).
      */
     offered: boolean;
+    /**
+     * True on a website a move to a lower plan paused (#800): the plans
+     * show, nobody joins online here, and the site says it isn't taking
+     * orders. Absent otherwise.
+     */
+    notTakingOrders?: true;
 }
 
 function notFound(): never {
@@ -219,6 +226,9 @@ export class PublicPlansService {
                 // Join is a new subscription: the plan starts one (checked
                 // above); here, whether a checkout opens.
                 takesOnlinePayment(organizationId),
+                // A website a move to a lower plan paused takes no orders
+                // (#800): the plans show, Join doesn't.
+                siteTakingOrders(organizationId, siteId),
             ]);
         });
         if (read === null) {
@@ -229,7 +239,8 @@ export class PublicPlansService {
                 offered: false,
             };
         }
-        const [rows, payOnline] = read;
+        const [rows, takesPayment, taking] = read;
+        const payOnline = takesPayment && taking;
         // How the join sheet can offer autopay (D12): the provider's own
         // list, only where Join is paid online; a provider that can't say
         // offers none.
@@ -242,16 +253,19 @@ export class PublicPlansService {
                           .catch((): MandateMethod[] => []),
                   )
                 : [];
-        return {
-            payOnline,
-            autopayMethods,
-            offered: true,
-            plans: orderPlans(
-                rows.map(({ _count, ...row }) => ({
-                    ...row,
-                    members: _count.subscriptions,
-                })),
-            ),
-        };
+        return withPause(
+            {
+                payOnline,
+                autopayMethods,
+                offered: true,
+                plans: orderPlans(
+                    rows.map(({ _count, ...row }) => ({
+                        ...row,
+                        members: _count.subscriptions,
+                    })),
+                ),
+            },
+            taking,
+        );
     }
 }

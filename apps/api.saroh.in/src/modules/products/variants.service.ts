@@ -83,11 +83,7 @@ export class VariantsService {
         dto: CreateVariantDto,
     ) {
         return this.createIn(
-            await this.products.access.writeViaStore(
-                storeId,
-                userId,
-                productId,
-            ),
+            await this.products.access.editViaStore(storeId, userId, productId),
             productId,
             dto,
         );
@@ -173,11 +169,7 @@ export class VariantsService {
         dto: UpdateVariantDto,
     ) {
         return this.updateIn(
-            await this.products.access.writeViaStore(
-                storeId,
-                userId,
-                productId,
-            ),
+            await this.products.access.editViaStore(storeId, userId, productId),
             productId,
             variantId,
             dto,
@@ -233,11 +225,7 @@ export class VariantsService {
         dto: ReorderVariantsDto,
     ) {
         return this.reorderIn(
-            await this.products.access.writeViaStore(
-                storeId,
-                userId,
-                productId,
-            ),
+            await this.products.access.editViaStore(storeId, userId, productId),
             productId,
             dto,
         );
@@ -282,11 +270,7 @@ export class VariantsService {
         userId: string,
     ) {
         return this.removeIn(
-            await this.products.access.writeViaStore(
-                storeId,
-                userId,
-                productId,
-            ),
+            await this.products.access.editViaStore(storeId, userId, productId),
             productId,
             variantId,
         );

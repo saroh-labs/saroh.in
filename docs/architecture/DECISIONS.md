@@ -1289,3 +1289,16 @@ Unless an entry says otherwise, its status is **Proposed — requires audit revi
 - Consequences: the list lives in `docs/patterns/saroh-product.md`; code identifiers, routes and stored values keep their names.
 
 Also decided 9 Oct (#886): each admin console deploys only its own environment; see DEC-107.
+
+## DEC-114 A move to a lower plan pauses what's over its limits, 7 days after we say what
+
+**Status: Accepted — 2026-10-09** · owner · #800 #801 #802 · matches the Terms' "Moving to a lower plan"
+
+- Context: the published Terms promise that on a move to a lower plan, what's over the new plan's limits becomes read-only, with an email 7 days before, nothing deleted, and moving back up restoring everything at once. Before this, nothing paused; only adding more was refused.
+- Decision:
+    - What's over the limits is worked out from the plan the business reads now and a fixed order; nothing is stored per item. Team (seats as DEC-105 and DEC-111 count them, view-only people against their own limit): the owner always stays, then the earliest to join, then open invitations. Products and posts: the newest stay. Locations (SHOP storefronts, DEC-109) and websites (DEC-094): the first made stay.
+    - Paused people can't open the business, and take no new bookings (diary people with no login and paused members' own diary rows). Paused products and posts are hidden from the site and read-only. A paused location stops taking orders; a paused website stops orders, bookings, class packs and plans sold online. Invoices, orders, customers and payment records are never touched, and bookings already made are kept.
+    - **The pause waits 7 days after a notice (owner, 9 Oct).** Moves known ahead (an offer's end, a term's end, a chosen move) are told at 30, 7 and 1 days; moves that happen at once (a failed payment the provider gave up on, cancelling now, an operator change) are told within the hour and pause 7 days later. The billing moves themselves are unchanged.
+    - **Locations and bookings (owner, 9 Oct):** bookings belong to the business, not a location, so a paused location stops orders and a paused website stops bookings; the Terms stand as written.
+    - Moving back up restores everything at once. Behind `PLAN_ENFORCEMENT`; nothing pauses with it off or off the catalogue, and a failed read pauses nothing.
+- Consequences: one stored clock, a `CustomerNotice` of kind `MOVE_DOWN` per set of limits told; `Membership.createdAt` added (migration `20261101100000_membership_joined_at`, backfilled from the accepted invitation). The admin limit-override warning says what will pause and when (#802). When `PLAN_ENFORCEMENT` turns on, every business already over its limits is told at once and pauses 7 days later. `docs/patterns/backend-billing-and-classes.md` → "Moving to a lower plan".

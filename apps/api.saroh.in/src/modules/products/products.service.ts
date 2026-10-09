@@ -507,7 +507,7 @@ export class ProductsService {
         dto: UpdateProductDto,
     ) {
         return this.updateIn(
-            await this.access.writeViaStore(storeId, userId, productId),
+            await this.access.editViaStore(storeId, userId, productId, dto),
             productId,
             dto,
         );
@@ -602,7 +602,7 @@ export class ProductsService {
         dto: PatchProductDto,
     ) {
         return this.patchIn(
-            await this.access.writeViaStore(storeId, userId, productId),
+            await this.access.editViaStore(storeId, userId, productId, dto),
             productId,
             dto,
         );

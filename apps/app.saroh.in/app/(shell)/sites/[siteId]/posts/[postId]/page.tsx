@@ -1,7 +1,9 @@
 import { notFound } from "next/navigation";
 
 import { PostEditor } from "@/components/sites/post-editor";
+import { activeCut, postPaused } from "@/lib/billing/paused";
 import { getPost, listPostCategories } from "@/lib/content/service";
+import { pausedOrNull } from "@/lib/saroh-billing/service";
 import { requireSession } from "@/lib/session";
 import { getSite } from "@/lib/sites/service";
 
@@ -23,11 +25,20 @@ export default async function EditPostPage({
     const site = await getSite(siteId);
     if (!site) notFound();
 
-    const [post, categories] = await Promise.all([
+    const [post, categories, paused] = await Promise.all([
         getPost(siteId, postId),
         listPostCategories(siteId),
+        // Past the plan's blog posts limit (#800): read-only, and why.
+        pausedOrNull(),
     ]);
     if (!post) notFound();
 
-    return <PostEditor siteId={siteId} categories={categories} post={post} />;
+    return (
+        <PostEditor
+            siteId={siteId}
+            categories={categories}
+            post={post}
+            paused={postPaused(post, activeCut(paused, "posts"))}
+        />
+    );
 }

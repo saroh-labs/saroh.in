@@ -133,7 +133,7 @@ export class OrganizationProductsController {
         @Query("storefront") storefront?: string,
     ) {
         return this.products.patchIn(
-            await this.access.write(ctx, productId, storefront),
+            await this.access.edit(ctx, productId, storefront, dto),
             productId,
             dto,
         );
@@ -146,7 +146,7 @@ export class OrganizationProductsController {
         @Body() dto: UpdateProductDto,
     ) {
         return this.products.updateIn(
-            await this.access.write(ctx, productId),
+            await this.access.edit(ctx, productId, undefined, dto),
             productId,
             dto,
         );
@@ -202,7 +202,7 @@ export class OrganizationProductsController {
         @Body() dto: ReplaceProductImagesDto,
     ) {
         return this.images.replaceIn(
-            await this.access.write(ctx, productId),
+            await this.access.edit(ctx, productId),
             productId,
             dto,
         );
@@ -230,7 +230,7 @@ export class OrganizationProductsController {
         @Body() dto: CreateVariantDto,
     ) {
         return this.variants.createIn(
-            await this.access.write(ctx, productId),
+            await this.access.edit(ctx, productId),
             productId,
             dto,
         );
@@ -245,7 +245,7 @@ export class OrganizationProductsController {
         @Query("storefront") storefront?: string,
     ) {
         return this.variants.reorderIn(
-            await this.access.write(ctx, productId, storefront),
+            await this.access.edit(ctx, productId, storefront),
             productId,
             dto,
         );
@@ -259,7 +259,7 @@ export class OrganizationProductsController {
         @Body() dto: UpdateVariantDto,
     ) {
         return this.variants.updateIn(
-            await this.access.write(ctx, productId),
+            await this.access.edit(ctx, productId),
             productId,
             variantId,
             dto,
@@ -273,7 +273,7 @@ export class OrganizationProductsController {
         @Param("variantId") variantId: string,
     ) {
         return this.variants.removeIn(
-            await this.access.write(ctx, productId),
+            await this.access.edit(ctx, productId),
             productId,
             variantId,
         );
@@ -344,7 +344,7 @@ export class OrganizationProductsController {
         @Body() dto: SetStockTrackingDto,
     ) {
         return this.inventory.setTrackingIn(
-            await this.access.write(ctx, productId),
+            await this.access.edit(ctx, productId),
             productId,
             dto.tracked,
         );

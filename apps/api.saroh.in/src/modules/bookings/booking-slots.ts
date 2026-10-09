@@ -2,6 +2,11 @@ import { BadRequestException, ConflictException } from "@nestjs/common";
 import type { Service } from "@saroh/database";
 import { prisma } from "@saroh/database";
 
+import {
+    diaryPaused,
+    PERSON_NOT_TAKING_BOOKINGS,
+    SERVICE_NOT_TAKING_BOOKINGS,
+} from "../billing/paused-errors";
 import type {
     AvailabilityRuleWindow,
     AvailabilityService,
@@ -24,6 +29,7 @@ import {
     workingIntervals,
 } from "./availability";
 import { holdsPlace } from "./booking-hold";
+import { nobodyTaking, pausedDiaryIds, splitPaused } from "./diary-paused";
 import type { BookingLocationType } from "./dto";
 import { heldSeatIntervals } from "./held-seats";
 import { openingFor } from "./opening-hours";
@@ -56,7 +62,13 @@ export type AvailableSlot = Slot & { staffIds?: string[] };
  * instructors, for display and clash checks only.
  */
 export interface Staffing {
+    /** Who takes it and takes bookings now. */
     people: { id: string; name: string }[];
+    /**
+     * Who takes it but is past the plan's team limit (#800,
+     * `diary-paused.ts`): no new bookings. Absent: nobody is paused.
+     */
+    paused?: { id: string; name: string }[];
     perPerson: boolean;
     /** The business's zone — staff hours are wall-clock times in it. */
     zone: string | null;
@@ -81,6 +93,10 @@ export async function openSlots(
         loadStaffing(service),
         openingFor(service, where),
     ]);
+    // Past the plan's team limit (#800): no new times with them, and a
+    // service only they take offers none.
+    if (staffId && staffing.paused?.some((p) => p.id === staffId)) return [];
+    if (nobodyTaking(staffing)) return [];
     if (staffId && !staffing.people.some((p) => p.id === staffId)) {
         throw new BadRequestException({
             message: "That person doesn't take this service.",
@@ -133,10 +149,18 @@ export async function openSlots(
 
 /** How a service is staffed — see {@link Staffing}. */
 export async function loadStaffing(service: Service): Promise<Staffing> {
-    const people = await serviceStaff(prisma, service.id);
-    const perPerson = service.capacity === 1 && people.length > 0;
+    const [all, pausedIds] = await Promise.all([
+        serviceStaff(prisma, service.id),
+        pausedDiaryIds(service.organizationId),
+    ]);
+    const { taking, paused } = splitPaused(all, pausedIds);
+    // Judged on everyone who takes it: a one-to-one whose people are all
+    // paused stays theirs, and offers nothing, rather than reading as a
+    // service nobody takes.
+    const perPerson = service.capacity === 1 && all.length > 0;
     return {
-        people,
+        people: taking,
+        ...(paused.length > 0 ? { paused } : {}),
         perPerson,
         zone: perPerson
             ? await businessTimezone(prisma, service.organizationId)
@@ -163,6 +187,27 @@ export async function resolvePerson(
     /** In person: the opening hours it keeps to (DEC-087). */
     opening: OpeningHours | null = null,
 ): Promise<ReserveWith> {
+    // Past the plan's team limit (#800): the team hears who and why; a
+    // customer only that they aren't taking bookings, never the plan.
+    const pausedNamed = requested
+        ? staffing.paused?.find((p) => p.id === requested)
+        : undefined;
+    if (pausedNamed) {
+        throw audience === "team"
+            ? diaryPaused([pausedNamed.name])
+            : new BadRequestException({
+                  message: PERSON_NOT_TAKING_BOOKINGS,
+                  field: "staffId",
+              });
+    }
+    if (nobodyTaking(staffing)) {
+        throw audience === "team"
+            ? diaryPaused((staffing.paused ?? []).map((p) => p.name))
+            : new BadRequestException({
+                  message: SERVICE_NOT_TAKING_BOOKINGS,
+                  field: "startAt",
+              });
+    }
     const named = requested
         ? staffing.people.find((p) => p.id === requested)
         : undefined;

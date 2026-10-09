@@ -1,3 +1,4 @@
+import type { Prisma } from "@saroh/database";
 import { prisma } from "@saroh/database";
 
 import { fromMinor } from "../../common/money";
@@ -34,6 +35,13 @@ import { NEW_STOREFRONT_TYPES, storefrontTypesOf } from "./fulfilment";
 export interface ShopScope {
     organizationId: string;
     storefront: { id: string; name: string };
+    /**
+     * The products a move to a lower plan keeps on the site (#800). A
+     * paused one reads as no longer sold here; absent, every product.
+     */
+    kept?: Prisma.ProductWhereInput;
+    /** False: the site or its location stopped taking orders (#800). */
+    takingOrders?: boolean;
 }
 
 /** What the checkout reads from the storefront's settings. */
@@ -116,6 +124,7 @@ export async function priceBag(
                       id: { in: ids },
                       organizationId: scope.organizationId,
                       storeId: scope.storefront.id,
+                      ...(scope.kept ? { product: scope.kept } : {}),
                   },
                   select: {
                       id: true,

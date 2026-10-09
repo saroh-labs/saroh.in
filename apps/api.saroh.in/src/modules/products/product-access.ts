@@ -14,6 +14,7 @@ import {
     canWriteStock,
 } from "../organizations/organization-policy";
 import { StoresService } from "../stores/stores.service";
+import { assertProductEditable } from "./product-paused";
 
 /**
  * Whose catalogue a request works on, at which storefront, and what the
@@ -139,6 +140,34 @@ export class ProductAccess {
             may: (action) => Promise.resolve(allows(ctx, action)),
             canStock: () => Promise.resolve(canWriteStock(ctx)),
         };
+    }
+
+    /**
+     * {@link write} for a change to an existing product's content (#800): a
+     * product the plan has paused is read-only (`product-paused.ts`).
+     * `dto`, the save, lets a status-only take-off-sale through.
+     */
+    async edit(
+        ctx: OrganizationContext,
+        productId: string,
+        storefront?: string,
+        dto?: object,
+    ): Promise<ProductScope> {
+        const scope = await this.write(ctx, productId, storefront);
+        await assertProductEditable(scope.organizationId, productId, dto);
+        return scope;
+    }
+
+    /** {@link writeViaStore} for a content change (#800), as {@link edit}. */
+    async editViaStore(
+        storeId: string,
+        userId: string,
+        productId: string,
+        dto?: object,
+    ): Promise<ProductScope> {
+        const scope = await this.writeViaStore(storeId, userId, productId);
+        await assertProductEditable(scope.organizationId, productId, dto);
+        return scope;
     }
 
     /** Store-route alias: read at `storeId`, where the product is listed. */

@@ -7,6 +7,8 @@ import {
 import type { Prisma } from "@saroh/database";
 import { prisma, runInOrgContext } from "@saroh/database";
 
+import { keptByCut } from "../billing/over-limit";
+import { overLimit } from "../billing/over-limit.service";
 import { FixedWindowRateLimiter } from "../bookings/rate-limiter";
 import { MODULE_BY_KEY } from "../capabilities/module-registry";
 import { FeatureFlagService } from "../feature-flags/feature-flags.service";
@@ -118,6 +120,11 @@ function image(row: ImageRow): PublicImage {
 interface ShopScope {
     organizationId: string;
     storefront: { id: string; name: string };
+    /**
+     * The products a move to a lower plan keeps on the site (#800): spread
+     * into every product read, so a paused one is in no list, grid or page.
+     */
+    kept: Prisma.ProductWhereInput;
 }
 
 /** What a card needs of a listing and its product. */
@@ -223,7 +230,7 @@ export class PublicCatalogueService {
                     where: {
                         organizationId: scope.organizationId,
                         storeId: scope.storefront.id,
-                        product: { status: "PUBLISHED" },
+                        product: { status: "PUBLISHED", ...scope.kept },
                     },
                     orderBy: [{ product: { name: "asc" } }, { id: "asc" }],
                     take: MAX_PRODUCTS,
@@ -248,7 +255,7 @@ export class PublicCatalogueService {
         const sold = {
             organizationId: scope.organizationId,
             storeId: scope.storefront.id,
-            product: { status: "PUBLISHED" },
+            product: { status: "PUBLISHED", ...scope.kept },
         } satisfies Prisma.ProductListingWhereInput;
 
         if (grid.source === "newest") {
@@ -382,6 +389,7 @@ export class PublicCatalogueService {
                     organizationId: scope.organizationId,
                     slug,
                     status: "PUBLISHED",
+                    ...scope.kept,
                     listings: { some: { storeId: scope.storefront.id } },
                 },
                 select: {
@@ -562,7 +570,11 @@ export class PublicCatalogueService {
             if (!(await commerceRolledOut(organizationId))) notFound();
             const storefront = await effectiveStorefront(prisma, site);
             if (!storefront) notFound();
-            return fn({ organizationId, storefront });
+            const paused = await overLimit.pausedNow(organizationId);
+            const kept: Prisma.ProductWhereInput = keptByCut(
+                paused?.products ?? null,
+            );
+            return fn({ organizationId, storefront, kept });
         });
     }
 

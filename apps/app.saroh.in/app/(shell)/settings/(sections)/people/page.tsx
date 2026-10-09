@@ -2,6 +2,7 @@ import { PlanLimitNotice } from "@/components/billing/plan-limit-notice";
 import { TeamScreen } from "@/components/organizations/team-screen";
 import { SettingsPanel } from "@/components/settings/settings-panel";
 import { rowNotice } from "@/lib/billing/access";
+import { pausedTeam } from "@/lib/billing/paused";
 import { modulesOrUnknown } from "@/lib/modules/guard";
 import { diaryPeopleToInvite } from "@/lib/organizations/calendar-only";
 import { shownCatalogue } from "@/lib/organizations/catalogue-shown";
@@ -14,7 +15,7 @@ import {
 import { getRoleCatalogue, listRoles } from "@/lib/organizations/roles";
 import { rolesLock } from "@/lib/organizations/roles-lock";
 import { resolveActiveOrganization } from "@/lib/organizations/service";
-import { billingAccessOrNull } from "@/lib/saroh-billing/service";
+import { billingAccessOrNull, pausedOrNull } from "@/lib/saroh-billing/service";
 import { requireSession } from "@/lib/session";
 import { listSites } from "@/lib/sites/service";
 import { listStaff } from "@/lib/staff/service";
@@ -59,6 +60,7 @@ export default async function PeoplePage() {
         joinedFromStorefronts,
         modules,
         staff,
+        paused,
     ] = await Promise.all([
         listMembers(),
         // Empty for anyone who may not see them, rather than an error: this is
@@ -80,6 +82,8 @@ export default async function PeoplePage() {
         // Who takes bookings with no login: a team seat each (DEC-105,
         // UX-053). Unread (no diary, or no right to it), nobody is added.
         canManage ? listStaff().catch(() => null) : Promise.resolve(null),
+        // Past the plan's team limit (#800): who is paused, and why.
+        pausedOrNull(),
     ]);
     // The plan, for whoever changes the team or its roles.
     const access =
@@ -126,6 +130,7 @@ export default async function PeoplePage() {
                     invitations,
                 )}
                 rolesLock={canEditRoles ? rolesLock(access) : null}
+                paused={pausedTeam(paused)}
                 limitNotice={
                     canManage ? <PlanLimitNotice moduleId="members" /> : null
                 }
