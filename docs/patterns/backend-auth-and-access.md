@@ -420,7 +420,8 @@ orgId)` (`organizations/organization-kind.ts`).
   a Platform Owner whose ownership does not expire.
 - **Current** — **Cross-tenant reads live only behind the admin guards** (plan
   D2). The admin services (`admin-organizations`, `admin-people`,
-  `admin-machinery`, `admin-waitlist`, `admin-metrics`, and the pricing
+  `admin-machinery`, `admin-waitlist`, `admin-metrics`, `admin-usage`
+  (storage per business, #798), and the pricing
   catalogue's `ImpactService`) read across every
   business with no organization context, so the `org_isolation` policies take
   their permissive branch. Each says **CROSS-TENANT READ** in its doc comment,

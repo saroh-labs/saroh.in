@@ -114,6 +114,17 @@ nobody was told. Round-2 A14 closed it (`bookings/booking-notify.handler.ts`).
   stopped, for an insert that committed late; a run whose sweep failed
   hands its own `since` on. A fresh chain (boot, or `ensureScheduled` every
   six hours finding none) starts 90 days back, the page's longest range.
+- **`analytics.retention`** is the daily self-rescheduling sweep (#799,
+  `analytics/analytics-retention.handler.ts`), one PENDING run at a time
+  (`Job_one_pending_analytics_retention`), restarted by the same six-hour
+  check and boot. It deletes `AnalyticsEvent` rows whose `expiresAt` (intake
+  stamps received + `ANALYTICS_RETENTION_DAYS`, 400) has passed, 1,000 ids a
+  statement in `expiresAt` order, at most 50 batches a run; a run that stops
+  at that cap with more due comes back in a minute, not a day. A row with
+  no stamp is kept. It **never deletes an aggregate**: the daily rollups
+  outlive their events, and `analytics.aggregate` refuses to rebuild a day
+  that starts before the 400-day cutoff (`pastRetention`), since what is
+  left of it would shrink its rollup. It logs counts only.
 
 ## Custom-domain re-check — **Current** (#860)
 
