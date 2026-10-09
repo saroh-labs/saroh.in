@@ -1290,7 +1290,7 @@ Unless an entry says otherwise, its status is **Proposed — requires audit revi
 
 Also decided 9 Oct (#886): each admin console deploys only its own environment; see DEC-107.
 
-## DEC-114 Every error page is drawn by the apps, not by Cloudflare
+## DEC-115 Every error page is drawn by the apps, not by Cloudflare
 
 **Status: Accepted — 2026-10-09** · owner
 

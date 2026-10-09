@@ -60,7 +60,7 @@ Before the split, one API restart signed out every user.
 
 - **Adopted** — **Every app root has `error.tsx` and `loading.tsx`.** Gap:
   templates, saroh.in and ui have no `loading.tsx`.
-- **Current** — **One error page, in three layers** (DEC-114). A Saroh app's
+- **Current** — **One error page, in three layers** (DEC-115). A Saroh app's
   root `error.tsx` draws `ErrorPage` from `@saroh/ui/error-page` — the 404's
   shape (mono eyebrow "500", display heading, one sentence, Try again and
   the surface's home, the digest as a reference); `kind="unavailable"` is
