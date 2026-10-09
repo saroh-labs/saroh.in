@@ -417,6 +417,23 @@ describe("a discount code in the bag (DEC-104)", () => {
         ).toBe(false);
     });
 
+    it("reads a quote's free delivery over an amount, and one from an older API", () => {
+        expect(
+            isQuote({
+                ...priced,
+                freeDelivery: { over: "999.00", short: "120.00" },
+            }),
+        ).toBe(true);
+        expect(
+            isQuote({
+                ...priced,
+                freeDelivery: { over: "999.00", short: null },
+            }),
+        ).toBe(true);
+        expect(isQuote({ ...priced, freeDelivery: null })).toBe(true);
+        expect(isQuote({ ...priced, freeDelivery: { over: 999 } })).toBe(false);
+    });
+
     it("says a code that stopped applying in the checkout's words", () => {
         expect(
             problemOf(409, {

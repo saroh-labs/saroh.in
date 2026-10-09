@@ -64,6 +64,7 @@ export async function shopSettings(scope: ShopScope): Promise<ShopSettings> {
             shippingEnabled: true,
             localDeliveryFee: true,
             shippingFee: true,
+            freeShippingThreshold: true,
             kind: true,
             address: true,
             openingHours: true,
@@ -82,6 +83,7 @@ export async function shopSettings(scope: ShopScope): Promise<ShopSettings> {
         fees: {
             localDeliveryFee: row?.localDeliveryFee ?? null,
             shippingFee: row?.shippingFee ?? null,
+            freeOver: row?.freeShippingThreshold ?? null,
         },
     };
 }

@@ -225,9 +225,18 @@ export function checkoutWays(
 export interface DeliveryFees {
     localDeliveryFee: { toString(): string } | null;
     shippingFee: { toString(): string } | null;
+    /**
+     * "Free delivery over" (`StoreSettings.freeShippingThreshold`): an order
+     * whose items come to this or more pays no delivery fee. Null or absent,
+     * the fee is always charged.
+     */
+    freeOver?: { toString(): string } | null;
 }
 
-/** What a way adds to the order, in minor units. Pick-up is free. */
+/**
+ * What a way adds to the order, in minor units, before any free-delivery
+ * amount: the storefront's flat fee. Pick-up is free.
+ */
 export function feeCents(
     type: StorefrontFulfilmentType,
     fees: DeliveryFees,
@@ -241,12 +250,49 @@ export function feeCents(
     return 0;
 }
 
+/** The free-delivery amount in minor units; null when there is none. */
+export function freeOverCents(fees: DeliveryFees): number | null {
+    if (!fees.freeOver) return null;
+    const cents = toMinor(fees.freeOver);
+    return cents > 0 ? cents : null;
+}
+
+/**
+ * What a way adds to this order, in minor units. `itemsCents` is what the
+ * items come to after any code and before delivery: the bag's Subtotal less
+ * its Code line. (A GST-registered business's prices already include GST,
+ * ADR-008, so no tax sits between them.) At or above the storefront's "Free
+ * delivery over", Local delivery and Shipping add nothing; Pick-up never
+ * adds anything.
+ */
+export function deliveryCents(
+    type: StorefrontFulfilmentType,
+    fees: DeliveryFees,
+    itemsCents: number,
+): number {
+    const fee = feeCents(type, fees);
+    if (fee === 0) return 0;
+    const over = freeOverCents(fees);
+    return over !== null && itemsCents >= over ? 0 : fee;
+}
+
 /** One way as the checkout shows it. */
 export interface CheckoutWay {
     type: StorefrontFulfilmentType;
     label: string;
-    /** "60.00", or null when it adds nothing. */
+    /** "60.00", or null when it adds nothing (free delivery included). */
     fee: string | null;
+}
+
+/**
+ * The storefront's "Free delivery over", as the bag shows it: the amount,
+ * and how much more the items must come to before delivery is free (null
+ * once they reach it). Null when there is no amount, or no way offered
+ * here carries a fee for it to waive.
+ */
+export interface QuoteFreeDelivery {
+    over: string;
+    short: string | null;
 }
 
 /** The quote the site's bag and checkout draw. */
@@ -275,6 +321,8 @@ export interface CheckoutQuote {
      * nothing. Null when no code was typed.
      */
     discount: QuoteDiscount | null;
+    /** Free delivery over an amount (`deliveryCents`); null when none. */
+    freeDelivery: QuoteFreeDelivery | null;
     total: string;
     /** Every line can be sold and a way is chosen: it can be paid for now. */
     ready: boolean;
@@ -336,9 +384,14 @@ export function buildQuote(input: {
         (sum, l) => sum + l.unitCents * l.quantity,
         0,
     );
-    const delivery = chosen ? feeCents(chosen, input.fees) : 0;
     // A code comes off the lines, never the delivery, and never below zero.
     const off = Math.min(subtotal, Math.max(0, input.discount?.cents ?? 0));
+    // Free delivery is judged on the items after the code: what the bag's
+    // Subtotal and Code lines leave, before delivery.
+    const items = subtotal - off;
+    const delivery = chosen ? deliveryCents(chosen, input.fees, items) : 0;
+    const over = freeOverCents(input.fees);
+    const waivable = ways.some((type) => feeCents(type, input.fees) > 0);
     return {
         currency: input.currency,
         lines: input.lines.map((l) => ({
@@ -357,7 +410,7 @@ export function buildQuote(input: {
             available: l.available,
         })),
         ways: ways.map((type) => {
-            const fee = feeCents(type, input.fees);
+            const fee = deliveryCents(type, input.fees, items);
             return {
                 type,
                 label: FULFILMENT_RULES[type].label,
@@ -368,7 +421,14 @@ export function buildQuote(input: {
         subtotal: fromMinor(subtotal),
         delivery: fromMinor(delivery),
         discount: input.discount?.view ?? null,
-        total: fromMinor(subtotal - off + delivery),
+        freeDelivery:
+            over !== null && waivable
+                ? {
+                      over: fromMinor(over),
+                      short: items >= over ? null : fromMinor(over - items),
+                  }
+                : null,
+        total: fromMinor(items + delivery),
         ready:
             input.lines.length > 0 &&
             input.lines.every((l) => l.state === "ok") &&

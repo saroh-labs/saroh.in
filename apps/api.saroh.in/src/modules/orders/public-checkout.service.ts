@@ -10,7 +10,7 @@ import {
 } from "@nestjs/common";
 import { prisma, runInOrgContext } from "@saroh/database";
 
-import { toMoneyString } from "../../common/money";
+import { toMinor, toMoneyString } from "../../common/money";
 import { notTakingOrders } from "../billing/paused-errors";
 import { FixedWindowRateLimiter } from "../bookings/rate-limiter";
 import { DiscountsService } from "../discounts/discounts.service";
@@ -405,7 +405,9 @@ export class PublicCheckoutService {
             const orderId = await createCheckoutOrder(scope, account, {
                 lines,
                 type,
-                shippingCents: feeCents(type, settings.fees),
+                // The delivery the bag showed for this way: free at or
+                // above the storefront's "Free delivery over" (`deliveryCents`).
+                shippingCents: toMinor(quote.delivery),
                 currency: settings.currency,
                 dto,
                 payOnHandover: payBy === "ON_HANDOVER",
