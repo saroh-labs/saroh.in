@@ -125,6 +125,7 @@ beforeAll(async () => {
                 bookerName: "Meena Rao",
                 bookerEmail: `meena-${tag}@example.com`,
                 timezone: "UTC",
+                snapshot: { priceCents: 0, currency: "INR" },
             },
         })
     ).id;
