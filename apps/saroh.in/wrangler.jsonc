@@ -5,7 +5,9 @@
 {
     "$schema": "node_modules/wrangler/config-schema.json",
     "name": "saroh-web-dev",
-    "main": ".open-next/worker.js",
+    // OpenNext's handler behind Saroh's crash page: worker.ts wraps
+    // .open-next/worker.js, which `pnpm cf:build` writes.
+    "main": "worker.ts",
     "compatibility_date": "2026-10-01",
     // Off: esbuild's name-keeping wraps functions in __name(), which breaks
     // functions Next turns into inline <script>s ("__name is not defined").

@@ -1289,3 +1289,11 @@ Unless an entry says otherwise, its status is **Proposed — requires audit revi
 - Consequences: the list lives in `docs/patterns/saroh-product.md`; code identifiers, routes and stored values keep their names.
 
 Also decided 9 Oct (#886): each admin console deploys only its own environment; see DEC-107.
+
+## DEC-114 Every error page is drawn by the apps, not by Cloudflare
+
+**Status: Accepted — 2026-10-09** · owner
+
+- Context: the owner asked for every error page to be custom (404, 5xx). Our zones are on Cloudflare's Free plan, where Cloudflare's own edge error pages can't be replaced.
+- Decision: stay on the Free plan. Every error page comes from the Next.js apps: `not-found.tsx` (`@saroh/ui/not-found`), `error.tsx` (`@saroh/ui/error-page`), and `global-error.tsx` (`@saroh/ui/crash-page`, self-styled because the root layout's CSS is gone). Each Worker's entry (`worker.ts`) wraps OpenNext's handler in `withCrashPage`, so an exception before Next renders returns the same page as static HTML with a 500. Merchant sites (`saroh.app`) use their `--site-*` palette, and the neutral, unbranded page where the palette is unknown.
+- Consequences: what the apps can't draw stays Cloudflare's: a Worker stopped for CPU or memory, an error after a streamed response has started, and edge errors when a host can't be reached (502, 521, 522, …, including api.saroh.in seen directly). A page whose API read fails still renders our own error page, because the Worker, not the visitor, calls the API.

@@ -59,13 +59,30 @@ Before the split, one API restart signed out every user.
 ### Boundaries
 
 - **Adopted** — **Every app root has `error.tsx` and `loading.tsx`.** Gap:
-  templates, saroh.in and ui have neither.
+  templates, saroh.in and ui have no `loading.tsx`.
+- **Current** — **One error page, in three layers** (DEC-114). A Saroh app's
+  root `error.tsx` draws `ErrorPage` from `@saroh/ui/error-page` — the 404's
+  shape (mono eyebrow "500", display heading, one sentence, Try again and
+  the surface's home, the digest as a reference); `kind="unavailable"` is
+  the 503 "Back shortly". Every app has a `global-error.tsx` drawing
+  `CrashDocument` from `@saroh/ui/crash-page`, which carries its own
+  `<style>`, because the root layout and its CSS are what failed; help and
+  docs (Nextra, no Tailwind for `@saroh/ui`) use its inline `CrashPage` in
+  `error.jsx` too. Each Cloudflare app's `worker.ts` wraps OpenNext's
+  handler in `withCrashPage` (`@saroh/ui/lib/crash-page`), so a throw before
+  Next renders is the same page as static HTML, not Cloudflare's screen.
+  Merchant sites use `SiteError` (`apps/saroh.app/components/site-error.tsx`)
+  and the `neutral` crash page, never Saroh's brand. New boundaries take
+  Next 16.3's `retry` (re-fetches), not `reset`.
+- **Current** — **Say nothing was lost only when it is true.** A failed read
+  leaves saved work alone ("Anything you'd already saved is safe"); a
+  boundary a write can reach doesn't promise it.
 - **Adopted** — **Show `error.digest` as a reference** — the only handle a user
   can give support. Report the error with `reportError(error, { boundary,
 digest })` from `@saroh/ui/lib/report-error` (#103): it logs, and it forwards
   once a tracker is registered. Never call `console.error` directly in a
-  boundary. Current in the accounts, admin and saroh.app boundaries; gap:
-  `app.saroh.in/app/error.tsx` does not show it.
+  boundary. Current in every app's root and global boundaries and in
+  `SectionError`.
 - **Current** — **A 403 from a server read calls `forbidden()` instead of throwing
   an ordinary error.**
     - `getJson` does it (`lib/api/http.ts`).
