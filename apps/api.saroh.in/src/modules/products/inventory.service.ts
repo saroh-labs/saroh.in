@@ -349,11 +349,7 @@ export class InventoryService {
         tracked: boolean,
     ): Promise<ProductTracking> {
         return this.setTrackingIn(
-            await this.products.access.writeViaStore(
-                storeId,
-                userId,
-                productId,
-            ),
+            await this.products.access.editViaStore(storeId, userId, productId),
             productId,
             tracked,
         );

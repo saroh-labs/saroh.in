@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 
 import {
     ModulePageUnavailable,
+    NotTakingOrders,
     ShopListing,
     ShopUnavailable,
 } from "@saroh/site-blocks";
@@ -124,6 +125,7 @@ export default async function ShopPage({
     // offers "Ask about ordering".
     return (
         <main className="w-full">
+            {checkout?.notTakingOrders ? <NotTakingOrders banner /> : null}
             <ShopListing
                 products={lookup.data.products}
                 bagSite={checkout?.canOrder ? siteId : null}

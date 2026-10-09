@@ -78,6 +78,21 @@ export function memberPausedWords(businessName: string): string {
     return `Your access to ${businessName} is paused. Its plan includes fewer team members than it has, so the people who joined most recently are paused until it moves up again. Nothing of yours is lost. Ask the owner to choose a plan in Plan and billing.`;
 }
 
+export const INVITATION_PAUSED = "INVITATION_PAUSED";
+
+/** What someone reads accepting an invitation past the plan's limit. */
+export function invitationPausedWords(businessName: string): string {
+    return `${businessName}'s plan has no room for you right now, so this invitation can't be accepted yet. You can accept it once the business moves up, while the invitation is still valid. Ask the owner to choose a plan in Plan and billing.`;
+}
+
+/** 409: accepting an invitation the plan has paused. */
+export function invitationPaused(businessName: string): ConflictException {
+    return new ConflictException({
+        message: invitationPausedWords(businessName),
+        details: { code: INVITATION_PAUSED },
+    });
+}
+
 /** 403: a paused team member opening the business. */
 export function memberPaused(businessName: string): ForbiddenException {
     return new ForbiddenException({

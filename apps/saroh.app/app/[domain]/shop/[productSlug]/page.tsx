@@ -5,6 +5,7 @@ import type { SignInOptions } from "@saroh/site-blocks";
 import {
     AddToBag,
     AskAboutOrdering,
+    NotTakingOrders,
     ProductPage,
     ShopUnavailable,
 } from "@saroh/site-blocks";
@@ -118,6 +119,9 @@ export default async function ShopProductPage({
     const action =
         checkout?.canOrder && product.listingId ? (
             <AddToBag site={resolved.siteId} listingId={product.listingId} />
+        ) : checkout?.notTakingOrders ? (
+            // Stopped taking orders for now (#800): nothing to ask about.
+            <NotTakingOrders />
         ) : (
             <AskAboutOrdering
                 enquiryHref={enquiryPagePath(resolved.snapshot)}

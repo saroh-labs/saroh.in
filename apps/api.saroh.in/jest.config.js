@@ -316,6 +316,10 @@ module.exports = {
         "<rootDir>/src/modules/subscriptions/dto.spec.ts",
         "<rootDir>/src/modules/orders/orders.service.discount.spec.ts",
         "<rootDir>/src/modules/products/products.remove.spec.ts",
+        // A move to a lower plan pauses what is past its limits (#800).
+        "<rootDir>/src/modules/products/product-paused.spec.ts",
+        "<rootDir>/src/modules/content/post-paused.spec.ts",
+        "<rootDir>/src/modules/orders/checkout-paused.spec.ts",
         "<rootDir>/src/modules/product-reviews/**/*.spec.ts",
         // S5-002 payments: AES-256-GCM credential crypto (round-trip, tamper,
         // missing-key) and PaymentsService specs with a jest-mocked Prisma

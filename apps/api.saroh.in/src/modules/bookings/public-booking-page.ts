@@ -3,6 +3,7 @@ import { prisma } from "@saroh/database";
 import { DateTime } from "luxon";
 
 import { planMeter } from "../billing/metering.service";
+import { siteTakingBookings } from "../orders/checkout-paused";
 import { APPOINTMENTS_OPEN, appointmentsOpen } from "./appointments-open";
 import type { OpeningHours, Slot } from "./availability";
 import {
@@ -421,10 +422,15 @@ export async function publicBookingPage(
         takesOnlinePayment(organizationId),
         open ? onlineBookingsPaused(organizationId) : Promise.resolve(false),
     ]);
+    // A website a move to a lower plan paused takes no bookings (#800): the
+    // page says so before the form, as at the monthly cap.
+    const siteOpen = open
+        ? await siteTakingBookings(organizationId, siteId)
+        : true;
     return {
         businessName: site.organization.name,
         open,
-        paused,
+        paused: paused || !siteOpen,
         timezone: zone,
         payOnline: online && allowsOnline(rules),
         rules,

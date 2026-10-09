@@ -11,6 +11,7 @@ import {
 import { prisma, runInOrgContext } from "@saroh/database";
 
 import { toMoneyString } from "../../common/money";
+import { notTakingOrders } from "../billing/paused-errors";
 import { FixedWindowRateLimiter } from "../bookings/rate-limiter";
 import { DiscountsService } from "../discounts/discounts.service";
 import { assertOrganizationOpen } from "../organizations/organization-lifecycle.gate";
@@ -33,6 +34,7 @@ import type { BagCode, ShopScope } from "./checkout-bag";
 import { priceBag, shopSettings } from "./checkout-bag";
 import type { SiteAccount } from "./checkout-order";
 import { createCheckoutOrder } from "./checkout-order";
+import { shopPause } from "./checkout-paused";
 import type { BagLine, CheckoutQuote, CheckoutWay } from "./checkout-quote";
 import { feeCents } from "./checkout-quote";
 import type {
@@ -107,6 +109,12 @@ export interface CheckoutOptions {
      * hours, the business's public details. Null when Pick-up isn't offered.
      */
     pickup: PickupPlace | null;
+    /**
+     * True when a move to a lower plan stopped this website or its location
+     * taking orders (#800): the site says "This business isn't taking
+     * orders right now." and draws no bag. Absent from an older API.
+     */
+    notTakingOrders?: boolean;
 }
 
 /** The bag priced now, and how an order leaving the chosen way is paid. */
@@ -211,6 +219,17 @@ export class PublicCheckoutService {
                       };
                   })
                 : [];
+            if (scope.takingOrders === false) {
+                return {
+                    canOrder: false,
+                    notTakingOrders: true,
+                    storefront: { name: scope.storefront.name },
+                    currency: settings.currency,
+                    ways: [],
+                    payments: { online: false, onHandover: false },
+                    pickup: null,
+                };
+            }
             return {
                 // No way an order can leave (Pick-up from a place with no
                 // address, UX-025): the product page asks about ordering
@@ -235,6 +254,7 @@ export class PublicCheckoutService {
     ): Promise<PricedBag> {
         this.read(siteId, callerHash);
         return this.inShop(siteId, async (scope) => {
+            if (scope.takingOrders === false) throw notTakingOrders();
             const pays = paysOf(
                 await checkoutReadiness(
                     prisma,
@@ -284,6 +304,7 @@ export class PublicCheckoutService {
                 throw signedOut();
             }
             await assertOrganizationOpen(scope.organizationId);
+            if (scope.takingOrders === false) throw notTakingOrders();
             const ready = await checkoutReadiness(
                 prisma,
                 scope.organizationId,
@@ -525,7 +546,14 @@ export class PublicCheckoutService {
             if (!(await commerceOpen(prisma, organizationId))) notFound();
             const storefront = await effectiveStorefront(prisma, site);
             if (!storefront) notFound();
-            return fn({ organizationId, storefront });
+            // A move to a lower plan (#800): a paused website or location
+            // takes no orders, and a paused product isn't sold here.
+            const pause = await shopPause(
+                organizationId,
+                siteId,
+                storefront.id,
+            );
+            return fn({ organizationId, storefront, ...pause });
         });
     }
 

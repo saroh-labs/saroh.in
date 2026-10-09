@@ -184,6 +184,10 @@ export type {
 } from "./shop/api";
 export { AskAboutOrdering, askAboutHref } from "./shop/ask-about-ordering";
 export { ShopBag } from "./shop/bag";
+export {
+    NOT_TAKING_ORDERS_TEXT,
+    NotTakingOrders,
+} from "./shop/not-taking-orders";
 // The order confirmation page after a shop payment (P4).
 export type { ShopBagProps } from "./shop/bag";
 export type { BagItem } from "./shop/bag-store";

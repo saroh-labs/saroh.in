@@ -14,6 +14,7 @@ import { sanitizeRichHtml } from "../sites/sanitize";
 import { assertSiteInOrg, reviewerScope } from "../sites/site-access";
 import { slugify } from "../stores/slug";
 import type { CreatePostDto, PostStatus, UpdatePostDto } from "./dto";
+import { assertPostEditable } from "./post-paused";
 import { postPath } from "./posts-prefix";
 
 /**
@@ -157,6 +158,8 @@ export class PostsService {
         if (!current) {
             throw new NotFoundException("Post not found");
         }
+        // A live post the plan paused is read-only (#800).
+        await assertPostEditable(ctx.organizationId, postId);
 
         const slug = slugify(dto.slug);
         if (current.slug !== slug) await this.assertSlugFree(siteId, slug);
@@ -256,6 +259,8 @@ export class PostsService {
         if (!post) {
             throw new NotFoundException("Post not found");
         }
+        // Republishing a live post the plan paused is an edit (#800).
+        await assertPostEditable(ctx.organizationId, postId);
 
         const publishedAt = new Date();
         const path = postPath(site.postsPrefix, post.slug);
