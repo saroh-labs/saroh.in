@@ -10,6 +10,8 @@ import { PageContainer } from "@/components/shared/page-container";
 import { takesOnlinePayment } from "@/lib/billing/access";
 import { canReadPacks, canUsePacksOnBookings } from "@/lib/class-packs/access";
 import { packsOn } from "@/lib/class-packs/switched-on";
+import { arrivalContactId } from "@/lib/customers/prefill";
+import { readCustomerPick } from "@/lib/customers/prefill-read";
 import { onlinePayReady } from "@/lib/invoices/payments-on";
 import { readNoticeReach } from "@/lib/messages/notice-reach-read";
 import { modulesOrUnknown } from "@/lib/modules/guard";
@@ -151,6 +153,16 @@ export default async function BookingsPage({
     }
 
     const active = services.filter((s) => s.status === "ACTIVE");
+    // Opened from a person's page (#247, `?new=1&contactId=`): New booking
+    // arrives open with them chosen, read only for someone who may book
+    // and search. With no service to book it doesn't open; its button says
+    // why, as before.
+    const arriving = params.new === "1" && may("booking:write");
+    const forContact = arriving ? arrivalContactId(params) : null;
+    const initialWho =
+        forContact && people.canSearch
+            ? await readCustomerPick(forContact)
+            : null;
     return (
         <PageContainer width="full" className={BARE}>
             <CalendarScreen
@@ -194,6 +206,8 @@ export default async function BookingsPage({
                                 priceCents: s.priceCents,
                             }))}
                             people={people}
+                            openOnArrival={arriving}
+                            initialWho={initialWho}
                             // Paying with a class pack spends one (ADR-007),
                             // while Class packs is on (E12).
                             canUsePacks={

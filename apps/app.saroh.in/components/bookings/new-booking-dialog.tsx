@@ -32,6 +32,7 @@ import { classesLeft, packOffer, usablePacks } from "@/lib/class-packs/balance";
 import type { PackPurchase } from "@/lib/class-packs/service";
 import type { CustomerPick } from "@/lib/customers/picker";
 import { pickName } from "@/lib/customers/picker";
+import { withoutArrival } from "@/lib/customers/prefill";
 import {
     bookByHand,
     bookVisit,
@@ -85,6 +86,8 @@ export function NewBookingDialog({
     plainTrigger = false,
     visit,
     primaryTrigger = false,
+    initialWho = null,
+    openOnArrival = false,
 }: {
     services: {
         id: string;
@@ -107,15 +110,29 @@ export function NewBookingDialog({
      * header) rather than the booking page's outline button.
      */
     primaryTrigger?: boolean;
+    /**
+     * Who it is for, already chosen (#247): the person page's New booking
+     * arrives with `?new=1&contactId=`. The picker's Change still picks
+     * anyone else; once booked, the next one starts empty.
+     */
+    initialWho?: CustomerPick | null;
+    /**
+     * Open on arrival (`?new=1`); closing it then leaves the page's own
+     * address, so a reload doesn't open it again.
+     */
+    openOnArrival?: boolean;
 }) {
     const router = useRouter();
-    const [open, setOpen] = useState(false);
+    const [open, setOpen] = useState(
+        openOnArrival && services.length > 0 && !visit,
+    );
     const [saving, setSaving] = useState(false);
     // One per attempt, so a double-click books once (the API replays it).
     const [attempt, setAttempt] = useState(() => crypto.randomUUID());
     const [reload, setReload] = useState(0);
     const [serviceId, setServiceId] = useState(services.at(0)?.id ?? "");
-    const [who, setWho] = useState<CustomerPick | null>(null);
+    const [who, setWho] = useState<CustomerPick | null>(initialWho);
+    const [arrived, setArrived] = useState(openOnArrival);
     const [pay, setPay] = useState<PayChoice>(defaultPay(people.payLink));
     const [done, setDone] = useState<{
         booked: string;
@@ -177,6 +194,22 @@ export function NewBookingDialog({
             live = false;
         };
     }, [open, packKey, reload]);
+
+    /** Opened by `?new=1` (#247): once closed, the page's own address. */
+    function leaveArrival() {
+        if (!arrived) return;
+        setArrived(false);
+        router.replace(
+            withoutArrival(window.location.pathname, window.location.search),
+            { scroll: false },
+        );
+    }
+
+    /** Closed by the dialog's own buttons, as by Esc or the ×. */
+    function close() {
+        setOpen(false);
+        leaveArrival();
+    }
 
     const heldNow = held?.key === packKey ? held.packs : [];
     const usable = picked ? usablePacks(heldNow, picked) : [];
@@ -276,7 +309,7 @@ export function NewBookingDialog({
                 ? `${whom} booked for ${service.name}, ${dayTime(picked, service.timezone)} — paid with ${pack.pack.name}`
                 : `${whom} booked for ${service.name}, ${dayTime(picked, service.timezone)}`,
         );
-        setOpen(false);
+        close();
         setPicked(null);
         setWho(null);
         setAttempt(crypto.randomUUID());
@@ -288,6 +321,7 @@ export function NewBookingDialog({
             open={open}
             onOpenChange={(o) => {
                 setOpen(o);
+                if (!o) leaveArrival();
                 if (!o) {
                     setPicked(null);
                     setPackRefusal(null);
@@ -341,7 +375,7 @@ export function NewBookingDialog({
                         booked={done.booked}
                         bookingId={done.bookingId}
                         first={done.link}
-                        onDone={() => setOpen(false)}
+                        onDone={close}
                     />
                 ) : (
                     <>
@@ -546,7 +580,7 @@ export function NewBookingDialog({
                             <Button
                                 type="button"
                                 variant="outline"
-                                onClick={() => setOpen(false)}
+                                onClick={close}
                             >
                                 Close
                             </Button>
