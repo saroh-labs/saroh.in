@@ -266,14 +266,16 @@ describe("public catalogue (G11)", () => {
             soldOut: false,
             listingId: expect.any(String),
             bagVariantId: expect.any(String),
+            bagLeft: card?.bagLeft ?? null,
         });
         // The card's Add to bag takes the first option that can be sold
         // now: Small is sold out here, so Large.
         const page = await catalogue.product(ryeSite, "sourdough", "visitor");
         expect(card?.listingId).toBe(page.listingId);
-        expect(card?.bagVariantId).toBe(
-            page.variants.find((v) => v.title === "Large")?.id,
-        );
+        const large = page.variants.find((v) => v.title === "Large");
+        expect(card?.bagVariantId).toBe(large?.id);
+        // And stops where the product page says "Only N left" (UX-058).
+        expect(card?.bagLeft).toBe(large?.left ?? null);
         // A product without options adds itself.
         expect(
             shop.products.find((p) => p.slug === "focaccia")?.bagVariantId,

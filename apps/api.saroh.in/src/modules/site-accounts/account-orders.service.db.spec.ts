@@ -633,7 +633,7 @@ describe("Track", () => {
         });
         expect(res.status).toBe(200);
         expect(res.body).toMatchObject({
-            fulfilment: "Appointment, in person",
+            fulfilment: "Booking, in person",
             status: "Booked",
             lines: [
                 {

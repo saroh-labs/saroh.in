@@ -45,6 +45,13 @@ import { useForm, useWatch } from "react-hook-form";
 
 import { ConfirmDialog } from "@/components/shared/confirm-dialog";
 import { useTabParam } from "@/lib/hooks/use-tab-param";
+import type { DiaryPerson } from "@/lib/organizations/calendar-only";
+import {
+    CALENDAR_ONLY_BLURB,
+    CALENDAR_ONLY_PLAIN,
+    CALENDAR_ONLY_ROLE,
+    roleAfterDiaryPick,
+} from "@/lib/organizations/calendar-only";
 import {
     anyoneHasExtras,
     beyondViewer,
@@ -82,6 +89,7 @@ import {
 } from "@/lib/organizations/storefront-team";
 import { TEAM_TAB_PARAM } from "@/lib/settings/search";
 
+import { InviteDiaryPerson } from "./invite-diary-person";
 import { LastActiveLine } from "./last-active-line";
 import {
     ExtraPermissions,
@@ -212,6 +220,7 @@ export function TeamScreen({
     rolesLock = null,
     limitNotice = null,
     bookableNoLogin = 0,
+    diaryPeople = [],
 }: {
     organizationName: string;
     members: OrganizationMember[];
@@ -248,6 +257,11 @@ export function TeamScreen({
      * (DEC-105, UX-053), so the count line says them.
      */
     bookableNoLogin?: number;
+    /**
+     * Those of them the invite can give a login to (#868): they join as
+     * Calendar only unless another role is picked.
+     */
+    diaryPeople?: DiaryPerson[];
 }) {
     // In the address, so Search settings can open Roles.
     const [tab, setTab] = useTabParam(TEAM_TAB_PARAM, TEAM_TABS, "people");
@@ -258,15 +272,20 @@ export function TeamScreen({
     // DEC-105). With both caps reached, it says why, as the design flashes
     // it: the invite would be refused, invites count too, and where more is.
     const room = inviteRoom(teamLimit);
+    // Someone already on the diary takes no extra seat (#868), so a full
+    // team can still invite them.
     const inviteLabel = !teamLimit?.full
         ? "Invite someone"
         : room.open
           ? "Invite someone view-only"
-          : "Team is full";
+          : diaryPeople.length > 0
+            ? "Invite someone on the diary"
+            : "Team is full";
     // What the seats count (DEC-105), from what the API says each uses.
     const counts = teamCounts(members, invitations);
     const openInvite = () => {
-        if (!room.open && teamLimit) {
+        // Someone already on the diary takes no extra seat (#868).
+        if (!room.open && teamLimit && diaryPeople.length === 0) {
             showInfo(
                 `${teamLimit.why} (invites count too). See plans in Plan and billing.`,
             );
@@ -282,11 +301,13 @@ export function TeamScreen({
             byKey.get(key)?.label ?? (isBuiltIn(key) ? ROLE_LABEL[key] : key),
         blurbOf: (key) => {
             if (isBuiltIn(key)) return ROLE_BLURB[key];
+            if (key === CALENDAR_ONLY_ROLE) return CALENDAR_ONLY_BLURB;
             const n = byKey.get(key)?.actions.length ?? 0;
             return `Made for ${organizationName}. Whoever holds it can do exactly what was ticked for it — ${n === 1 ? "1 permission" : `${n} permissions`}.`;
         },
         plainOf: (key) => {
             if (isBuiltIn(key)) return ROLE_PLAIN[key];
+            if (key === CALENDAR_ONLY_ROLE) return CALENDAR_ONLY_PLAIN;
             const n = byKey.get(key)?.actions.length ?? 0;
             return n === 1 ? "1 permission" : `${n} permissions`;
         },
@@ -490,6 +511,7 @@ export function TeamScreen({
                     invitations={invitations}
                     seatReason={room.seatReason}
                     viewOnlyReason={room.viewOnlyReason}
+                    diaryPeople={diaryPeople}
                     // The new invite shows at the top of People.
                     onSent={() => setTab("people")}
                 />
@@ -770,6 +792,9 @@ function PendingInvites({
                                 </p>
                                 <p className="text-[11.5px] text-muted-foreground">
                                     {invitationMeta(invitation, zone)}
+                                    {invitation.staff
+                                        ? ` · for ${invitation.staff.name} on the diary`
+                                        : ""}
                                 </p>
                             </div>
                             <span className="text-[12.5px] text-foreground/80">
@@ -1145,6 +1170,7 @@ function InviteDialog({
     invitations,
     seatReason,
     viewOnlyReason,
+    diaryPeople,
     onSent,
 }: {
     open: boolean;
@@ -1158,6 +1184,8 @@ function InviteDialog({
     seatReason: string | null;
     /** The view-only people are full (DEC-105): only a seat, and why. */
     viewOnlyReason: string | null;
+    /** Who on the diary could be given a login (#868). */
+    diaryPeople: DiaryPerson[];
     onSent: () => void;
 }) {
     const router = useRouter();
@@ -1168,14 +1196,15 @@ function InviteDialog({
     const offered = book.all.filter((r) => r.key !== "OWNER");
     // Why a role can't be picked for want of room on the plan: by whether
     // holding it uses a seat (DEC-105), never by its name.
-    const noRoom = (r: Role): string | null =>
+    const roomFor = (r: Role): string | null =>
         usesSeat(r) ? seatReason : viewOnlyReason;
     // Picked to start with: Member, or with the seats full the first
     // view-only role the inviter may give.
     const startRole =
         (seatReason
-            ? offered.find((r) => noRoom(r) === null && book.withinReach(r.key))
-                  ?.key
+            ? offered.find(
+                  (r) => roomFor(r) === null && book.withinReach(r.key),
+              )?.key
             : undefined) ?? "MEMBER";
     const form = useForm<InviteValues>({
         resolver: zodResolver(schema),
@@ -1183,11 +1212,31 @@ function InviteDialog({
             email: "",
             role: startRole,
             siteIds: [],
+            staffId: "",
         },
         mode: "onTouched",
     });
     const sending = form.formState.isSubmitting;
     const role = useWatch({ control: form.control, name: "role" });
+    const staffId = useWatch({ control: form.control, name: "staffId" });
+    // Someone already on the diary takes bookings, so holds a seat
+    // whatever the role: the invite adds nobody to either cap (#868).
+    const noRoom = (r: Role): string | null => (staffId ? null : roomFor(r));
+
+    function pickDiaryPerson(next: string) {
+        form.setValue("staffId", next);
+        form.setValue(
+            "role",
+            roleAfterDiaryPick({
+                staffId: next,
+                current: form.getValues("role"),
+                start: startRole,
+                hasCalendarOnly: offered.some(
+                    (r) => r.key === CALENDAR_ONLY_ROLE,
+                ),
+            }),
+        );
+    }
 
     function setOpen(next: boolean) {
         if (!next)
@@ -1195,6 +1244,7 @@ function InviteDialog({
                 email: "",
                 role: startRole,
                 siteIds: [],
+                staffId: "",
             });
         onOpenChange(next);
     }
@@ -1204,6 +1254,7 @@ function InviteDialog({
             email: values.email.trim().toLowerCase(),
             role: values.role,
             ...(values.role === "REVIEWER" ? { siteIds: values.siteIds } : {}),
+            ...(values.staffId ? { staffId: values.staffId } : {}),
         });
         if (!res.ok) {
             // The plan's team limit (U13): its notice, not a toast.
@@ -1274,6 +1325,13 @@ function InviteDialog({
                                 )}
                             />
 
+                            <InviteDiaryPerson
+                                people={diaryPeople}
+                                value={staffId ?? ""}
+                                disabled={sending}
+                                onPick={pickDiaryPerson}
+                            />
+
                             <FormField
                                 control={form.control}
                                 name="role"
@@ -1285,7 +1343,8 @@ function InviteDialog({
                                         >
                                             Role
                                         </p>
-                                        {(seatReason ?? viewOnlyReason) ? (
+                                        {!staffId &&
+                                        (seatReason ?? viewOnlyReason) ? (
                                             <p className="text-[12px] leading-[1.45] text-muted-foreground">
                                                 {seatReason ?? viewOnlyReason}
                                             </p>

@@ -1,3 +1,5 @@
+import { personHref } from "@/lib/contacts/person-href";
+
 import type { PackKind } from "./pack-cards";
 import { money, unitWord } from "./pack-cards";
 import {
@@ -90,7 +92,7 @@ export function holderRow(
         purchaseId: h.purchaseId,
         contactId: h.contact.id,
         name: h.contact.name,
-        href: `/customers/${encodeURIComponent(h.contact.id)}`,
+        href: personHref(h.contact.id),
         left: `${h.left} of ${h.credits}`,
         pct: h.credits > 0 ? Math.round((100 * h.left) / h.credits) : 0,
         bar: ended ? "ended" : soon ? "soon" : "ok",

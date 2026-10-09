@@ -22,6 +22,7 @@ import { useRouter } from "next/navigation";
 import { useId, useState } from "react";
 
 import type { ContactOption } from "@/components/shared/contact-picker";
+import { personHref } from "@/lib/contacts/person-href";
 import {
     addSession,
     cancelEnrollment,
@@ -520,7 +521,7 @@ function RosterRow({
             </span>
             <span className="min-w-0 flex-1">
                 <Link
-                    href={`/contacts/${e.contact.id}`}
+                    href={personHref(e.contact.id)}
                     className="-my-1 block truncate py-1 text-sm font-medium underline-offset-4 hover:underline"
                 >
                     {e.contact.name}

@@ -104,6 +104,11 @@
         "TMPDIR",
         // Runs the site shop's e2e (G13) where the stack has the shop on.
         "E2E_SITE_SHOP",
+        // Runs the own-domain hosting states' e2e (#861) where the stack's
+        // api has a fake verifier and hosting provider: DOMAIN_HOSTING_FAKE,
+        // the api's test-only switch for them (refused in production).
+        "E2E_DOMAIN_HOSTING",
+        "DOMAIN_HOSTING_FAKE",
         "npm_package_version"
     ],
     "tasks": {

@@ -50,9 +50,7 @@ describe("a booking notice as Saroh sends it (DEC-086)", () => {
             }),
             sender,
         );
-        expect(words?.subject).toBe(
-            "Your booking with Bank Alert is confirmed",
-        );
+        expect(words?.subject).toBe("You're booked with Bank Alert");
         const all = `${words?.subject} ${words?.body}`;
         expect(all).not.toMatch(/evil|https?:|www\./);
         expect(words?.body).toContain("Your Free gift with mail on");
@@ -83,7 +81,7 @@ describe("a booking notice as Saroh sends it (DEC-086)", () => {
             }),
             sender,
         );
-        expect(words?.subject).toBe("Your booking with rye-co is confirmed");
+        expect(words?.subject).toBe("You're booked with rye-co");
         expect(words?.body).toContain("Your booking on ");
         expect(words?.body).not.toContain(" with ");
     });

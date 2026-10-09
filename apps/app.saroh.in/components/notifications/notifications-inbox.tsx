@@ -10,6 +10,7 @@ import { useRouter } from "next/navigation";
 import { useTransition } from "react";
 
 import { ListCard, ListRow } from "@/components/shared/list-card";
+import { personHref } from "@/lib/contacts/person-href";
 import { DISPLAY_LOCALE } from "@/lib/format/locale";
 import {
     markAllNotificationsRead,
@@ -167,7 +168,7 @@ export function NotificationsInbox({
                                 // A customer's message (UX-014): it opens
                                 // their thread, and opening it is reading it.
                                 <Link
-                                    href={`/customers/${encodeURIComponent(n.contactId)}?tab=msg`}
+                                    href={personHref(n.contactId, "msg")}
                                     aria-label={label}
                                     className={rowClass}
                                     onClick={() => {

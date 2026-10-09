@@ -7,8 +7,8 @@ describe("paid-how (#834)", () => {
         expect(PAID_HOW.map((w) => w.label)).toEqual([
             "Cash",
             "UPI",
+            "Card",
             "Bank transfer",
-            "Card at the counter",
             "Other",
         ]);
     });
@@ -17,9 +17,7 @@ describe("paid-how (#834)", () => {
         expect(paidByHandWords("BANK_TRANSFER")).toBe(
             "Bank transfer · recorded by hand",
         );
-        expect(paidByHandWords("CARD")).toBe(
-            "Card at the counter · recorded by hand",
-        );
+        expect(paidByHandWords("CARD")).toBe("Card · recorded by hand");
         expect(paidByHandWords(null)).toBe("Recorded by hand");
         expect(paidByHandWords(undefined)).toBe("Recorded by hand");
     });

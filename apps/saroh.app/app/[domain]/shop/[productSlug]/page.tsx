@@ -10,6 +10,7 @@ import {
 } from "@saroh/site-blocks";
 
 import { getCatalogueProduct } from "@/lib/catalogue";
+import { dontCachePage, showsProduct } from "@/lib/page-cache/site-rules";
 import { getSiteForHost, postsPrefix, shareImages } from "@/lib/publication";
 import { getCheckoutOptions } from "@/lib/shop-checkout";
 import { enquiryPagePath } from "@/lib/shop-checkout-shape";
@@ -107,9 +108,12 @@ export default async function ShopProductPage({
     ]);
     if (!lookup.ok) {
         if (lookup.reason === "missing") notFound();
+        dontCachePage("shop unavailable");
         return <ShopUnavailable business={resolved.snapshot.site.name} />;
     }
     const product = lookup.data;
+    // Its price and stock are on this page (#863).
+    showsProduct(resolved.siteId, product.productId);
     const business = resolved.snapshot.site.name;
     const action =
         checkout?.canOrder && product.listingId ? (

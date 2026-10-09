@@ -68,10 +68,23 @@ describe("StoresService (dev DB)", () => {
 
     afterAll(async () => {
         const storeIds = [...createdStoreIds, legacyStoreId];
+        const orgIds = [orgId, otherOrgId];
         await prisma.storeOwner.deleteMany({
-            where: { storeId: { in: storeIds } },
+            where: {
+                OR: [
+                    { storeId: { in: storeIds } },
+                    { store: { organizationId: { in: orgIds } } },
+                ],
+            },
         });
-        await prisma.store.deleteMany({ where: { id: { in: storeIds } } });
+        await prisma.store.deleteMany({
+            where: {
+                OR: [
+                    { id: { in: storeIds } },
+                    { organizationId: { in: orgIds } },
+                ],
+            },
+        });
         await prisma.organization.deleteMany({
             where: { id: { in: [orgId, otherOrgId] } },
         });
@@ -116,23 +129,19 @@ describe("StoresService (dev DB)", () => {
         );
     });
 
-    it("stops at the plan's storefronts, with a 403", async () => {
-        // Five on the free floor: three more fill it, the sixth is refused.
-        for (const n of [3, 4, 5]) {
+    it("never holds an online storefront to the plan's places (DEC-109)", async () => {
+        // The free floor names 5 locations; online storefronts aren't
+        // locations, so a sixth is made too. Becoming a shop is what counts
+        // (`billing/legacy-location-floor.spec.ts`).
+        for (const n of [3, 4, 5, 6]) {
             const res = await service.createForUser(userA, orgId, {
                 name: `Shop ${n}`,
             });
             createdStoreIds.push(res.id);
         }
-        await expect(
-            service.createForUser(userA, orgId, { name: "Shop 6" }),
-        ).rejects.toMatchObject({
-            status: 403,
-            response: { message: expect.stringMatching(/5 locations/) },
-        });
         expect(
             await prisma.store.count({ where: { organizationId: orgId } }),
-        ).toBe(5);
+        ).toBe(6);
     });
 
     it("an update carrying a slug succeeds and leaves the slug as it was (L14)", async () => {

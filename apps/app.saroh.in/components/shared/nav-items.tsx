@@ -1060,15 +1060,15 @@ export function isNavChildCurrent(
 }
 
 /**
- * Pages that belong to a section without living under its address. Customer
- * Detail (`/customers/:contactId`, U18) is rooted on the contact, so it is
- * Sell › Customers where the business sells and Contacts where it does not:
- * the first of its homes the actor's rail holds is where the rail says you
- * are. A plan's pages (`/billing/plans/:planId`) are Subscriptions', whose
- * tab Plans is (D3). Every other address is its own.
+ * Pages that belong to a section without living under its address. The
+ * person page (`/contacts/:contactId`, #869) is Contacts', and Sell ›
+ * Customers' where the rail has no Contacts (CRM off): the first of its
+ * homes the actor's rail holds is where the rail says you are. A plan's
+ * pages (`/billing/plans/:planId`) are Subscriptions', whose tab Plans is
+ * (D3). Every other address is its own.
  */
 const NAV_HOMES: readonly { prefix: string; homes: readonly string[] }[] = [
-    { prefix: "/customers/", homes: ["/commerce/customers", "/contacts"] },
+    { prefix: "/contacts/", homes: ["/contacts", "/commerce/customers"] },
     { prefix: "/billing/plans/", homes: ["/billing/subscriptions"] },
 ];
 

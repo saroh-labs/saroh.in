@@ -74,6 +74,12 @@ export interface PublicCatalogueCard {
      * every option is sold out).
      */
     bagVariantId: string | null;
+    /**
+     * How many of that option can be sold, only where the product page would
+     * say "Only N left" (LOW); null otherwise. The card's Add another stops
+     * there (UX-058).
+     */
+    bagLeft: number | null;
 }
 
 export interface PublicCatalogue {
@@ -83,6 +89,13 @@ export interface PublicCatalogue {
 
 /** One product's page: `ProductPageData`, plus its address and search text. */
 export interface PublicProduct {
+    /**
+     * The product's id, which the site's page cache tags this page with,
+     * so a stock or price change redraws this product's page only (#863).
+     * An id, like the listing's: nothing about the product a visitor can't
+     * already see.
+     */
+    productId: string;
     slug: string;
     /** The listing at the site's storefront: what the bag holds (G13). */
     listingId: string;

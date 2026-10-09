@@ -17,6 +17,8 @@ import { WaitlistModule } from "../waitlist/waitlist.module";
 import { WebhooksModule } from "../webhooks/webhooks.module";
 import { AdminAccessService } from "./admin-access.service";
 import { AdminAuditService } from "./admin-audit.service";
+import { AdminDeploymentsController } from "./admin-deployments.controller";
+import { AdminDeploymentsService } from "./admin-deployments.service";
 import { AdminFlagsService } from "./admin-flags.service";
 import { AdminHealthService } from "./admin-health.service";
 import { AdminLifecycleService } from "./admin-lifecycle.service";
@@ -63,6 +65,7 @@ import { OrganizationAccessSessionGuard } from "./organization-access-session.gu
         AdminMachineryController,
         AdminWaitlistController,
         AdminPricingController,
+        AdminDeploymentsController,
     ],
     providers: [
         IdempotencyService,
@@ -81,6 +84,7 @@ import { OrganizationAccessSessionGuard } from "./organization-access-session.gu
         AdminOperationsService,
         AdminHealthService,
         AdminWaitlistService,
+        AdminDeploymentsService,
         // Pricing catalogue writes (U4): they audit through AdminAuditService.
         CatalogueWritesService,
         CouponsService,

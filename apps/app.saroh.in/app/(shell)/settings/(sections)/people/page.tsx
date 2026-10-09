@@ -3,6 +3,7 @@ import { TeamScreen } from "@/components/organizations/team-screen";
 import { SettingsPanel } from "@/components/settings/settings-panel";
 import { rowNotice } from "@/lib/billing/access";
 import { modulesOrUnknown } from "@/lib/modules/guard";
+import { diaryPeopleToInvite } from "@/lib/organizations/calendar-only";
 import { shownCatalogue } from "@/lib/organizations/catalogue-shown";
 import { bookableWithNoLogin } from "@/lib/organizations/invitations";
 import {
@@ -118,6 +119,12 @@ export default async function PeoplePage() {
                 joinedFromStorefronts={joinedFromStorefronts}
                 teamLimit={teamLimit}
                 bookableNoLogin={bookableWithNoLogin(staff?.staff ?? null)}
+                // Who of them can be given a login, as Calendar only by
+                // default (#868).
+                diaryPeople={diaryPeopleToInvite(
+                    staff?.staff ?? null,
+                    invitations,
+                )}
                 rolesLock={canEditRoles ? rolesLock(access) : null}
                 limitNotice={
                     canManage ? <PlanLimitNotice moduleId="members" /> : null

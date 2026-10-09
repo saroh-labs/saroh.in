@@ -422,6 +422,32 @@ organizations/:org/customers`: everyone who has paid (an order through a
   nothing from the account area, never on a test release or preview), and an
   enquiry writes `enquiry.submitted` in its own transaction (UX-032).
 
+## One word each
+
+**Current** (UX-078, owner 9 Oct) — one word for one thing, in the workspace,
+on merchant sites, in emails and in Help. Code identifiers, routes, enum
+values and module keys keep their names (`APPOINTMENTS`, `/appointments`,
+`RESCHEDULED`, `BANK` and `BANK_TRANSFER`); only the words shown change.
+`pnpm check:words` fails on the three that crept back most.
+
+- **Booking**, never "appointment" or "reservation". The `APPOINTMENTS`
+  module is **Bookings**; its name lives in `lib/modules/names.ts` (and the
+  API registry's `label`, which its refusals quote).
+- **Move** a booking, never "Reschedule".
+- **Booked** for a confirmed booking still to come, never "Confirmed" — the
+  pill and the confirmation email ("You're booked with …"). A `PENDING`
+  booking's pill and filter read **To confirm** (`bookingStatus` in
+  `lib/format/status.ts`). Open question for the owner: the diary and the
+  month calendar still say **Awaiting payment** for the same pay-now hold,
+  the word the payment-provider Help pages use too.
+- **Cash, UPI, Card, Bank transfer, Other** — every payment picker and
+  label, from `lib/payments/method-words.ts`. Where it is taken ("at the
+  counter", "the card machine") is a hint under the choice, never the label.
+- **Closed**, never "Shut", for business hours.
+- **Location / Locations** follows the count — the rail, the page title and
+  every breadcrumb (`locationsWord` in `lib/stores/pick.ts`).
+- Classes vs credits: **not decided** — leave both as they are.
+
 ## Saying what is true
 
 - **Current** — UI, marketing, docs and comments match what ships, and a

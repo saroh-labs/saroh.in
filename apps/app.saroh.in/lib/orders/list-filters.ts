@@ -243,7 +243,7 @@ export function stepOptions(
     );
 }
 
-/** "Appointment, online" → "online appointment": a way as a noun's adjective. */
+/** "Booking, online" → "online booking": a way as a noun's adjective. */
 function typeWords(label: string): string {
     const [head, tail] = label.split(", ");
     return (tail ? `${tail} ${head}` : label).toLowerCase();

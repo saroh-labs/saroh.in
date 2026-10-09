@@ -221,6 +221,11 @@ const MORE = [
         title: "Make your link look right when shared",
         steps: 4,
     },
+    {
+        slug: "verify-your-site-and-add-analytics",
+        title: "Verify your site and add analytics",
+        steps: 6,
+    },
     { slug: "add-sizes-and-options", title: "Add sizes and options", steps: 5 },
     { slug: "count-and-move-stock", title: "Count and move stock", steps: 5 },
 ];

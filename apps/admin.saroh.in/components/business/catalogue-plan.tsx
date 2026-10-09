@@ -9,6 +9,7 @@ import type {
 } from "@/lib/businesses";
 import { asWords, camelToWords, formatDate } from "@/lib/format";
 import { overrideKindWords } from "@/lib/overrides";
+import { planLine, USAGE_NOTE_WORDS } from "@/lib/plan-words";
 
 import { Facts } from "../panel";
 import { RemoveOverride } from "./catalogue-actions";
@@ -63,9 +64,11 @@ export function CataloguePlan({
                 rows={[
                     [
                         "Plan",
-                        catalogue.planOverride
-                            ? `${catalogue.planName} until ${formatDate(catalogue.planOverride.expiresAt)}, then ${planName(catalogue.basePlanId)}`
-                            : catalogue.planName,
+                        plan.effective
+                            ? planLine(plan.effective)
+                            : catalogue.planOverride
+                              ? `${catalogue.planName} until ${formatDate(catalogue.planOverride.expiresAt)}, then ${planName(catalogue.basePlanId)}`
+                              : catalogue.planName,
                     ],
                     [
                         "Version",
@@ -148,10 +151,17 @@ export function CataloguePlan({
                                                 Not measured
                                             </span>
                                         )}
+                                        {m.usageNote && (
+                                            <span className="block text-[12.5px] text-muted-foreground">
+                                                {USAGE_NOTE_WORDS[m.usageNote]}
+                                            </span>
+                                        )}
                                         {over && (
                                             <div className="mt-1 flex justify-end">
                                                 <Badge variant="warning">
-                                                    Over · read-only
+                                                    {m.soft
+                                                        ? "Over · not refused"
+                                                        : "Over · read-only"}
                                                 </Badge>
                                             </div>
                                         )}

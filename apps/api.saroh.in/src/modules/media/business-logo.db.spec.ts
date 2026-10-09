@@ -108,8 +108,8 @@ describe("the business logo (real database)", () => {
         await expect(settings.setLogo(owner, big)).rejects.toBeInstanceOf(
             BadRequestException,
         );
-        const gif = await upload(owner, "image/gif");
-        await expect(settings.setLogo(owner, gif)).rejects.toThrow(
+        // A logo's type is refused when the upload starts (#873).
+        await expect(upload(owner, "image/gif")).rejects.toThrow(
             /PNG, JPG or WebP/,
         );
     });

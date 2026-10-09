@@ -15,6 +15,7 @@ import {
     monthFirstDay,
     monthWindow,
     openInvitations,
+    SEAT_INVITE_SELECT,
     SEAT_MEMBER_SELECT,
     seatKindCounted,
     SHOP_KIND,
@@ -234,7 +235,7 @@ export async function countUsageAcross(
                         organizationId: { in: ids },
                         ...openInvitations(now),
                     },
-                    select: { organizationId: true, role: true },
+                    select: { organizationId: true, ...SEAT_INVITE_SELECT },
                 }),
                 db.organizationRole.findMany({
                     where: { organizationId: { in: ids } },

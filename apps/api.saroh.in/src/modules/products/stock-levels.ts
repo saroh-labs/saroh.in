@@ -1,5 +1,10 @@
 import type { Prisma } from "@saroh/database";
 
+import {
+    noteProductsChanging,
+    noteShelvesChanging,
+} from "../sites/page-cache-revalidate";
+
 /**
  * StockLevel helpers (#510): one storefront's shelf of a product (variantId
  * null — it counts as a whole) or of one variant. A product counts stock at
@@ -57,7 +62,14 @@ export function asCounts(
     };
 }
 
-/** Take the row locks for `ids`, in id order so two writers never deadlock. */
+/**
+ * Take the row locks for `ids`, in id order so two writers never deadlock.
+ *
+ * Every flow that changes a shelf takes these (the lock order above), so
+ * this is also where the merchant sites' page cache hears a shelf is about
+ * to change (#863): a revalidation is queued on the same transaction, and
+ * goes only if it commits. Nothing is queued while the cache is off.
+ */
 export async function lockStockLevels(
     tx: Prisma.TransactionClient,
     ids: readonly string[],
@@ -65,6 +77,7 @@ export async function lockStockLevels(
     const sorted = Array.from(new Set(ids)).sort();
     if (sorted.length === 0) return;
     await tx.$queryRaw`SELECT id FROM "StockLevel" WHERE id = ANY(${sorted}::text[]) ORDER BY id FOR UPDATE`;
+    await noteShelvesChanging(tx, sorted);
 }
 
 /** Lock a product's rows (all storefronts, or one) and return them. */
@@ -93,6 +106,8 @@ export async function lockProduct(
     productId: string,
 ): Promise<void> {
     await tx.$queryRaw`SELECT id FROM "Product" WHERE id = ${productId} FOR NO KEY UPDATE`;
+    // A change to how the product counts or sells (#863, as above).
+    await noteProductsChanging(tx, [productId]);
 }
 
 /** Lock several products at once, in id order, in one statement. */
@@ -103,6 +118,7 @@ export async function lockProducts(
     const sorted = Array.from(new Set(productIds)).sort();
     if (sorted.length === 0) return;
     await tx.$queryRaw`SELECT id FROM "Product" WHERE id = ANY(${sorted}::text[]) ORDER BY id FOR NO KEY UPDATE`;
+    await noteProductsChanging(tx, sorted);
 }
 
 /** Whether the product counts stock per variant (anywhere). */

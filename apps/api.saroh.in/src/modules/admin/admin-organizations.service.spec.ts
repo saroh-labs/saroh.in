@@ -10,6 +10,7 @@ jest.mock("@saroh/database", () => ({
 import { ForbiddenException } from "@nestjs/common";
 import { prisma } from "@saroh/database";
 
+import type { CatalogueAccessService } from "../billing/catalogue-access.service";
 import { AdminOrganizationsService } from "./admin-organizations.service";
 
 const findMany = prisma.organization.findMany as jest.Mock;
@@ -31,8 +32,18 @@ function record(id: string, overrides: Record<string, unknown> = {}) {
 
 beforeEach(() => jest.clearAllMocks());
 
+/** The resolver: off the catalogue unless a test says otherwise. */
+const resolve = jest.fn(async (): Promise<unknown> => ({
+    source: "legacy",
+    reason: "no-plan",
+    entitlements: {},
+    planEntitlements: {},
+    planOverride: null,
+}));
+const access = { resolve } as unknown as CatalogueAccessService;
+
 describe("AdminOrganizationsService.directory", () => {
-    const service = new AdminOrganizationsService();
+    const service = new AdminOrganizationsService(access);
 
     it("refuses an email search without the PII permission", async () => {
         await expect(
@@ -114,5 +125,53 @@ describe("AdminOrganizationsService.directory", () => {
         expect(findMany.mock.calls[0][0].where).toEqual({
             AND: [{ subscription: { is: null } }],
         });
+    });
+
+    it("shows the plan an override puts it on, with its subscription's beside it (UX-087)", async () => {
+        const until = new Date("2026-12-31T18:29:59.999Z");
+        findMany.mockResolvedValue([
+            record("a", {
+                subscription: {
+                    status: "ACTIVE",
+                    plan: { key: "catalog.free", name: "Free" },
+                },
+            }),
+        ]);
+        resolve.mockResolvedValueOnce({
+            source: "catalogue",
+            catalog: {
+                plans: [
+                    { id: "free", name: "Free" },
+                    { id: "pro", name: "Pro" },
+                ],
+            },
+            basePlanId: "free",
+            planId: "pro",
+            planName: "Pro",
+            planOverride: { id: "o1", planKey: "pro", expiresAt: until },
+        });
+
+        const page = await service.directory({}, { canReadPii: false });
+        expect(resolve).toHaveBeenCalledWith("a", expect.any(Date));
+        expect(page.items[0]?.plan).toEqual({
+            key: "catalog.free",
+            name: "Free",
+        });
+        expect(page.items[0]?.effectivePlan).toEqual({
+            id: "pro",
+            name: "Pro",
+            basePlanId: "free",
+            basePlanName: "Free",
+            override: { expiresAt: until },
+        });
+    });
+
+    it("keeps the row when its plan can't be read, falling back to the subscription's", async () => {
+        findMany.mockResolvedValue([record("a")]);
+        resolve.mockRejectedValueOnce(new Error("db down"));
+
+        const page = await service.directory({}, { canReadPii: false });
+        expect(page.items).toHaveLength(1);
+        expect(page.items[0]?.effectivePlan).toBeNull();
     });
 });

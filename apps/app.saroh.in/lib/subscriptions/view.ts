@@ -555,6 +555,11 @@ export function sortCharges(
         );
 }
 
+/** A charge's invoice, where every charge row opens (UX-080). */
+export function chargeHref(invoiceId: string): string {
+    return `/billing/invoices/${encodeURIComponent(invoiceId)}`;
+}
+
 export function chargeRow(
     c: SubscriptionCharge,
     timeZone: string,

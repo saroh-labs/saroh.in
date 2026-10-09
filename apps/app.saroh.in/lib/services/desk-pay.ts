@@ -9,6 +9,7 @@
 
 import type { CashChange } from "@/lib/orders/new-order";
 import { cashChange, centsOf } from "@/lib/orders/new-order";
+import { METHOD_WORD, methodLabel } from "@/lib/payments/method-words";
 
 /** How the desk takes it, as the API records it. */
 export type DeskMethod = "CASH" | "UPI" | "CARD";
@@ -46,20 +47,7 @@ export interface DeskPayment {
 
 /** How a payment taken by hand reads: "Cash", "UPI", "Card". */
 export function methodWord(method: string | null | undefined): string | null {
-    switch (method) {
-        case "CASH":
-            return "Cash";
-        case "UPI":
-            return "UPI";
-        case "CARD":
-            return "Card";
-        case "BANK_TRANSFER":
-            return "Bank transfer";
-        case "OTHER":
-            return "Other";
-        default:
-            return null;
-    }
+    return methodLabel(method);
 }
 
 /** "Paid at the desk · Cash" — how the desk took it, never how much. */
@@ -85,9 +73,10 @@ export function deskChoices(input: {
     online?: boolean;
 }): { key: DeskChoice; label: string; off: string | null }[] {
     return [
-        { key: "CASH", label: "Cash", off: null },
-        { key: "UPI", label: "UPI at the counter", off: null },
-        { key: "CARD", label: "Card machine", off: null },
+        // One word each (UX-078); where it's taken is the note's to say.
+        { key: "CASH", label: METHOD_WORD.CASH, off: null },
+        { key: "UPI", label: METHOD_WORD.UPI, off: null },
+        { key: "CARD", label: METHOD_WORD.CARD, off: null },
         ...(input.online === false
             ? []
             : [

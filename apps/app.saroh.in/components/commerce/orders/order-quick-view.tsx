@@ -8,6 +8,7 @@ import { useEffect, useState } from "react";
 
 import { BusinessDate } from "@/components/shared/business-zone";
 import { QuickLook } from "@/components/shared/quick-look";
+import { personHref } from "@/lib/contacts/person-href";
 import { customerHref } from "@/lib/customers/links";
 import { formatMoneyMajor } from "@/lib/format/money";
 import { attentionLines } from "@/lib/orders/attention";
@@ -267,7 +268,7 @@ export function QuickViewBody({ order }: { order: OrderRead }) {
     const c = order.customer;
     const customerLink = c
         ? c.contactId
-            ? `/customers/${encodeURIComponent(c.contactId)}`
+            ? personHref(c.contactId)
             : customerHref(order.store.id, c.id)
         : null;
     // A walk-in (B13) has no record to open: their name and phone only.

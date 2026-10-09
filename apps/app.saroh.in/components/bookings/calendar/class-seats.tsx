@@ -4,6 +4,7 @@ import { Button } from "@saroh/ui/button";
 import { cn } from "@saroh/ui/lib/utils";
 import Link from "next/link";
 
+import { personHref } from "@/lib/contacts/person-href";
 import type {
     ClassSession,
     DiaryBooking,
@@ -113,7 +114,7 @@ export function ClassSeats({
                             <div className="min-w-0 flex-[1_1_150px]">
                                 {b.contact ? (
                                     <Link
-                                        href={`/customers/${b.contact.id}`}
+                                        href={personHref(b.contact.id)}
                                         className="text-[13px] font-semibold text-foreground hover:text-brand"
                                     >
                                         {whoFor(b)}

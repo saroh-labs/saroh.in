@@ -260,8 +260,14 @@ describe("sidebarName", () => {
         expect(sidebarName(ALL, "CRM")).toBe("Contacts");
     });
 
+    it("names Appointments Bookings, as every other screen does (UX-078)", () => {
+        expect(sidebarName(ALL, "APPOINTMENTS")).toBe("Bookings");
+        expect(sidebarName(ALL, "PAYMENTS")).toBe("Payments");
+    });
+
     it("falls back to the module's own label", () => {
-        expect(sidebarName(ALL, "PAYMENTS")).toBe("PAYMENTS");
+        const later = [...ALL, mod("LATER", { label: "Later module" })];
+        expect(sidebarName(later, "LATER")).toBe("Later module");
     });
 });
 

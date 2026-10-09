@@ -1,331 +1,372 @@
-import { Badge } from "@saroh/ui/badge";
-import { PageHeader } from "@saroh/ui/page-header";
+import { Button } from "@saroh/ui/button";
 import Link from "next/link";
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import type { ReactNode } from "react";
 
 import { CoursesPanel } from "@/components/contacts/courses-panel";
-import { DeleteContactMenu } from "@/components/contacts/delete-contact-menu";
-import { EditContactDialog } from "@/components/contacts/edit-contact-dialog";
-import { InvoicesPanel } from "@/components/contacts/invoices-panel";
-import { PacksPanel } from "@/components/contacts/packs-panel";
-import { SamePersonPrompt } from "@/components/contacts/same-person-prompt";
-import { SubscriptionsPanel } from "@/components/contacts/subscriptions-panel";
-import { EnquiryCard } from "@/components/crm/enquiry-card";
-import { AddLeadDialog } from "@/components/leads/add-lead-dialog";
+import { EnquiriesPanel } from "@/components/contacts/enquiries-panel";
+import { LeadsPanel } from "@/components/contacts/leads-panel";
+import { SubscribeAction } from "@/components/contacts/subscribe-action";
+import { CustomerDetailScreen } from "@/components/customers/detail/detail-screen";
+import type { PackSale } from "@/components/customers/detail/packs-tab";
+import { AccessDenied } from "@/components/shared/access-denied";
 import { PageContainer } from "@/components/shared/page-container";
-import type { ContactHoldings } from "@/lib/contacts/holdings";
+import { canSellPacks, canWritePacks } from "@/lib/class-packs/access";
 import { loadContactHoldings } from "@/lib/contacts/holdings";
-import { contactPanels } from "@/lib/contacts/panels";
-import type { Holdings } from "@/lib/contacts/removal";
+import { contactPanels, moduleOn, sellPacksOnly } from "@/lib/contacts/panels";
+import {
+    crumbsToSell,
+    personTabActions,
+    personTabGates,
+} from "@/lib/contacts/person";
+import { deleteQuestion, heldCounts } from "@/lib/contacts/removal";
+import type { ContactDetail } from "@/lib/contacts/service";
 import { getContact } from "@/lib/contacts/service";
 import { contactSourceLabel } from "@/lib/contacts/source";
+import { isRemovedContact, shownEmail } from "@/lib/crm/format";
+import { rolesThatSeeSensitive } from "@/lib/customer-workspace/attention";
+import { getCustomerDetail } from "@/lib/customer-workspace/detail";
 import {
-    contactName,
-    formatValue,
-    isRemovedContact,
-    LEAD_STATUS,
-    shownEmail,
-} from "@/lib/crm/format";
-import { shownDuplicates } from "@/lib/customer-workspace/merge";
-import type { DuplicateSuggestion } from "@/lib/customer-workspace/service";
-import { getSuggestions } from "@/lib/customer-workspace/service";
+    isMergedRedirect,
+    mergedRedirectPath,
+} from "@/lib/customer-workspace/merge";
+import type {
+    DuplicateSuggestion,
+    IdentitySuggestion,
+    Suggestion,
+} from "@/lib/customer-workspace/service";
+import { getSuggestions, getThread } from "@/lib/customer-workspace/service";
+import type {
+    ReviewsRead,
+    Tab,
+    TabKey,
+    ThreadRead,
+} from "@/lib/customer-workspace/view";
+import { tabFromQuery, tabsFor } from "@/lib/customer-workspace/view";
 import { loadAddLead } from "@/lib/leads/add-lead-data";
-import type { LeadStatus } from "@/lib/leads/service";
 import { modulesOrUnknown } from "@/lib/modules/guard";
+import { listRoles } from "@/lib/organizations/roles";
 import { resolveActiveOrganization } from "@/lib/organizations/service";
+import { contactReviews } from "@/lib/product-reviews/service";
 import { requireSession } from "@/lib/session";
 
 export const metadata = { title: "Contact" };
 
 /**
- * One person the business knows: who they are, and every lead that is theirs.
- * Edit changes what is known about them; "Add a lead" starts another
- * conversation with them without typing them in again.
+ * One person, one page (UX-050, #869): everyone the business knows — who
+ * enquired, booked or bought — at `/contacts/<id>`, with a tab for each
+ * thing it has with them. `/customers/<id>` redirects here.
  *
- * After Leads, what they hold (ADR-007): subscriptions, class packs, course
- * seats and invoices — the one place a merchant looks when this person calls.
- * A panel this viewer may not read, or whose module is off, is not asked for
- * at all (`lib/contacts/panels.ts`); one whose read fails says so on its own.
+ * Built on Customer Detail (U18), rooted on the contact and rendered from
+ * one read whose blocks the API leaves out where the viewer may not read
+ * them or their module is off — orders, bookings, packs, subscriptions,
+ * invoices with their amounts (DEC-098) — plus this page's own tabs:
+ * Leads and Enquiries where CRM is on and the viewer reads leads, Courses
+ * where Courses is on and they read courses (`lib/contacts/person.ts`).
+ * The tab lives in `?tab=`.
  *
- * Another contact with the same email is offered to merge, "This may be the
- * same person" (DEC-097), with the merge Customer Detail uses.
+ * Another record that looks like the same person is offered to merge,
+ * never merged on its own (DEC-097); a site account's own record keeps
+ * DEC-049's placeholder email out of view.
  */
-export default async function ContactDetailPage({
+export default async function PersonPage({
     params,
+    searchParams,
 }: {
     params: Promise<{ contactId: string }>;
+    searchParams: Promise<{ tab?: string }>;
 }) {
-    const { contactId } = await params;
-    await requireSession();
-
-    const [contact, addLead, organization, modules] = await Promise.all([
-        getContact(contactId),
-        // Stages for "Add a lead"; empty for a viewer who may not see them.
-        loadAddLead(),
+    const session = await requireSession();
+    const [{ contactId }, query, organization, modules] = await Promise.all([
+        params,
+        searchParams,
         resolveActiveOrganization(),
         modulesOrUnknown(),
     ]);
-    if (!contact) notFound();
-    const name = contactName(contact);
-    const plan = contactPanels(organization, modules);
-    // A Member reads the people on the diary but changes nothing and sees no
-    // leads (DEC-020); without resolved actions, the built-in roles decide.
-    const can = (action: string) =>
+    // Non-money reads: without resolved actions the built-in roles decide,
+    // as Customer Detail did. Money is asked of `permits` alone, in
+    // `lib/contacts/person.ts` and `panels.ts` (DEC-098).
+    const may = (action: string) =>
         organization?.actions
             ? organization.actions.includes(action)
             : organization?.role === "OWNER" || organization?.role === "ADMIN";
-    // Removed for a privacy request (C11): their leads stay, and the page
-    // opens for them, but nothing can put details back.
-    const removed = isRemovedContact(contact);
-    const canEdit = can("contact:write") && !removed;
-    // Never the placeholder a site account's own record holds (UX-013).
-    const email = shownEmail(contact);
-    const seesLeads = can("lead:read");
-    // Another contact with the same email (DEC-097): offered to whoever can
-    // edit contacts, never merged on its own. A failed read shows no prompt.
-    const [holdings, duplicates] = await Promise.all([
-        loadContactHoldings(contact.id, plan),
-        canEdit
-            ? getSuggestions(contact.id, { includeContacts: true })
-                  .then((all) =>
-                      shownDuplicates(
-                          all.filter(
-                              (s): s is DuplicateSuggestion =>
-                                  s.kind === "contact",
-                          ),
-                          { canEdit, emailOnly: true },
-                      ),
-                  )
-                  .catch((): DuplicateSuggestion[] => [])
-            : Promise.resolve<DuplicateSuggestion[]>([]),
-    ]);
-    const person = { id: contact.id, name, email: email ?? "" };
-    // The clock is read once, here, for the pack balances.
-    const now = new Date().toISOString();
 
-    const facts: [string, ReactNode][] = [
-        ["Email", email],
-        // An empty string is a field someone cleared: shown as not given.
-        ["Phone", contact.phone?.trim() ? contact.phone : null],
-        ["Company", contact.company?.trim() ? contact.company : null],
-        [
-            "Came from",
-            contact.source ? contactSourceLabel(contact.source) : null,
-        ],
+    // Told so, and who can change it — not a "not found" that reads like a
+    // broken link.
+    if (organization?.actions && !may("contact:read")) {
+        return (
+            <AccessDenied
+                title="You can't open contacts"
+                description={`Your role in ${organization.name} can't see the people the business knows. An owner or admin can change that in Team.`}
+            />
+        );
+    }
+
+    const detail = await getCustomerDetail(contactId);
+    if (!detail) notFound();
+    // A record merged into another (C9): its old address leads to the one
+    // kept, on the same tab.
+    if (isMergedRedirect(detail)) {
+        redirect(mergedRedirectPath(detail.mergedInto, query.tab));
+    }
+
+    const canWrite = may("contact:write");
+    const canMerge = may("customer:merge");
+    const canRemove = may("customer:remove");
+    const gates = personTabGates(organization, modules);
+    const acts = personTabActions(organization, modules);
+    // Courses and what Subscribe offers come from the contact's holdings;
+    // the rest is in the detail read.
+    const panels = contactPanels(organization, modules);
+    const holdingsPlan = {
+        ...panels,
+        panels: panels.panels.filter((p) => p === "courses"),
+        canAct: {
+            ...panels.canAct,
+            subscriptions: acts.subscribe && detail.subscriptions !== undefined,
+            packs: false,
+            invoices: false,
+        },
+    };
+    const packsShown = detail.packs !== undefined;
+
+    const [suggestions, thread, reviews, packSale, crm, holdings] =
+        await Promise.all([
+            // Only whoever may link or merge reads what they'd be offered.
+            canWrite || canMerge
+                ? getSuggestions(contactId, { includeContacts: true }).catch(
+                      (): Suggestion[] => [],
+                  )
+                : Promise.resolve<Suggestion[]>([]),
+            // Their message thread (A13). A failed read shows the tab with
+            // the failure said, never an empty thread.
+            may("message:read")
+                ? getThread(contactId).catch((): ThreadRead => "failed")
+                : Promise.resolve<ThreadRead>(null),
+            // Their product reviews (C6), where the business sells.
+            detail.linkedCustomers !== undefined && may("product-review:read")
+                ? contactReviews(contactId).catch((): ReviewsRead => "failed")
+                : Promise.resolve<ReviewsRead>(null),
+            // Selling a pack needs the packs on sale (C7).
+            packsShown && canSellPacks(organization)
+                ? loadContactHoldings(contactId, sellPacksOnly()).then(
+                      ({ choices }): PackSale | null =>
+                          choices.packs
+                              ? {
+                                    packs: choices.packs,
+                                    invoicesOnSale: choices.invoicesOnSale,
+                                }
+                              : null,
+                  )
+                : Promise.resolve(null),
+            // Their leads and enquiries, only where CRM is on and the viewer
+            // reads leads; null when the read failed.
+            gates.leads
+                ? getContact(contactId).catch((): ContactDetail | null => null)
+                : Promise.resolve(null),
+            loadContactHoldings(contactId, holdingsPlan),
+        ]);
+
+    const name = detail.contact.name;
+    const first = detail.contact.firstName?.trim()
+        ? detail.contact.firstName.trim()
+        : (name.split(" ")[0] ?? name);
+    // Removed for a privacy request (C11): their leads stay, but nothing can
+    // put details back or add to them.
+    const removed = isRemovedContact(crm ?? detail.contact);
+    // Never the placeholder a site account's own record holds (UX-013).
+    const email = shownEmail(crm ?? detail.contact);
+    const person = { id: contactId, name, email: email ?? "" };
+    const stages =
+        gates.leads && canWrite && !removed
+            ? (await loadAddLead()).stages
+            : null;
+
+    const extra: (Tab & { panel: ReactNode })[] = [];
+    if (gates.leads) {
+        extra.push({
+            key: "lead",
+            label: "Leads",
+            count: crm ? crm.leads.length : null,
+            panel: (
+                <LeadsPanel
+                    person={person}
+                    leads={crm ? crm.leads : null}
+                    stages={stages}
+                />
+            ),
+        });
+    }
+    if (gates.enquiries) {
+        const enquiries = crm ? (crm.enquiries ?? []) : null;
+        extra.push({
+            key: "enq",
+            label: "Enquiries",
+            count: enquiries ? enquiries.length : null,
+            panel: (
+                <EnquiriesPanel
+                    enquiries={enquiries}
+                    knownEmail={email}
+                    first={first}
+                />
+            ),
+        });
+    }
+    if (holdingsPlan.panels.includes("courses")) {
+        const enrollments = holdings.courses ?? null;
+        extra.push({
+            key: "crs",
+            label: "Courses",
+            count: enrollments ? enrollments.length : null,
+            panel: (
+                <CoursesPanel
+                    contact={person}
+                    enrollments={enrollments}
+                    courses={holdings.choices.courses}
+                    invoicesOnEnrol={panels.paymentsOn}
+                    mentionInvoices={panels.mentionInvoices}
+                />
+            ),
+        });
+    }
+
+    const actions: Partial<Record<TabKey, ReactNode>> = {};
+    if (holdingsPlan.canAct.subscriptions && holdings.choices.plans) {
+        actions.sub = (
+            <SubscribeAction contact={person} plans={holdings.choices.plans} />
+        );
+    }
+    if (acts.newInvoice && detail.invoices !== undefined && !removed) {
+        actions.inv = (
+            <Button size="sm" variant="outline" className="coarse:h-11" asChild>
+                <Link
+                    href={`/billing/invoices/new?contactId=${encodeURIComponent(contactId)}`}
+                >
+                    New invoice
+                </Link>
+            </Button>
+        );
+    }
+
+    const tabs = [
+        ...tabsFor(detail, thread, reviews),
+        ...extra.map(({ key, label, count }) => ({ key, label, count })),
     ];
+    const canSensitive =
+        may("customer:sensitive") ||
+        organization?.role === "OWNER" ||
+        organization?.role === "ADMIN";
+    // C12's sensitive tick names who can read the note (DEC-073).
+    const sensitiveRoles =
+        canWrite && canSensitive && detail.attention?.suggestions?.length
+            ? await listRoles()
+                  .then(rolesThatSeeSensitive)
+                  .catch(() => null)
+            : null;
+    // Linked store customers are read only where the business sells.
+    const sells = detail.linkedCustomers !== undefined;
+    const now = new Date();
+    // The delete confirm names what deleting them ends, from what this page
+    // read; a kind it couldn't read keeps the sentence general.
+    const deleteWords = deleteQuestion(
+        crm ? crm.leads.length : null,
+        heldCounts(
+            {
+                subscriptions: detail.subscriptions?.rows,
+                packs: detail.packs?.rows,
+                courses: holdings.courses,
+            },
+            now,
+        ),
+    );
 
     return (
-        <PageContainer>
-            <div className="flex flex-col gap-6">
-                <PageHeader
-                    className="mb-0"
-                    breadcrumb={[
-                        <Link
-                            key="contacts"
-                            href="/contacts"
-                            className="hover:text-foreground"
-                        >
-                            Contacts
-                        </Link>,
-                        name,
-                    ]}
-                    title={name}
-                    description={
-                        removed
-                            ? "Their details were removed at their request. Their leads stay as they were."
-                            : contact.company?.trim()
-                              ? contact.company
-                              : (email ?? undefined)
-                    }
-                    actions={
-                        canEdit ? (
-                            <>
-                                <EditContactDialog
-                                    contactId={contact.id}
-                                    initial={{
-                                        firstName: contact.firstName ?? "",
-                                        lastName: contact.lastName ?? "",
-                                        phone: contact.phone ?? "",
-                                        company: contact.company ?? "",
-                                    }}
-                                />
-                                <AddLeadDialog
-                                    // Only this person: the lead is theirs.
-                                    contacts={[person]}
-                                    stages={addLead.stages}
-                                />
-                                <DeleteContactMenu
-                                    contactId={contact.id}
-                                    name={name}
-                                    leadCount={contact.leads.length}
-                                    holdings={heldCounts(holdings)}
-                                />
-                            </>
-                        ) : undefined
-                    }
-                />
-
-                <SamePersonPrompt
-                    contactId={contact.id}
-                    duplicates={duplicates}
-                    canMerge={can("customer:merge")}
-                />
-
-                {removed ? null : (
-                    // One person, one record a click away (UX-050): this
-                    // page holds their leads and what they hold; their
-                    // bookings, orders, messages and notes are on the
-                    // customer page.
-                    <p className="text-[13px] text-muted-foreground">
-                        Bookings, orders, messages and notes are on{" "}
-                        <Link
-                            href={`/customers/${encodeURIComponent(contact.id)}`}
-                            className="font-medium text-foreground underline-offset-4 hover:underline"
-                        >
-                            {`${name}'s full record`}
-                        </Link>
-                        .
-                    </p>
+        <PageContainer width="full" className="space-y-0 p-0 sm:p-0">
+            <CustomerDetailScreen
+                d={detail}
+                initialTab={tabFromQuery(query.tab, tabs)}
+                bizName={organization?.name ?? null}
+                sells={sells}
+                // Contacts, the person page's own list; Sell › Customers
+                // only where Contacts is off and they buy (#858).
+                crumbsSell={crumbsToSell(
+                    moduleOn(modules, "CRM"),
+                    sells,
+                    detail.linkedCustomers?.length ?? 0,
                 )}
-
-                {seesLeads ? (
-                    <EnquiryCard
-                        enquiries={contact.enquiries ?? []}
-                        knownEmail={email}
-                    />
-                ) : null}
-
-                <section className="overflow-hidden rounded-[12px] border border-border bg-card">
-                    <h2 className="border-b border-muted px-4 py-[13px] text-[11px] font-semibold uppercase tracking-[0.1em] text-muted-foreground">
-                        Details
-                    </h2>
-                    <dl className="grid gap-x-6 gap-y-3 p-4 text-[13px] sm:grid-cols-2">
-                        {facts.map(([label, value]) => (
-                            <div key={label} className="min-w-0">
-                                <dt className="text-[11.5px] text-muted-foreground">
-                                    {label}
-                                </dt>
-                                <dd className="truncate">
-                                    {value ?? (
-                                        <span className="text-muted-foreground">
-                                            Not given
-                                        </span>
-                                    )}
-                                </dd>
-                            </div>
-                        ))}
-                    </dl>
-                </section>
-
-                {seesLeads ? (
-                    <section className="overflow-hidden rounded-[12px] border border-border bg-card">
-                        <h2 className="border-b border-muted px-4 py-[13px] text-[11px] font-semibold uppercase tracking-[0.1em] text-muted-foreground">
-                            Leads · {contact.leads.length}
-                        </h2>
-                        {contact.leads.length === 0 ? (
-                            <p className="text-pretty px-4 py-3.5 text-[12.5px] leading-[1.5] text-muted-foreground">
-                                No leads for {name} yet. An enquiry from them
-                                lands here, or add one above.
-                            </p>
-                        ) : (
-                            <ul>
-                                {contact.leads.map((lead) => {
-                                    const amount = formatValue(lead.value);
-                                    const status =
-                                        lead.status in LEAD_STATUS
-                                            ? LEAD_STATUS[
-                                                  lead.status as LeadStatus
-                                              ]
-                                            : LEAD_STATUS.OPEN;
-                                    return (
-                                        <li
-                                            key={lead.id}
-                                            className="border-b border-foreground/10 last:border-b-0"
-                                        >
-                                            <Link
-                                                href={`/leads/${lead.id}`}
-                                                className="flex items-center gap-3 px-4 py-3 transition-colors duration-fast hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
-                                            >
-                                                <span className="min-w-0 flex-1">
-                                                    <span className="block truncate text-[13.5px] font-medium">
-                                                        {lead.title}
-                                                    </span>
-                                                    <span className="block text-[11.5px] text-muted-foreground">
-                                                        {lead.pipeline?.name ??
-                                                            "Pipeline"}
-                                                        {amount
-                                                            ? ` · worth ${amount}`
-                                                            : ""}
-                                                    </span>
-                                                </span>
-                                                {lead.stage ? (
-                                                    <Badge variant="neutral">
-                                                        {lead.stage.name}
-                                                    </Badge>
-                                                ) : null}
-                                                <Badge variant={status.variant}>
-                                                    {status.label}
-                                                </Badge>
-                                            </Link>
-                                        </li>
-                                    );
-                                })}
-                            </ul>
-                        )}
-                    </section>
-                ) : null}
-
-                {plan.panels.includes("subscriptions") ? (
-                    <SubscriptionsPanel
-                        contact={person}
-                        subscriptions={holdings.subscriptions ?? null}
-                        plans={holdings.choices.plans}
-                    />
-                ) : null}
-                {plan.panels.includes("packs") ? (
-                    <PacksPanel
-                        contact={person}
-                        purchases={holdings.packs ?? null}
-                        packs={holdings.choices.packs}
-                        invoicesOnSale={holdings.choices.invoicesOnSale}
-                        mentionInvoices={plan.mentionInvoices}
-                        now={now}
-                    />
-                ) : null}
-                {plan.panels.includes("courses") ? (
-                    <CoursesPanel
-                        contact={person}
-                        enrollments={holdings.courses ?? null}
-                        courses={holdings.choices.courses}
-                        invoicesOnEnrol={plan.paymentsOn}
-                        mentionInvoices={plan.mentionInvoices}
-                    />
-                ) : null}
-                {plan.panels.includes("invoices") ? (
-                    <InvoicesPanel
-                        contact={person}
-                        invoices={holdings.invoices?.rows ?? null}
-                        owed={holdings.invoices?.owed ?? null}
-                        canWrite={plan.canAct.invoices}
-                    />
-                ) : null}
-            </div>
+                canWrite={canWrite}
+                canMerge={canMerge}
+                canRemove={canRemove}
+                canConsent={may("consent:write")}
+                canSensitive={canSensitive}
+                sensitiveRoles={sensitiveRoles}
+                userId={session.user.id}
+                suggestions={suggestions.filter(
+                    (s): s is IdentitySuggestion => s.kind === "customer",
+                )}
+                duplicates={suggestions.filter(
+                    (s): s is DuplicateSuggestion => s.kind === "contact",
+                )}
+                thread={thread}
+                reviews={reviews}
+                canReplyReviews={may("product-review:write")}
+                packSale={packSale}
+                canExtendPacks={packsShown && canWritePacks(organization)}
+                nowIso={now.toISOString()}
+                extra={extra}
+                actions={actions}
+                deleteWords={deleteWords}
+                canRecordPayment={acts.recordPayment}
+                overviewExtra={
+                    removed ? null : (
+                        <PersonFacts
+                            company={detail.contact.company}
+                            source={detail.contact.source}
+                        />
+                    )
+                }
+            />
         </PageContainer>
     );
 }
 
 /**
- * What deleting them ends, counted the way the delete counts it — running or
- * paused subscriptions, packs not yet expired, course seats still held — for
- * each panel that was read. One not read stays undefined, and the question
- * says that kind in general terms.
+ * What the Contacts page kept about them beside their email and phone (in
+ * the header): their company and where they came from, said in words.
  */
-function heldCounts(h: ContactHoldings): Holdings {
-    return {
-        subscriptions: h.subscriptions?.filter((s) => s.status !== "CANCELLED")
-            .length,
-        packs: h.packs?.filter((p) => p.standing !== "EXPIRED").length,
-        courses: h.courses?.filter((e) => e.status === "ACTIVE").length,
-    };
+function PersonFacts({
+    company,
+    source,
+}: {
+    company: string | null;
+    source: string | null;
+}) {
+    const facts: [string, string | null][] = [
+        // An empty string is a field someone cleared: shown as not given.
+        ["Company", company?.trim() ? company : null],
+        ["Came from", source ? contactSourceLabel(source) : null],
+    ];
+    return (
+        <section
+            aria-label="Details"
+            className="mt-4 rounded-xl border border-border bg-card px-4 py-3.5"
+        >
+            <dl className="grid gap-x-6 gap-y-3 text-[13px] sm:grid-cols-2">
+                {facts.map(([label, value]) => (
+                    <div key={label} className="min-w-0">
+                        <dt className="text-[12.5px] text-muted-foreground">
+                            {label}
+                        </dt>
+                        <dd className="truncate">
+                            {value ?? (
+                                <span className="text-muted-foreground">
+                                    Not given
+                                </span>
+                            )}
+                        </dd>
+                    </div>
+                ))}
+            </dl>
+        </section>
+    );
 }

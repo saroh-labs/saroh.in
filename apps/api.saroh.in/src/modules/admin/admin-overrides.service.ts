@@ -146,7 +146,9 @@ export class AdminOverridesService {
                 );
             }
             value = command.value;
-            const used = (await catalogueUsage(command.organizationId))[row.id];
+            const used = (
+                await catalogueUsage(command.organizationId, [row.id])
+            ).usage[row.id];
             if (typeof used === "number" && used > value) {
                 warning = `It has ${used} already. They stay, read-only; it can't add more until it is under ${value}.`;
             }

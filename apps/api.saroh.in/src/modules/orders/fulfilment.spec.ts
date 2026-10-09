@@ -171,7 +171,7 @@ describe("what a write stores", () => {
         ] as const) {
             expect(() => storedValueFor(t)).toThrow(BadRequestException);
             expect(() => storedValueFor(t)).toThrow(
-                "An appointment is made by booking it, not by adding an order.",
+                "A booking is made on the calendar, not by adding an order.",
             );
         }
     });

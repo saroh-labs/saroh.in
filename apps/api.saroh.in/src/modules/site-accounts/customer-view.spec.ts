@@ -441,7 +441,7 @@ describe("the account's allow-list", () => {
                     },
                 ],
             } as never);
-            expect(view.fulfilment).toBe("Appointment, in person");
+            expect(view.fulfilment).toBe("Booking, in person");
             expect(view.status).toBe("Booked");
             expect(view.lines).toEqual([
                 {

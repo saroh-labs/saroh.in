@@ -482,11 +482,14 @@ export function BagSheet({
                                     >
                                         −
                                     </button>
-                                    <span
-                                        aria-label={`${line.quantity} of ${name}`}
-                                        className="min-w-5 text-center font-semibold tabular-nums"
-                                    >
-                                        {line.quantity}
+                                    {/* Words a screen reader reads: an
+                                        aria-label on a plain span is not
+                                        (UX-082). */}
+                                    <span className="min-w-5 text-center font-semibold tabular-nums">
+                                        <span aria-hidden>{line.quantity}</span>
+                                        <span className="sr-only">
+                                            {`${line.quantity} of ${name}`}
+                                        </span>
                                     </span>
                                     <button
                                         type="button"

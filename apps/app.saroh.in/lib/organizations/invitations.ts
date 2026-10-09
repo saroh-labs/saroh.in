@@ -89,6 +89,8 @@ export function inviteSchema(known: {
             /** Any role this business has, built-in or invented. */
             role: z.string().min(1),
             siteIds: z.array(z.string()),
+            /** Who on the diary this gives a login to (#868); "" for no one. */
+            staffId: z.string().optional(),
         })
         .superRefine((values, ctx) => {
             const problem = inviteEmailError(values.email, known);
@@ -158,22 +160,21 @@ export function usesSeat(x: { usesSeat?: boolean } | undefined): boolean {
 
 /**
  * The Team line's three counts: seats taken, seat invites waiting, and
- * view-only people with their invites.
+ * view-only people with their invites. An invite for someone on the diary
+ * with no login is that person, already counted among those taking
+ * bookings with no login (#868), so it isn't counted again.
  */
 export function teamCounts(
     members: readonly { usesSeat?: boolean }[],
-    invitations: readonly { usesSeat?: boolean }[],
+    invitations: readonly { usesSeat?: boolean; countedOnDiary?: boolean }[],
 ): { people: number; waiting: number; viewOnly: number } {
     const seated = (xs: readonly { usesSeat?: boolean }[]) =>
         xs.filter((x) => usesSeat(x)).length;
+    const open = invitations.filter((i) => i.countedOnDiary !== true);
     return {
         people: seated(members),
-        waiting: seated(invitations),
-        viewOnly:
-            members.length +
-            invitations.length -
-            seated(members) -
-            seated(invitations),
+        waiting: seated(open),
+        viewOnly: members.length + open.length - seated(members) - seated(open),
     };
 }
 

@@ -12,10 +12,11 @@ import type {
     DataFilter,
 } from "@/components/shared/data-view/types";
 import { ShareLinkButton } from "@/components/sites/share-link-button";
+import { personHref } from "@/lib/contacts/person-href";
 import { formatDayHeading, formatTimeRange } from "@/lib/format/datetime";
 // From ./booking-state, NOT ./service: this is a client component, and the
 // service module reaches next/headers through the CRM HTTP plumbing.
-import { formatStatus } from "@/lib/format/status";
+import { bookingStatus } from "@/lib/format/status";
 import {
     hasEnded,
     isInNextWeek,
@@ -66,8 +67,8 @@ const FILTERS: DataFilter<BookingWithService>[] = [
     },
     {
         id: "unconfirmed",
-        label: "Unconfirmed",
-        predicate: (b) => b.status !== "CONFIRMED",
+        label: "To confirm",
+        predicate: (b) => b.status === "PENDING",
     },
 ];
 
@@ -149,7 +150,7 @@ export function BookingsView({
                 // as from the peek (E5); a typed-in name is not.
                 b.contact ? (
                     <Link
-                        href={`/customers/${b.contact.id}`}
+                        href={personHref(b.contact.id)}
                         className="text-muted-foreground underline-offset-4 hover:text-foreground hover:underline"
                     >
                         {bookerLabel(b)}
@@ -212,7 +213,7 @@ export function BookingsView({
                               : "warning"
                     }
                 >
-                    {formatStatus(b.status)}
+                    {bookingStatus(b.status)}
                 </Badge>
             ),
         },

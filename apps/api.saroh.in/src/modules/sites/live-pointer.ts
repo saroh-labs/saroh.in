@@ -7,6 +7,7 @@ import {
     auditMetadata,
     AuditOutcome,
 } from "../audit/audit.service";
+import { enqueuePageRevalidation } from "./page-cache-revalidate";
 import {
     approvalApplies,
     approvalRequired,
@@ -50,7 +51,7 @@ export type LiveSource = "publish" | "restore" | "go-live";
 /** What `putLive` needs of a transaction client, and nothing more. */
 export type LiveTx = Pick<
     Prisma.TransactionClient,
-    "publication" | "site" | "siteApproval" | "auditEvent" | "$queryRaw"
+    "publication" | "site" | "siteApproval" | "auditEvent" | "$queryRaw" | "job"
 >;
 
 /**
@@ -287,6 +288,13 @@ export async function putLive(
             select: { id: true },
         });
     }
+
+    // The site's kept pages are now the old version's (#863): told once
+    // this transaction commits, by the job it writes.
+    await enqueuePageRevalidation(tx, {
+        cause: "publish",
+        siteIds: [site.id],
+    });
 
     return {
         publicationId: publication.id,

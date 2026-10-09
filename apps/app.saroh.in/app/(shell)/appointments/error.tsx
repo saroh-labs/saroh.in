@@ -17,7 +17,7 @@ export default function Error({
         <SectionError
             error={error}
             reset={reset}
-            title="Couldn't load appointments"
+            title="Couldn't load bookings"
             description="Your bookings are safe — this is a display problem, not a data one."
             backHref="/"
             backLabel="Back to Home"

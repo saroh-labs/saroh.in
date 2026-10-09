@@ -613,14 +613,37 @@ describe("locations customers visit (DB, U13)", () => {
         ).resolves.toMatchObject({ kind: "SHOP" });
     });
 
-    it("with the switch off, keeps the old floor of storefronts", async () => {
+    it("with the switch off, the old floor caps shops, never online storefronts", async () => {
         const b = await business("free", false);
-        for (let i = 0; i < 4; i++) {
-            await stores.createForUser(b.ownerId, b.orgId, { name: `S ${i}` });
+        // Online-only ones are 0 locations (owner, 8 Oct): past the floor's
+        // five storefronts, a sixth is still made.
+        const more: string[] = [];
+        for (let i = 0; i < 5; i++) {
+            more.push(
+                (
+                    await stores.createForUser(b.ownerId, b.orgId, {
+                        name: `S ${i}`,
+                    })
+                ).id,
+            );
         }
-        await refused(
-            stores.createForUser(b.ownerId, b.orgId, { name: "Sixth" }),
+        // Five become shops: the floor's five places customers visit.
+        await storefronts.update(b.orgId, b.storeId, { kind: "SHOP" });
+        for (const id of more.slice(0, 4)) {
+            await storefronts.update(b.orgId, id, { kind: "SHOP" });
+        }
+        expect(await countUsage(prisma, b.orgId, "shopLocations")).toBe(5);
+        const body = await refused(
+            storefronts.update(b.orgId, more[4], { kind: "SHOP" }),
         );
+        expect(body.message).toBe(
+            "Your plan includes 5 places customers visit. A bigger plan adds more.",
+        );
+        const saved = await prisma.storeSettings.findUnique({
+            where: { storeId: more[4] },
+            select: { kind: true },
+        });
+        expect(saved?.kind ?? "ONLINE").toBe("ONLINE");
     });
 });
 

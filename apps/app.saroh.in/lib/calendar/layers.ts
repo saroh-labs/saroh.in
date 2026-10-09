@@ -84,24 +84,14 @@ export function layersFor(month: Pick<CalendarMonth, "layers" | "totals">) {
     const sent = ORDER.filter((k) => month.layers.includes(k));
     const lead = sent[0] ?? null;
     const shown = sent.filter((k) => k === lead || month.totals[k] !== 0);
-    // With no classes beside them, bookings are appointments (the design's
-    // clinic, and the Bookings screen's own legend).
-    const appointments = !shown.includes("classes");
+    // Bookings are bookings with or without classes beside them: one word
+    // each (UX-078, owner 9 Oct), never "appointments".
     return shown.map((key): LayerStyle => ({
         key,
-        ...(key === "bookings" && appointments
-            ? APPOINTMENTS
-            : LABELS[key](shop)),
+        ...LABELS[key](shop),
         tone: toneOf(key, shop),
     }));
 }
-
-/** The bookings layer's words where no class runs beside it. */
-const APPOINTMENTS: Pick<LayerStyle, "label" | "one" | "many"> = {
-    label: "Appointments",
-    one: "appointment",
-    many: "appointments",
-};
 
 /** A layer's words; money's kinds are named by them too (E23). */
 export const LABELS: Record<

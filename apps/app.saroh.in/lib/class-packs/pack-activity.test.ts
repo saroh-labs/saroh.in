@@ -290,7 +290,7 @@ describe("Each sale", () => {
             purchaseId: "pp_1",
             when: "10 Sep",
             name: "Asha Rao",
-            href: "/customers/c_1",
+            href: "/contacts/c_1",
             amount: "₹1,500",
             older: false,
             method: "UPI",

@@ -1113,7 +1113,7 @@ describe("online checkout (E11)", () => {
         await chooseOneToOne();
         expect(
             screen.getByRole("radio", {
-                name: "Pay ₹1,200 now Online — your appointment is confirmed straight away",
+                name: "Pay ₹1,200 now Online — booked straight away",
             }),
         ).toHaveAttribute("aria-checked", "true");
         expect(
@@ -1128,7 +1128,7 @@ describe("online checkout (E11)", () => {
         );
         expect(
             screen.getByRole("radio", {
-                name: "Pay ₹500 for this class Online — your place is confirmed straight away",
+                name: "Pay ₹500 for this class Online — booked straight away",
             }),
         ).toBeInTheDocument();
         // Saroh can't vouch for the account's methods, so it names none.
@@ -2294,7 +2294,7 @@ describe("the header's facts (E6)", () => {
         expect(
             screen.getByRole("heading", {
                 level: 1,
-                name: "Book your appointment",
+                name: "Make a booking",
             }),
         ).toBeInTheDocument();
         expect(
@@ -2411,7 +2411,7 @@ describe("a treatment of several visits (E10)", () => {
         expect(within(aside).getByText("First visit")).toBeInTheDocument();
         expect(
             within(aside).getByText(
-                "We'll book visits 2 and 3 with you at the first appointment",
+                "We'll book visits 2 and 3 with you at the first visit",
             ),
         ).toBeInTheDocument();
     });

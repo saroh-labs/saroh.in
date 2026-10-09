@@ -1,7 +1,44 @@
 import { describe, expect, it } from "vitest";
 
 import { access, row } from "./fixtures.test-data";
-import { importRoom, planMeter } from "./meter";
+import { importRoom, meterBeside, planMeter } from "./meter";
+
+/** The products limit said once, not in the banner and the header (#874). */
+describe("meterBeside", () => {
+    const full = planMeter(
+        access({ modules: [row({ usage: 10 })] }),
+        "products",
+    );
+    const some = planMeter(
+        access({ modules: [row({ usage: 4 })] }),
+        "products",
+    );
+
+    it("counts beside New product while no banner says it", () => {
+        expect(meterBeside(some, false)).toEqual({
+            label: "4 of 10 products",
+            upgrade: false,
+        });
+        expect(meterBeside(full, false)).toEqual({
+            label: "10 of 10 products",
+            upgrade: true,
+        });
+    });
+
+    it("leaves it to the banner once the banner shows", () => {
+        expect(meterBeside(full, true)).toEqual({
+            label: null,
+            upgrade: false,
+        });
+    });
+
+    it("says nothing without a limit", () => {
+        expect(meterBeside(null, false)).toEqual({
+            label: null,
+            upgrade: false,
+        });
+    });
+});
 
 /** UX-036: the limit shown before the work, with made-up figures. */
 describe("planMeter", () => {

@@ -3432,3 +3432,62 @@ same-origin). Merchant sites' HSTS has no `includeSubDomains`: on a merchant's
 own domain it would reach subdomains Saroh doesn't serve.
 **Check**: `pnpm run check:security-headers` (prepush and CI).
 **Category**: security · `apps/*/next.config.*`
+
+## Storage — an upload could skip the byte check, and an SVG was a 500
+
+**Symptom**: found 8 Oct 2026 building #873 (UX-037). On R2, a photo whose
+object was never stored passed the completion check and became READY; and
+the app's pickers take any `image/*`, so an SVG or HEIC reached the storage
+port's allowlist and came back as a 500, "Something went wrong", instead of
+a reason.
+**Root cause**: the completion check let unreadable bytes through for every
+photo, because the in-memory adapter of local development never sees the
+browser's PUT; nothing told the service which storage it had. The type was
+only checked inside the port, where a refusal is a thrown zod error.
+**Fix**: the port says whether it `seesUploads` (R2 yes, memory no), and
+where it does, no bytes is a FAILED upload. `media/upload-checks.ts` refuses
+a type outside the allowlist, and a logo outside PNG, JPG and WebP, before
+signing, in the words the screens already show.
+**Check**: `upload-checks.spec.ts` (real PNG/JPEG/WebP headers, a text file
+renamed `.png`, a type mismatch, an SVG) and `media.service.spec.ts`.
+**Rule**: `docs/patterns/backend-integrations.md` → "Media storage".
+**Category**: security · storage · `apps/api.saroh.in/src/modules/media/`
+
+## Access — store access alone still read a storefront's totals (#868)
+
+**Symptom**: found in the 7 Oct UX audit follow-ups. A business role with
+"See locations" (`store:read`) and no order read could open the store-scoped
+order list and read (`GET stores/:id/orders`) and customer list, with every
+order's total and what each customer had spent.
+**Root cause**: `requireOrderRead` refused the kitchen's roles (`order:stage`
+without `order:read`) and, since DEC-106, a storefront role alone, but let
+anyone in whose business role carried `store:read`. Store access was read as
+a money grant, which DEC-098 rules out. The money scans only looked for role
+names, so they couldn't see it.
+**Fix**: the store-scoped reads that send amounts take `order:read` on the
+business role (`StoresService.moneyAllows`; the storefront's owner on the
+older per-store path), never `store:read`. The workspace no longer reads the
+store-scoped order list, and the customer page already falls back when the
+store-scoped customer read is refused.
+**Check**: `organizations/money-by-permission.spec.ts` → "store access grants
+no amounts" fails on `store:read` in `order-read-access.ts`, and on a
+store-scoped orders or customers method that serializes amounts without
+asking `requireOrderRead` first. `stores/order-read-access.authorization.spec.ts`
+pins Member, store-only, `order:read`, Owner and Admin.
+**Category**: access · `apps/api.saroh.in/src/modules/stores/order-read-access.ts`
+
+## The quick gate skipped the api's unit tests on a batch that changed the api
+
+**Symptom**: on batch-2026-10-09-1 (93 changed api files) `pnpm prepush`
+printed "api-unit:changed PASS (the api is not affected)".
+**Cause**: `affected()` in `scripts/prepush.sh` asks `turbo ls` which
+packages changed, with its errors sent to `/dev/null`, and read an empty
+answer as "nothing affected". Run right after a fresh `pnpm install` in a new
+worktree, the query came back empty, and every "only if affected" step
+skipped silently.
+**Fix**: a failed query counts every package as affected, and an empty answer
+counts only if git agrees that nothing under `apps/` or `packages/` changed.
+Otherwise every package is affected and the step runs.
+**Check**: the helper fails closed in both cases. A gate that can't tell what
+changed runs everything.
+**Category**: tooling · `scripts/prepush.sh` → `affected()`

@@ -12,6 +12,7 @@ import {
 } from "@saroh/ui/form";
 import { Input } from "@saroh/ui/input";
 import { cn } from "@saroh/ui/lib/utils";
+import { useEdgeFade } from "@saroh/ui/scroll-x";
 import { Switch } from "@saroh/ui/switch";
 import { showError, showInfo } from "@saroh/ui/toast";
 import Link from "next/link";
@@ -424,6 +425,13 @@ export function OrganizationSettingsForm({
         businessTypeOf(settings.profile.type) === "";
     // In the address, so Search settings can open the tab a setting is on.
     const [tab, setTab] = useTabParam(BUSINESS_TAB_PARAM, TAB_KEYS, "identity");
+    // On a phone the strip runs off the screen: it fades on the side with
+    // more, and the open tab is kept in view (UX-079).
+    const tabStrip = useRef<HTMLDivElement>(null);
+    const tabFade = useEdgeFade(tabStrip, {
+        current: '[aria-selected="true"]',
+        revealKey: tab,
+    });
     const [editing, setEditing] = useState<TabKey | null>(null);
     // The Hours card keeps its own form; whether it has changes, from it.
     const [hoursDirty, setHoursDirty] = useState(false);
@@ -1193,11 +1201,14 @@ export function OrganizationSettingsForm({
     return (
         <Form {...form}>
             <div
+                ref={tabStrip}
                 role="tablist"
                 aria-label="Business details"
                 onKeyDown={onTabKeys}
+                style={tabFade}
                 // One line however narrow: the strip scrolls sideways, with
-                // no scrollbar drawn, rather than wrapping under itself.
+                // no scrollbar drawn, rather than wrapping under itself; the
+                // fade says there is more (UX-079).
                 className="-mt-1.5 mb-[18px] flex flex-nowrap gap-0.5 overflow-x-auto border-b border-border [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
             >
                 {TAB_KEYS.map((key) => {

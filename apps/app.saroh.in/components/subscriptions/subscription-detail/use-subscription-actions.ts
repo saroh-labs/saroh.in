@@ -4,7 +4,7 @@ import { showError, showSuccess, showUndo } from "@saroh/ui/toast";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 
-import { createPayLink } from "@/lib/invoices/actions";
+import { newPayLink as makePayLink } from "@/lib/invoices/link-actions";
 import {
     cancelPlanChange,
     cancelSubscription,
@@ -187,7 +187,7 @@ export function useSubscriptionActions(
         const invoiceId = sub.failedCharge?.id;
         if (!invoiceId) return;
         void run(
-            () => createPayLink(invoiceId),
+            () => makePayLink(invoiceId),
             (res) => {
                 if ("data" in res) setPayLink(res.data.url);
                 showSuccess(

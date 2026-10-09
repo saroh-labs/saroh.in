@@ -1,4 +1,4 @@
-// @covers accounts:/login app:/open app:/customers api:customer-workspace api:contacts
+// @covers accounts:/login app:/open app:/customers app:/contacts api:customer-workspace api:contacts
 import type { Page } from "@playwright/test";
 import { expect, test } from "@playwright/test";
 
@@ -96,7 +96,7 @@ test.describe("Customer Detail — merge", () => {
             .click();
 
         await expect(page.getByText(/^Merged\. All of /)).toBeVisible();
-        await expect(page).toHaveURL(new RegExp(`/customers/${kept}`));
+        await expect(page).toHaveURL(new RegExp(`/contacts/${kept}`));
         await expect(page.getByRole("heading", { level: 1 })).toHaveText(
             `Merge Kept ${stamp}`,
         );
@@ -107,7 +107,7 @@ test.describe("Customer Detail — merge", () => {
         // The merged record's old address lands on the one kept, same tab.
         await page.goto(`/customers/${gone}?tab=notes`);
         await expect(page).toHaveURL(
-            new RegExp(`/customers/${kept}\\?tab=notes`),
+            new RegExp(`/contacts/${kept}\\?tab=notes`),
         );
     });
 

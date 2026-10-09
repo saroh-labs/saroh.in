@@ -153,7 +153,7 @@ export const MODULES: readonly ModuleDescriptor[] = [
     },
     {
         key: "APPOINTMENTS",
-        label: "Appointments",
+        label: "Bookings",
         description: "Services, availability, and bookings for scheduled work.",
         rootRoutes: ["/appointments"],
         requiredAction: "booking:read",
@@ -218,7 +218,7 @@ export const MODULES: readonly ModuleDescriptor[] = [
         key: "PAYMENTS",
         label: "Payments",
         description:
-            "Payment providers, checkout intents, and reconciliation. Becomes ready once Appointments or Commerce is enabled and a provider is healthy.",
+            "Payment providers, checkout intents, and reconciliation. Becomes ready once Bookings or Commerce is enabled and a provider is healthy.",
         rootRoutes: ["/payments"],
         requiredAction: "payment:read",
         dependencies: [],

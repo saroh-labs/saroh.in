@@ -1165,20 +1165,25 @@ describe("navCountFor", () => {
     });
 });
 
-describe("Customer Detail sits in the section that holds customers (U18)", () => {
+describe("the person page sits in the section that holds people (#869)", () => {
     const groupsWith = (moduleKeys: string[]) =>
         navFor({ role: "OWNER", moduleKeys });
 
-    it("is Sell › Customers where the business sells", () => {
+    it("is Contacts, where the business sells too", () => {
         const groups = groupsWith(["CRM", "COMMERCE"]);
-        expect(navPathname("/customers/c_1", groups)).toBe(
-            "/commerce/customers",
-        );
+        expect(navPathname("/contacts/c_1", groups)).toBe("/contacts");
     });
 
     it("is Contacts where it takes bookings and sells nothing", () => {
         const groups = groupsWith(["CRM", "APPOINTMENTS"]);
-        expect(navPathname("/customers/c_1", groups)).toBe("/contacts");
+        expect(navPathname("/contacts/c_1", groups)).toBe("/contacts");
+    });
+
+    it("is Sell › Customers where the rail has no Contacts", () => {
+        const groups = groupsWith(["COMMERCE"]);
+        expect(navPathname("/contacts/c_1", groups)).toBe(
+            "/commerce/customers",
+        );
     });
 
     it("leaves every other address as it is", () => {
@@ -1186,7 +1191,7 @@ describe("Customer Detail sits in the section that holds customers (U18)", () =>
         expect(navPathname("/commerce/orders/o_1", groups)).toBe(
             "/commerce/orders/o_1",
         );
-        expect(navPathname("/customers", groups)).toBe("/customers");
+        expect(navPathname("/contacts", groups)).toBe("/contacts");
     });
 });
 

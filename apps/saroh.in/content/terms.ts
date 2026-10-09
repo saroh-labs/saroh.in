@@ -3,7 +3,7 @@
  * Policy and Terms": the 4 Oct text, with the 5 Oct changes for the 12-month
  * term, the introductory month and moving to a lower plan, and the 7 Oct
  * change to the term's end: a request to pay, not a one-tap renewal,
- * DEC-100). Published VERBATIM at /terms: do not reword it here. A change comes from the owner's
+ * DEC-100; and the 8 Oct paragraph on merchants' own trackers, DEC-108). Published VERBATIM at /terms: do not reword it here. A change comes from the owner's
  * text, and moves `publishOn` (`content/resources.ts`), which is the "Last
  * updated" date the page shows.
  *
@@ -74,6 +74,8 @@ We may remove content or suspend an account that does these things. Where we can
 ## Your website and domain
 
 You're responsible for what your website says. A domain you connect stays registered to you. We can take down a page that breaks the law or these terms.
+
+You can connect analytics and advertising tools to your website from the list Saroh offers. You're responsible for having a lawful reason and a privacy notice for what they collect, and for how you use it. You must not use them to deceive or harm visitors. Saroh may switch them off on your site, and tell you why, if they put visitors or Saroh at risk.
 
 ## The source code
 

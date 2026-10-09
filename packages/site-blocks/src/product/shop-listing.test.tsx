@@ -123,6 +123,33 @@ describe("ShopListing (G11)", () => {
             expect(button).toHaveTextContent("Sold out");
         });
 
+        it("stops at what is left, as the product page does (UX-058)", () => {
+            render(
+                <ShopListing
+                    products={[{ ...offered, bagLeft: 1 }]}
+                    bagSite="site-1"
+                />,
+            );
+            fireEvent.click(
+                screen.getByRole("button", {
+                    name: "Add Sourdough to your bag",
+                }),
+            );
+            const button = screen.getByRole("button", {
+                name: "Sourdough: the last one is in your bag",
+            });
+            expect(button).toBeDisabled();
+            expect(button).toHaveTextContent("In your bag");
+            fireEvent.click(button);
+            expect(readBag("site-1")).toEqual([
+                {
+                    listingId: "listing-sourdough",
+                    variantId: "variant-large",
+                    quantity: 1,
+                },
+            ]);
+        });
+
         it("draws no button where the site takes no online orders", () => {
             render(<ShopListing products={[offered]} />);
             expect(screen.queryByRole("button")).toBeNull();

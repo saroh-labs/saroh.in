@@ -2,6 +2,9 @@ import type { LookupAddress } from "node:dns";
 import { Resolver as DnsResolver } from "node:dns/promises";
 import { BlockList, isIP } from "node:net";
 
+import type { RunMarks } from "../../common/test-run";
+import { isTestRun } from "../../common/test-run";
+
 /**
  * The link preview tool's guard (resources plan U2, KTD-3): the only code in
  * Saroh that fetches an address a stranger typed, so the only place that
@@ -191,14 +194,9 @@ export function isLoopbackAddress(ip: string): boolean {
  */
 export function testHostsFrom(
     value: string | undefined,
-    run: { nodeEnvs: (string | undefined)[]; ci?: string },
+    run: RunMarks,
 ): ReadonlySet<string> {
-    if (!value || run.nodeEnvs.includes("production")) return new Set();
-    const ci = (run.ci ?? "").trim().toLowerCase();
-    const testRun =
-        run.nodeEnvs[0] === "test" ||
-        (ci !== "" && ci !== "false" && ci !== "0");
-    if (!testRun) return new Set();
+    if (!value || !isTestRun(run)) return new Set();
     return new Set(
         value
             .split(",")

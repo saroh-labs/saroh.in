@@ -73,6 +73,55 @@ export function holdingsSentence(h: Holdings): string {
     return `Their ${list} ${one ? "goes" : "go"} too${bookings}. `;
 }
 
+/** The rows the person page read that deleting them would end. */
+export interface HeldRows {
+    subscriptions?: readonly { status: string }[] | null;
+    packs?: readonly { expiresAt: string }[] | null;
+    courses?: readonly { status: string }[] | null;
+}
+
+/**
+ * What deleting them ends, counted the way the delete counts it (the API's
+ * `ContactsService.remove`): subscriptions running or paused, packs not yet
+ * expired, course seats still held. A kind not read — no permission, its
+ * module off, or the read failed — stays undefined, and the question says
+ * that kind in general terms.
+ */
+export function heldCounts(rows: HeldRows, now: Date): Holdings {
+    return {
+        subscriptions: rows.subscriptions?.filter(
+            (s) => s.status === "ACTIVE" || s.status === "PAUSED",
+        ).length,
+        packs: rows.packs?.filter(
+            (p) => new Date(p.expiresAt).getTime() > now.getTime(),
+        ).length,
+        courses: rows.courses?.filter((e) => e.status === "ACTIVE").length,
+    };
+}
+
+/**
+ * The person page's "Delete ‹name›?" paragraph (#869): their notes and
+ * leads, then what they hold (`holdingsSentence`, named when every count
+ * is known), then what stays on record. `leads` is null when their leads
+ * weren't read, and the sentence then says "leads" without a number.
+ */
+export function deleteQuestion(
+    leads: number | null | undefined,
+    holdings: Holdings,
+): string {
+    const notes =
+        leads === null || leads === undefined
+            ? "Their notes and any leads go with them. "
+            : leads > 0
+              ? `Their notes and ${count(leads, "lead", "leads")} go with them. `
+              : "Their notes go with them. ";
+    const held = holdingsSentence(holdings);
+    // Bookings the sentence above has just said are cancelled are not the
+    // ones that stay.
+    const someCancelled = held.includes("cancelled");
+    return `${notes}${held}Orders, ${someCancelled ? "other bookings" : "bookings"} and invoices stay on record under the name they gave, and a location's record of a customer with the same email is kept. This cannot be undone.`;
+}
+
 // ── Privacy removal (DEC-042, C11) ──────────────────────────────────────
 
 /**

@@ -203,7 +203,7 @@ function orderSentence(
 function noticeSubject(vars: NoticeVars): string {
     switch (vars.kind) {
         case "BOOKING_CONFIRMED":
-            return `Your booking with ${vars.booking.business} is confirmed`;
+            return `You're booked with ${vars.booking.business}`;
         case "BOOKING_MOVED":
             return `Your booking with ${vars.booking.business} has moved`;
         case "BOOKING_CANCELLED":

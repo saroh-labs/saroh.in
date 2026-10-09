@@ -430,8 +430,8 @@ describe("where the merge is opened from", () => {
 
 describe("the old address", () => {
     it("goes to the record kept, on the same tab", () => {
-        expect(mergedRedirectPath("c_1")).toBe("/customers/c_1");
-        expect(mergedRedirectPath("c_1", "ord")).toBe("/customers/c_1?tab=ord");
+        expect(mergedRedirectPath("c_1")).toBe("/contacts/c_1");
+        expect(mergedRedirectPath("c_1", "ord")).toBe("/contacts/c_1?tab=ord");
     });
 
     it("tells a merged answer from a customer", () => {

@@ -13,6 +13,7 @@ import {
     setModuleStatusAction,
 } from "@/lib/modules/actions";
 import { blockerSentence, refusalSentence } from "@/lib/modules/blocker-copy";
+import { moduleName } from "@/lib/modules/names";
 import type { RowPlanLock } from "@/lib/modules/plan-locks";
 import { asShown, rowPlanLock } from "@/lib/modules/plan-locks";
 import type { ModuleBlocker, ModuleView } from "@/lib/modules/schema";
@@ -100,25 +101,18 @@ export function ModuleList({
 }
 
 /**
- * What each module is called here and what it is for, from the design. The
- * names are the rail's — the API says "Commerce" and "CRM", but a merchant
- * turns on the Sell and Contacts they see in the sidebar. A module the design
- * does not describe keeps the API's name and the rows it adds.
+ * What each module is for, from the design. Its name is the rail's, from
+ * `lib/modules/names.ts` — the API says "Commerce" and "CRM", but a merchant
+ * turns on the Sell and Contacts they see in the sidebar.
  */
-const DISPLAY: Partial<Record<string, { label?: string; note: string }>> = {
-    CRM: { label: "Contacts", note: "People who are not customers yet." },
-    COMMERCE: {
-        label: "Sell",
-        note: "Orders, products, customers and locations.",
-    },
+const DISPLAY: Partial<Record<string, { note: string }>> = {
+    CRM: { note: "People who are not customers yet." },
+    COMMERCE: { note: "Orders, products, customers and locations." },
     PAYMENTS: {
         note: "Take subscriptions, sell plans and take payment online.",
     },
     WEBSITE: { note: "Pages, posts and a domain." },
-    APPOINTMENTS: {
-        label: "Bookings",
-        note: "A calendar, services and bookings.",
-    },
+    APPOINTMENTS: { note: "A calendar, services and bookings." },
     COURSES: { note: "A run of dated sessions with seats and a price." },
     CLASS_PACKS: {
         note: "A number of visits bought up front and used over time.",
@@ -133,9 +127,7 @@ const DISPLAY: Partial<Record<string, { label?: string; note: string }>> = {
 };
 
 function labelOf(modules: ModuleView[], key: string): string {
-    return (
-        DISPLAY[key]?.label ?? modules.find((m) => m.key === key)?.label ?? key
-    );
+    return moduleName(key, modules);
 }
 
 function noteOf(modules: ModuleView[], module: ModuleView): string {

@@ -241,7 +241,7 @@ describe("Pack Detail's Who has it", () => {
         expect(text()).toContain("Use by 10 Nov");
         expect(text()).toContain("Bought 1 Sep · ₹1,500 · UPI");
         const link = document.querySelector('a[aria-label="Open Asha Rao"]');
-        expect(link?.getAttribute("href")).toBe("/customers/c_1");
+        expect(link?.getAttribute("href")).toBe("/contacts/c_1");
 
         click(button("Extend"));
         expect(text()).toContain("Extend Asha Rao's pack");

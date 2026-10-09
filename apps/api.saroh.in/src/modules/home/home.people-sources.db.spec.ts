@@ -297,7 +297,7 @@ describe("bookingPageNotes (DB)", () => {
                 [orphan.id, "To check", "Kabir Test left a note when booking"],
             ],
         );
-        expect(action?.evidence?.[0].href).toBe(`/customers/${rahul.id}`);
+        expect(action?.evidence?.[0].href).toBe(`/contacts/${rahul.id}`);
     });
 
     it("gives a Member nothing, not even a count", async () => {

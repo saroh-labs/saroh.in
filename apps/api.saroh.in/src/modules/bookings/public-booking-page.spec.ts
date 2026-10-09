@@ -293,6 +293,7 @@ describe("pay now (U19)", () => {
         expect(out.payToken).toEqual(expect.any(String));
         expect(db.invoice.updateMany.mock.calls[0][0].data).toEqual({
             payTokenHash: hashPayToken(out.payToken ?? ""),
+            payLinkCreatedAt: expect.any(Date),
         });
 
         await expect(

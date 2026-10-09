@@ -65,8 +65,11 @@ what the API allows.
   of which reaches it, and Commerce takes `order:read` or `order:stage`, so a
   Member reaches Sell → Orders (the list comes back without totals or emails)
   and Order Detail (`GET organizations/:org/orders/:id`). The older
-  store-scoped order list and read send totals, so they refuse a role with
-  `order:stage` but no `order:read`. A new read inside Commerce must ask for
+  store-scoped order list and read send totals (and the store-scoped
+  customer list each customer's spend), so they take `order:read`
+  (`requireOrderRead`): a role with `order:stage` but no `order:read` is
+  refused, and so is store access alone (#868) — `store:read` shows the
+  storefront, never what it has sold. A new read inside Commerce must ask for
   its own action; the module gate no longer implies `order:read`.
 - **Current** (B16, DEC-039) — **Each order endpoint asks its own power.**
   `order:create` takes a new order (store-scoped `POST stores/:id/orders`
@@ -225,6 +228,38 @@ what the API allows.
   `reviewerScope`: another storefront's order is a 404 to read, and every
   move asks `assertOrdersAtOwnLocation` (a 403). A new order read or move
   spreads the same; Home, the calendar and New order alerts follow it.
+- **Current** (#868, owner decision 2026-10-08) — **A diary person given a
+  login is Calendar only by default.** Someone taking bookings with no login
+  (DEC-105) is invited from Team by naming them (`staffId` on the invite,
+  `OrganizationInvitation.staffId`); with no role picked the invite is at
+  **"Calendar only"** (key `calendar-only`: `org:read`, `module:read`,
+  `booking:read`, `booking:write`, `service:read` — no customers, team,
+  set-up or money), and the owner may pick any role within reach instead.
+  Like Storefront team it is an ordinary role row, made on first use
+  (`ensureCalendarOnlyRole` in `@saroh/database`: a business's first diary
+  person, an invite or accept at it, the seed) and by the migration
+  `20261031100000_calendar_only_role` for businesses already on the diary;
+  with no row the policy resolves the key to that list, never the floor.
+  Accepting links the diary person to the new membership in the accept's
+  transaction (`linkDiaryPerson`; a login already on the diary as someone
+  else keeps that). Linking an existing member to a diary person
+  (`PATCH staff/:id`) changes no role: a role held is never lowered. **What it reaches is narrowed by the key**, like DEC-074's
+  locations: `bookings/own-diary.ts` (`ownDiaryOf`, `ownBookingsWhere`,
+  `assertOwnBooking`, `bookingStaffFor`) gives the person's own bookings —
+  those they take, and nobody's for a service they take — to the bookings
+  list, the bookings calendar, a booking's detail (another's is a 404), the
+  business calendar (others' time off unnamed), a class's waitlist, the
+  diary's people (themselves only) and Home (no business-wide booking
+  counts; off the diary, no bookings rather than everyone's); a move,
+  cancel, outcome or pay link on another's booking is a 403 ("Your role
+  changes only your own bookings."), and a booking by hand is with
+  themselves. They hear no business-wide booking alerts. A new booking read
+  or write spreads the same. **Seats:** the role holds `booking:write`, so
+  it is a seat (DEC-105); an open invite naming a diary person with no login
+  is that person, counted once (`countedOnDiary` in `billing/seats.ts`, read
+  by metering, the invite's meter check and Team's count line).
+  `calendar-only-role.spec.ts`, `diary-invite.spec.ts`, `own-diary.spec.ts`,
+  `organization-members.diary.spec.ts`, `calendar-only.db.spec.ts`.
 - **Current** — **The last OWNER cannot be demoted or removed.** The S1-006
   invariant, enforced in `organization-members.service.ts` inside a serializable
   transaction — it is about the state of the roster, not what a role may do, so
@@ -296,7 +331,9 @@ orgId)` (`organizations/organization-kind.ts`).
   storefront's kind becomes SHOP) are the catalogue's where `enforcedRow`
   answers for the row; elsewhere the old one-website and `storefronts`
   floor (`LEGACY_FLOOR_ENTITLEMENTS`) still applies, so nothing new locks
-  behind the switch. Team members never count a Reviewer, so moving
+  behind the switch. The `storefronts` floor counts what `shopLocations`
+  counts and is asked where a storefront becomes a SHOP, never on creating
+  an online one (DEC-109, `billing/legacy-location-floor.ts`). Team members never count a Reviewer, so moving
   someone off Reviewer is metered. Over after a downgrade,
   existing things stay readable and editable; only adding is refused. A
   new write that adds a metered thing, or a new switch row, gets its call

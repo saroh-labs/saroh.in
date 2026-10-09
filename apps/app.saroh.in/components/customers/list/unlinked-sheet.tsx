@@ -15,6 +15,7 @@ import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useState, useTransition } from "react";
 
 import { ViewerDate } from "@/components/shared/viewer-date";
+import { personHref } from "@/lib/contacts/person-href";
 import { linkCustomerAction } from "@/lib/customer-workspace/actions";
 import { loadUnlinkedCustomers } from "@/lib/customers/actions";
 import { customerHref } from "@/lib/customers/links";
@@ -305,7 +306,7 @@ function UnlinkedItem({
                         <p className="min-w-0 flex-[1_1_180px] text-muted-foreground">
                             Their email belongs to{" "}
                             <Link
-                                href={`/customers/${encodeURIComponent(holder.contactId)}`}
+                                href={personHref(holder.contactId)}
                                 className="font-medium text-brand transition-colors hover:text-foreground active:text-muted-foreground"
                             >
                                 {holderName}

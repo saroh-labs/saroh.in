@@ -1,4 +1,4 @@
-// @covers accounts:/login app:/open app:/ app:/commerce/orders app:/commerce/customers app:/customers app:/calendar app:/bookings app:/commerce/products app:/billing/invoices app:/billing/subscriptions app:/settings/organization app:/settings/people app:/settings/modules app:/settings/billing app:/settings/profile app:/settings/activity api:home api:orders api:customer-workspace api:customers api:calendar api:bookings api:products api:invoices api:subscriptions api:organizations pkg:ui
+// @covers accounts:/login app:/open app:/ app:/commerce/orders app:/commerce/customers app:/customers app:/contacts app:/calendar app:/bookings app:/commerce/products app:/billing/invoices app:/billing/subscriptions app:/settings/organization app:/settings/people app:/settings/modules app:/settings/billing app:/settings/profile app:/settings/activity api:home api:orders api:customer-workspace api:customers api:calendar api:bookings api:products api:invoices api:subscriptions api:organizations pkg:ui
 import fs from "node:fs";
 
 import AxeBuilder from "@axe-core/playwright";

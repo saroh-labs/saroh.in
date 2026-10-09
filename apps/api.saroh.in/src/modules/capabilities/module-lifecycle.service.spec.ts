@@ -71,7 +71,7 @@ describe("ModuleLifecycleService", () => {
         const refused = svc.enable(OWNER, "COURSES");
         await expect(refused).rejects.toBeInstanceOf(BadRequestException);
         await expect(refused).rejects.toThrow(
-            "Courses needs Appointments. Turn on Appointments first.",
+            "Courses needs Bookings. Turn on Bookings first.",
         );
         expect(db.organizationModule.upsert).not.toHaveBeenCalled();
     });
@@ -88,7 +88,7 @@ describe("ModuleLifecycleService", () => {
         const refused = svc.disable(OWNER, "APPOINTMENTS");
         await expect(refused).rejects.toBeInstanceOf(ConflictException);
         await expect(refused).rejects.toThrow(
-            "Courses needs Appointments. Turn off Courses first.",
+            "Courses needs Bookings. Turn off Courses first.",
         );
     });
 
@@ -168,7 +168,7 @@ describe("ModuleLifecycleService", () => {
             flags as never,
         );
         await expect(svc.disable(OWNER, "APPOINTMENTS")).rejects.toThrow(
-            "Courses needs Appointments. Turn off Courses first.",
+            "Courses needs Bookings. Turn off Courses first.",
         );
         expect(db.organizationModule.upsert).not.toHaveBeenCalled();
     });

@@ -6,7 +6,7 @@ import { showError, showSuccess } from "@saroh/ui/toast";
 import { Copy } from "lucide-react";
 import Link from "next/link";
 import type { ReactNode } from "react";
-import { useId, useState } from "react";
+import { useId, useReducer, useState } from "react";
 
 import { reportFailure } from "@/components/billing/plan-refusal";
 import { EmailNoteText } from "@/components/communications/email-note";
@@ -21,16 +21,20 @@ import { InvoiceCrumbs } from "@/components/invoices/invoice-crumbs";
 import { InvoicePill } from "@/components/invoices/invoice-pill";
 import { OfflinePayHint } from "@/components/invoices/offline-pay-hint";
 import { SendDialog } from "@/components/invoices/send-dialog";
+import {
+    NewLinkConfirm,
+    UnseenLinkNote,
+} from "@/components/invoices/unseen-link";
 import { useBusinessDetailsStep } from "@/components/organizations/use-business-details-step";
 import { ConfirmDialog } from "@/components/shared/confirm-dialog";
 import { ReadOnlyNote } from "@/components/shared/read-only-note";
 import { ViewerDate } from "@/components/shared/viewer-date";
 import type { EmailNote } from "@/lib/communications/email-setup";
 import { INVOICE_EMAIL_WORDS } from "@/lib/communications/email-setup";
-import { createPayLink, createViewLink } from "@/lib/invoices/actions";
 import type { DetailActionId } from "@/lib/invoices/detail-actions";
 import { detailActions, owedHere } from "@/lib/invoices/detail-actions";
-import { mintedLink, rememberLink } from "@/lib/invoices/minted-links";
+import { newPayLink, newViewLink } from "@/lib/invoices/link-actions";
+import { mintedLink } from "@/lib/invoices/minted-links";
 import { downloadInvoicePdf, hasPdf } from "@/lib/invoices/pdf";
 import { canSend, paysOnline, wasSent } from "@/lib/invoices/send";
 import type { InvoiceSend, InvoiceSent } from "@/lib/invoices/service";
@@ -105,7 +109,15 @@ export function InvoiceDetail({
     paymentsOn = true,
     emailNote = null,
 }: {
-    invoice: InvoiceRef & { kind: string };
+    invoice: InvoiceRef & {
+        kind: string;
+        /**
+         * When it last changed: a link made here is forgotten once it
+         * changes again, since a send, a view link or the customer's own
+         * "Pay now" may have replaced it (#870).
+         */
+        updatedAt?: string;
+    };
     pill: { label: string; variant: PillVariant };
     subline: ReactNode;
     canWrite: boolean;
@@ -117,6 +129,8 @@ export function InvoiceDetail({
     online: {
         providerConnected: boolean;
         payLinkActive: boolean;
+        /** When the link out was made (#870); absent from an older API. */
+        payLinkMadeAt?: string | null;
         /** An autopay charge under way (D13): the pay link is held. */
         autopayCharge?: { at: string } | null;
         /** Why its link can't take payment (#835); absent from an older API. */
@@ -152,14 +166,24 @@ export function InvoiceDetail({
         then: "make its pay link",
         continueLabel: "Save and make link",
     });
-    // A pay link made for it earlier in this tab, shown again (UX-048):
-    // its address can't be read back from the API.
-    const [url, setUrl] = useState<string | null>(() => mintedLink(invoice.id));
-    // A view link (#833) or a pay link: what the copied address opens.
-    const [urlKind, setUrlKind] = useState<"pay" | "view">("pay");
+    // A view link just made (#833): shown until something replaces it.
+    const [viewUrl, setViewUrl] = useState<string | null>(null);
+    // A pay link is kept outside React (UX-048); this redraws once it is.
+    const [, redraw] = useReducer((n: number) => n + 1, 0);
     const [busy, setBusy] = useState(false);
     const [downloading, setDownloading] = useState(false);
     const s = invoice.standing;
+    // A pay link made for it earlier in this tab, shown again (UX-048): its
+    // address can't be read back from the API. Not once it is paid or void,
+    // or changed since (#870): then it isn't the link that is out.
+    const payUrl = mintedLink(invoice.id, {
+        standing: s,
+        updatedAt: invoice.updatedAt,
+        payLinkMadeAt: online?.payLinkMadeAt,
+    });
+    const url = viewUrl ?? payUrl;
+    // A view link (#833) or a pay link: what the copied address opens.
+    const urlKind: "pay" | "view" = viewUrl ? "view" : "pay";
     const credit = invoice.kind === "CREDIT_NOTE";
     const owed = owedHere({ standing: s, credit, fromOrder: !!orderHref });
     // While autopay is charging it (D13), no link: the customer would pay twice.
@@ -173,14 +197,15 @@ export function InvoiceDetail({
 
     async function makeLink() {
         setBusy(true);
-        const res = await details.run(() => createPayLink(invoice.id));
+        const res = await details.run(() =>
+            newPayLink(invoice.id, invoice.updatedAt),
+        );
         setBusy(false);
         if (!res) return;
         // A plan without online payments: its notice and the way up.
         if (!res.ok) return reportFailure(res);
-        rememberLink(invoice.id, res.data.url);
-        setUrl(res.data.url);
-        setUrlKind("pay");
+        setViewUrl(null);
+        redraw();
         showSuccess(
             (await copy(res.data.url))
                 ? `Pay link copied. Send it to ${invoice.who}.`
@@ -191,15 +216,17 @@ export function InvoiceDetail({
     /** No pay link can be made (#833): a link to view it and how to pay. */
     async function makeViewLink() {
         setBusy(true);
-        const res = await details.run(() => createViewLink(invoice.id));
+        // It replaces the pay link this tab made, which is forgotten.
+        const res = await details.run(() => newViewLink(invoice.id));
         setBusy(false);
         if (!res) return;
         if (!res.ok) return reportFailure(res);
-        setUrl(res.data.url);
-        setUrlKind("view");
+        setViewUrl(res.data.url);
         showSuccess(
             (await copy(res.data.url))
-                ? `Link copied. Send it to ${invoice.who}: it shows the invoice and how to pay you.`
+                ? s === "PAID"
+                    ? `Link copied. Send it to ${invoice.who}: it shows the invoice, paid.`
+                    : `Link copied. Send it to ${invoice.who}: it shows the invoice and how to pay you.`
                 : "Link ready. Copy it from the Payment panel.",
         );
     }
@@ -216,7 +243,7 @@ export function InvoiceDetail({
     }
 
     function copyLink() {
-        if (url && urlKind === "pay") return copyShown();
+        if (payUrl && !viewUrl) return copyShown();
         // The address of a link already out was shown once; a new one
         // retires it, so that is asked first.
         if (online?.payLinkActive) setOpen("newLink");
@@ -224,7 +251,7 @@ export function InvoiceDetail({
     }
 
     function copyViewLink() {
-        if (url && urlKind === "view") return copyShown();
+        if (viewUrl) return copyShown();
         if (online?.payLinkActive) setOpen("newViewLink");
         else void makeViewLink();
     }
@@ -259,6 +286,25 @@ export function InvoiceDetail({
         refundOrder: { href: orderHref ?? undefined },
     };
     const readOnlyId = useId();
+    /** The link made in this tab, to copy again from the Payment panel. */
+    const linkBox = url ? (
+        <div className="mt-2 flex min-w-0 items-center gap-2">
+            <code className="min-w-0 flex-1 break-all rounded-[7px] bg-muted px-[9px] py-[7px] font-mono text-[12px]">
+                {url}
+            </code>
+            <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={copyShown}
+                aria-label={
+                    urlKind === "view" ? "Copy the link" : "Copy the pay link"
+                }
+            >
+                <Copy aria-hidden className="size-4" />
+            </Button>
+        </div>
+    ) : null;
     const actions = detailActions({
         standing: s,
         credit,
@@ -271,6 +317,9 @@ export function InvoiceDetail({
         charging: !!charging,
         hasPdf: hasPdf(invoice),
         linkBusy: busy,
+        // A link is out that this tab can't show: the button makes a new
+        // one, confirmed first (UX-048).
+        linkUnseen: !!online?.payLinkActive && !(payUrl && !viewUrl),
         pdfBusy: downloading,
     }).map((a) => ({ ...a, ...does[a.id] }));
 
@@ -368,24 +417,7 @@ export function InvoiceDetail({
                             </p>
                         ) : owed ? (
                             url ? (
-                                <div className="mt-2 flex min-w-0 items-center gap-2">
-                                    <code className="min-w-0 flex-1 break-all rounded-[7px] bg-muted px-[9px] py-[7px] font-mono text-[12px]">
-                                        {url}
-                                    </code>
-                                    <Button
-                                        type="button"
-                                        variant="outline"
-                                        size="sm"
-                                        onClick={copyShown}
-                                        aria-label={
-                                            urlKind === "view"
-                                                ? "Copy the link"
-                                                : "Copy the pay link"
-                                        }
-                                    >
-                                        <Copy aria-hidden className="size-4" />
-                                    </Button>
-                                </div>
+                                linkBox
                             ) : !payOnline ? (
                                 <OfflinePayHint
                                     blocker={online?.onlineBlocker ?? null}
@@ -397,13 +429,17 @@ export function InvoiceDetail({
                                     who={invoice.who}
                                 />
                             ) : online?.payLinkActive ? (
-                                <p className="mt-2 text-[12.5px] leading-[1.5] text-muted-foreground">
-                                    A pay link is out. Its address was shown
-                                    once, when it was copied — copying it again
-                                    {sendable ? " or sending it" : ""} makes a
-                                    new one, and the old one stops working.
-                                </p>
+                                // Out, but not made in this tab: it can't
+                                // be shown, only replaced (UX-048).
+                                <UnseenLinkNote
+                                    sendable={sendable}
+                                    madeAt={online.payLinkMadeAt}
+                                    className="mt-2"
+                                />
                             ) : null
+                        ) : url && urlKind === "view" ? (
+                            // A paid one's view link (UX-080), made here.
+                            linkBox
                         ) : null}
                         {owed && sendable && reminding && nextReminderAt ? (
                             <p className="mt-2 text-[12.5px] leading-[1.5] text-muted-foreground">
@@ -456,6 +492,8 @@ export function InvoiceDetail({
                     }}
                     invoice={invoice}
                     send={send}
+                    // It went with a fresh link: the one shown is dead.
+                    onSent={() => setViewUrl(null)}
                     mode={
                         open === "remind"
                             ? "reminder"
@@ -488,13 +526,10 @@ export function InvoiceDetail({
                 registered={registered}
                 refund
             />
-            <ConfirmDialog
+            <NewLinkConfirm
                 open={open === "newLink"}
                 onOpenChange={dialog("newLink")}
-                title="Make a new pay link?"
-                description={`The link you shared before stops working straight away. Send ${invoice.who} the new one.`}
-                confirmLabel="Make a new link"
-                cancelLabel="Keep the old one"
+                who={invoice.who}
                 onConfirm={() => void makeLink()}
             />
             <ConfirmDialog

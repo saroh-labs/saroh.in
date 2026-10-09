@@ -31,6 +31,7 @@ const MONEY = [
     "lib/invoices",
     "lib/class-packs",
     "lib/contacts/panels.ts",
+    "lib/contacts/person.ts",
     "lib/home/first-run.ts",
     "components/bookings",
     "components/commerce/order-detail",

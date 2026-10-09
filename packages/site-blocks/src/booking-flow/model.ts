@@ -448,7 +448,6 @@ export function payChoices(
     const online = payOnline && way !== "DESK";
     const atDesk = way !== "ONLINE";
     const isClass = service.kind === "class";
-    const place = isClass ? "place" : "appointment";
     // A treatment is paid for whole (E10): "for all 3 visits".
     const visits = visitsOf(service);
     const forAll = visits > 1 ? ` for all ${visits} visits` : "";
@@ -457,7 +456,7 @@ export function payChoices(
         label: isClass
             ? `Pay ${price} for this class`
             : `Pay ${price}${forAll} now`,
-        sub: `Online — your ${place} is confirmed straight away`,
+        sub: "Online — booked straight away",
         amount: price,
     };
     const desk: PayChoice = {
@@ -555,7 +554,7 @@ export function visitsOf(service: BookingService | null): number {
 
 /**
  * The summary's "Then" for a treatment (the Kavi Dental design): "We'll
- * book visits 2 and 3 with you at the first appointment". Null for one
+ * book visits 2 and 3 with you at the first visit". Null for one
  * visit.
  */
 export function laterVisitsText(visits: number): string | null {
@@ -566,7 +565,7 @@ export function laterVisitsText(visits: number): string | null {
             : visits === 3
               ? "visits 2 and 3"
               : `visits 2 to ${visits}`;
-    return `We'll book ${which} with you at the first appointment`;
+    return `We'll book ${which} with you at the first visit`;
 }
 
 /** The confirmation's word on a treatment: "Visit 1 of 3. We'll book the rest with you then". */

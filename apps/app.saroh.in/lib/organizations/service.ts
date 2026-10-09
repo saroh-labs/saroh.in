@@ -52,6 +52,13 @@ export interface Organization {
      * calls either India's.
      */
     timeZone?: string | null;
+    /**
+     * `ACTIVE`, or the state an operator put it in (`SUSPENDED`,
+     * `PENDING_DELETION`, `DELETED_RETAINED`): read-only, not gone. The
+     * chooser lists one that isn't open apart (UX-084). Absent from an
+     * older API, which reads as open.
+     */
+    lifecycleStatus?: string;
 }
 
 export interface OrganizationProfileInput {

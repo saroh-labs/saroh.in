@@ -249,7 +249,7 @@ test.describe("flows stop short on a test release (T6)", () => {
         // would be. No booking, no hold.
         await page.goto(`${TEST}/book`);
         await expect(
-            page.getByRole("heading", { name: "Book your appointment" }),
+            page.getByRole("heading", { name: "Make a booking" }),
         ).toBeVisible();
         await page
             .getByRole("radio", { name: /Warehouse walkthrough/ })

@@ -19,6 +19,7 @@ import type { ReactNode } from "react";
 import { useId, useState } from "react";
 
 import { createContact } from "@/lib/contacts/create";
+import { personHref } from "@/lib/contacts/person-href";
 
 /** A contact just added, as a picker names it. */
 export interface AddedContact {
@@ -97,7 +98,7 @@ export function AddContactDialog({
             onAdded({ id: res.data.id, name, email: fields.email.trim() });
             return;
         }
-        router.push(`/contacts/${res.data.id}`);
+        router.push(personHref(res.data.id));
     }
 
     return (
