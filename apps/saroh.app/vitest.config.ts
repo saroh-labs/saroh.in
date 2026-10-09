@@ -17,6 +17,11 @@ export default defineConfig({
         environment: "node",
         globals: true,
         // And the middleware's routing (DEC-069, L6).
-        include: ["lib/**/*.test.ts", "middleware.test.ts"],
+        include: [
+            "lib/**/*.test.ts",
+            // The 404 pages, as markup.
+            "components/**/*.test.tsx",
+            "middleware.test.ts",
+        ],
     },
 });
