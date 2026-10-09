@@ -9,6 +9,7 @@ import { SiteSettingsRead } from "./site-settings-read";
 
 vi.mock("next/navigation", () => ({
     useRouter: () => ({ refresh: vi.fn() }),
+    useSearchParams: () => new URLSearchParams(),
 }));
 vi.mock("@/lib/sites/actions", () => ({
     updateSiteFooter: vi.fn(),
@@ -65,6 +66,8 @@ const address: SiteAddress = {
 /** The text a merchant reads, tags and entities aside. */
 const words = (html: string) =>
     html
+        // A break opportunity is no space (the web address's <wbr>).
+        .replace(/<wbr\/?>/g, "")
         .replace(/<[^>]+>/g, " ")
         .replace(/&#x27;/g, "'")
         .replace(/\s+/g, " ");
@@ -79,6 +82,14 @@ describe("the site's settings name each address (DEC-069, L12)", () => {
         expect(text).toContain("Web address rye.saroh.app");
         expect(text.match(/rye\.saroh\.app Copy/g)).toHaveLength(1);
         expect(text).not.toMatch(/Saroh address|Subdomain|Site status/);
+    });
+
+    it("gives the web address the row's width, breaking only at its parts", () => {
+        // The value and its buttons share one cell, so the address keeps
+        // one line where it fits instead of a narrow column of its own.
+        expect(html).toMatch(
+            /data-row-inline[\s\S]*data-web-address[^>]*>rye\.<wbr\/>saroh\.<wbr\/>app</,
+        );
     });
 
     it("calls where the posts live the posts path", () => {
@@ -233,6 +244,16 @@ describe("the two save models, made visible (UX-081, the audit)", () => {
         expect(html).toContain('href="/sites/site_rye"');
     });
 
+    it("leaves room under the bar so the last rows scroll above it", () => {
+        const html = renderToStaticMarkup(
+            <SiteSettings site={liveSite(["menu"])} address={address} />,
+        );
+        // Measured once mounted; the room comes straight after the bar.
+        expect(html).toMatch(
+            /data-publish-bar[\s\S]*<\/div><div aria-hidden="true" data-publish-bar-room/,
+        );
+    });
+
     it("draws no bar when the live site matches the draft", () => {
         const html = renderToStaticMarkup(
             <SiteSettings site={liveSite([])} address={address} />,
@@ -316,8 +337,16 @@ describe("Before you share your site (the audit)", () => {
     });
 });
 
-describe("the groups and the in-page list (the audit)", () => {
-    it("lists the groups in order, Shop while the shop is open", () => {
+describe("the groups, as tabs (owner, 9 Oct)", () => {
+    const tabsOf = (html: string) =>
+        Array.from(
+            html.matchAll(
+                /role="tab" aria-selected="(true|false)"[^>]*>([^<]+)</g,
+            ),
+            (m: RegExpMatchArray) => [m[2], m[1]],
+        );
+
+    it("draws the groups as tabs in order, Address open, one panel shown", () => {
         const html = renderToStaticMarkup(
             <SiteSettings
                 site={site}
@@ -325,7 +354,29 @@ describe("the groups and the in-page list (the audit)", () => {
                 approval={{ on: false, canChange: true }}
             />,
         );
-        expect(html).toContain('aria-label="Settings sections"');
+        expect(html).toContain('role="tablist" aria-label="Website settings"');
+        expect(tabsOf(html)).toEqual([
+            ["Address", "true"],
+            ["Search and sharing", "false"],
+            ["Menu and footer", "false"],
+            ["Shop", "false"],
+            ["Tracking", "false"],
+            ["Advanced", "false"],
+        ]);
+        const panels = Array.from(
+            html.matchAll(
+                /<div id="settings-panel-([a-z-]+)" role="tabpanel"[^>]*>/g,
+            ),
+            (m: RegExpMatchArray) => [
+                m[1],
+                m[0].includes(" hidden") ? "hidden" : "shown",
+            ],
+        );
+        expect(panels.filter(([, v]) => v === "shown")).toEqual([
+            ["address", "shown"],
+        ]);
+        // Every panel stays mounted, so a half-edited row survives a tab.
+        expect(panels).toHaveLength(6);
         const ids = Array.from(
             html.matchAll(/data-settings-group="([a-z-]+)"/g),
             (m: RegExpMatchArray) => m[1],
@@ -349,7 +400,12 @@ describe("the groups and the in-page list (the audit)", () => {
         );
         expect(html).not.toContain('data-settings-group="shop"');
         expect(html).not.toContain('data-settings-group="advanced"');
-        expect(html).not.toContain('href="#shop"');
+        expect(tabsOf(html).map(([name]) => name)).toEqual([
+            "Address",
+            "Search and sharing",
+            "Menu and footer",
+            "Tracking",
+        ]);
     });
 
     it("offers Change for the web address only where the owner may", () => {
@@ -368,6 +424,9 @@ describe("the groups and the in-page list (the audit)", () => {
             <SiteSettingsRead site={site} address={address} />,
         );
         expect(html).toContain('data-settings-group="search-and-sharing"');
+        expect(tabsOf(html).map(([name]) => name)).toContain(
+            "Search and sharing",
+        );
         expect(html).not.toMatch(/<input|<textarea|>Edit<|>Write<|>Build</);
     });
 });
