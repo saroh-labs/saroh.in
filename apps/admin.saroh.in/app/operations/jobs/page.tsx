@@ -16,7 +16,8 @@ export const metadata = { title: "Jobs" };
 
 /**
  * The job queue (plan U7): what is waiting, how late, what has failed and
- * why — and a retry for what failed, always dry-run first.
+ * why — a retry for what failed and a cancel for what is waiting (#907),
+ * always dry-run first.
  */
 export default async function JobsPage({
     searchParams,
@@ -101,6 +102,7 @@ export default async function JobsPage({
                             { value: "PENDING", label: "Waiting" },
                             { value: "PROCESSING", label: "Running" },
                             { value: "DONE", label: "Done" },
+                            { value: "CANCELLED", label: "Cancelled" },
                         ]}
                     />
                     <FilterSelect

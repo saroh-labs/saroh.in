@@ -15,7 +15,8 @@
   then completes or fails the job. Defaults: `JOB_WORKER_POLL_MS=2000`,
   `JOB_WORKER_BATCH=10`, `JOB_VISIBILITY_MS=300000`.
 - **At-least-once.** Retries back off exponentially (1 s base, 5 min cap) up to
-  `maxAttempts` (5), and the job is then FAILED.
+  `maxAttempts` (5), and the job is then FAILED. Staff may cancel a job that
+  is still `PENDING` (`CANCELLED`, below).
 
 ## Rules
 
@@ -100,6 +101,47 @@ with the hourly `analytics.rollup` chain (below).
 `booking.notify` was the other gap: enqueued on every booking and
 reschedule from S4-002 with no handler, so its jobs dead-lettered and
 nobody was told. Round-2 A14 closed it (`bookings/booking-notify.handler.ts`).
+
+## Cancelling a job — **Current** (#907)
+
+- **Staff cancel only a job that hasn't started or is waiting to retry**
+  (`PENDING`), from the console's Jobs screen, as a `jobs.cancel` durable
+  operation: dry run first, a reason, `jobs:retry` (the people who retry
+  jobs cancel them), audited as `operation.jobs.cancel.started`
+  (`admin/job-cancel.ts`). The write is fenced on `PENDING`, so a worker
+  that claims the job first wins and the cancel says so. A cancelled job is
+  `CANCELLED`, terminal like `DONE`; nothing claims it again.
+- **Refused on purpose** (`CANCEL_REFUSED`): the self-rescheduling sweeps
+  (`ensureScheduled` would start the chain again), `subscription.charge`
+  (its steps hand on to each other) and `site.go_live` (the release keeps
+  its schedule; the business cancels it from its Website). A new chain or a
+  job whose state lives elsewhere adds its type there.
+- **A durable operation can be cancelled while it runs**
+  (`POST /admin/operations/:id/cancel`, `admin/admin-operation-cancel.ts`):
+  rows not started are `SKIPPED` ("Cancelled before it ran"), the one
+  running finishes, and the operation is `CANCELLED`. It needs the
+  permission the operation was started under, checked in the service, and
+  is audited as `operation.<kind>.cancelled`.
+
+## Business deletion — **Current** (#907)
+
+- **`organization.deletion`** is a daily self-rescheduling sweep
+  (`admin/organization-deletion.handler.ts`), one PENDING run at a time
+  (`Job_one_pending_organization_deletion`). It takes a business whose
+  `PENDING_DELETION` window has ended (`deletionScheduledAt` passed) to
+  `DELETED_RETAINED`, stamping `deletedRetainedAt` — the lifecycle's own
+  last step (`admin-access.service.ts`). Nothing else: no row, file or
+  provider record is removed, because no complete safe path exists yet
+  (`Store`, `Order`, `Customer`, `Cart` and `Inventory` hold the business
+  without a cascade; issued invoices are kept; media, custom hostnames and
+  Saroh's billing subscription have no clean-up). The gaps are on #907.
+- **Re-read inside the transaction, fenced on `lifecycleVersion`**: a
+  business reinstated, suspended or given a new window between the list
+  and the write is left alone, and one inside its window is never touched
+  (`organization-deletion.db.spec.ts`). Each deletion writes the admin
+  ledger (`system:organization-deletion`, `organization.deleted`) and the
+  business's own history in that transaction; the log line carries counts
+  and ids only.
 
 ## Insights rollups — **Current** (DEC-075)
 

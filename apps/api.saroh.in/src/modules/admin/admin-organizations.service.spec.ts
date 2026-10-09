@@ -79,10 +79,70 @@ describe("AdminOrganizationsService.directory", () => {
         });
     });
 
-    it("searches by id, name or slug otherwise", async () => {
+    it("searches by id, name, slug or web address otherwise", async () => {
         findMany.mockResolvedValue([]);
         await service.directory({ q: "north" }, { canReadPii: false });
-        expect(findMany.mock.calls[0][0].where.AND[0].OR).toHaveLength(3);
+        const or = findMany.mock.calls[0][0].where.AND[0].OR;
+        expect(or.slice(0, 3)).toEqual([
+            { id: "north" },
+            { name: { contains: "north", mode: "insensitive" } },
+            { slug: { contains: "north", mode: "insensitive" } },
+        ]);
+        // The bare address: a site's Saroh address or a claimed host.
+        expect(or).toContainEqual({
+            sites: {
+                some: {
+                    subdomain: { contains: "north", mode: "insensitive" },
+                },
+            },
+        });
+        expect(or).toContainEqual({
+            domains: {
+                some: {
+                    hostname: { contains: "north", mode: "insensitive" },
+                },
+            },
+        });
+    });
+
+    it("finds a business by its custom domain, pasted as a link (#907)", async () => {
+        findMany.mockResolvedValue([]);
+        await service.directory(
+            { q: "https://Shop.Northwind.com/products?x=1" },
+            { canReadPii: false },
+        );
+        const or = findMany.mock.calls[0][0].where.AND[0].OR;
+        expect(or).toContainEqual({
+            domains: {
+                some: {
+                    hostname: {
+                        contains: "shop.northwind.com",
+                        mode: "insensitive",
+                    },
+                },
+            },
+        });
+        // A custom domain names no Saroh address.
+        expect(JSON.stringify(or)).not.toContain("subdomain");
+    });
+
+    it("finds a business by its Saroh address (#907)", async () => {
+        findMany.mockResolvedValue([]);
+        await service.directory(
+            { q: "northwind.saroh.app" },
+            { canReadPii: false },
+        );
+        const or = findMany.mock.calls[0][0].where.AND[0].OR;
+        expect(or).toContainEqual({
+            sites: {
+                some: {
+                    subdomain: { contains: "northwind", mode: "insensitive" },
+                },
+            },
+        });
+        expect(or).toContainEqual({
+            slug: { equals: "northwind", mode: "insensitive" },
+        });
     });
 
     it("pages on a cursor with a tie-breaking order, reading one extra row", async () => {

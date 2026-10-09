@@ -2523,7 +2523,7 @@ model AdminOperation {
   id String @id @default(cuid())
 
   kind        String // "jobs.retry" | "webhooks.replay"
-  status      String @default("PENDING") // PENDING | RUNNING | DONE | FAILED
+  status      String @default("PENDING") // PENDING | RUNNING | DONE | FAILED | CANCELLED (#907)
   actorUserId String
   reason      String
 
@@ -4049,7 +4049,7 @@ model Job {
   type    String // handler key, e.g. "enquiry.notify"
   payload Json // handler input
 
-  status      String @default("PENDING") // PENDING → PROCESSING → DONE | FAILED
+  status      String @default("PENDING") // PENDING → PROCESSING → DONE | FAILED; PENDING → CANCELLED (staff, #907)
   attempts    Int    @default(0)
   maxAttempts Int    @default(5)
 
@@ -4076,6 +4076,8 @@ model Job {
   @@unique([type], map: "Job_one_pending_billing_moves_apply", where: raw("type = 'billing.moves.apply' AND status = 'PENDING'"))
   // One waiting run of Insights' hourly rollup chain (DEC-075), like the renewal chain.
   @@unique([type], map: "Job_one_pending_analytics_rollup", where: raw("type = 'analytics.rollup' AND status = 'PENDING'"))
+  // One waiting run of the daily business deletion sweep (#907), like the renewal chain.
+  @@unique([type], map: "Job_one_pending_organization_deletion", where: raw("type = 'organization.deletion' AND status = 'PENDING'"))
   @@index([status, runAt])
   @@index([organizationId])
 }

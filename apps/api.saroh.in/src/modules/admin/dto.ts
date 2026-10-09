@@ -332,7 +332,7 @@ export class StartOperationDto extends OperatorReasonDto {
 
 export class ListJobsDto {
     @IsOptional()
-    @IsIn(["PENDING", "PROCESSING", "DONE", "FAILED"])
+    @IsIn(["PENDING", "PROCESSING", "DONE", "FAILED", "CANCELLED"])
     status?: string;
 
     @IsOptional()

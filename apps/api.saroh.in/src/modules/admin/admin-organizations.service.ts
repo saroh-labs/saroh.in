@@ -8,9 +8,14 @@ import type { Prisma } from "@saroh/database";
 import { prisma } from "@saroh/database";
 
 import { CatalogueAccessService } from "../billing/catalogue-access.service";
+import { siteRootDomain } from "../sites/site-host-mode";
 import { OPERATOR_LIFECYCLE_ACTIONS } from "./admin-lifecycle.service";
 import type { EffectivePlan } from "./effective-plan";
 import { effectivePlan } from "./effective-plan";
+import {
+    domainSearchTerms,
+    domainSearchWhere,
+} from "./organization-domain-search";
 
 const DEFAULT_PAGE_SIZE = 25;
 const MAX_PAGE_SIZE = 100;
@@ -191,6 +196,10 @@ export class AdminOrganizationsService {
                         { id: q },
                         { name: { contains: q, mode: "insensitive" } },
                         { slug: { contains: q, mode: "insensitive" } },
+                        // Its custom domain or Saroh address (#907).
+                        ...domainSearchWhere(
+                            domainSearchTerms(q, siteRootDomain()),
+                        ),
                     ],
                 });
             }
