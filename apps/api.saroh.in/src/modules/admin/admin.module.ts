@@ -35,6 +35,8 @@ import { AdminPeopleService } from "./admin-people.service";
 import { AdminSiteTrackersService } from "./admin-site-trackers.service";
 import { AdminStaffController } from "./admin-staff.controller";
 import { AdminStaffService } from "./admin-staff.service";
+import { AdminUsageController } from "./admin-usage.controller";
+import { AdminUsageService } from "./admin-usage.service";
 import { AdminWaitlistController } from "./admin-waitlist.controller";
 import { AdminWaitlistService } from "./admin-waitlist.service";
 import { AdminController } from "./admin.controller";
@@ -66,6 +68,7 @@ import { OrganizationAccessSessionGuard } from "./organization-access-session.gu
         AdminWaitlistController,
         AdminPricingController,
         AdminDeploymentsController,
+        AdminUsageController,
     ],
     providers: [
         IdempotencyService,
@@ -85,6 +88,7 @@ import { OrganizationAccessSessionGuard } from "./organization-access-session.gu
         AdminHealthService,
         AdminWaitlistService,
         AdminDeploymentsService,
+        AdminUsageService,
         // Pricing catalogue writes (U4): they audit through AdminAuditService.
         CatalogueWritesService,
         CouponsService,

@@ -49,9 +49,14 @@ Signing in needs a staff grant or an address on the API's `ADMIN_ALLOWLIST`
   builds; merges still deploy only what changed.
 - **Server-only modules stay server-only.** `lib/control-plane.ts` and the
   modules that read through it (`businesses`, `staff`, `people`, `machinery`,
-  `waitlist`, `deployments`) import `next/headers`; a client component takes types from them,
+  `waitlist`, `deployments`, `usage`) import `next/headers`; a client component takes types from them,
   never values. Client-safe words live in `lib/roles.ts`, `lib/modules.ts`,
-  `lib/format.ts`, `lib/deployment-words.ts`.
+  `lib/format.ts`, `lib/deployment-words.ts`, `lib/usage-words.ts`.
+- **Usage (`/usage`, #798)** lists every business by the storage its
+  photos and videos use (READY media, in GB as the plan's `storageGb`
+  counts it), sorted by the API across all businesses (Most / Least) and
+  paged by number. It reads with `organization:read`, the directory's
+  permission, so it adds none (DEC-039).
 - **A business's details need a support session.** The session id lives in an
   httpOnly cookie per business (`accessCookieName`) and is sent as
   `x-admin-access-session`; without one the page shows the directory row and
