@@ -1245,3 +1245,11 @@ Unless an entry says otherwise, its status is **Proposed — requires audit revi
     - **Responsibility.** The merchant is responsible for their visitors' data for the tools they connect; Saroh acts on their behalf. Staff can switch off a site's trackers from admin, and the terms forbid malicious use.
     - **Later.** Shop and booking events, and sending purchases from Saroh's server, are a later plan. Any secret that plan needs is stored encrypted on the API like payment keys, never served.
 - Consequences: new tables hold codes and trackers, separate from the snapshot-bound `Site` fields, and never count as unpublished changes. Each page view makes one more live API read. A catalogue row gates trackers. Every merchant site also gets `sitemap.xml` and `robots.txt`.
+
+## DEC-109 An online-only storefront is 0 locations, on every plan path
+
+**Status: Accepted — 2026-10-08** · owner · amends ADR-010 · #875
+
+- Context: the catalogue's `locations` row already counted only places customers visit (`shopLocations`). Where the catalogue doesn't govern a business (the `PLAN_ENFORCEMENT` switch off, or a business it doesn't reach yet), the old `storefronts` floor still counted every storefront, online-only included, and refused creating one past it.
+- Decision: only a physical place (a storefront whose settings say `SHOP`) is a location. The old floor counts what metering counts (`countUsage(…, "shopLocations")`) and is asked where a storefront becomes a SHOP: created as one (Sell's setup starting from the registered address) or its kind changed to one. Creating an online storefront asks only the product's ceiling (25).
+- Consequences: `billing/legacy-location-floor.ts` holds the floor; its refusal uses the catalogue's words ("Your plan includes N places customers visit"). The workspace's storefront allowance is the ceiling. Sell's setup on a plan with no room starts the location online rather than refusing. The admin console's `storefronts` usage is the shop count.

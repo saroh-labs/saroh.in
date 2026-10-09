@@ -6,7 +6,10 @@ import { PageHeader } from "@saroh/ui/page-header";
 import { notFound } from "next/navigation";
 
 import { AdminShell } from "@/components/admin-shell";
-import { CatalogueActions } from "@/components/business/catalogue-actions";
+import {
+    CatalogueActions,
+    PlanOverrideDialog,
+} from "@/components/business/catalogue-actions";
 import { CataloguePlan } from "@/components/business/catalogue-plan";
 import { CloseAccess } from "@/components/business/close-access";
 import { LifecycleActions } from "@/components/business/lifecycle-actions";
@@ -50,6 +53,7 @@ import {
     plural,
 } from "@/lib/format";
 import { moduleLabel } from "@/lib/modules";
+import { planLine } from "@/lib/plan-words";
 
 export const metadata = { title: "Business" };
 
@@ -149,7 +153,7 @@ function SummaryStrip({ summary }: { summary: BusinessRow }) {
                 </Badge>
             ))}
             <span className="text-muted-foreground">
-                {summary.plan ? summary.plan.name : "No plan"} ·{" "}
+                {planLine(summary.effectivePlan ?? null, summary.plan?.name)} ·{" "}
                 {plural(summary.members, "person", "people")} · last active{" "}
                 {formatRelative(summary.lastActiveAt)}
             </span>
@@ -520,8 +524,24 @@ function Business({
                                         plan.subscription?.status ?? null
                                     }
                                     numericLimits={raisableLimits(plan)}
+                                    catalogueLive={Boolean(plan.liveCatalogue)}
                                 />
                             )}
+                            {pricingOverride &&
+                                plan.legacyReason === "no-plan" &&
+                                plan.liveCatalogue && (
+                                    <div className="flex flex-wrap gap-2">
+                                        <PlanOverrideDialog
+                                            organizationId={id}
+                                            plans={plan.liveCatalogue.plans}
+                                            current={null}
+                                            defaultPlanId={
+                                                plan.liveCatalogue.plans[0]
+                                                    ?.id ?? ""
+                                            }
+                                        />
+                                    </div>
+                                )}
                             {pricingOverride && plan.catalogue && (
                                 <CatalogueActions
                                     organizationId={id}

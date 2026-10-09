@@ -234,55 +234,11 @@ export function CatalogueActions({
                     }}
                 />
             )}
-            <OperatorDialog
-                trigger={
-                    catalogue.planOverride
-                        ? "Change plan override"
-                        : "Put on a plan"
-                }
-                title={
-                    catalogue.planOverride
-                        ? "Change or extend the plan override"
-                        : "Put it on a plan until a date"
-                }
-                effect={
-                    catalogue.planOverride
-                        ? `It is on ${planName(catalogue, catalogue.planOverride.planKey)} until ${formatDate(catalogue.planOverride.expiresAt)}. Saving replaces that with the plan and date you choose.`
-                        : "Whatever its subscription says, it gets this plan until the date you set, then goes back to its own. Its price doesn't change."
-                }
-                fields={
-                    <>
-                        <div className="grid gap-1.5">
-                            <Label htmlFor="plan-override-key">Plan</Label>
-                            <select
-                                id="plan-override-key"
-                                name="planKey"
-                                className={selectClass}
-                                defaultValue={
-                                    catalogue.planOverride?.planKey ??
-                                    catalogue.basePlanId
-                                }
-                                required
-                            >
-                                {catalogue.plans.map((p) => (
-                                    <option key={p.id} value={p.id}>
-                                        {p.name}
-                                    </option>
-                                ))}
-                            </select>
-                        </div>
-                        <UntilField id="plan-override-until" required />
-                    </>
-                }
-                submitLabel="Save plan override"
-                onSubmit={({ reason, idempotencyKey, values }) =>
-                    planOverrideAction(organizationId, {
-                        reason,
-                        idempotencyKey,
-                        planKey: values.planKey ?? "",
-                        expiresAt: endOfDayIso(values.until ?? "") ?? "",
-                    })
-                }
+            <PlanOverrideDialog
+                organizationId={organizationId}
+                plans={catalogue.plans}
+                current={catalogue.planOverride}
+                defaultPlanId={catalogue.basePlanId}
             />
             {canMove && catalogue.liveVersion !== null && (
                 <OperatorDialog
@@ -350,6 +306,68 @@ export function RemoveOverride({
     );
 }
 
-function planName(catalogue: BusinessCatalogue, planId: string): string {
-    return catalogue.plans.find((p) => p.id === planId)?.name ?? planId;
+/**
+ * Put the business on a catalogue plan until a date, or change the plan
+ * override it has. A business the catalogue doesn't reach yet gets the live
+ * version's plans: the API puts it on one of those.
+ */
+export function PlanOverrideDialog({
+    organizationId,
+    plans,
+    current,
+    defaultPlanId,
+}: {
+    organizationId: string;
+    plans: { id: string; name: string }[];
+    current: { planKey: string; expiresAt: string | null } | null;
+    defaultPlanId: string;
+}) {
+    const nameOf = (id: string) => plans.find((p) => p.id === id)?.name ?? id;
+    return (
+        <OperatorDialog
+            trigger={current ? "Change plan override" : "Put on a plan"}
+            title={
+                current
+                    ? "Change or extend the plan override"
+                    : "Put it on a plan until a date"
+            }
+            effect={
+                current
+                    ? `It is on ${nameOf(current.planKey)} until ${formatDate(current.expiresAt)}. Saving replaces that with the plan and date you choose.`
+                    : "Whatever its subscription says, it gets this plan until the date you set, then goes back to its own. Its price doesn't change."
+            }
+            fields={
+                <>
+                    <div className="grid gap-1.5">
+                        <Label htmlFor="plan-override-key">Plan</Label>
+                        <select
+                            id="plan-override-key"
+                            name="planKey"
+                            className={selectClass}
+                            defaultValue={current?.planKey ?? defaultPlanId}
+                            required
+                        >
+                            {plans.map((p) => (
+                                <option key={p.id} value={p.id}>
+                                    {p.name}
+                                </option>
+                            ))}
+                        </select>
+                    </div>
+                    <UntilField id="plan-override-until" required />
+                </>
+            }
+            submitLabel="Save plan override"
+            disabled={plans.length === 0}
+            disabledReason="The live catalogue has no plan to put it on."
+            onSubmit={({ reason, idempotencyKey, values }) =>
+                planOverrideAction(organizationId, {
+                    reason,
+                    idempotencyKey,
+                    planKey: values.planKey ?? "",
+                    expiresAt: endOfDayIso(values.until ?? "") ?? "",
+                })
+            }
+        />
+    );
 }

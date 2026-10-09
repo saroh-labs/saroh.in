@@ -19,9 +19,11 @@ export const metadata = { title: "New location" };
 /**
  * Sell → Location → New location.
  *
- * A business may have several locations, up to its plan (ADR-010) — a
- * counter and a stall count their stock apart. At the plan's number
- * the API refuses another, so this says so before the form, not after Save.
+ * A business may have several locations, up to Saroh's ceiling (ADR-010) —
+ * a counter and a stall count their stock apart. A new one is online, so
+ * no plan caps it (DEC-109): the plan's places customers visit are asked
+ * when one becomes a shop. At the ceiling the API refuses another, so this
+ * says so before the form, not after Save.
  * An allowance that cannot be read shows the form and leaves it to the API.
  */
 export default async function NewStorefrontPage() {
@@ -30,7 +32,7 @@ export default async function NewStorefrontPage() {
         listStorefronts(),
         getStorefrontAllowance().catch(() => null),
     ]);
-    // The plan's number, when the business already has that many.
+    // The ceiling, when the business already has that many.
     const full =
         allowance &&
         !mayAddStorefront({ used: storefronts.length, limit: allowance.limit })
@@ -61,8 +63,8 @@ export default async function NewStorefrontPage() {
             {full !== null ? (
                 <EmptyState
                     icon={<Store />}
-                    title={`Your plan includes ${full === 1 ? "one location" : `${full} locations`}`}
-                    description={`This business has ${storefronts.length === 1 ? "its one" : `all ${storefronts.length}`}. A bigger plan adds more, or close one it no longer sells from.`}
+                    title={`This business has ${full} locations, as many as Saroh allows`}
+                    description="Close one it no longer sells from to add another."
                     action={
                         <Button asChild variant="outline">
                             <Link href="/commerce/locations">

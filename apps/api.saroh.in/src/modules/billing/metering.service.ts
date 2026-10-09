@@ -81,8 +81,9 @@ export async function lockMeter(
  * Websites and locations: where {@link enforcedRow} answers for `sites` or
  * `locations`, the catalogue governs them and the old `sites`/`storefronts`
  * floor isn't asked; where it doesn't (switch off, off the catalogue), the
- * callers keep the floor `EntitlementService.check` has always enforced
- * (`LEGACY_FLOOR_ENTITLEMENTS`), so nothing new locks behind the switch.
+ * callers keep the old floor (`LEGACY_FLOOR_ENTITLEMENTS`: websites through
+ * `EntitlementService.check`, places customers visit through
+ * `legacy-location-floor.ts`), so nothing new locks behind the switch.
  *
  * Fail safe (OQ-4): if the plan can't be read, the write goes ahead and the
  * failure is logged (`plan_meter_unresolved`) — a business keeps what it has

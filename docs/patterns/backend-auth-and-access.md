@@ -331,7 +331,9 @@ orgId)` (`organizations/organization-kind.ts`).
   storefront's kind becomes SHOP) are the catalogue's where `enforcedRow`
   answers for the row; elsewhere the old one-website and `storefronts`
   floor (`LEGACY_FLOOR_ENTITLEMENTS`) still applies, so nothing new locks
-  behind the switch. Team members never count a Reviewer, so moving
+  behind the switch. The `storefronts` floor counts what `shopLocations`
+  counts and is asked where a storefront becomes a SHOP, never on creating
+  an online one (DEC-109, `billing/legacy-location-floor.ts`). Team members never count a Reviewer, so moving
   someone off Reviewer is metered. Over after a downgrade,
   existing things stay readable and editable; only adding is refused. A
   new write that adds a metered thing, or a new switch row, gets its call
