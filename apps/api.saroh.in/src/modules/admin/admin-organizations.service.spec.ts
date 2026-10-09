@@ -10,12 +10,17 @@ jest.mock("@saroh/database", () => ({
         webhookEvent: { groupBy: jest.fn(async () => []) },
     },
 }));
+// Deletions waiting on refunds (#921): none unless a test says so.
+jest.mock("./deletion-trail", () => ({
+    businessesWaitingOnRefunds: jest.fn(async () => new Set()),
+}));
 
 import { ForbiddenException } from "@nestjs/common";
 import { prisma } from "@saroh/database";
 
 import type { CatalogueAccessService } from "../billing/catalogue-access.service";
 import { AdminOrganizationsService } from "./admin-organizations.service";
+import { businessesWaitingOnRefunds } from "./deletion-trail";
 
 const findMany = prisma.organization.findMany as jest.Mock;
 const jobGroupBy = prisma.job.groupBy as jest.Mock;
@@ -192,6 +197,23 @@ describe("AdminOrganizationsService.directory", () => {
         ]);
         const page = await service.directory({}, { canReadPii: false });
         expect(page.items[0]?.attention).toEqual(["DELETION_CLEANUP"]);
+    });
+
+    it("flags a deletion waiting on refunds, and finds it under Needs attention (#921)", async () => {
+        findMany.mockResolvedValue([
+            record("closing", { lifecycleStatus: "PENDING_DELETION" }),
+        ]);
+        (businessesWaitingOnRefunds as jest.Mock).mockResolvedValue(
+            new Set(["closing"]),
+        );
+        const page = await service.directory(
+            { health: "attention" },
+            { canReadPii: false },
+        );
+        expect(page.items[0]?.attention).toEqual(["DELETION_WAITING_REFUNDS"]);
+        const where = JSON.stringify(findMany.mock.calls[0][0].where);
+        expect(where).toContain('{"id":{"in":["closing"]}}');
+        (businessesWaitingOnRefunds as jest.Mock).mockResolvedValue(new Set());
     });
 
     it("filters to businesses without a plan", async () => {

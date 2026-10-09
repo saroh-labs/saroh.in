@@ -3,6 +3,7 @@ import {
     ConflictException,
     Inject,
     Injectable,
+    Logger,
     NotFoundException,
 } from "@nestjs/common";
 import { prisma } from "@saroh/database";
@@ -16,6 +17,10 @@ import {
 import type { OrganizationContext } from "../../common/types/organization-context";
 import { BYTES_PER_GB } from "../billing/metering";
 import { planMeter } from "../billing/metering.service";
+import {
+    errorResult,
+    logDeletionProviderCall,
+} from "../organizations/deletion-provider-log";
 import { authorize } from "../organizations/organization-policy";
 import { OBJECT_STORAGE } from "./object-storage.provider";
 import type { CreateUploadInput } from "./upload-checks";
@@ -24,6 +29,9 @@ import {
     NOTHING_UPLOADED_MESSAGE,
     storedBytesProblem,
 } from "./upload-checks";
+
+/** A deleted business's stored files, on its deletion trail (#921). */
+const deletionLog = new Logger("OrganizationDeletion");
 
 /** What the client needs to PUT the file directly to storage. */
 export interface CreateUploadResult {
@@ -321,7 +329,21 @@ export class MediaService {
             for (const media of batch) {
                 try {
                     await this.storage.deleteObject(media.key);
-                } catch {
+                    logDeletionProviderCall(deletionLog, {
+                        organizationId,
+                        provider: "storage",
+                        call: "object.delete",
+                        result: "ok",
+                        ref: media.id,
+                    });
+                } catch (error) {
+                    logDeletionProviderCall(deletionLog, {
+                        organizationId,
+                        provider: "storage",
+                        call: "object.delete",
+                        result: errorResult(error),
+                        ref: media.id,
+                    });
                     failedIds.push(media.id);
                     continue;
                 }

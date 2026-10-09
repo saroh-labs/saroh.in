@@ -51,7 +51,8 @@ Signing in needs a staff grant or an address on the API's `ADMIN_ALLOWLIST`
   modules that read through it (`businesses`, `staff`, `people`, `machinery`,
   `waitlist`, `deployments`, `usage`) import `next/headers`; a client component takes types from them,
   never values. Client-safe words live in `lib/roles.ts`, `lib/modules.ts`,
-  `lib/format.ts`, `lib/deployment-words.ts`, `lib/usage-words.ts`.
+  `lib/format.ts`, `lib/deployment-words.ts`, `lib/usage-words.ts`,
+  `lib/deletion-words.ts`.
 - **Usage (`/usage`, #798)** lists every business by the storage its
   photos and videos use (READY media, in GB as the plan's `storageGb`
   counts it), sorted by the API across all businesses (Most / Least) and

@@ -17,7 +17,9 @@ export type AttentionReason =
     | "FAILED_JOBS"
     | "FAILED_WEBHOOKS"
     /** A deleted business whose clean-up has failed and isn't done (#921). */
-    | "DELETION_CLEANUP";
+    | "DELETION_CLEANUP"
+    /** Past its deletion window, held back by refunds owed (#921). */
+    | "DELETION_WAITING_REFUNDS";
 
 export interface BusinessRow {
     id: string;
@@ -228,6 +230,43 @@ export interface BusinessView {
     sites?: Panel<SiteTrackersRow[]>;
     /** Where its sites are live, and payments yes or no. Absent from an older API. */
     presence?: Panel<BusinessPresence>;
+    /** Every deletion step on the admin ledger (#921). Absent from an older API. */
+    deletionTrail?: Panel<DeletionTrailRow[]>;
+    /** Refunds a closing business still owes (#921). Absent from an older API. */
+    deletionRefunds?: Panel<DeletionRefundRow[]>;
+}
+
+/** One step of a business's way out, from the admin ledger (#921). */
+export interface DeletionTrailRow {
+    id: string;
+    action: string;
+    outcome: string;
+    reason: string | null;
+    actorUserId: string;
+    actor: string | null;
+    createdAt: string;
+    /** A run that waited on refunds: how many, and what is owed. */
+    refunds: {
+        count: number;
+        owedMinorByCurrency: Record<string, number>;
+    } | null;
+    /** A clean-up run: each step and how it went. */
+    steps: { step: string; result: string }[] | null;
+}
+
+/** A refund a deletion waits on (#921). */
+export interface DeletionRefundRow {
+    key: string;
+    stage: "OWED" | "FAILED" | "SENDING" | "CONFIRMING";
+    amountMinor: number | null;
+    currency: string | null;
+    /** Null unless the operator may read personal data. */
+    customer: string | null;
+    /** The order or invoice number. */
+    paper: string | null;
+    provider: string | null;
+    providerRef: string | null;
+    since: string;
 }
 
 /** One web address a site is live on (the API's `PresenceAddress`). */

@@ -80,6 +80,36 @@ export async function mismatchesOwed(
     db: Db,
     organizationId: string,
 ): Promise<{ count: number; rows: MismatchOwedRow[] }> {
+    const attempts = await mismatchAttemptsOwed(db, organizationId);
+    const words = refundReasonWords("AMOUNT_MISMATCH");
+    const rows: MismatchOwedRow[] = [];
+    for (const a of attempts) {
+        const intent = a.paymentIntent;
+        const owed = owedOf(a.rawResponse, intent.currency);
+        const paper = paperOf(intent);
+        rows.push({
+            id: a.id,
+            title: paper.title,
+            subtitle: paper.who ? `${paper.who} · ${words}` : words,
+            at: a.createdAt.toISOString(),
+            // What was captured is what goes back; a mismatch that recorded
+            // no amount shows none rather than the intent's.
+            amountMinor: owed?.amountCents ?? null,
+            currency: owed?.currency ?? null,
+            href: paper.href,
+            sortAt: a.createdAt,
+        });
+    }
+    return { count: rows.length, rows };
+}
+
+/**
+ * The mismatched captures no refund on its way or done has handed back,
+ * oldest first. Home's row ({@link mismatchesOwed}) and a closing
+ * business's refunds (`payments/refunds-outstanding.ts`, #921) read this
+ * one definition.
+ */
+export async function mismatchAttemptsOwed(db: Db, organizationId: string) {
     const [attempts, refunded] = await Promise.all([
         db.paymentAttempt.findMany({
             where: { organizationId, ...MISMATCH_ATTEMPT_WHERE },
@@ -89,8 +119,11 @@ export async function mismatchesOwed(
                 id: true,
                 createdAt: true,
                 rawResponse: true,
+                provider: true,
+                providerRef: true,
                 paymentIntent: {
                     select: {
+                        id: true,
                         currency: true,
                         amountCents: true,
                         invoice: {
@@ -120,31 +153,11 @@ export async function mismatchesOwed(
         }),
         refundedAttempts(db, organizationId),
     ]);
-    const words = refundReasonWords("AMOUNT_MISMATCH");
-    const rows: MismatchOwedRow[] = [];
-    for (const a of attempts) {
-        if (refunded.has(a.id)) continue;
-        const intent = a.paymentIntent;
-        const owed = owedOf(a.rawResponse, intent.currency);
-        const paper = paperOf(intent);
-        rows.push({
-            id: a.id,
-            title: paper.title,
-            subtitle: paper.who ? `${paper.who} · ${words}` : words,
-            at: a.createdAt.toISOString(),
-            // What was captured is what goes back; a mismatch that recorded
-            // no amount shows none rather than the intent's.
-            amountMinor: owed?.amountCents ?? null,
-            currency: owed?.currency ?? null,
-            href: paper.href,
-            sortAt: a.createdAt,
-        });
-    }
-    return { count: rows.length, rows };
+    return attempts.filter((a) => !refunded.has(a.id));
 }
 
-/** The order or invoice a mismatch was taken for, and who paid it. */
-function paperOf(intent: {
+/** The order or invoice a payment was taken for, and who paid it. */
+export function paperOf(intent: {
     invoice: {
         id: string;
         number: string | null;

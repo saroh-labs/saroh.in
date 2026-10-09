@@ -28,4 +28,6 @@ export const ATTENTION_LABEL: Record<AttentionReason, string> = {
     FAILED_WEBHOOKS: "Webhooks failing",
     // Its billing, domains, files or keys may still be there; Jobs says which.
     DELETION_CLEANUP: "Deletion clean-up unfinished",
+    // Past its window; the business page lists the refunds (#921).
+    DELETION_WAITING_REFUNDS: "Deletion waiting on refunds",
 };

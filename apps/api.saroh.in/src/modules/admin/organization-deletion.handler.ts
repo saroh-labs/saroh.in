@@ -3,6 +3,8 @@ import type { Job } from "@saroh/database";
 import { prisma } from "@saroh/database";
 
 import { prismaErrorCode } from "../../common/prisma-errors";
+import type { OutstandingRefund } from "../payments/refunds-outstanding";
+import { refundsOutstanding } from "../payments/refunds-outstanding";
 import {
     assertOrganizationLifecycleTransition,
     OrganizationLifecycleStatus,
@@ -26,10 +28,24 @@ export const ORGANIZATION_DELETION_ACTOR = "system:organization-deletion";
 /** What the admin ledger and the business's own history record. */
 export const ORGANIZATION_DELETED_ACTION = "organization.deleted";
 
+/**
+ * The admin ledger's row for a run that found a business past its window
+ * with refunds still owed to its customers (#921), one a day while it
+ * waits. The console flags the business from it ("Deletion waiting on
+ * refunds") and shows it on the deletion trail.
+ */
+export const ORGANIZATION_DELETION_WAITING_ACTION =
+    "organization.deletion.waiting_on_refunds";
+
+/** The most refunds one waiting row names; its count says the rest. */
+const WAITING_REFS = 50;
+
 const BATCH = 50;
 
 export interface DeletionSweep {
     deleted: string[];
+    /** Past their window and left PENDING_DELETION: refunds are owed (#921). */
+    waiting: string[];
     /** Due when listed, but no longer due or no longer scheduled when re-read. */
     passed: number;
     failed: number;
@@ -62,6 +78,15 @@ export interface DeletionSweep {
  * business's own history in that transaction; the log carries counts and
  * ids only.
  *
+ * **Refunds owed hold it back** (owner, 9 Oct): a business that still owes
+ * its customers a refund — owed, being sent, or sent and unconfirmed by its
+ * provider (`payments/refunds-outstanding.ts`) — is not deleted. It stays
+ * `PENDING_DELETION` past its window, its payment keys kept so the refunds
+ * can settle, its members see the list in the workspace, and the admin
+ * ledger notes it once a day (`organization.deletion.waiting_on_refunds`),
+ * which flags it "Deletion waiting on refunds" on the console. Each daily
+ * run asks again.
+ *
  * A self-rescheduling daily chain like the waitlist's retention sweep
  * (ADR-007): one PENDING run at a time (`Job_one_pending_organization_deletion`),
  * a failing business is logged and skipped, and the run throws only when
@@ -76,9 +101,13 @@ export class OrganizationDeletionHandler {
     readonly handle = async (_job: Job): Promise<void> => {
         try {
             const result = await this.sweep(new Date());
-            if (result.deleted.length > 0 || result.failed > 0) {
+            if (
+                result.deleted.length > 0 ||
+                result.waiting.length > 0 ||
+                result.failed > 0
+            ) {
                 this.logger.log(
-                    `organization_deletion deleted=${result.deleted.length} passed=${result.passed} failed=${result.failed} ids=${result.deleted.join(",")}`,
+                    `organization_deletion deleted=${result.deleted.length} waiting=${result.waiting.length} passed=${result.passed} failed=${result.failed} ids=${result.deleted.join(",")} waiting_ids=${result.waiting.join(",")}`,
                 );
             }
         } catch (error) {
@@ -108,7 +137,12 @@ export class OrganizationDeletionHandler {
 
     /** Delete every business whose window ended by `now`. */
     async sweep(now: Date): Promise<DeletionSweep> {
-        const result: DeletionSweep = { deleted: [], passed: 0, failed: 0 };
+        const result: DeletionSweep = {
+            deleted: [],
+            waiting: [],
+            passed: 0,
+            failed: 0,
+        };
         // Never fetch an id twice, so one that always fails can't starve the rest.
         const tried: string[] = [];
         for (;;) {
@@ -127,10 +161,14 @@ export class OrganizationDeletionHandler {
             for (const { id } of due) {
                 tried.push(id);
                 try {
-                    if (await this.deleteOne(id, now)) {
+                    const outcome = await this.deleteOne(id, now);
+                    if (outcome === true) {
                         result.deleted.push(id);
-                    } else {
+                    } else if (outcome === false) {
                         result.passed += 1;
+                    } else {
+                        result.waiting.push(id);
+                        await this.recordWaiting(id, now, outcome.refunds);
                     }
                 } catch (error) {
                     result.failed += 1;
@@ -145,10 +183,18 @@ export class OrganizationDeletionHandler {
 
     /**
      * Take one business to `DELETED_RETAINED` if, read again inside the
-     * transaction, it is still `PENDING_DELETION` and its window has ended.
-     * True when it was deleted; false when it was left alone.
+     * transaction, it is still `PENDING_DELETION`, its window has ended and
+     * it owes its customers no refund (#921, owner 9 Oct). True when it was
+     * deleted; false when it was left alone; `{ refunds }` when a refund is
+     * still owed, being sent or unconfirmed by its provider
+     * (`refundsOutstanding`) — it stays `PENDING_DELETION` past its window,
+     * its clean-up unqueued and its payment keys kept, and the next daily
+     * run asks again.
      */
-    async deleteOne(organizationId: string, now: Date): Promise<boolean> {
+    async deleteOne(
+        organizationId: string,
+        now: Date,
+    ): Promise<boolean | { refunds: OutstandingRefund[] }> {
         return prisma.$transaction(async (tx) => {
             const organization = await tx.organization.findUnique({
                 where: { id: organizationId },
@@ -168,6 +214,11 @@ export class OrganizationDeletionHandler {
             ) {
                 return false;
             }
+            // Read in the transaction that would delete it. The business
+            // takes no new activity, so only a provider's webhook adds one.
+            const owed = await refundsOutstanding(tx, organization.id);
+            if (owed.count > 0) return { refunds: owed.rows };
+
             assertOrganizationLifecycleTransition(
                 OrganizationLifecycleStatus.PendingDeletion,
                 OrganizationLifecycleStatus.DeletedRetained,
@@ -232,6 +283,61 @@ export class OrganizationDeletionHandler {
             await enqueueDeletionCleanup(tx, organization.id);
             return true;
         });
+    }
+
+    /**
+     * Note on the admin ledger that this business waits on refunds (#921):
+     * once a day (the key names the day), with what is owed — the count,
+     * the amounts by currency, and each refund's stage, order or invoice
+     * number, provider and provider reference. No customer: the console
+     * reads names live, for an operator allowed to see them. A failed write
+     * is logged; the next run writes it.
+     */
+    async recordWaiting(
+        organizationId: string,
+        now: Date,
+        refunds: OutstandingRefund[],
+    ): Promise<void> {
+        const owed: Record<string, number> = {};
+        for (const r of refunds) {
+            if (r.currency && r.amountCents !== null) {
+                owed[r.currency] = (owed[r.currency] ?? 0) + r.amountCents;
+            }
+        }
+        this.logger.warn(
+            `organization_deletion_waiting_on_refunds org=${organizationId} count=${refunds.length}`,
+        );
+        try {
+            await this.audit.write(prisma, {
+                actorUserId: ORGANIZATION_DELETION_ACTOR,
+                permission: AdminPermission.OrganizationLifecycleWrite,
+                action: ORGANIZATION_DELETION_WAITING_ACTION,
+                targetType: "organization",
+                targetId: organizationId,
+                organizationId,
+                reason: "Refunds to its customers are still owed",
+                outcome: AdminAuditOutcome.Failure,
+                idempotencyKey: `organization-deletion-waiting:${organizationId}:${now.toISOString().slice(0, 10)}`,
+                metadata: {
+                    count: refunds.length,
+                    owedMinorByCurrency: owed,
+                    refunds: refunds.slice(0, WAITING_REFS).map((r) => ({
+                        stage: r.stage,
+                        paper: r.paper?.label ?? null,
+                        amountMinor: r.amountCents,
+                        currency: r.currency,
+                        provider: r.provider,
+                        providerRef: r.providerRef,
+                    })),
+                },
+            });
+        } catch (error) {
+            // Already noted today: a second run the same day.
+            if (prismaErrorCode(error) === "P2002") return;
+            this.logger.error(
+                `organization_deletion_waiting_not_recorded org=${organizationId} error=${errorName(error)}`,
+            );
+        }
     }
 
     /**

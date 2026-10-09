@@ -1,14 +1,27 @@
 jest.mock("@saroh/database", () => {
     const prisma = {
         organization: { findUnique: jest.fn() },
-        job: { updateMany: jest.fn(), create: jest.fn() },
-        merchantPaymentProvider: { deleteMany: jest.fn() },
-        storePaymentConfig: { deleteMany: jest.fn() },
-        integrationSecret: { deleteMany: jest.fn() },
+        job: {
+            updateMany: jest.fn(),
+            create: jest.fn(),
+            findUnique: jest.fn(async () => ({ attempts: 2 })),
+        },
+        merchantPaymentProvider: { deleteMany: jest.fn(), findMany: jest.fn() },
+        communicationProvider: { deleteMany: jest.fn(), findMany: jest.fn() },
+        storePaymentConfig: { deleteMany: jest.fn(), findMany: jest.fn() },
+        integrationSecret: { deleteMany: jest.fn(), findMany: jest.fn() },
+        adminAuditEvent: { create: jest.fn() },
         $transaction: jest.fn((fn: (tx: unknown) => unknown) => fn(prisma)),
     };
     return { prisma };
 });
+// Refunds owed and autopay mandates (#921): none unless a test says so.
+jest.mock("../payments/refunds-outstanding", () => ({
+    refundsOutstanding: jest.fn(async () => ({ count: 0, rows: [] })),
+}));
+jest.mock("../payments/provider-memberships", () => ({
+    activeMandatesByProvider: jest.fn(async () => new Map()),
+}));
 
 import type { Job } from "@saroh/database";
 import { prisma } from "@saroh/database";
@@ -16,6 +29,8 @@ import { prisma } from "@saroh/database";
 import type { DeletedBusinessBilling } from "../billing/business-closing";
 import type { DomainsService } from "../domains/domains.service";
 import type { MediaService } from "../media/media.service";
+import { activeMandatesByProvider } from "../payments/provider-memberships";
+import { refundsOutstanding } from "../payments/refunds-outstanding";
 import {
     CLEANUP_KEEPS_JOB_TYPES,
     enqueueDeletionCleanup,
@@ -29,6 +44,8 @@ const jobs = prisma.job.updateMany as jest.Mock;
 const merchantKeys = prisma.merchantPaymentProvider.deleteMany as jest.Mock;
 const storeKeys = prisma.storePaymentConfig.deleteMany as jest.Mock;
 const secrets = prisma.integrationSecret.deleteMany as jest.Mock;
+const commsKeys = prisma.communicationProvider.deleteMany as jest.Mock;
+const trail = prisma.adminAuditEvent.create as jest.Mock;
 
 function build() {
     const billing = {
@@ -73,6 +90,18 @@ beforeEach(() => {
     merchantKeys.mockResolvedValue({ count: 1 });
     storeKeys.mockResolvedValue({ count: 1 });
     secrets.mockResolvedValue({ count: 0 });
+    commsKeys.mockResolvedValue({ count: 2 });
+    (prisma.merchantPaymentProvider.findMany as jest.Mock).mockResolvedValue([
+        { id: "mpp_1", provider: "RAZORPAY" },
+    ]);
+    (prisma.communicationProvider.findMany as jest.Mock).mockResolvedValue([
+        { id: "cp_1", provider: "RESEND" },
+        { id: "cp_2", provider: "META" },
+    ]);
+    (prisma.storePaymentConfig.findMany as jest.Mock).mockResolvedValue([
+        { id: "spc_1", provider: "RAZORPAY" },
+    ]);
+    (prisma.integrationSecret.findMany as jest.Mock).mockResolvedValue([]);
 });
 
 describe("enqueueDeletionCleanup (#921)", () => {
@@ -105,7 +134,8 @@ describe("OrganizationDeletionCleanupHandler (#921)", () => {
                 billingCheckoutsDropped: 1,
                 domainsReleased: 2,
                 mediaRemoved: 5,
-                keysDeleted: 2,
+                mandatesLeftAtProvider: 0,
+                keysDeleted: 4,
             },
         });
         expect(billing.end).toHaveBeenCalledWith("org_1");
@@ -130,6 +160,8 @@ describe("OrganizationDeletionCleanupHandler (#921)", () => {
                 ORGANIZATION_DELETION_CLEANUP_TYPE,
                 "billing.provider.cancel",
                 "subscription.charge",
+                // A refund on its way is the customer's money (owner, 9 Oct).
+                "payments.send-refund",
             ]),
         );
     });
@@ -145,6 +177,74 @@ describe("OrganizationDeletionCleanupHandler (#921)", () => {
         });
         expect(secrets).toHaveBeenCalledWith({
             where: { store: { organizationId: "org_1" } },
+        });
+    });
+
+    it("deletes its email and WhatsApp keys too (owner, 9 Oct)", async () => {
+        const { handler } = build();
+        await handler.run("org_1");
+        expect(commsKeys).toHaveBeenCalledWith({
+            where: { organizationId: "org_1" },
+        });
+    });
+
+    it("keeps every key while a customer is still owed a refund, and retries", async () => {
+        (refundsOutstanding as jest.Mock).mockResolvedValueOnce({
+            count: 1,
+            rows: [],
+        });
+        const { handler, billing } = build();
+        const result = await handler.run("org_1", "job_1");
+        expect(result.failed).toEqual(["keys"]);
+        expect(merchantKeys).not.toHaveBeenCalled();
+        expect(commsKeys).not.toHaveBeenCalled();
+        // The other steps still ran.
+        expect(billing.end).toHaveBeenCalled();
+    });
+
+    it("logs one deletion_provider_call line per key removed and per provider's mandates", async () => {
+        (activeMandatesByProvider as jest.Mock).mockResolvedValueOnce(
+            new Map([["RAZORPAY", 3]]),
+        );
+        const { handler } = build();
+        const log = jest
+            .spyOn(
+                (handler as unknown as { logger: { log: () => void } }).logger,
+                "log",
+            )
+            .mockImplementation(() => undefined);
+        const result = await handler.run("org_1", "job_1");
+        const lines = log.mock.calls
+            .map((c) => String(c[0]))
+            .filter((l) => l.startsWith("deletion_provider_call"));
+        expect(lines).toEqual(
+            expect.arrayContaining([
+                "deletion_provider_call org=org_1 provider=razorpay call=mandates.read result=ok ref=active:3",
+                "deletion_provider_call org=org_1 provider=razorpay call=keys.remove result=ok ref=mpp_1",
+                "deletion_provider_call org=org_1 provider=resend call=keys.remove result=ok ref=cp_1",
+                "deletion_provider_call org=org_1 provider=meta call=keys.remove result=ok ref=cp_2",
+            ]),
+        );
+        expect(result.counts.mandatesLeftAtProvider).toBe(3);
+    });
+
+    it("writes each run to the admin ledger with every step's result, for the deletion trail", async () => {
+        const { handler, domains } = build();
+        domains.releaseForDeletedBusiness.mockRejectedValueOnce(new Error("x"));
+        await handler.run("org_1", "job_1");
+        expect(trail).toHaveBeenCalledWith({
+            data: expect.objectContaining({
+                action: "organization.deletion.cleanup",
+                organizationId: "org_1",
+                outcome: "FAILURE",
+                idempotencyKey: "organization-deletion-cleanup:job_1:2",
+                metadata: expect.objectContaining({
+                    steps: expect.arrayContaining([
+                        { step: "domains", result: "failed" },
+                        { step: "keys", result: "ok" },
+                    ]),
+                }),
+            }),
         });
     });
 

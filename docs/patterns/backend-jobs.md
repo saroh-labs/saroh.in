@@ -133,7 +133,16 @@ nobody was told. Round-2 A14 closed it (`bookings/booking-notify.handler.ts`).
   `PENDING_DELETION` window has ended (`deletionScheduledAt` passed) to
   `DELETED_RETAINED`, stamping `deletedRetainedAt` — the lifecycle's own
   last step (`admin-access.service.ts`) — and queues its clean-up on the
-  same transaction. Its rows are never deleted (`Store`, `Order`,
+  same transaction. **Not while its customers are owed a refund** (owner,
+  9 Oct): `payments/refunds-outstanding.ts`, read inside that transaction,
+  finds every refund owed, refused, being sent or unconfirmed by its
+  provider (Home's and Order Detail's own definitions, and queued
+  `payments.send-refund` jobs); with any, the business stays
+  `PENDING_DELETION` past its window, the ledger gets one
+  `organization.deletion.waiting_on_refunds` row a day, the console flags
+  it "Deletion waiting on refunds" (`admin/deletion-trail.ts`) and the
+  workspace banner lists them (`GET /organizations/:id/closing`). Each run
+  asks again. Its rows are never deleted (`Store`, `Order`,
   `Customer`, `Cart` and `Inventory` hold the business without a cascade;
   orders, invoices, credit notes, customers and the audit trails are
   records, ADR-008).
@@ -141,11 +150,19 @@ nobody was told. Round-2 A14 closed it (`bookings/booking-notify.handler.ts`).
   `admin/organization-deletion-cleanup.handler.ts`) clears what a deleted
   business leaves behind, each step idempotent and tried whatever the others
   did: its pending jobs cancelled (but the clean-up itself,
-  `billing.provider.cancel` and `subscription.charge`, which stands aside on
-  its own), Saroh's subscription cancelled at the provider and then recorded
+  `billing.provider.cancel`, `subscription.charge`, which stands aside on
+  its own, and `payments.send-refund` — a customer's money is never called
+  off), Saroh's subscription cancelled at the provider and then recorded
   CANCELLED (provider first: no answer writes nothing), custom hostnames
   deleted at Cloudflare and the claims released, media out of storage and
-  their rows deleted, payment-provider keys deleted. A failing step is
+  their rows deleted, the customers' active autopay mandates read and
+  logged per provider (deletion cancels none there), then the payment and
+  messaging keys deleted (`CommunicationProvider` too) — never while a
+  refund is still owed, which fails the step so it is retried. Every
+  provider call logs one `deletion_provider_call` line
+  (`devops-observability.md`), and each run writes an
+  `organization.deletion.cleanup` ledger row with every step's result: the
+  console's deletion trail. A failing step is
   logged by name and the run throws, so the queue retries it (24 attempts,
   about an hour and a half); from its first failure the business is flagged
   "Deletion clean-up unfinished" (`DELETION_CLEANUP`) in the console's

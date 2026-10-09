@@ -20,6 +20,15 @@
   queue.
 - **Activation metrics** go through the versioned analytics event contract only —
   never free-form logs, never customer identifiers (18 §3).
+- **A business's way out is one grep** (#921): every provider call made
+  while it is closing or after it is deleted — a refund's send, Saroh's
+  billing cancel, a custom hostname or stored file removed, the autopay
+  mandates read, keys removed — logs
+  `deletion_provider_call org=… provider=… call=… result=… ref=…`
+  (`organizations/deletion-provider-log.ts`): INFO when it worked, WARN
+  when not, every value squeezed to an id's characters, so no personal
+  data, card data or key can ride along. The steps and their results are on
+  the admin ledger and the console's deletion trail.
 
 ## Rules
 

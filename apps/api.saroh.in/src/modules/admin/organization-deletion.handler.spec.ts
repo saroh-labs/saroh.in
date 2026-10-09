@@ -11,15 +11,21 @@ jest.mock("@saroh/database", () => {
     };
     return { prisma };
 });
+// Refunds owed (#921): none unless a test says so.
+jest.mock("../payments/refunds-outstanding", () => ({
+    refundsOutstanding: jest.fn(async () => ({ count: 0, rows: [] })),
+}));
 
 import type { Job } from "@saroh/database";
 import { prisma } from "@saroh/database";
 
+import { refundsOutstanding } from "../payments/refunds-outstanding";
 import type { AdminAuditService } from "./admin-audit.service";
 import { ORGANIZATION_DELETION_CLEANUP_TYPE } from "./organization-deletion-cleanup.handler";
 import {
     ORGANIZATION_DELETION_ACTOR,
     ORGANIZATION_DELETION_TYPE,
+    ORGANIZATION_DELETION_WAITING_ACTION,
     OrganizationDeletionHandler,
 } from "./organization-deletion.handler";
 
@@ -79,7 +85,12 @@ describe("OrganizationDeletionHandler.sweep (#907)", () => {
 
         const result = await handler.sweep(NOW);
 
-        expect(result).toEqual({ deleted: ["o1"], passed: 0, failed: 0 });
+        expect(result).toEqual({
+            deleted: ["o1"],
+            waiting: [],
+            passed: 0,
+            failed: 0,
+        });
         expect(write).toHaveBeenCalledWith({
             where: {
                 id: "o1",
@@ -140,7 +151,12 @@ describe("OrganizationDeletionHandler.sweep (#907)", () => {
 
             const result = await handler.sweep(NOW);
 
-            expect(result).toEqual({ deleted: [], passed: 1, failed: 0 });
+            expect(result).toEqual({
+                deleted: [],
+                waiting: [],
+                passed: 1,
+                failed: 0,
+            });
             expect(write).not.toHaveBeenCalled();
             expect(audit.write).not.toHaveBeenCalled();
             expect(history).not.toHaveBeenCalled();
@@ -156,10 +172,103 @@ describe("OrganizationDeletionHandler.sweep (#907)", () => {
 
         expect(await handler.sweep(NOW)).toEqual({
             deleted: [],
+            waiting: [],
             passed: 1,
             failed: 0,
         });
         expect(audit.write).not.toHaveBeenCalled();
+    });
+
+    it("leaves a business that owes refunds PENDING_DELETION past its window, noted once a day (#921)", async () => {
+        list.mockResolvedValueOnce([{ id: "o1" }]);
+        read.mockResolvedValue(org("o1"));
+        (refundsOutstanding as jest.Mock).mockResolvedValueOnce({
+            count: 2,
+            rows: [
+                {
+                    key: "refund:r1",
+                    stage: "CONFIRMING",
+                    amountCents: 50_000,
+                    currency: "INR",
+                    customer: "Asha Rao",
+                    paper: { label: "#1042", href: "/commerce/orders/ord_1" },
+                    provider: "RAZORPAY",
+                    providerRef: "rfnd_1",
+                    since: PAST,
+                },
+                {
+                    key: "intent:pi_2",
+                    stage: "OWED",
+                    amountCents: 12_000,
+                    currency: "INR",
+                    customer: null,
+                    paper: { label: "INV-7", href: "/billing/invoices/inv_7" },
+                    provider: "RAZORPAY",
+                    providerRef: "pay_2",
+                    since: PAST,
+                },
+            ],
+        });
+        const { handler, audit } = build();
+
+        const result = await handler.sweep(NOW);
+
+        expect(result).toEqual({
+            deleted: [],
+            waiting: ["o1"],
+            passed: 0,
+            failed: 0,
+        });
+        // Not deleted: no write, no history, no clean-up (which removes keys).
+        expect(write).not.toHaveBeenCalled();
+        expect(history).not.toHaveBeenCalled();
+        expect(jobCreate).not.toHaveBeenCalled();
+        expect(refundsOutstanding).toHaveBeenCalledWith(prisma, "o1");
+        expect(audit.write).toHaveBeenCalledWith(
+            prisma,
+            expect.objectContaining({
+                action: ORGANIZATION_DELETION_WAITING_ACTION,
+                organizationId: "o1",
+                outcome: "FAILURE",
+                idempotencyKey: "organization-deletion-waiting:o1:2026-11-10",
+                metadata: expect.objectContaining({
+                    count: 2,
+                    owedMinorByCurrency: { INR: 62_000 },
+                }),
+            }),
+        );
+        // The ledger names no customer.
+        expect(JSON.stringify(audit.write.mock.calls)).not.toContain("Asha");
+    });
+
+    it("takes a second note the same day as already noted", async () => {
+        list.mockResolvedValueOnce([{ id: "o1" }]);
+        read.mockResolvedValue(org("o1"));
+        (refundsOutstanding as jest.Mock).mockResolvedValueOnce({
+            count: 1,
+            rows: [
+                {
+                    key: "job:j1",
+                    stage: "SENDING",
+                    amountCents: null,
+                    currency: null,
+                    customer: null,
+                    paper: null,
+                    provider: null,
+                    providerRef: "r9",
+                    since: PAST,
+                },
+            ],
+        });
+        const { handler, audit } = build();
+        audit.write.mockRejectedValueOnce(
+            Object.assign(new Error("dup"), { code: "P2002" }),
+        );
+
+        const result = await handler.sweep(NOW);
+
+        expect(result.waiting).toEqual(["o1"]);
+        expect(result.failed).toBe(0);
     });
 
     it("logs and moves past a business that fails, never fetching it twice", async () => {

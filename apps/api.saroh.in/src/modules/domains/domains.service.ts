@@ -4,6 +4,7 @@ import {
     ForbiddenException,
     Inject,
     Injectable,
+    Logger,
     NotFoundException,
     ServiceUnavailableException,
 } from "@nestjs/common";
@@ -14,6 +15,10 @@ import { randomBytes } from "node:crypto";
 import type { OrganizationContext } from "../../common/types/organization-context";
 import { EntitlementService } from "../billing/entitlement.service";
 import { queueDomainAlert } from "../notifications/domain-alerts";
+import {
+    errorResult,
+    logDeletionProviderCall,
+} from "../organizations/deletion-provider-log";
 import { authorize } from "../organizations/organization-policy";
 import type { DomainHosting } from "./domain-hosting";
 import { DOMAIN_HOSTING, HostingCallError } from "./domain-hosting";
@@ -22,6 +27,9 @@ import { hostingView, syncHosting } from "./domain-hosting-sync";
 import type { DomainVerifier, VerificationFailure } from "./domain-verifier";
 import { DOMAIN_VERIFIER, verificationRecordName } from "./domain-verifier";
 import { isTestReservedHostname, TEST_RESERVED_HOSTNAME_MSG } from "./dto";
+
+/** A deleted business's hostnames, on its deletion trail (#921). */
+const deletionLog = new Logger("OrganizationDeletion");
 
 /** Input for {@link DomainsService.claim} — the validated {@link ClaimDomainDto}. */
 export interface ClaimDomainInput {
@@ -314,9 +322,25 @@ export class DomainsService {
         let released = 0;
         let failed = 0;
         for (const domain of domains) {
+            // The host's id for it, or the row's when it was never there.
+            const ref = domain.hostingId ?? domain.id;
             try {
                 await this.removeFromHosting(domain);
-            } catch {
+                logDeletionProviderCall(deletionLog, {
+                    organizationId,
+                    provider: "cloudflare",
+                    call: "hostname.remove",
+                    result: "ok",
+                    ref,
+                });
+            } catch (error) {
+                logDeletionProviderCall(deletionLog, {
+                    organizationId,
+                    provider: "cloudflare",
+                    call: "hostname.remove",
+                    result: errorResult(error),
+                    ref,
+                });
                 failed += 1;
                 continue;
             }

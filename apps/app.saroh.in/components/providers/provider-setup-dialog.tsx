@@ -31,6 +31,7 @@ import {
 import {
     needsPublicKey,
     needsWebhookSecret,
+    paymentsConsequence,
     RAZORPAY_KEY_ID,
 } from "@/lib/providers/rows";
 import type {
@@ -422,7 +423,12 @@ function PaymentsForm({
                         if (!o) setConfirming(null);
                     }}
                     title={`Disconnect ${labelOfPayment(confirming)}?`}
-                    description="Checkout stops taking online payments through it straight away. Orders already paid are not affected. Connecting again means entering the keys again — they cannot be read back."
+                    description={paymentsConsequence({
+                        provider: confirming,
+                        activeMemberships: connected.find(
+                            (c) => c.provider === confirming,
+                        )?.activeMemberships,
+                    })}
                     confirmLabel="Disconnect"
                     onConfirm={() => void disconnect(confirming)}
                 />

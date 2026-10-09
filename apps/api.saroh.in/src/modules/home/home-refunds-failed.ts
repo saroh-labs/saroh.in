@@ -25,86 +25,7 @@ export async function failedOrderRefunds(
     organizationId: string,
     storeIds?: readonly string[] | null,
 ): Promise<HomeAction | null> {
-    const failed = await db.paymentRefund.findMany({
-        where: {
-            organizationId,
-            status: "FAILED",
-            // A refused refund of a capture at the wrong amount (PAY-06) is
-            // not the order's: it stays on refunds owed, with its Refund.
-            // The null branch spelled out: NOT of a null key is null in SQL.
-            OR: [
-                { idempotencyKey: null },
-                {
-                    NOT: {
-                        idempotencyKey: { startsWith: MISMATCH_REFUND_PREFIX },
-                    },
-                },
-            ],
-            paymentIntent: {
-                orderId: { not: null },
-                ...(storeIds
-                    ? { order: { storeId: { in: [...storeIds] } } }
-                    : {}),
-            },
-        },
-        orderBy: [{ updatedAt: "desc" }, { id: "desc" }],
-        select: {
-            id: true,
-            amountCents: true,
-            currency: true,
-            createdAt: true,
-            updatedAt: true,
-            paymentIntent: {
-                select: {
-                    provider: true,
-                    order: {
-                        select: {
-                            id: true,
-                            orderId: true,
-                            walkInName: true,
-                            customer: {
-                                select: {
-                                    firstName: true,
-                                    lastName: true,
-                                    email: true,
-                                },
-                            },
-                        },
-                    },
-                },
-            },
-        },
-    });
-    if (failed.length === 0) return null;
-
-    // Refunded again since, and that one hasn't failed: it's in hand.
-    const orderIds = [
-        ...new Set(
-            failed.flatMap((r) =>
-                r.paymentIntent.order ? [r.paymentIntent.order.id] : [],
-            ),
-        ),
-    ];
-    const later = await db.paymentRefund.findMany({
-        where: {
-            organizationId,
-            status: { not: "FAILED" },
-            paymentIntent: { orderId: { in: orderIds } },
-        },
-        select: {
-            createdAt: true,
-            paymentIntent: { select: { orderId: true } },
-        },
-    });
-    const open = failed.filter((r) => {
-        const order = r.paymentIntent.order;
-        if (!order) return false;
-        return !later.some(
-            (l) =>
-                l.paymentIntent.orderId === order.id &&
-                l.createdAt.getTime() > r.createdAt.getTime(),
-        );
-    });
+    const open = await openFailedOrderRefunds(db, organizationId, storeIds);
     if (open.length === 0) return null;
 
     const evidence: HomeEvidence[] = open.slice(0, EVIDENCE_LIMIT).map((r) => {
@@ -142,4 +63,99 @@ export async function failedOrderRefunds(
         evidence,
         tone: "bad",
     };
+}
+
+/**
+ * The failed order refunds no later refund of the order has taken over,
+ * newest first. Home's row ({@link failedOrderRefunds}) and a closing
+ * business's refunds (`payments/refunds-outstanding.ts`, #921) read this
+ * one definition.
+ */
+export async function openFailedOrderRefunds(
+    db: Db,
+    organizationId: string,
+    storeIds?: readonly string[] | null,
+) {
+    const failed = await db.paymentRefund.findMany({
+        where: {
+            organizationId,
+            status: "FAILED",
+            // A refused refund of a capture at the wrong amount (PAY-06) is
+            // not the order's: it stays on refunds owed, with its Refund.
+            // The null branch spelled out: NOT of a null key is null in SQL.
+            OR: [
+                { idempotencyKey: null },
+                {
+                    NOT: {
+                        idempotencyKey: { startsWith: MISMATCH_REFUND_PREFIX },
+                    },
+                },
+            ],
+            paymentIntent: {
+                orderId: { not: null },
+                ...(storeIds
+                    ? { order: { storeId: { in: [...storeIds] } } }
+                    : {}),
+            },
+        },
+        orderBy: [{ updatedAt: "desc" }, { id: "desc" }],
+        select: {
+            id: true,
+            amountCents: true,
+            currency: true,
+            providerRefundId: true,
+            createdAt: true,
+            updatedAt: true,
+            paymentIntent: {
+                select: {
+                    id: true,
+                    provider: true,
+                    order: {
+                        select: {
+                            id: true,
+                            orderId: true,
+                            walkInName: true,
+                            customer: {
+                                select: {
+                                    firstName: true,
+                                    lastName: true,
+                                    email: true,
+                                },
+                            },
+                        },
+                    },
+                },
+            },
+        },
+    });
+    if (failed.length === 0) return [];
+
+    // Refunded again since, and that one hasn't failed: it's in hand.
+    const orderIds = [
+        ...new Set(
+            failed.flatMap((r) =>
+                r.paymentIntent.order ? [r.paymentIntent.order.id] : [],
+            ),
+        ),
+    ];
+    const later = await db.paymentRefund.findMany({
+        where: {
+            organizationId,
+            status: { not: "FAILED" },
+            paymentIntent: { orderId: { in: orderIds } },
+        },
+        select: {
+            createdAt: true,
+            paymentIntent: { select: { orderId: true } },
+        },
+    });
+    return failed.filter((r) => {
+        const order = r.paymentIntent.order;
+        if (!order) return false;
+        return !later.some(
+            (l) =>
+                l.paymentIntent.orderId === order.id &&
+                l.createdAt.getTime() > r.createdAt.getTime(),
+        );
+    });
 }

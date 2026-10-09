@@ -3,6 +3,10 @@ import type { Prisma } from "@saroh/database";
 import { prisma } from "@saroh/database";
 
 import {
+    errorResult,
+    logDeletionProviderCall,
+} from "../organizations/deletion-provider-log";
+import {
     billingMayCharge,
     OrganizationLifecycleStatus,
 } from "../organizations/organization-lifecycle.policy";
@@ -258,11 +262,25 @@ export class DeletedBusinessBilling {
                         atCycleEnd: false,
                     });
                 cancelledAtProvider = true;
+                logDeletionProviderCall(this.logger, {
+                    organizationId,
+                    provider: sub.provider,
+                    call: "billing.cancel",
+                    result: "ok",
+                    ref: sub.providerSubscriptionId,
+                });
             } catch (error) {
-                if (
-                    !(error instanceof BillingProviderError) ||
-                    error.kind !== "REFUSED"
-                ) {
+                const refused =
+                    error instanceof BillingProviderError &&
+                    error.kind === "REFUSED";
+                logDeletionProviderCall(this.logger, {
+                    organizationId,
+                    provider: sub.provider,
+                    call: "billing.cancel",
+                    result: refused ? "refused" : errorResult(error),
+                    ref: sub.providerSubscriptionId,
+                });
+                if (!refused) {
                     throw error;
                 }
                 this.logger.warn(

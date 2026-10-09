@@ -12,6 +12,7 @@ import {
 } from "@/components/business/catalogue-actions";
 import { CataloguePlan } from "@/components/business/catalogue-plan";
 import { CloseAccess } from "@/components/business/close-access";
+import { DeletionPanels } from "@/components/business/deletion-panels";
 import { LifecycleActions } from "@/components/business/lifecycle-actions";
 import {
     ATTENTION_LABEL,
@@ -658,6 +659,9 @@ function Business({
                         </div>
                     )}
                 </Panel>
+
+                {/* Its way out (#921): refunds it waits on, and the trail. */}
+                <DeletionPanels view={view} />
 
                 {view.sites && (
                     <Panel

@@ -31,6 +31,12 @@ export interface ConnectedPaymentProvider {
      */
     webhookSecretMissing?: boolean;
     attention?: ProviderAttention | null;
+    /**
+     * Customers' autopay memberships active at this provider (#921):
+     * disconnecting cancels none of them there, and the confirm says how
+     * many. Absent from an older API: read as none.
+     */
+    activeMemberships?: number;
     updatedAt: string;
 }
 

@@ -63,6 +63,7 @@ import {
     paymentProviderWorks,
     providerOrderFailed,
 } from "./provider-keys";
+import { activeMandatesByProvider } from "./provider-memberships";
 import type {
     CreateOrderIntentResult,
     MerchantProvider,
@@ -604,14 +605,26 @@ export class PaymentsService {
         return redact(row);
     }
 
-    /** List the org's connected providers, redacted. `payment:read`. */
-    async listProviders(ctx: OrganizationContext): Promise<RedactedProvider[]> {
+    /**
+     * List the org's connected providers, redacted. `payment:read`. Each
+     * says how many customers' autopay memberships are active at it
+     * (#921): disconnecting cancels none of them, and the confirm says so.
+     */
+    async listProviders(
+        ctx: OrganizationContext,
+    ): Promise<(RedactedProvider & { activeMemberships: number })[]> {
         authorize(ctx, "payment:read");
-        const rows = await prisma.merchantPaymentProvider.findMany({
-            where: { organizationId: ctx.organizationId },
-            orderBy: { createdAt: "desc" },
-        });
-        return rows.map(redact);
+        const [rows, memberships] = await Promise.all([
+            prisma.merchantPaymentProvider.findMany({
+                where: { organizationId: ctx.organizationId },
+                orderBy: { createdAt: "desc" },
+            }),
+            activeMandatesByProvider(prisma, ctx.organizationId),
+        ]);
+        return rows.map((row) => ({
+            ...redact(row),
+            activeMemberships: memberships.get(row.provider) ?? 0,
+        }));
     }
 
     /** Get one of the org's providers, redacted. `payment:read`. 404 if absent. */

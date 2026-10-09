@@ -10,6 +10,7 @@ import { prisma } from "@saroh/database";
 import { CatalogueAccessService } from "../billing/catalogue-access.service";
 import { siteRootDomain } from "../sites/site-host-mode";
 import { OPERATOR_LIFECYCLE_ACTIONS } from "./admin-lifecycle.service";
+import { businessesWaitingOnRefunds } from "./deletion-trail";
 import type { EffectivePlan } from "./effective-plan";
 import { effectivePlan } from "./effective-plan";
 import { UNFINISHED_CLEANUP_JOB } from "./organization-deletion-cleanup.handler";
@@ -39,7 +40,12 @@ export type AttentionReason =
     | "FAILED_JOBS"
     | "FAILED_WEBHOOKS"
     /** A deleted business whose clean-up has failed and isn't done (#921). */
-    | "DELETION_CLEANUP";
+    | "DELETION_CLEANUP"
+    /**
+     * Past its deletion window and still `PENDING_DELETION`: its customers
+     * are owed refunds (#921, owner 9 Oct). The business page lists them.
+     */
+    | "DELETION_WAITING_REFUNDS";
 
 export interface OrganizationDirectoryRow {
     id: string;
@@ -112,7 +118,11 @@ export class AdminOrganizationsService {
         caller: { canReadPii: boolean },
     ): Promise<OrganizationDirectoryPage> {
         const limit = clamp(query.limit);
-        const where = this.where(query, caller);
+        const waiting =
+            query.health === "attention"
+                ? await businessesWaitingOnRefunds(new Date())
+                : new Set<string>();
+        const where = this.where(query, caller, waiting);
 
         const records = await prisma.organization.findMany({
             where,
@@ -176,6 +186,7 @@ export class AdminOrganizationsService {
     private where(
         query: OrganizationDirectoryQuery,
         caller: { canReadPii: boolean },
+        waitingOnRefunds: ReadonlySet<string> = new Set(),
     ): Prisma.OrganizationWhereInput {
         const and: Prisma.OrganizationWhereInput[] = [];
         const q = query.q?.trim();
@@ -250,6 +261,10 @@ export class AdminOrganizationsService {
                     },
                     // However long ago: a half-cleared business stays flagged.
                     { jobs: { some: UNFINISHED_CLEANUP_JOB } },
+                    // A deletion held back by refunds owed (#921).
+                    ...(waitingOnRefunds.size > 0
+                        ? [{ id: { in: [...waitingOnRefunds] } }]
+                        : []),
                 ],
             });
         }
@@ -269,7 +284,7 @@ export class AdminOrganizationsService {
         const since = new Date(Date.now() - ATTENTION_WINDOW_MS);
 
         const now = new Date();
-        const [activity, failedJobs, failedWebhooks, plans, cleanups] =
+        const [activity, failedJobs, failedWebhooks, plans, cleanups, waiting] =
             await Promise.all([
                 prisma.auditEvent.groupBy({
                     by: ["organizationId"],
@@ -310,6 +325,8 @@ export class AdminOrganizationsService {
                     },
                     select: { organizationId: true },
                 }),
+                // A deletion held back by refunds owed (#921).
+                businessesWaitingOnRefunds(now, ids),
             ]);
         const effective = new Map(ids.map((id, i) => [id, plans[i]]));
         const cleanupUnfinished = new Set(
@@ -337,6 +354,9 @@ export class AdminOrganizationsService {
             }
             if (cleanupUnfinished.has(record.id)) {
                 attention.push("DELETION_CLEANUP");
+            }
+            if (waiting.has(record.id)) {
+                attention.push("DELETION_WAITING_REFUNDS");
             }
 
             return {

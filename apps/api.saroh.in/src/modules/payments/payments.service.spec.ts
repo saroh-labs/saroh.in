@@ -33,6 +33,8 @@ jest.mock("@saroh/database", () => {
             update: jest.fn(),
             updateMany: jest.fn(),
         },
+        // Active autopay memberships per provider (#921): none here.
+        paymentMandate: { groupBy: jest.fn(async () => []) },
         job: { create: jest.fn() },
         customerNotice: { findFirst: jest.fn() },
         paymentIntent: {
@@ -467,6 +469,30 @@ describe("PaymentsService.listProviders", () => {
         });
         expect(rows[0]).not.toHaveProperty("encryptedCredentials");
         expect(JSON.stringify(rows)).not.toContain("super-secret-value");
+    });
+
+    it("says how many autopay memberships are active at each provider (#921)", async () => {
+        const { service } = makeService();
+        providerFindMany.mockResolvedValue([
+            connectedRow(),
+            connectedRow({ provider: "CASHFREE" }),
+        ]);
+        const groupBy = prisma.paymentMandate.groupBy as jest.Mock;
+        groupBy.mockResolvedValueOnce([
+            { provider: "RAZORPAY", _count: { _all: 3 } },
+        ]);
+
+        const rows = await service.listProviders(ctx());
+
+        expect(groupBy).toHaveBeenCalledWith(
+            expect.objectContaining({
+                where: { organizationId: "org_1", status: "ACTIVE" },
+            }),
+        );
+        expect(rows.map((r) => [r.provider, r.activeMemberships])).toEqual([
+            ["RAZORPAY", 3],
+            ["CASHFREE", 0],
+        ]);
     });
 
     it("denies a MEMBER? no — payment:read allows nobody but OWNER/ADMIN", async () => {

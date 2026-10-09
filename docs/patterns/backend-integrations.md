@@ -75,6 +75,10 @@ a note saying so.
   first** (DEC-036): a disconnected one stays listed as theirs, only what the
   API can connect is offered, and a row shows only what the API sends as
   public (a checkout's public key, a sending address), never a credential.
+  Disconnecting a payment provider's confirm says it cancels none of the
+  customers' autopay memberships there, with how many are active (owner,
+  9 Oct, #921: `activeMemberships` on the list,
+  `lib/payments/memberships-warning.ts`).
 - **Current** (UX-012) — **Keys are checked before they are kept, and
   watched after.** Connecting a provider asks it one cheap authenticated
   read with the typed keys (`verifyCredentials` on the port: Razorpay
