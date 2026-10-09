@@ -544,6 +544,38 @@ export class CatalogueAccessService {
         };
     }
 
+    /**
+     * Every row a business would have on catalogue plan `planId` at `at`
+     * (#801: what a term that ends unpaid moves it to): the version it reads
+     * now, its overrides still live then, and no add-ons (a move to Free
+     * clears them). A plan override live then still wins, as it would.
+     * Null off the catalogue.
+     */
+    async modulesOnPlan(
+        organizationId: string,
+        planId: string,
+        at: Date,
+        now: Date = new Date(),
+    ): Promise<ModuleAccess[] | null> {
+        const a = await this.resolve(organizationId, now);
+        if (a.source !== "catalogue") return null;
+        const rows = await prisma.entitlementOverride.findMany({
+            where: {
+                organizationId,
+                revokedAt: null,
+                OR: [{ expiresAt: null }, { expiresAt: { gt: at } }],
+            },
+            select: OVERRIDE_SELECT,
+        });
+        return resolveAllAccess({
+            catalog: a.catalog,
+            planId,
+            addons: [],
+            now: at,
+            overrides: toOverrides(rows as OverrideRow[]),
+        });
+    }
+
     /** The app's countdown: {@link planEnding} within its 30 days. */
     private async endingSoon(
         organizationId: string,
