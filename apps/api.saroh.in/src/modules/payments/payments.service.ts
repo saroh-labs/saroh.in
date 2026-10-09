@@ -26,7 +26,11 @@ import { assertBusinessDetails } from "../invoices/business-details";
 import { creditNoteForRefund } from "../invoices/order-invoicing";
 import { NOT_PAID_ONLINE } from "../invoices/pay-online";
 import { assertWithinOrderLeftInTx } from "../orders/hand-refund";
-import { finishCancelInTx, isCancelRefundKey } from "../orders/order-cancel";
+import {
+    finishCancelInTx,
+    isCancelRefundKey,
+    onlineRefundableInTx,
+} from "../orders/order-cancel";
 import type {
     LineRefundRequest,
     PlannedLineRefund,
@@ -790,6 +794,13 @@ export class PaymentsService {
      * over, cancelled already) are read where no stage move can slip in.
      * The refund rows carry the cancel's key (`order-cancel.ts`); the order
      * is marked cancelled as the provider answers for them.
+     *
+     * After part of the order was refunded by hand (#865, #918, DEC-116)
+     * what goes back is what is left on the order, not the payments' whole
+     * balance: that amount, split across the payments newest first as
+     * another amount is. The lines still ride on it, so their stock comes
+     * back as it is confirmed; its credit note, whose lines no longer add
+     * up to the money, is spread over the invoice for that amount.
      */
     async refundOrderForCancel(
         ctx: OrganizationContext,
@@ -809,8 +820,11 @@ export class PaymentsService {
             plan: async (tx) => {
                 await input.guard(tx);
                 const refundable = await refundableLines(tx, order.id);
+                const { leftCents, onlineLeftCents } =
+                    await onlineRefundableInTx(tx, order.id);
                 return {
-                    amountCents: "REMAINING",
+                    amountCents:
+                        leftCents < onlineLeftCents ? leftCents : "REMAINING",
                     lines: planRemainingLines(
                         refundable,
                         totalToCents(order.discount),

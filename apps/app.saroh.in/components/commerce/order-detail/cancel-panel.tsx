@@ -25,17 +25,19 @@ const FIELD =
 
 /**
  * "Cancel #1063? It stays on record as cancelled, never deleted." — the
- * refund sheet with every line ticked (the design's option B): a cancel is
- * a refund in full, so there is no "another amount" and no line to leave
- * out. Why is kept on the order. Nothing paid: it just cancels, and its
- * stock goes back on the shelf.
+ * refund sheet with every line ticked (the design's option B): a cancel
+ * refunds what is left on the order, so there is no "another amount" and
+ * no line to leave out. It says how much goes back and how — less than
+ * was paid once part went back by hand (#918, DEC-116) — from
+ * `lib/orders/cancel-money.ts`. Why is kept on the order. Nothing paid or
+ * nothing left: it just cancels, and its stock goes back on the shelf.
  */
 export function CancelPanel({
     number,
     first,
     lines,
-    amount,
-    how,
+    says,
+    confirm,
     canTell,
     format,
     onCancel,
@@ -44,10 +46,10 @@ export function CancelPanel({
     number: string;
     first: string;
     lines: OrderReadLine[];
-    /** What goes back, in major units; 0 when nothing was paid. */
-    amount: number;
-    /** "Back to Razorpay, in 3–5 days." — or from the till. */
-    how: string;
+    /** How much goes back and how ("₹380 goes back to Razorpay, …"). */
+    says: string;
+    /** The button: "Refund ₹380", or "Cancel order" when nothing goes back. */
+    confirm: string;
     canTell: boolean;
     format: ((amount: number) => string) | null;
     onCancel: () => void;
@@ -57,7 +59,6 @@ export function CancelPanel({
     const [reason, setReason] = useState<RefundReason | "">("");
     const [other, setOther] = useState("");
     const [tell, setTell] = useState(canTell);
-    const money = amount > 0 && format ? format(amount) : null;
 
     return (
         <WorkPanel label={`Cancel ${number}`}>
@@ -123,9 +124,7 @@ export function CancelPanel({
                 id={`${ids}-how`}
                 className="mt-2 text-[12px] text-muted-foreground"
             >
-                {money
-                    ? `${how} Its stock goes back on the shelf once the refund is confirmed.`
-                    : "Nothing was paid, so nothing goes back. Its stock goes back on the shelf."}
+                {says}
             </p>
             {canTell ? (
                 <label className="mt-2 flex cursor-pointer items-center gap-2 text-[12.5px]">
@@ -164,7 +163,7 @@ export function CancelPanel({
                         })
                     }
                 >
-                    {money ? `Refund ${money}` : "Cancel order"}
+                    {confirm}
                 </Button>
             </div>
         </WorkPanel>
