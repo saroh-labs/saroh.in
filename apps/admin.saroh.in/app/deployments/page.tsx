@@ -11,31 +11,24 @@ import { Panel } from "@/components/panel";
 import { requireStaff } from "@/lib/console";
 import {
     anyInFlight,
+    ownEnvironmentPanel,
     RUN_STATE,
     shortCommit,
     triggerWords,
 } from "@/lib/deployment-words";
-import type {
-    DeployEnvironment,
-    DeploymentRow,
-    DeploymentsView,
-} from "@/lib/deployments";
+import type { DeploymentRow, DeploymentsView } from "@/lib/deployments";
 import { getDeployments } from "@/lib/deployments";
 import { formatDateTime, formatRelative } from "@/lib/format";
 
 export const metadata = { title: "Deployments" };
 
-const ENVIRONMENTS: { key: DeployEnvironment; title: string; from: string }[] =
-    [
-        { key: "production", title: "Production", from: "main" },
-        { key: "development", title: "Development", from: "development" },
-    ];
-
 /**
- * The Cloudflare apps per environment (#886, DEC-107): what is live, when it
- * was deployed and the latest run, with a Deploy button per row. Platform
- * Owners only. A dev deploy starts at once; production asks for the
- * Worker's name first. Every start is in the audit trail.
+ * The Cloudflare apps in this console's own environment (#886, DEC-107):
+ * what is live, when it was deployed and the latest run, with a Deploy
+ * button per row. The dev console deploys only dev, the production console
+ * only production; the API refuses the other. Platform Owners only. A dev
+ * deploy starts at once; production asks for the Worker's name first.
+ * Every start is in the audit trail.
  */
 export default async function DeploymentsPage() {
     const gate = await requireStaff("deployments:run");
@@ -62,6 +55,7 @@ export default async function DeploymentsPage() {
 }
 
 function Board({ view }: { view: DeploymentsView }) {
+    const panel = ownEnvironmentPanel(view);
     return (
         <>
             <AutoRefresh active={anyInFlight(view.rows)} everyMs={15_000} />
@@ -92,27 +86,38 @@ function Board({ view }: { view: DeploymentsView }) {
                     </AlertDescription>
                 </Alert>
             )}
-            {ENVIRONMENTS.map((env) => (
-                <Panel
-                    key={env.key}
-                    title={env.title}
-                    description={`Built from ${env.from}. What is live is read from GitHub Actions: the last deploy that succeeded.`}
-                >
-                    {() => (
-                        <ul className="grid gap-3">
-                            {view.rows
-                                .filter((row) => row.environment === env.key)
-                                .map((row) => (
+            {panel ? (
+                <>
+                    <Panel title={panel.title} description={panel.description}>
+                        {() => (
+                            <ul className="grid gap-3">
+                                {panel.rows.map((row) => (
                                     <Row
                                         key={`${row.app}-${row.environment}`}
                                         row={row}
                                         canDeploy={view.configured}
                                     />
                                 ))}
-                        </ul>
-                    )}
-                </Panel>
-            ))}
+                            </ul>
+                        )}
+                    </Panel>
+                    <p className="text-[13px] text-muted-foreground">
+                        {panel.otherNote}
+                    </p>
+                </>
+            ) : (
+                <Alert>
+                    <AlertTitle>
+                        This console doesn&apos;t know which environment it
+                        deploys
+                    </AlertTitle>
+                    <AlertDescription>
+                        The API names no environment (SITE_DEPLOY_ENVIRONMENT),
+                        so nothing can be deployed from here. Merges still
+                        deploy.
+                    </AlertDescription>
+                </Alert>
+            )}
             <p className="text-[13px] text-muted-foreground">
                 <a
                     href={view.workflowUrl}

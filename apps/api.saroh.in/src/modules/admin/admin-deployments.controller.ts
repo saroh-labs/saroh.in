@@ -10,9 +10,10 @@ import { AdminRoutes } from "./admin-routes.decorator";
 import { StartDeploymentDto } from "./dto";
 
 /**
- * Deployments (#886, DEC-107): each Cloudflare app's latest run per
- * environment, and starting one. Platform Owners only: `deployments:run` is
- * on no other role.
+ * Deployments (#886, DEC-107): each Cloudflare app's latest run in this
+ * API's own environment (`SITE_DEPLOY_ENVIRONMENT`), and starting one there;
+ * the other environment is deployed from its own console. Platform Owners
+ * only: `deployments:run` is on no other role.
  */
 @AdminRoutes()
 export class AdminDeploymentsController {
@@ -28,7 +29,7 @@ export class AdminDeploymentsController {
     }
 
     /**
-     * Start one app's deploy in one environment. A double press, or a retry
+     * Start one app's deploy in this console's environment (any other is 403). A double press, or a retry
      * after a dropped response, carries the same key and starts one run.
      */
     @Post("deployments")

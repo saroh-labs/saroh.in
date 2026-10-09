@@ -7,9 +7,10 @@ import { adminWrite } from "./control-plane";
 import type { DeployApp, DeployEnvironment } from "./deployments";
 
 /**
- * Start one app's deploy in one environment (#886). The API checks the
- * permission, the typed name for production and the rate limit, and
- * records the start; this only forwards.
+ * Start one app's deploy in this console's environment (#886). The API
+ * checks the permission, that the environment is its own (DEC-107), the
+ * typed name for production and the rate limit, and records the start;
+ * this only forwards.
  */
 export async function startDeploymentAction(input: {
     app: DeployApp;

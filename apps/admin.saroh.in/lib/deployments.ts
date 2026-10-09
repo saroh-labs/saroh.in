@@ -32,10 +32,17 @@ export interface DeploymentRow {
 export interface DeploymentsView {
     /** False when the API holds no deploy token: nothing can deploy. */
     configured: boolean;
+    /**
+     * The one environment this console deploys (the API's
+     * `SITE_DEPLOY_ENVIRONMENT`); the other is deployed from its own console
+     * (DEC-107). Null: the API names none, so nothing can deploy here.
+     */
+    environment: DeployEnvironment | null;
     workflowUrl: string;
     source: "github";
     /** GitHub could not be read: the rows know nothing, which is not "never". */
     readError: string | null;
+    /** This console's environment only. */
     rows: DeploymentRow[];
 }
 

@@ -1,6 +1,7 @@
 import {
     BadGatewayException,
     BadRequestException,
+    ForbiddenException,
     HttpException,
     HttpStatus,
     Injectable,
@@ -44,6 +45,13 @@ const CACHE_MS = 15_000;
 export interface DeploymentsView {
     /** False when the API holds no `SITE_DEPLOY_GITHUB_TOKEN`: nothing can deploy. */
     configured: boolean;
+    /**
+     * The one environment this console deploys (`SITE_DEPLOY_ENVIRONMENT`):
+     * the dev console deploys only dev, the production console only
+     * production (DEC-107, owner 2026-10-09). Null when the API names none:
+     * then nothing can deploy, and there are no rows.
+     */
+    environment: DeployEnvironment | null;
     /** The workflow's runs on GitHub. */
     workflowUrl: string;
     /**
@@ -75,15 +83,21 @@ export interface StartedDeployment {
 /**
  * Deploy a Cloudflare app from the console (#886, DEC-107): Platform Owners
  * start `deploy-frontends.yml` through GitHub's `workflow_dispatch`, for one
- * app in one environment, and read back each app's latest run.
+ * app, and read back each app's latest run.
+ *
+ * Each console deploys only its own environment: the API's
+ * `SITE_DEPLOY_ENVIRONMENT` (`development` on api.saroh.io, `production` on
+ * api.saroh.in). A start for the other environment is refused (403) and on
+ * the record as DENIED; with no environment set, every start is refused
+ * (fail closed). The list holds this environment's rows only.
  *
  * The API's token (`SITE_DEPLOY_GITHUB_TOKEN`) can only run this repository's
  * workflows on code already on a branch, so no code comes from the console.
  * A console deploy always builds (`FORCE=1` in the workflow), even if nothing
  * changed.
  *
- * Every start is in the admin audit ledger, and so is every one the rate
- * limit (DENIED) or GitHub (FAILURE) refused: who
+ * Every start is in the admin audit ledger, and so is every one refused for
+ * its environment or by the rate limit (DENIED) or by GitHub (FAILURE): who
  * (`actorUserId`), which app and environment (target and metadata), when
  * (`createdAt`). Starts are rate-limited per app and environment and per
  * operator, per API instance ({@link FixedWindowRateLimiter}).
@@ -134,6 +148,24 @@ export class AdminDeploymentsService {
         if (!token) {
             throw new ServiceUnavailableException(
                 "Deploys from the console need SITE_DEPLOY_GITHUB_TOKEN on the API.",
+            );
+        }
+        const own = ownEnvironment();
+        if (!own) {
+            await this.record(staff, input, AdminAuditOutcome.Denied, {
+                refused: "environment_unset",
+            });
+            throw new ServiceUnavailableException(
+                "This console doesn't know which environment it deploys: SITE_DEPLOY_ENVIRONMENT is not set on the API. Nothing was deployed.",
+            );
+        }
+        if (environment !== own) {
+            await this.record(staff, input, AdminAuditOutcome.Denied, {
+                refused: "other_environment",
+                consoleEnvironment: own,
+            });
+            throw new ForbiddenException(
+                `This console deploys only to ${own}. Deploy ${info.label} to ${environment} from the ${environment} console. Nothing was deployed.`,
             );
         }
         if (
@@ -237,17 +269,20 @@ export class AdminDeploymentsService {
     }
 
     private async read(): Promise<DeploymentsView> {
+        const environment = ownEnvironment();
+        const environments = environment ? [environment] : [];
         const base = {
             configured: Boolean(env.SITE_DEPLOY_GITHUB_TOKEN),
+            environment,
             workflowUrl: workflowUrl(),
             source: "github" as const,
         };
         const token = env.SITE_DEPLOY_GITHUB_TOKEN;
-        if (!token) {
+        if (!token || !environment) {
             return {
                 ...base,
                 readError: null,
-                rows: deploymentRows([], new Map()),
+                rows: deploymentRows([], new Map(), environments),
             };
         }
         try {
@@ -269,7 +304,7 @@ export class AdminDeploymentsService {
             return {
                 ...base,
                 readError: null,
-                rows: deploymentRows(runs, new Map(jobs)),
+                rows: deploymentRows(runs, new Map(jobs), environments),
             };
         } catch (error) {
             const message =
@@ -280,7 +315,7 @@ export class AdminDeploymentsService {
             return {
                 ...base,
                 readError: message,
-                rows: deploymentRows([], new Map()),
+                rows: deploymentRows([], new Map(), environments),
             };
         }
     }
@@ -299,6 +334,11 @@ class GithubReadError extends Error {
     constructor(readonly status: number) {
         super(`GitHub answered ${status}`);
     }
+}
+
+/** The environment this API (and so its console) deploys, if it names one. */
+function ownEnvironment(): DeployEnvironment | null {
+    return env.SITE_DEPLOY_ENVIRONMENT ?? null;
 }
 
 function repo(): string {

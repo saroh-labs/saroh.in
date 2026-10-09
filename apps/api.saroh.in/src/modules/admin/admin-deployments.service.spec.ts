@@ -5,6 +5,7 @@ jest.mock("@saroh/database", () => ({ prisma: { adminAuditEvent: {} } }));
 import {
     BadGatewayException,
     BadRequestException,
+    ForbiddenException,
     HttpException,
     ServiceUnavailableException,
     ValidationPipe,
@@ -56,6 +57,7 @@ describe("AdminDeploymentsService.start (#886)", () => {
     beforeEach(() => {
         mockEnv.SITE_DEPLOY_GITHUB_TOKEN = TOKEN;
         mockEnv.SITE_DEPLOY_GITHUB_REPO = undefined;
+        mockEnv.SITE_DEPLOY_ENVIRONMENT = "development";
     });
 
     it("is for Platform Owners only", () => {
@@ -104,6 +106,7 @@ describe("AdminDeploymentsService.start (#886)", () => {
     });
 
     it("refuses production unless the Worker's name is typed back", async () => {
+        mockEnv.SITE_DEPLOY_ENVIRONMENT = "production";
         const { service, fetchFn } = setup();
         fetchFn.mockResolvedValue(new Response(null, { status: 204 }));
 
@@ -126,6 +129,67 @@ describe("AdminDeploymentsService.start (#886)", () => {
         });
         const [, init] = fetchFn.mock.calls[0] as [string, RequestInit];
         expect(JSON.parse(init.body as string)).toMatchObject({ ref: "main" });
+    });
+
+    it("refuses the other environment, calling nothing, on the record", async () => {
+        const { service, fetchFn, write } = setup();
+        fetchFn.mockResolvedValue(new Response(null, { status: 204 }));
+
+        const refused = service.start(staff, {
+            app: "web",
+            environment: "production",
+            confirm: "saroh-web",
+        });
+        await expect(refused).rejects.toBeInstanceOf(ForbiddenException);
+        await expect(refused).rejects.toThrow(
+            "This console deploys only to development.",
+        );
+        expect(fetchFn).not.toHaveBeenCalled();
+        expect(write).toHaveBeenCalledWith(
+            expect.anything(),
+            expect.objectContaining({
+                action: "deployment.start",
+                targetId: "web:production",
+                outcome: "DENIED",
+                metadata: expect.objectContaining({
+                    refused: "other_environment",
+                    consoleEnvironment: "development",
+                }) as unknown,
+            }),
+        );
+
+        // And the production console refuses dev the same way.
+        mockEnv.SITE_DEPLOY_ENVIRONMENT = "production";
+        await expect(
+            service.start(staff, { app: "web", environment: "development" }),
+        ).rejects.toThrow("This console deploys only to production.");
+        expect(fetchFn).not.toHaveBeenCalled();
+    });
+
+    it("refuses every start when no environment is set, and says why", async () => {
+        mockEnv.SITE_DEPLOY_ENVIRONMENT = undefined;
+        const { service, fetchFn, write } = setup();
+
+        for (const environment of ["development", "production"] as const) {
+            await expect(
+                service.start(staff, {
+                    app: "admin",
+                    environment,
+                    confirm: "saroh-admin",
+                }),
+            ).rejects.toThrow("SITE_DEPLOY_ENVIRONMENT is not set");
+        }
+        expect(fetchFn).not.toHaveBeenCalled();
+        expect(write).toHaveBeenCalledTimes(2);
+        expect(write).toHaveBeenLastCalledWith(
+            expect.anything(),
+            expect.objectContaining({
+                outcome: "DENIED",
+                metadata: expect.objectContaining({
+                    refused: "environment_unset",
+                }) as unknown,
+            }),
+        );
     });
 
     it("refuses when the API holds no token, calling nothing", async () => {
@@ -194,9 +258,10 @@ describe("AdminDeploymentsService.start (#886)", () => {
 describe("AdminDeploymentsService.list", () => {
     beforeEach(() => {
         mockEnv.SITE_DEPLOY_GITHUB_TOKEN = TOKEN;
+        mockEnv.SITE_DEPLOY_ENVIRONMENT = "production";
     });
 
-    it("reads the runs and their deploy jobs into rows, and caches briefly", async () => {
+    it("reads the runs and their deploy jobs into this environment's rows, and caches briefly", async () => {
         const { service, fetchFn } = setup();
         fetchFn.mockImplementation((url: string) =>
             Promise.resolve(
@@ -233,9 +298,15 @@ describe("AdminDeploymentsService.list", () => {
         const view = await service.list();
         expect(view).toMatchObject({
             configured: true,
+            environment: "production",
             source: "github",
             readError: null,
         });
+        // The production console shows production only.
+        expect(view.rows).toHaveLength(5);
+        expect(view.rows.every((r) => r.environment === "production")).toBe(
+            true,
+        );
         expect(
             view.rows.find(
                 (r) => r.app === "web" && r.environment === "production",
@@ -256,6 +327,14 @@ describe("AdminDeploymentsService.list", () => {
         const view = await service.list();
         expect(view.readError).toBe("GitHub answered 401.");
         expect(view.rows.every((r) => r.latestRun === null)).toBe(true);
+    });
+
+    it("shows no rows and reads nothing when no environment is set", async () => {
+        mockEnv.SITE_DEPLOY_ENVIRONMENT = undefined;
+        const { service, fetchFn } = setup();
+        const view = await service.list();
+        expect(view).toMatchObject({ environment: null, rows: [] });
+        expect(fetchFn).not.toHaveBeenCalled();
     });
 
     it("reads nothing when the API holds no token", async () => {

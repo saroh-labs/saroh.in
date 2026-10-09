@@ -157,14 +157,16 @@ export interface DeploymentRow {
  * One row per app and environment from the newest runs (newest first) and the
  * jobs read for some of them. A run counts for a row when it has that row's
  * deploy job, or, before its jobs exist or were read, when it is a manual run
- * titled for that app (or for all apps) in that environment.
+ * titled for that app (or for all apps) in that environment. Only the given
+ * environments get rows: a console reads only its own (DEC-107).
  */
 export function deploymentRows(
     runs: readonly GithubRun[],
     jobsByRun: ReadonlyMap<number, readonly GithubJob[]>,
+    environments: readonly DeployEnvironment[] = DEPLOY_ENVIRONMENTS,
 ): DeploymentRow[] {
     const rows: DeploymentRow[] = [];
-    for (const environment of DEPLOY_ENVIRONMENTS) {
+    for (const environment of environments) {
         for (const app of DEPLOY_APPS) {
             rows.push(rowFor(app, environment, runs, jobsByRun));
         }
