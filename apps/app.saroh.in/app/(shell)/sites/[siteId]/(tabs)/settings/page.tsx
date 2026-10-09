@@ -19,17 +19,17 @@ import {
 export const metadata = { title: "Settings · Website" };
 
 /**
- * Website settings (#188) — where the site lives, and what other platforms show
- * about it.
+ * Website settings (#188), grouped after the Website › Settings audit:
+ * what's left before the site is worth sharing, then Address, Search and
+ * sharing, Menu and footer, Shop, Tracking and Advanced.
  *
- * Store-level equivalents live under Commerce; this is the site's own record:
- * its address, its search appearance, and the card people see when the link is
- * forwarded. All of it is DRAFT state — it reaches the public only through the
- * next publish, exactly like a section edit — except "Search and tracking"
- * (DEC-108), whose codes and trackers are live as soon as they're saved.
+ * Most rows are draft state and reach the public with the next publish,
+ * like a section edit; they carry "Next publish". The address, the domain,
+ * where the shop sells from, the codes and trackers (DEC-108) and
+ * publishing approval apply as soon as they're saved.
  *
- * The Website header above it carries the site's name and the way into the
- * editor, so this tab is only the settings, at a form's measure.
+ * The Website header above it carries the site's name, its address and
+ * whether it is published, and the way into the editor.
  */
 export default async function SiteSettingsPage({
     params,
@@ -48,28 +48,33 @@ export default async function SiteSettingsPage({
     const address = siteAddressOf(site, webAddress, RENDERER_APEX);
     // "Publishing needs approval" (DEC-071, T13), or null to leave it out.
     const approval = await readPublishApproval(site);
+    // Change the web address: the owner's, while it is rolled out for the
+    // business (`WEB_ADDRESS_CHANGE`), and only for the site at it.
+    const canChangeAddress =
+        webAddress?.canChange === true && webAddress.address === site.subdomain;
 
-    return (
-        <div className="max-w-2xl space-y-8">
-            {site.can.manageSettings ? (
-                <SiteSettings
-                    site={site}
-                    address={address}
-                    approval={approval}
-                />
-            ) : (
-                // The values, and none of the controls the API would refuse
-                // (#275).
-                <SiteSettingsRead
-                    site={site}
-                    address={address}
-                    approval={approval}
-                />
-            )}
-            {/* Live at once, not draft state (DEC-108, U7); its own read. */}
-            <Suspense fallback={<SiteSearchTrackingLoading />}>
-                <SiteSearchTrackingSection site={site} address={address} />
-            </Suspense>
-        </div>
+    // Live at once, not draft state (DEC-108, U7); its own read.
+    const tracking = (
+        <Suspense fallback={<SiteSearchTrackingLoading />}>
+            <SiteSearchTrackingSection site={site} address={address} />
+        </Suspense>
+    );
+
+    return site.can.manageSettings ? (
+        <SiteSettings
+            site={site}
+            address={address}
+            approval={approval}
+            canChangeAddress={canChangeAddress}
+            tracking={tracking}
+        />
+    ) : (
+        // The values, and none of the controls the API would refuse (#275).
+        <SiteSettingsRead
+            site={site}
+            address={address}
+            approval={approval}
+            tracking={tracking}
+        />
     );
 }
