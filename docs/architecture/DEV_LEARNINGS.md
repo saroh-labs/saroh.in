@@ -3452,3 +3452,25 @@ signing, in the words the screens already show.
 renamed `.png`, a type mismatch, an SVG) and `media.service.spec.ts`.
 **Rule**: `docs/patterns/backend-integrations.md` → "Media storage".
 **Category**: security · storage · `apps/api.saroh.in/src/modules/media/`
+## Access — store access alone still read a storefront's totals (#868)
+
+**Symptom**: found in the 7 Oct UX audit follow-ups. A business role with
+"See locations" (`store:read`) and no order read could open the store-scoped
+order list and read (`GET stores/:id/orders`) and customer list, with every
+order's total and what each customer had spent.
+**Root cause**: `requireOrderRead` refused the kitchen's roles (`order:stage`
+without `order:read`) and, since DEC-106, a storefront role alone, but let
+anyone in whose business role carried `store:read`. Store access was read as
+a money grant, which DEC-098 rules out. The money scans only looked for role
+names, so they couldn't see it.
+**Fix**: the store-scoped reads that send amounts take `order:read` on the
+business role (`StoresService.moneyAllows`; the storefront's owner on the
+older per-store path), never `store:read`. The workspace no longer reads the
+store-scoped order list, and the customer page already falls back when the
+store-scoped customer read is refused.
+**Check**: `organizations/money-by-permission.spec.ts` → "store access grants
+no amounts" fails on `store:read` in `order-read-access.ts`, and on a
+store-scoped orders or customers method that serializes amounts without
+asking `requireOrderRead` first. `stores/order-read-access.authorization.spec.ts`
+pins Member, store-only, `order:read`, Owner and Admin.
+**Category**: access · `apps/api.saroh.in/src/modules/stores/order-read-access.ts`

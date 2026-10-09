@@ -11,7 +11,9 @@ import { CustomersService } from "./customers.service";
  * it takes a read of the store's orders, as the store's order list does: a
  * Member at the counter holds `order:stage` and `store:read` but no money
  * read, and is refused. Owner and Admin read it as before; a role the
- * business invented is let in when it was granted `order:read`.
+ * business invented is let in when it was granted `order:read`, and refused
+ * when it sees the storefronts and customers but no orders (#868): store
+ * access sends no amounts.
  */
 const tag = `${process.pid}-${Date.now()}`;
 
@@ -24,7 +26,14 @@ describe("store customers access by role (DB)", () => {
     const customers = new CustomersService(stores);
 
     // "counter-lead": invented, moves the kitchen AND reads orders.
-    const roles = ["OWNER", "ADMIN", "MEMBER", "counter-lead"] as const;
+    // "location-viewer": invented, sees the storefronts and customers only.
+    const roles = [
+        "OWNER",
+        "ADMIN",
+        "MEMBER",
+        "counter-lead",
+        "location-viewer",
+    ] as const;
     const users: Record<string, string> = {};
     let orgId = "";
     let storeId = "";
@@ -51,6 +60,14 @@ describe("store customers access by role (DB)", () => {
                 key: "counter-lead",
                 label: "Counter lead",
                 actions: ["store:read", "order:stage", "order:read"],
+            },
+        });
+        await prisma.organizationRole.create({
+            data: {
+                organizationId: orgId,
+                key: "location-viewer",
+                label: "Location viewer",
+                actions: ["store:read", "contact:read"],
             },
         });
         await prisma.membership.createMany({
@@ -137,6 +154,21 @@ describe("store customers access by role (DB)", () => {
             users["counter-lead"],
         );
         expect(one.id).toBe(customerId);
+    });
+
+    it("refuses an invented role with store access but no order read (#868)", async () => {
+        const viewer = users["location-viewer"];
+        // It reaches the storefront itself…
+        await expect(stores.getForUser(storeId, viewer)).resolves.toMatchObject(
+            { id: storeId },
+        );
+        // …but not what its customers spent.
+        await expect(customers.list(storeId, viewer)).rejects.toThrow(
+            ForbiddenException,
+        );
+        await expect(
+            customers.get(storeId, customerId, viewer),
+        ).rejects.toThrow(ForbiddenException);
     });
 
     it("still answers a stranger with not found, not a refusal", async () => {

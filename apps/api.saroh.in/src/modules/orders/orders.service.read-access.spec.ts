@@ -2,9 +2,10 @@
 //
 // Commerce opened to `order:stage` so a Member at the counter can reach Sell
 // (DEC-024). This older read sends every order's totals, so it must refuse
-// the kitchen's roles — `order:stage` without `order:read` — and a storefront
-// role alone (DEC-106), while everyone who reaches it through their business
-// role, and a legacy storefront owner, is unchanged.
+// the kitchen's roles — `order:stage` without `order:read` — a storefront
+// role alone (DEC-106), and store access alone (#868): amounts take a money
+// permission, never `store:read`. A role that reads orders, and a legacy
+// storefront owner, read as before.
 jest.mock("@saroh/database", () => ({
     prisma: {
         order: {
@@ -56,8 +57,19 @@ describe("OrdersService store-scoped reads", () => {
         ).rejects.toThrow(NotFoundException);
     });
 
-    it("leaves a role that reaches the storefront through the business as it was", async () => {
-        const orders = service(["store:read"]);
+    it("refuses a business role with store access but no order read (#868)", async () => {
+        // "See locations" alone: the storefront, not what it has sold.
+        const orders = service(["store:read", "contact:read"]);
+        await expect(orders.list("store_1", "user_1")).rejects.toThrow(
+            ForbiddenException,
+        );
+        await expect(
+            orders.get("store_1", "order_1", "user_1"),
+        ).rejects.toThrow(ForbiddenException);
+    });
+
+    it("lets a business role that reads orders in, store access or not", async () => {
+        const orders = service(["store:read", "order:read"]);
         await expect(orders.list("store_1", "user_1")).resolves.toEqual([]);
     });
 
