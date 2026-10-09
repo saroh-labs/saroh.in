@@ -177,7 +177,7 @@ export class OverLimitService {
     ): Promise<PausedNow | null> {
         const hit = this.cache.get(organizationId);
         if (hit && hit.until > Date.now()) return hit.value;
-        let value: PausedNow | null = null;
+        let value: PausedNow | null;
         try {
             const s = await this.standing(organizationId, now);
             value =
@@ -390,7 +390,7 @@ async function teamPaused(
             id: m.id,
             createdAt: m.createdAt,
             kind: "member",
-            label: m.user.name?.trim() || m.user.email,
+            label: m.user.name?.trim() ? m.user.name.trim() : m.user.email,
             owner: m.role === "OWNER",
             seat: seatOf(
                 lookup,

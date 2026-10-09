@@ -6,7 +6,8 @@
  * rules off for the business, nothing pauses or is refused, and it says
  * so. Pure.
  */
-import { PAUSE_NOTICE_DAYS, PAUSE_ROWS } from "../billing/over-limit";
+import type { PAUSE_ROWS } from "../billing/over-limit";
+import { PAUSE_NOTICE_DAYS } from "../billing/over-limit";
 
 /** What pauses past the limit, per catalogue row, in the console's words. */
 const PAUSES: Record<keyof typeof PAUSE_ROWS, string> = {

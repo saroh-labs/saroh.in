@@ -572,7 +572,7 @@ export class CatalogueAccessService {
             planId,
             addons: [],
             now: at,
-            overrides: toOverrides(rows as OverrideRow[]),
+            overrides: toOverrides(rows),
         });
     }
 
