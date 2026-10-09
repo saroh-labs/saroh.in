@@ -28,6 +28,7 @@ import {
 } from "../helpers";
 import { seedPlanId } from "../pricing";
 import { deleteSeeded } from "../run";
+import { seedStandInPaymentProvider } from "../stand-in-providers";
 import { bookingRows, planBookings, upsertServices } from "./appointments";
 import { RYE, seedBakery } from "./bakery";
 import type { BillingContext, InvoiceRows, InvoiceSpec, Seen } from "./billing";
@@ -1010,24 +1011,12 @@ async function seedBusiness(
     await subscribe(ctx, key, orgId);
 
     if (biz.paymentProvider) {
-        await prisma.merchantPaymentProvider.upsert({
-            where: {
-                organizationId_provider: {
-                    organizationId: orgId,
-                    provider: biz.paymentProvider,
-                },
-            },
-            update: { status: "CONNECTED" },
-            create: {
-                id: sid(key, "payments", biz.paymentProvider.toLowerCase()),
-                organizationId: orgId,
-                provider: biz.paymentProvider,
-                status: "CONNECTED",
-                // Placeholders: the seed never fabricates a usable credential.
-                encryptedCredentials: "seed-not-a-real-credential",
-                credentialsIv: "seed-iv",
-                credentialsAuthTag: "seed-tag",
-            },
+        // A stand-in on this machine's database only: its keys are
+        // placeholders (`stand-in-providers.ts`).
+        await seedStandInPaymentProvider(prisma, {
+            id: sid(key, "payments", biz.paymentProvider.toLowerCase()),
+            organizationId: orgId,
+            provider: biz.paymentProvider,
         });
     }
 

@@ -12,6 +12,31 @@ mistaken for bureaucracy and removed.
 
 ---
 
+## Seed — the dev environment's businesses claimed providers they couldn't use
+
+**Symptom**: on the dev environment (9 Oct 2026), Northwind's Settings ›
+Providers showed Cashfree and Resend connected and its site offered to take
+money online, but checkout answered 500 and every customer email (a booking
+confirmation, say) failed five times with "Invalid authentication tag
+length: 6".
+**Cause**: the seed writes provider rows with placeholder sealed keys
+(`seed-not-a-real-credential`, rightly: it never fabricates a usable
+credential) and marked them CONNECTED. Nothing tells a row whose keys can't
+be opened from a real one until the API opens them — at checkout, or in the
+send job, which then retries. The browser specs need those rows connected
+(Pay now offered, a pay link made, Send naming email) and stub the provider
+in the browser, so it never showed locally or on CI.
+**Fix**: `packages/database/src/seed/stand-in-providers.ts`. The CONNECTED
+stand-ins (Northwind's Cashfree and Resend, the showcase's Razorpay and
+Cashfree) are written only on this machine's database, as the fixture
+password is; on any other the seed writes none and removes a placeholder
+row an earlier seed left, never touching one with real keys. The DISABLED
+Razorpay row stays: it is honest anywhere.
+**Check**: `stand-in-providers.test.ts`. Re-seed the dev environment to
+clear its old rows.
+
+---
+
 ## Deploy — the merchant sites' production Worker didn't know it was production
 
 **Symptom**: none reported. Found 9 Oct 2026 in a review after Vercel was
@@ -3560,6 +3585,7 @@ database were changed by hand.
 **Check**: the seed throws before writing anything to a database that isn't
 on this machine without `SEED_PASSWORD`; `seed/seed-password.test.ts`.
 **Category**: secrets · `packages/database/src/seed/data.ts` → `seedPassword()`
+
 ## Insights — the orders figure read 0 because nothing wrote order.paid (#867)
 
 **Symptom**: Insights' orders figure was always empty for a real business,
@@ -3578,6 +3604,7 @@ subtracts it. An order paid before the change is never taken off.
 **Check**: `analytics/event-contract.spec.ts` → "every declared type is used"
 fails for any `*_TYPE` the contract exports that no other source file names.
 **Category**: analytics · `apps/api.saroh.in/src/modules/analytics/order-events.ts`
+
 ## Flaky tests — a timestamp, a real popover and a lost click (#846, #847, #854)
 
 **Symptom**: three tests failed now and then and passed on a re-run. (1)
