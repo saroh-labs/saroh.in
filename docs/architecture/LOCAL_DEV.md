@@ -83,6 +83,16 @@ two storefronts: "Northwind Supply Store" (`seed_store`) and "Online"
 (one low, one out) so Move stock has somewhere to go (#526). Northwind is the
 write sandbox; re-seeding counts every shelf back.
 
+Provider connections are stand-ins (`seed/stand-in-providers.ts`): the seed
+never writes a real credential, so their sealed keys are placeholders the API
+can't open. On this machine's database Northwind's Cashfree and Resend, and
+the showcase's Razorpay and Cashfree, read as CONNECTED so the browser specs
+and films can offer Pay now, make pay links and name email on Send — the
+specs stub the provider in the browser — but a real checkout there fails and
+an email sent through Northwind's own provider fails on every retry. On any
+other database (the dev environment's) the seed writes none, and removes one
+an earlier seed left; connect real test keys in Settings › Providers instead.
+
 ### Showcase (the product film's world)
 
 ```bash

@@ -753,25 +753,29 @@ export const POSTS: readonly {
 // --- Providers -----------------------------------------------------------
 
 /**
- * A second payment provider, this one live.
+ * A second payment provider, the one Northwind takes money through.
  *
  * The RAZORPAY row the seed already writes is DISABLED, which on its own makes
  * `/settings/providers` report Payments as "Not working" — a true reading of a
- * merchant who has connected nothing that works, but not the state most of them
- * are in. Adding CASHFREE as CONNECTED (rather than editing the Razorpay row)
- * leaves that deliberate fixture intact and tells a story merchants recognise:
- * they switched processor and never removed the old connection.
+ * merchant who has connected nothing that works. CASHFREE is a stand-in
+ * connection (`stand-in-providers.ts`): CONNECTED on a throwaway database,
+ * where the browser specs need Pay now, pay links and Send to work, and not
+ * written at all on a shared one, where its placeholder keys could only make
+ * checkout fail. Left beside the Razorpay row, it tells a story merchants
+ * recognise: they switched processor and never removed the old connection.
  */
 export const LIVE_PAYMENT_PROVIDER = {
     provider: "CASHFREE",
-    status: "CONNECTED",
 } as const;
 
-/** The org's sending identity, so Communications reports a real connection. */
+/**
+ * The org's sending identity, a stand-in connection like Cashfree's: on a
+ * throwaway database Communications reads as connected; on a shared one
+ * there is none, so no email is queued through keys nobody can open.
+ */
 export const COMMUNICATION_PROVIDER = {
     channel: "EMAIL",
     provider: "RESEND",
-    status: "CONNECTED",
     fromAddress: "northwind@example.com",
 } as const;
 
