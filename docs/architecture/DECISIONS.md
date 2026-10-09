@@ -930,6 +930,7 @@ Unless an entry says otherwise, its status is **Proposed — requires audit revi
     - **Languages (D13):** "English and हिंदी" means multilingual content. It is internationalisation of the business's own content, to be built; the chip stays only once that exists.
     - **Demo businesses (D14):** Rye & Co., Pulse Fitness, Kavi Dental and the rest are labelled as demos wherever the site shows them.
 - Consequences: the ledger's rewrites for these rows follow this entry. Insights and multilingual content become product work. The demo label goes on every screenshot caption and story that names a demo business.
+- **Amended 2026-10-09 (owner, #919): Insights' website figures show Orders again.** It had been dropped because it counted `order.paid`, which nothing wrote, so it read 0 beside the paid orders Sales counts from Orders itself. Since #867 every payment writes `order.paid` and a full refund `order.refunded`, so the tile is real and net of full refunds. It is not Sales' "Orders, 4 weeks" twice: it sits beside Visits, Visitors and Enquiries and covers the days the range buttons chose (7, 30 or 90), opening the paid orders of those days. Nothing before #867 is back-filled (DEC-012), so while a range reaches back before 31 Oct 2026 (`ORDERS_RECORDED_FROM`) a line under the tiles says Orders counts from October 2026; with none paid it says "No paid orders (recorded) in the last N days", never a bare 0. Like its neighbours it carries no comparison with the period before.
 
 ## DEC-076 The Billing team manages coupons
 

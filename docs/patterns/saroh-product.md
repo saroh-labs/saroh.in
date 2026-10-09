@@ -420,7 +420,11 @@ organizations/:org/customers`: everyone who has paid (an order through a
   (`apps/saroh.app/lib/site-view.ts`: path only, the referrer's origin only,
   nothing when the browser sends Do Not Track or Global Privacy Control,
   nothing from the account area, never on a test release or preview), and an
-  enquiry writes `enquiry.submitted` in its own transaction (UX-032).
+  enquiry writes `enquiry.submitted` in its own transaction (UX-032). Its
+  Orders tile (#919) counts `order.paid` less `order.refunded` (#867) over the
+  range's days; nothing before #867 is back-filled (DEC-012), so a line under
+  the tiles says so while the range reaches back before
+  `ORDERS_RECORDED_FROM` (`lib/analytics/website-words.ts`).
 
 ## One word each
 

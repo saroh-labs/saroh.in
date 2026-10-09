@@ -52,6 +52,41 @@ export function pageTitle(path: string): string {
     return words.charAt(0).toUpperCase() + words.slice(1);
 }
 
+/**
+ * The day by which every business's paid orders are recorded. `order.paid`
+ * is written from #867, which reached production in October 2026; nothing
+ * before it is made up from the orders table (DEC-012), so a range that
+ * reaches back past this day counts fewer orders than were paid. Set at the
+ * month's end, so the note says so for as long as it might be true.
+ */
+export const ORDERS_RECORDED_FROM = "2026-10-31";
+
+/**
+ * The line under the website's figures about Orders (#919), or nothing
+ * when the figure needs no words: whether none were paid, and whether the
+ * range reaches back before orders were recorded. `from` is the range's
+ * first day (`YYYY-MM-DD`), `rangeLabel` its name ("30 days").
+ */
+export function ordersLine({
+    orders,
+    from,
+    rangeLabel,
+}: {
+    orders: number;
+    from: string;
+    rangeLabel: string;
+}): string | null {
+    const before = from < ORDERS_RECORDED_FROM;
+    if (orders <= 0) {
+        return before
+            ? `No paid orders recorded in the last ${rangeLabel}. Insights began recording them in October 2026, so earlier ones aren't counted.`
+            : `No paid orders in the last ${rangeLabel}.`;
+    }
+    return before
+        ? "Orders counts from October 2026, when Insights began recording paid orders; earlier ones aren't counted."
+        : null;
+}
+
 /** Which days of `days` carry a label: about `ticks` of them, evenly. */
 export function tickEvery(days: number, ticks: number): number {
     return Math.max(1, Math.ceil(days / Math.max(1, ticks)));

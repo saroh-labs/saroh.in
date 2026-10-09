@@ -111,8 +111,8 @@ export default async function AnalyticsPage({
                             Your website
                         </h2>
                         <p className="mt-1 text-[13px] leading-[1.5] text-muted-foreground">
-                            Last {range.label}: visits, visitors and enquiries.
-                            Updated every hour.
+                            Last {range.label}: visits, visitors, enquiries and
+                            paid orders. Updated every hour.
                         </p>
                     </div>
                     <div className="flex items-center gap-1">
@@ -144,6 +144,11 @@ export default async function AnalyticsPage({
                 {traffic.status === "ok" ? (
                     <AnalyticsDashboard
                         view={summarizeAnalytics(traffic.data)}
+                        range={{
+                            from,
+                            to: isoDaysAgo(0),
+                            label: range.label,
+                        }}
                     />
                 ) : (
                     <FailedState
