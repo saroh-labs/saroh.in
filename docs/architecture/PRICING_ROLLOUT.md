@@ -439,8 +439,10 @@ paper, drawn by the D16 renderer `invoices/invoice-pdf.ts`),
   `billing:read`. The Settings › Plan list and download wait for U14's
   designs.
 - **Mail.** `billing.email` (`backend-jobs.md`) sends the invoice with its
-  PDF, a failed payment (retrying, or now on Free) and a trial ending (U16
-  queues it), to everyone whose role has `billing:manage`.
+  PDF, a failed payment (retrying, or now on Free), a trial ending (U16
+  queues it) and, 3 days before each autopay charge, the renewal reminder
+  (#804, queued by the hourly sweep), to everyone whose role has
+  `billing:manage`.
 
 ### Razorpay test-mode spike (OQ-6)
 
