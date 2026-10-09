@@ -101,7 +101,9 @@ export function LifecycleActions({
                         <p>
                             Nothing is deleted now. The business stops taking
                             new activity at once, and the deletion can be
-                            cancelled until the window ends.
+                            cancelled until the window ends. Within a day of its
+                            end the business is marked deleted for good; its
+                            record is kept.
                         </p>
                     }
                     fields={

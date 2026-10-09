@@ -17,6 +17,7 @@ const STATUS: Record<
     PROCESSING: { label: "Running", variant: "info" },
     DONE: { label: "Done", variant: "success" },
     FAILED: { label: "Failed", variant: "error" },
+    CANCELLED: { label: "Cancelled", variant: "neutral" },
 };
 
 const COLUMNS: DataColumn<JobRow>[] = [
@@ -80,7 +81,11 @@ const COLUMNS: DataColumn<JobRow>[] = [
     },
 ];
 
-/** Jobs on the queue. A failed one can be retried, always through a dry run. */
+/**
+ * Jobs on the queue. A failed one can be retried, and one waiting (not
+ * started, or waiting to retry) cancelled (#907), each through a dry run
+ * that the API decides and a reason it records.
+ */
 export function JobTable({
     rows,
     canRetry,
@@ -104,6 +109,14 @@ export function JobTable({
                                   kind="jobs.retry"
                                   ids={[row.id]}
                                   trigger="Retry"
+                                  triggerVariant="ghost"
+                                  noun={{ one: "job", other: "jobs" }}
+                              />
+                          ) : row.status === "PENDING" ? (
+                              <BulkAction
+                                  kind="jobs.cancel"
+                                  ids={[row.id]}
+                                  trigger="Cancel"
                                   triggerVariant="ghost"
                                   noun={{ one: "job", other: "jobs" }}
                               />

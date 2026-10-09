@@ -34,6 +34,8 @@ export const OPERATOR_LIFECYCLE_ACTIONS = [
     "organization.suspended",
     "organization.reinstated",
     "organization.deletion.scheduled",
+    // Written by the deletion sweep when the window ends (#907).
+    "organization.deleted",
 ] as const;
 
 /** Retention window bounds for a scheduled deletion, in days. */
@@ -57,7 +59,8 @@ export interface OperatorCommand {
  *
  * Nothing here deletes a business. Scheduling deletion starts a retention
  * window that can be cancelled; the business is refused new activity during
- * it, exactly as when suspended.
+ * it, exactly as when suspended. When the window ends the daily sweep
+ * (`organization-deletion.handler.ts`, #907) takes it to `DELETED_RETAINED`.
  */
 @Injectable()
 export class AdminLifecycleService {

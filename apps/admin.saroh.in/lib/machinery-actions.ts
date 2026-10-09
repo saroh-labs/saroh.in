@@ -12,7 +12,7 @@ import { adminWrite } from "./control-plane";
  */
 
 export type OperationKind =
-    "jobs.retry" | "webhooks.replay" | "waitlist.invite";
+    "jobs.retry" | "jobs.cancel" | "webhooks.replay" | "waitlist.invite";
 
 export interface PlannedItem {
     targetId: string;
@@ -31,6 +31,7 @@ export interface OperationPlan {
 
 const PATHS: Record<OperationKind, string> = {
     "jobs.retry": "/jobs/retry",
+    "jobs.cancel": "/jobs/cancel",
     "webhooks.replay": "/webhooks/replay",
     "waitlist.invite": "/waitlist/invite",
 };
@@ -61,6 +62,26 @@ export async function startOperationAction(
         revalidatePath("/operations/jobs");
         revalidatePath("/operations/webhooks");
         revalidatePath("/waitlist");
+    }
+    return result;
+}
+
+/**
+ * Stop a running operation's rows that have not started (#907). The API
+ * checks the permission it was started under and records the reason.
+ */
+export async function cancelOperationAction(
+    operationId: string,
+    input: { reason: string; idempotencyKey: string },
+): Promise<ControlPlaneResult<{ cancelled: number }>> {
+    const result = await adminWrite<{ cancelled: number }>(
+        `/operations/${encodeURIComponent(operationId)}/cancel`,
+        "POST",
+        input,
+        "Could not cancel it.",
+    );
+    if (result.ok) {
+        revalidatePath(`/operations/runs/${operationId}`);
     }
     return result;
 }
