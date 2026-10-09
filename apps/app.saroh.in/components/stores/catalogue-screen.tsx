@@ -11,6 +11,7 @@ import { NeedsYou } from "@/components/commerce/needs-you";
 import { ConfirmDialog } from "@/components/shared/confirm-dialog";
 import { DataView } from "@/components/shared/data-view/data-view";
 import type { PlanMeter } from "@/lib/billing/meter";
+import type { PausedCut } from "@/lib/billing/paused";
 import type { PlanRefusal } from "@/lib/billing/refusal";
 import type { ProductRating } from "@/lib/product-reviews/service";
 import { deleteProduct, setProductStatus } from "@/lib/products/actions";
@@ -70,6 +71,7 @@ export function CatalogueScreen({
     collectionCount = null,
     meter = null,
     limitBannerShown = false,
+    pausedCut = null,
 }: {
     query: ListQuery;
     /** The first page, read on the server. */
@@ -93,6 +95,8 @@ export function CatalogueScreen({
     meter?: PlanMeter | null;
     /** The page's limit banner says the limit: the header doesn't (#874). */
     limitBannerShown?: boolean;
+    /** Past the plan's products limit (#800): rows before it are marked. */
+    pausedCut?: PausedCut;
 }) {
     const router = useRouter();
     const [navigating, startNavigation] = useTransition();
@@ -118,8 +122,8 @@ export function CatalogueScreen({
     }
 
     const rows = useMemo(
-        () => catalogueRows([...data.items, ...extra]),
-        [data.items, extra],
+        () => catalogueRows([...data.items, ...extra], pausedCut),
+        [data.items, extra, pausedCut],
     );
     const ratingById = useMemo(
         () => new Map(ratings.map((r) => [r.productId, r])),
@@ -165,7 +169,7 @@ export function CatalogueScreen({
         }
         setExtra((had) => [...had, ...res.data.items]);
         setExtraCursor(res.data.nextCursor);
-        return catalogueRows(res.data.items);
+        return catalogueRows(res.data.items, pausedCut);
     }
     const more = extra.length > 0 ? extraCursor : data.nextCursor;
 

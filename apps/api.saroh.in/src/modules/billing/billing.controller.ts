@@ -12,6 +12,7 @@ import {
     UseGuards,
 } from "@nestjs/common";
 import type { Plan } from "@saroh/database";
+import { prisma } from "@saroh/database";
 
 import { hashClientIp } from "../../common/client-ip";
 import { OrgContext } from "../../common/decorators/org-context.decorator";
@@ -37,6 +38,9 @@ import {
     SetAddonDto,
     SubscribeDto,
 } from "./dto";
+import { OverLimitService } from "./over-limit.service";
+import type { PausedView } from "./paused-view";
+import { pausedView } from "./paused-view";
 import { PlansService } from "./plans.service";
 import type { SarohInvoiceView } from "./saroh-invoices.service";
 import { SarohInvoicesService } from "./saroh-invoices.service";
@@ -84,6 +88,7 @@ export class BillingController {
         private readonly invoices: SarohInvoicesService,
         private readonly addons: AddonsService,
         private readonly confirmer: CheckoutConfirmService,
+        private readonly overLimit: OverLimitService,
     ) {}
 
     /** Saroh's invoices to the business for its plan, newest first (U17). */
@@ -188,6 +193,38 @@ export class BillingController {
         @OrgContext() ctx: OrganizationContext,
     ): Promise<BillingAccessView> {
         return this.access.view(ctx);
+    }
+
+    /**
+     * What a move to a lower plan has paused, or will pause (#800), for the
+     * workspace's marks. Anyone in the business; what it names follows
+     * what the reader may already see (`paused-view.ts`).
+     */
+    @Get("paused")
+    @Header("Cache-Control", "no-store")
+    async getPaused(
+        @OrgContext() ctx: OrganizationContext,
+    ): Promise<PausedView> {
+        const standing = await this.overLimit.standing(ctx.organizationId);
+        // The Team screen lists people by user: name the paused members'.
+        const memberIds = (standing?.over ? standing.measure.people : [])
+            .filter((p) => p.kind === "member")
+            .map((p) => p.id);
+        const rows =
+            memberIds.length > 0
+                ? await prisma.membership.findMany({
+                      where: {
+                          id: { in: memberIds },
+                          organizationId: ctx.organizationId,
+                      },
+                      select: { id: true, userId: true },
+                  })
+                : [];
+        return pausedView(
+            standing,
+            ctx,
+            new Map(rows.map((r) => [r.id, r.userId])),
+        );
     }
 
     @Get("subscription")

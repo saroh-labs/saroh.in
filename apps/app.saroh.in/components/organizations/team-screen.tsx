@@ -1,8 +1,11 @@
 "use client";
 
+import { PausedNote } from "@/components/billing/paused-banner";
 import { showPlanRefusal } from "@/components/billing/plan-refusal";
 import { SettingsPanelHeader } from "@/components/settings/settings-panel";
 import { useBusinessZone } from "@/components/shared/business-zone";
+import type { PausedTeam } from "@/lib/billing/paused";
+import { NONE_PAUSED, pausedWords } from "@/lib/billing/paused";
 import { zodResolver } from "@hookform/resolvers/zod";
 import {
     Avatar,
@@ -11,6 +14,7 @@ import {
     RoleDot,
     roleRingTone,
 } from "@saroh/ui/avatar";
+import { Badge } from "@saroh/ui/badge";
 import { Button } from "@saroh/ui/button";
 import {
     Dialog,
@@ -221,6 +225,7 @@ export function TeamScreen({
     limitNotice = null,
     bookableNoLogin = 0,
     diaryPeople = [],
+    paused = NONE_PAUSED,
 }: {
     organizationName: string;
     members: OrganizationMember[];
@@ -262,6 +267,11 @@ export function TeamScreen({
      * Calendar only unless another role is picked.
      */
     diaryPeople?: DiaryPerson[];
+    /**
+     * Past the plan's team limit (#800): who can't open the business, and
+     * which invitations can't be accepted, from `GET …/billing/paused`.
+     */
+    paused?: PausedTeam;
 }) {
     // In the address, so Search settings can open Roles.
     const [tab, setTab] = useTabParam(TEAM_TAB_PARAM, TEAM_TABS, "people");
@@ -454,6 +464,7 @@ export function TeamScreen({
                     invitations={invitations}
                     canManage={canManage}
                     book={book}
+                    paused={paused}
                     // Changing a role or a person's extras is
                     // `member:role:update`, which a custom role may hold
                     // without inviting anyone (F17).
@@ -531,12 +542,14 @@ function PeopleTab({
     onEdit,
     onRemove,
     notice,
+    paused,
 }: {
     organizationName: string;
     members: OrganizationMember[];
     invitations: OrganizationInvitation[];
     canManage: boolean;
     book: RoleBook;
+    paused: PausedTeam;
     /** Absent for a viewer who can neither manage people nor change roles. */
     onEdit?: (member: OrganizationMember) => void;
     onRemove: (member: OrganizationMember) => void;
@@ -558,8 +571,16 @@ function PeopleTab({
         <div className="space-y-3.5">
             {notice}
 
+            {paused.userIds.length > 0 || paused.invitationIds.length > 0 ? (
+                <PausedNote>{pausedWords("person")}</PausedNote>
+            ) : null}
+
             {canManage && invitations.length > 0 ? (
-                <PendingInvites invitations={invitations} book={book} />
+                <PendingInvites
+                    invitations={invitations}
+                    book={book}
+                    pausedIds={paused.invitationIds}
+                />
             ) : null}
 
             <div className="overflow-hidden rounded-xl border border-border">
@@ -616,6 +637,16 @@ function PeopleTab({
                                                     {" "}
                                                     · you
                                                 </span>
+                                            ) : null}
+                                            {paused.userIds.includes(
+                                                m.userId,
+                                            ) ? (
+                                                <Badge
+                                                    variant="warning"
+                                                    className="ml-1.5 align-middle"
+                                                >
+                                                    Paused
+                                                </Badge>
                                             ) : null}
                                         </p>
                                         <p className="mt-0.5 truncate text-[11.5px] text-muted-foreground">
@@ -715,9 +746,12 @@ function PeopleTab({
 function PendingInvites({
     invitations,
     book,
+    pausedIds = [],
 }: {
     invitations: OrganizationInvitation[];
     book: RoleBook;
+    /** Invitations past the plan's limit (#800): can't be accepted yet. */
+    pausedIds?: string[];
 }) {
     const router = useRouter();
     const zone = useBusinessZone();
@@ -789,6 +823,14 @@ function PendingInvites({
                             <div className="min-w-0 flex-[1_1_200px]">
                                 <p className="text-[13.5px] font-medium [overflow-wrap:anywhere]">
                                     {invitation.email}
+                                    {pausedIds.includes(invitation.id) ? (
+                                        <Badge
+                                            variant="warning"
+                                            className="ml-1.5 align-middle"
+                                        >
+                                            Paused · can&rsquo;t be accepted yet
+                                        </Badge>
+                                    ) : null}
                                 </p>
                                 <p className="text-[11.5px] text-muted-foreground">
                                     {invitationMeta(invitation, zone)}

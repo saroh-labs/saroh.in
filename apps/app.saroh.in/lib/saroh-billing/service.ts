@@ -5,6 +5,7 @@ import { cache } from "react";
 import { ApiError } from "@/lib/api/errors";
 import { apiFetch, orgBase } from "@/lib/api/http";
 import type { BillingAccessView } from "@/lib/billing/access";
+import type { PausedView } from "@/lib/billing/paused";
 
 import { cleanHandoff } from "./handoff";
 import type { NotAvailableYet, PlanUsage, SarohSubscription } from "./plan";
@@ -77,6 +78,23 @@ export async function billingAccessOrNull(): Promise<BillingAccessView | null> {
         return null;
     }
 }
+
+/**
+ * What a move to a lower plan has paused, or will pause (#800), for the
+ * banner and the marks on Products, Posts, Team and Locations. Anyone in
+ * the business may read it. An aid, like {@link billingAccessOrNull}: null
+ * when it can't be read, and the API still refuses a paused write and
+ * says why. Request-cached: the shell and a page read it in one render.
+ */
+export const pausedOrNull = cache(async (): Promise<PausedView | null> => {
+    try {
+        const read = await orgRead<PausedView | null>("/billing/paused", null);
+        return read.status === "ok" ? read.data : null;
+    } catch {
+        // Degraded, not failed: the marks are an aid the write backs up.
+        return null;
+    }
+});
 
 /** Saroh's invoices to the business, newest first (U17). */
 export function listSarohInvoices(): Promise<Read<SarohInvoice[]>> {

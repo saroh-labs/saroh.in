@@ -10,6 +10,8 @@ import {
     chooserGroups,
     chooserSkips,
     lifecycleLabel,
+    PAUSED_LABEL,
+    PAUSED_NOTE,
 } from "@/lib/organizations/choose";
 import type {
     Organization,
@@ -72,7 +74,12 @@ export default async function ChoosePage({
     const skip = chooserSkips(organizations.length, notice);
     if (skip) redirect(skip);
 
-    const { owned, invited: guest, closed } = chooserGroups(organizations);
+    const {
+        owned,
+        invited: guest,
+        closed,
+        paused,
+    } = chooserGroups(organizations);
 
     return (
         <SplitShell
@@ -122,6 +129,15 @@ export default async function ChoosePage({
                     spaced={owned.length + guest.length > 0}
                 />
             ) : null}
+            {paused.length > 0 ? (
+                <Group
+                    label={PAUSED_LABEL}
+                    note={PAUSED_NOTE}
+                    organizations={paused}
+                    spaced={owned.length + guest.length + closed.length > 0}
+                    closedDoor
+                />
+            ) : null}
 
             <p className="sa-rise mt-5 text-[12.5px] text-muted-foreground">
                 Starting something new?{" "}
@@ -146,13 +162,59 @@ function Group({
     note,
     organizations,
     spaced,
+    closedDoor,
 }: {
     label: string;
     /** A line under the heading, for what the group has in common. */
     note?: string;
     organizations: Organization[];
     spaced?: boolean;
+    /**
+     * Their access is paused (#800): listed so they know it's there, but
+     * not offered as a door — opening it would only be refused.
+     */
+    closedDoor?: boolean;
 }) {
+    if (closedDoor) {
+        return (
+            <div className={spaced ? "mt-5" : undefined}>
+                <p className="sa-rise mb-2 text-[11px] font-semibold uppercase tracking-[0.1em] text-muted-foreground">
+                    {label}
+                </p>
+                {note ? (
+                    <p className="sa-rise -mt-1 mb-2 text-pretty text-[12.5px] leading-[1.5] text-muted-foreground">
+                        {note}
+                    </p>
+                ) : null}
+                <ul className="flex flex-col gap-2">
+                    {organizations.map((org) => (
+                        <li
+                            key={org.id}
+                            className="sa-rise flex items-center gap-[11px] rounded-[9px] border border-input bg-muted px-[13px] py-[11px]"
+                        >
+                            <span
+                                aria-hidden
+                                className="flex size-[30px] shrink-0 items-center justify-center rounded-lg bg-card font-display text-[12.5px] font-semibold text-muted-foreground"
+                            >
+                                {org.name.trim().charAt(0).toUpperCase()}
+                            </span>
+                            <span className="min-w-0 flex-1">
+                                <span className="block truncate text-[13.5px] font-medium text-muted-foreground">
+                                    {org.name}
+                                </span>
+                                <span className="block text-[11.5px] text-muted-foreground">
+                                    {org.roleLabel ?? ROLE_LABEL[org.role]}
+                                </span>
+                            </span>
+                            <Badge variant="neutral" className="shrink-0">
+                                {PAUSED_LABEL}
+                            </Badge>
+                        </li>
+                    ))}
+                </ul>
+            </div>
+        );
+    }
     return (
         <div className={spaced ? "mt-5" : undefined}>
             <p className="sa-rise mb-2 text-[11px] font-semibold uppercase tracking-[0.1em] text-muted-foreground">

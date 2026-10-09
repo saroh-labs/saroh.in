@@ -9,6 +9,7 @@ import { useRef, useState } from "react";
 
 import { showPlanRefusal } from "@/components/billing/plan-refusal";
 import { useLeaveGuard } from "@/components/sites/use-leave-guard";
+import { pausedWords, PLAN_AND_BILLING_HREF } from "@/lib/billing/paused";
 import { currencySymbol } from "@/lib/format/money";
 import { createProduct } from "@/lib/products/actions";
 import { readOnlyBanner, sectionJumps } from "@/lib/products/editor-labels";
@@ -78,6 +79,11 @@ export interface ProductEditorProps {
      * creating one); null when they could not be read.
      */
     defaults: EffectiveDefaults | null;
+    /**
+     * Past the plan's products limit (#800): hidden from the site and
+     * read-only. The page passes `canWrite` false with it; this says why.
+     */
+    paused?: boolean;
 }
 
 const PRODUCTS_HREF = "/commerce/products";
@@ -123,6 +129,7 @@ function EditorBody({
     sku,
     allergens,
     defaults: initialDefaults,
+    paused = false,
 }: ProductEditorProps) {
     const router = useRouter();
     const {
@@ -305,7 +312,19 @@ function EditorBody({
                     </div>
                 </div>
 
-                {!canWrite ? (
+                {paused ? (
+                    // Past the plan's products limit (#800): read-only for
+                    // everyone, and why, not "you're viewing as …".
+                    <ReadOnlyNote>
+                        {pausedWords("product")}{" "}
+                        <Link
+                            href={PLAN_AND_BILLING_HREF}
+                            className="font-medium underline underline-offset-2"
+                        >
+                            See Plan and billing
+                        </Link>
+                    </ReadOnlyNote>
+                ) : !canWrite ? (
                     <ReadOnlyNote>
                         {readOnlyBanner(viewerRole, canStock)}
                     </ReadOnlyNote>

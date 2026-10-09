@@ -109,6 +109,11 @@
         // the api's test-only switch for them (refused in production).
         "E2E_DOMAIN_HOSTING",
         "DOMAIN_HOSTING_FAKE",
+        // Runs the workspace's paused-by-plan e2e (#800) against a business
+        // the stack was prepared to have paused (its id).
+        "E2E_PAUSED_ORG",
+        // The merchant site in the paused state (#800), for its e2e.
+        "E2E_PAUSED_SITE",
         "npm_package_version"
     ],
     "tasks": {
