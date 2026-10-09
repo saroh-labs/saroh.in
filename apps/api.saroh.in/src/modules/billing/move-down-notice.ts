@@ -66,8 +66,18 @@ export async function claimGraceInTx(
     now: Date,
 ): Promise<Date> {
     const eventKey = moveDownClaimKey(measure.limits);
+    // Dated by the sweep's clock, not the database's: the 7 days count from
+    // the `now` the notice was written for, so a check at exactly 7 days on
+    // agrees with what the notice said.
     await tx.customerNotice.createMany({
-        data: [{ organizationId, eventKey, kind: MOVE_DOWN_CLAIM_KIND }],
+        data: [
+            {
+                organizationId,
+                eventKey,
+                kind: MOVE_DOWN_CLAIM_KIND,
+                createdAt: now,
+            },
+        ],
         skipDuplicates: true,
     });
     const row = await tx.customerNotice.findUnique({
@@ -302,6 +312,7 @@ async function tell(input: {
                         organizationId,
                         eventKey: graceKey,
                         kind: MOVE_DOWN_CLAIM_KIND,
+                        createdAt: now,
                     },
                 ],
                 skipDuplicates: true,

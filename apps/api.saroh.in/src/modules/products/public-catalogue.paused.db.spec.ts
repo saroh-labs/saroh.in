@@ -55,6 +55,13 @@ async function shop() {
         data: { name: "Paused Pottery", slug: uniq("p800-org") },
     });
     for (const flagKey of ["SITE_SHOP", "MODULE_COMMERCE"]) {
+        // The global row the override hangs off (the test database has no
+        // flag rows of its own).
+        await prisma.featureFlag.upsert({
+            where: { key: flagKey },
+            update: {},
+            create: { key: flagKey, enabledByDefault: false },
+        });
         await prisma.featureFlagOverride.create({
             data: { flagKey, organizationId: org.id, enabled: true },
         });

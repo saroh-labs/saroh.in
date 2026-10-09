@@ -124,6 +124,7 @@ beforeAll(async () => {
                 status: "CONFIRMED",
                 bookerName: "Meena Rao",
                 bookerEmail: `meena-${tag}@example.com`,
+                timezone: "UTC",
             },
         })
     ).id;
