@@ -5,6 +5,7 @@ import {
     Inject,
     Injectable,
     NotFoundException,
+    ServiceUnavailableException,
 } from "@nestjs/common";
 import { prisma } from "@saroh/database";
 import { randomBytes } from "node:crypto";
@@ -12,6 +13,9 @@ import { randomBytes } from "node:crypto";
 import type { OrganizationContext } from "../../common/types/organization-context";
 import { EntitlementService } from "../billing/entitlement.service";
 import { authorize } from "../organizations/organization-policy";
+import type { DomainHosting } from "./domain-hosting";
+import { DOMAIN_HOSTING, HostingCallError } from "./domain-hosting";
+import { hostingView, syncHosting } from "./domain-hosting-sync";
 import type { DomainVerifier, VerificationFailure } from "./domain-verifier";
 import { DOMAIN_VERIFIER, verificationRecordName } from "./domain-verifier";
 import { isTestReservedHostname, TEST_RESERVED_HOSTNAME_MSG } from "./dto";
@@ -46,6 +50,9 @@ export class DomainsService {
     constructor(
         @Inject(DOMAIN_VERIFIER) private readonly verifier: DomainVerifier,
         private readonly entitlements: EntitlementService,
+        // #859: null when hosting isn't set up on this instance (off).
+        @Inject(DOMAIN_HOSTING)
+        private readonly hosting: DomainHosting | null = null,
     ) {}
 
     /**
@@ -115,16 +122,23 @@ export class DomainsService {
             throw err;
         }
 
-        return { domain, dnsRecord: this.instructionsFor(domain) };
+        return {
+            domain: this.withHosting(domain),
+            dnsRecord: this.instructionsFor(domain),
+        };
     }
 
     /**
      * Verify a claimed domain by checking DNS for its token. Authorizes
      * `domain:manage`, loads the org's own domain (404 otherwise), and asks the
      * verifier port. On success flips PENDING → VERIFIED (+ verifiedAt) and, if a
-     * Site is bound, routes it by setting `Site.customDomainId`. Idempotent: a
-     * domain already VERIFIED is returned unchanged. A failing check leaves the
-     * domain PENDING (never trusts the client, never links).
+     * Site is bound, routes it by setting `Site.customDomainId`, then
+     * registers the hostname with the host (#859). A domain already VERIFIED
+     * is not re-checked in DNS; its hosting is synced instead: registered if
+     * an earlier call failed (the retry), else its standing refreshed. A host
+     * failure never undoes the verification: it is recorded on the row. A
+     * failing check leaves the domain PENDING (never trusts the client,
+     * never links).
      */
     async verify(ctx: OrganizationContext, domainId: string) {
         authorize(ctx, "domain:manage");
@@ -132,7 +146,8 @@ export class DomainsService {
         const domain = await this.requireOwned(ctx, domainId);
 
         if (domain.status === "VERIFIED") {
-            return { domain, verified: true };
+            const synced = await syncHosting(this.hosting, domain);
+            return { domain: this.withHosting(synced), verified: true };
         }
 
         const checkedAt = new Date();
@@ -153,7 +168,7 @@ export class DomainsService {
                 },
             });
             return {
-                domain: checked,
+                domain: this.withHosting(checked),
                 verified: false,
                 reason: outcome.reason satisfies VerificationFailure,
             };
@@ -178,7 +193,8 @@ export class DomainsService {
             });
         }
 
-        return { domain: verified, verified: true };
+        const hosted = await syncHosting(this.hosting, verified);
+        return { domain: this.withHosting(hosted), verified: true };
     }
 
     /**
@@ -194,15 +210,18 @@ export class DomainsService {
             orderBy: { createdAt: "desc" },
         });
         return domains.map((domain) => ({
-            ...domain,
+            ...this.withHosting(domain),
             dnsRecord: this.instructionsFor(domain),
         }));
     }
 
     /**
      * Release a claimed domain. Authorizes `domain:manage`; cross-tenant or
-     * missing ids 404. Unlinks it from a routed Site first so no Site is left
-     * pointing at a deleted claim.
+     * missing ids 404. Deletes the hostname at the host FIRST (#859): if
+     * that fails, nothing here changes and the merchant is told to try again
+     * (a 503 with `reason: "hosting-unavailable"`), so no hostname is left
+     * registered for a domain Saroh no longer holds. Then unlinks it from a
+     * routed Site so no Site is left pointing at a deleted claim.
      */
     async remove(
         ctx: OrganizationContext,
@@ -211,6 +230,8 @@ export class DomainsService {
         authorize(ctx, "domain:manage");
 
         const domain = await this.requireOwned(ctx, domainId);
+
+        await this.removeFromHosting(domain);
 
         if (domain.siteId) {
             // Only clear the pointer if it still points at THIS domain.
@@ -223,6 +244,49 @@ export class DomainsService {
         await prisma.domain.delete({ where: { id: domain.id } });
 
         return { id: domain.id, deleted: true };
+    }
+
+    /**
+     * Delete the domain's hostname at the host. Only a domain that may be
+     * registered is looked at: one with a hosting id, or a VERIFIED one whose
+     * register may have worked with its answer lost. Hosting off with a
+     * hosting id on the row refuses too: removing would orphan it.
+     */
+    private async removeFromHosting(domain: {
+        hostname: string;
+        status: string;
+        hostingId: string | null;
+    }): Promise<void> {
+        if (!domain.hostingId && domain.status !== "VERIFIED") return;
+        if (!this.hosting) {
+            if (!domain.hostingId) return;
+            throw hostingUnavailable();
+        }
+        try {
+            await this.hosting.remove({
+                id: domain.hostingId,
+                hostname: domain.hostname,
+            });
+        } catch (err) {
+            if (err instanceof HostingCallError) throw hostingUnavailable();
+            throw err;
+        }
+    }
+
+    /** A domain row with its hosting state (#859), as the workspace reads it. */
+    private withHosting<
+        T extends {
+            hostname: string;
+            status: string;
+            hostingStatus: string | null;
+            hostingError: string | null;
+            hostingCheckedAt: Date | null;
+        },
+    >(domain: T) {
+        return {
+            ...domain,
+            hosting: hostingView(domain, this.hosting !== null),
+        };
     }
 
     /** The DNS TXT record the org must publish for a domain. */
@@ -263,4 +327,13 @@ export class DomainsService {
         }
         return site;
     }
+}
+
+/** The 503 a removal answers when the host couldn't delete the hostname. */
+function hostingUnavailable(): ServiceUnavailableException {
+    return new ServiceUnavailableException({
+        message:
+            "We couldn't disconnect this domain from our hosting just now, so it hasn't been removed. Try again in a few minutes.",
+        details: { reason: "hosting-unavailable" },
+    });
 }

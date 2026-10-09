@@ -2,6 +2,8 @@ import type { Provider } from "@nestjs/common";
 import { Logger } from "@nestjs/common";
 import { resolveTxt } from "node:dns/promises";
 
+import { domainFakesOn } from "./domain-fakes";
+
 /**
  * Domain-verification port (S2-007).
  *
@@ -162,6 +164,47 @@ export class FakeDomainVerifier implements DomainVerifier {
     }
 }
 
+/** The reserved domain (RFC 2606) the browser tests claim under. */
+export const TEST_DOMAIN_SUFFIX = ".example.com";
+
+/**
+ * The browser-test stack's verifier (`DOMAIN_HOSTING_FAKE`, #861): a
+ * hostname under `.example.com` passes without any record — nobody can
+ * publish one there, so no real domain verifies this way — and every other
+ * hostname goes to `fallback` (DNS), as it would without the switch.
+ */
+export class ExampleDomainVerifier implements DomainVerifier {
+    constructor(
+        private readonly fallback: DomainVerifier = new DnsTxtDomainVerifier(),
+    ) {}
+
+    verify(
+        hostname: string,
+        expectedToken: string,
+    ): Promise<VerificationOutcome> {
+        if (hostname.trim().toLowerCase().endsWith(TEST_DOMAIN_SUFFIX)) {
+            return Promise.resolve({ ok: true });
+        }
+        return this.fallback.verify(hostname, expectedToken);
+    }
+}
+
+const verifierLogger = new Logger("DomainVerifier");
+
+/**
+ * The verifier for this instance: DNS TXT, or the {@link ExampleDomainVerifier}
+ * when the test-only `DOMAIN_HOSTING_FAKE` is on (`domain-fakes.ts`).
+ */
+export function createDomainVerifier(): DomainVerifier {
+    if (domainFakesOn()) {
+        verifierLogger.warn(
+            "domain_verifier_fake: hostnames under .example.com verify without DNS (DOMAIN_HOSTING_FAKE, test only)",
+        );
+        return new ExampleDomainVerifier();
+    }
+    return new DnsTxtDomainVerifier();
+}
+
 /**
  * Nest provider exposing the {@link DomainVerifier} under {@link DOMAIN_VERIFIER}.
  * Defaults to the real DNS_TXT verifier; tests inject a {@link FakeDomainVerifier}
@@ -169,5 +212,5 @@ export class FakeDomainVerifier implements DomainVerifier {
  */
 export const domainVerifierProvider: Provider = {
     provide: DOMAIN_VERIFIER,
-    useFactory: (): DomainVerifier => new DnsTxtDomainVerifier(),
+    useFactory: createDomainVerifier,
 };

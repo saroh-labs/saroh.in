@@ -51,6 +51,19 @@ describe("the API's environment", () => {
         ).toEqual([]);
     });
 
+    it("refuses the custom domains' fakes in production", () => {
+        expect(missing({ ...DEPLOYED, DOMAIN_HOSTING_FAKE: "1" })).toEqual([
+            "DOMAIN_HOSTING_FAKE",
+        ]);
+        expect(
+            missing({ ...BASE, NODE_ENV: "test", DOMAIN_HOSTING_FAKE: "1" }),
+        ).toEqual([]);
+        // Only `1` turns them on; anything else is a mistake, said at boot.
+        expect(
+            missing({ ...BASE, NODE_ENV: "test", DOMAIN_HOSTING_FAKE: "yes" }),
+        ).toEqual(["DOMAIN_HOSTING_FAKE"]);
+    });
+
     it("lets development and tests go without them", () => {
         expect(missing({ ...BASE, NODE_ENV: "development" })).toEqual([]);
         expect(missing({ ...BASE, NODE_ENV: "test" })).toEqual([]);
