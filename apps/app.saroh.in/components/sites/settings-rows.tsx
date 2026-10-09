@@ -4,7 +4,8 @@ import { Card, CardContent } from "@saroh/ui/card";
 /**
  * The site settings screen's building blocks (Website › Settings audit):
  *
- * - `Group` — one of the six groups the in-page list jumps to (h2).
+ * - `Group` — one of the six groups, the content of its tab (its h2 is
+ *   for a screen reader: the tab already says it on screen).
  * - `Section` — a titled card of rows inside a group (h3), shared with the
  *   rows that live in their own files (`sells-from-row.tsx`,
  *   `publish-approval-row.tsx`).
@@ -33,9 +34,9 @@ export function Group({
             id={id}
             aria-labelledby={`${id}-title`}
             data-settings-group={id}
-            className="scroll-mt-24 space-y-3"
+            className="scroll-mt-24"
         >
-            <h2 id={`${id}-title`} className="text-base font-semibold">
+            <h2 id={`${id}-title`} className="sr-only">
                 {title}
             </h2>
             <div className="space-y-4">{children}</div>
@@ -98,6 +99,7 @@ export function Row({
     children,
     action,
     draft = false,
+    inline = false,
 }: {
     /** For the checklist to jump to. */
     id?: string;
@@ -106,7 +108,32 @@ export function Row({
     action?: React.ReactNode;
     /** Part of the draft: reaches the live site with the next publish. */
     draft?: boolean;
+    /**
+     * A short value that should keep one line (a web address): the value
+     * and its actions share the row's width, and the actions drop below
+     * only when both can't fit. The default keeps the actions in a column
+     * of their own, for values that grow (an editor, a preview).
+     */
+    inline?: boolean;
 }) {
+    if (inline) {
+        return (
+            <div
+                id={id}
+                data-row-inline
+                className="grid scroll-mt-24 items-center gap-x-4 gap-y-2 px-4 py-3 sm:grid-cols-[10rem_minmax(0,1fr)]"
+            >
+                <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-muted-foreground">
+                    <span>{label}</span>
+                    {draft ? <NextPublishPill /> : null}
+                </div>
+                <div className="flex min-w-0 flex-wrap items-center justify-between gap-x-4 gap-y-2 text-sm">
+                    <div className="min-w-0">{children}</div>
+                    {action ? <div className="shrink-0">{action}</div> : null}
+                </div>
+            </div>
+        );
+    }
     return (
         <div
             id={id}

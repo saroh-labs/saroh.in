@@ -292,8 +292,10 @@ const RYE_PLANS = "/billing/subscriptions?tab=plans";
  * RENDERER_URL=https://saroh.app for help-own-domain-1, so it reads
  * northwind.saroh.app as in production, not the local renderer's host. */
 const NW_SETTINGS = "/sites/seed_site_0/settings";
-/* The settings' groups (Website › Settings regroup, 9 Oct): the domain is
- * in Address, the share image and the description in Search and sharing. */
+/* The settings' tabs (Website › Settings, 9 Oct): the domain is in
+ * Address (the first tab), the share image and the description in Search
+ * and sharing, the codes and trackers in Tracking; a shot opens its tab
+ * with `?section=`. */
 const DOMAIN = "#address";
 const SHARE = "#search-and-sharing";
 const SEARCH = "#search-and-sharing";
@@ -609,7 +611,7 @@ const HELP_SHOTS_B: Shot[] = [
         key: "help-share-image-1",
         business: "northwind",
         role: "owner",
-        route: NW_SETTINGS,
+        route: `${NW_SETTINGS}?section=search-and-sharing`,
         viewport: { width: 1280, height: 3000 },
         clip: { selector: SHARE, pad: 12 },
         mark: `${SHARE} button:text-is("Add")`,
@@ -620,7 +622,7 @@ const HELP_SHOTS_B: Shot[] = [
         key: "help-share-image-2",
         business: "northwind",
         role: "owner",
-        route: NW_SETTINGS,
+        route: `${NW_SETTINGS}?section=search-and-sharing`,
         viewport: { width: 1280, height: 3000 },
         steps: [{ click: `${SHARE} button:text-is("Add")` }],
         clip: {
@@ -635,7 +637,7 @@ const HELP_SHOTS_B: Shot[] = [
         key: "help-share-image-3",
         business: "northwind",
         role: "owner",
-        route: NW_SETTINGS,
+        route: `${NW_SETTINGS}?section=search-and-sharing`,
         viewport: { width: 1280, height: 3000 },
         steps: [
             {
@@ -668,7 +670,7 @@ const HELP_SHOTS_B: Shot[] = [
         key: "help-verify-analytics-1",
         business: "northwind",
         role: "owner",
-        route: NW_SETTINGS,
+        route: `${NW_SETTINGS}?section=tracking`,
         viewport: ST_DESK,
         steps: [OPEN_CODES],
         clip: { selector: ST_VERIFY, pad: 12 },
@@ -680,7 +682,7 @@ const HELP_SHOTS_B: Shot[] = [
         key: "help-verify-analytics-2",
         business: "northwind",
         role: "owner",
-        route: NW_SETTINGS,
+        route: `${NW_SETTINGS}?section=tracking`,
         viewport: ST_DESK,
         steps: [
             OPEN_CODES,
@@ -698,7 +700,7 @@ const HELP_SHOTS_B: Shot[] = [
         key: "help-verify-analytics-3",
         business: "northwind",
         role: "owner",
-        route: NW_SETTINGS,
+        route: `${NW_SETTINGS}?section=tracking`,
         viewport: ST_DESK,
         steps: [OPEN_CODES],
         clip: {
@@ -714,7 +716,7 @@ const HELP_SHOTS_B: Shot[] = [
         key: "help-verify-analytics-4",
         business: "northwind",
         role: "owner",
-        route: NW_SETTINGS,
+        route: `${NW_SETTINGS}?section=tracking`,
         viewport: ST_DESK,
         clip: { selector: ST_TRACKERS, pad: 12 },
         mark: '[data-tracker="ga4"] button:text-is("Set up")',
@@ -725,7 +727,7 @@ const HELP_SHOTS_B: Shot[] = [
         key: "help-verify-analytics-5",
         business: "northwind",
         role: "owner",
-        route: NW_SETTINGS,
+        route: `${NW_SETTINGS}?section=tracking`,
         viewport: { width: 1280, height: 900 },
         steps: [
             { click: '[data-tracker="ga4"] button:text-is("Set up")' },

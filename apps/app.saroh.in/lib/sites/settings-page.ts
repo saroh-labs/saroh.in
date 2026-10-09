@@ -24,6 +24,9 @@ export const SETTINGS_GROUPS = [
 
 export type SettingsGroupId = (typeof SETTINGS_GROUPS)[number]["id"];
 
+/** The open group's tab, in the address as Settings › Business keeps its own. */
+export const SETTINGS_TAB_PARAM = "section";
+
 /**
  * The groups this screen draws. Shop only while the online shop is open
  * for the business (`sellsFrom`, the API's `SITE_SHOP`), and Advanced only
@@ -50,6 +53,11 @@ export const ROW_ANCHORS = {
 } as const;
 
 export type ShareStepKey = keyof typeof ROW_ANCHORS;
+
+/** The tab that holds a checklist step's row. */
+export function groupOfStep(key: ShareStepKey): SettingsGroupId {
+    return key === "menu" ? "menu-and-footer" : "search-and-sharing";
+}
 
 export interface ShareStep {
     key: ShareStepKey;

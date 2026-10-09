@@ -1,10 +1,11 @@
 "use client";
 
 import type { TrackerKind } from "@saroh/block-contract";
-import { TRACKER_KINDS, VERIFICATION_SERVICES } from "@saroh/block-contract";
+import { VERIFICATION_SERVICES } from "@saroh/block-contract";
 import { Button } from "@saroh/ui/button";
 import { Switch } from "@saroh/ui/switch";
 import { showError, showSuccess } from "@saroh/ui/toast";
+import { ChevronDown } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 
@@ -39,6 +40,7 @@ import {
     trackerSavedLine,
 } from "@/lib/sites/search-tracking";
 import type { SiteAddress } from "@/lib/sites/share-links";
+import { moreToolsLine, splitTrackers } from "@/lib/sites/tracker-order";
 import type { TrackersLock } from "@/lib/sites/trackers-lock";
 import { trackersLockOfRefusal } from "@/lib/sites/trackers-lock";
 
@@ -229,6 +231,22 @@ function Editable({
         );
     }
 
+    // The common tools and every connected one first; the rest fold.
+    const trackers = splitTrackers(new Set(byKind.keys()));
+    const row = (kind: TrackerKind) => {
+        const tracker = byKind.get(kind) ?? null;
+        return (
+            <TrackerRow
+                key={kind}
+                kind={kind}
+                tracker={tracker}
+                standing={standing}
+                lock={lock}
+                actions={actionsFor(kind, tracker)}
+            />
+        );
+    };
+
     return (
         <SearchTrackingFrame>
             {view.switchedOff ? <SwitchedOffNotice /> : null}
@@ -238,19 +256,35 @@ function Editable({
                 description="Your own analytics and ad tools. Visitors are asked first for any that uses cookies."
             >
                 {lock && !view.switchedOff ? <LockNotice lock={lock} /> : null}
-                {TRACKER_KINDS.map((kind) => {
-                    const tracker = byKind.get(kind) ?? null;
-                    return (
-                        <TrackerRow
-                            key={kind}
-                            kind={kind}
-                            tracker={tracker}
-                            standing={standing}
-                            lock={lock}
-                            actions={actionsFor(kind, tracker)}
-                        />
-                    );
-                })}
+                {trackers.shown.map(row)}
+                {trackers.folded.length ? (
+                    <details className="group" data-more-tools>
+                        <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-4 py-3 text-sm font-medium transition-colors duration-fast hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring active:bg-accent-active coarse:min-h-11 [&::-webkit-details-marker]:hidden">
+                            <span>
+                                <span className="group-open:hidden">
+                                    {moreToolsLine(trackers.folded.length)}
+                                </span>
+                                <span className="hidden group-open:inline">
+                                    Fewer tools
+                                </span>
+                                <span className="font-normal text-muted-foreground">
+                                    {" "}
+                                    ·{" "}
+                                    {trackers.folded
+                                        .map((k) => TRACKER_WORDS[k].name)
+                                        .join(", ")}
+                                </span>
+                            </span>
+                            <ChevronDown
+                                aria-hidden
+                                className="size-4 shrink-0 text-muted-foreground transition-transform duration-fast group-open:rotate-180"
+                            />
+                        </summary>
+                        <div className="divide-y divide-border border-t border-border">
+                            {trackers.folded.map(row)}
+                        </div>
+                    </details>
+                ) : null}
                 <PrivacyField saved={view.privacyUrl} save={save} />
             </Block>
 

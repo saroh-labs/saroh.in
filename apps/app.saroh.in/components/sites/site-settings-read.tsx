@@ -24,8 +24,7 @@ import type { SiteAddress } from "@/lib/sites/share-links";
 
 import { AddressGroup } from "./settings/address-group";
 import { PublishBar } from "./settings/publish-bar";
-import { SettingsFrame } from "./settings/settings-frame";
-import { ShareChecklist } from "./settings/share-checklist";
+import { SettingsTabs } from "./settings/settings-tabs";
 
 /**
  * The site's settings, for someone who may read them and not change them
@@ -61,157 +60,182 @@ export function SiteSettingsRead({
     const automatic = automaticMenu(site);
 
     return (
-        <SettingsFrame groups={groups}>
-            <ReadOnlyNote className="mb-0">
+        <>
+            <ReadOnlyNote className="mb-4 max-w-2xl">
                 Your role can read this site&apos;s settings but not change
                 them. A connected domain isn&apos;t shown: reading it needs the
                 domain permission.
             </ReadOnlyNote>
-
-            <ShareChecklist steps={shareReadiness(site)} live={live} />
-
-            <AddressGroup
-                address={address}
+            <SettingsTabs
+                groups={groups}
+                steps={shareReadiness(site)}
                 live={live}
-                canChangeAddress={false}
-            />
-
-            <Group id="search-and-sharing" title="Search and sharing">
-                <Section>
-                    <Row id={ROW_ANCHORS.title} label="Title" draft>
-                        {site.seoTitle?.trim() ? (
-                            site.seoTitle
-                        ) : (
-                            <InUse
-                                value={siteNameOf(site)}
-                                source="your site's name"
-                            />
-                        )}
-                    </Row>
-                    <Row id={ROW_ANCHORS.description} label="Description" draft>
-                        {site.seoDescription?.trim() ? (
-                            <span className="[overflow-wrap:anywhere]">
-                                {site.seoDescription}
-                            </span>
-                        ) : (
-                            <Absent>Not written</Absent>
-                        )}
-                    </Row>
-                    <Row id={ROW_ANCHORS.image} label="Share image" draft>
-                        {site.socialImageUrl ? (
-                            <span className="break-all text-xs text-muted-foreground">
-                                {site.socialImageUrl}
-                            </span>
-                        ) : (
-                            <Absent>None</Absent>
-                        )}
-                    </Row>
-                    <Row label="When shared">
-                        <ShareCards
-                            fold
-                            title={
-                                site.seoTitle?.trim()
-                                    ? site.seoTitle
-                                    : site.name
-                            }
-                            description={site.seoDescription ?? ""}
-                            siteName={site.name}
-                            domain={address?.host ?? null}
-                            image={
-                                site.socialImageUrl
-                                    ? {
-                                          url: site.socialImageUrl,
-                                          width: site.socialImageWidth,
-                                          height: site.socialImageHeight,
-                                          bytes: site.socialImageBytes,
-                                      }
-                                    : null
-                            }
-                            liveUrl={live && address ? address.url : null}
+                canEdit={false}
+                panels={{
+                    address: (
+                        <AddressGroup
+                            address={address}
+                            live={live}
+                            canChangeAddress={false}
                         />
-                    </Row>
-                </Section>
-            </Group>
-
-            <Group id="menu-and-footer" title="Menu and footer">
-                <Section>
-                    <Row id={ROW_ANCHORS.menu} label="Menu" draft>
-                        {site.navigation ? (
-                            site.navigation.items
-                                .map(
-                                    (i) =>
-                                        i.label ??
-                                        pagesById.get(i.pageId)?.title ??
-                                        "?",
-                                )
-                                .join(" · ")
-                        ) : (
-                            <span>
-                                <Absent>Not built</Absent>
-                                {automatic.length ? (
-                                    <span className="text-muted-foreground">
-                                        {" "}
-                                        · {automatic.join(" · ")}{" "}
-                                        {automatic.length === 1
-                                            ? "shows"
-                                            : "show"}{" "}
-                                        on their own
+                    ),
+                    "search-and-sharing": (
+                        <Group
+                            id="search-and-sharing"
+                            title="Search and sharing"
+                        >
+                            <Section>
+                                <Row id={ROW_ANCHORS.title} label="Title" draft>
+                                    {site.seoTitle?.trim() ? (
+                                        site.seoTitle
+                                    ) : (
+                                        <InUse
+                                            value={siteNameOf(site)}
+                                            source="your site's name"
+                                        />
+                                    )}
+                                </Row>
+                                <Row
+                                    id={ROW_ANCHORS.description}
+                                    label="Description"
+                                    draft
+                                >
+                                    {site.seoDescription?.trim() ? (
+                                        <span className="[overflow-wrap:anywhere]">
+                                            {site.seoDescription}
+                                        </span>
+                                    ) : (
+                                        <Absent>Not written</Absent>
+                                    )}
+                                </Row>
+                                <Row
+                                    id={ROW_ANCHORS.image}
+                                    label="Share image"
+                                    draft
+                                >
+                                    {site.socialImageUrl ? (
+                                        <span className="break-all text-xs text-muted-foreground">
+                                            {site.socialImageUrl}
+                                        </span>
+                                    ) : (
+                                        <Absent>None</Absent>
+                                    )}
+                                </Row>
+                                <Row label="When shared">
+                                    <ShareCards
+                                        fold
+                                        title={
+                                            site.seoTitle?.trim()
+                                                ? site.seoTitle
+                                                : site.name
+                                        }
+                                        description={site.seoDescription ?? ""}
+                                        siteName={site.name}
+                                        domain={address?.host ?? null}
+                                        image={
+                                            site.socialImageUrl
+                                                ? {
+                                                      url: site.socialImageUrl,
+                                                      width: site.socialImageWidth,
+                                                      height: site.socialImageHeight,
+                                                      bytes: site.socialImageBytes,
+                                                  }
+                                                : null
+                                        }
+                                        liveUrl={
+                                            live && address ? address.url : null
+                                        }
+                                    />
+                                </Row>
+                            </Section>
+                        </Group>
+                    ),
+                    "menu-and-footer": (
+                        <Group id="menu-and-footer" title="Menu and footer">
+                            <Section>
+                                <Row id={ROW_ANCHORS.menu} label="Menu" draft>
+                                    {site.navigation ? (
+                                        site.navigation.items
+                                            .map(
+                                                (i) =>
+                                                    i.label ??
+                                                    pagesById.get(i.pageId)
+                                                        ?.title ??
+                                                    "?",
+                                            )
+                                            .join(" · ")
+                                    ) : (
+                                        <span>
+                                            <Absent>Not built</Absent>
+                                            {automatic.length ? (
+                                                <span className="text-muted-foreground">
+                                                    {" "}
+                                                    · {automatic.join(
+                                                        " · ",
+                                                    )}{" "}
+                                                    {automatic.length === 1
+                                                        ? "shows"
+                                                        : "show"}{" "}
+                                                    on their own
+                                                </span>
+                                            ) : null}
+                                        </span>
+                                    )}
+                                </Row>
+                                <Row label="Footer" draft>
+                                    {site.footer?.value.trim() ? (
+                                        <span className="whitespace-pre-wrap break-words text-muted-foreground">
+                                            {site.footer.value}
+                                        </span>
+                                    ) : (
+                                        <Absent>Not written</Absent>
+                                    )}
+                                </Row>
+                                <Row label="Posts path" draft>
+                                    <span>
+                                        /{site.postsPrefix ?? "blog"}
+                                        <span className="text-muted-foreground">
+                                            {" "}
+                                            · where your posts live
+                                        </span>
                                     </span>
-                                ) : null}
-                            </span>
-                        )}
-                    </Row>
-                    <Row label="Footer" draft>
-                        {site.footer?.value.trim() ? (
-                            <span className="whitespace-pre-wrap break-words text-muted-foreground">
-                                {site.footer.value}
-                            </span>
-                        ) : (
-                            <Absent>Not written</Absent>
-                        )}
-                    </Row>
-                    <Row label="Posts path" draft>
-                        <span>
-                            /{site.postsPrefix ?? "blog"}
-                            <span className="text-muted-foreground">
-                                {" "}
-                                · where your posts live
-                            </span>
-                        </span>
-                    </Row>
-                </Section>
-            </Group>
-
-            {site.sellsFrom ? (
-                <Group id="shop" title="Shop">
-                    <SellsFromRow
-                        siteId={site.id}
-                        sellsFrom={site.sellsFrom}
-                        canChange={false}
-                        awaiting={site.shopAwaitsSellsFrom === true}
+                                </Row>
+                            </Section>
+                        </Group>
+                    ),
+                    shop: site.sellsFrom ? (
+                        <Group id="shop" title="Shop">
+                            <SellsFromRow
+                                siteId={site.id}
+                                sellsFrom={site.sellsFrom}
+                                canChange={false}
+                                awaiting={site.shopAwaitsSellsFrom === true}
+                            />
+                        </Group>
+                    ) : null,
+                    tracking: (
+                        <Group id="tracking" title="Tracking">
+                            {tracking}
+                        </Group>
+                    ),
+                    advanced: approval ? (
+                        <Group id="advanced" title="Advanced">
+                            <Section title="Publishing">
+                                <Row label="Needs approval">
+                                    {publishApprovalLine(approval.on)}
+                                </Row>
+                            </Section>
+                        </Group>
+                    ) : null,
+                }}
+                footer={
+                    <PublishBar
+                        waiting={publishWaiting(site)}
+                        editorHref={`/sites/${site.id}`}
+                        canPublish={site.can.publish}
                     />
-                </Group>
-            ) : null}
-
-            <Group id="tracking" title="Tracking">
-                {tracking}
-            </Group>
-
-            {approval ? (
-                <Group id="advanced" title="Advanced">
-                    <Section title="Publishing">
-                        <Row label="Needs approval">
-                            {publishApprovalLine(approval.on)}
-                        </Row>
-                    </Section>
-                </Group>
-            ) : null}
-
-            <PublishBar
-                waiting={publishWaiting(site)}
-                editorHref={`/sites/${site.id}`}
-                canPublish={site.can.publish}
+                }
             />
-        </SettingsFrame>
+        </>
     );
 }

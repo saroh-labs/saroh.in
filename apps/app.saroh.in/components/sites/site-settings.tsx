@@ -17,16 +17,14 @@ import { AddressGroup } from "./settings/address-group";
 import { MenuFooterGroup } from "./settings/menu-footer-group";
 import { PublishBar } from "./settings/publish-bar";
 import { SearchSharingGroup } from "./settings/search-sharing-group";
-import { SettingsFrame } from "./settings/settings-frame";
-import { ShareChecklist } from "./settings/share-checklist";
+import { SettingsTabs } from "./settings/settings-tabs";
 import { useSettingsSave } from "./settings/use-settings-save";
 
 /**
  * A site's Settings tab (#188), regrouped after the Website › Settings
  * audit (9 Oct 2026): what's left before the site is worth sharing first,
- * then six groups — Address, Search and sharing, Menu and footer, Shop,
- * Tracking, Advanced — with a list of them beside the column on a wide
- * screen.
+ * then the groups as tabs, as Settings › Business is: Address, Search and
+ * sharing, Menu and footer, Shop, Tracking, Advanced (`settings-tabs.tsx`).
  *
  * Saving is per row; there is no page-level Save, because a settings form
  * that saves everything at once lets a stale tab overwrite a field someone
@@ -61,61 +59,68 @@ export function SiteSettings({
     const groups = settingsGroups({ shop, advanced: approval !== null });
 
     return (
-        <SettingsFrame groups={groups}>
-            <ShareChecklist
-                steps={shareReadiness(site)}
-                live={live}
-                onJump={(key) =>
-                    state.setEditing(key === "image" ? "social" : key)
-                }
-            />
-
-            <AddressGroup
-                address={address}
-                live={live}
-                canChangeAddress={canChangeAddress}
-                domain={<CustomDomain siteId={site.id} />}
-            />
-
-            <SearchSharingGroup
-                site={site}
-                address={address}
-                live={live}
-                state={state}
-            />
-
-            <MenuFooterGroup site={site} address={address} state={state} />
-
-            {/* Where the shop sells from (G11): only while it is open. */}
-            {site.sellsFrom ? (
-                <Group id="shop" title="Shop">
-                    <SellsFromRow
-                        siteId={site.id}
-                        sellsFrom={site.sellsFrom}
-                        canChange={site.can.manageSettings}
-                        awaiting={site.shopAwaitsSellsFrom === true}
+        <SettingsTabs
+            groups={groups}
+            steps={shareReadiness(site)}
+            live={live}
+            canEdit
+            onJump={(key) => state.setEditing(key === "image" ? "social" : key)}
+            panels={{
+                address: (
+                    <AddressGroup
+                        address={address}
+                        live={live}
+                        canChangeAddress={canChangeAddress}
+                        domain={<CustomDomain siteId={site.id} />}
                     />
-                </Group>
-            ) : null}
-
-            <Group id="tracking" title="Tracking">
-                {tracking}
-            </Group>
-
-            {approval ? (
-                <Group id="advanced" title="Advanced">
-                    <PublishApprovalSection
-                        siteId={site.id}
-                        approval={approval}
+                ),
+                "search-and-sharing": (
+                    <SearchSharingGroup
+                        site={site}
+                        address={address}
+                        live={live}
+                        state={state}
                     />
-                </Group>
-            ) : null}
-
-            <PublishBar
-                waiting={publishWaiting(site)}
-                editorHref={`/sites/${site.id}`}
-                canPublish={site.can.publish}
-            />
-        </SettingsFrame>
+                ),
+                "menu-and-footer": (
+                    <MenuFooterGroup
+                        site={site}
+                        address={address}
+                        state={state}
+                    />
+                ),
+                // Where the shop sells from (G11): only while it is open.
+                shop: site.sellsFrom ? (
+                    <Group id="shop" title="Shop">
+                        <SellsFromRow
+                            siteId={site.id}
+                            sellsFrom={site.sellsFrom}
+                            canChange={site.can.manageSettings}
+                            awaiting={site.shopAwaitsSellsFrom === true}
+                        />
+                    </Group>
+                ) : null,
+                tracking: (
+                    <Group id="tracking" title="Tracking">
+                        {tracking}
+                    </Group>
+                ),
+                advanced: approval ? (
+                    <Group id="advanced" title="Advanced">
+                        <PublishApprovalSection
+                            siteId={site.id}
+                            approval={approval}
+                        />
+                    </Group>
+                ) : null,
+            }}
+            footer={
+                <PublishBar
+                    waiting={publishWaiting(site)}
+                    editorHref={`/sites/${site.id}`}
+                    canPublish={site.can.publish}
+                />
+            }
+        />
     );
 }

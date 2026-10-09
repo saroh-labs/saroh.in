@@ -18,7 +18,7 @@ const VERB: Record<ShareStepKey, string> = {
  * "Before you share your site · 2 of 4" (Website › Settings audit, the
  * goal gradient told honestly): the steps that are true to ask for, from
  * what is already done. Each one not done jumps to its row and, where the
- * reader may change it, opens it (`onJump`).
+ * reader may change it, opens it: `onJump` switches to its tab first.
  *
  * A live site with every step done gets one quiet line instead: nothing is
  * asked of the owner, and the card would only push the settings down.
@@ -27,11 +27,14 @@ export function ShareChecklist({
     steps,
     live,
     onJump,
+    canEdit = false,
 }: {
     steps: readonly ShareStep[];
     live: boolean;
     /** Opens the row for editing; absent for someone who can't change it. */
-    onJump?: (key: ShareStepKey) => void;
+    onJump?: (step: ShareStep) => void;
+    /** Whether the reader may change the rows: "Write" or just "Show". */
+    canEdit?: boolean;
 }) {
     const { done, of } = readinessCount(steps);
     if (live && done === of) {
@@ -105,10 +108,14 @@ export function ShareChecklist({
                             {step.done ? null : (
                                 <a
                                     href={`#${step.anchor}`}
-                                    onClick={() => onJump?.(step.key)}
+                                    onClick={(e) => {
+                                        if (!onJump) return;
+                                        e.preventDefault();
+                                        onJump(step);
+                                    }}
                                     className="shrink-0 rounded-sm px-1 py-1 font-medium underline underline-offset-2 hover:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring active:text-foreground coarse:min-h-11 coarse:py-2.5"
                                 >
-                                    {onJump ? VERB[step.key] : "Show"}
+                                    {canEdit ? VERB[step.key] : "Show"}
                                     <span className="sr-only">
                                         : {step.label}
                                     </span>

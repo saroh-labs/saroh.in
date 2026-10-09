@@ -222,6 +222,40 @@ describe("one line per tool, codes folded (the settings audit)", () => {
         ).toBe(true);
     });
 
+    it("shows the common tools and folds the rest behind N more tools", () => {
+        render(
+            ok(
+                viewOf({
+                    trackers: [
+                        {
+                            kind: "plausible",
+                            trackerId: "example.com",
+                            region: null,
+                            enabled: true,
+                        },
+                    ],
+                }),
+            ),
+        );
+        const more = within("details[data-more-tools]");
+        expect(more.hasAttribute("open")).toBe(false);
+        expect(more.querySelector("summary")?.textContent).toContain(
+            "3 more tools",
+        );
+        const folded = Array.from(
+            more.querySelectorAll<HTMLElement>("[data-tracker]"),
+        ).map((el) => el.dataset.tracker);
+        expect(folded).toEqual(["posthog", "clarity", "umami"]);
+        // Connected, so never folded away.
+        expect(more.querySelector('[data-tracker="plausible"]')).toBe(null);
+        expect(host.querySelector('[data-tracker="plausible"]')).not.toBe(null);
+        expect(
+            more.querySelector(
+                '[data-tracker="ga4"], [data-tracker="meta-pixel"]',
+            ),
+        ).toBe(null);
+    });
+
     it("folds the verification codes behind one row that says how many", () => {
         render(
             ok(

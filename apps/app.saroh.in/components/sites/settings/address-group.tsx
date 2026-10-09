@@ -7,6 +7,16 @@ import { CopyValue } from "@/components/sites/search-tracking/parts";
 import { Absent, Group, Row, Section } from "@/components/sites/settings-rows";
 import type { SiteAddress } from "@/lib/sites/share-links";
 
+/**
+ * "rye.saroh.app" with a break opportunity after each dot and hyphen, so a
+ * long address wraps at its parts on a phone, never mid-word.
+ */
+export function breakable(host: string): React.ReactNode[] {
+    return host
+        .split(/(?<=[.-])/)
+        .flatMap((part, i) => (i === 0 ? [part] : [<wbr key={i} />, part]));
+}
+
 /** Where the web address is changed: its one place (DEC-069). */
 export const WEB_ADDRESS_HREF = "/settings/organization#web-address";
 
@@ -36,6 +46,7 @@ export function AddressGroup({
             <Section>
                 <Row
                     label="Web address"
+                    inline
                     action={
                         address ? (
                             <div className="flex flex-wrap gap-2">
@@ -66,8 +77,13 @@ export function AddressGroup({
                     }
                 >
                     {address ? (
-                        <span className="font-mono [overflow-wrap:anywhere]">
-                            {address.platformHost}
+                        // One line where it fits; on a phone it may break,
+                        // and then only at a dot or a hyphen.
+                        <span
+                            data-web-address
+                            className="font-mono [overflow-wrap:anywhere]"
+                        >
+                            {breakable(address.platformHost)}
                         </span>
                     ) : (
                         <Absent>None yet</Absent>
