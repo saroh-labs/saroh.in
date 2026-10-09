@@ -9,7 +9,9 @@ import { prisma } from "@saroh/database";
 import {
     isKeysRefused,
     KEYS_REFUSED,
+    NO_ATTENTION,
 } from "../../common/providers/provider-attention";
+import { queueProviderBack } from "../notifications/provider-alerts";
 import { enqueueTeamAlert } from "../notifications/team-alerts";
 import type {
     MerchantProvider,
@@ -122,10 +124,49 @@ export async function flagPaymentProvider(
         if (marked.count === 0) return false;
         await enqueueTeamAlert(tx, row.organizationId, {
             event: "provider",
+            change: "down",
             channel: "PAYMENTS",
             providerId: row.id,
             since: now.toISOString(),
         });
         return true;
     });
+}
+
+/**
+ * A flagged payment connection whose provider order went through after all
+ * (#555): the provider let the keys back in. Clears the flag it was read
+ * with (one flagged again since stands) and queues "working again" on the
+ * same transaction, when the team was told it stopped. Never fails the
+ * customer's checkout: a failure here is only logged. True when this call
+ * cleared it.
+ */
+export async function paymentProviderWorks(
+    row: Pick<MerchantPaymentProvider, "id" | "organizationId" | "attentionAt">,
+    now: Date = new Date(),
+): Promise<boolean> {
+    const flaggedAt = row.attentionAt;
+    if (!flaggedAt) return false;
+    try {
+        return await prisma.$transaction(async (tx) => {
+            const cleared = await tx.merchantPaymentProvider.updateMany({
+                where: {
+                    id: row.id,
+                    organizationId: row.organizationId,
+                    attentionAt: flaggedAt,
+                },
+                data: NO_ATTENTION,
+            });
+            if (cleared.count === 0) return false;
+            await queueProviderBack(tx, row, "PAYMENTS", now);
+            return true;
+        });
+    } catch (err) {
+        logger.warn(
+            `Could not clear provider ${row.id}'s attention: ${
+                err instanceof Error ? err.message : "unknown"
+            }`,
+        );
+        return false;
+    }
 }

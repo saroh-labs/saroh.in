@@ -14,6 +14,7 @@ import { cleanBusinessName } from "../site-accounts/sender-name";
 import type { AlertEvent } from "./alert-preferences";
 import { alertOn, mayHearAbout } from "./alert-preferences";
 import { wordDomain } from "./domain-alerts";
+import { wordProvider } from "./provider-alerts";
 import { wordReview } from "./review-alerts";
 import type { TeamAlertPayload, WordedAlert } from "./team-alerts";
 import { TEAM_ALERT_TYPE } from "./team-alerts";
@@ -23,6 +24,10 @@ export {
     DOMAIN_BACK_NOTIFICATION_TYPE,
     DOMAIN_DOWN_NOTIFICATION_TYPE,
 } from "./domain-alerts";
+export {
+    PROVIDER_ATTENTION_NOTIFICATION_TYPE,
+    PROVIDER_BACK_NOTIFICATION_TYPE,
+} from "./provider-alerts";
 export { TEAM_ALERT_TYPE } from "./team-alerts";
 export { ORDER_UNCOLLECTED_NOTIFICATION_TYPE } from "./uncollected-alert";
 
@@ -32,7 +37,6 @@ export const PAYMENT_FAILED_NOTIFICATION_TYPE = "payment.failed";
 export const TEAM_JOINED_NOTIFICATION_TYPE = "team.joined";
 export const SITE_LIVE_NOTIFICATION_TYPE = "site.live";
 export const SITE_NOT_LIVE_NOTIFICATION_TYPE = "site.not_live";
-export const PROVIDER_ATTENTION_NOTIFICATION_TYPE = "provider.attention";
 
 type Tx = Prisma.TransactionClient;
 
@@ -593,66 +597,6 @@ async function wordSite(
     };
 }
 
-/**
- * A provider that refused the business's keys (UX-012), told while it
- * still needs attention: keys entered again since, or a disconnect, and
- * there is nothing to say. Names the provider, never a key.
- */
-async function wordProvider(
-    tx: Tx,
-    organizationId: string,
-    p: Extract<TeamAlertPayload, { event: "provider" }>,
-): Promise<WordedAlert | null> {
-    const where = { id: p.providerId, organizationId };
-    const select = {
-        provider: true,
-        status: true,
-        attentionAt: true,
-    } as const;
-    const row =
-        p.channel === "PAYMENTS"
-            ? await tx.merchantPaymentProvider.findFirst({ where, select })
-            : await tx.communicationProvider.findFirst({ where, select });
-    if (row?.status !== "CONNECTED" || !row.attentionAt) return null;
-    if (row.attentionAt.toISOString() !== p.since) return null;
-    const name = PROVIDER_NAMES[row.provider] ?? row.provider;
-    const base = {
-        event: "failed" as const,
-        eventKey: `team:provider:${p.providerId}:${p.since}`,
-        notificationId: null,
-        type: PROVIDER_ATTENTION_NOTIFICATION_TYPE,
-        path: "/settings/providers",
-        skipUserId: null,
-    };
-    // Saroh sends the email, not the provider whose keys were refused
-    // (DEC-011 amended), so an email provider's alert is emailed too.
-    if (p.channel === "PAYMENTS") {
-        const body = `Customers can't pay online until you connect ${name} again with keys that work, in Settings › Providers.`;
-        return {
-            ...base,
-            title: `${name} refused your keys`,
-            body,
-            mail: { heading: `${name} refused your keys`, body },
-        };
-    }
-    const body = `Emails to your customers aren't going out. Connect ${name} again with a key that works, in Settings › Providers.`;
-    return {
-        ...base,
-        title: `${name} refused your email keys`,
-        body,
-        mail: { heading: `${name} refused your email keys`, body },
-    };
-}
-
-/** How a provider is named in an alert. */
-const PROVIDER_NAMES: Partial<Record<string, string>> = {
-    RAZORPAY: "Razorpay",
-    CASHFREE: "Cashfree",
-    RESEND: "Resend",
-    SENDGRID: "SendGrid",
-    SMTP: "SMTP relay",
-};
-
 /** A booking's email words, by the notice's type: fixed, naming nobody. */
 const NEW_BOOKING_MAIL: WordedAlert["mail"] = {
     heading: "New booking",
@@ -692,7 +636,10 @@ function payloadOf(value: unknown): TeamAlertPayload | null {
         case "provider":
             return str("providerId") &&
                 str("since") &&
-                (p.channel === "PAYMENTS" || p.channel === "EMAIL")
+                (p.channel === "PAYMENTS" || p.channel === "EMAIL") &&
+                (p.change === undefined ||
+                    p.change === "down" ||
+                    p.change === "back")
                 ? (p as TeamAlertPayload)
                 : null;
         case "review":

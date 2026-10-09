@@ -25,6 +25,7 @@ import {
 import { assertBusinessDetails } from "../invoices/business-details";
 import { creditNoteForRefund } from "../invoices/order-invoicing";
 import { NOT_PAID_ONLINE } from "../invoices/pay-online";
+import { queueProviderBack } from "../notifications/provider-alerts";
 import { assertWithinOrderLeftInTx } from "../orders/hand-refund";
 import {
     finishCancelInTx,
@@ -50,7 +51,11 @@ import { authorize } from "../organizations/organization-policy";
 import { assertPutBack, returnablePlan, STOCK_HELD } from "../stock/reserve";
 import { decryptSecret, encryptSecret } from "./crypto";
 import { businessPayLinkProvider, payLinkProvider } from "./pay-link-provider";
-import { assertKeysAccepted, providerOrderFailed } from "./provider-keys";
+import {
+    assertKeysAccepted,
+    paymentProviderWorks,
+    providerOrderFailed,
+} from "./provider-keys";
 import type {
     CreateOrderIntentResult,
     MerchantProvider,
@@ -526,8 +531,17 @@ export class PaymentsService {
         const row = await planMeter.withRoom(
             ctx.organizationId,
             "integrations",
-            (tx) =>
-                tx.merchantPaymentProvider.upsert({
+            async (tx) => {
+                const before = await tx.merchantPaymentProvider.findUnique({
+                    where: {
+                        organizationId_provider: {
+                            organizationId: ctx.organizationId,
+                            provider,
+                        },
+                    },
+                    select: { attentionAt: true },
+                });
+                const saved = await tx.merchantPaymentProvider.upsert({
                     where: {
                         organizationId_provider: {
                             organizationId: ctx.organizationId,
@@ -552,7 +566,20 @@ export class PaymentsService {
                         // Keys that just passed the check need no attention.
                         ...NO_ATTENTION,
                     },
-                }),
+                });
+                // They end a refusal the team was told of (#555); whoever
+                // entered them sees it here, so isn't emailed.
+                if (before?.attentionAt) {
+                    await queueProviderBack(
+                        tx,
+                        saved,
+                        "PAYMENTS",
+                        new Date(),
+                        ctx.userId,
+                    );
+                }
+                return saved;
+            },
             {
                 addingIn: async (tx) =>
                     (await tx.merchantPaymentProvider.count({
@@ -1789,6 +1816,9 @@ export class PaymentsService {
             // team (UX-012).
             throw await providerOrderFailed(providerRow, err);
         }
+        // A provider order made on a connection flagged as refused: it
+        // works again, and the team hears so once (#555). Never throws.
+        if (providerRow.attentionAt) await paymentProviderWorks(providerRow);
 
         // Persist intent + first attempt atomically. rawResponse holds only the
         // non-secret client params — never any credential.

@@ -34,6 +34,7 @@ jest.mock("@saroh/database", () => {
             updateMany: jest.fn(),
         },
         job: { create: jest.fn() },
+        customerNotice: { findFirst: jest.fn() },
         paymentIntent: {
             findUnique: jest.fn(),
             findFirst: jest.fn(),
@@ -1528,6 +1529,43 @@ describe("PaymentsService — keys checked on connect (UX-012)", () => {
         expect(result.attention).toBeNull();
     });
 
+    it("tells the team it works again when the keys end a refusal they were told of, but not whoever entered them (#555)", async () => {
+        const { service } = makeService();
+        const jobCreate = prisma.job.create as jest.Mock;
+        providerFindUnique.mockResolvedValue({
+            attentionAt: new Date("2026-10-08T09:00:00Z"),
+        });
+        (prisma.customerNotice.findFirst as jest.Mock).mockResolvedValue({
+            eventKey: "team:provider:mpp_1:down:2026-10-08T09:00:00.000Z",
+        });
+
+        await service.connectProvider(ctx(), KEYS);
+
+        expect(jobCreate).toHaveBeenCalledWith({
+            data: {
+                organizationId: "org_1",
+                type: "team.alert",
+                payload: {
+                    event: "provider",
+                    change: "back",
+                    channel: "PAYMENTS",
+                    providerId: "mpp_1",
+                    since: expect.any(String),
+                    actorUserId: "user_1",
+                },
+            },
+        });
+    });
+
+    it("says nothing on keys entered for a connection that was working", async () => {
+        const { service } = makeService();
+        providerFindUnique.mockResolvedValue({ attentionAt: null });
+
+        await service.connectProvider(ctx(), KEYS);
+
+        expect(prisma.job.create).not.toHaveBeenCalled();
+    });
+
     it("lists a connection that refused its keys as needing attention, and since when", async () => {
         const { service } = makeService();
         const since = new Date("2026-10-07T09:30:00Z");
@@ -1604,6 +1642,7 @@ describe("PaymentsService — a provider failing at checkout (UX-012)", () => {
             type: "team.alert",
             payload: {
                 event: "provider",
+                change: "down",
                 channel: "PAYMENTS",
                 providerId: "mpp_1",
                 since: expect.any(String),
@@ -1642,6 +1681,67 @@ describe("PaymentsService — a provider failing at checkout (UX-012)", () => {
         ).toMatchObject({ details: { reason: "provider-unavailable" } });
         expect(updateMany).not.toHaveBeenCalled();
         expect(jobCreate).not.toHaveBeenCalled();
+    });
+
+    it("clears the flag when a provider order goes through after all, and tells the team it works again (#555)", async () => {
+        const { service } = makeService();
+        const flaggedAt = new Date("2026-10-08T09:00:00Z");
+        providerFindMany.mockResolvedValue([
+            {
+                ...connectedRow(),
+                attentionReason: "KEYS_REFUSED",
+                attentionAt: flaggedAt,
+            },
+        ]);
+        intentCreate.mockResolvedValue({ id: "pi_1" });
+        attemptCreate.mockResolvedValue({ id: "att_1" });
+        updateMany.mockResolvedValue({ count: 1 });
+        (prisma.customerNotice.findFirst as jest.Mock).mockResolvedValue({
+            eventKey: `team:provider:mpp_1:down:${flaggedAt.toISOString()}`,
+        });
+
+        await service.createIntentForOrder(ctx(), "order_1");
+
+        expect(updateMany).toHaveBeenCalledWith({
+            where: {
+                id: "mpp_1",
+                organizationId: "org_1",
+                attentionAt: flaggedAt,
+            },
+            data: { attentionReason: null, attentionAt: null },
+        });
+        expect(jobCreate).toHaveBeenCalledWith({
+            data: {
+                organizationId: "org_1",
+                type: "team.alert",
+                payload: {
+                    event: "provider",
+                    change: "back",
+                    channel: "PAYMENTS",
+                    providerId: "mpp_1",
+                    since: expect.any(String),
+                    actorUserId: null,
+                },
+            },
+        });
+    });
+
+    it("still makes the customer's order when clearing the flag fails", async () => {
+        const { service } = makeService();
+        providerFindMany.mockResolvedValue([
+            {
+                ...connectedRow(),
+                attentionReason: "KEYS_REFUSED",
+                attentionAt: new Date("2026-10-08T09:00:00Z"),
+            },
+        ]);
+        intentCreate.mockResolvedValue({ id: "pi_1" });
+        attemptCreate.mockResolvedValue({ id: "att_1" });
+        updateMany.mockRejectedValue(new Error("db down"));
+
+        await expect(
+            service.createIntentForOrder(ctx(), "order_1"),
+        ).resolves.toMatchObject({ paymentIntentId: "pi_1" });
     });
 
     it("still answers the customer when the flag can't be written", async () => {

@@ -23,6 +23,7 @@ import {
 import type { OrganizationContext } from "../../common/types/organization-context";
 import { planMeter } from "../billing/metering.service";
 import { isReservedContactEmail } from "../contacts/contact-email";
+import { queueProviderBack } from "../notifications/provider-alerts";
 import { allows, authorize } from "../organizations/organization-policy";
 import { encryptSecret } from "../payments/crypto";
 import type {
@@ -318,8 +319,17 @@ export class CommunicationsService {
         const row = await planMeter.withRoom(
             ctx.organizationId,
             "integrations",
-            (tx) =>
-                tx.communicationProvider.upsert({
+            async (tx) => {
+                const before = await tx.communicationProvider.findUnique({
+                    where: {
+                        organizationId_channel: {
+                            organizationId: ctx.organizationId,
+                            channel,
+                        },
+                    },
+                    select: { attentionAt: true },
+                });
+                const saved = await tx.communicationProvider.upsert({
                     where: {
                         organizationId_channel: {
                             organizationId: ctx.organizationId,
@@ -345,7 +355,21 @@ export class CommunicationsService {
                         credentialsAuthTag: sealed.authTag,
                         ...NO_ATTENTION,
                     },
-                }),
+                });
+                // A key that passed the check ends a refusal the team was
+                // told of (#555, email only, as the refusal); whoever
+                // entered it sees it here, so isn't emailed.
+                if (before?.attentionAt && channel === "EMAIL") {
+                    await queueProviderBack(
+                        tx,
+                        saved,
+                        "EMAIL",
+                        new Date(),
+                        ctx.userId,
+                    );
+                }
+                return saved;
+            },
             {
                 addingIn: async (tx) =>
                     (await tx.communicationProvider.count({
