@@ -3611,3 +3611,42 @@ serialized read only after stripping the timestamps.
 **Category**: tests · `e2e/tests/business-settings.spec.ts`,
 `apps/app.saroh.in/components/sites/site-editor.test.tsx`,
 `apps/api.saroh.in/src/modules/orders/order-kitchen.service.spec.ts`
+
+## Flaky tests — two settings specs on PR #913, already fixed underneath it
+
+**Symptom**: CI on PR #913 (run 37917139224, 9 Oct) failed two phone tests,
+first try and retry, and passed on a re-run. (1) `business-settings.spec.ts`
+→ "the address tab is Registered address": no "Registered address" region,
+Identity still selected, and a "Choose your business type" card on the
+page. (2) `ux-polish-874.spec.ts` → "Settings' tabs say there is more at
+320px": `expect(got.inView).toBe(true)` got false on /settings/activity,
+whose feed was full of other tests' changes.
+**Cause**: neither was another test changing Northwind. The run was cut
+before both fixes reached `development`. (1) is #846's lost click: the tab
+is server-drawn and a press before hydration does nothing; the trace has the
+click 0.5 s after the page loaded. The business-type card is the seed's
+state (not registered, no type), and the six tabs and the region's title
+are constants (`TAB_KEYS`, `SECTIONS` in `organization-settings-form.tsx`),
+so nothing a parallel test saves changes them. Fixed by 1b5224de8 (clicks
+until `aria-selected`). (2) `useEdgeFade` revealed the open tab once, on
+first paint, and web fonts widened the tabs after it; the spec looked once.
+Fixed by 310085602 (reveals again as the strip or tab resizes, and the spec
+polls `inView`). What was left in (2): the fade and the "no sideways scroll"
+checks were still one look each after the poll, the page check compared
+`scrollWidth` with `innerWidth`, which a phone widens to fit an overflow
+(so it passed on the bug), and it read Northwind's Activity and Providers
+tab, which other tests write to. The Business tab strip test pressed the
+last tab without waiting for hydration, so it could pass on Identity.
+**Fix**: Settings' tabs are read on a business the test sets up
+(`makeBusiness`), and one `expect.poll` checks the strip overflows, fades,
+shows the open tab, and that the page neither scrolls nor zooms out past
+the width set. The Business strip test presses until `aria-selected`, then
+polls. No product change: read from the code, nothing on Activity widens the page; its rows are
+clipped by the card's `overflow-hidden`, not spilled.
+**Check**: before calling a CI flake a data race, check the failing run's
+tree against `development` (`git merge-base --is-ancestor <fix> <head>`) and
+read the trace's timings. A one-shot `expect(await page.evaluate(…))` in a
+spec is the pattern the skill bans (#718); five remain in `e2e/tests` and a
+grep in `scripts/prepush.sh` could refuse new ones.
+**Category**: tests · `e2e/tests/ux-polish-874.spec.ts`,
+`.agents/skills/saroh-browser-tests/SKILL.md` → Waiting
