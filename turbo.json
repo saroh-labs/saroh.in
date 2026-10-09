@@ -114,6 +114,8 @@
         "E2E_PAUSED_ORG",
         // The merchant site in the paused state (#800), for its e2e.
         "E2E_PAUSED_SITE",
+        // A page on that site with a Class packs or Plans block (#800).
+        "E2E_PAUSED_PRICES_PATH",
         "npm_package_version"
     ],
     "tasks": {
