@@ -274,7 +274,7 @@ describe("Saroh sends booking emails (DEC-086, real database)", () => {
             status: "QUEUED",
             template: "BOOKING_CONFIRMED",
             toAddress: "asha@example.com",
-            subject: "Your booking with Rye & Co. is confirmed",
+            subject: "You're booked with Rye & Co.",
         });
         expect(message.body).toContain("Sent for Rye &amp; Co. by Saroh.");
         expect(message.deliveries).toEqual([

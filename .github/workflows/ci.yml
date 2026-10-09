@@ -191,6 +191,11 @@ jobs:
       - name: mktemp templates
         run: pnpm run check:mktemp
 
+      # One word each (UX-078): no "Reschedule", "Shut" or "reservation" in
+      # what merchants and customers read.
+      - name: One word each
+        run: pnpm run check:words
+
       # Every browser spec names what it exercises (`// @covers …`), so the
       # local gate can run only the specs a batch reaches. CI still runs all.
       - name: Browser spec coverage keys

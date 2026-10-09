@@ -621,13 +621,13 @@ describe("visits (E10)", () => {
     it("says when the later visits are booked", () => {
         expect(laterVisitsText(1)).toBeNull();
         expect(laterVisitsText(2)).toBe(
-            "We'll book visit 2 with you at the first appointment",
+            "We'll book visit 2 with you at the first visit",
         );
         expect(laterVisitsText(3)).toBe(
-            "We'll book visits 2 and 3 with you at the first appointment",
+            "We'll book visits 2 and 3 with you at the first visit",
         );
         expect(laterVisitsText(6)).toBe(
-            "We'll book visits 2 to 6 with you at the first appointment",
+            "We'll book visits 2 to 6 with you at the first visit",
         );
         expect(firstVisitText(1)).toBeNull();
         expect(firstVisitText(3)).toBe(

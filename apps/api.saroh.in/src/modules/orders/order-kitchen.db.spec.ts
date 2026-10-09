@@ -788,7 +788,7 @@ describe("fulfilment types (real database)", () => {
                 fulfilment: "APPOINTMENT_IN_PERSON",
             }),
         ).rejects.toThrow(
-            "An appointment is made by booking it, not by adding an order.",
+            "A booking is made on the calendar, not by adding an order.",
         );
         expect(await stored()).toBe("DIGITAL");
         expect(

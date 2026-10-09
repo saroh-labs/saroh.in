@@ -1,3 +1,4 @@
+import { moduleName } from "@/lib/modules/names";
 import { rolledOutKeys } from "@/lib/modules/rollout";
 import type { ModuleView } from "@/lib/modules/schema";
 import { listWords } from "@/lib/modules/switch-plan";
@@ -51,16 +52,6 @@ const USES_WORD: Partial<Record<string, string>> = {
     CLASS_PACKS: "Class packs",
     PAYMENTS: "Plans",
     CRM: "Enquiries",
-};
-
-/** The module as the rail names it (`nav-items.tsx`, the module list). */
-const RAIL_NAME: Partial<Record<string, string>> = {
-    COMMERCE: "Sell",
-    APPOINTMENTS: "Bookings",
-    COURSES: "Courses",
-    CLASS_PACKS: "Class packs",
-    PAYMENTS: "Payments",
-    CRM: "Contacts",
 };
 
 /** What a template is built around, as a card's tag says it. */
@@ -180,7 +171,8 @@ export function moduleNote(
 ): string | null {
     if (!modules) return null;
     const off = gating(template).flatMap((k) => {
-        const rail = RAIL_NAME[k];
+        // The module as the rail names it (`lib/modules/names.ts`).
+        const rail = moduleName(k);
         const word = USES_WORD[k];
         return rail &&
             word &&

@@ -234,8 +234,8 @@ export const FULFILMENT_RULES: Readonly<Record<FulfilmentType, TypeRule>> = {
         ],
     },
     APPOINTMENT_IN_PERSON: {
-        label: "Appointment, in person",
-        noun: "an appointment",
+        label: "Booking, in person",
+        noun: "a booking",
         steps: BOOKED_ATTENDED,
         // The first attended visit, which the visits (E9) record.
         handedOver: ["DELIVERED"],
@@ -247,8 +247,8 @@ export const FULFILMENT_RULES: Readonly<Record<FulfilmentType, TypeRule>> = {
         moves: [],
     },
     APPOINTMENT_ONLINE: {
-        label: "Appointment, online",
-        noun: "an appointment",
+        label: "Booking, online",
+        noun: "a booking",
         steps: BOOKED_ATTENDED,
         handedOver: ["DELIVERED"],
         done: "DELIVERED",
@@ -290,7 +290,7 @@ export function storedValueFor(type: FulfilmentType): OrderFulfilment {
     if (FULFILMENT_RULES[type].visits) {
         throw new BadRequestException({
             message:
-                "An appointment is made by booking it, not by adding an order.",
+                "A booking is made on the calendar, not by adding an order.",
             field: "fulfilment",
         });
     }

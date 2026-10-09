@@ -758,7 +758,7 @@ function Legend({ classes }: { classes: boolean }) {
         <ul className="mb-3 flex flex-wrap gap-x-3.5 gap-y-1.5 text-[11.5px] text-muted-foreground">
             <li className="inline-flex items-center gap-1.5">
                 <span aria-hidden className={cn(sw, "bg-diary-one")} />
-                {classes ? "One-to-one" : "Appointment"}
+                {classes ? "One-to-one" : "Booking"}
             </li>
             {classes ? (
                 <li className="inline-flex items-center gap-1.5">

@@ -232,7 +232,7 @@ describe("editing and the legacy status PATCH", () => {
             /^A pick-up order isn't shipped\. Change how it's fulfilled first\.$/,
         ],
         ["DIGITAL", /^A digital order isn't shipped/],
-        ["APPOINTMENT_ONLINE", /^An appointment isn't shipped/],
+        ["APPOINTMENT_ONLINE", /^A booking isn't shipped/],
     ])(
         "SHIPPED on a %s order is refused (409), not turned into a delivery",
         (fulfilment, sentence) => {

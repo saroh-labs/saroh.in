@@ -150,8 +150,7 @@ export function planStageMove(order: StageSubject, to: OrderStage): StageMove {
     const rule = FULFILMENT_RULES[type];
     if (rule.visits) {
         throw new BadRequestException({
-            message:
-                "An appointment moves on by its visits, not by order steps.",
+            message: "A booking moves on by its visits, not by order steps.",
             field: "stage",
         });
     }
@@ -367,7 +366,7 @@ export function stageForStatus(
             if (rule.visits) {
                 throw new ConflictException({
                     message:
-                        "An appointment is finished by its visits, not marked delivered.",
+                        "A booking is finished by its visits, not marked delivered.",
                     field: "status",
                 });
             }

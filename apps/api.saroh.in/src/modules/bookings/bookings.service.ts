@@ -1450,6 +1450,6 @@ export function outcomeTooEarly(
             : startAt.getTime();
     if (now.getTime() >= opensAt) return null;
     return outcome === "ATTENDED"
-        ? "Check-in opens an hour before the appointment."
-        : "This appointment has not started yet.";
+        ? "Check-in opens an hour before the booking."
+        : "This booking has not started yet.";
 }

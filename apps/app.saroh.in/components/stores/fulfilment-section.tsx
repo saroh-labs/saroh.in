@@ -131,7 +131,7 @@ export function FulfilmentSection({
                 <Note id="storefront-ways-note">
                     {types.length === 0
                         ? "None chosen: orders from here are only ever digital or booked visits."
-                        : "The ways an order from here can reach the customer. Digital products and appointments follow the product, so they need no chip."}
+                        : "The ways an order from here can reach the customer. Digital products and bookings follow the product, so they need no chip."}
                 </Note>
             </div>
 

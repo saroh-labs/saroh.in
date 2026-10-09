@@ -4,6 +4,7 @@ import { mayAddStorefront } from "@/lib/business-limits";
 import { resolveActiveOrganization } from "@/lib/organizations/service";
 import { requireSession } from "@/lib/session";
 import { readSiteSelling } from "@/lib/stores/location-selling";
+import { locationsWord } from "@/lib/stores/pick";
 import {
     getStorefront,
     getStorefrontAllowance,
@@ -20,7 +21,11 @@ import {
  * `useSearchParams` would put the whole screen behind Suspense for a value
  * needed once. An unknown id falls back to the first, not to an error.
  */
-export const metadata = { title: "Locations" };
+export async function generateMetadata() {
+    // Named by the count, as the rail names it: "Location" for one.
+    const storefronts = await listStorefronts().catch(() => []);
+    return { title: locationsWord(storefronts.length) };
+}
 
 export default async function StorefrontsPage({
     searchParams,

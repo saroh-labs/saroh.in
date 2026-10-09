@@ -808,6 +808,7 @@ bg_step cycles pnpm run check:cycles
 bg_step e2e-covers pnpm run check:e2e-covers
 bg_step migration-ids pnpm run check:migration-ids
 bg_step mktemp pnpm run check:mktemp
+bg_step words pnpm run check:words
 
 # Unit tests. The quick run takes only the specs the change reaches; --int and
 # --all run the full suites. As CI: the api's unit tests mock the environment,

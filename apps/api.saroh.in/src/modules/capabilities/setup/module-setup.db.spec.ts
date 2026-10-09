@@ -276,7 +276,7 @@ describe("Contacts, Bookings and what needs what", () => {
             }),
             BadRequestException,
         );
-        expect(r.message).toBe("Appointments needs CRM. Turn on CRM first.");
+        expect(r.message).toBe("Bookings needs CRM. Turn on CRM first.");
         expect(await status(ctx, "APPOINTMENTS")).toBeNull();
         expect(await status(ctx, "CRM")).toBeNull();
         expect(

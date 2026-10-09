@@ -172,9 +172,9 @@ describe("a refused module write's words (DEC-057)", () => {
     it("keeps the API's own sentence", () => {
         expect(
             moduleErrorSentence(
-                "Class packs needs Appointments. Turn on Appointments first.",
+                "Class packs needs Bookings. Turn on Bookings first.",
             ),
-        ).toBe("Class packs needs Appointments. Turn on Appointments first.");
+        ).toBe("Class packs needs Bookings. Turn on Bookings first.");
     });
 
     it("turns a bare code into its words, never the code", () => {

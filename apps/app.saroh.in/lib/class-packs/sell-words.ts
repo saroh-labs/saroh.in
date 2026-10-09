@@ -1,4 +1,5 @@
 import { DISPLAY_LOCALE } from "@/lib/format/locale";
+import { METHOD_WORD } from "@/lib/payments/method-words";
 
 import type { PackStanding } from "./balance";
 import type { PackKind } from "./pack-cards";
@@ -19,18 +20,18 @@ export type DeskPaidBy = "CASH" | "UPI" | "CARD" | "BANK" | "NONE";
 export type PaidBy = DeskPaidBy | "ONLINE";
 
 export const DESK_PAID_BY: readonly { value: DeskPaidBy; label: string }[] = [
-    { value: "CASH", label: "Cash" },
-    { value: "UPI", label: "UPI at the desk" },
-    { value: "CARD", label: "Card machine" },
-    { value: "BANK", label: "Bank transfer" },
+    { value: "CASH", label: METHOD_WORD.CASH },
+    { value: "UPI", label: METHOD_WORD.UPI },
+    { value: "CARD", label: METHOD_WORD.CARD },
+    { value: "BANK", label: METHOD_WORD.BANK },
     { value: "NONE", label: "No payment" },
 ];
 
 const PAID_BY_LABEL: Record<PaidBy, string> = {
-    CASH: "Cash",
-    UPI: "UPI",
-    CARD: "Card",
-    BANK: "Bank transfer",
+    CASH: METHOD_WORD.CASH,
+    UPI: METHOD_WORD.UPI,
+    CARD: METHOD_WORD.CARD,
+    BANK: METHOD_WORD.BANK,
     ONLINE: "Online",
     NONE: "None",
 };

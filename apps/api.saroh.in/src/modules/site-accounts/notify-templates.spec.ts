@@ -168,7 +168,7 @@ describe("the notice email (A14)", () => {
             kind: "BOOKING_CONFIRMED",
             booking: booking(),
         });
-        expect(mail.subject).toBe("Your booking with Kavi Dental is confirmed");
+        expect(mail.subject).toBe("You're booked with Kavi Dental");
         expect(mail.body).toContain("<p>Hi Asha,</p>");
         expect(mail.body).toContain(
             "Your Check-up with Dr Kavi on Tue 6 Oct at 11:00 is booked.",

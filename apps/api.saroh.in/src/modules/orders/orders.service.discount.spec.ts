@@ -300,7 +300,7 @@ describe("OrdersService.create — fulfilment types (DEC-045)", () => {
             expect(err).toBeInstanceOf(BadRequestException);
             expect((err as BadRequestException).getResponse()).toMatchObject({
                 message:
-                    "An appointment is made by booking it, not by adding an order.",
+                    "A booking is made on the calendar, not by adding an order.",
                 field: "fulfilment",
             });
             expect(db.order!.create).not.toHaveBeenCalled();

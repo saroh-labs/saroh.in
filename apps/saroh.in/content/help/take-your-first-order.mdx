@@ -10,8 +10,8 @@
 #          phone", Walk-in with Name and "Phone (if they give one)")
 #   LINES  .../new-order/lines-step.tsx ("Add a product — type to find it")
 #   LEAVES .../new-order/leaves-step.tsx ("How it leaves", the address)
-#   PAY    apps/app.saroh.in/lib/orders/new-order.ts (Cash, "UPI at the
-#          counter", "Card machine", "Send a payment link", "Pay on
+#   PAY    apps/app.saroh.in/lib/orders/new-order.ts (Cash, UPI, Card,
+#          "Send a payment link", "Pay on
 #          collection" and why each is off; the button: "UPI received ·
 #          create" and the others)
 #   STEPS  apps/app.saroh.in/lib/orders/lifecycle.ts ("Start preparing",
@@ -52,9 +52,9 @@ steps:
       marker: Meera Iyer
     # LEAVES, PAY.
     - title: How it leaves and how it's paid
-      body: "Under How it leaves, choose from the ways your location offers, and add the address for a delivery. Under Payment, choose Cash, UPI at the counter or Card machine for money taken now, Send a payment link to send the customer a link, or Pay on collection for a pick-up they'll pay for later. The button at the bottom says what will happen, such as UPI received · create. Press it once the money is in."
+      body: "Under How it leaves, choose from the ways your location offers, and add the address for a delivery. Under Payment, choose Cash, UPI or Card for money taken now at the counter, Send a payment link to send the customer a link, or Pay on collection for a pick-up they'll pay for later. The button at the bottom says what will happen, such as UPI received · create. Press it once the money is in."
       shot: help-take-order-3
-      caption: "Northwind Supply (a demo shop): a local delivery paid by UPI at the counter, ready to create."
+      caption: "Northwind Supply (a demo shop): a local delivery paid by UPI, ready to create."
       tip: "Send a payment link needs a payment provider connected and a customer with a phone or email. A delivery can't be paid on collection."
       marker: UPI received · create
     # STEPS.

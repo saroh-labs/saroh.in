@@ -165,15 +165,15 @@ const PAID = {
 };
 
 describe("Take ₹X at the desk", () => {
-    it("offers cash, UPI at the counter, the card machine and a pay link, cash first", () => {
+    it("offers Cash, UPI, Card and a pay link, one word each, cash first", () => {
         openTake();
         const chips = Array.from(
             dialog().querySelectorAll<HTMLButtonElement>('[role="radio"]'),
         );
         expect(chips.map((c) => c.textContent)).toEqual([
             "Cash",
-            "UPI at the counter",
-            "Card machine",
+            "UPI",
+            "Card",
             "Send a pay link",
         ]);
         expect(chip("Cash").getAttribute("aria-checked")).toBe("true");
@@ -211,8 +211,8 @@ describe("Take ₹X at the desk", () => {
     });
 
     it.each([
-        ["UPI at the counter", "UPI received", "UPI", "₹500 taken by UPI."],
-        ["Card machine", "Card approved", "CARD", "₹500 taken by card."],
+        ["UPI", "UPI received", "UPI", "₹500 taken by UPI."],
+        ["Card", "Card approved", "CARD", "₹500 taken by card."],
     ])(
         "%s: sends its method and no cash given",
         async (label, action, method, toast) => {
@@ -488,9 +488,7 @@ describe("the calendar quick look's Take ₹X", () => {
         );
         act(() => trigger?.click());
         const dialogs = document.querySelectorAll('[role="dialog"]');
-        expect(dialogs[dialogs.length - 1].textContent).toContain(
-            "UPI at the counter",
-        );
+        expect(dialogs[dialogs.length - 1].textContent).toContain("UPI");
     });
 
     it("is shown disabled, with why, to a role that can't take it (FB-1, DEC-098)", () => {

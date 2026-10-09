@@ -17,7 +17,7 @@ const email = {
     fallbackName: "Your booking",
     contactEmail: "frontdesk@kavi.example",
     to: "customer@example.test",
-    subject: "Your booking with Kavi Dental is confirmed",
+    subject: "You're booked with Kavi Dental",
     html: "<p>See you soon.</p>",
 };
 

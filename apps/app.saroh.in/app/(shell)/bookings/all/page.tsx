@@ -93,7 +93,7 @@ export default async function BookingsPage({
                     "All bookings",
                 ]}
                 title="All bookings"
-                description="Reservations across your services, in the timezone each was booked in."
+                description="Bookings across your services, in the timezone each was booked in."
                 actions={
                     <>
                         <Button asChild variant="outline">

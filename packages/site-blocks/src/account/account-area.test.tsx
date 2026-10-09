@@ -161,19 +161,19 @@ describe("Home", () => {
         plan: { ok: true, value: PLAN },
     };
 
-    it("shows the next appointment and the plan, under the header's greeting", () => {
+    it("shows the next booking and the plan, under the header's greeting", () => {
         render(<AccountHome account={ACCOUNT} home={home} />);
         // "Hi, Farah" is the account header's title now (DEC-073 #10).
         expect(screen.queryByRole("heading", { level: 1 })).toBeNull();
         expect(
-            screen.getByRole("heading", { name: "Next appointment" }),
+            screen.getByRole("heading", { name: "Next booking" }),
         ).toBeInTheDocument();
         expect(
             screen.getByText("Check-up · Mon 5 Oct, 10:00"),
         ).toBeInTheDocument();
         expect(screen.getByText("With Dr. Rao")).toBeInTheDocument();
         expect(
-            screen.getByRole("link", { name: "Book an appointment" }),
+            screen.getByRole("link", { name: "Make a booking" }),
         ).toHaveAttribute("href", "/book");
         expect(
             screen.getByText("Unlimited · ₹2,500 / month"),

@@ -1,4 +1,5 @@
 import type { PaymentMethod } from "@/lib/invoices/service";
+import { METHOD_WORD } from "@/lib/payments/method-words";
 
 /**
  * The ways a business says it was paid outside Saroh (#834), in the order
@@ -6,11 +7,11 @@ import type { PaymentMethod } from "@/lib/invoices/service";
  * choice on the order's invoice and its timeline.
  */
 export const PAID_HOW: readonly { value: PaymentMethod; label: string }[] = [
-    { value: "CASH", label: "Cash" },
-    { value: "UPI", label: "UPI" },
-    { value: "BANK_TRANSFER", label: "Bank transfer" },
-    { value: "CARD", label: "Card at the counter" },
-    { value: "OTHER", label: "Other" },
+    { value: "CASH", label: METHOD_WORD.CASH },
+    { value: "UPI", label: METHOD_WORD.UPI },
+    { value: "CARD", label: METHOD_WORD.CARD },
+    { value: "BANK_TRANSFER", label: METHOD_WORD.BANK_TRANSFER },
+    { value: "OTHER", label: METHOD_WORD.OTHER },
 ];
 
 /**

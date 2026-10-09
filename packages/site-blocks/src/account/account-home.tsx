@@ -39,11 +39,9 @@ export function AccountHome({
             {home.nextBooking ? (
                 <NextBooking
                     block={home.nextBooking}
-                    title={clinic ? "Next appointment" : "Next up"}
+                    title={clinic ? "Next booking" : "Next up"}
                     bookLabel={
-                        clinic
-                            ? "Book an appointment"
-                            : "Book a class or session"
+                        clinic ? "Make a booking" : "Book a class or session"
                     }
                 />
             ) : null}

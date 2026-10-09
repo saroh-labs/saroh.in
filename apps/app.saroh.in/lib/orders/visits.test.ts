@@ -139,11 +139,11 @@ describe("the Visits card's words (B14)", () => {
     });
 
     it("the heading says the type and the next visit", () => {
-        expect(visitsHow("Appointment, in person", d301(), zone, now)).toBe(
-            "Appointment, in person · next visit today, 10:00",
+        expect(visitsHow("Booking, in person", d301(), zone, now)).toBe(
+            "Booking, in person · next visit today, 10:00",
         );
-        expect(visitsHow("Appointment, online", null, zone, now)).toBe(
-            "Appointment, online",
+        expect(visitsHow("Booking, online", null, zone, now)).toBe(
+            "Booking, online",
         );
     });
 
