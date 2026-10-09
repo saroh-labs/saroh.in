@@ -272,11 +272,15 @@ export function TeamScreen({
     // DEC-105). With both caps reached, it says why, as the design flashes
     // it: the invite would be refused, invites count too, and where more is.
     const room = inviteRoom(teamLimit);
+    // Someone already on the diary takes no extra seat (#868), so a full
+    // team can still invite them.
     const inviteLabel = !teamLimit?.full
         ? "Invite someone"
         : room.open
           ? "Invite someone view-only"
-          : "Team is full";
+          : diaryPeople.length > 0
+            ? "Invite someone on the diary"
+            : "Team is full";
     // What the seats count (DEC-105), from what the API says each uses.
     const counts = teamCounts(members, invitations);
     const openInvite = () => {

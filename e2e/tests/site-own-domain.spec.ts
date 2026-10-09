@@ -127,7 +127,9 @@ test.describe(
             try {
                 await openSettings(page);
                 const own = block(page, d.hostname);
-                await expect(own.getByText("Not live yet")).toBeVisible();
+                await expect(
+                    own.getByText("Not live yet", { exact: true }),
+                ).toBeVisible();
                 await expect(
                     own.getByText("Visitors don't reach your site yet.", {
                         exact: false,

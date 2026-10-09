@@ -36,6 +36,7 @@ test.describe("the person page", () => {
         const who = await makeContact(page.request, {
             firstName: "Person",
             lastName: s,
+            email: `person-${s}@example.com`,
         });
         const title = `Wedding cake ${s}`;
         await northwind(page.request).post("/leads", {
@@ -81,6 +82,7 @@ test.describe("the person page", () => {
         const who = await makeContact(page.request, {
             firstName: "Facts",
             lastName: s,
+            email: `person-${s}@example.com`,
         });
         const company = `Acme ${s}`;
         await northwind(page.request).patch(`/contacts/${who.id}`, {
@@ -101,6 +103,7 @@ test.describe("the person page", () => {
         const who = await makeContact(page.request, {
             firstName: "Lead",
             lastName: s,
+            email: `person-${s}@example.com`,
         });
         const lead = await northwind(page.request).post<{ id: string }>(
             "/leads",
@@ -121,6 +124,7 @@ test.describe("the person page", () => {
         const who = await makeContact(page.request, {
             firstName: "Ends",
             lastName: s,
+            email: `person-${s}@example.com`,
         });
         await northwind(page.request).post("/leads", {
             contactId: who.id,
@@ -161,6 +165,7 @@ test.describe("the person page", () => {
         const who = await makeContact(page.request, {
             firstName: "Pays",
             lastName: s,
+            email: `person-${s}@example.com`,
         });
         const made = await nw.post<{ id: string }>("/invoices", {
             contactId: who.id,

@@ -378,7 +378,8 @@ test.describe("needs attention", () => {
     }, testInfo) => {
         await signIn(page, NORTHWIND);
         const contact = await aContact(page, testInfo);
-        await page.goto(`/customers/${contact}`);
+        // The person page (#869); the old address redirects here.
+        await page.goto(`/contacts/${contact}`);
         await page
             .getByRole("region", { name: "Needs attention" })
             .getByRole("button", { name: "Add" })
@@ -389,7 +390,7 @@ test.describe("needs attention", () => {
         await sheet.getByRole("radio", { name: "Access" }).click();
         await sheet.getByLabel("Short label for the team").fill("Wheelchair");
         // The Server Action's POST never reaches the server.
-        await page.route(`**/customers/${contact}**`, (route) =>
+        await page.route(`**/contacts/${contact}**`, (route) =>
             route.request().method() === "POST"
                 ? route.abort()
                 : route.continue(),
