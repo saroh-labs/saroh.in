@@ -145,6 +145,27 @@ describe("the pay link token (real database)", () => {
         );
     });
 
+    it("keeps when each link was made, clears it on void, and the read never carries the token (#870)", async () => {
+        const id = await issued();
+        const first = await invoices.createPayLink(owner, id);
+        const second = await invoices.createPayLink(owner, id);
+        expect(second.payLinkCreatedAt.getTime()).toBeGreaterThanOrEqual(
+            first.payLinkCreatedAt.getTime(),
+        );
+        const view = await invoices.get(owner, id);
+        expect(view.online?.payLinkMadeAt).toBe(
+            second.payLinkCreatedAt.toISOString(),
+        );
+        expect(JSON.stringify(view)).not.toContain(second.token);
+
+        await invoices.voidInvoice(owner, id, { reason: "Wrong amount" });
+        const stored = await prisma.invoice.findUniqueOrThrow({
+            where: { id },
+            select: { payTokenHash: true, payLinkCreatedAt: true },
+        });
+        expect(stored).toEqual({ payTokenHash: null, payLinkCreatedAt: null });
+    });
+
     it("keeps working when deleting the contact is refused (DEC-042)", async () => {
         const other = await prisma.contact.create({
             data: {

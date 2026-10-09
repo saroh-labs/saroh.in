@@ -1,5 +1,6 @@
 import { CANT_MARK_PAID } from "@/lib/organizations/permits";
 
+import { UNSEEN_LINK } from "./minted-links";
 import { sendLabel } from "./send";
 import type { InvoiceStanding } from "./service";
 
@@ -62,6 +63,11 @@ export interface DetailActionState {
     hasPdf: boolean;
     /** A pay link is being made. */
     linkBusy: boolean;
+    /**
+     * A pay link is out that this tab can't show (UX-048): the button makes
+     * a new one, which ends the old one, so it says "Make a new link".
+     */
+    linkUnseen?: boolean;
     /** The PDF is being made. */
     pdfBusy: boolean;
 }
@@ -118,7 +124,11 @@ export function detailActions(s: DetailActionState): DetailAction[] {
         if (canLink) {
             actions.push({
                 id: "copyLink",
-                label: s.linkBusy ? "Making a link…" : "Copy pay link",
+                label: s.linkBusy
+                    ? "Making a link…"
+                    : s.linkUnseen
+                      ? UNSEEN_LINK.action
+                      : "Copy pay link",
                 primary: !s.sendable,
                 disabled: s.linkBusy,
             });

@@ -111,6 +111,7 @@ export default async function InvoicePage({
                     kind: invoice.kind ?? "INVOICE",
                     who: who.name,
                     total: money(invoice.total),
+                    updatedAt: invoice.updatedAt,
                 }}
                 pill={invoicePill(invoice)}
                 subline={

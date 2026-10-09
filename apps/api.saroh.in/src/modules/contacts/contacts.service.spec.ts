@@ -839,7 +839,7 @@ describe("ContactsService.remove", () => {
                 contactId: "c_1",
                 payTokenHash: { not: null },
             },
-            data: { payTokenHash: null },
+            data: { payTokenHash: null, payLinkCreatedAt: null },
         });
         const [revoked] = invoiceUpdateMany.mock.invocationCallOrder;
         const [deleted] = contactDelete.mock.invocationCallOrder;

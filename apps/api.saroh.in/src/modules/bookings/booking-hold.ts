@@ -175,6 +175,7 @@ export async function createHoldInvoiceInTx(
             currency: input.service.currency,
             ...documentColumns(doc),
             payTokenHash: tokenHash,
+            payLinkCreatedAt: new Date(),
         },
         select: { id: true },
     });
@@ -199,7 +200,7 @@ export async function renewHoldTokenInTx(
             source: "BOOKING",
             status: "DRAFT",
         },
-        data: { payTokenHash: tokenHash },
+        data: { payTokenHash: tokenHash, payLinkCreatedAt: new Date() },
     });
     return count > 0 ? token : null;
 }
@@ -288,6 +289,7 @@ export async function releaseHoldInTx(
             voidedAt: now,
             voidReason: HOLD_RELEASED_REASON,
             payTokenHash: null,
+            payLinkCreatedAt: null,
         },
     });
     // A treatment whose first visit was never paid was never sold (E9).

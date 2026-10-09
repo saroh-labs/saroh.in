@@ -611,7 +611,11 @@ export async function issueCreditNote(
                 id: original.id,
                 status: { in: ["ISSUED", "PAID"] },
             },
-            data: { status: "CREDITED", payTokenHash: null },
+            data: {
+                status: "CREDITED",
+                payTokenHash: null,
+                payLinkCreatedAt: null,
+            },
         });
     }
     return note;

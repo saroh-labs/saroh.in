@@ -692,7 +692,7 @@ export class ContactsService {
                     contactId,
                     payTokenHash: { not: null },
                 },
-                data: { payTokenHash: null },
+                data: { payTokenHash: null, payLinkCreatedAt: null },
             });
             await tx.contact.delete({ where: { id: contactId } });
             return {

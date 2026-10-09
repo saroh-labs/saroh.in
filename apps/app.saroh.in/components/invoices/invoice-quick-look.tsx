@@ -8,15 +8,20 @@ import { useEffect, useState } from "react";
 
 import { reportFailure } from "@/components/billing/plan-refusal";
 import { InvoicePill } from "@/components/invoices/invoice-pill";
+import {
+    NewLinkConfirm,
+    UnseenLinkNote,
+} from "@/components/invoices/unseen-link";
 import { QuickLook, QuickLookCard } from "@/components/shared/quick-look";
 import { ViewerDate } from "@/components/shared/viewer-date";
 import { formatMoneyMajor } from "@/lib/format/money";
-import { createPayLink, readInvoice } from "@/lib/invoices/actions";
+import { readInvoice } from "@/lib/invoices/actions";
+import { newPayLink } from "@/lib/invoices/link-actions";
 import { customerHref, invoiceHref, sourceHref } from "@/lib/invoices/links";
 import {
     copyLinkLabel,
+    linkSight,
     mintedLink,
-    rememberLink,
 } from "@/lib/invoices/minted-links";
 import {
     isExemptPaper,
@@ -69,6 +74,8 @@ export function InvoiceQuickLook({
     // inline, so a blocked clipboard never loses it.
     const [shown, setShown] = useState<string | null>(null);
     const [busy, setBusy] = useState(false);
+    // "Make a new link?" — asked before one replaces a link that is out.
+    const [confirming, setConfirming] = useState(false);
     const id = invoice?.id ?? null;
 
     // A new row starts a new read; the previous row's copy state goes too.
@@ -77,6 +84,7 @@ export function InvoiceQuickLook({
         setWasId(id);
         setRead({ state: "loading" });
         setShown(null);
+        setConfirming(false);
     }
 
     useEffect(() => {
@@ -131,8 +139,22 @@ export function InvoiceQuickLook({
     const firstName = who.name.split(" ")[0] ?? who.name;
 
     // A link made for this invoice earlier in this tab: shown again as it
-    // is, never replaced by a new one.
-    const remembered = canLink ? mintedLink(i.id) : null;
+    // is, never replaced by a new one — unless the full read says it can't
+    // be the one out any more: paid or void, or another link made since
+    // (#870).
+    const remembered = canLink
+        ? mintedLink(i.id, {
+              standing: full?.standing,
+              updatedAt: full?.updatedAt,
+              payLinkMadeAt: full?.online?.payLinkMadeAt,
+          })
+        : null;
+    // One out that this tab didn't make (after a reload, or on another
+    // device): it can't be shown, only replaced (UX-048, owner 8 Oct).
+    const unseen =
+        canLink &&
+        !shown &&
+        linkSight({ linkOut, held: remembered !== null }) === "unseen";
 
     async function copyText(url: string, made: boolean) {
         try {
@@ -151,10 +173,9 @@ export function InvoiceQuickLook({
         if (!i) return;
         if (shown) return copyText(shown, false);
         setBusy(true);
-        const res = await createPayLink(i.id);
+        const res = await newPayLink(i.id, full?.updatedAt);
         setBusy(false);
         if (!res.ok) return reportFailure(res);
-        rememberLink(i.id, res.data.url);
         setShown(res.data.url);
         await copyText(res.data.url, true);
     }
@@ -215,7 +236,9 @@ export function InvoiceQuickLook({
                             type="button"
                             variant="outline"
                             disabled={busy}
-                            onClick={() => void copyLink()}
+                            onClick={() =>
+                                unseen ? setConfirming(true) : void copyLink()
+                            }
                             className="h-[38px] px-4 text-[14px]"
                         >
                             {copyLinkLabel({
@@ -357,10 +380,20 @@ export function InvoiceQuickLook({
 
             <p className="text-[12.5px] leading-[1.5] text-foreground">
                 {payLine(i, money)}
-                {canLink && linkOut && !shown && !remembered
-                    ? " A pay link is out. Its address was shown once, when it was made, so copying makes a new one and the old one stops working."
-                    : null}
             </p>
+            {unseen ? (
+                <UnseenLinkNote
+                    sendable={false}
+                    madeAt={full?.online?.payLinkMadeAt}
+                />
+            ) : null}
+
+            <NewLinkConfirm
+                open={confirming}
+                onOpenChange={setConfirming}
+                who={who.name}
+                onConfirm={() => void copyLink()}
+            />
         </QuickLook>
     );
 }

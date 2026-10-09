@@ -151,6 +151,7 @@ describe("BookingsService.payLink (E4)", () => {
         // ₹800 as booked, not the ₹900 the service costs now.
         expect(data.total.toString()).toBe("800.00");
         expect(data.payTokenHash).toBe(hashPayToken(token));
+        expect(data.payLinkCreatedAt).toEqual(NOW);
     });
 
     it("takes the invoice's lock before the booking's (the webhook's order)", async () => {
@@ -174,7 +175,7 @@ describe("BookingsService.payLink (E4)", () => {
         expect(invoiceCreate).not.toHaveBeenCalled();
         expect(invoiceUpdate).toHaveBeenCalledWith({
             where: { id: "inv_1" },
-            data: { payTokenHash: hashPayToken(token) },
+            data: { payTokenHash: hashPayToken(token), payLinkCreatedAt: NOW },
         });
     });
 
@@ -294,7 +295,7 @@ describe("after the link (E4)", () => {
                 status: "ISSUED",
                 payTokenHash: { not: null },
             },
-            data: { payTokenHash: null },
+            data: { payTokenHash: null, payLinkCreatedAt: null },
         });
     });
 });

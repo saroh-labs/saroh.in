@@ -23,7 +23,7 @@ import {
     writesReply,
 } from "@/lib/home/inline-actions";
 import type { HomeInline, HomeNeed } from "@/lib/home/service";
-import { remindInvoice } from "@/lib/invoices/actions";
+import { remindWithLink } from "@/lib/invoices/link-actions";
 import { sendOutcome } from "@/lib/invoices/send";
 import { moveStage, undoStage } from "@/lib/orders/actions";
 import type { KitchenStage } from "@/lib/orders/read";
@@ -189,7 +189,7 @@ export function useInlineActions() {
                     }
                     return;
                 }
-                const res = await remindInvoice(inline.target);
+                const res = await remindWithLink(inline.target);
                 if (!res.ok) {
                     refused = res.error;
                     throw new Error(res.error);

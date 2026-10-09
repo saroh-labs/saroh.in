@@ -29,6 +29,26 @@ const labels = (over: Partial<DetailActionState>) =>
 const primary = (over: Partial<DetailActionState>) =>
     detailActions({ ...base, ...over }).find((a) => a.primary)?.label;
 
+describe("detailActions' pay link after a reload (UX-048)", () => {
+    it("says Make a new link when the link out can't be shown", () => {
+        const got = labels({ linkUnseen: true });
+        expect(got).toContain("Make a new link");
+        expect(got).not.toContain("Copy pay link");
+    });
+
+    it("still says it is working while the link is made", () => {
+        expect(labels({ linkUnseen: true, linkBusy: true })).toContain(
+            "Making a link…",
+        );
+    });
+
+    it("offers no link at all while autopay is charging", () => {
+        expect(labels({ linkUnseen: true, charging: true })).not.toContain(
+            "Make a new link",
+        );
+    });
+});
+
 describe("detailActions", () => {
     it("an unpaid invoice that pays online: Send with pay link and Copy pay link, as today", () => {
         expect(labels({})).toEqual([

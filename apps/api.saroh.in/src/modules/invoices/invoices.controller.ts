@@ -184,9 +184,15 @@ export class InvoicesController {
     async payLink(
         @OrgContext() ctx: OrganizationContext,
         @Param("invoiceId") id: string,
-    ): Promise<{ url: string }> {
-        const { token } = await this.invoices.createPayLink(ctx, id);
-        return { url: await payLinkUrlFor(ctx.organizationId, token) };
+    ): Promise<{ url: string; payLinkMadeAt: string }> {
+        const { token, payLinkCreatedAt } = await this.invoices.createPayLink(
+            ctx,
+            id,
+        );
+        return {
+            url: await payLinkUrlFor(ctx.organizationId, token),
+            payLinkMadeAt: payLinkCreatedAt.toISOString(),
+        };
     }
 
     /**
@@ -201,9 +207,15 @@ export class InvoicesController {
     async viewLink(
         @OrgContext() ctx: OrganizationContext,
         @Param("invoiceId") id: string,
-    ): Promise<{ url: string }> {
-        const { token } = await this.invoices.createViewLink(ctx, id);
-        return { url: await payLinkUrlFor(ctx.organizationId, token) };
+    ): Promise<{ url: string; payLinkMadeAt: string }> {
+        const { token, payLinkCreatedAt } = await this.invoices.createViewLink(
+            ctx,
+            id,
+        );
+        return {
+            url: await payLinkUrlFor(ctx.organizationId, token),
+            payLinkMadeAt: payLinkCreatedAt.toISOString(),
+        };
     }
 
     /**

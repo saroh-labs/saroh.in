@@ -119,6 +119,7 @@ export async function dropEarlyRenewalInTx(
                 voidedAt: now,
                 voidReason: note,
                 payTokenHash: null,
+                payLinkCreatedAt: null,
             },
         });
         if (count === 0) return null;
