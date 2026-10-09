@@ -16,6 +16,7 @@ import { useEffect, useState } from "react";
 import { showPlanRefusal } from "@/components/billing/plan-refusal";
 import { useBusinessDetailsStep } from "@/components/organizations/use-business-details-step";
 import { Chip } from "@/components/shared/chip";
+import type { CustomerPick } from "@/lib/customers/picker";
 import { pickName } from "@/lib/customers/picker";
 import { orderHref } from "@/lib/orders/links";
 import { centsOf, createLabel, partyOf, payNote } from "@/lib/orders/new-order";
@@ -51,6 +52,7 @@ export function NewOrderSheet({
     canLink,
     online = true,
     canSearch,
+    initialPick = null,
 }: {
     open: boolean;
     onOpenChange: (open: boolean) => void;
@@ -60,6 +62,11 @@ export function NewOrderSheet({
     /** The plan takes payment online (R33); else no link is offered. */
     online?: boolean;
     canSearch: boolean;
+    /**
+     * Who it is for, already chosen (#247): each opening starts with them
+     * picked, and Change still picks anyone else.
+     */
+    initialPick?: CustomerPick | null;
 }) {
     const [session, setSession] = useState(0);
     const [dirty, setDirty] = useState(false);
@@ -112,6 +119,7 @@ export function NewOrderSheet({
                         canLink={canLink}
                         online={online}
                         canSearch={canSearch}
+                        initialPick={initialPick}
                         onDirty={setDirty}
                         onClose={() => {
                             onOpenChange(false);
@@ -131,6 +139,7 @@ function NewOrderBody({
     canLink,
     online,
     canSearch,
+    initialPick,
     onDirty,
     onClose,
 }: {
@@ -139,6 +148,7 @@ function NewOrderBody({
     canLink: boolean;
     online: boolean;
     canSearch: boolean;
+    initialPick: CustomerPick | null;
     onDirty: (dirty: boolean) => void;
     onClose: () => void;
 }) {
@@ -148,6 +158,7 @@ function NewOrderBody({
         canLink,
         online,
         canSearch,
+        initialPick,
     });
     const [saving, setSaving] = useState(false);
     const details = useBusinessDetailsStep({

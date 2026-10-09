@@ -1,4 +1,5 @@
 import type { Tab, TabKey } from "@/lib/customer-workspace/view";
+import { orderPowers } from "@/lib/orders/access";
 
 import type { ModuleStates, Viewer } from "./panels";
 import { moduleOn, viewerCan } from "./panels";
@@ -77,6 +78,67 @@ export function personTabActions(
             viewerCan(viewer, "subscription:write"),
         newInvoice: invoices,
     };
+}
+
+/**
+ * New order and New booking from the person (#247): each the existing flow,
+ * opened with them already chosen. Shown only where it can be used — its
+ * module on (DEC-057: a module that is off is hidden, not explained) and the
+ * role holding what that flow's own button asks. New order on the Orders
+ * list is `orderPowers().create` (`order:create`, or the old `order:write`)
+ * for someone who reads orders, never the kitchen's view; New booking on the
+ * calendar is `booking:write`, in a section that opens on `booking:read`.
+ * Only the role's permissions decide (DEC-098). A module list that couldn't
+ * be read fails open, as the rail does; the API decides again.
+ */
+export function personNewActions(
+    viewer: Viewer,
+    modules: ModuleStates,
+): { newOrder: boolean; newBooking: boolean } {
+    return {
+        newOrder:
+            !!viewer &&
+            moduleOn(modules, "COMMERCE") &&
+            viewerCan(viewer, "order:read") &&
+            orderPowers(viewer).create,
+        newBooking:
+            moduleOn(modules, "APPOINTMENTS") &&
+            viewerCan(viewer, "booking:read") &&
+            viewerCan(viewer, "booking:write"),
+    };
+}
+
+/** New order on the Orders list, opened for this person. */
+export function newOrderHref(contactId: string): string {
+    return `/commerce/orders?new=1&contactId=${encodeURIComponent(contactId)}`;
+}
+
+/** New booking on the calendar, opened for this person. */
+export function newBookingHref(contactId: string): string {
+    return `/bookings?new=1&contactId=${encodeURIComponent(contactId)}`;
+}
+
+/**
+ * The header's New order and New booking for this person, in that order:
+ * each one `personNewActions` allows, New order only where the business
+ * sells something a counter takes (the Orders list's own rule), and
+ * neither for someone whose details were removed for a privacy request
+ * (C11) — nothing new is made for them.
+ */
+export function personStarts(
+    contactId: string,
+    can: { newOrder: boolean; newBooking: boolean },
+    { removed, sellsProducts }: { removed: boolean; sellsProducts: boolean },
+): { label: string; href: string }[] {
+    if (removed) return [];
+    const starts: { label: string; href: string }[] = [];
+    if (can.newOrder && sellsProducts) {
+        starts.push({ label: "New order", href: newOrderHref(contactId) });
+    }
+    if (can.newBooking) {
+        starts.push({ label: "New booking", href: newBookingHref(contactId) });
+    }
+    return starts;
 }
 
 /** The order the page draws its tabs in. */

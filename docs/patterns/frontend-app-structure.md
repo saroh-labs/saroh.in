@@ -76,6 +76,14 @@ components/shared/             app shell, navigation, command menu
   couldn't read is said in general terms), and each unpaid invoice on the
   Invoices tab offers Record payment — Invoice Detail's own
   `RecordPaymentDialog`, on `invoice:write` as there (DEC-098).
+  Its header's New order and New booking (#247) are links into the flows
+  that already exist — `/commerce/orders?new=1&contactId=` and
+  `/bookings?new=1&contactId=` — each shown only with its module on and the
+  permission that flow's own button asks (`personNewActions`). The page they
+  land on reads the person (`readCustomerPick`) and opens the sheet or
+  dialog with them picked; a person it can't read opens it empty. A new
+  flow reached from a person takes the same `?new=1&contactId=` rather than
+  a copy of the flow on the person page.
 - **Adopted** — **Every app has `app/error.tsx` and `app/loading.tsx`,** and a
   route group that can fail on its own gets its own boundary. Gap: templates,
   saroh.in and ui have neither.

@@ -6,6 +6,10 @@ import type { ModuleStates, Viewer } from "./panels";
 import {
     crumbsToSell,
     customerRedirectPath,
+    newBookingHref,
+    newOrderHref,
+    personNewActions,
+    personStarts,
     personTabActions,
     personTabGates,
     withPersonTabs,
@@ -203,5 +207,120 @@ describe("crumbsToSell — the crumb leads to Contacts", () => {
         expect(crumbsToSell(false, true, 1)).toBe(true);
         expect(crumbsToSell(false, true, 0)).toBe(false);
         expect(crumbsToSell(false, false, 0)).toBe(false);
+    });
+});
+
+describe("personNewActions — New order and New booking from the person (#247)", () => {
+    const bothOn = modules({ COMMERCE: "ACTIVE", APPOINTMENTS: "ACTIVE" });
+    const seller = viewer("order:read", "order:create");
+    const booker = viewer("booking:read", "booking:write");
+
+    it("offers New order to someone who reads and takes orders, Sell on", () => {
+        expect(personNewActions(seller, bothOn).newOrder).toBe(true);
+    });
+
+    it("counts the old order:write umbrella as taking orders", () => {
+        expect(
+            personNewActions(viewer("order:read", "order:write"), bothOn)
+                .newOrder,
+        ).toBe(true);
+    });
+
+    it("hides New order from the kitchen's view and from a reader", () => {
+        expect(
+            personNewActions(viewer("order:stage", "order:create"), bothOn)
+                .newOrder,
+        ).toBe(false);
+        expect(personNewActions(viewer("order:read"), bothOn).newOrder).toBe(
+            false,
+        );
+    });
+
+    it("offers New booking on booking:read and booking:write, Bookings on", () => {
+        expect(personNewActions(booker, bothOn).newBooking).toBe(true);
+        expect(
+            personNewActions(viewer("booking:read"), bothOn).newBooking,
+        ).toBe(false);
+        expect(
+            personNewActions(viewer("booking:write"), bothOn).newBooking,
+        ).toBe(false);
+    });
+
+    it("hides each one whose module is off (DEC-057)", () => {
+        const off = modules({ COMMERCE: "DISABLED", APPOINTMENTS: "DISABLED" });
+        const all = viewer(
+            "order:read",
+            "order:create",
+            "booking:read",
+            "booking:write",
+        );
+        expect(personNewActions(all, off)).toEqual({
+            newOrder: false,
+            newBooking: false,
+        });
+    });
+
+    it("fails open on a module list that couldn't be read", () => {
+        expect(personNewActions(seller, null).newOrder).toBe(true);
+        expect(personNewActions(booker, null).newBooking).toBe(true);
+    });
+
+    it("offers nothing without resolved permissions, whatever the role", () => {
+        expect(personNewActions({ role: "OWNER" }, bothOn)).toEqual({
+            newOrder: false,
+            newBooking: false,
+        });
+        expect(personNewActions(null, bothOn)).toEqual({
+            newOrder: false,
+            newBooking: false,
+        });
+    });
+});
+
+describe("personStarts — the header's buttons, with the person in the link", () => {
+    const both = { newOrder: true, newBooking: true };
+
+    it("opens each flow with them chosen, New order first", () => {
+        expect(
+            personStarts("c_1", both, { removed: false, sellsProducts: true }),
+        ).toEqual([
+            {
+                label: "New order",
+                href: "/commerce/orders?new=1&contactId=c_1",
+            },
+            { label: "New booking", href: "/bookings?new=1&contactId=c_1" },
+        ]);
+    });
+
+    it("keeps an odd id inside its parameter", () => {
+        expect(newOrderHref("a&b")).toBe(
+            "/commerce/orders?new=1&contactId=a%26b",
+        );
+        expect(newBookingHref("a b")).toBe("/bookings?new=1&contactId=a%20b");
+    });
+
+    it("leaves New order out where the business sells no products", () => {
+        expect(
+            personStarts("c_1", both, {
+                removed: false,
+                sellsProducts: false,
+            }).map((s) => s.label),
+        ).toEqual(["New booking"]);
+    });
+
+    it("offers only what the role may do", () => {
+        expect(
+            personStarts(
+                "c_1",
+                { newOrder: false, newBooking: false },
+                { removed: false, sellsProducts: true },
+            ),
+        ).toEqual([]);
+    });
+
+    it("offers nothing for someone whose details were removed (C11)", () => {
+        expect(
+            personStarts("c_1", both, { removed: true, sellsProducts: true }),
+        ).toEqual([]);
     });
 });
