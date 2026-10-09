@@ -6,6 +6,8 @@ import { businessTimezone } from "../bookings/staff-availability";
 import { canSeeSensitive } from "../customer-workspace/attention-read";
 import { FULFILMENT_RULES } from "./fulfilment";
 import { lateThresholdsByStore, thresholdsFor } from "./late-thresholds";
+import type { IntentForState } from "./online-payment";
+import { latestIntentsFor } from "./online-payment";
 import type { OrderAttention } from "./order-attention";
 import { attentionByCustomer } from "./order-attention";
 import type { OrderListFilter, OrderListView } from "./order-list-filters";
@@ -237,7 +239,7 @@ export async function listOrderRows(
     );
     // Each storefront's late thresholds, once per storefront in the page:
     // the numbers `lateSql` read for the Late filter and the counts.
-    const [thresholds, attention, visits] = await Promise.all([
+    const [thresholds, attention, visits, intents] = await Promise.all([
         lateThresholdsByStore(
             prisma,
             loaded.map((o) => o.store.id),
@@ -253,6 +255,8 @@ export async function listOrderRows(
             organizationId,
             loaded.flatMap((o) => (goesByVisits(o.fulfilment) ? [o.id] : [])),
         ),
+        // "Payment failed", "Waiting for Razorpay" on its row (#122).
+        rowLatestIntents(organizationId, page),
     ]);
 
     return {
@@ -277,6 +281,9 @@ export async function listOrderRows(
                           ...(visits?.has(o.id)
                               ? { nextVisit: visits.get(o.id) ?? null }
                               : {}),
+                          ...(intents
+                              ? { latestIntent: intents.get(o.id) ?? null }
+                              : {}),
                       }),
                   ]
                 : [];
@@ -294,6 +301,26 @@ function goesByVisits(stored: string): boolean {
             stored
         ]?.visits === true
     );
+}
+
+/**
+ * The page's orders' newest payment intents (#122). A failed read leaves
+ * every row's `onlinePayment` out, so the rows say nothing of it rather
+ * than that nothing is wrong; the list itself still answers.
+ */
+async function rowLatestIntents(
+    organizationId: string,
+    orderIds: string[],
+): Promise<Map<string, IntentForState> | null> {
+    if (orderIds.length === 0) return null;
+    try {
+        return await latestIntentsFor(prisma, organizationId, orderIds);
+    } catch (error) {
+        logger.warn(
+            `Payment states couldn't be read for the Orders list: ${String(error)}`,
+        );
+        return null;
+    }
 }
 
 /**

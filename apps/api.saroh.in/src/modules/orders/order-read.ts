@@ -10,6 +10,7 @@ import type { InvoiceTitle } from "../invoices/invoice-title";
 import type { FulfilmentView, LateThresholds, LateView } from "./fulfilment";
 import { fulfilmentView, lateOf } from "./fulfilment";
 import { handPaidCents, leftToRefundCents } from "./hand-payments";
+import type { OnlinePaymentDto } from "./online-payment";
 import type { OrderAttention } from "./order-attention";
 import type { ChangeOptions } from "./order-change-types";
 import type { RawOrderInvoice } from "./order-invoice-title";
@@ -239,6 +240,13 @@ export interface OrderReadDto extends FulfilmentView, LateView {
      * the link — only its hash is kept. Only with `order:read`.
      */
     payLinkCreatedAt?: Date | null;
+    /**
+     * Where its online payment stands when it isn't simply paid (#122):
+     * failed, waiting for the provider, or not finished; null when there is
+     * nothing to chase (`online-payment.ts`). Set by Order Detail's read
+     * only, and left out when it couldn't be read.
+     */
+    onlinePayment?: OnlinePaymentDto | null;
     items: OrderLineDto[];
     events: OrderEventDto[];
     /** What the caller may do next, worked out by the API. */

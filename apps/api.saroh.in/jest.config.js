@@ -209,6 +209,9 @@ module.exports = {
         // runs against Postgres in order-list.db.spec.ts.
         "<rootDir>/src/modules/orders/order-list-filters.spec.ts",
         "<rootDir>/src/modules/orders/order-row.spec.ts",
+        // #122: an order's online payment in words — failed, waiting, not
+        // finished — with a mocked Prisma.
+        "<rootDir>/src/modules/orders/online-payment.spec.ts",
         // B4: the filter bar's options, DB-free.
         "<rootDir>/src/modules/orders/order-list-options.spec.ts",
         // B13: New order's rules and how a walk-in reads, DB-free. The

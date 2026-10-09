@@ -50,6 +50,7 @@ import {
     onlineKeptCents,
 } from "./hand-payments";
 import { LATE_THRESHOLD_SELECT, lateThresholdsOf } from "./late-thresholds";
+import { onlinePaymentForRead } from "./online-payment";
 import type { OrderAttention } from "./order-attention";
 import { attentionByCustomer } from "./order-attention";
 import { changeOptionsFor } from "./order-change-options";
@@ -70,7 +71,7 @@ import {
     withGstRates,
 } from "./order-pricing";
 import type { OrderReadDto } from "./order-read";
-import { serializeOrderRead } from "./order-read";
+import { amountDueCents, serializeOrderRead } from "./order-read";
 import { canEditItems } from "./order-stage";
 import type { CourierField } from "./order-stage-write";
 import {
@@ -231,6 +232,18 @@ export class OrderKitchenService {
             customerNotice: await this.noticeOf(ctx, order),
             // A treatment's visits (B14), in their own file.
             ...(await visitsForRead(order, this.logger)),
+            // "Payment failed", "Waiting for Razorpay" (#122).
+            ...(await onlinePaymentForRead(
+                prisma,
+                ctx.organizationId,
+                {
+                    id: order.id,
+                    status: order.status,
+                    owedCents: amountDueCents(order),
+                },
+                new Date(),
+                this.logger,
+            )),
         };
         return change
             ? { ...withNotice, next: { ...withNotice.next, ...change } }
