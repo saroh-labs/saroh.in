@@ -82,10 +82,10 @@ function bareAddress(raw: string | undefined): string | null {
  * `x-forwarded-for` entry.
  *
  * Cloudflare writes `cf-connecting-ip` and overwrites any a visitor sent, on
- * a Worker and when Cloudflare proxies to Vercel. Behind that proxy Vercel's
- * `x-real-ip` and `x-forwarded-for` name Cloudflare's edge, not the visitor,
- * so every visitor would share a handful of addresses (and the API's
- * per-visitor limits with them). On a Worker `x-forwarded-for` keeps what the
+ * a Worker and in front of any origin it proxies to. Behind that proxy (Vercel,
+ * until 9 Oct 2026) `x-real-ip` and `x-forwarded-for` name Cloudflare's edge,
+ * not the visitor, so every visitor would share a handful of addresses (and
+ * the API's per-visitor limits with them). On a Worker `x-forwarded-for` keeps what the
  * visitor sent, so it is never read before Cloudflare's header.
  *
  * Off the platform (local development behind portless, CI) a request can

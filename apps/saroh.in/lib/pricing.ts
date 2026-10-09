@@ -53,7 +53,7 @@ function building(): boolean {
  *
  * - No `API_URL`, or a 404 (no version installed): null, the placeholder.
  * - The API down, an error answer or a snapshot that doesn't validate: a
- *   deployment's build (`VERCEL_ENV` set, by Vercel or the deploy workflow)
+ *   deployment's build (`VERCEL_ENV` set, by the deploy workflow)
  *   fails, so the last good site keeps serving instead of a placeholder; a
  *   local build or development shows the placeholder.
  */

@@ -12,7 +12,7 @@ const { defineConfig } = require("prisma/config");
  * for.
  *
  * That broke deploys for apps with no database at all. This package runs
- * `prisma generate` on `postinstall`, and a Vercel build for ANY app in this
+ * `prisma generate` on `postinstall`, and a deploy build for ANY app in this
  * workspace runs `pnpm install` across all 22 projects — so saroh.in, the
  * marketing site, which has no prisma dependency and never touches a database,
  * failed its install on a missing DATABASE_URL. The obvious workaround is to

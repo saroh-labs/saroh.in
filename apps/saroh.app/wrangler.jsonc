@@ -79,7 +79,7 @@
         // api.saroh.in (cut over 2026-10-07). A deploy replaces the Worker's
         // routes with these, so they live here, not only in the dashboard;
         // deploy-frontends.yml then sets them to fail open, so a failing Worker
-        // falls through to the origin (Vercel) instead of an error page.
+        // falls through to the origin instead of an error page.
         // Bindings and vars are not inherited, so each is repeated.
         "production": {
             "name": "saroh-sites",

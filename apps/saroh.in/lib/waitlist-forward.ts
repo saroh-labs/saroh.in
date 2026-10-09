@@ -15,8 +15,8 @@ import { isIP } from "node:net";
  * same as `apps/saroh.app/lib/site-relay.ts` and the API's `signSiteRelay`.
  *
  * The address comes only from the platform's own header (`cf-connecting-ip`,
- * which Cloudflare writes over whatever a visitor sent; `x-real-ip` where
- * Vercel served the site). A client-sent `X-Forwarded-For` is never read or
+ * which Cloudflare writes over whatever a visitor sent; `x-real-ip` as a
+ * fallback, kept from when Vercel served the site). A client-sent `X-Forwarded-For` is never read or
  * passed on: anyone can write one, and it would let them pick the key their
  * limit is counted by.
  */
@@ -116,7 +116,8 @@ export function joinBody(posted: unknown): JoinBody | null {
 
 /**
  * The visitor's country as the edge saw their connection (Cloudflare's
- * `cf-ipcountry`, or Vercel's `x-vercel-ip-country`; two letters), or
+ * `cf-ipcountry`, or, kept from before 9 Oct 2026, Vercel's
+ * `x-vercel-ip-country`; two letters), or
  * undefined anywhere it isn't set: local dev, the browser tests, a request
  * that came through neither. Cloudflare's `XX` (unknown) and `T1` (Tor)
  * aren't countries. Never asked of the visitor.

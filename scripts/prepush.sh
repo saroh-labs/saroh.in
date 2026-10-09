@@ -1,8 +1,7 @@
 #!/bin/bash
 # The local gate before a batch is pushed (docs/patterns/devops-tooling-and-deploy.md
 # → Branches, batches and pull requests). It runs what CI runs, on this machine,
-# so a failure costs minutes here instead of a push, five Vercel builds and a
-# CI round trip. Every step here exists because CI once caught it first —
+# so a failure costs minutes here instead of a push and a CI round trip. Every step here exists because CI once caught it first —
 # docs/architecture/DEV_LEARNINGS.md has the stories.
 #
 #   pnpm prepush                 secrets, private prices, lint, types, checks, and the unit
