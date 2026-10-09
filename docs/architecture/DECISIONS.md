@@ -1302,3 +1302,10 @@ Also decided 9 Oct (#886): each admin console deploys only its own environment; 
     - **Locations and bookings (owner, 9 Oct):** bookings belong to the business, not a location, so a paused location stops orders and a paused website stops bookings; the Terms stand as written.
     - Moving back up restores everything at once. Behind `PLAN_ENFORCEMENT`; nothing pauses with it off or off the catalogue, and a failed read pauses nothing.
 - Consequences: one stored clock, a `CustomerNotice` of kind `MOVE_DOWN` per set of limits told; `Membership.createdAt` added (migration `20261101100000_membership_joined_at`, backfilled from the accepted invitation). The admin limit-override warning says what will pause and when (#802). When `PLAN_ENFORCEMENT` turns on, every business already over its limits is told at once and pauses 7 days later. `docs/patterns/backend-billing-and-classes.md` → "Moving to a lower plan".
+## DEC-115 Every error page is drawn by the apps, not by Cloudflare
+
+**Status: Accepted — 2026-10-09** · owner
+
+- Context: the owner asked for every error page to be custom (404, 5xx). Our zones are on Cloudflare's Free plan, where Cloudflare's own edge error pages can't be replaced.
+- Decision: stay on the Free plan. Every error page comes from the Next.js apps: `not-found.tsx` (`@saroh/ui/not-found`), `error.tsx` (`@saroh/ui/error-page`), and `global-error.tsx` (`@saroh/ui/crash-page`, self-styled because the root layout's CSS is gone). Each Worker's entry (`worker.ts`) wraps OpenNext's handler in `withCrashPage`, so an exception before Next renders returns the same page as static HTML with a 500. Merchant sites (`saroh.app`) use their `--site-*` palette, and the neutral, unbranded page where the palette is unknown.
+- Consequences: what the apps can't draw stays Cloudflare's: a Worker stopped for CPU or memory, an error after a streamed response has started, and edge errors when a host can't be reached (502, 521, 522, …, including api.saroh.in seen directly). A page whose API read fails still renders our own error page, because the Worker, not the visitor, calls the API.

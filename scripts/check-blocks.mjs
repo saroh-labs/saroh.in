@@ -195,6 +195,9 @@ const SITE_LAYER_ALLOWED = new Set([
     "apps/saroh.app/app/[domain]/loading.tsx",
     "apps/saroh.app/app/preview/[token]/error.tsx",
     "apps/saroh.app/app/preview/[token]/loading.tsx",
+    // The page all three error boundaries above draw (the 5xx twin of
+    // site-not-found.tsx): a heading, a line and ctaClasses(); no block.
+    "apps/saroh.app/components/site-error.tsx",
     // The catalog's preview document. Same category as the layouts above: it
     // supplies the merchant's page GROUND so a block has one to sit on, and
     // without it every palette would look identical behind the section. It
