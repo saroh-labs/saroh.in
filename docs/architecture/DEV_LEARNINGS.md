@@ -3542,3 +3542,21 @@ Otherwise every package is affected and the step runs.
 **Check**: the helper fails closed in both cases. A gate that can't tell what
 changed runs everything.
 **Category**: tooling · `scripts/prepush.sh` → `affected()`
+
+## The dev environment's demo login used the password written in the repo
+
+**Symptom**: the demo owner on the dev environment (saroh.io), and every
+other seeded login there, signed in with the fixture password the public
+repo documents (owner, 9 Oct).
+**Cause**: every seeded login took one hard-coded fixture password, and the
+seed upserts it on every run (`update: { password }`), so any seed of a
+shared database put, and kept putting, a published password on it.
+**Fix**: `seedPassword()` in `packages/database/src/seed/data.ts`. The
+fixture is used only when the database is on this machine (localhost, as on
+CI and a local stack). Anywhere else the seed needs `SEED_PASSWORD`
+(12+ characters, never in the repo) and refuses the fixture, and it never
+prints a password it didn't get from the docs. Passwords already on the dev
+database were changed by hand.
+**Check**: the seed throws before writing anything to a database that isn't
+on this machine without `SEED_PASSWORD`; `seed/seed-password.test.ts`.
+**Category**: secrets · `packages/database/src/seed/data.ts` → `seedPassword()`

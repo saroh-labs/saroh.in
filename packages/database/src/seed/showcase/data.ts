@@ -44,7 +44,6 @@ export const SHOWCASE_SEED = 20_260_922;
 /** Showcase ids read `seed_sc_<business>_…`, inside the base seed's prefix. */
 export const SHOWCASE_KEY = "sc";
 
-export const SHOWCASE_PASSWORD = "demo-password-123";
 export const TIMEZONE = "Asia/Kolkata";
 
 export type OrgRole = "OWNER" | "ADMIN" | "MEMBER" | "REVIEWER";
