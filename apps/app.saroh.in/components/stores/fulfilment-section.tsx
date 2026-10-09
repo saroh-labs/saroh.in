@@ -89,6 +89,16 @@ export function FulfilmentSection(props: SectionProps) {
         >
             {store.fulfilmentTypes ? (
                 <div id={LATE_AFTER_ANCHOR} className="grid scroll-mt-20 gap-3">
+                    {/* Says what the list is for, before it: the free-delivery row
+                        under the ways is a rule of its own. */}
+                    {store.fulfilmentTypes.length === 0 ? (
+                        <Note>
+                            None on: orders from here are only digital products
+                            or bookings.
+                        </Note>
+                    ) : store.siteShop ? (
+                        <Note>Your website checkout offers these.</Note>
+                    ) : null}
                     <div>
                         <div
                             aria-hidden
@@ -123,14 +133,6 @@ export function FulfilmentSection(props: SectionProps) {
                             ) : null}
                         </ul>
                     </div>
-                    {store.fulfilmentTypes.length === 0 ? (
-                        <Note>
-                            None on: orders from here are only digital products
-                            or bookings.
-                        </Note>
-                    ) : store.siteShop ? (
-                        <Note>Your website checkout offers these.</Note>
-                    ) : null}
                 </div>
             ) : (
                 <>
