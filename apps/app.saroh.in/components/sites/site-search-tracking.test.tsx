@@ -206,6 +206,43 @@ function openSetup(kind: string) {
     return area;
 }
 
+describe("one line per tool, codes folded (the settings audit)", () => {
+    it("keeps where to find the ID off the row, for Set up to say", () => {
+        render(ok(viewOf()));
+        const row = within('[data-tracker="ga4"]');
+        expect(row.textContent).toContain("Google Analytics");
+        expect(row.textContent).toContain("Not connected");
+        expect(row.querySelector("a")).toBe(null);
+        openSetup("ga4");
+        const dialog = document.querySelector('[role="dialog"]');
+        expect(
+            Array.from(dialog?.querySelectorAll("a") ?? []).some((a) =>
+                a.textContent.startsWith("Help"),
+            ),
+        ).toBe(true);
+    });
+
+    it("folds the verification codes behind one row that says how many", () => {
+        render(
+            ok(
+                viewOf({
+                    verifications: {
+                        google: "abc",
+                        bing: null,
+                        meta: null,
+                        pinterest: null,
+                    },
+                }),
+            ),
+        );
+        const codes = within("[data-verification-codes] details");
+        expect(codes.hasAttribute("open")).toBe(false);
+        expect(codes.querySelector("summary")?.textContent).toContain(
+            "Prove the site is yours to Google and Bing. 1 added",
+        );
+    });
+});
+
 describe("connecting a tracker", () => {
     it("takes the ID out of a pasted gtag snippet and sends only the ID", async () => {
         saveSearchTracking.mockResolvedValue({
@@ -475,7 +512,7 @@ describe("states", () => {
     it("draws a failed read as a failure with Retry, never an empty form", async () => {
         render({ ok: false });
         expect(host.querySelector('[role="alert"]')).not.toBe(null);
-        expect(text()).toContain("Search and tracking couldn't be loaded");
+        expect(text()).toContain("Tracking couldn't be loaded");
         expect(host.querySelector("input, textarea")).toBe(null);
         await click(buttonIn(host, "Retry"));
         expect(refresh).toHaveBeenCalled();

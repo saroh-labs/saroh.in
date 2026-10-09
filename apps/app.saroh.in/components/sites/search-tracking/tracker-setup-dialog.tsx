@@ -21,6 +21,7 @@ import {
     POSTHOG_REGION_WORDS,
     readTrackerPaste,
     TRACKER_WORDS,
+    trackerHelpHref,
 } from "@/lib/sites/search-tracking";
 
 import type { SaveOutcome } from "./parts";
@@ -95,7 +96,22 @@ export function TrackerSetupDialog({
                             ? `Change ${words.name}`
                             : `Connect ${words.name}`}
                     </DialogTitle>
-                    <DialogDescription>{words.where}</DialogDescription>
+                    <DialogDescription>
+                        {words.where}{" "}
+                        <a
+                            href={trackerHelpHref(kind)}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-foreground underline underline-offset-2 hover:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring active:text-foreground"
+                        >
+                            Help
+                            <span className="sr-only">
+                                {" "}
+                                with finding your {words.name} ID (opens in a
+                                new tab)
+                            </span>
+                        </a>
+                    </DialogDescription>
                 </DialogHeader>
                 <form
                     className="space-y-4"
