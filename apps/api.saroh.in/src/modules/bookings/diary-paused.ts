@@ -1,3 +1,5 @@
+import { prisma } from "@saroh/database";
+
 import { overLimit } from "../billing/over-limit.service";
 
 /**
@@ -12,12 +14,25 @@ import { overLimit } from "../billing/over-limit.service";
 
 const NONE: ReadonlySet<string> = new Set();
 
-/** The staff ids of the diary people the plan has paused now. */
+/**
+ * The staff ids of the diary people the plan has paused now: those with no
+ * login past the limit, and the diary rows of paused team members (a paused
+ * member takes no new bookings either).
+ */
 export async function pausedDiaryIds(
     organizationId: string,
 ): Promise<ReadonlySet<string>> {
     const paused = await overLimit.pausedNow(organizationId);
-    return paused?.diaryIds ?? NONE;
+    if (!paused) return NONE;
+    if (paused.memberIds.size === 0) return paused.diaryIds;
+    const theirs = await prisma.staffMember.findMany({
+        where: {
+            organizationId,
+            membershipId: { in: [...paused.memberIds] },
+        },
+        select: { id: true },
+    });
+    return new Set([...paused.diaryIds, ...theirs.map((s) => s.id)]);
 }
 
 /** Split people into who takes bookings and who the plan has paused. Pure. */

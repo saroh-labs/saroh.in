@@ -9,7 +9,12 @@ import type { Service } from "@saroh/database";
  * already made are never read here, so nothing of theirs changes. What is
  * paused is the core's (`over-limit.service.ts`), mocked here.
  */
-jest.mock("@saroh/database", () => ({ prisma: {} }));
+const staffFind = jest.fn();
+jest.mock("@saroh/database", () => ({
+    prisma: {
+        staffMember: { findMany: (...a: unknown[]) => staffFind(...a) },
+    },
+}));
 
 const pausedNow = jest.fn();
 jest.mock("../billing/over-limit.service", () => ({
@@ -106,6 +111,24 @@ describe("pausedDiaryIds", () => {
     it("is the diary people the plan paused", async () => {
         pausedNow.mockResolvedValue(pausing([RAVI.id]));
         expect([...(await pausedDiaryIds("org_1"))]).toEqual([RAVI.id]);
+    });
+
+    it("adds the diary rows of paused team members, scoped to the business", async () => {
+        pausedNow.mockResolvedValue({
+            ...pausing([RAVI.id]),
+            memberIds: new Set(["mem_asha"]),
+        });
+        staffFind.mockResolvedValue([{ id: ASHA.id }]);
+        expect([...(await pausedDiaryIds("org_1"))].sort()).toEqual(
+            [ASHA.id, RAVI.id].sort(),
+        );
+        expect(staffFind).toHaveBeenCalledWith({
+            where: {
+                organizationId: "org_1",
+                membershipId: { in: ["mem_asha"] },
+            },
+            select: { id: true },
+        });
     });
 });
 
