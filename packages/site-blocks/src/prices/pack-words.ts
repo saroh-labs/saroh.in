@@ -38,14 +38,23 @@ function isPublicPack(value: unknown): value is PublicPack {
 }
 
 /** The packs in a read's body, narrowed rather than cast (#264); else null. */
-export function packsOf(
-    body: unknown,
-): { packs: PublicPack[]; payOnline: boolean } | null {
-    const b = body as { packs?: unknown; payOnline?: unknown } | null;
+export function packsOf(body: unknown): {
+    packs: PublicPack[];
+    payOnline: boolean;
+    notTakingOrders?: true;
+} | null {
+    const b = body as {
+        packs?: unknown;
+        payOnline?: unknown;
+        notTakingOrders?: unknown;
+    } | null;
     if (!Array.isArray(b?.packs)) return null;
+    // A website its business's plan paused (#800): nothing sold online.
+    const paused = b.notTakingOrders === true;
     return {
         packs: b.packs.filter(isPublicPack),
-        payOnline: b.payOnline === true,
+        payOnline: !paused && b.payOnline === true,
+        ...(paused ? { notTakingOrders: true as const } : {}),
     };
 }
 

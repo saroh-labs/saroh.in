@@ -16,6 +16,8 @@ export function hasPacks(sections: readonly { type: string }[]): boolean {
 export interface PacksRead {
     packs: PublicPack[];
     payOnline: boolean;
+    /** The business isn't taking orders on this site (#800). */
+    notTakingOrders?: boolean;
 }
 
 export async function packsFeed(
@@ -27,6 +29,11 @@ export async function packsFeed(
     if (!hasPacks(sections)) return undefined;
     // A failed read, Class packs off or no pack on sale is an empty list
     // (the reader never throws), and an empty list draws nothing.
-    const { packs, payOnline } = await read();
-    return { packs, payOnline, askHref };
+    const { packs, payOnline, notTakingOrders } = await read();
+    return {
+        packs,
+        payOnline,
+        askHref,
+        ...(notTakingOrders ? { notTakingOrders: true } : {}),
+    };
 }

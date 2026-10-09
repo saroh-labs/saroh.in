@@ -105,7 +105,12 @@ export {
     default as ProductGridSection,
 } from "./blocks/product-grid";
 export { PROJECTS_LINK, default as ProjectsSection } from "./blocks/projects";
-export { plansAutopayMethods, plansOf, plansPayOnline } from "./lib/plans-read";
+export {
+    plansAutopayMethods,
+    plansNotTakingOrders,
+    plansOf,
+    plansPayOnline,
+} from "./lib/plans-read";
 // Called by saroh.app's server: from a module with no "use client".
 export type { ProductGridFeed } from "./blocks/product-grid";
 export { default as RichTextSection } from "./blocks/rich-text";

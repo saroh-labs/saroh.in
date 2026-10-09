@@ -14,6 +14,7 @@ import { PricesDone, useSignInFirst } from "../prices/flow";
 import type { PublicPack } from "../prices/pack-words";
 import { packEyebrow, packPerClass, packsOf } from "../prices/pack-words";
 import { askAboutHref } from "../shop/ask-about-ordering";
+import { NotTakingOrders } from "../shop/not-taking-orders";
 
 /**
  * `packs` v1 — the business's class packs on sale, read live (G20; Saroh
@@ -55,6 +56,11 @@ export interface PacksFeed {
      * none (no "Ask about this pack").
      */
     askHref: string | null;
+    /**
+     * The business isn't taking orders on this site just now (#800): the
+     * packs show, with no button, and the section says so.
+     */
+    notTakingOrders?: boolean;
 }
 
 /** What the section is called when the merchant left the title empty. */
@@ -299,7 +305,10 @@ function PackCards({
     /** Drawn in the editor: the button shows its words but goes nowhere. */
     canvas?: boolean;
 }) {
-    const buys = prices !== null && feed.payOnline;
+    // Not taking orders (#800): nothing to click that cannot work, not even
+    // "Ask about this pack".
+    const stopped = !canvas && feed.notTakingOrders === true;
+    const buys = !stopped && prices !== null && feed.payOnline;
     const flow = useSignInFirst(buys ? prices : null);
     const [buying, setBuying] = useState<PublicPack | null>(null);
     const [done, setDone] = useState<string | null>(null);
@@ -322,6 +331,7 @@ function PackCards({
             {done && prices ? (
                 <PricesDone message={done} accountHref={prices.accountHref} />
             ) : null}
+            {stopped ? <NotTakingOrders /> : null}
             <ul className="grid gap-3 [grid-template-columns:repeat(auto-fill,minmax(min(260px,100%),1fr))]">
                 {feed.packs.map((pack) => {
                     const perClass = packPerClass(pack);
@@ -364,7 +374,7 @@ function PackCards({
                                     >
                                         {label}
                                     </button>
-                                ) : feed.askHref ? (
+                                ) : feed.askHref && !stopped ? (
                                     <a
                                         href={askAboutHref(
                                             feed.askHref,

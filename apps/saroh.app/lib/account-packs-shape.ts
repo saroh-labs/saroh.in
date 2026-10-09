@@ -53,7 +53,13 @@ export function packsOnSaleResult(v: unknown): AccountPacksOnSale | null {
         Array.isArray(v.packs) &&
         v.packs.every(isPackOnSale)
     ) {
-        return { payOnline: v.payOnline, packs: v.packs };
+        // A website its business's plan paused (#800): nothing sold online.
+        const paused = v.notTakingOrders === true;
+        return {
+            payOnline: v.payOnline && !paused,
+            packs: v.packs,
+            ...(paused ? { notTakingOrders: true as const } : {}),
+        };
     }
     return null;
 }
