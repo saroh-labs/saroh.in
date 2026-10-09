@@ -104,9 +104,42 @@ export function useEdgeFade<T extends HTMLElement>(
         if (!el || !current) return;
         const item = el.querySelector<HTMLElement>(current);
         if (!item) return;
-        const to = revealOffset(el, item);
-        // `scrollLeft`, not `scrollIntoView`: that would scroll the page too.
-        if (to !== null) el.scrollLeft = to;
+        const reveal = () => {
+            const to = revealOffset(el, item);
+            // `scrollLeft`, not `scrollIntoView`: that would scroll the page too.
+            if (to !== null) el.scrollLeft = to;
+        };
+        reveal();
+        // Widths settle after the first paint (web fonts, late styles), which
+        // can push the open item back out of view: reveal it again as they
+        // do, until the person scrolls the strip themselves.
+        let touched = false;
+        const stop = () => {
+            touched = true;
+        };
+        const again = () => {
+            if (!touched) reveal();
+        };
+        const ro =
+            typeof ResizeObserver === "undefined"
+                ? null
+                : new ResizeObserver(again);
+        ro?.observe(el);
+        ro?.observe(item);
+        void document.fonts?.ready.then(again);
+        const opts = { passive: true } as const;
+        el.addEventListener("pointerdown", stop, opts);
+        el.addEventListener("wheel", stop, opts);
+        el.addEventListener("touchstart", stop, opts);
+        el.addEventListener("keydown", stop);
+        return () => {
+            touched = true;
+            ro?.disconnect();
+            el.removeEventListener("pointerdown", stop);
+            el.removeEventListener("wheel", stop);
+            el.removeEventListener("touchstart", stop);
+            el.removeEventListener("keydown", stop);
+        };
     }, [ref, current, revealKey]);
 
     const mask = edgeMask(edges);

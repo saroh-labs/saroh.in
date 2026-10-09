@@ -52,12 +52,24 @@ test.describe("phone tab strips (UX-079)", () => {
             await signIn(page);
             // Activity sits late in the row: it must be scrolled to.
             await page.goto("/settings/activity");
+            // The strip settles once fonts load; the open tab stays revealed.
+            await expect
+                .poll(
+                    async () =>
+                        (
+                            await strip(
+                                page,
+                                'nav[aria-label="Settings"]',
+                                '[aria-current="page"]',
+                            )
+                        ).inView,
+                )
+                .toBe(true);
             const got = await strip(
                 page,
                 'nav[aria-label="Settings"]',
                 '[aria-current="page"]',
             );
-            expect(got.inView).toBe(true);
             if (got.overflows) expect(got.mask).toContain("transparent");
             expect(
                 await page.evaluate(
