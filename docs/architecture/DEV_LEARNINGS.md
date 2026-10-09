@@ -3611,3 +3611,23 @@ serialized read only after stripping the timestamps.
 **Category**: tests · `e2e/tests/business-settings.spec.ts`,
 `apps/app.saroh.in/components/sites/site-editor.test.tsx`,
 `apps/api.saroh.in/src/modules/orders/order-kitchen.service.spec.ts`
+## A module switched off would have hidden its own history
+
+**Symptom**: the #117 audit found `@RequireModule("COMMERCE")` on the
+whole of both order controllers. With `MODULE_ENFORCEMENT` on and Commerce
+off, Sell › Orders answered 403 for orders the business had already taken,
+and the same was true of store customers and of bookings under Appointments.
+The runbook said history reads are never gated, but nothing checked it, and
+the guard logged nothing, so a shadow run could not have shown it either.
+**Cause**: a class-level gate is the easy way to annotate a controller, and
+it covers the reads beside the writes. Dark enforcement made the mistake
+invisible.
+**Fix**: those four controllers gate each write or operational handler and
+leave their history reads open. The guard has a `shadow` mode that refuses
+nothing and logs `module_enforcement_would_refuse`, and logs
+`module_enforcement_refused` when on (throttled, ids only).
+**Check**: `capabilities/history-reads.gate.spec.ts` names every handler of
+those controllers as a history read or a gated route and runs the real guard
+on each; `module-annotations.spec.ts` (now in the unit project) lists them as
+method-level, so a class-level gate fails it.
+**Category**: access · `apps/api.saroh.in/src/modules/capabilities/module-enforcement.guard.ts`

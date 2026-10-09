@@ -12,6 +12,7 @@ import type { AuthUser } from "../../common/types/store-context";
 import { isMemberPaused } from "../billing/paused-errors";
 import { OrganizationContextService } from "../organizations/organization-context.service";
 import { ModuleAvailabilityService } from "./module-availability.service";
+import { logModuleEnforcement } from "./module-enforcement.log";
 import type { ModuleKey } from "./module-registry";
 import {
     IGNORE_MODULE_READINESS_KEY,
@@ -19,22 +20,49 @@ import {
 } from "./require-module.decorator";
 
 /**
- * True when API module enforcement is switched on for this environment. Read
- * live from the environment (not the frozen typed `env`) so it is a genuine
+ * How `ModuleEnforcementGuard` runs in this environment, read live from
+ * `MODULE_ENFORCEMENT` (not the frozen typed `env`) so it is a genuine
  * runtime kill-switch — the same pattern as `RLS_ENFORCEMENT` — togglable
  * without a rebuild.
+ *
+ * - `off` (unset, or any other value): every request passes, with no lookup
+ *   and no log — zero cost.
+ * - `shadow`: every request passes, but an annotated one is evaluated, and
+ *   one that would have been refused logs `module_enforcement_would_refuse`
+ *   (the runbook's Shadow step).
+ * - `on` (`1`/`true`): an unavailable module is refused, and the refusal
+ *   logs `module_enforcement_refused`.
  */
-export function isModuleEnforcementEnabled(): boolean {
+export type ModuleEnforcementMode = "off" | "shadow" | "on";
+
+export function moduleEnforcementMode(): ModuleEnforcementMode {
     // eslint-disable-next-line no-restricted-properties -- runtime kill-switch; must toggle without a rebuild (mirrors RLS_ENFORCEMENT). Declared in turbo.json globalEnv.
     const v = process.env.MODULE_ENFORCEMENT;
-    return v === "1" || v === "true";
+    if (v === "1" || v === "true") return "on";
+    if (v === "shadow") return "shadow";
+    return "off";
+}
+
+/** True when the guard actually refuses (`MODULE_ENFORCEMENT` on). */
+export function isModuleEnforcementEnabled(): boolean {
+    return moduleEnforcementMode() === "on";
 }
 
 interface GuardedRequest {
+    method?: string;
+    route?: { path?: unknown };
     organizationContext?: OrganizationContext;
     user?: AuthUser;
     params?: Record<string, string | undefined>;
     query?: Record<string, unknown>;
+}
+
+/** What the guard would refuse a request with, and what to log about it. */
+interface Refusal {
+    error: NotFoundException | ForbiddenException;
+    status: 403 | 404;
+    org: string;
+    blockers: string[];
 }
 
 /**
@@ -45,10 +73,12 @@ interface GuardedRequest {
  * no-existence-leak policy (UNAUTHORIZED → 404, other gate blockers → 403).
  *
  * DARK by default: with `MODULE_ENFORCEMENT` unset this guard always allows, so
- * endpoints can be annotated well ahead of the controlled flip. Requires the
- * OrganizationContext (attach OrganizationGuard first); public/webhook routes
- * carry no context and are never enforced here — their reconciliation paths
- * must keep working after a module is disabled.
+ * endpoints can be annotated well ahead of the controlled flip. In `shadow`
+ * it still allows, and logs what it would have refused
+ * (`module-enforcement.log.ts`). Requires the OrganizationContext (attach
+ * OrganizationGuard first); public/webhook routes carry no context and are
+ * never enforced here — their reconciliation paths must keep working after a
+ * module is disabled.
  */
 @Injectable()
 export class ModuleEnforcementGuard implements CanActivate {
@@ -62,9 +92,55 @@ export class ModuleEnforcementGuard implements CanActivate {
         const moduleKey = this.reflector.getAllAndOverride<
             ModuleKey | undefined
         >(REQUIRE_MODULE_KEY, [context.getHandler(), context.getClass()]);
-        // Unannotated route, or enforcement dark → allow.
-        if (!moduleKey || !isModuleEnforcementEnabled()) return true;
+        // Unannotated route, or enforcement dark → allow, with no lookup.
+        if (!moduleKey) return true;
+        const mode = moduleEnforcementMode();
+        if (mode === "off") return true;
 
+        if (mode === "shadow") {
+            // Shadow never changes an answer: whatever it finds, or fails to
+            // find, the request goes on exactly as with enforcement off.
+            try {
+                const refusal = await this.refusal(context, moduleKey);
+                if (refusal) {
+                    logModuleEnforcement("module_enforcement_would_refuse", {
+                        module: moduleKey,
+                        route: routeOf(context),
+                        org: refusal.org,
+                        blockers: refusal.blockers,
+                        status: refusal.status,
+                    });
+                }
+            } catch (err) {
+                // A paused member is answered by the service as before; it
+                // is not a module question.
+                if (!isMemberPaused(err)) {
+                    logModuleEnforcement("module_enforcement_shadow_failed", {
+                        module: moduleKey,
+                        route: routeOf(context),
+                    });
+                }
+            }
+            return true;
+        }
+
+        const refusal = await this.refusal(context, moduleKey);
+        if (!refusal) return true;
+        logModuleEnforcement("module_enforcement_refused", {
+            module: moduleKey,
+            route: routeOf(context),
+            org: refusal.org,
+            blockers: refusal.blockers,
+            status: refusal.status,
+        });
+        throw refusal.error;
+    }
+
+    /** What enforcement would answer this request with; null to let it pass. */
+    private async refusal(
+        context: ExecutionContext,
+        moduleKey: ModuleKey,
+    ): Promise<Refusal | null> {
         const request = context.switchToHttp().getRequest<GuardedRequest>();
         // Store-scoped routes (`stores/:storeId/...`) carry no `:organizationId`
         // and do not run OrganizationGuard, so resolve the owning Organization
@@ -76,7 +152,7 @@ export class ModuleEnforcementGuard implements CanActivate {
             request.organizationContext ??
             (await this.contextFromStore(request));
         // No resolved Organization (public/webhook) → not enforced here.
-        if (!orgContext) return true;
+        if (!orgContext) return null;
 
         const projectId =
             request.params?.projectId ??
@@ -100,22 +176,33 @@ export class ModuleEnforcementGuard implements CanActivate {
         // A route that works before setup is finished passes once every gate
         // has — decided by availability, so a gate added there later still
         // shuts it rather than being mistaken for readiness.
-        if (ignoreReadiness && availability.gatesPassed) return true;
+        if (ignoreReadiness && availability.gatesPassed) return null;
         const blockers = availability.blockers;
-        if (blockers.length === 0) return true;
+        if (blockers.length === 0) return null;
 
         // Preserve the no-existence-leak policy: an unauthorized actor gets 404,
         // never an upsell; any other gate (rollout/module/project/entitlement)
         // is a deliberate "unavailable" 403 that reveals no flag detail.
         const codes = blockers.map((b) => b.code);
+        const org = orgContext.organizationId;
         if (codes.includes("UNAUTHORIZED")) {
-            throw new NotFoundException();
+            return {
+                error: new NotFoundException(),
+                status: 404,
+                org,
+                blockers: codes,
+            };
         }
-        throw new ForbiddenException({
-            error: "MODULE_UNAVAILABLE",
-            moduleKey,
-            blockerCodes: codes,
-        });
+        return {
+            error: new ForbiddenException({
+                error: "MODULE_UNAVAILABLE",
+                moduleKey,
+                blockerCodes: codes,
+            }),
+            status: 403,
+            org,
+            blockers: codes,
+        };
     }
 
     /**
@@ -157,4 +244,18 @@ export class ModuleEnforcementGuard implements CanActivate {
             return null;
         }
     }
+}
+
+/**
+ * The route as registered — `GET /organizations/:organizationId/orders` —
+ * never the URL, which carries ids and a query string. Falls back to the
+ * controller and handler names when the platform gives no template.
+ */
+function routeOf(context: ExecutionContext): string {
+    const request = context.switchToHttp().getRequest<GuardedRequest>();
+    const path = request.route?.path;
+    if (typeof path === "string" && path) {
+        return `${request.method ?? ""} ${path}`.trim();
+    }
+    return `${context.getClass().name}.${context.getHandler().name}`;
 }

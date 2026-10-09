@@ -36,7 +36,6 @@ const CLASS_LEVEL: Record<string, string> = {
     "leads/leads.controller.ts": "CRM",
     "contacts/contacts.controller.ts": "CRM",
     "pipelines/pipelines.controller.ts": "CRM",
-    "bookings/bookings.controller.ts": "APPOINTMENTS",
     // A12: a class's waitlist, for the team.
     "bookings/waitlist.controller.ts": "APPOINTMENTS",
     // Staff, their hours and the booking rules (U3) — both controllers.
@@ -58,13 +57,10 @@ const CLASS_LEVEL: Record<string, string> = {
     // addresses kept for one release.
     "catalogue/catalogue.controller.ts": "COMMERCE",
     "catalogue/store-catalogue.controller.ts": "COMMERCE",
-    // The business's orders across its storefronts, and the storefronts.
-    "orders/organization-orders.controller.ts": "COMMERCE",
+    // The storefronts.
     "stores/storefronts.controller.ts": "COMMERCE",
-    "customers/customers.controller.ts": "COMMERCE",
     "discounts/discounts.controller.ts": "COMMERCE",
     "product-reviews/product-reviews.controller.ts": "COMMERCE",
-    "orders/orders.controller.ts": "COMMERCE",
     "products/products.controller.ts": "COMMERCE",
     "products/product-details.controller.ts": "COMMERCE",
     // #531: the business's products and where each is sold.
@@ -90,6 +86,12 @@ const METHOD_LEVEL: Record<string, string> = {
     // DEC-070: invoicing needs no module; only the pay link is Payments'.
     "invoices/invoices.controller.ts": "PAYMENTS",
     "communications/communications.controller.ts": "COMMUNICATIONS",
+    // #117: history reads stay open when the module is off; every write and
+    // operational route is gated. `history-reads.gate.spec.ts` pins which.
+    "orders/orders.controller.ts": "COMMERCE",
+    "orders/organization-orders.controller.ts": "COMMERCE",
+    "customers/customers.controller.ts": "COMMERCE",
+    "bookings/bookings.controller.ts": "APPOINTMENTS",
 };
 
 /**
