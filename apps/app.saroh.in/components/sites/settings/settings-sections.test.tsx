@@ -10,8 +10,8 @@ import type { SiteAddress } from "@/lib/sites/share-links";
 import { SiteSettings } from "../site-settings";
 
 /**
- * Website › Settings in tabs (owner, 9 Oct): the open tab is in the
- * address, and a checklist step switches to its tab and opens its row.
+ * Website › Settings, its groups from a side list (owner, 9 Oct): the open
+ * group is in the address, and a checklist step opens its group and row.
  */
 
 vi.mock("next/navigation", () => ({
@@ -90,7 +90,7 @@ const shown = () =>
         (p) => p.id,
     );
 
-describe("the settings' tabs", () => {
+describe("the settings' side list", () => {
     it("opens on Address, and on the tab the address names", () => {
         render();
         expect(selected()).toBe("Address");
@@ -120,13 +120,13 @@ describe("the settings' tabs", () => {
         expect(window.history.length).toBe(before + 1);
     });
 
-    it("moves with the arrow keys", () => {
+    it("moves with the up and down keys", () => {
         render();
         const strip = host.querySelector<HTMLElement>('[role="tablist"]');
         act(() => {
             strip?.dispatchEvent(
                 new KeyboardEvent("keydown", {
-                    key: "ArrowRight",
+                    key: "ArrowDown",
                     bubbles: true,
                 }),
             );

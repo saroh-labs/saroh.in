@@ -337,7 +337,7 @@ describe("Before you share your site (the audit)", () => {
     });
 });
 
-describe("the groups, as tabs (owner, 9 Oct)", () => {
+describe("the groups, from a side list (owner, 9 Oct)", () => {
     const tabsOf = (html: string) =>
         Array.from(
             html.matchAll(
@@ -346,7 +346,7 @@ describe("the groups, as tabs (owner, 9 Oct)", () => {
             (m: RegExpMatchArray) => [m[2], m[1]],
         );
 
-    it("draws the groups as tabs in order, Address open, one panel shown", () => {
+    it("lists the groups in order, Address open, one panel shown", () => {
         const html = renderToStaticMarkup(
             <SiteSettings
                 site={site}
@@ -354,7 +354,12 @@ describe("the groups, as tabs (owner, 9 Oct)", () => {
                 approval={{ on: false, canChange: true }}
             />,
         );
-        expect(html).toContain('role="tablist" aria-label="Website settings"');
+        expect(html).toContain(
+            'role="tablist" aria-label="Settings sections" aria-orientation="vertical"',
+        );
+        // Below 1024px the same choice is a select, never a second strip.
+        expect(words(html)).toContain("Section");
+        expect(html).toMatch(/<button[^>]*role="combobox"/);
         expect(tabsOf(html)).toEqual([
             ["Address", "true"],
             ["Search and sharing", "false"],

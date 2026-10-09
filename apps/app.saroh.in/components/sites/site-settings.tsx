@@ -17,14 +17,15 @@ import { AddressGroup } from "./settings/address-group";
 import { MenuFooterGroup } from "./settings/menu-footer-group";
 import { PublishBar } from "./settings/publish-bar";
 import { SearchSharingGroup } from "./settings/search-sharing-group";
-import { SettingsTabs } from "./settings/settings-tabs";
+import { SettingsSections } from "./settings/settings-sections";
 import { useSettingsSave } from "./settings/use-settings-save";
 
 /**
  * A site's Settings tab (#188), regrouped after the Website › Settings
- * audit (9 Oct 2026): what's left before the site is worth sharing first,
- * then the groups as tabs, as Settings › Business is: Address, Search and
- * sharing, Menu and footer, Shop, Tracking, Advanced (`settings-tabs.tsx`).
+ * audit (9 Oct 2026): the groups (Address, Search and sharing, Menu and
+ * footer, Shop, Tracking, Advanced) chosen from a side list, or a select
+ * on a phone, with what's left before the site is worth sharing at the
+ * top of the content (`settings-sections.tsx`).
  *
  * Saving is per row; there is no page-level Save, because a settings form
  * that saves everything at once lets a stale tab overwrite a field someone
@@ -59,7 +60,7 @@ export function SiteSettings({
     const groups = settingsGroups({ shop, advanced: approval !== null });
 
     return (
-        <SettingsTabs
+        <SettingsSections
             groups={groups}
             steps={shareReadiness(site)}
             live={live}
