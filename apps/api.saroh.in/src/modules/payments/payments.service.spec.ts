@@ -75,6 +75,7 @@ import {
     BadRequestException,
     ConflictException,
     ForbiddenException,
+    Logger,
     NotFoundException,
     ServiceUnavailableException,
 } from "@nestjs/common";
@@ -1642,6 +1643,66 @@ describe("PaymentsService — a provider failing at checkout (UX-012)", () => {
         ).toMatchObject({ details: { reason: "provider-unavailable" } });
         expect(updateMany).not.toHaveBeenCalled();
         expect(jobCreate).not.toHaveBeenCalled();
+    });
+
+    it("answers keys that won't open with the same handled 503, calling no provider and logging no secret", async () => {
+        // A seeded business's placeholder keys: the seal doesn't open under
+        // the server's key, and that was a bare 500 with nothing logged.
+        const { service, fake } = makeService();
+        providerFindMany.mockResolvedValue([
+            { ...connectedRow(), credentialsAuthTag: "AAA=" },
+        ]);
+        const logged = jest
+            .spyOn(Logger.prototype, "error")
+            .mockImplementation(() => undefined);
+
+        const err = await service
+            .createIntentForOrder(ctx(), "order_1")
+            .catch((e: unknown) => e);
+
+        expect(err).toBeInstanceOf(ServiceUnavailableException);
+        expect((err as ServiceUnavailableException).getResponse()).toEqual({
+            message:
+                "The business can't take payment online right now. Please try again later, or pay them another way.",
+            details: { reason: "provider-unavailable" },
+        });
+        expect(fake.calls).toHaveLength(0);
+        expect(intentCreate).not.toHaveBeenCalled();
+        // Not flagged: the server's key may be what's wrong, not theirs.
+        expect(updateMany).not.toHaveBeenCalled();
+        // Logged once, naming the provider, the business and the cause.
+        expect(logged).toHaveBeenCalledTimes(1);
+        const line = String(logged.mock.calls[0][0]);
+        expect(line).toContain("Razorpay");
+        expect(line).toContain("org_1");
+        expect(line).toMatch(/authentication tag/i);
+        expect(line).not.toContain("super-secret-value");
+        logged.mockRestore();
+    });
+
+    it("answers keys that open to something other than a key pair the same way, quoting none of it", async () => {
+        const { service, fake } = makeService();
+        const sealed = encryptSecret("not-json super-secret-value");
+        providerFindMany.mockResolvedValue([
+            {
+                ...connectedRow(),
+                encryptedCredentials: sealed.ciphertext,
+                credentialsIv: sealed.iv,
+                credentialsAuthTag: sealed.authTag,
+            },
+        ]);
+        const logged = jest
+            .spyOn(Logger.prototype, "error")
+            .mockImplementation(() => undefined);
+
+        await expect(
+            service.createIntentForOrder(ctx(), "order_1"),
+        ).rejects.toBeInstanceOf(ServiceUnavailableException);
+        expect(fake.calls).toHaveLength(0);
+        expect(String(logged.mock.calls[0][0])).not.toContain(
+            "super-secret-value",
+        );
+        logged.mockRestore();
     });
 
     it("still answers the customer when the flag can't be written", async () => {

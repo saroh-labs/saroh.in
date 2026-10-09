@@ -151,12 +151,15 @@ export interface CheckoutStanding {
  * - bag-changed: price it again before paying.
  * - busy: a checkout is open already, or too many tries.
  * - cant-order: the shop isn't taking orders online now.
+ * - payments-down: the business's online payment failed just now; try
+ *   later, or pay them another way.
  */
 export type ShopProblem =
     | "signed-out"
     | "bag-changed"
     | "busy"
     | "cant-order"
+    | "payments-down"
     | "invalid"
     | "error"
     | "test-release";
