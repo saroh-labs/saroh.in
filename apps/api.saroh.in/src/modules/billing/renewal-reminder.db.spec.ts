@@ -228,6 +228,9 @@ describe("a plan about to renew (#804)", () => {
                 chargeAt: renewsAt,
                 provider: "RAZORPAY",
                 providerSubscriptionId,
+                // A sent charge carries the provider's id (migration check
+                // `SubscriptionAddonCharge_sent_shape`).
+                providerChargeId: `${providerSubscriptionId}_addon`,
                 status: "SENT",
             },
         });
