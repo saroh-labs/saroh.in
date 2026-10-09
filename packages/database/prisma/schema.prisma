@@ -4076,6 +4076,8 @@ model Job {
   @@unique([type], map: "Job_one_pending_billing_moves_apply", where: raw("type = 'billing.moves.apply' AND status = 'PENDING'"))
   // One waiting run of Insights' hourly rollup chain (DEC-075), like the renewal chain.
   @@unique([type], map: "Job_one_pending_analytics_rollup", where: raw("type = 'analytics.rollup' AND status = 'PENDING'"))
+  // One waiting run of the daily analytics retention sweep (#799), like the renewal chain.
+  @@unique([type], map: "Job_one_pending_analytics_retention", where: raw("type = 'analytics.retention' AND status = 'PENDING'"))
   @@index([status, runAt])
   @@index([organizationId])
 }
