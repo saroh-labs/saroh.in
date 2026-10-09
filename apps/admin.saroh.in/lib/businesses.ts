@@ -221,6 +221,30 @@ export interface BusinessView {
     >;
     /** Each site's tracker switch (#897). Absent from an older API. */
     sites?: Panel<SiteTrackersRow[]>;
+    /** Where its sites are live, and payments yes or no. Absent from an older API. */
+    presence?: Panel<BusinessPresence>;
+}
+
+/** One web address a site is live on (the API's `PresenceAddress`). */
+export interface PresenceAddress {
+    kind: "web-address" | "own-domain";
+    url: string;
+}
+
+/** What the business's customers can reach (owner, 9 Oct). Never a key. */
+export interface BusinessPresence {
+    sites: {
+        id: string;
+        name: string;
+        published: boolean;
+        /** Empty while nothing is published. */
+        addresses: PresenceAddress[];
+    }[];
+    payments: {
+        provider: string;
+        connected: boolean;
+        needsAttention: boolean;
+    }[];
 }
 
 /** One site and whether Saroh has switched its trackers off. */

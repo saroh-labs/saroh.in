@@ -31,6 +31,20 @@ export interface PersonDetail extends PersonRow {
     }[];
 }
 
+/** One account in "Newest sign-ups". */
+export interface RecentSignup {
+    id: string;
+    name: string | null;
+    email: string;
+    createdAt: string;
+    businesses: { id: string; name: string }[];
+}
+
+/** The last 25 accounts created, newest first. Each read is recorded. */
+export function recentSignups(): Promise<RecentSignup[] | null> {
+    return getJson<RecentSignup[]>("/people/recent");
+}
+
 export function searchPeople(q: string): Promise<PersonRow[] | null> {
     return getJson<PersonRow[]>(`/people?q=${encodeURIComponent(q)}`);
 }

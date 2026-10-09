@@ -43,6 +43,16 @@ export function createDomainHosting(): DomainHosting | null {
     return new CloudflareDomainHosting(config);
 }
 
+/**
+ * Whether this instance hosts custom domains: true exactly when
+ * {@link createDomainHosting} returns an adapter. For reads outside the
+ * domains module (the admin business page) that need `hostingView`'s
+ * `hostingOn` without building, or logging about, an adapter.
+ */
+export function domainHostingOn(): boolean {
+    return domainFakesOn() || hostingConfig() !== null;
+}
+
 /** Nest provider exposing the port (or null, off) under {@link DOMAIN_HOSTING}. */
 export const domainHostingProvider: Provider = {
     provide: DOMAIN_HOSTING,
