@@ -54,6 +54,30 @@ test("the site's settings say web address, posts path and your online shop", asy
         page.getByText(/Saroh address|Subdomain|Writing address|storefront/i),
     ).toHaveCount(0);
 
+    // Grouped after the settings audit: the groups as headings, the address
+    // once, and no per-heading "goes live" suffixes.
+    for (const name of ["Address", "Search and sharing", "Menu and footer"]) {
+        await expect(
+            page.getByRole("heading", { level: 2, name, exact: true }),
+        ).toBeVisible();
+    }
+    await expect(page.getByText("Site status", { exact: true })).toHaveCount(0);
+    await expect(
+        page.getByText(
+            /Live as soon as it's saved|Goes live with your next publish/,
+        ),
+    ).toHaveCount(0);
+    await expect(
+        page.getByText("Next publish", { exact: true }).first(),
+    ).toBeVisible();
+    // The in-page list is drawn only where there's room beside the column.
+    const list = page.getByRole("navigation", { name: "Settings sections" });
+    if ((page.viewportSize()?.width ?? 0) >= 1280) {
+        await expect(list).toBeVisible();
+    } else {
+        await expect(list).toBeHidden();
+    }
+
     const sellsFrom = read.sellsFrom?.storefront?.name;
     if (sellsFrom) {
         await expect(

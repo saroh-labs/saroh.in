@@ -78,7 +78,7 @@ export function SellsFromRow({
         <div id={SELLS_FROM_ANCHOR} className="scroll-mt-20">
             <Section
                 title="Your online shop"
-                description="The location whose products your online shop lists at /shop. Changes here show at once; there's nothing to publish."
+                description="The location whose products your online shop lists at /shop."
                 badge={
                     waiting ? (
                         <Badge variant="warning">Not live</Badge>

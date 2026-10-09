@@ -42,6 +42,13 @@ export interface ShareCardsProps {
     image: ShareImageFacts | null;
     /** Set once the site has been published: enables the inspector links. */
     liveUrl: string | null;
+    /**
+     * Draw WhatsApp alone, the app most of a business's customers in India
+     * see the link in, and fold the others under "See N more apps". The
+     * link preview tool on saroh.in draws them all; the site's settings
+     * fold them (Website › Settings audit).
+     */
+    fold?: boolean;
     className?: string;
 }
 
@@ -61,48 +68,70 @@ export function ShareCards({
     domain,
     image,
     liveUrl,
+    fold = false,
     className,
 }: ShareCardsProps) {
     const host = domain ?? "your-site.saroh.app";
     const warnings = shareImageWarnings(image);
+    const drawn = DRAWN.map(([platform, name]) => (
+        <figure key={platform} className="min-w-0">
+            <figcaption className="mb-1.5 flex items-baseline justify-between gap-2 text-xs">
+                <span className="font-medium">{name}</span>
+                {platform === "whatsapp" && image && !isWhatsappLarge(image) ? (
+                    <span className="truncate text-muted-foreground">
+                        small thumbnail — see below
+                    </span>
+                ) : null}
+            </figcaption>
+            <ShareCard
+                platform={platform}
+                title={title}
+                description={description}
+                siteName={siteName}
+                domain={host}
+                image={image}
+            />
+        </figure>
+    ));
+    const instagram = (
+        <figure className="min-w-0">
+            <figcaption className="mb-1.5 text-xs font-medium">
+                Instagram
+            </figcaption>
+            <div className="rounded border border-dashed p-3 text-[13px] leading-snug text-muted-foreground">
+                Instagram shows the link as text. It does not unfurl links in
+                captions, bios or most messages, so there is no card to design.
+            </div>
+        </figure>
+    );
 
     return (
         <div className={cn("space-y-4", className)}>
-            <div className="grid gap-4 sm:grid-cols-2">
-                {DRAWN.map(([platform, name]) => (
-                    <figure key={platform} className="min-w-0">
-                        <figcaption className="mb-1.5 flex items-baseline justify-between gap-2 text-xs">
-                            <span className="font-medium">{name}</span>
-                            {platform === "whatsapp" &&
-                            image &&
-                            !isWhatsappLarge(image) ? (
-                                <span className="truncate text-muted-foreground">
-                                    small thumbnail — see below
-                                </span>
-                            ) : null}
-                        </figcaption>
-                        <ShareCard
-                            platform={platform}
-                            title={title}
-                            description={description}
-                            siteName={siteName}
-                            domain={host}
-                            image={image}
-                        />
-                    </figure>
-                ))}
-
-                <figure className="min-w-0">
-                    <figcaption className="mb-1.5 text-xs font-medium">
-                        Instagram
-                    </figcaption>
-                    <div className="rounded border border-dashed p-3 text-[13px] leading-snug text-muted-foreground">
-                        Instagram shows the link as text. It does not unfurl
-                        links in captions, bios or most messages, so there is no
-                        card to design.
-                    </div>
-                </figure>
-            </div>
+            {fold ? (
+                <>
+                    <div className="max-w-sm">{drawn.slice(0, 1)}</div>
+                    <details className="group" data-more-apps>
+                        <summary className="inline-flex cursor-pointer items-center rounded-sm py-1 text-sm font-medium underline underline-offset-2 hover:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring active:text-foreground coarse:min-h-11">
+                            <span className="group-open:hidden">
+                                {/* The five other cards, and Instagram. */}
+                                See {DRAWN.length} more apps
+                            </span>
+                            <span className="hidden group-open:inline">
+                                Hide the other apps
+                            </span>
+                        </summary>
+                        <div className="mt-3 grid gap-4 sm:grid-cols-2">
+                            {drawn.slice(1)}
+                            {instagram}
+                        </div>
+                    </details>
+                </>
+            ) : (
+                <div className="grid gap-4 sm:grid-cols-2">
+                    {drawn}
+                    {instagram}
+                </div>
+            )}
 
             {warnings.length > 0 ? (
                 <ul className="space-y-1 text-xs text-muted-foreground">

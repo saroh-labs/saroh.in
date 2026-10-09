@@ -13,7 +13,14 @@ import {
 import { cn } from "@saroh/ui/lib/utils";
 import { PageHeader } from "@saroh/ui/page-header";
 import { useEdgeFade } from "@saroh/ui/scroll-x";
-import { Check, ChevronDown, Globe, PenLine, Plus } from "lucide-react";
+import {
+    Check,
+    ChevronDown,
+    ExternalLink,
+    Globe,
+    PenLine,
+    Plus,
+} from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useRef } from "react";
@@ -51,6 +58,7 @@ export function WebsiteHeader({
     site,
     sites,
     address,
+    liveUrl = null,
     canEdit,
     mayCreate,
     pageCount,
@@ -61,6 +69,13 @@ export function WebsiteHeader({
     sites: WebsiteHeaderSite[];
     /** Where the public reaches it: "rye.saroh.app". */
     address: string;
+    /**
+     * `https://` + the address, set only while the site is published: the
+     * address is then a link that opens the live site. Never published, it
+     * stays text, since nobody can reach it yet; Open editor (or Review, for
+     * a reader) is where the draft is seen.
+     */
+    liveUrl?: string | null;
     /** `can.edit` for this site: author tabs, or the reading ones. */
     canEdit: boolean;
     mayCreate: boolean;
@@ -155,7 +170,12 @@ export function WebsiteHeader({
                                 {site.name.trim() || "Untitled site"}
                             </span>
                         )}
-                        <span className="font-mono text-[12px]">{address}</span>
+                        <SiteAddressLink
+                            address={address}
+                            liveUrl={liveUrl}
+                            previewHref={base}
+                            siteName={site.name.trim() || "Untitled site"}
+                        />
                         <StateBadge state={site.state} />
                         {site.paused ? (
                             <span
@@ -225,6 +245,67 @@ export function WebsiteHeader({
                 })}
             </nav>
         </div>
+    );
+}
+
+/** The header's link look: the address's size, its icon beside it. */
+const ADDRESS_LINK =
+    "-my-1 inline-flex min-w-0 max-w-full items-center gap-1 rounded-sm py-1 text-[12px] text-foreground underline underline-offset-2 transition-colors duration-fast hover:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring active:text-foreground coarse:min-h-11";
+
+/**
+ * The site's address under the title, opening in a new tab.
+ *
+ * - Published: the address is the link, to the live site.
+ * - Never published: the address opens nothing yet, so it stays text, and
+ *   "Preview" beside it opens the draft in the workspace (the editor, or
+ *   Review for someone who reads the site: `/sites/:id` sends them there).
+ *   A shareable preview link is a thing the owner makes on purpose (Review
+ *   tab), so none is made here.
+ */
+export function SiteAddressLink({
+    address,
+    liveUrl,
+    previewHref,
+    siteName,
+}: {
+    address: string;
+    liveUrl: string | null;
+    /** Where the draft is seen in the workspace. */
+    previewHref: string;
+    siteName: string;
+}) {
+    if (!liveUrl) {
+        return (
+            <>
+                <span className="min-w-0 font-mono text-[12px] [overflow-wrap:anywhere]">
+                    {address}
+                </span>
+                <a
+                    href={previewHref}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    aria-label={`Preview ${siteName}'s website, not published yet (opens in a new tab)`}
+                    data-site-preview
+                    className={cn(ADDRESS_LINK, "font-medium")}
+                >
+                    Preview
+                    <ExternalLink aria-hidden className="size-3 shrink-0" />
+                </a>
+            </>
+        );
+    }
+    return (
+        <a
+            href={liveUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            aria-label={`View ${siteName}'s website (opens in a new tab)`}
+            data-site-address
+            className={cn(ADDRESS_LINK, "font-mono")}
+        >
+            <span className="min-w-0 [overflow-wrap:anywhere]">{address}</span>
+            <ExternalLink aria-hidden className="size-3 shrink-0" />
+        </a>
     );
 }
 

@@ -10,6 +10,7 @@ import {
 } from "@/components/sites/search-tracking/parts";
 import type { TrackerStanding } from "@/components/sites/search-tracking/tracker-row";
 import { TrackerRow } from "@/components/sites/search-tracking/tracker-row";
+import { VerificationCodes } from "@/components/sites/search-tracking/verification-codes";
 import { VerifyAddress } from "@/components/sites/search-tracking/verify-address";
 import type { SearchTrackingRead } from "@/lib/sites/search-tracking";
 import { PRIVACY_NOTE, VERIFICATION_WORDS } from "@/lib/sites/search-tracking";
@@ -54,27 +55,6 @@ export function SiteSearchTrackingRead({
             </p>
             {view.switchedOff ? <SwitchedOffNotice /> : null}
 
-            <Block title="Verify your site">
-                <VerifyAddress address={address} />
-                {VERIFICATION_SERVICES.map((service) => {
-                    const code = view.verifications[service];
-                    return (
-                        <LineRow
-                            key={service}
-                            label={VERIFICATION_WORDS[service].label}
-                        >
-                            {code ? (
-                                <span className="font-mono">{code}</span>
-                            ) : (
-                                <span className="text-muted-foreground">
-                                    Not set
-                                </span>
-                            )}
-                        </LineRow>
-                    );
-                })}
-            </Block>
-
             <Block title="Your trackers">
                 {lock && !view.switchedOff ? <LockNotice lock={lock} /> : null}
                 {view.trackers.length === 0 ? (
@@ -100,6 +80,33 @@ export function SiteSearchTrackingRead({
                     )}
                 </LineRow>
             </Block>
+
+            <VerificationCodes
+                services={VERIFICATION_SERVICES}
+                added={
+                    VERIFICATION_SERVICES.filter((s) => view.verifications[s])
+                        .length
+                }
+            >
+                <VerifyAddress address={address} />
+                {VERIFICATION_SERVICES.map((service) => {
+                    const code = view.verifications[service];
+                    return (
+                        <LineRow
+                            key={service}
+                            label={VERIFICATION_WORDS[service].label}
+                        >
+                            {code ? (
+                                <span className="font-mono">{code}</span>
+                            ) : (
+                                <span className="text-muted-foreground">
+                                    Not set
+                                </span>
+                            )}
+                        </LineRow>
+                    );
+                })}
+            </VerificationCodes>
         </SearchTrackingFrame>
     );
 }

@@ -21,6 +21,7 @@ import { PrivacyField } from "@/components/sites/search-tracking/privacy-field";
 import type { TrackerStanding } from "@/components/sites/search-tracking/tracker-row";
 import { TrackerRow } from "@/components/sites/search-tracking/tracker-row";
 import { TrackerSetupDialog } from "@/components/sites/search-tracking/tracker-setup-dialog";
+import { VerificationCodes } from "@/components/sites/search-tracking/verification-codes";
 import { VerificationField } from "@/components/sites/search-tracking/verification-field";
 import { VerifyAddress } from "@/components/sites/search-tracking/verify-address";
 import { saveSearchTracking } from "@/lib/sites/actions";
@@ -157,6 +158,10 @@ function Editable({
           : "open";
     const ownDomain = address !== null && address.host !== address.platformHost;
     const byKind = new Map(view.trackers.map((t) => [t.kind, t]));
+    // Meta and Pinterest verify only a domain of the business's own.
+    const services = VERIFICATION_SERVICES.filter(
+        (s) => ownDomain || !OWN_DOMAIN_SERVICES.includes(s),
+    );
 
     function actionsFor(kind: TrackerKind, tracker: TrackerView | null) {
         const name = TRACKER_WORDS[kind].name;
@@ -217,7 +222,7 @@ function Editable({
                     size="sm"
                     onClick={() => setSetup(kind)}
                 >
-                    Change
+                    Edit
                 </Button>
                 {remove}
             </>
@@ -229,32 +234,8 @@ function Editable({
             {view.switchedOff ? <SwitchedOffNotice /> : null}
 
             <Block
-                title="Verify your site"
-                description="Prove the site is yours to Google, Bing and others. Codes are added to every page of your live site."
-            >
-                <VerifyAddress address={address} />
-                {VERIFICATION_SERVICES.filter(
-                    (s) => ownDomain || !OWN_DOMAIN_SERVICES.includes(s),
-                ).map((service) => (
-                    <VerificationField
-                        key={service}
-                        service={service}
-                        saved={view.verifications[service]}
-                        host={address?.url ?? null}
-                        liveUrl={address?.url ?? null}
-                        save={save}
-                    />
-                ))}
-                {ownDomain ? null : (
-                    <p className="px-4 py-3 text-sm text-muted-foreground">
-                        {OWN_DOMAIN_NOTE}
-                    </p>
-                )}
-            </Block>
-
-            <Block
                 title="Your trackers"
-                description="Connect your own analytics and ad tools. Saroh adds each tool's own code and asks visitors first for any that uses cookies."
+                description="Your own analytics and ad tools. Visitors are asked first for any that uses cookies."
             >
                 {lock && !view.switchedOff ? <LockNotice lock={lock} /> : null}
                 {TRACKER_KINDS.map((kind) => {
@@ -272,6 +253,28 @@ function Editable({
                 })}
                 <PrivacyField saved={view.privacyUrl} save={save} />
             </Block>
+
+            <VerificationCodes
+                services={services}
+                added={services.filter((s) => view.verifications[s]).length}
+            >
+                <VerifyAddress address={address} />
+                {services.map((service) => (
+                    <VerificationField
+                        key={service}
+                        service={service}
+                        saved={view.verifications[service]}
+                        host={address?.url ?? null}
+                        liveUrl={address?.url ?? null}
+                        save={save}
+                    />
+                ))}
+                {ownDomain ? null : (
+                    <p className="px-4 py-3 text-sm text-muted-foreground">
+                        {OWN_DOMAIN_NOTE}
+                    </p>
+                )}
+            </VerificationCodes>
 
             {setup ? (
                 <TrackerSetupDialog
