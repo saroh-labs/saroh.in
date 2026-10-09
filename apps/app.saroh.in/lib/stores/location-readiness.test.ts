@@ -219,7 +219,11 @@ describe("locationReadiness", () => {
         ).toMatchObject({
             done: false,
             label: "Choose which provider checkout uses",
-            action: { href: "#payments", inPage: true },
+            action: {
+                href: "?section=payments",
+                inPage: true,
+                tab: "payments",
+            },
         });
     });
 
@@ -262,5 +266,48 @@ describe("locationReadiness", () => {
             { notTakingOrders: true },
         );
         expect(keys(r).slice(0, 2)).toEqual(["· plan", "· paused"]);
+    });
+
+    it("each step on this page names its tab and the field to focus", () => {
+        const r = locationReadiness({ ...base, kind: "SHOP" }, undefined);
+        expect(r.items.map((i) => i.action)).toEqual([
+            {
+                label: "Add address",
+                href: "?section=the-place",
+                inPage: true,
+                tab: "the-place",
+                focus: "storefront-address",
+            },
+            {
+                label: "Set hours",
+                href: "?section=the-place",
+                inPage: true,
+                tab: "the-place",
+                focus: "storefront-hours",
+            },
+        ]);
+        expect(
+            locationReadiness(base, undefined).items[0]?.action,
+        ).toMatchObject({ label: "Set up delivery", tab: "delivery" });
+    });
+
+    it("says where a counter sells only when the website was read", () => {
+        const counter = { ...base, kind: "SHOP" as const };
+        expect(locationReadiness(counter, null).note).toBe(
+            "Sells in person only",
+        );
+        expect(locationReadiness(counter, undefined).note).toBeUndefined();
+        expect(locationReadiness(base, null).note).toBeUndefined();
+    });
+
+    it("a live shop's step links to it", () => {
+        expect(
+            locationReadiness(base, site()).items.find(
+                (i) => i.key === "listed",
+            )?.view,
+        ).toEqual({
+            label: "Your online shop",
+            href: "https://rye.saroh.app/shop",
+        });
     });
 });

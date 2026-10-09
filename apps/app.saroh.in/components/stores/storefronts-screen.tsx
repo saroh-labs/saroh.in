@@ -8,15 +8,18 @@ import { PageHeader } from "@saroh/ui/page-header";
 import { showError, showSuccess } from "@saroh/ui/toast";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useState, useTransition } from "react";
+import { useEffect, useRef, useState, useTransition } from "react";
 
 import { PausedNote } from "@/components/billing/paused-banner";
 import { ReadOnlyNote } from "@/components/shared/read-only-note";
 import { pausedWords } from "@/lib/billing/paused";
+import { useTabParam } from "@/lib/hooks/use-tab-param";
 import type { SiteSelling } from "@/lib/sites/sells-from";
 import { newStorefrontHref, storefrontHref } from "@/lib/stores/links";
+import type { LocationTab } from "@/lib/stores/location-readiness";
 import {
     LOCATION_SECTIONS,
+    LOCATION_TAB_PARAM,
     locationReadiness,
     locationSubtitle,
 } from "@/lib/stores/location-readiness";
@@ -31,7 +34,12 @@ import { ClosingSection } from "./closing-section";
 import { FulfilmentSection } from "./fulfilment-section";
 import { LocationReadinessCard } from "./location-readiness-card";
 import type { Saver } from "./location-save";
-import { LocationSectionNav } from "./location-section-nav";
+import { jumpTo } from "./location-save";
+import {
+    LOCATION_PANEL_ID,
+    LocationTabs,
+    locationTabId,
+} from "./location-tabs";
 import { PaymentsSection } from "./payments-section";
 import { PlaceSection } from "./place-section";
 import { SameEmailSection } from "./same-email-section";
@@ -312,9 +320,12 @@ function StorefrontDetail({
         });
     };
 
-    const shared = { store, canEdit, pending, save, setStore };
+    // The open tab lives in the address (`?section=delivery`), as Settings ›
+    // Business keeps its own, so a link opens it and Back returns to the
+    // last one. Customers shows only where the API sends its setting; Pause
+    // or close only to someone who may do either.
     const closes = canClose || canEdit;
-    const sections = [
+    const tabs = [
         LOCATION_SECTIONS.place,
         LOCATION_SECTIONS.payments,
         LOCATION_SECTIONS.delivery,
@@ -323,31 +334,62 @@ function StorefrontDetail({
             : []),
         ...(closes ? [LOCATION_SECTIONS.closing] : []),
     ];
+    const [tab, setTab] = useTabParam<LocationTab>(
+        LOCATION_TAB_PARAM,
+        tabs.map((t) => t.id),
+        "the-place",
+        { push: true },
+    );
+    // A field to put the keyboard on once its tab has drawn.
+    const focusNext = useRef<string | null>(null);
+    const [jumps, setJumps] = useState(0);
+    useEffect(() => {
+        const id = focusNext.current;
+        if (!id) return;
+        focusNext.current = null;
+        jumpTo(id);
+    }, [jumps, tab]);
+    const goTo = (to: LocationTab, focus?: string) => {
+        focusNext.current = focus ?? LOCATION_PANEL_ID;
+        setTab(to);
+        setJumps((n) => n + 1);
+    };
+
+    const shared = { store, canEdit, pending, save, setStore, goTo };
 
     return (
-        <>
-            <div className="flex min-w-0 max-w-[760px] flex-1 flex-col gap-4">
-                {notTakingOrders ? (
-                    <PausedNote>{pausedWords("location")}</PausedNote>
+        <div className="flex min-w-0 max-w-[760px] flex-1 flex-col gap-4">
+            {notTakingOrders ? (
+                <PausedNote>{pausedWords("location")}</PausedNote>
+            ) : null}
+            {!canEdit ? <ReadOnlyNote className="mb-0" /> : null}
+            <LocationReadinessCard
+                readiness={locationReadiness(store, site, {
+                    notTakingOrders,
+                })}
+                canEdit={canEdit}
+                onJump={goTo}
+            />
+            <LocationTabs tabs={tabs} tab={tab} onChange={setTab} />
+            <div
+                id={LOCATION_PANEL_ID}
+                role="tabpanel"
+                aria-labelledby={locationTabId(tab)}
+                className="min-w-0 outline-none"
+            >
+                {tab === "the-place" ? <PlaceSection {...shared} /> : null}
+                {tab === "payments" ? <PaymentsSection {...shared} /> : null}
+                {tab === "delivery" ? <FulfilmentSection {...shared} /> : null}
+                {tab === "customers" ? (
+                    <SameEmailSection
+                        store={store}
+                        canEdit={canLinkCustomers}
+                        pending={pending}
+                        save={save}
+                        setStore={setStore}
+                    />
                 ) : null}
-                {!canEdit ? <ReadOnlyNote className="mb-0" /> : null}
-                <LocationReadinessCard
-                    readiness={locationReadiness(store, site, {
-                        notTakingOrders,
-                    })}
-                    canEdit={canEdit}
-                />
-                <PlaceSection {...shared} site={site} />
-                <PaymentsSection {...shared} />
-                <FulfilmentSection {...shared} />
-                <SameEmailSection
-                    store={store}
-                    canEdit={canLinkCustomers}
-                    pending={pending}
-                    save={save}
-                    setStore={setStore}
-                />
-                {closes ? (
+                {tab === "pause-or-close" && closes ? (
                     <ClosingSection
                         {...shared}
                         businessName={businessName}
@@ -355,7 +397,6 @@ function StorefrontDetail({
                     />
                 ) : null}
             </div>
-            <LocationSectionNav sections={sections} />
-        </>
+        </div>
     );
 }

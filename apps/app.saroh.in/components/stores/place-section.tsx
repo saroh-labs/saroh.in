@@ -9,8 +9,6 @@ import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 
 import { SEGMENT, SEGMENTED } from "@/components/shared/segmented";
-import type { SiteSelling } from "@/lib/sites/sells-from";
-import { locationSelling } from "@/lib/sites/sells-from";
 import {
     storefrontDetailsHref,
     storefrontPeopleHref,
@@ -23,7 +21,6 @@ import type { StorefrontKind } from "@/lib/stores/storefronts";
 
 import type { SectionProps } from "./location-save";
 import { jumpTo } from "./location-save";
-import { LocationSellingLine } from "./location-selling-line";
 import { OpeningHours } from "./opening-hours";
 import { Note, Section } from "./storefront-section";
 
@@ -44,12 +41,11 @@ export const KIND_ANSWER: Record<StorefrontKind, string> = {
  */
 export function PlaceSection({
     store,
-    site,
     canEdit,
     pending,
     save,
     setStore,
-}: SectionProps & { site: SiteSelling | null | undefined }) {
+}: SectionProps) {
     const [name, setName] = useState(store.name);
     const trimmed = name.trim();
     const dirty = trimmed !== store.name;
@@ -77,6 +73,19 @@ export function PlaceSection({
             setKindError,
         );
     };
+    // Going online only leaves a saved Pick-up as it was; one press here
+    // turns it off, rather than leaving the two to contradict each other.
+    const ways = store.fulfilmentTypes;
+    const pickupLeftOn =
+        canEdit && store.kind === "ONLINE" && Boolean(ways?.includes("PICKUP"));
+    const turnPickupOff = () => {
+        if (!ways) return;
+        const next = ways.filter((t) => t !== "PICKUP");
+        setStore((s) => ({ ...s, fulfilmentTypes: next }));
+        save({ fulfilmentTypes: next }, "Pick-up turned off", () =>
+            setStore((s) => ({ ...s, fulfilmentTypes: ways })),
+        );
+    };
     useEffect(() => {
         if (!askAddress.current || pending) return;
         askAddress.current = false;
@@ -88,11 +97,6 @@ export function PlaceSection({
             title={LOCATION_SECTIONS.place.label}
             id={LOCATION_SECTIONS.place.id}
         >
-            {/* Unknown (the site couldn't be read) says nothing: "in
-                person only" would be a guess. */}
-            {site !== undefined ? (
-                <LocationSellingLine selling={locationSelling(store, site)} />
-            ) : null}
             <form
                 className="grid gap-2"
                 onSubmit={(e) => {
@@ -157,6 +161,28 @@ export function PlaceSection({
                     >
                         {kindError}
                     </p>
+                ) : null}
+                {pickupLeftOn ? (
+                    // No counter, but Pick-up still on (just switched, or
+                    // saved that way before): the way out, right here.
+                    <div
+                        role="status"
+                        className="flex flex-wrap items-center gap-x-3 gap-y-2 rounded-lg bg-muted px-3 py-2.5 text-[12.5px] leading-[1.5]"
+                    >
+                        <span className="min-w-0 flex-[1_1_220px]">
+                            Pick-up is still on, but with no counter nobody can
+                            collect from here.
+                        </span>
+                        <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            disabled={pending}
+                            onClick={turnPickupOff}
+                        >
+                            Turn Pick-up off
+                        </Button>
+                    </div>
                 ) : null}
             </div>
 

@@ -1,15 +1,17 @@
 "use client";
 
 import { Button } from "@saroh/ui/button";
-import { Check } from "lucide-react";
+import { ArrowUpRight, Check } from "lucide-react";
 import Link from "next/link";
 
 import type {
     LocationReadiness,
+    LocationTab,
     ReadyItem,
 } from "@/lib/stores/location-readiness";
 
-import { jumpTo } from "./location-save";
+/** Opens a tab of the page and puts the keyboard on a field there. */
+type Jump = (tab: LocationTab, focus?: string) => void;
 
 /**
  * "Ready for online orders · 2 of 4" at the top of a location (the 9 Oct
@@ -25,24 +27,34 @@ import { jumpTo } from "./location-save";
 export function LocationReadinessCard({
     readiness,
     canEdit,
+    onJump,
 }: {
     readiness: LocationReadiness;
     canEdit: boolean;
+    onJump: Jump;
 }) {
-    const { heading, items, done, total } = readiness;
+    const { heading, note, items, done, total } = readiness;
     if (total === 0) return null;
 
     if (done === total) {
+        // The one link a done step carries (the live shop) stays reachable.
+        const view = items.find((i) => i.view)?.view;
         return (
             <p
                 data-testid="location-ready"
-                className="flex items-center gap-2 rounded-xl border border-border bg-card px-4 py-2.5 text-[13px] font-medium"
+                className="flex flex-wrap items-center gap-x-2 gap-y-1 rounded-xl border border-border bg-card px-4 py-2.5 text-[13px] font-medium"
             >
                 <Check
                     aria-hidden
                     className="size-4 shrink-0 text-success-subtle-foreground"
                 />
                 {heading}
+                {note ? (
+                    <span className="font-normal text-muted-foreground">
+                        · {note}
+                    </span>
+                ) : null}
+                {view ? <ViewLink view={view} /> : null}
             </p>
         );
     }
@@ -64,6 +76,11 @@ export function LocationReadinessCard({
                 <span className="text-[12.5px] tabular-nums text-foreground/80">
                     {done} of {total}
                 </span>
+                {note ? (
+                    <span className="text-[12.5px] text-foreground/80">
+                        · {note}
+                    </span>
+                ) : null}
                 <div
                     role="progressbar"
                     aria-label={heading}
@@ -81,14 +98,27 @@ export function LocationReadinessCard({
             </div>
             <ul className="grid gap-2">
                 {items.map((item) => (
-                    <Item key={item.key} item={item} canEdit={canEdit} />
+                    <Item
+                        key={item.key}
+                        item={item}
+                        canEdit={canEdit}
+                        onJump={onJump}
+                    />
                 ))}
             </ul>
         </section>
     );
 }
 
-function Item({ item, canEdit }: { item: ReadyItem; canEdit: boolean }) {
+function Item({
+    item,
+    canEdit,
+    onJump,
+}: {
+    item: ReadyItem;
+    canEdit: boolean;
+    onJump: Jump;
+}) {
     if (item.done) {
         return (
             <li className="flex items-center gap-2.5 text-[13px] text-foreground/80">
@@ -100,6 +130,7 @@ function Item({ item, canEdit }: { item: ReadyItem; canEdit: boolean }) {
                     <span className="sr-only">Done: </span>
                     {item.label}
                 </span>
+                {item.view ? <ViewLink view={item.view} /> : null}
             </li>
         );
     }
@@ -121,8 +152,7 @@ function Item({ item, canEdit }: { item: ReadyItem; canEdit: boolean }) {
                         variant="outline"
                         size="sm"
                         onClick={() => {
-                            const id = action.href.slice(1);
-                            if (!jumpTo(id)) window.location.hash = id;
+                            if (action.tab) onJump(action.tab, action.focus);
                         }}
                     >
                         {action.label}
@@ -134,5 +164,21 @@ function Item({ item, canEdit }: { item: ReadyItem; canEdit: boolean }) {
                 )
             ) : null}
         </li>
+    );
+}
+
+/** "Your online shop ↗": the live page, in a new tab. */
+function ViewLink({ view }: { view: { label: string; href: string } }) {
+    return (
+        <a
+            href={view.href}
+            target="_blank"
+            rel="noreferrer"
+            className="inline-flex min-h-6 items-center gap-0.5 rounded-sm text-[12.5px] font-medium text-foreground underline decoration-muted-foreground/40 underline-offset-4 hover:decoration-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring active:text-muted-foreground"
+        >
+            {view.label}
+            <ArrowUpRight aria-hidden className="size-3.5" />
+            <span className="sr-only">(opens in a new tab)</span>
+        </a>
     );
 }

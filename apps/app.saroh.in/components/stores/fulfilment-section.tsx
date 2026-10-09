@@ -119,6 +119,7 @@ function WayRow({
     pending,
     save,
     setStore,
+    goTo,
     type,
     types,
 }: SectionProps & { type: Way; types: Way[] }) {
@@ -234,9 +235,16 @@ function WayRow({
                                         {" "}
                                         <button
                                             type="button"
-                                            onClick={() =>
-                                                jumpTo(ADDRESS_FIELD_ID)
-                                            }
+                                            onClick={() => {
+                                                if (goTo) {
+                                                    goTo(
+                                                        "the-place",
+                                                        ADDRESS_FIELD_ID,
+                                                    );
+                                                } else {
+                                                    jumpTo(ADDRESS_FIELD_ID);
+                                                }
+                                            }}
                                             className="rounded-sm font-medium text-foreground underline decoration-muted-foreground/40 underline-offset-4 hover:decoration-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring active:text-muted-foreground"
                                         >
                                             Add address

@@ -1,3 +1,4 @@
+import type { LocationTab } from "@/lib/stores/location-readiness";
 import type {
     StorefrontInput,
     StorefrontSettings,
@@ -25,6 +26,8 @@ export interface SectionProps {
     pending: boolean;
     save: Saver;
     setStore: (fn: (s: StorefrontSettings) => StorefrontSettings) => void;
+    /** Open another tab, and put the keyboard on a field there. */
+    goTo?: (tab: LocationTab, focus?: string) => void;
 }
 
 /**

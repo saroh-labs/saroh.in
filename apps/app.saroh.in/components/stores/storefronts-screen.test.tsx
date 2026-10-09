@@ -1,5 +1,5 @@
 import { renderToStaticMarkup } from "react-dom/server";
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { SiteSelling } from "@/lib/sites/sells-from";
 import type {
@@ -9,18 +9,30 @@ import type {
 
 import { StorefrontsScreen } from "./storefronts-screen";
 
+/** The address's `?section=`, as each test sets it. */
+const address = vi.hoisted(() => ({ section: null as string | null }));
+
 vi.mock("next/navigation", () => ({
     useRouter: () => ({ refresh: vi.fn(), replace: vi.fn() }),
+    useSearchParams: () =>
+        new URLSearchParams(
+            address.section ? `section=${address.section}` : "",
+        ),
 }));
 vi.mock("@/lib/stores/storefront-actions", () => ({
     closeStorefront: vi.fn(),
     updateStorefront: vi.fn(),
 }));
 
+beforeEach(() => {
+    address.section = null;
+});
+
 /**
- * Sell › Location (DEC-069, L9; the 9 Oct audit): the page is titled with the
- * location's name, says what it still needs at the top, and groups its
- * parts by job: The place, Payments, Delivery, Customers, Pause or close.
+ * Sell › Location (DEC-069, L9; the 9 Oct audit, tabs from the owner): the
+ * page is titled with the location's name, says what it still needs above
+ * its tabs, and splits its parts by job into tabs: The place, Payments,
+ * Delivery, Customers, Pause or close, the open one in `?section=`.
  * Identifiers stay storefront; the words don't. Made-up names only.
  */
 
@@ -76,8 +88,12 @@ const site = (sellsFromId: string | null, products = 2): SiteSelling => ({
     },
 });
 
-const screen = (props: Partial<Parameters<typeof StorefrontsScreen>[0]> = {}) =>
-    renderToStaticMarkup(
+const screen = (
+    props: Partial<Parameters<typeof StorefrontsScreen>[0]> = {},
+    section: string | null = null,
+) => {
+    address.section = section;
+    return renderToStaticMarkup(
         <StorefrontsScreen
             businessName="Rye & Co."
             storefronts={[summary(hill)]}
@@ -88,6 +104,7 @@ const screen = (props: Partial<Parameters<typeof StorefrontsScreen>[0]> = {}) =>
             {...props}
         />,
     );
+};
 
 /** What a person reads: the text, not the ids and classes. */
 const text = (html: string) =>
@@ -100,6 +117,19 @@ const text = (html: string) =>
 
 const h1 = (html: string) =>
     text(/<h1[^>]*>(.*?)<\/h1>/.exec(html)?.[1] ?? "").trim();
+
+/** The tabs' names, in order, and which one is open. */
+const tabsOf = (html: string) => ({
+    names: Array.from(
+        html.matchAll(/<button[^>]*role="tab"[^>]*>(.*?)<\/button>/g),
+        (m: RegExpMatchArray) => text(String(m[1])).trim(),
+    ),
+    open: text(
+        /<button[^>]*aria-selected="true"[^>]*>(.*?)<\/button>/.exec(
+            html,
+        )?.[1] ?? "",
+    ).trim(),
+});
 
 describe("StorefrontsScreen as a location's own page", () => {
     it("is titled with the location's name; the crumb keeps the word", () => {
@@ -118,24 +148,58 @@ describe("StorefrontsScreen as a location's own page", () => {
         expect(t).toContain("No counter · stock for online orders");
     });
 
-    it("groups the page by job, Pause or close last, with no Behaviour", () => {
+    it("tabs by job, Pause or close last, The place open, and no Behaviour", () => {
         const html = screen();
-        const t = text(html);
-        const headings = Array.from(
-            html.matchAll(/<h2[^>]*>(.*?)<\/h2>/g),
-            (m: RegExpMatchArray) => text(String(m[1])).trim(),
+        expect(tabsOf(html)).toEqual({
+            names: [
+                "The place",
+                "Payments",
+                "Delivery",
+                "Customers",
+                "Pause or close",
+            ],
+            open: "The place",
+        });
+        expect(html).toContain('role="tablist"');
+        expect(html).toMatch(
+            /role="tabpanel"[^>]*aria-labelledby="location-tab-the-place"|aria-labelledby="location-tab-the-place"[^>]*role="tabpanel"/,
         );
-        expect(headings).toEqual([
-            "Ready for the counter",
-            "The place",
-            "Payments",
-            "Delivery",
-            "Customers",
-            "Pause or close",
-        ]);
+        const t = text(html);
+        // Only the open tab is drawn.
+        expect(t).toContain("Location name");
+        expect(t).not.toContain("Online payments");
         expect(t).not.toContain("Behaviour");
         expect(t).not.toContain("How orders leave");
-        expect(t).not.toContain("Closing up");
+        // The scroll list is gone with the tabs.
+        expect(html).not.toContain('aria-label="On this page"');
+    });
+
+    it("opens the tab the address names, and The place for one it doesn't", () => {
+        expect(tabsOf(screen({}, "delivery")).open).toBe("Delivery");
+        expect(text(screen({}, "delivery"))).toContain(
+            "Late counts from when an order is placed.",
+        );
+        expect(tabsOf(screen({}, "nonsense")).open).toBe("The place");
+        // A tab the page doesn't offer falls back too.
+        expect(
+            tabsOf(
+                screen({ canEdit: false, canClose: false }, "pause-or-close"),
+            ).open,
+        ).toBe("The place");
+    });
+
+    it("keeps the title and the readiness card above every tab", () => {
+        for (const section of [
+            null,
+            "payments",
+            "delivery",
+            "customers",
+            "pause-or-close",
+        ]) {
+            const html = screen({}, section);
+            expect(h1(html)).toBe("Hill Road");
+            expect(html).toContain('data-testid="location-readiness"');
+        }
     });
 
     it("asks Do customers come here?, answered Yes or No", () => {
@@ -156,6 +220,30 @@ describe("StorefrontsScreen as a location's own page", () => {
         expect(t).not.toContain("Opening hours");
     });
 
+    it("no counter with Pick-up still on: offers turning it off right there", () => {
+        const t = text(
+            screen({
+                storefronts: [summary(online)],
+                selected: { ...online, fulfilmentTypes: ["PICKUP"] },
+            }),
+        );
+        expect(t).toContain("Pick-up is still on");
+        expect(t).toContain("Turn Pick-up off");
+        // Not offered when it is off, or to a role that can't change it.
+        expect(
+            text(screen({ storefronts: [summary(online)], selected: online })),
+        ).not.toContain("Turn Pick-up off");
+        expect(
+            text(
+                screen({
+                    storefronts: [summary(online)],
+                    selected: { ...online, fulfilmentTypes: ["PICKUP"] },
+                    canEdit: false,
+                }),
+            ),
+        ).not.toContain("Turn Pick-up off");
+    });
+
     it("says no merchant-visible storefront, in any state", () => {
         for (const html of [
             screen(),
@@ -169,22 +257,28 @@ describe("StorefrontsScreen as a location's own page", () => {
             screen({ storefronts: [], selected: null }),
             screen({ selected: null }),
             screen({ canEdit: false, canClose: false }),
+            screen({}, "payments"),
+            screen({}, "delivery"),
+            screen({}, "customers"),
+            screen({}, "pause-or-close"),
         ]) {
             expect(text(html)).not.toMatch(/storefront/i);
             expect(text(html)).not.toMatch(/online store/i);
         }
     });
 
-    it("the Sells from location sells in person and online", () => {
-        const html = screen({ site: site("st_hill") });
-        expect(text(html)).toContain("Sells in person and online");
-        expect(html).toContain('href="https://rye.saroh.app/shop"');
-    });
-
-    it("a location the shop doesn't sell from sells in person only", () => {
-        expect(text(screen({ site: site("st_online") }))).toContain(
-            "Sells in person only",
-        );
+    it("has no selling line in The place: the readiness card says it", () => {
+        for (const html of [
+            screen({ site: site("st_hill", 0) }),
+            screen({
+                storefronts: [summary(online)],
+                selected: online,
+                site: site("st_hill"),
+            }),
+        ]) {
+            expect(html).not.toContain('data-testid="location-selling"');
+            expect(text(html)).not.toContain("isn't live yet");
+        }
     });
 
     it("several locations: the list, and the chosen one's name as the title", () => {
@@ -193,16 +287,9 @@ describe("StorefrontsScreen as a location's own page", () => {
             selected: online,
             site: site("st_online"),
         });
-        const t = text(html);
         expect(h1(html)).toBe("Rye Online");
-        expect(t).toContain("Online only");
-        expect(t).toContain("2 locations");
+        expect(text(html)).toContain("2 locations");
         expect(html).toMatch(/aria-label="Breadcrumb"[^]*Locations/);
-    });
-
-    it("says nothing about selling when the site couldn't be read", () => {
-        const html = screen({ site: undefined });
-        expect(html).not.toContain('data-testid="location-selling"');
     });
 
     it("links to Description and logo and People who work here (L14)", () => {
@@ -224,7 +311,7 @@ describe("StorefrontsScreen as a location's own page", () => {
         expect(h1(html)).toBe("Hill Road");
         expect(text(html)).toContain("This location could not be loaded");
         expect(text(html)).toContain("Try again");
-        expect(html).not.toContain('aria-label="On this page"');
+        expect(html).not.toContain('role="tablist"');
     });
 });
 
@@ -253,7 +340,7 @@ describe("the readiness card", () => {
         );
     });
 
-    it("folds to one quiet line once everything is done", () => {
+    it("folds to one quiet line once everything is done, keeping the shop's link", () => {
         const html = screen({
             storefronts: [summary(online)],
             selected: {
@@ -267,13 +354,24 @@ describe("the readiness card", () => {
         expect(html).toContain('data-testid="location-ready"');
         expect(html).not.toContain('data-testid="location-readiness"');
         expect(text(html)).toContain("Ready for online orders");
+        expect(html).toContain('href="https://rye.saroh.app/shop"');
     });
 
-    it("a counter that sells in person counts its address and hours", () => {
-        const t = text(screen());
-        expect(t).toContain("Ready for the counter 1 of 2");
+    it("a counter the shop sells from counts both, and links the live shop", () => {
+        const html = screen({ site: site("st_hill") });
+        expect(text(html)).toContain("Ready for the counter and online orders");
+        expect(html).toContain('href="https://rye.saroh.app/shop"');
+    });
+
+    it("a counter that sells in person counts its address and hours, and says so", () => {
+        const t = text(screen({ site: site("st_online") }));
+        expect(t).toContain(
+            "Ready for the counter 1 of 2 · Sells in person only",
+        );
         expect(t).toContain("Address on receipts");
         expect(t).toContain("Save its opening hours");
+        // The website couldn't be read: nothing said about selling.
+        expect(text(screen())).not.toContain("Sells in person only");
     });
 
     it("a location past the plan's limit (#800) is not ready, and says why", () => {
@@ -283,53 +381,68 @@ describe("the readiness card", () => {
     });
 
     it("a paused location counts its pause as a step left", () => {
-        const t = text(
-            screen({ selected: { ...hill, pausedAt: "2026-10-01T00:00:00Z" } }),
+        const paused = { ...hill, pausedAt: "2026-10-01T00:00:00Z" };
+        expect(text(screen({ selected: paused }))).toContain(
+            "Paused: customers can't pay here",
         );
-        expect(t).toContain("Paused: customers can't pay here");
-        expect(t).toContain("Resume location");
+        expect(text(screen({ selected: paused }, "pause-or-close"))).toContain(
+            "Resume location",
+        );
     });
 });
 
 describe("Payments", () => {
     it("says Not connected and links to connect one", () => {
-        const html = screen();
+        const html = screen({}, "payments");
         expect(text(html)).toContain("Online payments Not connected");
         expect(html).toMatch(/href="\/settings\/providers"/);
     });
 
     it("currency: no Editable pill; Locked only once it locks", () => {
         const unlocked = text(
-            screen({ storefronts: [summary(online)], selected: online }),
+            screen(
+                { storefronts: [summary(online)], selected: online },
+                "payments",
+            ),
         );
         expect(unlocked).not.toContain("Editable");
         expect(unlocked).not.toContain("Locked");
         expect(unlocked).toContain("Locks after the first order.");
-        expect(text(screen())).toContain("Locked by the 3 orders taken here");
+        expect(text(screen({}, "payments"))).toContain(
+            "Locked by the 3 orders taken here",
+        );
     });
 
     it("lists the providers only when there is a choice to make here", () => {
         const one = text(
-            screen({
-                selected: {
-                    ...hill,
-                    effectiveProvider: "RAZORPAY",
-                    providers: [{ provider: "RAZORPAY", status: "CONNECTED" }],
+            screen(
+                {
+                    selected: {
+                        ...hill,
+                        effectiveProvider: "RAZORPAY",
+                        providers: [
+                            { provider: "RAZORPAY", status: "CONNECTED" },
+                        ],
+                    },
                 },
-            }),
+                "payments",
+            ),
         );
         expect(one).toContain("Checkout here charges through Razorpay.");
         expect(one).not.toContain("In use here");
         const two = text(
-            screen({
-                selected: {
-                    ...hill,
-                    providers: [
-                        { provider: "RAZORPAY", status: "CONNECTED" },
-                        { provider: "CASHFREE", status: "CONNECTED" },
-                    ],
+            screen(
+                {
+                    selected: {
+                        ...hill,
+                        providers: [
+                            { provider: "RAZORPAY", status: "CONNECTED" },
+                            { provider: "CASHFREE", status: "CONNECTED" },
+                        ],
+                    },
                 },
-            }),
+                "payments",
+            ),
         );
         expect(two).toContain("Choose one");
         expect(two).toContain("Use here");
@@ -337,8 +450,12 @@ describe("Payments", () => {
 });
 
 describe("Delivery", () => {
+    const delivery = (
+        props: Partial<Parameters<typeof StorefrontsScreen>[0]>,
+    ) => screen(props, "delivery");
+
     it("a row per way; Pick-up off with no counter is off, and says why", () => {
-        const html = screen({
+        const html = delivery({
             storefronts: [summary(online)],
             selected: online,
         });
@@ -354,7 +471,7 @@ describe("Delivery", () => {
     });
 
     it("Pick-up saved on for a No counter location shows as it is, and why the website skips it", () => {
-        const html = screen({
+        const html = delivery({
             storefronts: [summary(online)],
             selected: { ...online, fulfilmentTypes: ["PICKUP"] },
         });
@@ -371,7 +488,7 @@ describe("Delivery", () => {
     });
 
     it("a fee per delivery way while the online shop is open, and late after per way", () => {
-        const html = screen({
+        const html = delivery({
             selected: {
                 ...hill,
                 fulfilmentTypes: ["PICKUP", "LOCAL_DELIVERY", "SHIPPING"],
@@ -389,7 +506,7 @@ describe("Delivery", () => {
     });
 
     it("no fee to set while the online shop is closed", () => {
-        const html = screen({
+        const html = delivery({
             selected: { ...hill, fulfilmentTypes: ["SHIPPING"] },
         });
         expect(html).not.toContain('id="storefront-way-shipping-fee"');
@@ -398,7 +515,7 @@ describe("Delivery", () => {
 
     it("free delivery over is one amount, and says checkout doesn't apply it yet", () => {
         const t = text(
-            screen({
+            delivery({
                 selected: {
                     ...hill,
                     fulfilmentTypes: ["LOCAL_DELIVERY"],
@@ -411,11 +528,11 @@ describe("Delivery", () => {
     });
 
     it("keeps the late-after anchor Orders' notice links to", () => {
-        expect(screen()).toContain('id="late-after"');
+        expect(delivery({})).toContain('id="late-after"');
     });
 });
 
-describe("roles and the section list", () => {
+describe("roles", () => {
     it("read-only: says so, and offers no Save, Pause or in-page fixes", () => {
         const html = screen({ canEdit: false, canClose: false });
         const t = text(html);
@@ -424,22 +541,6 @@ describe("roles and the section list", () => {
         );
         expect(t).not.toContain("Save hours");
         expect(t).not.toContain("Set hours");
-        expect(t).not.toContain("Pause or close");
-    });
-
-    it("a section list for wide screens, as a nav", () => {
-        const html = screen();
-        expect(html).toContain('aria-label="On this page"');
-        for (const id of [
-            "the-place",
-            "payments",
-            "delivery",
-            "customers",
-            "pause-or-close",
-        ]) {
-            expect(html).toContain(`href="#${id}"`);
-            expect(html).toContain(`id="${id}"`);
-        }
-        expect(html).toMatch(/aria-current="location"[^>]*>The place/);
+        expect(tabsOf(html).names).not.toContain("Pause or close");
     });
 });

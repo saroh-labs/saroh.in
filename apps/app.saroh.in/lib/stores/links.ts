@@ -6,8 +6,16 @@ const q = (id: string) => `?storefront=${encodeURIComponent(id)}`;
 
 export const newStorefrontHref = "/commerce/locations/new";
 
-export function storefrontHref(storeId: string): string {
-    return `/commerce/locations${q(storeId)}`;
+/**
+ * A location's page; with `section`, on that tab (`the-place` is the page
+ * itself, `delivery`, `payments`, …: `LOCATION_TABS`).
+ */
+export function storefrontHref(storeId: string, section?: string): string {
+    const tab =
+        section && section !== "the-place"
+            ? `&section=${encodeURIComponent(section)}`
+            : "";
+    return `/commerce/locations${q(storeId)}${tab}`;
 }
 
 /** Its address, description and logo. */

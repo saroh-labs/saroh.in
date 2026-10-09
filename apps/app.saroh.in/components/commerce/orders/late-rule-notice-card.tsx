@@ -63,7 +63,7 @@ export function LateRuleNoticeCard({
                     className="h-[30px] rounded-[8px] border-highlight px-[11px] text-[12.5px] font-semibold coarse:h-11"
                 >
                     <Link
-                        href={`${storefrontHref(notice.storeId)}#${LATE_AFTER_ANCHOR}`}
+                        href={`${storefrontHref(notice.storeId, "delivery")}#${LATE_AFTER_ANCHOR}`}
                     >
                         Change it
                     </Link>

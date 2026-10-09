@@ -13,8 +13,14 @@ import type { StorefrontSettings } from "@/lib/stores/storefronts";
 
 import { StorefrontsScreen } from "./storefronts-screen";
 
+/** The address's `?section=`, as each test sets it. */
+const address = vi.hoisted(() => ({ section: null as string | null }));
 vi.mock("next/navigation", () => ({
     useRouter: () => ({ refresh: vi.fn(), replace: vi.fn() }),
+    useSearchParams: () =>
+        new URLSearchParams(
+            address.section ? `section=${address.section}` : "",
+        ),
 }));
 const update = vi.fn();
 vi.mock("@/lib/stores/storefront-actions", () => ({
@@ -78,6 +84,8 @@ beforeEach(() => {
     update.mockReset();
     showError.mockReset();
     showSuccess.mockReset();
+    address.section = null;
+    window.history.replaceState(null, "", "/commerce/locations");
 });
 
 afterEach(() => {
@@ -181,6 +189,7 @@ describe("Pick-up needs a counter (UX-025)", () => {
         update.mockImplementation((_id: string, input: object) =>
             Promise.resolve({ ok: true, data: { ...online, ...input } }),
         );
+        address.section = "delivery";
         draw();
         expect(host.textContent).toContain(
             "Not on your website: it needs a counter.",
@@ -199,18 +208,30 @@ describe("Pick-up needs a counter (UX-025)", () => {
         expect(pickup()?.disabled).toBe(true);
         expect(host.textContent).toContain("Needs a counter");
     });
-});
 
-describe("a delivery row", () => {
-    const shop: StorefrontSettings = {
-        ...online,
-        kind: "SHOP",
-        address: "12 Hill Road",
-        fulfilmentTypes: ["PICKUP", "LOCAL_DELIVERY"],
-        siteShop: true,
-        localDeliveryFee: null,
-    };
-    const drawShop = () =>
+    it("The place offers turning Pick-up off in one press when there is no counter", async () => {
+        update.mockImplementation((_id: string, input: object) =>
+            Promise.resolve({ ok: true, data: { ...online, ...input } }),
+        );
+        draw();
+        expect(host.textContent).toContain("Pick-up is still on");
+        await press(item("Turn Pick-up off"));
+        expect(update).toHaveBeenCalledWith(online.id, {
+            fulfilmentTypes: [],
+        });
+        expect(item("Turn Pick-up off")).toBeUndefined();
+    });
+
+    it("switching to No, online only with Pick-up on offers turning it off", async () => {
+        const shop: StorefrontSettings = {
+            ...online,
+            kind: "SHOP",
+            address: "12 Hill Road",
+            fulfilmentTypes: ["PICKUP"],
+        };
+        update.mockImplementation((_id: string, input: object) =>
+            Promise.resolve({ ok: true, data: { ...shop, ...input } }),
+        );
         act(() =>
             root.render(
                 <StorefrontsScreen
@@ -231,6 +252,146 @@ describe("a delivery row", () => {
                 />,
             ),
         );
+        expect(item("Turn Pick-up off")).toBeUndefined();
+        await press(item("No, online only"));
+        expect(update).toHaveBeenCalledWith(shop.id, { kind: "ONLINE" });
+        // Going online didn't touch the ways: it offers, it doesn't decide.
+        expect(update).toHaveBeenCalledTimes(1);
+        expect(item("Turn Pick-up off")).toBeDefined();
+    });
+});
+
+describe("the tabs", () => {
+    const tab = (name: string) =>
+        Array.from(
+            host.querySelectorAll<HTMLButtonElement>('[role="tab"]'),
+        ).find((b) => b.textContent === name);
+
+    it("a tab opens its part and puts itself in the address", async () => {
+        draw();
+        await press(tab("Delivery"));
+        expect(tab("Delivery")?.getAttribute("aria-selected")).toBe("true");
+        expect(window.location.search).toBe("?section=delivery");
+        expect(host.querySelector("#storefront-way-pickup")).not.toBeNull();
+        expect(host.querySelector("#storefront-name")).toBeNull();
+        // Back to The place: the page's own address, with no section.
+        await press(tab("The place"));
+        expect(window.location.search).toBe("");
+    });
+
+    it("arrow keys move between tabs", async () => {
+        draw();
+        const first = tab("The place");
+        first?.focus();
+        await act(async () => {
+            first?.dispatchEvent(
+                new KeyboardEvent("keydown", {
+                    key: "ArrowRight",
+                    bubbles: true,
+                }),
+            );
+            await Promise.resolve();
+        });
+        expect(tab("Payments")?.getAttribute("aria-selected")).toBe("true");
+        expect(document.activeElement).toBe(tab("Payments"));
+    });
+
+    it("the readiness card's Set up delivery opens Delivery", async () => {
+        act(() =>
+            root.render(
+                <StorefrontsScreen
+                    businessName="Rye & Co."
+                    storefronts={[
+                        {
+                            id: online.id,
+                            name: online.name,
+                            orderCount: 0,
+                            kind: "ONLINE",
+                            paused: false,
+                        },
+                    ]}
+                    selected={{ ...online, fulfilmentTypes: [] }}
+                    canCreate
+                    canEdit
+                    canClose
+                />,
+            ),
+        );
+        await press(item("Set up delivery"));
+        expect(tab("Delivery")?.getAttribute("aria-selected")).toBe("true");
+        expect(window.location.search).toBe("?section=delivery");
+        // The keyboard lands in the open tab, not back at the top.
+        expect(
+            document
+                .getElementById("location-panel")
+                ?.contains(document.activeElement),
+        ).toBe(true);
+    });
+
+    it("Add address on Delivery opens The place on its address field", async () => {
+        address.section = "delivery";
+        act(() =>
+            root.render(
+                <StorefrontsScreen
+                    businessName="Rye & Co."
+                    storefronts={[
+                        {
+                            id: online.id,
+                            name: online.name,
+                            orderCount: 0,
+                            kind: "SHOP",
+                            paused: false,
+                        },
+                    ]}
+                    selected={{
+                        ...online,
+                        kind: "SHOP",
+                        fulfilmentTypes: ["PICKUP"],
+                    }}
+                    canCreate
+                    canEdit
+                    canClose
+                />,
+            ),
+        );
+        await press(item("Add address"));
+        expect(tab("The place")?.getAttribute("aria-selected")).toBe("true");
+        expect(document.activeElement?.id).toBe("storefront-address");
+    });
+});
+
+describe("a delivery row", () => {
+    const shop: StorefrontSettings = {
+        ...online,
+        kind: "SHOP",
+        address: "12 Hill Road",
+        fulfilmentTypes: ["PICKUP", "LOCAL_DELIVERY"],
+        siteShop: true,
+        localDeliveryFee: null,
+    };
+    const drawShop = () => {
+        address.section = "delivery";
+        act(() =>
+            root.render(
+                <StorefrontsScreen
+                    businessName="Rye & Co."
+                    storefronts={[
+                        {
+                            id: shop.id,
+                            name: shop.name,
+                            orderCount: 0,
+                            kind: "SHOP",
+                            paused: false,
+                        },
+                    ]}
+                    selected={shop}
+                    canCreate
+                    canEdit
+                    canClose
+                />,
+            ),
+        );
+    };
 
     it("saves a late time alone in its own words", async () => {
         update.mockResolvedValue({ ok: true, data: shop });

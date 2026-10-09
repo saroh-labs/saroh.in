@@ -17,7 +17,7 @@ import type { StorefrontSettings } from "./storefronts";
  * never guessed: a fact the page couldn't read is left out, not counted.
  */
 
-/** The page's parts, in order, with the ids the section list jumps to. */
+/** The page's tabs, in order: each one's address value and its name. */
 export const LOCATION_SECTIONS = {
     place: { id: "the-place", label: "The place" },
     payments: { id: "payments", label: "Payments" },
@@ -27,6 +27,16 @@ export const LOCATION_SECTIONS = {
 } as const;
 
 export type LocationSectionKey = keyof typeof LOCATION_SECTIONS;
+
+/** A tab, as the address carries it (`?section=delivery`). */
+export type LocationTab = (typeof LOCATION_SECTIONS)[LocationSectionKey]["id"];
+
+export const LOCATION_TABS: readonly LocationTab[] = Object.values(
+    LOCATION_SECTIONS,
+).map((s) => s.id);
+
+/** The query parameter the open tab lives in, as Settings › Business. */
+export const LOCATION_TAB_PARAM = "section";
 
 /** Where "Connect a provider" goes, as it did from the old Checkout card. */
 export const PROVIDERS_HREF = "/settings/providers";
@@ -117,21 +127,38 @@ export interface ReadyItem {
      * The one thing that does it: a page elsewhere, or `#id` for a field or
      * part of this page. Absent when nothing here can do it.
      */
-    action?: { label: string; href: string; inPage: boolean };
+    action?: {
+        label: string;
+        href: string;
+        inPage: boolean;
+        /** The tab it is on, and the field to put the keyboard on there. */
+        tab?: LocationTab;
+        focus?: string;
+    };
+    /** Where a done step can be seen: the live shop, in a new tab. */
+    view?: { label: string; href: string };
 }
 
 export interface LocationReadiness {
     heading: string;
+    /**
+     * Where it sells, when the items don't say it (DEC-069): "Sells in
+     * person only" for a counter the online shop doesn't sell from. Absent
+     * when the website couldn't be read.
+     */
+    note?: string;
     /** Done first (what's already behind the owner), then what's left. */
     items: ReadyItem[];
     done: number;
     total: number;
 }
 
-const inPage = (label: string, id: string) => ({
+const inPage = (label: string, tab: LocationTab, focus?: string) => ({
     label,
-    href: `#${id}`,
+    href: `?${LOCATION_TAB_PARAM}=${tab}`,
     inPage: true,
+    tab,
+    focus,
 });
 const away = (label: string, href: string) => ({
     label,
@@ -184,7 +211,7 @@ export function locationReadiness(
             key: "paused",
             done: false,
             label: "Paused: customers can't pay here",
-            action: inPage("Resume", LOCATION_SECTIONS.closing.id),
+            action: inPage("Resume", "pause-or-close"),
         });
     }
 
@@ -197,7 +224,11 @@ export function locationReadiness(
                       key: "address",
                       done: false,
                       label: "Add the address customers come to",
-                      action: inPage("Add address", ADDRESS_FIELD_ID),
+                      action: inPage(
+                          "Add address",
+                          "the-place",
+                          ADDRESS_FIELD_ID,
+                      ),
                   },
             store.openingHours
                 ? { key: "hours", done: true, label: "Opening hours set" }
@@ -205,7 +236,7 @@ export function locationReadiness(
                       key: "hours",
                       done: false,
                       label: "Save its opening hours",
-                      action: inPage("Set hours", HOURS_FIELD_ID),
+                      action: inPage("Set hours", "the-place", HOURS_FIELD_ID),
                   },
         );
     }
@@ -221,10 +252,7 @@ export function locationReadiness(
                       label: counter
                           ? "Offer a way for orders to leave"
                           : "Offer local delivery or shipping",
-                      action: inPage(
-                          "Set up delivery",
-                          LOCATION_SECTIONS.delivery.id,
-                      ),
+                      action: inPage("Set up delivery", "delivery"),
                   },
             paymentsItem(store),
         );
@@ -241,6 +269,9 @@ export function locationReadiness(
                 : counter
                   ? "Ready for the counter"
                   : "Ready for online orders",
+        ...(counter && !online && site !== undefined
+            ? { note: "Sells in person only" }
+            : {}),
         items: [...done, ...left],
         done: done.length,
         total: items.length,
@@ -268,7 +299,7 @@ function paymentsItem(store: Store): ReadyItem {
               key: "payments",
               done: false,
               label: "Choose which provider checkout uses",
-              action: inPage("Choose", LOCATION_SECTIONS.payments.id),
+              action: inPage("Choose", "payments"),
           }
         : {
               key: "payments",
@@ -336,5 +367,6 @@ function listingItem(
         key: "listed",
         done: true,
         label: "Listed in your online shop",
+        view: { label: "Your online shop", href: `${site.origin}/shop` },
     };
 }
