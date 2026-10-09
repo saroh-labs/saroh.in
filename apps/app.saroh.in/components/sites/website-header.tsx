@@ -12,9 +12,11 @@ import {
 } from "@saroh/ui/dropdown-menu";
 import { cn } from "@saroh/ui/lib/utils";
 import { PageHeader } from "@saroh/ui/page-header";
+import { useEdgeFade } from "@saroh/ui/scroll-x";
 import { Check, ChevronDown, Globe, PenLine, Plus } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useRef } from "react";
 
 import { mayAddWebsite } from "@/lib/business-limits";
 import type { SiteStateTone } from "@/lib/sites/site-state";
@@ -122,6 +124,13 @@ export function WebsiteHeader({
               ];
     const active =
         tabs.find((t) => pathname.startsWith(t.href))?.id ?? tabs[0].id;
+    // On a phone the tabs scroll sideways: the strip fades on the side with
+    // more, and the open tab is scrolled into view (UX-079).
+    const strip = useRef<HTMLElement>(null);
+    const fade = useEdgeFade(strip, {
+        current: '[aria-current="page"]',
+        revealKey: pathname,
+    });
 
     // Switching site keeps the tab you were on, where the other site has it.
     const switchTo = (id: string) =>
@@ -164,7 +173,10 @@ export function WebsiteHeader({
                 }
             />
             <nav
+                ref={strip}
                 aria-label="Website"
+                data-scroll-x=""
+                style={fade}
                 className="flex gap-1 overflow-x-auto border-b border-border"
             >
                 {tabs.map((t) => {

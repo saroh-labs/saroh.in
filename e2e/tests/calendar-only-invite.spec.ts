@@ -27,6 +27,8 @@ test(
     async ({ page }, testInfo) => {
         test.setTimeout(90_000);
         await useSession(page, "owner");
+        // Opening the business makes it the one the workspace shows.
+        await page.goto("/open/seed_org");
         const nw = northwind(page.request);
         const tag = stamp(testInfo);
         const name = `E2E Diary ${tag}`;

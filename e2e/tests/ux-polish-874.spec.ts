@@ -116,7 +116,11 @@ test("a live plan's page offers Subscribe someone, on that plan (UX-080)", async
         name: string;
         status: string;
     }[];
-    const live = plans.find((p) => p.status === "ACTIVE");
+    // A seeded plan: other tests make, change and archive their own "E2E
+    // plan …" rows at the same time.
+    const live = plans.find(
+        (p) => p.status === "ACTIVE" && !p.name.startsWith("E2E"),
+    );
     test.skip(!live, "Northwind sells no plan on this stack.");
     if (!live) return;
 
@@ -129,7 +133,7 @@ test("a live plan's page offers Subscribe someone, on that plan (UX-080)", async
     await subscribe.click();
     const dialog = page.getByRole("dialog", { name: "Subscribe someone" });
     await expect(dialog).toBeVisible();
-    await expect(dialog.getByRole("combobox").last()).toContainText(live.name);
+    await expect(dialog.getByLabel("Plan")).toContainText(live.name);
     // Closed without subscribing anyone: nothing is saved.
     await page.keyboard.press("Escape");
     await expect(page).not.toHaveURL(/subscribe=1/);
