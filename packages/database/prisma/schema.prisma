@@ -4757,7 +4757,8 @@ model PaymentAttempt {
   provider    String
   providerRef String? // provider payment id
   // CREATED | AUTHORIZED | CAPTURED | FAILED, or CAPTURED_NEEDS_REFUND: money
-  // taken on an invoice that was already paid or void when it arrived, or
+  // taken on an invoice that was already paid or void when it arrived, or at
+  // an amount or currency the intent didn't ask for (PAY-06), or
   // STOCK_HELD: Saroh's note that this payment's order held its units
   // (stock/reserve.ts reserveOnPayment), not a provider interaction.
   status      String
@@ -4853,8 +4854,11 @@ model WebhookEvent {
 
   createdAt DateTime @default(now())
 
-  // Idempotency backstop: one row per provider event.
-  @@unique([provider, providerEventId])
+  // Idempotency backstop: one row per provider event, per business (PAY-05,
+  // #106). Unique across all businesses let one business, signing bodies to
+  // its own endpoint, claim an event id first and have another's real
+  // delivery dropped as a duplicate.
+  @@unique([organizationId, provider, providerEventId])
   @@index([organizationId])
   @@index([status])
 }

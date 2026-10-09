@@ -11,6 +11,8 @@ import {
     recordSubscriptionEvent,
 } from "../subscriptions/subscription-events";
 
+import type { CapturedAmount } from "./capture-mismatch";
+import { recordCaptureMismatchInTx } from "./capture-mismatch";
 import { providerName } from "./mandate-rules";
 
 /**
@@ -44,7 +46,12 @@ export type ChargeFailure =
      * Not asked: the customer had a pay-link checkout open on the invoice
      * (`checkoutOpenOn`), so autopay stood aside. Nothing was declined.
      */
-    | "CHECKOUT_OPEN";
+    | "CHECKOUT_OPEN"
+    /**
+     * The provider captured an amount or currency Saroh didn't ask for
+     * (PAY-06): not applied, recorded as owed back.
+     */
+    | "AMOUNT_MISMATCH";
 
 /** Write one charge event on the invoice's subscription; false when it has none. */
 export async function recordChargeEventInTx(
@@ -184,4 +191,46 @@ export async function settleCapturedChargeInTx(
         },
     });
     return "OWED_BACK";
+}
+
+/**
+ * A charge the provider captured at an amount or currency Saroh didn't
+ * ask for (PAY-06), found by a look-up: the invoice is not paid. Under the
+ * intent's lock (the order the webhook takes), the capture is recorded as
+ * owed back once, and the charge fails as a decline does, with
+ * RENEWAL_FAILED reason AMOUNT_MISMATCH. Returns whether anything changed.
+ */
+export async function mismatchedChargeInTx(
+    tx: Tx,
+    organizationId: string,
+    intentId: string,
+    providerPaymentRef: string | null,
+    captured: CapturedAmount,
+): Promise<boolean> {
+    await tx.$queryRaw`
+        SELECT status FROM "PaymentIntent" WHERE id = ${intentId} AND "organizationId" = ${organizationId} FOR NO KEY UPDATE`;
+    const intent = await tx.paymentIntent.findFirst({
+        where: { id: intentId, organizationId },
+        select: {
+            id: true,
+            organizationId: true,
+            provider: true,
+            amountCents: true,
+            currency: true,
+        },
+    });
+    if (!intent) return false;
+    const recorded = await recordCaptureMismatchInTx(
+        tx,
+        intent,
+        providerPaymentRef,
+        captured,
+    );
+    const failed = await failMandateChargeInTx(
+        tx,
+        organizationId,
+        intentId,
+        "AMOUNT_MISMATCH",
+    );
+    return recorded || failed;
 }

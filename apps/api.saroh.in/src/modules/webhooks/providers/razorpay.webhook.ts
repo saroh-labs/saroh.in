@@ -53,7 +53,13 @@ export class RazorpayWebhookProvider implements WebhookProvider {
             event?: string;
             payload?: {
                 payment?: {
-                    entity?: { id?: string; order_id?: string; fee?: number };
+                    entity?: {
+                        id?: string;
+                        order_id?: string;
+                        fee?: number;
+                        amount?: number;
+                        currency?: string;
+                    };
                 };
                 refund?: {
                     entity?: {
@@ -105,6 +111,10 @@ export class RazorpayWebhookProvider implements WebhookProvider {
             // and `order.paid` both carry it). Absent or not a whole number:
             // no fee is recorded, never a guess (default 47).
             feeCents: wholeNumber(payment?.fee),
+            // The payment's amount, in paise already — Razorpay captures a
+            // payment whole, so this is what was taken (PAY-06).
+            capturedAmountCents: wholeNumber(payment?.amount),
+            capturedCurrency: nonEmpty(payment?.currency),
             providerRefundId: refund?.id,
             // Paise already. Saroh's reference rides in `receipt`, and in
             // `notes` as a second copy (DEC-026).
