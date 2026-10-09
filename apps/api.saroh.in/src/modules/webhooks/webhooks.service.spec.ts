@@ -554,7 +554,11 @@ describe("WebhooksService refund settlement", () => {
 
     it("arriving before the refund path stored the provider's id, it settles Saroh's row by its reference and writes the REFUND step once", async () => {
         // No row carries the provider id yet; the reference names Saroh's row.
+        // Asked twice: first whether it is a mismatch's refund (PAY-06; its
+        // key says it isn't), then by the order's own refund path.
         refundFindFirst
+            .mockResolvedValueOnce(null)
+            .mockResolvedValueOnce({ id: "rf_1", providerRefundId: null })
             .mockResolvedValueOnce(null)
             .mockResolvedValueOnce({ id: "rf_1", providerRefundId: null });
         refundFindUnique.mockResolvedValue(

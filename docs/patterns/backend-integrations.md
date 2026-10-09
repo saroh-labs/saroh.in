@@ -142,7 +142,13 @@ a note saying so.
   (`rawResponse.invoiceStatus` AMOUNT_MISMATCH, both figures), logged, and an
   open intent fails as a decline does (`payments/capture-mismatch.ts`). A
   look-up must report the amount; a signed webhook that carries none is
-  settled on the provider order's own amount.
+  settled on the provider order's own amount. Such a capture is the
+  attempt's to refund, never the order's: Home lists it until refunded and
+  offers Refund, which sends exactly what was captured against that payment
+  as a PaymentRefund keyed `amount-mismatch:<attempt>`, touching no order,
+  invoice or credit note; its refund webhook (Saroh's, or a dashboard
+  refund matched by payment id) settles on that row before the order's
+  refund path (`payments/mismatch-refund.ts`).
 - **Current** — **The server derives amounts.** A payment intent's amount comes
   from the Order or, for an invoice pay link, the Invoice — never from the
   request. The public invoice intent route reads its body by hand, so an

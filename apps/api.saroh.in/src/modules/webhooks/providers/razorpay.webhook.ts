@@ -106,7 +106,9 @@ export class RazorpayWebhookProvider implements WebhookProvider {
             eventType,
             outcome: outcomeFor(eventType),
             providerIntentId: payment?.order_id,
-            providerPaymentRef: payment?.id,
+            // A refund names its payment on the refund entity too: how a
+            // dashboard refund of a mismatched capture finds it (PAY-06).
+            providerPaymentRef: payment?.id ?? nonEmpty(refund?.payment_id),
             // Paise, GST included, on the captured payment (`payment.captured`
             // and `order.paid` both carry it). Absent or not a whole number:
             // no fee is recorded, never a guess (default 47).

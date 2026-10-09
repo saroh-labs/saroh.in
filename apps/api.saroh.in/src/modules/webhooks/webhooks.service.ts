@@ -57,6 +57,7 @@ import {
     applyMandateChangeInTx,
     applyPreDebitInTx,
 } from "../payments/mandate-events";
+import { settleMismatchRefundInTx } from "../payments/mismatch-refund";
 import { PaymentsService } from "../payments/payments.service";
 import { enqueueRefundSendInTx } from "../payments/send-refund.handler";
 import { enqueueOrderPlacedNotice } from "../site-accounts/customer-notify-queue";
@@ -424,6 +425,18 @@ export class WebhooksService {
                   )
                 : { applied: false };
         }
+
+        // PAY-06: a refund of a capture taken at the wrong amount is that
+        // payment's alone — Saroh's "Refund" on Home, or one made in the
+        // provider's dashboard. It settles on its own row, never refused as
+        // a refund of the order it failed to pay.
+        const mismatch = await settleMismatchRefundInTx(
+            tx,
+            organizationId,
+            provider,
+            event,
+        );
+        if (mismatch.handled) return { applied: mismatch.applied };
 
         const intent = await this.findIntent(
             tx,

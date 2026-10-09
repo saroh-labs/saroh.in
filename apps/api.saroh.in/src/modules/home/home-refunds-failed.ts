@@ -1,6 +1,7 @@
 import type { prisma } from "@saroh/database";
 
 import { providerName } from "../payments/mandate-rules";
+import { MISMATCH_REFUND_PREFIX } from "../payments/mismatch-refund";
 import type { HomeAction, HomeEvidence } from "./home-model";
 import { EVIDENCE_LIMIT, personName } from "./home-model";
 
@@ -28,6 +29,17 @@ export async function failedOrderRefunds(
         where: {
             organizationId,
             status: "FAILED",
+            // A refused refund of a capture at the wrong amount (PAY-06) is
+            // not the order's: it stays on refunds owed, with its Refund.
+            // The null branch spelled out: NOT of a null key is null in SQL.
+            OR: [
+                { idempotencyKey: null },
+                {
+                    NOT: {
+                        idempotencyKey: { startsWith: MISMATCH_REFUND_PREFIX },
+                    },
+                },
+            ],
             paymentIntent: {
                 orderId: { not: null },
                 ...(storeIds

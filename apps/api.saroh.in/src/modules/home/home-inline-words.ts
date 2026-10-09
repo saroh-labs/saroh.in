@@ -183,6 +183,30 @@ export function reviewReplyWords(first: string | null): Words {
     };
 }
 
+/**
+ * Refund (REFUND, PAY-06): a payment the provider took at a different
+ * amount than asked goes back whole — `amount` is what it captured,
+ * already formatted — through the business's provider, to how they paid.
+ * The order or invoice it was for stays unpaid, and a refund can't be
+ * taken back. The provider tells the customer, not Saroh.
+ */
+export function refundMismatchWords(
+    first: string | null,
+    amount: string,
+    provider: string,
+    paper: "order" | "invoice" | null,
+): Words {
+    const who = first ?? "the customer";
+    const stays = paper ? ` The ${paper} stays unpaid, as it is now.` : "";
+    return {
+        label: "Refund",
+        confirm: `${amount} goes back to ${who} through ${provider}, the way they paid.${stays} A refund can't be undone.`,
+        yes: `Refund ${amount}`,
+        done: first ? `Refund on its way to ${first}` : "Refund on its way",
+        sends: false,
+    };
+}
+
 function capital(text: string): string {
     return text.charAt(0).toUpperCase() + text.slice(1);
 }
