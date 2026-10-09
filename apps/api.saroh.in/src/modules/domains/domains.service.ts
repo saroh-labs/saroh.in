@@ -7,6 +7,7 @@ import {
     NotFoundException,
     ServiceUnavailableException,
 } from "@nestjs/common";
+import type { Domain } from "@saroh/database";
 import { prisma } from "@saroh/database";
 import { randomBytes } from "node:crypto";
 
@@ -144,10 +145,33 @@ export class DomainsService {
         authorize(ctx, "domain:manage");
 
         const domain = await this.requireOwned(ctx, domainId);
+        const result = await this.check(domain);
+        return result.verified
+            ? { domain: this.withHosting(result.domain), verified: true }
+            : {
+                  domain: this.withHosting(result.domain),
+                  verified: false,
+                  reason: result.reason,
+              };
+    }
 
+    /**
+     * The check behind {@link verify}, for a row already loaded and scoped:
+     * a VERIFIED domain has its hosting synced; any other is checked in DNS
+     * and, on a pass, verified, routed and registered. The background
+     * re-check (`domain-recheck.handler.ts`, #860) calls it for each due
+     * domain, so "Check now" and the job never disagree. Never throws for a
+     * DNS or host failure: both are recorded on the row.
+     */
+    async check(
+        domain: Domain,
+    ): Promise<
+        | { domain: Domain; verified: true }
+        | { domain: Domain; verified: false; reason: VerificationFailure }
+    > {
         if (domain.status === "VERIFIED") {
             const synced = await syncHosting(this.hosting, domain);
-            return { domain: this.withHosting(synced), verified: true };
+            return { domain: synced, verified: true };
         }
 
         const checkedAt = new Date();
@@ -168,7 +192,7 @@ export class DomainsService {
                 },
             });
             return {
-                domain: this.withHosting(checked),
+                domain: checked,
                 verified: false,
                 reason: outcome.reason satisfies VerificationFailure,
             };
@@ -194,7 +218,7 @@ export class DomainsService {
         }
 
         const hosted = await syncHosting(this.hosting, verified);
-        return { domain: this.withHosting(hosted), verified: true };
+        return { domain: hosted, verified: true };
     }
 
     /**

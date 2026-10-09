@@ -24,6 +24,9 @@ the merchant-sites zone once its TXT check passes, and deletes it there
 before the Domain row goes (a failed delete is a 503 and removes nothing). A
 failed call never undoes the verification: the row stays VERIFIED with
 `hostingStatus` and `hostingError` in words, and the next check retries.
+The next check is "Check now" or the `domains.recheck` chain (#860,
+`backend-jobs.md`), which asks Cloudflare often until a domain is live and
+daily after, at most 50 domains a run and stopping on repeated failures.
 With `CLOUDFLARE_HOSTNAMES_TOKEN` or `CLOUDFLARE_HOSTNAMES_ZONE_ID` unset the
 port is null, a WARN says so at boot, and the read says `hosting.state: "OFF"`
 (`domain-hosting-sync.ts`).
