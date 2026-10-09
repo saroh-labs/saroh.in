@@ -6,8 +6,8 @@ import { useSession } from "../fixtures/sessions";
 import { urls } from "../playwright.config";
 
 /**
- * Locations, "How orders leave" (plan B, B17): the chips, and "Mark
- * pick-up orders late after [N] [hours ▾]" per way the location offers.
+ * A location's Delivery card (plan B, B17; the 9 Oct audit): a row per way
+ * with its switch, and "Late after [N] [hours ▾]" on each way it offers.
  * (Storefronts in the API and in code; DEC-069 renamed only the words.)
  *
  * Walks it on Northwind Supply, the base seed — Rye & Co. and Pulse Fitness
@@ -46,11 +46,16 @@ test.describe("Locations (DEC-069)", () => {
         await expect(page).toHaveURL(
             new RegExp(`/commerce/locations\\?storefront=${one.id}$`),
         );
+        // Titled with the location's own name; the crumb keeps the word.
         await expect(
-            page.getByRole("heading", {
-                level: 1,
-                name: stores.length > 1 ? "Locations" : "Location",
-            }),
+            page.getByRole("heading", { level: 1, name: one.name }),
+        ).toBeVisible();
+        await expect(
+            page
+                .getByRole("navigation", { name: "Breadcrumb" })
+                .getByText(stores.length > 1 ? "Locations" : "Location", {
+                    exact: true,
+                }),
         ).toBeVisible();
         await expect(page.getByLabel("Location name")).toHaveValue(one.name);
         // The words changed, not only the address.
@@ -159,24 +164,24 @@ test.describe(
                     fulfilmentTypes: ["PICKUP"],
                 });
                 await page.goto(`/commerce/locations?storefront=${first.id}`);
-                const card = page.getByRole("region", {
-                    name: "How orders leave",
-                });
+                const card = page.getByRole("region", { name: "Delivery" });
                 await expect(
-                    card.getByRole("button", { name: "Pick-up" }),
-                ).toHaveAttribute("aria-pressed", "true");
+                    card.getByRole("switch", { name: "Pick-up", exact: true }),
+                ).toHaveAttribute("aria-checked", "true");
                 await expect(
-                    card.getByRole("button", { name: "Shipping" }),
-                ).toHaveAttribute("aria-pressed", "false");
+                    card.getByRole("switch", { name: "Shipping", exact: true }),
+                ).toHaveAttribute("aria-checked", "false");
                 await expect(
-                    card.getByLabel("Mark shipping orders late after"),
+                    card.getByLabel("Shipping Late after", { exact: true }),
                 ).toHaveCount(0);
 
                 // 20 minutes: a fraction of an hour, so in minutes.
-                const field = card.getByLabel("Mark pick-up orders late after");
+                const field = card.getByLabel("Pick-up Late after", {
+                    exact: true,
+                });
                 await field.fill("20");
                 await card
-                    .getByRole("combobox", { name: "Unit for pick-up orders" })
+                    .getByRole("combobox", { name: "Pick-up late after, unit" })
                     .click();
                 await page.getByRole("option", { name: "minutes" }).click();
                 await card.getByRole("button", { name: "Save" }).click();
@@ -192,7 +197,7 @@ test.describe(
 
                 // 3 minutes is refused before it is sent, with the bounds.
                 await card
-                    .getByLabel("Mark pick-up orders late after")
+                    .getByLabel("Pick-up Late after", { exact: true })
                     .fill("3");
                 await expect(
                     card.getByText("5 minutes at the soonest.", {
@@ -204,9 +209,11 @@ test.describe(
                 ).toBeDisabled();
 
                 // Shipping on: its row appears, on its default.
-                await card.getByRole("button", { name: "Shipping" }).click();
+                await card
+                    .getByRole("switch", { name: "Shipping", exact: true })
+                    .click();
                 await expect(
-                    card.getByLabel("Mark shipping orders late after"),
+                    card.getByLabel("Shipping Late after", { exact: true }),
                 ).toHaveValue(String(before.lateAfterMinutes.SHIPPING / 60));
             } finally {
                 await write(page.request, first.id, {

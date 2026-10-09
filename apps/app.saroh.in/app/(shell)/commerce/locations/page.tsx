@@ -75,6 +75,7 @@ export default async function StorefrontsPage({
                 businessName={organization?.name ?? "This business"}
                 storefronts={storefronts}
                 selected={selected}
+                chosenId={chosen?.id}
                 site={siteSelling.known ? siteSelling.site : undefined}
                 canCreate={
                     may("store:create") &&

@@ -11,6 +11,7 @@ import {
     SelectTrigger,
     SelectValue,
 } from "@saroh/ui/select";
+import { Switch } from "@saroh/ui/switch";
 import { useState } from "react";
 
 import { STOREFRONT_FULFILMENT_TYPES } from "@/lib/stores/fulfilment-types";
@@ -23,268 +24,342 @@ import {
     lateAfterWords,
     ORDERS_NOUN,
 } from "@/lib/stores/late-after";
-import { pickupNotOffered } from "@/lib/stores/pickup-place";
+import {
+    ADDRESS_FIELD_ID,
+    LOCATION_SECTIONS,
+    savedWays,
+} from "@/lib/stores/location-readiness";
 import type {
     StorefrontFulfilmentType,
     StorefrontInput,
     StorefrontSettings,
 } from "@/lib/stores/storefronts";
 
-import { DeliveryFeeRow } from "./delivery-fee-row";
+import { FreeOverRow } from "./free-over-row";
+import { LegacyWays } from "./legacy-ways";
+import type { SectionProps } from "./location-save";
+import { jumpTo } from "./location-save";
 import { Note, Section } from "./storefront-section";
 
 /** Where Orders' notice sends someone to change a threshold. */
 export const LATE_AFTER_ANCHOR = "late-after";
 
-type Saver = (
-    input: StorefrontInput,
-    said: string,
-    onFail?: () => void,
-) => void;
+const MONEY_RE = /^\d+(\.\d{1,2})?$/;
+
+type Way = StorefrontFulfilmentType;
+type Paid = "LOCAL_DELIVERY" | "SHIPPING";
 
 /**
- * How a storefront's orders leave, and when they count as late (plan B,
- * B17): a chip per way — Pick-up, Local delivery, Shipping — and, for each
- * way it offers, "Mark ‹type› orders late after [N] [hours ▾]".
+ * Delivery: one row per way an order leaves (Pick-up, Local delivery,
+ * Shipping), each with its switch, its fee on the website and when its
+ * orders count as late, side by side (the 9 Oct audit; B17, G13).
  *
- * The chips replace the collection and delivery switches; the API keeps
- * those in step. A chip saves when pressed, a threshold when its Save is
- * pressed, like every other control on this screen. Digital and
- * appointments have no chip and no row: Digital is never late, and an
- * appointment follows its visits.
+ * A switch saves when flipped; a row's fee and late time save together
+ * with its Save, like every other control on the page. Digital products and
+ * bookings have no row: Digital is never late, and a booking follows its
+ * visits.
+ *
+ * Pick-up needs a door (UX-025): a location with no counter can't turn it
+ * on, and says why beside the switch. One that already has it on (saved
+ * before, or set through the API) shows it as it is, says the website
+ * doesn't offer it, and can turn it off. Nothing is changed for it here.
  */
-export function FulfilmentSection({
-    store,
-    types,
-    canEdit,
-    pending,
-    save,
-    setStore,
-}: {
-    store: StorefrontSettings;
-    types: StorefrontFulfilmentType[];
-    canEdit: boolean;
-    pending: boolean;
-    save: Saver;
-    setStore: (fn: (s: StorefrontSettings) => StorefrontSettings) => void;
-}) {
-    // Pick-up needs a door: an online store is offered it only while it
-    // already has it on, so it can turn it off.
-    const offered = STOREFRONT_FULFILMENT_TYPES.filter(
-        (t) => t !== "PICKUP" || store.kind === "SHOP" || types.includes(t),
-    );
-    const late = store.lateAfterMinutes ?? DEFAULT_LATE_AFTER;
-    // Pick-up on, but nowhere to collect from (UX-025): said here, inline.
-    const noPlace = pickupNotOffered({ ...store, fulfilmentTypes: types });
-
-    const toggle = (type: StorefrontFulfilmentType) => {
-        const on = types.includes(type);
-        const next = STOREFRONT_FULFILMENT_TYPES.filter((t) =>
-            t === type ? !on : types.includes(t),
-        );
-        setStore((s) => ({ ...s, fulfilmentTypes: next }));
-        save(
-            { fulfilmentTypes: next },
-            `${FULFILMENT_LABEL[type]} turned ${on ? "off" : "on"}`,
-            () => setStore((s) => ({ ...s, fulfilmentTypes: types })),
-        );
-    };
+export function FulfilmentSection(props: SectionProps) {
+    const { store } = props;
+    const ways = savedWays(store);
+    const delivers = ways.some((w) => w !== "PICKUP");
 
     return (
-        <Section title="How orders leave" id={LATE_AFTER_ANCHOR}>
-            <div className="grid gap-2">
-                <div
-                    role="group"
-                    aria-label="How orders from here reach the customer"
-                    aria-describedby="storefront-ways-note"
-                    className="flex flex-wrap gap-1.5"
-                >
-                    {offered.map((type) => {
-                        const on = types.includes(type);
-                        return (
-                            <button
-                                key={type}
-                                type="button"
-                                aria-pressed={on}
-                                disabled={!canEdit || pending}
-                                onClick={() => toggle(type)}
-                                className={cn(
-                                    "h-[30px] rounded-full border px-3 text-[12.5px] disabled:cursor-not-allowed disabled:opacity-60 coarse:h-11",
-                                    on
-                                        ? "border-foreground bg-foreground font-semibold text-background"
-                                        : "border-border bg-card font-medium text-foreground/75 hover:bg-muted/50",
-                                )}
-                            >
-                                {FULFILMENT_LABEL[type]}
-                            </button>
-                        );
-                    })}
-                </div>
-                {noPlace ? (
-                    <p
-                        role="note"
-                        className="text-pretty rounded-lg bg-warning-subtle px-3 py-2 text-[12.5px] leading-[1.5] text-warning-subtle-foreground"
+        <Section
+            title={LOCATION_SECTIONS.delivery.label}
+            id={LOCATION_SECTIONS.delivery.id}
+        >
+            {store.fulfilmentTypes ? (
+                <div id={LATE_AFTER_ANCHOR} className="grid scroll-mt-20 gap-3">
+                    <ul
+                        aria-label="Ways orders leave"
+                        className="overflow-hidden rounded-lg border border-border"
                     >
-                        {noPlace}
-                    </p>
-                ) : null}
-                <Note id="storefront-ways-note">
-                    {types.length === 0
-                        ? "None chosen: orders from here are only ever digital or booked visits."
-                        : "The ways an order from here can reach the customer. Digital products and bookings follow the product, so they need no chip."}
-                </Note>
-            </div>
-
-            {store.siteShop
-                ? (["LOCAL_DELIVERY", "SHIPPING"] as const)
-                      .filter((type) => types.includes(type))
-                      .map((type) => (
-                          <DeliveryFeeRow
-                              key={`${type}-${String(fee(store, type))}`}
-                              type={type}
-                              fee={fee(store, type)}
-                              currency={store.currency}
-                              canEdit={canEdit}
-                              pending={pending}
-                              save={save}
-                          />
-                      ))
-                : null}
-
-            <div className="grid gap-3">
-                <div>
-                    <p className="text-[13.5px] font-medium">
-                        When is an order late?
-                    </p>
+                        {STOREFRONT_FULFILMENT_TYPES.map((type) => (
+                            <WayRow
+                                // A saved value starts the row afresh.
+                                key={`${type}-${String(fee(store, type))}-${store.lateAfterMinutes?.[type] ?? ""}`}
+                                {...props}
+                                type={type}
+                                types={store.fulfilmentTypes ?? []}
+                            />
+                        ))}
+                    </ul>
                     <Note>
-                        Counted from when the order is placed. Past this, it
-                        shows as Late on Home, in Orders and on the order
-                        itself, until it is handed over.
+                        {store.fulfilmentTypes.length === 0
+                            ? "None on: orders from here are only digital products or bookings."
+                            : store.siteShop
+                              ? "Your website checkout offers these. Bookings and digital products follow the product."
+                              : "Bookings and digital products follow the product."}{" "}
+                        Late counts from when an order is placed.
                     </Note>
                 </div>
-                {types.length === 0 ? (
-                    <Note>
-                        Choose how orders leave to set when they count as late.
-                    </Note>
-                ) : (
-                    types.map((type) => (
-                        <LateAfterRow
-                            key={`${type}-${late[type]}`}
-                            type={type}
-                            minutes={late[type]}
-                            canEdit={canEdit}
-                            pending={pending}
-                            save={save}
-                        />
-                    ))
-                )}
-            </div>
+            ) : (
+                <LegacyWays {...props} />
+            )}
+            {delivers || (!store.fulfilmentTypes && store.shippingEnabled) ? (
+                <FreeOverRow {...props} />
+            ) : null}
         </Section>
     );
 }
 
-/** "Mark pick-up orders late after [2] [hours ▾]", and its Save. */
-function LateAfterRow({
-    type,
-    minutes,
+/**
+ * One way an order leaves: "Local delivery [on] Fee [60] Late after [24]
+ * [hours ▾] Save". On a phone its parts stack; nothing scrolls sideways.
+ */
+function WayRow({
+    store,
     canEdit,
     pending,
     save,
-}: {
-    type: StorefrontFulfilmentType;
-    minutes: number;
-    canEdit: boolean;
-    pending: boolean;
-    save: Saver;
-}) {
+    setStore,
+    type,
+    types,
+}: SectionProps & { type: Way; types: Way[] }) {
+    const on = types.includes(type);
+    const label = FULFILMENT_LABEL[type];
+    const id = `storefront-way-${type.toLowerCase()}`;
+    const counter = store.kind === "SHOP";
+    // Pick-up needs a place customers visit (UX-025, the API's rule at the
+    // site's checkout). Off and with no counter, it can't be turned on.
+    const pickup = type === "PICKUP";
+    const blocked = pickup && !counter && !on;
+    const reason = pickup
+        ? !counter
+            ? on
+                ? "Not on your website: it needs a counter."
+                : "Needs a counter"
+            : on && !store.address?.trim()
+              ? "Not on your website until the address is added."
+              : null
+        : null;
+
+    // The fee, on the website's checkout (G13): only while its shop is open.
+    const paid: Paid | null =
+        type === "PICKUP" || !store.siteShop ? null : type;
+    const savedFee = paid ? (fee(store, paid) ?? "") : "";
+    const [feeText, setFeeText] = useState(savedFee);
+    const typedFee = feeText.trim();
+    const feeOk = typedFee === "" || MONEY_RE.test(typedFee);
+    const feeDirty =
+        paid !== null &&
+        typedFee !== savedFee &&
+        !(typedFee === "0" && savedFee === "");
+
+    const minutes = (store.lateAfterMinutes ?? DEFAULT_LATE_AFTER)[type];
     const initial = lateAfterField(minutes);
     const [amount, setAmount] = useState(initial.amount);
     const [unit, setUnit] = useState<LateUnit>(initial.unit);
     const read = lateAfterMinutes(amount, unit);
-    const dirty = !read.ok || read.minutes !== minutes;
-    const id = `storefront-late-${type.toLowerCase()}`;
-    const noun = ORDERS_NOUN[type];
+    const lateDirty = !read.ok || read.minutes !== minutes;
+    const dirty = on && (feeDirty || lateDirty);
+    const ok = feeOk && read.ok;
+
+    const toggle = (value: boolean) => {
+        const next = STOREFRONT_FULFILMENT_TYPES.filter((t) =>
+            t === type ? value : types.includes(t),
+        );
+        setStore((s) => ({ ...s, fulfilmentTypes: next }));
+        save(
+            { fulfilmentTypes: next },
+            `${label} turned ${value ? "on" : "off"}`,
+            () => setStore((s) => ({ ...s, fulfilmentTypes: types })),
+        );
+    };
+
+    const submit = () => {
+        if (!dirty || !feeOk || !read.ok) return;
+        const nextFee =
+            typedFee === "" || Number(typedFee) === 0 ? null : typedFee;
+        const lateChanged = read.minutes !== minutes;
+        const input: StorefrontInput = lateChanged
+            ? { lateAfterMinutes: { [type]: read.minutes } }
+            : {};
+        if (feeDirty) {
+            if (paid === "LOCAL_DELIVERY") input.localDeliveryFee = nextFee;
+            if (paid === "SHIPPING") input.shippingFee = nextFee;
+        }
+        save(
+            input,
+            feeDirty && lateChanged
+                ? `${label} saved`
+                : feeDirty
+                  ? nextFee
+                      ? `${label} on your website now costs ${store.currency} ${nextFee}`
+                      : `${label} on your website is now free`
+                  : `${capitalise(ORDERS_NOUN[type])} now count as late after ${lateAfterWords(read.minutes)}`,
+        );
+    };
+
+    const problem = !feeOk
+        ? "A fee is a number with up to 2 decimals, like 60 or 49.50."
+        : !read.ok
+          ? `${read.error} Between 5 minutes and 30 days.`
+          : null;
 
     return (
-        <form
-            className="grid gap-1.5"
-            onSubmit={(e) => {
-                e.preventDefault();
-                if (!read.ok || read.minutes === minutes) return;
-                save(
-                    { lateAfterMinutes: { [type]: read.minutes } },
-                    `${capitalise(noun)} now count as late after ${lateAfterWords(read.minutes)}`,
-                );
-            }}
-        >
-            <Label htmlFor={id} className="text-[12.5px] font-medium">
-                Mark {noun} late after
-            </Label>
-            <div className="flex flex-wrap items-center gap-2">
-                <Input
-                    id={id}
-                    inputMode="numeric"
-                    value={amount}
-                    readOnly={!canEdit}
-                    aria-invalid={!read.ok || undefined}
-                    aria-describedby={`${id}-note`}
-                    onChange={(e) => setAmount(e.target.value)}
-                    className="w-20 tabular-nums"
-                />
-                <Select
-                    value={unit}
-                    onValueChange={(v) => setUnit(v as LateUnit)}
-                    disabled={!canEdit}
-                >
-                    <SelectTrigger
-                        aria-label={`Unit for ${noun}`}
-                        className="w-[120px]"
-                    >
-                        <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                        <SelectItem value="hours">hours</SelectItem>
-                        <SelectItem value="minutes">minutes</SelectItem>
-                    </SelectContent>
-                </Select>
+        <li className="border-b border-border px-3 py-3 last:border-b-0">
+            <form
+                className="flex flex-wrap items-end gap-x-4 gap-y-3"
+                onSubmit={(e) => {
+                    e.preventDefault();
+                    submit();
+                }}
+            >
+                <div className="flex min-w-0 flex-[1_1_200px] items-center justify-between gap-3 self-center">
+                    <span className="min-w-0">
+                        <Label
+                            htmlFor={id}
+                            className={cn(
+                                "text-[13.5px] font-medium",
+                                blocked && "text-muted-foreground",
+                            )}
+                        >
+                            {label}
+                        </Label>
+                        {reason ? (
+                            <span
+                                id={`${id}-reason`}
+                                className="block text-pretty text-[12px] leading-[1.45] text-muted-foreground"
+                            >
+                                {reason}
+                                {pickup && counter && canEdit ? (
+                                    <>
+                                        {" "}
+                                        <button
+                                            type="button"
+                                            onClick={() =>
+                                                jumpTo(ADDRESS_FIELD_ID)
+                                            }
+                                            className="rounded-sm font-medium text-foreground underline decoration-muted-foreground/40 underline-offset-4 hover:decoration-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring active:text-muted-foreground"
+                                        >
+                                            Add address
+                                        </button>
+                                    </>
+                                ) : null}
+                            </span>
+                        ) : null}
+                    </span>
+                    <Switch
+                        id={id}
+                        checked={on}
+                        disabled={!canEdit || pending || blocked}
+                        aria-describedby={reason ? `${id}-reason` : undefined}
+                        onCheckedChange={toggle}
+                        className="shrink-0"
+                    />
+                </div>
+
+                {on && paid ? (
+                    <div className="grid w-32 gap-1">
+                        <Label
+                            htmlFor={`${id}-fee`}
+                            className="text-[11px] font-semibold uppercase tracking-[0.1em] text-muted-foreground"
+                        >
+                            <span className="sr-only">{label} </span>Fee
+                            <span className="sr-only">
+                                {" "}
+                                on your website, {store.currency}
+                            </span>
+                        </Label>
+                        <div className="relative">
+                            <Input
+                                id={`${id}-fee`}
+                                inputMode="decimal"
+                                placeholder="Free"
+                                value={feeText}
+                                readOnly={!canEdit}
+                                aria-invalid={!feeOk || undefined}
+                                aria-describedby={
+                                    problem ? `${id}-problem` : undefined
+                                }
+                                onChange={(e) => setFeeText(e.target.value)}
+                                className="pr-11 tabular-nums"
+                            />
+                            <span
+                                aria-hidden
+                                className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 font-mono text-[11.5px] text-muted-foreground"
+                            >
+                                {store.currency}
+                            </span>
+                        </div>
+                    </div>
+                ) : null}
+
+                {on ? (
+                    <div className="grid gap-1">
+                        <Label
+                            htmlFor={`${id}-late`}
+                            className="text-[11px] font-semibold uppercase tracking-[0.1em] text-muted-foreground"
+                        >
+                            <span className="sr-only">{label} </span>Late after
+                        </Label>
+                        <div className="flex items-center gap-1.5">
+                            <Input
+                                id={`${id}-late`}
+                                inputMode="numeric"
+                                value={amount}
+                                readOnly={!canEdit}
+                                aria-invalid={!read.ok || undefined}
+                                aria-describedby={
+                                    problem ? `${id}-problem` : undefined
+                                }
+                                onChange={(e) => setAmount(e.target.value)}
+                                className="w-16 tabular-nums"
+                            />
+                            <Select
+                                value={unit}
+                                onValueChange={(v) => setUnit(v as LateUnit)}
+                                disabled={!canEdit}
+                            >
+                                <SelectTrigger
+                                    aria-label={`${label} late after, unit`}
+                                    className="w-[104px]"
+                                >
+                                    <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="hours">hours</SelectItem>
+                                    <SelectItem value="minutes">
+                                        minutes
+                                    </SelectItem>
+                                </SelectContent>
+                            </Select>
+                        </div>
+                    </div>
+                ) : null}
+
                 {canEdit && dirty ? (
-                    <Button type="submit" disabled={pending || !read.ok}>
+                    <Button type="submit" disabled={pending || !ok}>
                         Save
                     </Button>
                 ) : null}
-            </div>
-            <p
-                id={`${id}-note`}
-                role={read.ok ? undefined : "alert"}
-                className={cn(
-                    "text-pretty text-[12px] leading-[1.5]",
-                    read.ok ? "text-muted-foreground" : "text-destructive",
-                )}
-            >
-                {read.ok
-                    ? helpFor(type)
-                    : `${read.error} Between 5 minutes and 30 days.`}
-            </p>
-        </form>
-    );
-}
 
-function helpFor(type: StorefrontFulfilmentType): string {
-    // No business type's figure is suggested (UX-082): a counter sets its own.
-    const start = `Starts at ${lateAfterWords(DEFAULT_LATE_AFTER[type])}.`;
-    return type === "PICKUP" ? `${start} Set what suits your counter.` : start;
+                {on && problem ? (
+                    <p
+                        id={`${id}-problem`}
+                        role="alert"
+                        className="basis-full text-pretty text-[12px] leading-[1.5] text-destructive"
+                    >
+                        {problem}
+                    </p>
+                ) : null}
+            </form>
+        </li>
+    );
 }
 
 const capitalise = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
 
 /** The website checkout's fee for a way (G13); null is free. */
-function fee(
-    store: StorefrontSettings,
-    type: "LOCAL_DELIVERY" | "SHIPPING",
-): string | null {
-    return (
-        (type === "LOCAL_DELIVERY"
-            ? store.localDeliveryFee
-            : store.shippingFee) ?? null
-    );
+function fee(store: StorefrontSettings, type: Way): string | null {
+    if (type === "LOCAL_DELIVERY") return store.localDeliveryFee ?? null;
+    if (type === "SHIPPING") return store.shippingFee ?? null;
+    return null;
 }

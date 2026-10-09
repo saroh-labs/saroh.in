@@ -1,33 +1,51 @@
 import { Badge } from "@saroh/ui/badge";
 import { Label } from "@saroh/ui/label";
+import { cn } from "@saroh/ui/lib/utils";
 import { Switch } from "@saroh/ui/switch";
 import type { ReactNode } from "react";
 
 /**
- * The card each part of a storefront's settings sits in, and the note under
- * a control ("Saroh Storefront Settings" design): an 11px uppercase label,
- * then the controls 20px apart. Shared by `storefronts-screen.tsx` and the
- * sections split out of it.
+ * The card each part of a location's page sits in (The place, Payments,
+ * Delivery, Customers, Pause or close), and the note under a control. A
+ * titled card, then the controls 20px apart. Shared by
+ * `storefronts-screen.tsx` and the sections split out of it.
  */
 export function Section({
     title,
     id,
+    action,
+    className,
     children,
 }: {
     title: string;
-    /** For a link straight to this card. */
+    /** For a link straight to this card, and the page's section list. */
     id?: string;
+    /** Something beside the title: a status, or a link elsewhere. */
+    action?: ReactNode;
+    className?: string;
     children: ReactNode;
 }) {
+    const headingId = id ? `${id}-heading` : undefined;
     return (
         <section
             id={id}
-            aria-label={title}
-            className="scroll-mt-6 rounded-xl border border-border px-5 py-[18px]"
+            aria-labelledby={headingId}
+            aria-label={headingId ? undefined : title}
+            // Clear of the sticky app header when a link jumps here.
+            className={cn(
+                "scroll-mt-20 rounded-xl border border-border bg-card px-5 py-[18px] max-[480px]:px-4",
+                className,
+            )}
         >
-            <h2 className="mb-3.5 text-[11px] font-semibold uppercase tracking-[0.1em] text-muted-foreground">
-                {title}
-            </h2>
+            <div className="mb-4 flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
+                <h2
+                    id={headingId}
+                    className="font-display text-[16px] font-semibold tracking-[-0.01em]"
+                >
+                    {title}
+                </h2>
+                {action}
+            </div>
             <div className="flex flex-col gap-5">{children}</div>
         </section>
     );
@@ -45,8 +63,8 @@ export function Note({ id, children }: { id?: string; children: ReactNode }) {
 }
 
 /**
- * A switch with its label and the note under it (the design's TOGGLES
- * rows), which saves the moment it is flipped.
+ * A switch with its label and the line under it, which saves the moment it
+ * is flipped.
  */
 export function ToggleRow({
     id,
@@ -59,7 +77,7 @@ export function ToggleRow({
 }: {
     id: string;
     label: string;
-    note: string;
+    note: ReactNode;
     /** Saved, but nothing reads it until customers can check out alone. */
     later?: boolean;
     checked: boolean;
