@@ -12,6 +12,57 @@ mistaken for bureaucracy and removed.
 
 ---
 
+## Deploy — the merchant sites' production Worker didn't know it was production
+
+**Symptom**: none reported. Found 9 Oct 2026 in a review after Vercel was
+retired (DEC-107): saroh.app's production build had never run its
+required-variables check, and the template renders' "not in production" lock
+read as open.
+**Cause**: the apps keep Vercel's names for the environment (`VERCEL_ENV`,
+`NEXT_PUBLIC_VERCEL_ENV`, `VERCEL_GIT_COMMIT_REF`). On Vercel the platform
+set them; on Cloudflare each app's `wrangler.jsonc` vars must, and the deploy
+workflow builds with them (`scripts/cf-env.mjs`). saroh.in, app, accounts and
+admin had them; `apps/saroh.app/wrangler.jsonc` set none, in either
+environment. So next.config skipped its `REQUIRED_IN_PRODUCTION` check,
+`templateRendersAllowed` saw no production (only `TEMPLATE_RENDERS` staying
+off kept the page shut), and the relay's `visitorAddress` thought it was off
+the platform and would have stood in the loopback address for a request
+without `cf-connecting-ip`. Nothing failed, because a missing marker turns
+checks off rather than on.
+**Fix**: saroh.app sets `VERCEL_ENV`, `NEXT_PUBLIC_VERCEL_ENV` and
+`VERCEL_GIT_COMMIT_REF` (`production`/`main` in `env.production.vars`,
+`preview`/`development` at the top), as the other apps do; app.saroh.in got
+`NEXT_PUBLIC_VERCEL_ENV` too, since its env.ts declares it. A production
+build with exactly the workflow's settings passed next.config's check
+(`API_URL`, `NEXT_PUBLIC_API_URL` and `NEXT_PUBLIC_ROOT_DOMAIN` from wrangler
+vars, `SITE_RELAY_SECRET` from the workflow's Secrets step).
+**Check**: `pnpm run check:deploy-env` (prepush and CI). For every app and
+both environments it requires the markers in wrangler vars, loads the app's
+next.config with only what the deploy build gets (those vars plus the
+workflow's secrets, as placeholders) and fails if it refuses, and fails if a
+config with only the marker set loads (its check is gone).
+**Rule**: a guard keyed on an environment variable is off wherever that
+variable is missing, and nothing says so. When a platform moves, list every
+variable the old one set for you and set each one on the new one.
+**Category**: deploy · `apps/*/wrangler.jsonc`, `scripts/check-deploy-env.mjs`
+
+## Security — the visitor's address and country fell back to headers a visitor can write
+
+**Symptom**: none reported. Found 9 Oct 2026 in the same review.
+**Cause**: the 7 and 8 Oct fixes (below) put Cloudflare's headers first but
+kept the old platform's as fallbacks: saroh.in's waitlist read `x-real-ip`
+and `x-vercel-ip-country`, and saroh.app's relay `x-real-ip` and
+`x-forwarded-for`. On a Worker those arrive as the visitor sent them, so had
+Cloudflare's header ever been missing, a visitor could have chosen the key
+the API's per-visitor limits count them by, or their country.
+**Fix**: only `cf-connecting-ip` and `cf-ipcountry` are read; without them
+the address or country is unknown. The browser tests stand in for Cloudflare
+by sending `cf-connecting-ip` (`e2e/tests/site-codes.ts`, `link-preview.spec.ts`).
+**Check**: `pnpm run check:edge-headers` now fails on any `x-real-ip`,
+`x-forwarded-for` or `x-vercel-ip-*` string in app or package code (tests
+and the API's `common/trust-proxy.ts` aside).
+**Category**: security · `apps/saroh.in/lib/waitlist-forward.ts`, `apps/saroh.app/lib/site-relay.ts`
+
 ## Secrets scan — a fake key in a test fails the gate, and fixing the file isn't enough
 
 **Symptom** (8 Oct, batch-2026-10-08-6): `pnpm prepush`'s `secrets` step failed twice on test data: a fake `sk_live_…` in a validator test (stripe-access-token), then a test idempotency key and a fake `phx_…` (generic-api-key).

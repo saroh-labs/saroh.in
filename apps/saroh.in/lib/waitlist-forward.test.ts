@@ -38,8 +38,8 @@ describe("signRelay", () => {
 describe("forwardHeaders", () => {
     const at = 1_790_000_000_000;
 
-    it("signs the platform's address for the API's limit", () => {
-        const headers = new Headers({ "x-real-ip": "198.51.100.7" });
+    it("signs Cloudflare's address for the API's limit", () => {
+        const headers = new Headers({ "cf-connecting-ip": "198.51.100.7" });
         const out = forwardHeaders({
             headers,
             host: "www.saroh.in",
@@ -54,16 +54,17 @@ describe("forwardHeaders", () => {
         );
     });
 
-    it("never reads or passes on a client-sent X-Forwarded-For", () => {
+    it("never reads or passes on a client-sent X-Forwarded-For or x-real-ip", () => {
         const honest = forwardHeaders({
-            headers: new Headers({ "x-real-ip": "198.51.100.7" }),
+            headers: new Headers({ "cf-connecting-ip": "198.51.100.7" }),
             host: "www.saroh.in",
             secret: DEV,
             now: at,
         });
         const spoofed = forwardHeaders({
             headers: new Headers({
-                "x-real-ip": "198.51.100.7",
+                "cf-connecting-ip": "198.51.100.7",
+                "x-real-ip": "6.6.6.6",
                 "x-forwarded-for": "1.2.3.4, 5.6.7.8",
             }),
             host: "www.saroh.in",
@@ -76,21 +77,24 @@ describe("forwardHeaders", () => {
         );
     });
 
-    it("sends no relay when the platform gave no address, or there is no secret", () => {
-        const onlySpoof = new Headers({ "x-forwarded-for": "1.2.3.4" });
+    it("sends no relay when Cloudflare gave no address, or there is no secret", () => {
+        const onlySpoof = new Headers({
+            "x-forwarded-for": "1.2.3.4",
+            "x-real-ip": "1.2.3.5",
+        });
         expect(
             forwardHeaders({ headers: onlySpoof, host: "h", secret: DEV }),
         ).toEqual({ "Content-Type": "application/json" });
         expect(
             forwardHeaders({
-                headers: new Headers({ "x-real-ip": "198.51.100.7" }),
+                headers: new Headers({ "cf-connecting-ip": "198.51.100.7" }),
                 host: "h",
                 secret: null,
             }),
         ).toEqual({ "Content-Type": "application/json" });
     });
 
-    it("reads Cloudflare's address first: behind it, x-real-ip isn't the visitor", () => {
+    it("reads only Cloudflare's address: anything else a visitor can send", () => {
         expect(
             visitorAddress(
                 new Headers({
@@ -102,11 +106,17 @@ describe("forwardHeaders", () => {
         expect(
             visitorAddress(new Headers({ "cf-connecting-ip": "2001:db8::1" })),
         ).toBe("2001:db8::1");
+        expect(
+            visitorAddress(new Headers({ "x-real-ip": "198.51.100.7" })),
+        ).toBeNull();
+        expect(
+            visitorAddress(new Headers({ "x-forwarded-for": "198.51.100.7" })),
+        ).toBeNull();
     });
 
     it("ignores an address header that is not an address", () => {
         expect(
-            visitorAddress(new Headers({ "x-real-ip": "<script>" })),
+            visitorAddress(new Headers({ "cf-connecting-ip": "<script>" })),
         ).toBeNull();
     });
 });
@@ -197,16 +207,14 @@ describe("joinBody", () => {
 
 describe("visitorCountry", () => {
     const h = (value?: string) =>
-        new Headers(
-            value === undefined ? {} : { "x-vercel-ip-country": value },
-        );
+        new Headers(value === undefined ? {} : { "cf-ipcountry": value });
 
-    it("reads the two letters Vercel's edge sets", () => {
+    it("reads the two letters Cloudflare sets", () => {
         expect(visitorCountry(h("IN"))).toBe("IN");
         expect(visitorCountry(h(" us "))).toBe("US");
     });
 
-    it("reads Cloudflare's country first", () => {
+    it("reads only Cloudflare's country: Vercel's old header is a visitor's word", () => {
         expect(
             visitorCountry(
                 new Headers({
@@ -215,6 +223,9 @@ describe("visitorCountry", () => {
                 }),
             ),
         ).toBe("AE");
+        expect(
+            visitorCountry(new Headers({ "x-vercel-ip-country": "IN" })),
+        ).toBeUndefined();
     });
 
     it("is unknown for Cloudflare's unknown and Tor codes", () => {

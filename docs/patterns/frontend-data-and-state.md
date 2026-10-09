@@ -61,7 +61,7 @@ add or change there may be served to the next visitor without rendering.
   minutes) unless the API revalidates its tags: a new API write that
   changes what a published page shows queues `site.pages.revalidate`
   (`backend-jobs.md` → Site page cache).
-- **Outside the Worker** (`next dev`, Vercel) none of it runs: pages render
+- **Outside the Worker** (`next dev`, a test) none of it runs: pages render
   per request, as before.
 
 ## If you think you need React Query

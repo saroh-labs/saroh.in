@@ -7,12 +7,17 @@
 
 ## Workspace — **Current**
 
-- **Adopted, implementation pending** — Saroh-managed client sites use one
-  Saroh-owned Vercel multi-tenant project for `*.saroh.app` and verified custom
-  domains. Next.js customer-facing server routes call the Saroh API; only the
-  API accesses the database. Content publications are tenant-specific but code
-  releases are shared. See [ADR-009](../architecture/adr/ADR-009-vercel-managed-multi-tenant-sites.md)
-  and DEC-025 before changing this hosting boundary.
+- **Current** (DEC-107, 2026-10-08; Vercel retired 2026-10-09) — every Saroh
+  web app runs on Cloudflare Workers, built with OpenNext and deployed by
+  GitHub Actions (`.github/workflows/deploy-frontends.yml`): the marketing site,
+  the workspace, accounts, admin and the merchant sites. Each app is one Worker
+  per environment (`saroh-<app>`, `saroh-<app>-dev`); `development` deploys dev,
+  `main` deploys production, and settings that aren't secret live in each app's
+  `wrangler.jsonc`. One merchant-sites Worker serves `*.saroh.app` and verified
+  custom domains: its server routes call the Saroh API, only the API accesses
+  the database, content publications are tenant-specific and code releases
+  are shared. The API deploys on its own (below). ADR-009 and DEC-025 (Vercel)
+  are superseded.
 
 - pnpm workspaces (`apps/*`, `packages/*`, `tooling/*`, `e2e`) with pnpm
   catalogs, and Turborepo: `build`, `dev`, `lint` and `typecheck` depend on
@@ -39,11 +44,12 @@
 
 ## Invariant checks — **Current**
 
-| Script         | Guards                                                         |
-| -------------- | -------------------------------------------------------------- |
-| `check:routes` | Every emitted destination and static link resolves to a route  |
-| `check:blocks` | G2 and G6: merchant sites stay merchant-coloured; one renderer |
-| `check:cycles` | No circular imports across workspaces                          |
+| Script             | Guards                                                                                                      |
+| ------------------ | ----------------------------------------------------------------------------------------------------------- |
+| `check:routes`     | Every emitted destination and static link resolves to a route                                               |
+| `check:blocks`     | G2 and G6: merchant sites stay merchant-coloured; one renderer                                              |
+| `check:cycles`     | No circular imports across workspaces                                                                       |
+| `check:deploy-env` | Every Worker's environment marker is set and its deploy build passes next.config's required-variables check |
 
 **Adopted** — a repo-wide rule that a lint rule cannot express becomes a
 `scripts/check-*.mjs` wired into CI and AGENTS.md → Before you finish, not a
@@ -171,9 +177,11 @@ seconds). Shared setup is `.github/actions/setup`.
 
 ## Branches, batches and pull requests — **Adopted** (2026-09-29)
 
-Every pushed branch starts five Vercel builds. Pushing one branch per unit
-used up Vercel's deploy quota ("Resource is limited — try again in 24
-hours") and blocked real deploys. So work reaches GitHub in batches:
+Every pushed PR is a full CI run, about twenty minutes, and a merge into
+`development` or `main` deploys the Workers whose build changed. The rule
+began on Vercel (retired 9 Oct 2026, DEC-107), where pushing one branch per
+unit used up the deploy quota ("Resource is limited — try again in 24 hours")
+and blocked real deploys. So work reaches GitHub in batches:
 
 1. **Open a batch.** Branch `batch-<YYYY-MM-DD>-<n>` from the latest
    `development`, in its own worktree under `.claude/worktrees/`. `n` counts

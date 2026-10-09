@@ -64,7 +64,7 @@ beforeEach(() => {
     jar.set.mockReset();
     jar.requestHeaders = new Headers({
         host: "kavi.saroh.app",
-        "x-real-ip": "203.0.113.7",
+        "cf-connecting-ip": "203.0.113.7",
         cookie: "__Host-saroh_session=tok; other=1",
     });
     fetchMock.mockReset();
@@ -209,7 +209,7 @@ describe("calls to the API", () => {
     });
 
     it("makes no call without a served host", async () => {
-        jar.requestHeaders = new Headers({ "x-real-ip": "203.0.113.7" });
+        jar.requestHeaders = new Headers({ "cf-connecting-ip": "203.0.113.7" });
         await expect(siteAccountsFetch("options")).resolves.toEqual({
             ok: false,
             reason: "no-host",

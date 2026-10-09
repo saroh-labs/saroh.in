@@ -44,8 +44,8 @@ import { z } from "zod";
  * unseen for two days after Gate W.
  *
  * `NEXT_PUBLIC_GA_MEASUREMENT_ID` turns Google Analytics on, and only on a
- * Vercel production deployment (`VERCEL_ENV`, which Vercel sets and nothing
- * else does): previews, local dev and the browser tests never load the tag,
+ * production deployment (`VERCEL_ENV`, a name kept from Vercel, which only
+ * the production Worker's wrangler.jsonc sets to `production`): previews, local dev and the browser tests never load the tag,
  * even with the id in a local `.env`, so test runs never count as visitors
  * (they were most of GA's "visitors" until 5 Oct). `lib/ga.ts` decides.
  * Even there, GA loads only once a visitor accepts the cookie notice

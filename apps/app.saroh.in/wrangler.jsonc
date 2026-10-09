@@ -43,6 +43,7 @@
     // apps' checks read them. Secrets come from GitHub (deploy workflow).
     "vars": {
         "VERCEL_ENV": "preview",
+        "NEXT_PUBLIC_VERCEL_ENV": "preview",
         "VERCEL_GIT_COMMIT_REF": "development",
         "AUTH_COOKIE_PREFIX": "saroh-dev",
         "BETTER_AUTH_TRUSTED_ORIGINS": "https://api.saroh.io,https://app.saroh.io,https://accounts.saroh.io,https://admin.saroh.io,https://saroh.io,https://www.saroh.io",
@@ -67,6 +68,7 @@
             ],
             "vars": {
                 "VERCEL_ENV": "production",
+                "NEXT_PUBLIC_VERCEL_ENV": "production",
                 "VERCEL_GIT_COMMIT_REF": "main",
                 "API_URL": "https://api.saroh.in",
                 "NEXT_PUBLIC_ACCOUNTS_URL": "https://accounts.saroh.in",
