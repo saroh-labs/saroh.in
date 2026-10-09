@@ -9,7 +9,8 @@ import { urls } from "../playwright.config";
  * The workspace after a move to a lower plan paused some products (#800):
  * the banner above every page says what is paused and links to Plan and
  * billing, and the Products list tags the oldest rows "Paused" with the
- * reason in words above the list (never only a tag or a hover). Read-only:
+ * reason in words above the list (never only a tag or a hover), with no
+ * "reached your limit" card repeating it. Read-only:
  * it opens pages and changes nothing.
  *
  * The paused state needs a business past its plan's products limit with
@@ -85,6 +86,9 @@ test.describe("workspace: what a lower plan paused", () => {
         await expect
             .poll(() => page.getByText("Paused", { exact: true }).count())
             .toBeGreaterThan(0);
+        // The note says the limit once: no "reached your limit" card under
+        // it saying it again.
+        await expect(page.getByText(/You've reached your/)).toHaveCount(0);
     });
 
     test("never sideways at the project's width", async ({ page }) => {

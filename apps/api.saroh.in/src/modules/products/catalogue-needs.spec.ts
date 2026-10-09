@@ -30,6 +30,29 @@ const whole = (
 });
 
 describe("needsFrom", () => {
+    it("never asks to restock a paused product, unless orders wait on it (#800)", () => {
+        // Hidden from the site by a lower plan: out and low say nothing,
+        // so Needs you and its counts leave it out. Short is orders
+        // already placed, still waiting: it stays.
+        const paused = (p: NeedProduct): NeedProduct => ({
+            ...p,
+            paused: true,
+        });
+        const needs = needsFrom(
+            [
+                paused(whole("vest", [shelf("hill", 0)])),
+                paused(whole("kit", [shelf("hill", 4)])),
+                paused(whole("gloves", [shelf("hill", 1, 3)])),
+                whole("boots", [shelf("hill", 0)]),
+            ],
+            [HILL],
+        );
+        expect(needs.map((n) => [n.productId, n.kind])).toEqual([
+            ["gloves", "short"],
+            ["boots", "out"],
+        ]);
+    });
+
     it("judges each shelf where it is sold, as Stock does", () => {
         // 0 Online, 20 at Hill Road: sold out Online, so it needs you.
         expect(

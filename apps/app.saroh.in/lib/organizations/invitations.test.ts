@@ -5,6 +5,7 @@ import { shortDate } from "@/lib/sites/format-date";
 import {
     bookableWithNoLogin,
     invitationMeta,
+    inviteButton,
     inviteEmailError,
     inviteRoom,
     inviteSchema,
@@ -238,6 +239,56 @@ describe("the team cap, said (UX-028, DEC-105)", () => {
             seatReason: null,
             viewOnlyReason:
                 "You've reached your 1 view-only person on Plan A (invites count too).",
+        });
+    });
+});
+
+describe("inviteButton (UX-028, #868, #800)", () => {
+    const FULL = {
+        full: true,
+        why: "You've reached your team members limit on Free",
+        reviewersFull: true,
+        reviewersWhy: "You've reached your 1 view-only person on Free",
+    };
+
+    it("invites anyone while there is room", () => {
+        expect(inviteButton(null, 2)).toEqual({
+            label: "Invite someone",
+            diary: true,
+            refused: null,
+        });
+    });
+
+    it("at the limit, still gives someone on the diary a login", () => {
+        expect(inviteButton(FULL, 2)).toEqual({
+            label: "Invite someone on the diary",
+            diary: true,
+            refused: null,
+        });
+        expect(inviteButton(FULL, 0)).toEqual({
+            label: "Team is full",
+            diary: false,
+            refused:
+                "You've reached your team members limit on Free (invites count too). See plans in Plan and billing.",
+        });
+    });
+
+    it("over the limit, offers nobody on the diary and says why", () => {
+        // Their login would join as the newest, and be paused.
+        const b = inviteButton(FULL, 2, true);
+        expect(b.label).toBe("Team is full");
+        expect(b.diary).toBe(false);
+        expect(b.refused).toContain("over its plan's limit");
+        expect(b.refused).toContain("Plan and billing");
+    });
+
+    it("over the limit with view-only room, invites view-only people only", () => {
+        expect(
+            inviteButton({ ...FULL, reviewersFull: false }, 2, true),
+        ).toEqual({
+            label: "Invite someone view-only",
+            diary: false,
+            refused: null,
         });
     });
 });

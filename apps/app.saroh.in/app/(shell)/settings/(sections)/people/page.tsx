@@ -2,7 +2,7 @@ import { PlanLimitNotice } from "@/components/billing/plan-limit-notice";
 import { TeamScreen } from "@/components/organizations/team-screen";
 import { SettingsPanel } from "@/components/settings/settings-panel";
 import { rowNotice } from "@/lib/billing/access";
-import { pausedTeam } from "@/lib/billing/paused";
+import { pausedTeam, teamOverLimit } from "@/lib/billing/paused";
 import { modulesOrUnknown } from "@/lib/modules/guard";
 import { diaryPeopleToInvite } from "@/lib/organizations/calendar-only";
 import { shownCatalogue } from "@/lib/organizations/catalogue-shown";
@@ -107,6 +107,7 @@ export default async function PeoplePage() {
               }
             : null;
     const catalogue = shownCatalogue(fullCatalogue, modules);
+    const pausedPeople = pausedTeam(paused);
 
     return (
         <SettingsPanel>
@@ -130,9 +131,15 @@ export default async function PeoplePage() {
                     invitations,
                 )}
                 rolesLock={canEditRoles ? rolesLock(access) : null}
-                paused={pausedTeam(paused)}
+                paused={pausedPeople}
+                // Over the limit (#800), the paused notes say it and link
+                // to Plan and billing; the "reached your limit" card would
+                // say it a third time, and its "everyone already on the
+                // team keeps access" is no longer true.
                 limitNotice={
-                    canManage ? <PlanLimitNotice moduleId="members" /> : null
+                    canManage && !teamOverLimit(pausedPeople) ? (
+                        <PlanLimitNotice moduleId="members" />
+                    ) : null
                 }
             />
         </SettingsPanel>

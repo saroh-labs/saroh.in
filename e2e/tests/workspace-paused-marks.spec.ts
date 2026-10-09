@@ -111,6 +111,15 @@ test.describe("workspace: the marks a lower plan's pause leaves", () => {
         await expect(section.getByRole("note")).toContainText(
             "take no new bookings. Bookings already made are kept.",
         );
+        // Over the limit, not at it; and no card claiming everyone keeps
+        // access, nor a diary invite whose login would be paused.
+        await expect(
+            page.getByText("the team is over its plan's limit."),
+        ).toBeVisible();
+        await expect(page.getByText(/keeps access/)).toHaveCount(0);
+        await expect(
+            page.getByRole("button", { name: "Invite someone on the diary" }),
+        ).toHaveCount(0);
     });
 
     test("never sideways at the project's width", async ({ page }) => {
