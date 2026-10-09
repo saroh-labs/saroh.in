@@ -1,25 +1,20 @@
-import Link from "next/link";
+import { NotFound } from "@saroh/ui/not-found";
 
 import { PageContainer } from "@/components/shared/page-container";
 
 /** An invoice that isn't here — never was, or is another business's. */
-export default function NotFound() {
+export default function NotFoundPage() {
     return (
         <PageContainer width="full">
-            <div className="p-10 text-center">
-                <h1 className="font-display text-[18px] font-semibold tracking-[-0.02em]">
-                    No invoice at this address
-                </h1>
-                <p className="mt-1 text-[13px] text-muted-foreground">
-                    It may belong to another business, or the link is wrong.
-                </p>
-                <Link
-                    href="/billing/invoices"
-                    className="mt-2.5 inline-block text-[13px] font-semibold text-brand transition-colors hover:text-foreground active:text-muted-foreground"
-                >
-                    Back to invoices
-                </Link>
-            </div>
+            <NotFound
+                variant="card"
+                title="No invoice at this address"
+                description="It may belong to another business, or the link is wrong."
+                primary={{
+                    href: "/billing/invoices",
+                    label: "Back to invoices",
+                }}
+            />
         </PageContainer>
     );
 }

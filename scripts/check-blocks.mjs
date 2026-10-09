@@ -166,7 +166,13 @@ const SITE_LAYER_ALLOWED = new Set([
     "apps/saroh.app/app/[domain]/account/receipts/[invoiceId]/page.tsx",
     "apps/saroh.app/components/provider-handoff.tsx",
     "apps/saroh.app/components/post-view.tsx",
-    "apps/saroh.app/app/[domain]/[slug]/not-found.tsx",
+    // The 404s: a page that isn't on a live site, drawn inside
+    // its chrome, and the root's "no website at this address" on the neutral
+    // SiteTheme defaults (same reasoning as app/error.tsx below). A heading,
+    // a line and ctaClasses() links; no block.
+    "apps/saroh.app/app/[domain]/not-found.tsx",
+    "apps/saroh.app/app/not-found.tsx",
+    "apps/saroh.app/components/site-not-found.tsx",
     "apps/saroh.app/app/[domain]/layout.tsx",
     "apps/saroh.app/app/preview/[token]/layout.tsx",
     // The renderer's template renders (industry templates U14): the same
@@ -272,7 +278,8 @@ for (const root of SEARCH_ROOTS) {
  */
 // Not preceded by a dash either: `--site-font-mono` is the merchant's own
 // mono role (industry templates), and `font-site-mono` its utility.
-const SAROH_FONT_UTILITY_RE = /(?<![\w-])font-(?:sans|display|mono)\b(?![\w-])/g;
+const SAROH_FONT_UTILITY_RE =
+    /(?<![\w-])font-(?:sans|display|mono)\b(?![\w-])/g;
 const SAROH_FONT_LOAD_RE =
     /packages\/ui\/fonts|from\s+["']next\/font(?:\/[\w-]+)?["']/g;
 
