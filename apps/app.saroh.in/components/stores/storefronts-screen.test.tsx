@@ -513,7 +513,7 @@ describe("Delivery", () => {
         expect(text(html)).not.toContain("Your website checkout offers these");
     });
 
-    it("free delivery over is one amount, and says checkout doesn't apply it yet", () => {
+    it("free delivery over is one amount, and says what website orders get (DEC-117)", () => {
         const t = text(
             delivery({
                 selected: {
@@ -524,7 +524,10 @@ describe("Delivery", () => {
             }),
         );
         expect(t).toContain("Free delivery over");
-        expect(t).toContain("checkout doesn't apply it yet");
+        expect(t).toContain(
+            "Website orders at or above this, after any discount code, pay no delivery fee. Empty means always charge.",
+        );
+        expect(t).not.toContain("doesn't apply it yet");
     });
 
     it("keeps the late-after anchor Orders' notice links to", () => {

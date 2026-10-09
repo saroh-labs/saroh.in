@@ -15,11 +15,10 @@ const MONEY_RE = /^\d+(\.\d{1,2})?$/;
  * way (`StoreSettings.freeShippingThreshold` is a single column), so it sits
  * under the ways rather than in a column beside each.
  *
- * Said as it is: it is saved, but nothing reads it yet. The website's
- * checkout adds the Local delivery or Shipping fee whatever the order comes
- * to (`checkout-quote.ts` `feeCents`), and neither the order nor the
- * receipt marks it free. The line says so rather than promise free
- * delivery. Kept, not cut, so a saved amount isn't lost.
+ * The website's checkout applies it (DEC-117): when the bag's subtotal,
+ * less any discount code and before delivery, is at or above it, Local
+ * delivery and Shipping add no fee. A counter's New order still fills in
+ * the flat fee, so the line speaks of website orders only.
  */
 export function FreeOverRow({ store, canEdit, pending, save }: SectionProps) {
     const [threshold, setThreshold] = useState(
@@ -76,7 +75,7 @@ export function FreeOverRow({ store, canEdit, pending, save }: SectionProps) {
             </div>
             <Note id="storefront-free-over-note">
                 {valid
-                    ? "Saved, but checkout doesn't apply it yet: orders still pay the delivery fee."
+                    ? "Website orders at or above this, after any discount code, pay no delivery fee. Empty means always charge."
                     : "A number with up to 2 decimals, or empty."}
             </Note>
         </form>
