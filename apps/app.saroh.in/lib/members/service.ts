@@ -109,9 +109,16 @@ export function revokeInvitation(
  * into, or the failure with its status, which is what tells an API that did
  * not answer from an invitation that is gone (`lib/invitations/outcome.ts`).
  */
-export async function acceptInvitation(
-    token: string,
-): Promise<InvitationAccept<{ storeId: string }>> {
+export async function acceptInvitation(token: string): Promise<
+    InvitationAccept<{
+        storeId: string;
+        /**
+         * The location's business, which the workspace opens on arrival.
+         * Null from an API that doesn't say: the page then goes straight on.
+         */
+        organizationId: string | null;
+    }>
+> {
     let res: Response;
     try {
         res = await apiFetch(
@@ -124,7 +131,16 @@ export async function acceptInvitation(
     const data: unknown = await res.json().catch(() => null);
     const storeId = (data as { storeId?: unknown } | null)?.storeId;
     if (res.ok && typeof storeId === "string") {
-        return { ok: true, data: { storeId } };
+        const organizationId = (data as { organizationId?: unknown })
+            .organizationId;
+        return {
+            ok: true,
+            data: {
+                storeId,
+                organizationId:
+                    typeof organizationId === "string" ? organizationId : null,
+            },
+        };
     }
     return {
         ok: false,

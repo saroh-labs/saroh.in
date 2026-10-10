@@ -274,7 +274,10 @@ export class MembersService {
         }
         if (invite.status === "ACCEPTED") {
             // Idempotent: already accepted by this user.
-            return { storeId: invite.storeId };
+            return {
+                storeId: invite.storeId,
+                organizationId: invite.store.organizationId,
+            };
         }
         if (invite.expiresAt.getTime() < Date.now()) {
             await prisma.storeInvitation.update({
@@ -354,7 +357,12 @@ export class MembersService {
         if (outcome === "gone") {
             throw new NotFoundException("Invitation not found");
         }
-        return { storeId: invite.storeId };
+        // The business too: the workspace opens it, so the person lands in
+        // the business they were invited into, not the one they had open.
+        return {
+            storeId: invite.storeId,
+            organizationId: invite.store.organizationId,
+        };
     }
 
     /**
