@@ -109,7 +109,11 @@ sends the merchant to another page to finish. Where the value belongs to
 another screen, that screen's own sheet opens here: Contact and social
 (DEC-125) opens the business's phone, email and social links sheets
 (`BusinessFieldSheet`, `SocialLinksSheet`) in place, so there is one
-implementation of each. A sheet built to be opened elsewhere takes only
+implementation of each, and its Address sheet edits each visited
+location's address inside the open sheet with the location's own fields
+(`LocationAddressFields`) and save. A sheet that only lists things with
+their own Edits ends in one Done (`doneOnly`), never a Save with nothing
+to save. A sheet built to be opened elsewhere takes only
 what it needs (the saved value, `returnTo`, `onSaved`), not the page's
 state.
 

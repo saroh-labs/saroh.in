@@ -433,8 +433,8 @@ nobody was told. Round-2 A14 closed it (`bookings/booking-notify.handler.ts`).
   unpublished or deleted, trackers saved or switched by Saroh, the business
   logo set or removed (it is the icon of a site with none of its own,
   DEC-121), how the business is reached (its phone, contact email, social
-  links, the registered address or its choice, and a location's name,
-  address, hours or kind: the footer reads them live, DEC-125; cause
+  links, the registered address, its choice or its map link, and a
+  location's name, address, map link, hours or kind: the footer reads them live, DEC-125; cause
   `contact`, `enqueueBusinessSitesRevalidation`), and the catalogue. **Stock is heard at its locks:** every flow that changes a
   stock row or how a product counts takes `lockStockLevels`, `lockProduct`
   or `lockProducts` (`products/stock-levels.ts`, the lock order), and those
