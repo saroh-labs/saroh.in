@@ -614,3 +614,123 @@ describe("a way's Edit sheet", () => {
         expect(chip("8 h")?.getAttribute("data-state")).toBe("on");
     });
 });
+
+describe("the tax rate, read first (Payments)", () => {
+    const taxed: StorefrontSettings = {
+        ...online,
+        taxEnabled: true,
+        taxRate: "18.00",
+    };
+    const drawTaxed = (
+        over: Partial<StorefrontSettings> = {},
+        canEdit = true,
+    ) => {
+        address.section = "payments";
+        act(() =>
+            root.render(
+                <StorefrontsScreen
+                    businessName="Rye & Co."
+                    storefronts={[
+                        {
+                            id: taxed.id,
+                            name: taxed.name,
+                            orderCount: 0,
+                            kind: "ONLINE",
+                            paused: false,
+                        },
+                    ]}
+                    selected={{ ...taxed, ...over }}
+                    canCreate
+                    canEdit={canEdit}
+                    canClose
+                />,
+            ),
+        );
+    };
+    const says = () =>
+        host.querySelector('[data-testid="tax-rate-summary"]')?.textContent;
+    const edit = () =>
+        host.querySelector<HTMLButtonElement>('[aria-label="Edit tax rate"]');
+    const rate = () =>
+        document.querySelector<HTMLInputElement>("#storefront-tax-rate");
+
+    it("is a row that says the saved rate, with no open field", () => {
+        drawTaxed();
+        expect(says()).toBe("18% of each order's items, before delivery");
+        expect(rate()).toBeNull();
+        expect(sheet()).toBeNull();
+    });
+
+    it("has no row while tax is off", () => {
+        drawTaxed({ taxEnabled: false });
+        expect(says()).toBeUndefined();
+        expect(edit()).toBeNull();
+    });
+
+    it("a read-only role sees the row without Edit", () => {
+        drawTaxed({}, false);
+        expect(says()).toBe("18% of each order's items, before delivery");
+        expect(edit()).toBeNull();
+    });
+
+    it("Edit opens the Tax rate sheet on the saved rate; Save sends it and closes", async () => {
+        update.mockImplementation((_id: string, input: object) =>
+            Promise.resolve({
+                ok: true,
+                data: { ...taxed, ...input, taxRate: "12.50" },
+            }),
+        );
+        drawTaxed();
+        await press(edit());
+        expect(sheetName()).toBe("Tax rate");
+        expect(rate()?.value).toBe("18");
+        expect(sheet()?.textContent).toContain(
+            "A percentage of the order's items, before delivery.",
+        );
+        type(rate(), "12.5");
+        expect(update).not.toHaveBeenCalled();
+        await press(item("Save"));
+        expect(update).toHaveBeenCalledTimes(1);
+        expect(update).toHaveBeenCalledWith(taxed.id, { taxRate: "12.5" });
+        expect(showSuccess).toHaveBeenCalledWith("Tax rate set to 12.5%");
+        expect(sheet()).toBeNull();
+        expect(says()).toBe("12.5% of each order's items, before delivery");
+    });
+
+    it("a rate out of bounds is said in place and not sent", async () => {
+        drawTaxed();
+        await press(edit());
+        type(rate(), "140");
+        expect(sheet()?.textContent).toContain(
+            "A percentage from 0 to 100, with up to 2 decimals.",
+        );
+        expect(rate()?.getAttribute("aria-invalid")).toBe("true");
+        await press(item("Save"));
+        expect(update).not.toHaveBeenCalled();
+        expect(sheetName()).toBe("Tax rate");
+    });
+
+    it("Cancel drops what was typed and returns to the row's Edit", async () => {
+        drawTaxed();
+        await press(edit());
+        type(rate(), "5");
+        await press(item("Cancel"));
+        expect(update).not.toHaveBeenCalled();
+        expect(sheet()).toBeNull();
+        expect(says()).toBe("18% of each order's items, before delivery");
+        expect(document.activeElement).toBe(edit());
+        await press(edit());
+        expect(rate()?.value).toBe("18");
+    });
+
+    it("a refusal keeps the sheet open with what was typed", async () => {
+        update.mockResolvedValue({ ok: false, error: "Could not save that." });
+        drawTaxed();
+        await press(edit());
+        type(rate(), "5");
+        await press(item("Save"));
+        expect(showError).toHaveBeenCalledWith("Could not save that.");
+        expect(sheetName()).toBe("Tax rate");
+        expect(rate()?.value).toBe("5");
+    });
+});
