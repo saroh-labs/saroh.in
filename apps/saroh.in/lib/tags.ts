@@ -7,6 +7,12 @@ import {
 } from "@/lib/consent";
 import type { TagConfig } from "@/lib/ga";
 import { hasAdTags } from "@/lib/ga";
+import {
+    cleanUrl,
+    guardHistory,
+    resetAddress,
+    takeAddress,
+} from "@/lib/page-address";
 import { isTeamBrowser } from "@/lib/team-browser";
 
 /**
@@ -32,6 +38,14 @@ import { isTeamBrowser } from "@/lib/team-browser";
  * - **No personal data.** No email, phone, name or anything typed is given
  *   to either: no enhanced conversions, no advanced matching, and the
  *   Pixel's automatic reading of the page (buttons, page metadata) is off.
+ * - **The address is cut back first.** Both tags report the page's address.
+ *   Before a tag's script is added, the address itself is cut to the
+ *   allow-list in `lib/page-address.ts` (no `ref`, `invite`, `email`,
+ *   `token`, `next` or anything unlisted), and every later address is cut
+ *   as it is set, so no tag ever has the whole one to read. The Pixel takes
+ *   no address from us and reads the page's, which is why the page's own is
+ *   what is cut. Each event sent to Google also names the cut address
+ *   (`page_location`).
  */
 type Fbq = ((...args: unknown[]) => void) & {
     callMethod?: (...args: unknown[]) => void;
@@ -225,6 +239,12 @@ export function syncTags(
     state.config = config;
     state.analytics = allowed.analytics && Boolean(config.gaId);
     state.ads = allowed.ads && hasAdTags(config);
+    // Before any script is added or any call queued: nothing a tag reads
+    // from the address, now or after a page change, is about someone else.
+    if (state.analytics || state.ads) {
+        takeAddress(win);
+        guardHistory(win);
+    }
     syncGoogle(win, doc);
     syncMeta(win, doc);
     if (!state.analytics) clearAnalyticsCookies(doc, win.location.hostname);
@@ -298,6 +318,7 @@ export function fireConversion(
     if (state.google && adsId && label && win.gtag) {
         win.gtag("event", "conversion", {
             send_to: `${adsId}/${label}`,
+            page_location: cleanUrl(win.location.href),
             ...(id ? { transaction_id: id } : {}),
             ...(onSent ? { event_callback: onSent } : {}),
         });
@@ -318,6 +339,7 @@ export function resetTags(
     doc: Document = document,
 ): void {
     state = fresh();
+    resetAddress(win);
     doc.querySelectorAll(`script[${MARK}]`).forEach((s) => s.remove());
     delete win.gtag;
     delete win.dataLayer;

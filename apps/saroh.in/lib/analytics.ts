@@ -1,4 +1,5 @@
 import type { LaunchMode, PlanId } from "@/lib/links";
+import { cleanUrl } from "@/lib/page-address";
 import { analyticsDestination } from "@/lib/tags";
 
 /**
@@ -50,5 +51,9 @@ export function track<E extends keyof AnalyticsEvents>(
             ([, v]) => v !== undefined,
         ),
     );
-    window.gtag("event", name, { ...clean, send_to: to });
+    window.gtag("event", name, {
+        ...clean,
+        send_to: to,
+        page_location: cleanUrl(window.location.href),
+    });
 }

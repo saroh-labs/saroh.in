@@ -76,6 +76,7 @@ describe("PricingPlans", () => {
             control: "yearly",
             value: true,
             send_to: "G-TEST123",
+            page_location: expect.any(String) as unknown,
         });
         // The arrow keys move back to Monthly.
         fireEvent.keyDown(yearly, { key: "ArrowLeft" });
@@ -103,6 +104,7 @@ describe("PricingPlans", () => {
             control: "gst",
             value: true,
             send_to: "G-TEST123",
+            page_location: expect.any(String) as unknown,
         });
     });
 

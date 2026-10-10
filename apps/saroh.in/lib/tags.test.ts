@@ -30,6 +30,8 @@ const ALL: TagConfig = {
     pixelId: PIXEL,
 };
 const BOTH = { analytics: true, ads: true };
+/** The page every test is on, as a tag may be told it. */
+const PAGE = `${window.location.origin}/`;
 
 const scripts = () =>
     Array.from(document.querySelectorAll("script")).map((s) => s.src);
@@ -282,7 +284,11 @@ describe("fireConversion", () => {
             meta: true,
         });
         expect(layer().slice(before.google)).toEqual([
-            ["event", "conversion", { send_to: `${ADS}/waitLabel` }],
+            [
+                "event",
+                "conversion",
+                { send_to: `${ADS}/waitLabel`, page_location: PAGE },
+            ],
         ]);
         expect(pixelCalls().slice(before.meta)).toEqual([["track", "Lead"]]);
     });
@@ -297,6 +303,7 @@ describe("fireConversion", () => {
                 "conversion",
                 {
                     send_to: `${ADS}/signLabel`,
+                    page_location: PAGE,
                     transaction_id: "1760000000000",
                 },
             ],
@@ -379,7 +386,7 @@ describe("track: Google Analytics events", () => {
         expect(layer().at(-1)).toEqual([
             "event",
             "pricing_toggle",
-            { control: "gst", value: true, send_to: GA },
+            { control: "gst", value: true, send_to: GA, page_location: PAGE },
         ]);
     });
 

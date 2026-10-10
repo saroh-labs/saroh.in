@@ -126,13 +126,68 @@ describe("the waitlist_joined ad conversion (DEC-127)", () => {
         await screen.findByText("Glow Studio is #7 on the list.");
 
         expect(adConversions()).toEqual([
-            ["event", "conversion", { send_to: "AW-123456789/waitLabel" }],
+            [
+                "event",
+                "conversion",
+                {
+                    send_to: "AW-123456789/waitLabel",
+                    page_location: `${window.location.origin}/waitlist?plan=grow&src=pricing`,
+                },
+            ],
         ]);
         expect(pixelEvents().slice(1)).toEqual([["track", "Lead"]]);
         const sent = JSON.stringify([adConversions(), window.fbq?.queue]);
         expect(sent).not.toContain("you@glowstudio.in");
         expect(sent).not.toContain("Glow Studio");
         expect(sent).not.toContain("Pune");
+    });
+
+    it("still records the referral after the address is cut for the tags, and no tag gets it", async () => {
+        // Arrived by a referral link, having accepted every cookie: the
+        // tags load first and cut `ref` from the address (`lib/page-address.ts`).
+        resetTags();
+        window.history.replaceState(
+            null,
+            "",
+            "/waitlist?plan=grow&src=referral&ref=hjkmnpqr&utm_source=instagram",
+        );
+        expect(window.location.search).toContain("ref=hjkmnpqr");
+        syncTags(ADVERTISING, BOTH);
+        window.gtag = gtag;
+        expect(window.location.search).toBe(
+            "?plan=grow&src=referral&utm_source=instagram",
+        );
+        answer({ ...joined, ref: "abcdefgh" });
+        render(<WaitlistForm content={WAITLIST} templates={TEMPLATES} />);
+        fill();
+        await submit();
+        await screen.findByText("Glow Studio is #7 on the list.");
+
+        // The API is told who referred them, as before.
+        const body = JSON.parse(
+            (fetchMock.mock.calls[0]?.[1] as RequestInit).body as string,
+        ) as Record<string, unknown>;
+        expect(body).toMatchObject({
+            ref: "hjkmnpqr",
+            plan: "grow",
+            src: "referral",
+        });
+        // Analytics hears that a referral was used, never whose.
+        expect(gtag).toHaveBeenCalledWith(
+            "event",
+            "waitlist_join",
+            expect.objectContaining({ ref: true }),
+        );
+        expect(adConversions()).toHaveLength(1);
+        const handed = JSON.stringify([
+            gtag.mock.calls,
+            window.dataLayer?.map((e) => Array.from(e as ArrayLike<unknown>)),
+            window.fbq?.queue,
+            Array.from(document.querySelectorAll("script")).map((s) => s.src),
+            window.location.href,
+        ]);
+        expect(handed).not.toContain("hjkmnpqr");
+        expect(handed).toContain("utm_source=instagram");
     });
 
     it("sends none when advertising cookies weren't accepted", async () => {
@@ -286,6 +341,7 @@ describe("WaitlistForm", () => {
             plan: "grow",
             ref: true,
             send_to: GA,
+            page_location: `${window.location.origin}/waitlist?plan=grow&src=pricing`,
         });
         const sent = JSON.stringify(gtag.mock.calls);
         expect(sent).not.toContain("you@glowstudio.in");

@@ -203,6 +203,7 @@ describe("forwardWelcome", () => {
                 "conversion",
                 {
                     send_to: "AW-123456789/signLabel",
+                    page_location: `${window.location.origin}/welcome`,
                     transaction_id: String(NOW),
                     event_callback: expect.any(Function) as unknown,
                 },

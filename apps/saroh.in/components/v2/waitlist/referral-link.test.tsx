@@ -53,6 +53,7 @@ describe("ReferralLink", () => {
         expect(screen.getByRole("button", { name: "Copied" })).toBeTruthy();
         expect(gtag).toHaveBeenCalledWith("event", "referral_copy", {
             send_to: "G-TEST123",
+            page_location: expect.any(String) as unknown,
         });
     });
 

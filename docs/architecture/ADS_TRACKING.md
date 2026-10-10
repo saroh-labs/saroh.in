@@ -28,6 +28,47 @@ both stay off: the code passes neither, and the two account settings below
 must stay off too. A sign-up's conversion carries one number, the time it
 was sent, so a reload doesn't count it twice.
 
+## What a tag sees of the page's address
+
+Both tags report the address of the page they are on, and an address can
+carry something about somebody else: `?ref=` is another entrant's referral
+id. So before a tag loads, the address is cut back to one allow-list
+(`apps/saroh.in/lib/page-address.ts`), for Google Analytics, Google Ads and
+Meta alike.
+
+| Stays                                                          | Cut                                                                            |
+| -------------------------------------------------------------- | ------------------------------------------------------------------------------ |
+| `plan`, `src`, `template` (the page's own choices)             | `ref`, `invite`, `email`, `token`, `next`                                      |
+| `utm_…`, `gclid`, `gbraid`, `wbraid`, `fbclid` (campaign data) | anything else, a parameter nobody has listed included (`site`, `url`, `at`, …) |
+|                                                                | a listed parameter whose value holds an `@`                                    |
+
+- **It is the address itself that is cut**, in the browser's address bar
+  (`history.replaceState`), before either tag's script is added to the page.
+  The Pixel takes no address from the site: it reads the page's. Cutting the
+  page's own address is the one way that holds for both tags and for
+  everything they send, so that is what is done, not a cleaned copy handed
+  to each tag.
+- **Every later address is cut as it is set** (a link followed inside the
+  site, a tool writing its state into the address), before a tag listening
+  for page changes can read it.
+- **Each event saroh.in sends to Google also names the cut address**
+  (`page_location`). It is not put on the tag's `config`: there it could
+  hold for Google Analytics' own page views on later pages and report the
+  first page for all of them.
+- **The page reads first.** What is cut is kept for the tab, by page, and a
+  page reads its query through `readAddress()`, never `location.search`. So
+  the waitlist still records who referred someone, and "Report this
+  business" still fills the site in.
+- Only where a tag may load: with nothing accepted, in the team's browser
+  or off production, the address is left as it is.
+
+One thing a visitor can notice: once they have accepted cookies, the
+address bar no longer shows what was cut. The link preview tool's
+`?url=…` goes from the address bar that way (its "Copy link" still gives
+the full link, and a shared link still opens the report); reloading the
+page then opens the tool empty. Add a parameter to the allow-list only if
+it is never about a person or a business.
+
 ## Who is never tagged
 
 - **Anyone who hasn't accepted.** No tag is loaded and no request goes to
@@ -145,6 +186,7 @@ passing through `/welcome`.
 | The ids, production only                                | `apps/saroh.in/lib/ga.ts`, `lib/site-tag-config.ts`, `env.ts`        |
 | The visitor's two answers, the privacy signals, cookies | `apps/saroh.in/lib/consent.ts`                                       |
 | Loading and stopping the tags; sending a conversion     | `apps/saroh.in/lib/tags.ts`                                          |
+| What a tag may see of the address                       | `apps/saroh.in/lib/page-address.ts`                                  |
 | The cookie notice                                       | `apps/saroh.in/app/site-tags.tsx`                                    |
 | The waitlist conversion                                 | `apps/saroh.in/components/v2/waitlist/waitlist-form.tsx`             |
 | The sign-up hand-off                                    | `apps/saroh.in/lib/welcome.ts`, `lib/welcome-forward.ts`, `/welcome` |

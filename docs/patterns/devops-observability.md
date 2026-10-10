@@ -131,6 +131,12 @@ Analytics. What is sent and how to switch it on:
 - **Only the fact.** Never an email, a phone number, a name or anything a
   visitor typed, hashed or not: no enhanced conversions, no advanced
   matching.
+- **A page reads its query through `readAddress()`**
+  (`lib/page-address.ts`), never `location.search`: before a tag loads the
+  address is cut back to one allow-list, so no tag reads a referral id, an
+  invitation, an email or a token from it. A new parameter is cut unless it
+  is added to that list, and only campaign data or the page's own choice
+  belongs there.
 - **Nowhere else.** No ad tag, ad id or ad host in the workspace, the
   console, accounts, `apps/saroh.app` or `packages/site-blocks`:
   `pnpm run check:merchant-site-tracking` fails the gate. A merchant's own

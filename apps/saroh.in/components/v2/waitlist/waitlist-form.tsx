@@ -8,6 +8,7 @@ import type { WaitlistContent } from "@/content/waitlist";
 import { NO_OFFER, WAITLIST_CONTACT, WAITLIST_KINDS } from "@/content/waitlist";
 import { track } from "@/lib/analytics";
 import { cn } from "@/lib/cn";
+import { readAddress } from "@/lib/page-address";
 import { fireConversion } from "@/lib/tags";
 import type {
     WaitlistResponse,
@@ -77,13 +78,13 @@ export function WaitlistForm({
     // for every address ("" on the server).
     const search = useSyncExternalStore(
         noSubscription,
-        () => window.location.search,
+        () => readAddress(),
         () => "",
     );
     const slugs = templates.map((t) => t.slug);
     const fromAddress = () =>
         waitlistContext(
-            Object.fromEntries(new URLSearchParams(window.location.search)),
+            Object.fromEntries(new URLSearchParams(readAddress())),
             slugs,
         );
     const savedSlug = waitlistContext(
