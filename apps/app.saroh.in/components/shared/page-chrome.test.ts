@@ -96,7 +96,12 @@ function loaderFor(dir: string): string | null {
 function loaderWidth(source: string): string | null {
     if (source.includes("<SettingsLoading")) return "settings";
     if (source.includes("<ArrivalLoading")) return "arrival";
-    return /<PageLoading[^>]*?\bwidth="(\w+)"/.exec(source)?.[1] ?? null;
+    // The shell's own loader is `PageLoading` named for the address.
+    return (
+        /<(?:PageLoading|ShellLoading)[^>]*?\bwidth="(\w+)"/.exec(
+            source,
+        )?.[1] ?? null
+    );
 }
 
 const pages = walk(SHELL)
@@ -121,7 +126,8 @@ describe("every page under the shell has a loader of its own width", () => {
 
         const loader = loaderFor(page.dir);
         if (!loader) throw new Error(`${name} has no loading.tsx`);
-        // Home's loader is Home's: nothing else may fall back to it.
+        // The shell's loader is shown first on every move between
+        // sections, named for the address; no page may have only that.
         if (name !== ".") {
             expect(
                 path.dirname(loader),
@@ -147,7 +153,7 @@ describe("every page under the shell has a loader of its own width", () => {
             .filter((f) => !own.has(f))
             .filter(
                 (f) =>
-                    !/<(PageLoading|SettingsLoading|ArrivalLoading)\b/.test(
+                    !/<(PageLoading|ShellLoading|SettingsLoading|ArrivalLoading)\b/.test(
                         readFileSync(path.join(APP, f), "utf8"),
                     ),
             );
