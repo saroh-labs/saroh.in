@@ -18,7 +18,9 @@ export const config = {
     // Files served from `public/` skip the gate: `next/image` fetches them
     // without the visitor's cookies, and a redirect to sign-in there is a
     // broken image (the template thumbnails, `middleware.test.ts`).
+    // The web app manifest too: a browser fetches it without cookies, and
+    // a redirect to sign-in there means the app can't be installed.
     matcher: [
-        "/((?!_next/static|_next/image|favicon.ico|.*\\.(?:png|jpe?g|gif|webp|avif|svg|ico)$).*)",
+        "/((?!_next/static|_next/image|favicon.ico|manifest.webmanifest|.*\\.(?:png|jpe?g|gif|webp|avif|svg|ico)$).*)",
     ],
 };

@@ -116,7 +116,7 @@ describe("ConfirmDialog", () => {
             button("Delete page").click();
             await Promise.resolve();
         });
-        expect(button("Deleting…").disabled).toBe(true);
+        expect(button("Deleting…").getAttribute("aria-busy")).toBe("true");
         expect(button("Keep page").disabled).toBe(true);
         // A second press can't run it twice.
         act(() => button("Deleting…").click());

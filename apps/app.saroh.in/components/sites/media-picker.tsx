@@ -413,15 +413,16 @@ export function MediaPicker({
                     type="button"
                     variant="outline"
                     size="sm"
-                    disabled={busy}
+                    busy={busy}
+                    busyLabel={
+                        progress === null
+                            ? "Uploading…"
+                            : `Uploading ${progress}%`
+                    }
                     onClick={() => inputRef.current?.click()}
                 >
                     <ImagePlus className="mr-1.5 size-3.5" />
-                    {busy
-                        ? progress === null
-                            ? "Working…"
-                            : `Uploading ${progress}%`
-                        : label}
+                    {label}
                 </Button>
                 <span className="text-xs text-muted-foreground">
                     or drop one here

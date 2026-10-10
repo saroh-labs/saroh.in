@@ -1,3 +1,4 @@
+import { moneyDecimals, moneySign } from "@saroh/ui/lib/money";
 import { NUMBER_LOCALE } from "./locale";
 
 /**
@@ -35,10 +36,12 @@ function amountWords(
     currency: string | null | undefined,
     options: MoneyOptions | undefined,
 ): string {
+    // As many places as the currency has: two for rupees, none for yen.
+    const places = currency ? moneyDecimals(currency) : 2;
     const digits =
         options?.decimals === "always"
-            ? { minimumFractionDigits: 2, maximumFractionDigits: 2 }
-            : { maximumFractionDigits: major % 1 === 0 ? 0 : 2 };
+            ? { minimumFractionDigits: places, maximumFractionDigits: places }
+            : { maximumFractionDigits: major % 1 === 0 ? 0 : places };
     return new Intl.NumberFormat(NUMBER_LOCALE, {
         ...(currency ? { style: "currency" as const, currency } : {}),
         ...digits,
@@ -117,18 +120,8 @@ export function formatCompact(value: number): string {
     }).format(value);
 }
 
-/** The sign a currency is written with ("₹" for INR), for a field's prefix. */
-export function currencySymbol(currency: string): string {
-    try {
-        const part = new Intl.NumberFormat(NUMBER_LOCALE, {
-            style: "currency",
-            currency,
-            currencyDisplay: "narrowSymbol",
-        })
-            .formatToParts(0)
-            .find((p) => p.type === "currency");
-        return part?.value ?? currency;
-    } catch {
-        return currency;
-    }
-}
+/**
+ * The sign a currency is written with ("₹" for INR), and how many decimal
+ * places it has: `@saroh/ui`'s, the same ones `MoneyInput` shows and keeps.
+ */
+export { moneyDecimals, moneySign };

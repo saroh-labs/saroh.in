@@ -10,6 +10,7 @@ import type { ChangeFulfilmentInput } from "@/lib/orders/kitchen-service";
 import { HOLD_MS } from "@/lib/orders/lifecycle";
 import type { OrderRead } from "@/lib/orders/read";
 
+import { runAction } from "@/lib/api/run-action";
 import type { CancelChoice } from "./cancel-panel";
 import type { Panel, PendingHold } from "./use-kitchen";
 
@@ -47,10 +48,13 @@ export function useOrderChanges({
 
     const saveFulfilment = (input: ChangeFulfilmentInput, label: string) => {
         startTransition(async () => {
-            const res = await changeFulfilment(order.id, {
-                ...input,
-                idempotencyKey: crypto.randomUUID(),
-            });
+            const res = await runAction(() =>
+                changeFulfilment(order.id, {
+                    ...input,
+                    idempotencyKey: crypto.randomUUID(),
+                }),
+            );
+            if (!res) return;
             if (!res.ok) {
                 showError(res.error);
                 return;
@@ -116,12 +120,19 @@ export function useOrderChanges({
             run: () =>
                 new Promise<void>((resolve) => {
                     startTransition(async () => {
-                        const res = await cancelOrder(order.id, {
-                            reason: choice.reason,
-                            idempotencyKey: key,
-                            tell: choice.tell,
-                        });
+                        const res = await runAction(() =>
+                            cancelOrder(order.id, {
+                                reason: choice.reason,
+                                idempotencyKey: key,
+                                tell: choice.tell,
+                            }),
+                        );
                         resolve();
+                        if (!res) {
+                            // The reply may have been lost after it went.
+                            router.refresh();
+                            return;
+                        }
                         if (!res.ok) {
                             showError(res.error);
                             router.refresh();

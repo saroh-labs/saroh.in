@@ -62,7 +62,7 @@ export function QrButton({
             data-qr-button={link.mode}
             className={cn(
                 "shrink-0",
-                compact === "always" && "size-8 coarse:size-11",
+                compact === "always" && "size-8",
                 compact === "phone" && "max-sm:px-2.5",
                 className,
             )}

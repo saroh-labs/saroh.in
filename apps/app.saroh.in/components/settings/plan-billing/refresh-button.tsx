@@ -13,10 +13,11 @@ export function RefreshButton({ label = "Try again" }: { label?: string }) {
             type="button"
             variant="outline"
             size="sm"
-            disabled={pending}
             onClick={() => start(() => router.refresh())}
+            busy={pending}
+            busyLabel="Trying again…"
         >
-            {pending ? "Trying again…" : label}
+            {label}
         </Button>
     );
 }

@@ -133,14 +133,12 @@ export function LogoUpload({
                         type="button"
                         variant="outline"
                         size="sm"
-                        disabled={busy || disabled}
+                        disabled={disabled}
                         onClick={() => inputRef.current?.click()}
+                        busy={busy}
+                        busyLabel="Uploading…"
                     >
-                        {busy
-                            ? "Uploading…"
-                            : value
-                              ? "Replace"
-                              : "Upload logo"}
+                        {value ? "Replace" : "Upload logo"}
                     </Button>
                     {value ? (
                         <Button

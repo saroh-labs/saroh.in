@@ -48,13 +48,57 @@ export interface ToastAction {
  * worse than none.
  */
 export function showError(message: string, description?: string) {
+    const way =
+        errorActions.get(message) ?? errorActions.get(description ?? "");
     toast.error(message, {
         description,
         duration: Number.POSITIVE_INFINITY,
         closeButton: true,
+        ...(way
+            ? {
+                  // One toast for it however many saves say it: the id
+                  // makes a second one replace the first.
+                  id: way.id,
+                  action: {
+                      label: way.label,
+                      onClick: (event: { preventDefault(): void }) => {
+                          // It stays: the way out may be needed twice.
+                          event.preventDefault();
+                          way.onClick();
+                      },
+                  },
+              }
+            : {}),
     });
 }
 
+interface ErrorAction {
+    id: string;
+    label: string;
+    onClick: () => void;
+}
+
+const errorActions = new Map<string, ErrorAction>();
+
+/**
+ * Give one error sentence its way out, wherever it is shown from.
+ *
+ * Some failures have one thing to do about them, and the sentence is said
+ * by hundreds of call sites that only know `showError(res.error)`: a save
+ * sent after the session ended says "You've been signed out…" and needs a
+ * "Sign in" button. Registering the sentence here puts the button on every
+ * one of them, and keeps it to one toast on screen. An app registers on
+ * mount and calls the returned function to take it back.
+ */
+export function setErrorAction(
+    sentence: string,
+    action: { label: string; onClick: () => void },
+): () => void {
+    errorActions.set(sentence, { id: `error-action:${sentence}`, ...action });
+    return () => {
+        errorActions.delete(sentence);
+    };
+}
 /** How long anything can be undone: ten seconds, everywhere. */
 export const UNDO_MS = 10_000;
 

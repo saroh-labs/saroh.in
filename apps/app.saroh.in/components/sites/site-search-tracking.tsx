@@ -25,6 +25,7 @@ import { TrackerSetupDialog } from "@/components/sites/search-tracking/tracker-s
 import { VerificationCodes } from "@/components/sites/search-tracking/verification-codes";
 import { VerificationField } from "@/components/sites/search-tracking/verification-field";
 import { VerifyAddress } from "@/components/sites/search-tracking/verify-address";
+import { runAction } from "@/lib/api/run-action";
 import { saveSearchTracking } from "@/lib/sites/actions";
 import type {
     SearchTrackingRead,
@@ -138,7 +139,8 @@ function Editable({
     /** A toggle or a removal: no field to put a refusal under. */
     function act(input: Parameters<SaveSection>[0], said: string) {
         startTransition(async () => {
-            const res = await save(input);
+            const res = await runAction(() => save(input));
+            if (!res) return;
             if (res.ok) showSuccess(said);
             else if (res.field) showError(res.error);
         });

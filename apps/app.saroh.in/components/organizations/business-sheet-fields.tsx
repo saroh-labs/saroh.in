@@ -16,13 +16,13 @@ import { BusinessKindField } from "@/components/organizations/business-kind-fiel
 import { BusinessTaxFields } from "@/components/organizations/business-tax-fields";
 import { fieldWidth } from "@/components/organizations/registered-address-fields";
 import { TimeZoneSelect } from "@/components/organizations/time-zone-select";
-import { OptionSelect } from "@/components/shared/option-select";
 import { PHONE_EXAMPLE } from "@/lib/organizations/business-phone";
 import type { BusinessSheet } from "@/lib/organizations/business-rows";
 import { nameLabelOf } from "@/lib/organizations/business-sheet-words";
 import { BUSINESS_TYPE_OPTIONS } from "@/lib/organizations/business-types";
 import { kindWords } from "@/lib/organizations/kind";
 import { browserZone } from "@/lib/organizations/time-zones";
+import { OptionSelect } from "@saroh/ui/option-select";
 
 /** One field's wrapper, at the width the design gives it. */
 const at = fieldWidth;

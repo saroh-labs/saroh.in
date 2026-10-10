@@ -1,9 +1,9 @@
 "use client";
 
+import { FieldError } from "@saroh/ui/field";
 import { Input } from "@saroh/ui/input";
 import { Textarea } from "@saroh/ui/textarea";
 
-import { OptionSelect } from "@/components/shared/option-select";
 import type { CategoryNode } from "@/lib/collections/rules";
 import {
     categoryChoices,
@@ -12,6 +12,7 @@ import {
 } from "@/lib/collections/rules";
 import { productSettingsHref } from "@/lib/products/links";
 import { Notice } from "@saroh/ui/notice";
+import { OptionSelect } from "@saroh/ui/option-select";
 import { TextLink } from "@saroh/ui/text-link";
 
 /**
@@ -20,22 +21,7 @@ import { TextLink } from "@saroh/ui/text-link";
  * the sheet's check or the API's — under it.
  */
 
-const LABEL = "block text-[12.5px] font-medium";
-
-export function FieldError({
-    id,
-    children,
-}: {
-    id?: string;
-    children?: string;
-}) {
-    if (!children) return null;
-    return (
-        <p id={id} role="alert" className="text-[12px] text-destructive">
-            {children}
-        </p>
-    );
-}
+const LABEL = "block";
 
 export function NameField({
     value,
@@ -62,7 +48,6 @@ export function NameField({
                 disabled={disabled}
                 aria-invalid={!!error}
                 aria-describedby={error ? "collection-name-error" : undefined}
-                className="h-9 rounded-[8px] text-[13px]"
             />
             <FieldError id="collection-name-error">{error}</FieldError>
         </div>
@@ -96,7 +81,7 @@ export function DescriptionField({
                 disabled={disabled}
                 placeholder="What's in it, in a line."
                 aria-invalid={!!error}
-                className="rounded-[8px] text-[13px] leading-[1.55]"
+                className="leading-[1.55]"
             />
             <FieldError>{error}</FieldError>
         </div>
@@ -141,7 +126,6 @@ export function CategoryField({
                     placeholder="Pick a category"
                     disabled={disabled}
                     aria-invalid={!!error}
-                    className="h-9 rounded-[8px] text-[13px]"
                 />
             )}
             <p className="text-[11.5px] leading-[1.5] text-muted-foreground">

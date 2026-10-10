@@ -1,5 +1,6 @@
 "use client";
 
+import { Input } from "@saroh/ui/input";
 import { cn } from "@saroh/ui/lib/utils";
 import type { ReactNode } from "react";
 
@@ -7,7 +8,7 @@ import type { StockDraft, StockLine } from "@/lib/products/editor-sections";
 import { isCount } from "@/lib/products/editor-sections";
 
 import { Notice } from "@saroh/ui/notice";
-import { boxClass, FieldHelp } from "./fields";
+import { FieldHelp } from "./fields";
 
 /**
  * The Stock section's two ways of counting, after the Editor design: one
@@ -45,7 +46,9 @@ export function WholeStock({
                     >
                         On hand
                     </label>
-                    <input
+                    <Input
+                        dense
+                        aria-invalid={!isCount(draft.quantity) || qtyBad}
                         id="pe-qty"
                         type="number"
                         min={0}
@@ -54,10 +57,6 @@ export function WholeStock({
                         disabled={ro}
                         aria-label="Quantity on hand"
                         onChange={(e) => onChange({ quantity: e.target.value })}
-                        className={boxClass({
-                            small: true,
-                            bad: !isCount(draft.quantity) || qtyBad,
-                        })}
                     />
                 </div>
                 <div className="min-w-[92px] flex-[0_1_112px]">
@@ -67,7 +66,9 @@ export function WholeStock({
                     >
                         Warn at
                     </label>
-                    <input
+                    <Input
+                        dense
+                        aria-invalid={!isCount(draft.lowStockAlert)}
                         id="pe-low"
                         type="number"
                         min={0}
@@ -78,10 +79,6 @@ export function WholeStock({
                             onChange({ lowStockAlert: e.target.value })
                         }
                         aria-label="Warn when on hand reaches"
-                        className={boxClass({
-                            small: true,
-                            bad: !isCount(draft.lowStockAlert),
-                        })}
                     />
                 </div>
                 <div className="min-w-0 flex-[1_1_96px]">
@@ -154,7 +151,12 @@ export function VariantStockTable({
                                 {l.title}
                             </span>
                         </span>
-                        <input
+                        <Input
+                            dense
+                            aria-invalid={
+                                !isCount(l.quantity) ||
+                                Number(l.quantity) < l.promised
+                            }
                             type="number"
                             min={0}
                             inputMode="numeric"
@@ -166,14 +168,10 @@ export function VariantStockTable({
                                     quantity: e.target.value,
                                 })
                             }
-                            className={boxClass({
-                                small: true,
-                                bad:
-                                    !isCount(l.quantity) ||
-                                    Number(l.quantity) < l.promised,
-                            })}
                         />
-                        <input
+                        <Input
+                            dense
+                            aria-invalid={!isCount(l.lowStockAlert)}
                             type="number"
                             min={0}
                             inputMode="numeric"
@@ -185,10 +183,6 @@ export function VariantStockTable({
                                     lowStockAlert: e.target.value,
                                 })
                             }
-                            className={boxClass({
-                                small: true,
-                                bad: !isCount(l.lowStockAlert),
-                            })}
                         />
                         <span className="text-right font-display text-[14px] font-semibold tabular-nums">
                             {l.promised}

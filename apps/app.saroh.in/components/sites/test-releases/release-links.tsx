@@ -5,6 +5,7 @@ import { showError, showSuccess } from "@saroh/ui/toast";
 import { useState } from "react";
 
 import { copyLink, LinkBox } from "@/components/sites/test-releases/link-box";
+import { runAction } from "@/lib/api/run-action";
 import type {
     CreatedTestReleaseLink,
     TestRelease,
@@ -47,9 +48,11 @@ export function ReleaseLinks({
     const active = links.filter((l) => l.state === "active");
 
     async function create() {
-        setBusy("create");
-        const res = await createTestReleaseLink(siteId, release.id, days);
-        setBusy(null);
+        const res = await runAction(
+            () => createTestReleaseLink(siteId, release.id, days),
+            { setBusy: (on) => setBusy(on ? "create" : null) },
+        );
+        if (!res) return;
         if (!res.ok) return showError(res.error);
         setFresh(res.data);
         const copied = res.data.url ? await copyLink(res.data.url) : false;
@@ -58,9 +61,11 @@ export function ReleaseLinks({
     }
 
     async function revoke(linkId: string) {
-        setBusy(linkId);
-        const res = await revokeTestReleaseLink(siteId, linkId);
-        setBusy(null);
+        const res = await runAction(
+            () => revokeTestReleaseLink(siteId, linkId),
+            { setBusy: (on) => setBusy(on ? linkId : null) },
+        );
+        if (!res) return;
         if (!res.ok) return showError(res.error);
         if (fresh?.id === linkId) setFresh(null);
         showSuccess("Link turned off. Anyone opening it now is told so.");
@@ -94,9 +99,9 @@ export function ReleaseLinks({
                             {canShare ? (
                                 <Button
                                     type="button"
-                                    size="sm"
+                                    size="xs"
                                     variant="ghost"
-                                    className="h-7 shrink-0 px-2 text-[12px]"
+                                    className="shrink-0"
                                     disabled={busy !== null}
                                     onClick={() => void revoke(link.id)}
                                 >
@@ -129,8 +134,10 @@ export function ReleaseLinks({
                         variant="outline"
                         disabled={busy !== null}
                         onClick={() => void create()}
+                        busy={busy === "create"}
+                        busyLabel="Making…"
                     >
-                        {busy === "create" ? "Making…" : "New link"}
+                        New link
                     </Button>
                 </div>
             ) : null}

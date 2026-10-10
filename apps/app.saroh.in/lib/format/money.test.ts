@@ -1,11 +1,11 @@
 import { describe, expect, it } from "vitest";
 
 import {
-    currencySymbol,
     formatCompact,
     formatMoney,
     formatMoneyMajor,
     formatNumber,
+    moneySign,
 } from "./money";
 import { count, plural } from "./plural";
 
@@ -76,8 +76,8 @@ describe("numbers", () => {
     });
 
     it("knows a currency's sign", () => {
-        expect(currencySymbol("INR")).toBe("₹");
-        expect(currencySymbol("USD")).toBe("$");
+        expect(moneySign("INR")).toBe("₹");
+        expect(moneySign("USD")).toBe("$");
     });
 });
 

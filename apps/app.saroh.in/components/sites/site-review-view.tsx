@@ -14,6 +14,7 @@ import { useBusinessZone } from "@/components/shared/business-zone";
 import { FailedRead } from "@/components/shared/failed-read";
 import { SectionReview } from "@/components/sites/section-review";
 import { VerdictControls } from "@/components/sites/verdict-controls";
+import { runAction } from "@/lib/api/run-action";
 import { createApproval } from "@/lib/sites/actions";
 import {
     releaseTitle,
@@ -78,9 +79,11 @@ export function SiteReviewView({
         outcome: ReviewerVerdict,
         reason?: string,
     ): Promise<boolean> {
-        setRecording(true);
-        const res = await createApproval(site.id, outcome, undefined, reason);
-        setRecording(false);
+        const res = await runAction(
+            () => createApproval(site.id, outcome, undefined, reason),
+            { setBusy: setRecording },
+        );
+        if (!res) return false;
         if (!res.ok) {
             showError(res.error);
             return false;

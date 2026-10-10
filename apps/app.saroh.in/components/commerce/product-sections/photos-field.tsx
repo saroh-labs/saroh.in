@@ -135,7 +135,6 @@ export function PhotosField({
                                         }
                                         placeholder="What it shows, for people who can't see it"
                                         aria-label={`Description of ${noun} ${i + 1}`}
-                                        className="h-9"
                                     />
                                 </div>
                                 <div className="flex shrink-0 gap-1">
@@ -298,7 +297,7 @@ function IconButton({
                 disabled={disabled}
                 onClick={onClick}
                 className={cn(
-                    "grid size-8 place-items-center rounded-md border border-border focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-40 coarse:size-11 [&_svg]:size-4",
+                    "grid size-8 place-items-center rounded-md border border-border focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:text-disabled-foreground coarse:size-11 [&_svg]:size-4",
                     danger
                         ? "text-destructive hover:bg-destructive-subtle"
                         : "hover:bg-muted",
@@ -379,7 +378,7 @@ function LibraryPanel({
                                             ? `${item.filename}, already on this product`
                                             : `${item.filename}. Add it.`
                                     }
-                                    className="w-full overflow-hidden rounded-md border border-border disabled:opacity-45"
+                                    className="w-full overflow-hidden rounded-md border border-border disabled:text-disabled-foreground"
                                 >
                                     {/* eslint-disable-next-line @next/next/no-img-element -- a tenant's own photos */}
                                     <img
@@ -444,7 +443,7 @@ export function AddressPanel({
                     setCheck("idle");
                 }}
                 placeholder="https://images.example.com/photo.jpg"
-                className="font-mono text-[12px]"
+                className="font-mono"
                 aria-invalid={problem ? true : undefined}
                 aria-describedby={`${id}-url-hint`}
             />
@@ -474,7 +473,7 @@ export function AddressPanel({
                 <Button
                     type="button"
                     size="sm"
-                    disabled={!valid || check === "checking"}
+                    disabled={!valid}
                     onClick={() => {
                         // What's stored is the address rebuilt behind https://,
                         // never the text as typed (release #772).
@@ -488,8 +487,10 @@ export function AddressPanel({
                         img.onerror = () => setCheck("broken");
                         img.src = safe;
                     }}
+                    busy={check === "checking"}
+                    busyLabel="Checking…"
                 >
-                    {check === "checking" ? "Checking…" : "Add photo"}
+                    Add photo
                 </Button>
                 {check === "broken" && safe?.startsWith("https://") ? (
                     <Button

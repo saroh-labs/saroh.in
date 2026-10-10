@@ -103,10 +103,7 @@ export function SubscriptionQuickLook({
             subtitle={`${sub.plan.name} · ${price}`}
             description={`${sub.contact.name}'s subscription: ${sub.plan.name}, ${price}.`}
             footer={
-                <Button
-                    asChild
-                    className="h-[38px] min-w-[160px] flex-1 rounded-[10px] text-[13.5px]"
-                >
+                <Button asChild className="min-w-[160px] flex-1">
                     <Link href={`/billing/subscriptions/${sub.id}`}>
                         Open full details
                     </Link>

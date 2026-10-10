@@ -204,10 +204,41 @@
   and the tables and cards on it are the step up (`--card`). So a table
   container carries `bg-card` itself, not relying on the page behind it
   (`app-shell.tsx`, `data-view.tsx`).
-- **Current** — **Button sizes are 32 / 38 / 45px** (`sm`, `default`, `lg`),
-  set explicitly and weight 600. **Disabled is one treatment for every
-  variant:** the `disabled` surface with an Ink 500 label that still clears
-  4.5:1, never an opacity. Say why a control is disabled, nearby.
+- **Current** — **Button sizes are 28 / 32 / 38 / 45px** (`xs`, `sm`,
+  `default`, `lg`), set explicitly and weight 600, with `icon`, `icon-sm`
+  and `icon-xs` as the same heights square and `inline` (with the `link`
+  variant) for a text action in a line of words. A call site never sets a
+  button's height, radius, type size or padding: pick a size. An icon-only
+  button is `IconButton`, which requires its label.
+- **Current** — **Busy is not disabled.** `Button busy busyLabel="Saving…"`
+  says it is working (`aria-busy`), takes no press and keeps its colour and
+  its width: both labels are laid out in one cell, so nothing beside it
+  moves. One wording per action, the verb's "-ing" form alone ("Saving…",
+  "Adding…", "Making…", "Trying again…"). `disabled` is for "you can't",
+  and a button that only waits on another's action (Cancel while saving)
+  is disabled, not busy.
+- **Current** — **Disabled is one treatment, on tokens of its own:**
+  `--disabled`, `--disabled-foreground` and `--disabled-border`, none of
+  them `muted`, so a disabled button on a muted panel keeps an edge and a
+  disabled value does not read as a placeholder. The label still clears
+  4.5:1. Never `disabled:opacity-*` (ESLint fails it). Say why a control is
+  disabled beside it, or keep it on and explain on submit.
+- **Current** — **A field's states come from the primitive.** `Input`,
+  `Textarea` and the select's box share one hover step, one focus ring
+  (`focus-visible:` only), the disabled tokens, the error look from
+  `aria-invalid`, and a read-only look (a hairline, no fill, the value at
+  full contrast: `readOnly` on a field, `readOnly` on `OptionSelect`).
+  `Input dense` is the 32px field for a table row. Checkbox and radio share
+  one 1.5px edge in `border-input` (3.17:1 on white). `Switch` has a `sm`
+  size. A call site never sets a field's height, radius or type size.
+- **Current** — **No hand-made controls in `app.saroh.in`.** ESLint
+  (`tooling/eslint-config-custom/controls.js`) fails a raw `<button>`,
+  `<input>`, `<select>`, `<textarea>` or `<label>`, `disabled:opacity-*`,
+  and `focus:ring*` / `focus:outline*`. What is still drawn by hand (a row
+  that is a button, a chip, a calendar cell, a file picker, a label that
+  wraps its control) is listed by file in `controls-allowlist.js` with what
+  it is, and `lib/controls-allowlist.test.ts` fails a stale line. Add a
+  line only for a genuinely different control.
 - **Adopted** — **One primary action per screen;** button labels are verb plus
   noun; sentence case everywhere; the product is always "Saroh" (07 §2, §4).
 - **Current** — **One page header: `PageHeader`** (`@saroh/ui/page-header`,
@@ -267,11 +298,19 @@
   Save) calls `useBottomBarInset(ref)` (`lib/hooks/use-bottom-bar-inset.ts`);
   the Toaster adds `--bottom-bar-inset` to its offsets, so a toast never
   covers, and swallows the tap on, the button the merchant reaches for next.
-- **Current** — **Touch targets reach 44px on a touch pointer.** Every `Button`
-  size grows through the `coarse:` variant (`default` and `icon` 40→44px, `sm`
-  32→44px) and keeps its desk height under a mouse; `coarse:` is a pointer
-  media query, not a width. 13 §7 and 14 §5's "40px default" finding predates
-  it. Inputs were not re-checked.
+- **Current** — **Touch targets reach 44px on a touch pointer.** Every
+  primitive carries it through the `coarse:` variant (a pointer media query,
+  not a width) and keeps its desk size under a mouse: every `Button` size,
+  `Input`, the select's box, `Toggle`, menu, select and command items,
+  calendar days and month buttons, the dialog and sheet close, a toast's
+  Undo, cancel and close, and the table's bulk bar. Where growing the box
+  would break a layout (checkbox, radio, switch, a slider's thumb, an
+  inline text button) an unseen area around the control takes the tap.
+  `controls.test.tsx` pins each.
+- **Current** — **A field is 16px on a touch pointer** (`coarse:text-base`
+  on `Input`, `Textarea`, the select's box and the command menu's search),
+  because iOS Safari zooms the page when a smaller field takes focus. A
+  call site never sets a field's type size.
 - **Current** — **A form control on a merchant's site is 16px or more**
   (`text-base` at least). iOS Safari zooms the page when a smaller field
   takes focus, and leaves it zoomed. Each also carries the keyboard and

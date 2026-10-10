@@ -4,6 +4,8 @@ import { showError, showSuccess, showUndo } from "@saroh/ui/toast";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 
+import { runAction } from "@/lib/api/run-action";
+import { UNREACHED } from "@/lib/api/unreached";
 import { replyToReview, setReviewHidden } from "@/lib/product-reviews/actions";
 
 /** The longest reply the API takes. */
@@ -36,7 +38,8 @@ export function useReviewActions() {
         const text = draft.trim();
         if (!text) return;
         startTransition(async () => {
-            const res = await replyToReview(id, text);
+            const res = await runAction(() => replyToReview(id, text));
+            if (!res) return;
             if (!res.ok) {
                 showError("Your reply wasn't posted. Try again.");
                 return;
@@ -50,7 +53,8 @@ export function useReviewActions() {
     function toggleHidden(id: string, status: "PUBLISHED" | "HIDDEN") {
         const hide = status !== "HIDDEN";
         startTransition(async () => {
-            const res = await setReviewHidden(id, hide);
+            const res = await runAction(() => setReviewHidden(id, hide));
+            if (!res) return;
             if (!res.ok) {
                 showError(
                     hide
@@ -64,7 +68,11 @@ export function useReviewActions() {
                 showUndo(
                     "Review hidden from the shop.",
                     async () => {
-                        const back = await setReviewHidden(id, false);
+                        const back = await runAction(
+                            () => setReviewHidden(id, false),
+                            { quiet: true },
+                        );
+                        if (!back) return { ok: false, error: UNREACHED };
                         router.refresh();
                         return back;
                     },

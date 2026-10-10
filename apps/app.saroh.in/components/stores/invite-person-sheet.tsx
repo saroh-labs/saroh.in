@@ -16,9 +16,9 @@ import { useForm } from "react-hook-form";
 import { z } from "zod";
 
 import { FormSheet } from "@/components/shared/form-sheet";
-import { OptionSelect } from "@/components/shared/option-select";
 import { inviteMember } from "@/lib/members/actions";
 import { LOCATION_ROLES, roleLabel } from "@/lib/stores/people";
+import { OptionSelect } from "@saroh/ui/option-select";
 
 const formSchema = z.object({
     email: z

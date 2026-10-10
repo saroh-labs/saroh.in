@@ -2,7 +2,6 @@
 
 import { useEffect, useId, useRef, useState } from "react";
 
-import { OptionSelect } from "@/components/shared/option-select";
 import { SettingsColumns } from "@/components/shared/settings-columns";
 import { useTabParam } from "@/lib/hooks/use-tab-param";
 import type { SettingsSheet } from "@/lib/sites/settings-edit";
@@ -21,6 +20,7 @@ import {
     readinessCount,
     SETTINGS_TAB_PARAM,
 } from "@/lib/sites/settings-page";
+import { OptionSelect } from "@saroh/ui/option-select";
 
 import { SectionList } from "@/components/shared/section-list";
 import { ShareChecklist } from "./share-checklist";

@@ -33,6 +33,7 @@ import {
     pickable,
 } from "@/lib/customer-workspace/merge";
 
+import { UNREACHED } from "@/lib/api/unreached";
 import { Notice } from "@saroh/ui/notice";
 import { AccountBox, Choice } from "./merge-parts";
 import { MergeSearch } from "./merge-search";
@@ -158,7 +159,7 @@ export function MergeDialog({
             mergeBody(preview, hereId, loaded.picks, carry, confirmed),
         ).catch(() => ({
             ok: false as const,
-            error: "Couldn't reach Saroh to merge them. Nothing has changed.",
+            error: UNREACHED,
         }));
         setMerging(false);
         if (!res.ok) return setFailure(res.error);
@@ -221,12 +222,12 @@ export function MergeDialog({
                             {readFailed} Nothing has changed.
                         </span>
                         <Button
+                            size="sm"
                             variant="outline"
                             onClick={() => {
                                 setReadFailed(null);
                                 setAttempt((n) => n + 1);
                             }}
-                            className="h-[30px] rounded-[8px] px-[11px] text-[12.5px] font-semibold coarse:h-11"
                         >
                             Try again
                         </Button>

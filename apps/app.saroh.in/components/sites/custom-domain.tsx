@@ -13,6 +13,7 @@ import { DomainRecords } from "@/components/sites/domain-records";
 import type { SheetControl } from "@/components/sites/settings/settings-sheet";
 import { useSheetControl } from "@/components/sites/settings/settings-sheet";
 import { env } from "@/env";
+import { runAction } from "@/lib/api/run-action";
 import {
     claimDomain,
     listSiteDomains,
@@ -135,9 +136,10 @@ export function CustomDomain({
     }
 
     async function check(domain: SiteDomain) {
-        setBusy(domain.id);
-        const res = await verifyDomain(domain.id);
-        setBusy(null);
+        const res = await runAction(() => verifyDomain(domain.id), {
+            setBusy: (on) => setBusy(on ? domain.id : null),
+        });
+        if (!res) return;
         if (!res.ok) {
             showError(res.error);
             return;
@@ -151,10 +153,11 @@ export function CustomDomain({
     }
 
     async function remove(domain: SiteDomain) {
-        setBusy(domain.id);
-        const res = await removeDomain(domain.id);
-        setBusy(null);
+        const res = await runAction(() => removeDomain(domain.id), {
+            setBusy: (on) => setBusy(on ? domain.id : null),
+        });
         setConfirmRemove(null);
+        if (!res) return;
         if (!res.ok) {
             showError(res.error);
             return;
@@ -235,12 +238,11 @@ export function CustomDomain({
                                         type="button"
                                         size="sm"
                                         variant="outline"
-                                        disabled={busy === domain.id}
                                         onClick={() => void check(domain)}
+                                        busy={busy === domain.id}
+                                        busyLabel="Checking…"
                                     >
-                                        {busy === domain.id
-                                            ? "Checking…"
-                                            : view.checkLabel}
+                                        {view.checkLabel}
                                     </Button>
                                 ) : null}
                                 {confirmRemove === domain.id ? null : (
@@ -308,12 +310,11 @@ export function CustomDomain({
                                         type="button"
                                         size="sm"
                                         variant="destructive"
-                                        disabled={busy === domain.id}
                                         onClick={() => void remove(domain)}
+                                        busy={busy === domain.id}
+                                        busyLabel="Removing…"
                                     >
-                                        {busy === domain.id
-                                            ? "Removing…"
-                                            : `Remove ${domain.hostname}`}
+                                        {`Remove ${domain.hostname}`}
                                     </Button>
                                     <Button
                                         type="button"

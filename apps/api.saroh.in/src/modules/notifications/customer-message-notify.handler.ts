@@ -10,6 +10,7 @@ import {
     CUSTOMER_MESSAGE_NOTIFY_TYPE,
     MESSAGE_NEW_NOTIFICATION_TYPE,
 } from "./customer-message-notify";
+import { noticeOf } from "./notice-target";
 
 export {
     CUSTOMER_MESSAGE_NOTIFY_TYPE,
@@ -120,11 +121,12 @@ export class CustomerMessageNotifyHandler {
             await prisma.notification.create({
                 data: {
                     organizationId: message.organizationId,
-                    type: MESSAGE_NEW_NOTIFICATION_TYPE,
+                    ...noticeOf(MESSAGE_NEW_NOTIFICATION_TYPE, {
+                        contactId,
+                        messageId: message.id,
+                    }),
                     title: `${who} sent you a message`,
                     body: quote,
-                    contactId,
-                    messageId: message.id,
                 },
             });
         } catch (err) {

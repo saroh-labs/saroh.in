@@ -1,8 +1,9 @@
 "use client";
 
-import { OptionSelect } from "@/components/shared/option-select";
 import { plural } from "@/lib/format/plural";
+import { Input } from "@saroh/ui/input";
 import { cn } from "@saroh/ui/lib/utils";
+import { OptionSelect } from "@saroh/ui/option-select";
 import { useId, useState } from "react";
 
 import { putBackOf, refundableQuantity } from "@/lib/orders/lifecycle";
@@ -40,12 +41,7 @@ export interface RefundChoice {
      * line, so nothing comes back to the shelf. Null: the lines decide.
      */
     goodwill: string | null;
-}
-
-const FIELD =
-    "h-8 rounded-lg border border-border bg-card px-[9px] text-[12.5px] font-normal text-foreground coarse:h-11";
-
-/**
+} /**
  * "What are you refunding?" — tick lines; every line refunds the order in
  * full, delivery too. Each line refunds what is left of it. Or type another
  * amount — late, a goodwill gesture — which refunds just that, needs a
@@ -174,6 +170,7 @@ function RefundDraft({
                     <label className="grid gap-1 text-[12px] font-medium">
                         Why
                         <OptionSelect<RefundReason | "">
+                            size="sm"
                             value={reason}
                             onValueChange={setReason}
                             placeholder="Choose a reason"
@@ -182,25 +179,26 @@ function RefundDraft({
                             aria-describedby={
                                 needsWhy ? `${ids}-why-help` : undefined
                             }
-                            className="h-8 w-full min-w-[150px] rounded-lg text-[12.5px] coarse:h-11"
+                            className="w-full min-w-[150px]"
                         />
                     </label>
                     {reason === "other" ? (
                         <label className="grid min-w-0 flex-[1_1_160px] gap-1 text-[12px] font-medium">
-                            Say why
-                            <input
+                            Say why (optional)
+                            <Input
+                                dense
                                 type="text"
                                 value={other}
                                 maxLength={REFUND_REASON_MAX}
                                 onChange={(e) => setOther(e.target.value)}
-                                placeholder="Optional"
-                                className={cn(FOCUS, FIELD, "w-full")}
+                                className="w-full"
                             />
                         </label>
                     ) : null}
                     <label className="grid gap-1 text-[12px] font-medium">
                         Or another amount
-                        <input
+                        <Input
+                            dense
                             type="text"
                             inputMode="decimal"
                             value={typed}
@@ -215,17 +213,14 @@ function RefundDraft({
                                     ? `${ids}-amount-help`
                                     : undefined
                             }
-                            className={cn(
-                                FOCUS,
-                                FIELD,
-                                "w-[110px] tabular-nums",
-                            )}
+                            className="w-[110px] tabular-nums"
                         />
                     </label>
                     {putBackUnits > 0 ? (
                         <label className="grid gap-1 text-[12px] font-medium">
                             Stock
                             <OptionSelect<"back" | "off">
+                                size="sm"
                                 value={stock}
                                 onValueChange={setStock}
                                 options={[
@@ -235,7 +230,7 @@ function RefundDraft({
                                     },
                                     { value: "off", label: "Write off" },
                                 ]}
-                                className="h-8 w-full min-w-[150px] rounded-lg text-[12.5px] coarse:h-11"
+                                className="w-full min-w-[150px]"
                             />
                         </label>
                     ) : null}

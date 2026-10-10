@@ -7,6 +7,7 @@ import {
     resolveVariant,
 } from "@saroh/block-contract";
 import { Button } from "@saroh/ui/button";
+import { Field } from "@saroh/ui/field";
 import { Input } from "@saroh/ui/input";
 import { Textarea } from "@saroh/ui/textarea";
 import { useId } from "react";
@@ -24,7 +25,6 @@ import {
     withCtaAction,
     withCtaLabel,
 } from "./cta-action-fields";
-import { Field } from "./field";
 import { ImageBrief } from "./image-brief";
 import { OptionSwitch } from "./option-switch";
 import type { SectionFieldsProps } from "./props";
@@ -239,7 +239,7 @@ export function PersonFields({
                 </>
             )}
 
-            <Field label="About them">
+            <Field optional label="About them">
                 <Textarea
                     value={c.bio ?? ""}
                     onChange={(e) =>
@@ -247,7 +247,7 @@ export function PersonFields({
                     }
                     rows={4}
                     maxLength={PERSON_BIO_MAX}
-                    placeholder="A few lines in their own words. Optional."
+                    placeholder="A few lines in their own words."
                 />
             </Field>
 

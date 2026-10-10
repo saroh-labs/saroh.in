@@ -1,6 +1,7 @@
 "use client";
 
 import { count } from "@/lib/format/plural";
+import { Button } from "@saroh/ui/button";
 import { EmptyState } from "@saroh/ui/data-state";
 import { cn } from "@saroh/ui/lib/utils";
 import { showError, showUndo } from "@saroh/ui/toast";
@@ -13,8 +14,9 @@ import { addAllergens, removeAllergen } from "@/lib/products/settings-actions";
 
 import { NameDialog } from "@/components/shared/name-dialog";
 import { ReadOnlyNote } from "@/components/shared/read-only-note";
+import { runAction } from "@/lib/api/run-action";
 import { Tip } from "@saroh/ui/tooltip";
-import { bigBtn, rowBtn, smallBtn, TabIntro } from "./product-settings";
+import { TabIntro } from "./product-settings";
 
 const MAX = 30;
 const COMMON = [
@@ -46,7 +48,11 @@ export function AllergensTab({
 
     function run(work: () => Promise<void>) {
         start(async () => {
-            await work();
+            const reached = await runAction(async () => {
+                await work();
+                return true;
+            });
+            if (!reached) return;
             router.refresh();
         });
     }
@@ -72,10 +78,10 @@ export function AllergensTab({
     const addOne = canWrite ? (
         <NameDialog
             trigger={
-                <button type="button" className={bigBtn}>
+                <Button type="button" className="shrink-0">
                     <Plus aria-hidden className="-ml-0.5 mr-1.5 size-3.5" />
                     Add allergen
-                </button>
+                </Button>
             }
             title="Add allergen"
             note="Customers see it as you name it here."
@@ -120,21 +126,28 @@ export function AllergensTab({
                     action={
                         canWrite ? (
                             <div className="flex flex-wrap items-center justify-center gap-2">
-                                <button
+                                <Button
+                                    variant="outline"
+                                    size="sm"
                                     type="button"
                                     disabled={pending}
-                                    className={cn(smallBtn, "h-9 px-3.5")}
                                     onClick={() =>
                                         start(async () => {
-                                            await add(
-                                                COMMON,
-                                                "The common food allergens are on the list.",
+                                            const reached = await runAction(
+                                                async () => {
+                                                    await add(
+                                                        COMMON,
+                                                        "The common food allergens are on the list.",
+                                                    );
+                                                    return true;
+                                                },
                                             );
+                                            if (!reached) return;
                                         })
                                     }
                                 >
                                     Add the common food allergens
-                                </button>
+                                </Button>
                                 {addOne}
                             </div>
                         ) : null
@@ -171,14 +184,15 @@ export function AllergensTab({
                                 </span>
                                 {canWrite ? (
                                     <Tip label={title}>
-                                        <button
+                                        <Button
+                                            variant="outline"
+                                            size="xs"
                                             type="button"
                                             disabled={used > 0 || pending}
                                             aria-label={title}
                                             className={cn(
-                                                rowBtn,
                                                 used === 0 &&
-                                                    "text-destructive",
+                                                    "text-destructive hover:text-destructive",
                                             )}
                                             onClick={() =>
                                                 run(async () => {
@@ -210,7 +224,7 @@ export function AllergensTab({
                                             }
                                         >
                                             Remove
-                                        </button>
+                                        </Button>
                                     </Tip>
                                 ) : null}
                             </li>

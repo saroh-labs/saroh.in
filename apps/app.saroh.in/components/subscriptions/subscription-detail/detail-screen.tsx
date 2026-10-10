@@ -52,9 +52,6 @@ import {
     PlanCard,
 } from "./panels";
 import { useSubscriptionActions } from "./use-subscription-actions";
-
-const BTN = "h-[38px] rounded-[9px] px-4 text-[14px] font-semibold";
-
 interface Action {
     label: string;
     kind: "primary" | "plain" | "danger";
@@ -319,7 +316,6 @@ export function SubscriptionDetail({
                                         disabled={busy}
                                         onClick={a.go}
                                         className={cn(
-                                            BTN,
                                             a.kind === "danger" &&
                                                 "text-destructive-subtle-foreground hover:text-destructive-subtle-foreground",
                                         )}
@@ -368,10 +364,11 @@ export function SubscriptionDetail({
                             part-payment.
                         </span>
                         <Button
+                            size="sm"
                             variant="outline"
                             disabled={busy}
                             onClick={keepCurrentPlan}
-                            className="h-[30px] rounded-[8px] border-border-strong px-[11px] text-[12.5px] font-semibold coarse:h-11"
+                            className="border-border-strong"
                         >
                             Keep current plan
                         </Button>

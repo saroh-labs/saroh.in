@@ -391,7 +391,7 @@ function SitePicker({
             <DropdownMenuTrigger asChild>
                 <Button
                     variant="outline"
-                    className="h-[38px] max-w-[260px] gap-[7px] px-[13px] text-[13px] font-medium text-neutral-600 dark:text-foreground"
+                    className="max-w-[260px] gap-[7px] font-medium text-neutral-600 dark:text-foreground"
                     aria-label={`Website: ${site.name}. Change it.`}
                 >
                     <Globe aria-hidden className="size-4 shrink-0" />

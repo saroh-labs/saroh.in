@@ -22,11 +22,9 @@ import { editHref } from "@/lib/subscriptions/plan-editor";
 import type { Plan, SubscriptionSettings } from "@/lib/subscriptions/service";
 
 import { StatusBadge } from "@/components/shared/status-badge";
+import { runAction } from "@/lib/api/run-action";
 import { AutopayTimingSetting } from "./autopay-timing-setting";
 import { MembersPauseRow } from "./members-pause-row";
-
-const BUTTON = "h-[38px] rounded-[9px] px-4 text-[14px] font-semibold";
-
 const NEW_PLAN_HREF = "/billing/plans/new";
 
 /**
@@ -73,8 +71,11 @@ export function PlansTab({
     function setArchived(plan: Plan, archived: boolean) {
         setBusyId(plan.id);
         start(async () => {
-            const res = await setPlanArchived(plan.id, archived);
+            const res = await runAction(() =>
+                setPlanArchived(plan.id, archived),
+            );
             setBusyId(null);
+            if (!res) return;
             if (!res.ok) {
                 // A plan without memberships refuses Sell again: its notice.
                 reportFailure(res);
@@ -94,7 +95,10 @@ export function PlansTab({
                 archiveToast(plan, archived),
                 () =>
                     start(async () => {
-                        const back = await setPlanArchived(plan.id, !archived);
+                        const back = await runAction(() =>
+                            setPlanArchived(plan.id, !archived),
+                        );
+                        if (!back) return;
                         if (!back.ok) reportFailure(back);
                         router.refresh();
                     }),
@@ -136,7 +140,7 @@ export function PlansTab({
                     Everyone already on a plan keeps what they agreed to.
                 </p>
                 {canWrite && !locked ? (
-                    <Button asChild className={BUTTON}>
+                    <Button asChild>
                         <Link href={NEW_PLAN_HREF}>New plan</Link>
                     </Button>
                 ) : null}
@@ -246,11 +250,7 @@ function PlanCard({
             ))}
             {canWrite ? (
                 <div className="mt-3 flex flex-wrap gap-2">
-                    <Button
-                        asChild
-                        variant="outline"
-                        className={cn(BUTTON, "coarse:h-11")}
-                    >
+                    <Button asChild variant="outline">
                         <Link
                             href={editHref(card.id)}
                             aria-label={`Edit ${card.name}`}
@@ -261,7 +261,6 @@ function PlanCard({
                     {card.canArchive && (sellsAgain || !card.archived) ? (
                         <Button
                             variant="outline"
-                            className={cn(BUTTON, "coarse:h-11")}
                             disabled={busy}
                             onClick={onArchive}
                         >

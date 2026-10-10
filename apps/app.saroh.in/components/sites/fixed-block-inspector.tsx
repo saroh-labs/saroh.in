@@ -2,6 +2,7 @@
 
 import { Badge } from "@saroh/ui/badge";
 import { Button } from "@saroh/ui/button";
+import { IconButton } from "@saroh/ui/icon-button";
 import { Input } from "@saroh/ui/input";
 import { Label } from "@saroh/ui/label";
 import { Lock, PanelBottom, PanelTop } from "lucide-react";
@@ -198,28 +199,20 @@ export function FixedBlockInspector({
             )}
 
             <div className="flex flex-wrap items-center gap-x-2 gap-y-2 border-t pt-3">
-                <Button
-                    type="button"
+                <IconButton
+                    label="Move up"
+                    icon={<span>↑</span>}
                     variant="outline"
-                    size="sm"
-                    className="h-8 w-8 p-0"
                     disabled
-                    aria-label="Move up"
                     aria-describedby="fixed-lock-reason"
-                >
-                    ↑
-                </Button>
-                <Button
-                    type="button"
+                />
+                <IconButton
+                    label="Move down"
+                    icon={<span>↓</span>}
                     variant="outline"
-                    size="sm"
-                    className="h-8 w-8 p-0"
                     disabled
-                    aria-label="Move down"
                     aria-describedby="fixed-lock-reason"
-                >
-                    ↓
-                </Button>
+                />
                 <p
                     id="fixed-lock-reason"
                     className="flex min-w-0 flex-1 items-center gap-1.5 text-xs leading-relaxed text-muted-foreground"
@@ -231,7 +224,7 @@ export function FixedBlockInspector({
                     type="button"
                     variant="outline"
                     size="sm"
-                    className="ml-auto h-8 px-3 text-xs"
+                    className="ml-auto"
                     disabled
                     aria-describedby="fixed-lock-reason"
                 >

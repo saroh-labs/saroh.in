@@ -9,6 +9,7 @@ import { ArrowDown, ArrowUp, Plus, Settings2, X } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 
+import { runAction } from "@/lib/api/run-action";
 import { saveStages } from "@/lib/pipelines/actions";
 import { IconButton } from "@saroh/ui/icon-button";
 import { Tip } from "@saroh/ui/tooltip";
@@ -85,18 +86,21 @@ export function StagesDialog({
     async function save() {
         setTried(true);
         if (blank) return;
-        setSaving(true);
-        const res = await saveStages(
-            pipelineId,
-            rows.map((r, i) => ({
-                id: r.id,
-                name: r.name.trim(),
-                order: i,
-                was: r.was,
-            })),
-            removed.flatMap((r) => (r.id ? [r.id] : [])),
+        const res = await runAction(
+            () =>
+                saveStages(
+                    pipelineId,
+                    rows.map((r, i) => ({
+                        id: r.id,
+                        name: r.name.trim(),
+                        order: i,
+                        was: r.was,
+                    })),
+                    removed.flatMap((r) => (r.id ? [r.id] : [])),
+                ),
+            { setBusy: setSaving },
         );
-        setSaving(false);
+        if (!res) return;
         if (!res.ok) {
             showError("Some of the stage changes were not saved.", res.error);
             router.refresh();
@@ -138,13 +142,14 @@ export function StagesDialog({
                             {i + 1}
                         </span>
                         <Input
+                            dense
                             aria-label={`Stage ${i + 1} name`}
                             aria-invalid={
                                 (tried && !r.name.trim()) || undefined
                             }
                             value={r.name}
                             maxLength={60}
-                            className="h-8 min-w-0 flex-1"
+                            className="min-w-0 flex-1"
                             onChange={(e) =>
                                 setRows((all) =>
                                     all.map((x) =>
@@ -176,16 +181,13 @@ export function StagesDialog({
                                     : undefined
                             }
                         >
-                            <Button
-                                type="button"
-                                variant="ghost"
-                                size="icon"
-                                className="size-8"
-                                aria-label={
+                            <IconButton
+                                label={
                                     r.leads > 0
                                         ? `${r.name} has ${count(r.leads, "lead")}; move them before removing it`
                                         : `Remove ${r.name || "this stage"}`
                                 }
+                                icon={<X className="size-4" />}
                                 disabled={r.leads > 0 || rows.length === 1}
                                 onClick={() => {
                                     setRows((all) =>
@@ -193,9 +195,7 @@ export function StagesDialog({
                                     );
                                     if (r.id) setRemoved((x) => [...x, r]);
                                 }}
-                            >
-                                <X className="size-4" />
-                            </Button>
+                            />
                         </Tip>
                     </li>
                 ))}
@@ -239,9 +239,10 @@ export function StagesDialog({
                 <p className="text-pretty text-[11.5px] leading-[1.5] text-muted-foreground">
                     Removing {removed.map((r) => r.name).join(", ")} when you
                     save.{" "}
-                    <button
+                    <Button
+                        variant="link"
+                        size="inline"
                         type="button"
-                        className="font-medium text-foreground underline-offset-4 hover:underline"
                         onClick={() => {
                             setRows((all) =>
                                 [...all, ...removed].sort(
@@ -254,7 +255,7 @@ export function StagesDialog({
                         }}
                     >
                         {plural(removed.length, "Put it back", "Put them back")}
-                    </button>
+                    </Button>
                 </p>
             ) : null}
         </FormDialog>

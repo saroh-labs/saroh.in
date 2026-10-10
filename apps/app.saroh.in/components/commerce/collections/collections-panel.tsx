@@ -109,10 +109,11 @@ export function CollectionsPanel({
                 </h2>
                 {canWrite ? (
                     <Button
+                        size="xs"
                         type="button"
                         variant="outline"
                         onClick={() => setSheet({ id: null })}
-                        className="h-[26px] gap-[5px] rounded-[7px] px-[9px] text-[12px] coarse:h-11"
+                        className="gap-[5px]"
                     >
                         <Plus className="size-3" aria-hidden />
                         New collection
@@ -145,11 +146,12 @@ export function CollectionsPanel({
                                     {c.name}
                                 </Link>
                                 <Button
+                                    size="xs"
                                     type="button"
                                     variant="ghost"
                                     onClick={() => setSheet({ id: c.id })}
                                     aria-label={`${canWrite ? "Edit" : "Open"} ${c.name}`}
-                                    className="relative z-[1] h-[26px] gap-[5px] rounded-[7px] px-[7px] text-[12px] text-foreground coarse:h-11"
+                                    className="relative z-[1] gap-[5px] text-foreground"
                                 >
                                     {canWrite ? (
                                         <Pencil

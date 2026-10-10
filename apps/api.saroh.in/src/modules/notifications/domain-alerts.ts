@@ -2,6 +2,7 @@ import type { Domain, Prisma } from "@saroh/database";
 
 import { HOSTING_WORDS } from "../domains/domain-hosting-sync";
 import { cleanBusinessName } from "../site-accounts/sender-name";
+import { noticeOf } from "./notice-target";
 import type { TeamAlertPayload, WordedAlert } from "./team-alerts";
 import { enqueueTeamAlert } from "./team-alerts";
 
@@ -186,7 +187,9 @@ export async function wordDomain(
     if (p.change === "back") {
         return {
             ...base,
-            type: DOMAIN_BACK_NOTIFICATION_TYPE,
+            ...noticeOf(DOMAIN_BACK_NOTIFICATION_TYPE, {
+                siteId: domain.siteId,
+            }),
             title: `${domain.hostname} is working again`,
             body: `Visitors reach ${site ?? "your website"} at ${domain.hostname} again.`,
             mail: {
@@ -198,7 +201,7 @@ export async function wordDomain(
     const problem = domainProblemWords(domain);
     return {
         ...base,
-        type: DOMAIN_DOWN_NOTIFICATION_TYPE,
+        ...noticeOf(DOMAIN_DOWN_NOTIFICATION_TYPE, { siteId: domain.siteId }),
         title: `${domain.hostname} stopped working`,
         body: `Visitors can't reach ${site ?? "your website"} at ${domain.hostname}. ${problem} You'll find it in the site's Settings, under Your own domain. We'll tell you when it works again.`,
         mail: {

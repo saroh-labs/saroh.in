@@ -13,7 +13,6 @@ import { useState } from "react";
 
 import type { ConfirmResult } from "@/components/shared/confirm-dialog";
 import { ConfirmDialog } from "@/components/shared/confirm-dialog";
-import { OptionSelect } from "@/components/shared/option-select";
 import { useHold } from "@/components/shared/use-hold";
 import { Section as Rows } from "@/components/sites/settings-rows";
 import {
@@ -33,7 +32,9 @@ import {
     shownInvitations,
 } from "@/lib/stores/people";
 import { couldntLoad } from "@saroh/ui/lib/state-copy";
+import { OptionSelect } from "@saroh/ui/option-select";
 
+import { runAction } from "@/lib/api/run-action";
 import { Notice } from "@saroh/ui/notice";
 import { InvitePersonSheet } from "./invite-person-sheet";
 import { Note, Section } from "./storefront-section";
@@ -118,9 +119,11 @@ export function PeopleSection({
     const alone = onlyOwnerHere(people);
 
     async function onChangeRole(userId: string, next: MemberRole) {
-        setBusy(userId);
-        const res = await updateMemberRole(store.id, userId, next);
-        setBusy(null);
+        const res = await runAction(
+            () => updateMemberRole(store.id, userId, next),
+            { setBusy: (on) => setBusy(on ? userId : null) },
+        );
+        if (!res) return;
         if (!res.ok) {
             showError(res.error);
             return;
@@ -130,9 +133,10 @@ export function PeopleSection({
     }
 
     async function onRemove(userId: string): Promise<ConfirmResult> {
-        setBusy(userId);
-        const res = await removeMember(store.id, userId);
-        setBusy(null);
+        const res = await runAction(() => removeMember(store.id, userId), {
+            setBusy: (on) => setBusy(on ? userId : null),
+        });
+        if (!res) return;
         if (!res.ok) return { ok: false, error: res.error };
         showSuccess("Person removed.");
         router.refresh();
@@ -253,7 +257,7 @@ export function PeopleSection({
                                                             options={
                                                                 ROLE_OPTIONS
                                                             }
-                                                            className="w-32 coarse:h-11"
+                                                            className="w-32"
                                                         />
                                                         <Button
                                                             type="button"

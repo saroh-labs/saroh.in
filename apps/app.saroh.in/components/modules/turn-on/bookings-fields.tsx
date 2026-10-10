@@ -1,16 +1,16 @@
 "use client";
 
 import { Checkbox } from "@saroh/ui/checkbox";
+import { Field } from "@saroh/ui/field";
 import { Input } from "@saroh/ui/input";
+import { MoneyInput } from "@saroh/ui/money-input";
 import { TimeSelect } from "@saroh/ui/time-select";
 import { useId } from "react";
 
-import { currencySymbol } from "@/lib/format/money";
 import type { DayDraft, TurnOnDraft } from "@/lib/modules/turn-on";
 import { hoursErrorsByWeekday, WEEK } from "@/lib/modules/turn-on";
 import type { FieldErrors } from "@/lib/modules/turn-on-errors";
 
-import { Field, INPUT } from "./field";
 import type { Update } from "./setup-fields";
 
 /**
@@ -129,10 +129,10 @@ export function BookingsFields({
             </fieldset>
 
             <Field
-                id={`${id}-service`}
+                htmlFor={`${id}-service`}
                 label="First service"
                 error={errors["service.name"]}
-                note="What people book, like “Haircut” or “Consultation”."
+                hint="What people book, like “Haircut” or “Consultation”."
             >
                 <Input
                     id={`${id}-service`}
@@ -142,12 +142,11 @@ export function BookingsFields({
                     aria-invalid={errors["service.name"] ? true : undefined}
                     aria-describedby={`${id}-service-note`}
                     onChange={(e) => setService({ name: e.target.value })}
-                    className={INPUT}
                 />
             </Field>
             <div className="grid min-w-0 grid-cols-2 gap-3">
                 <Field
-                    id={`${id}-minutes`}
+                    htmlFor={`${id}-minutes`}
                     label="Takes (minutes)"
                     error={errors["service.durationMinutes"]}
                 >
@@ -168,18 +167,17 @@ export function BookingsFields({
                         onChange={(e) =>
                             setService({ duration: e.target.value })
                         }
-                        className={INPUT}
                     />
                 </Field>
                 <Field
-                    id={`${id}-price`}
-                    label={`Price (${currencySymbol("INR")})`}
+                    htmlFor={`${id}-price`}
+                    label="Price"
                     error={errors["service.price"]}
                 >
-                    <Input
+                    <MoneyInput
                         id={`${id}-price`}
+                        currency="INR"
                         value={b.price}
-                        inputMode="decimal"
                         maxLength={10}
                         autoComplete="off"
                         aria-invalid={
@@ -190,8 +188,7 @@ export function BookingsFields({
                                 ? `${id}-price-note`
                                 : undefined
                         }
-                        onChange={(e) => setService({ price: e.target.value })}
-                        className={INPUT}
+                        onValueChange={(price) => setService({ price })}
                     />
                 </Field>
             </div>

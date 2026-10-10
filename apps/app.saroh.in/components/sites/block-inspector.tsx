@@ -1,6 +1,7 @@
 "use client";
 
 import { Button } from "@saroh/ui/button";
+import { IconButton } from "@saroh/ui/icon-button";
 import { cn } from "@saroh/ui/lib/utils";
 import { Info } from "lucide-react";
 
@@ -110,11 +111,11 @@ export function BlockInspector({
                         <Button
                             type="button"
                             variant="ghost"
-                            size="sm"
+                            size="xs"
                             aria-pressed={section.hidden === true}
                             onClick={onToggleHidden}
                             className={cn(
-                                "h-7 shrink-0 gap-1.5 px-2 text-xs",
+                                "shrink-0 gap-1.5",
                                 section.hidden && "text-muted-foreground",
                             )}
                         >
@@ -221,33 +222,25 @@ export function BlockInspector({
              * some people cannot reorder.
              */}
             <div className="flex items-center gap-1 border-t pt-3">
-                <Button
-                    type="button"
+                <IconButton
+                    label="Move block up"
+                    icon={<span>↑</span>}
                     variant="outline"
-                    size="sm"
-                    aria-label="Move block up"
-                    className="h-8 w-8 p-0"
                     disabled={index === 0}
                     onClick={() => onMove(-1)}
-                >
-                    ↑
-                </Button>
-                <Button
-                    type="button"
+                />
+                <IconButton
+                    label="Move block down"
+                    icon={<span>↓</span>}
                     variant="outline"
-                    size="sm"
-                    aria-label="Move block down"
-                    className="h-8 w-8 p-0"
                     disabled={index === count - 1}
                     onClick={() => onMove(1)}
-                >
-                    ↓
-                </Button>
+                />
                 <Button
                     type="button"
                     variant="outline"
                     size="sm"
-                    className="ml-auto h-8 px-3 text-xs text-destructive hover:text-destructive"
+                    className="ml-auto text-destructive hover:text-destructive"
                     onClick={onRemove}
                 >
                     Remove

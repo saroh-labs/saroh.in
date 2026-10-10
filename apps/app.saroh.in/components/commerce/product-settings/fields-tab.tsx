@@ -1,8 +1,8 @@
 "use client";
 
 import { count } from "@/lib/format/plural";
+import { Button } from "@saroh/ui/button";
 import { EmptyState } from "@saroh/ui/data-state";
-import { cn } from "@saroh/ui/lib/utils";
 import { showError, showUndo } from "@saroh/ui/toast";
 import { Plus } from "lucide-react";
 import { useRouter } from "next/navigation";
@@ -13,8 +13,9 @@ import { removeField, restoreField } from "@/lib/products/settings-actions";
 
 import { ReadOnlyNote } from "@/components/shared/read-only-note";
 import { StatusBadge } from "@/components/shared/status-badge";
+import { runAction } from "@/lib/api/run-action";
 import { FIELD_TYPES, FieldSheet } from "./field-sheet";
-import { bigBtn, rowBtn, TabIntro } from "./product-settings";
+import { TabIntro } from "./product-settings";
 
 /**
  * Extra things a product records, for the categories picked — "Skin type"
@@ -36,7 +37,11 @@ export function FieldsTab({
 
     function run(work: () => Promise<void>) {
         start(async () => {
-            await work();
+            const reached = await runAction(async () => {
+                await work();
+                return true;
+            });
+            if (!reached) return;
             router.refresh();
         });
     }
@@ -44,10 +49,10 @@ export function FieldsTab({
     const addOne = canWrite ? (
         <FieldSheet
             trigger={
-                <button type="button" className={bigBtn}>
+                <Button type="button" className="shrink-0">
                     <Plus aria-hidden className="-ml-0.5 mr-1.5 size-3.5" />
                     Add field
-                </button>
+                </Button>
             }
             fields={fields}
             categories={categories}
@@ -109,26 +114,26 @@ export function FieldsTab({
                                         <div className="flex shrink-0 gap-1.5">
                                             <FieldSheet
                                                 trigger={
-                                                    <button
+                                                    <Button
+                                                        variant="outline"
+                                                        size="xs"
                                                         type="button"
-                                                        className={rowBtn}
                                                         aria-label={`Edit ${f.name}`}
                                                     >
                                                         Edit
-                                                    </button>
+                                                    </Button>
                                                 }
                                                 field={f}
                                                 fields={fields}
                                                 categories={categories}
                                             />
-                                            <button
+                                            <Button
+                                                variant="outline"
+                                                size="xs"
                                                 type="button"
                                                 disabled={pending}
                                                 aria-label={`Delete ${f.name}`}
-                                                className={cn(
-                                                    rowBtn,
-                                                    "text-destructive",
-                                                )}
+                                                className="text-destructive hover:text-destructive"
                                                 onClick={() =>
                                                     run(async () => {
                                                         const res =
@@ -161,7 +166,7 @@ export function FieldsTab({
                                                 }
                                             >
                                                 Delete
-                                            </button>
+                                            </Button>
                                         </div>
                                     ) : null}
                                 </div>

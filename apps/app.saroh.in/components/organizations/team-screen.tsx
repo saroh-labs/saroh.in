@@ -86,6 +86,7 @@ import {
 } from "@/lib/organizations/storefront-team";
 import { TEAM_TAB_PARAM } from "@/lib/settings/search";
 
+import { runAction } from "@/lib/api/run-action";
 import { TabStrip } from "@saroh/ui/tabs";
 import { Tip } from "@saroh/ui/tooltip";
 import { InviteDiaryPerson } from "./invite-diary-person";
@@ -825,11 +826,13 @@ function PendingInvites({
                                     <Button
                                         size="sm"
                                         variant="outline"
-                                        disabled={resending || beyond}
+                                        disabled={beyond}
                                         onClick={() => resend(invitation)}
                                         aria-label={`Resend the invite to ${invitation.email}`}
+                                        busy={resending}
+                                        busyLabel="Sending…"
                                     >
-                                        {resending ? "Sending…" : "Resend"}
+                                        Resend
                                     </Button>
                                 </Tip>
                                 <Button
@@ -923,20 +926,28 @@ function MemberDrawer({
             );
             return;
         }
-        setSaving(true);
-        // The role first: the extras are judged against the role they'll
-        // sit on top of.
-        const res = roleChanged
-            ? await updateMemberRole(member.userId, {
-                  role,
-                  ...(role === "REVIEWER" ? { siteIds: member.siteIds } : {}),
-              })
-            : null;
-        const extrasRes =
-            (res === null || res.ok) && extras.changed
-                ? await setMemberExtraActions(member.userId, extras.chosen)
-                : null;
-        setSaving(false);
+        const userId = member.userId;
+        const siteIds = member.siteIds;
+        const saved = await runAction(
+            async () => {
+                // The role first: the extras are judged against the role
+                // they'll sit on top of.
+                const res = roleChanged
+                    ? await updateMemberRole(userId, {
+                          role,
+                          ...(role === "REVIEWER" ? { siteIds } : {}),
+                      })
+                    : null;
+                const extrasRes =
+                    (res === null || res.ok) && extras.changed
+                        ? await setMemberExtraActions(userId, extras.chosen)
+                        : null;
+                return { res, extrasRes };
+            },
+            { setBusy: setSaving },
+        );
+        if (!saved) return;
+        const { res, extrasRes } = saved;
         const failed = [res, extrasRes].find((r) => r && !r.ok);
         if (failed && !failed.ok) {
             showError(failed.error);
@@ -1315,7 +1326,7 @@ function InviteSheet({
                                     autoComplete="off"
                                     placeholder="name@example.in"
                                     disabled={sending}
-                                    className="h-[38px] rounded-[9px] text-[13.5px] aria-[invalid=true]:border-destructive-subtle-foreground"
+                                    className="aria-[invalid=true]:border-destructive-subtle-foreground"
                                     {...field}
                                 />
                             </FormControl>

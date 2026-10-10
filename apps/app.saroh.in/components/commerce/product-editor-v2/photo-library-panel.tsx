@@ -1,5 +1,6 @@
 "use client";
 
+import { Button } from "@saroh/ui/button";
 import { cn } from "@saroh/ui/lib/utils";
 import { Skeleton } from "@saroh/ui/skeleton";
 import { useEffect, useState } from "react";
@@ -43,13 +44,9 @@ export function LibraryPanel({
                 <span className="flex-1 text-[12.5px] font-semibold">
                     Your photos · tap to add or take off
                 </span>
-                <button
-                    type="button"
-                    onClick={onDone}
-                    className="h-7 rounded-[7px] bg-foreground px-[11px] text-[12px] font-semibold text-background hover:bg-foreground/90 coarse:h-11"
-                >
+                <Button size="xs" type="button" onClick={onDone}>
                     Done
-                </button>
+                </Button>
             </div>
             {items === "loading" ? (
                 <div role="status" aria-busy="true" className="flex gap-2">
@@ -83,7 +80,7 @@ export function LibraryPanel({
                                     onClick={() => onToggle(item)}
                                     aria-label={`${item.filename}${on ? ", on this product. Take it off." : ". Add it."}`}
                                     className={cn(
-                                        "w-full overflow-hidden rounded-[8px] bg-card text-left disabled:cursor-not-allowed disabled:opacity-50",
+                                        "w-full overflow-hidden rounded-[8px] bg-card text-left disabled:cursor-not-allowed disabled:text-disabled-foreground",
                                         on
                                             ? "border-[1.5px] border-foreground"
                                             : "border border-border",

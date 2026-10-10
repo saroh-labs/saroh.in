@@ -1,6 +1,7 @@
 "use client";
 
 import { Button } from "@saroh/ui/button";
+import { IconButton } from "@saroh/ui/icon-button";
 
 /**
  * The repeated-item editor that `features`, `faq`, `testimonials` and
@@ -77,28 +78,20 @@ export function RepeatedItems<T>({
                         <div className="flex items-center gap-1">
                             {reorderable && items.length > 1 ? (
                                 <>
-                                    <Button
-                                        type="button"
+                                    <IconButton
+                                        label={`Move ${itemNoun.toLowerCase()} ${index + 1} up`}
+                                        icon={<span>↑</span>}
                                         variant="outline"
-                                        size="sm"
-                                        className="h-8 w-8 p-0"
                                         disabled={index === 0}
-                                        aria-label={`Move ${itemNoun.toLowerCase()} ${index + 1} up`}
                                         onClick={() => move(index, -1)}
-                                    >
-                                        ↑
-                                    </Button>
-                                    <Button
-                                        type="button"
+                                    />
+                                    <IconButton
+                                        label={`Move ${itemNoun.toLowerCase()} ${index + 1} down`}
+                                        icon={<span>↓</span>}
                                         variant="outline"
-                                        size="sm"
-                                        className="h-8 w-8 p-0"
                                         disabled={index === items.length - 1}
-                                        aria-label={`Move ${itemNoun.toLowerCase()} ${index + 1} down`}
                                         onClick={() => move(index, 1)}
-                                    >
-                                        ↓
-                                    </Button>
+                                    />
                                 </>
                             ) : null}
                             {items.length > 1 ? (

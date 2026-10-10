@@ -10,8 +10,8 @@ import { Chip } from "@/components/shared/chip";
  * problem, and the design's 34px chip with its pressed state.
  */
 
-export const LABEL = "block text-[13px] font-medium";
-export const FIELD = "mt-[5px] h-[38px] rounded-[8px] text-[14px] font-normal";
+export const LABEL = "block";
+export const FIELD = "mt-[5px] font-normal";
 export const HELP =
     "mt-1.5 text-pretty text-[12.5px] leading-[1.5] text-muted-foreground";
 
@@ -49,16 +49,6 @@ export function PackSection({
             ) : null}
             {children}
         </section>
-    );
-}
-
-/** The problem beside a field, which the field names in aria-describedby. */
-export function FieldError({ id, message }: { id: string; message?: string }) {
-    if (!message) return null;
-    return (
-        <p id={id} className="mt-[5px] text-[12.5px] text-destructive">
-            {message}
-        </p>
     );
 }
 

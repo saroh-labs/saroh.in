@@ -18,6 +18,7 @@ import { orderForList, packCard } from "@/lib/class-packs/pack-cards";
 import type { MembershipPlan } from "@/lib/class-packs/packs-page";
 import type { HeldPack } from "@/lib/class-packs/sell-words";
 
+import { runAction } from "@/lib/api/run-action";
 import { ClassPacksTabs } from "./class-packs-tabs";
 import { MembershipsNote } from "./memberships-note";
 import { PackCard } from "./pack-card";
@@ -89,8 +90,11 @@ export function PacksScreen({
     function setArchived(pack: PackListItem, archived: boolean) {
         setBusyId(pack.id);
         start(async () => {
-            const res = await setPackArchived(pack.id, archived);
+            const res = await runAction(() =>
+                setPackArchived(pack.id, archived),
+            );
             setBusyId(null);
+            if (!res) return;
             if (!res.ok) {
                 showError(res.error);
                 return;
@@ -101,7 +105,10 @@ export function PacksScreen({
             dismissToasts();
             showUndo(archiveToast(pack, archived), () =>
                 start(async () => {
-                    const back = await setPackArchived(pack.id, !archived);
+                    const back = await runAction(() =>
+                        setPackArchived(pack.id, !archived),
+                    );
+                    if (!back) return;
                     if (!back.ok) showError(back.error);
                     router.refresh();
                 }),

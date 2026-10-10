@@ -11,6 +11,7 @@ import { useState } from "react";
 
 import { ListCard, ListRow } from "@/components/shared/list-card";
 import { ViewerDate } from "@/components/shared/viewer-date";
+import { runAction } from "@/lib/api/run-action";
 import { completeTask } from "@/lib/leads/actions";
 import type { OpenTask } from "@/lib/leads/service";
 import { couldntLoad } from "@saroh/ui/lib/state-copy";
@@ -55,9 +56,10 @@ export function FollowUpsList({
     }
 
     async function done(task: OpenTask) {
-        setBusy(task.id);
-        const res = await completeTask(task.leadId, task.id);
-        setBusy(null);
+        const res = await runAction(() => completeTask(task.leadId, task.id), {
+            setBusy: (on) => setBusy(on ? task.id : null),
+        });
+        if (!res) return;
         if (!res.ok) return showError(res.error);
         showSuccess("Done");
         router.refresh();

@@ -254,10 +254,11 @@ export function InvoicesScreen({
                                 worked out from the due date.
                             </span>
                             <Button
+                                size="sm"
                                 type="button"
                                 variant="outline"
                                 onClick={() => pick("overdue")}
-                                className="h-8 rounded-[8px] border-destructive-subtle-foreground px-3 text-[12.5px]"
+                                className="border-destructive-subtle-foreground"
                             >
                                 Show them
                             </Button>

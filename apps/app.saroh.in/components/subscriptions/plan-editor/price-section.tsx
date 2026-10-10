@@ -1,7 +1,8 @@
 "use client";
 
-import { Input } from "@saroh/ui/input";
+import { FieldError } from "@saroh/ui/field";
 import { cn } from "@saroh/ui/lib/utils";
+import { MoneyInput } from "@saroh/ui/money-input";
 import { useId, useState } from "react";
 
 import type { EditorFields } from "@/components/editor-shell/editor-shell";
@@ -12,7 +13,6 @@ import {
     Section,
 } from "@/components/services/service-editor/fields";
 import { Chip } from "@/components/shared/chip";
-import { currencySymbol } from "@/lib/format/money";
 import type { AutopayLimit } from "@/lib/subscriptions/plan-drafts";
 import type { PlanForm } from "@/lib/subscriptions/plan-editor";
 import {
@@ -22,8 +22,6 @@ import {
     MAIN_INTERVALS,
     MORE_INTERVALS,
 } from "@/lib/subscriptions/plan-editor";
-
-import { FieldError } from "./details-section";
 
 export const CHIP = "";
 
@@ -70,19 +68,19 @@ export function PriceSection({
     return (
         <Section title="Price and billing">
             <label htmlFor={ids.price} className={LABEL}>
-                Price ({currencySymbol(currency)})
+                Price
             </label>
-            <Input
-                id={ids.price}
-                inputMode="decimal"
-                autoComplete="off"
-                value={values.price}
-                aria-invalid={Boolean(errors.price)}
-                aria-describedby={describedBy}
-                onChange={(e) => set({ price: e.target.value })}
-                className={cn(FIELD, "w-[140px] max-w-full")}
-            />
-            <FieldError id={ids.priceErr} message={errors.price} />
+            <div className={cn(FIELD, "w-[140px] max-w-full")}>
+                <MoneyInput
+                    id={ids.price}
+                    currency={currency}
+                    value={values.price}
+                    aria-invalid={Boolean(errors.price)}
+                    aria-describedby={describedBy}
+                    onValueChange={(price) => set({ price })}
+                />
+            </div>
+            <FieldError id={ids.priceErr}>{errors.price}</FieldError>
             <p
                 id={ids.limit}
                 aria-live="polite"

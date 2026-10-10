@@ -145,7 +145,6 @@ export function ClassSeats({
                                 <Button
                                     size="sm"
                                     variant="outline"
-                                    className="rounded-[8px] text-[13px]"
                                     onClick={undo}
                                 >
                                     Undo
@@ -156,7 +155,6 @@ export function ClassSeats({
                                         <Button
                                             size="sm"
                                             variant="outline"
-                                            className="rounded-[8px] text-[13px]"
                                             onClick={() => act.checkIn(b)}
                                         >
                                             Check in
@@ -165,7 +163,7 @@ export function ClassSeats({
                                     <Button
                                         size="sm"
                                         variant="outline"
-                                        className="rounded-[8px] text-[13px] text-destructive hover:text-destructive"
+                                        className="text-destructive hover:text-destructive"
                                         onClick={() => act.cancel(b)}
                                     >
                                         Cancel

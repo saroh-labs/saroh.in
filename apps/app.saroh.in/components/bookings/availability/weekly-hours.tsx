@@ -1,6 +1,7 @@
 "use client";
 
 import { formatClock, formatClockRange } from "@/lib/format/datetime";
+import { submitOnModEnter } from "@/lib/hooks/keyboard-save";
 import { Button } from "@saroh/ui/button";
 import { cn } from "@saroh/ui/lib/utils";
 import { Popover, PopoverContent, PopoverTrigger } from "@saroh/ui/popover";
@@ -65,8 +66,8 @@ export function WeeklyHours({
                 </h2>
                 {canEdit ? (
                     <Button
+                        size="sm"
                         variant="outline"
-                        className="h-[30px] rounded-[8px] px-[11px] text-[12px] coarse:h-11"
                         onClick={() => {
                             const monday = dayRanges(hours, 1);
                             onChange([
@@ -197,6 +198,7 @@ export function WeeklyHours({
                                                 className="w-auto max-w-[calc(100vw-1.5rem)] rounded-[12px] p-3"
                                             >
                                                 <form
+                                                    onKeyDown={submitOnModEnter}
                                                     className="grid gap-2.5"
                                                     onSubmit={(e) => {
                                                         e.preventDefault();
@@ -253,8 +255,8 @@ export function WeeklyHours({
                                                     ) : null}
                                                     <div className="flex items-center gap-2">
                                                         <Button
+                                                            size="sm"
                                                             type="submit"
-                                                            className="h-8 rounded-[8px] px-3 text-[12.5px] coarse:h-11"
                                                             disabled={Boolean(
                                                                 bad,
                                                             )}
@@ -262,9 +264,9 @@ export function WeeklyHours({
                                                             Add hours
                                                         </Button>
                                                         <Button
+                                                            size="sm"
                                                             type="button"
                                                             variant="ghost"
-                                                            className="h-8 rounded-[8px] px-3 text-[12.5px] coarse:h-11"
                                                             onClick={() =>
                                                                 setAdding(null)
                                                             }

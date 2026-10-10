@@ -1,8 +1,10 @@
 "use client";
 
 import { Checkbox } from "@saroh/ui/checkbox";
+import { FieldError } from "@saroh/ui/field";
 import { Input } from "@saroh/ui/input";
 import { cn } from "@saroh/ui/lib/utils";
+import { MoneyInput } from "@saroh/ui/money-input";
 import { Textarea } from "@saroh/ui/textarea";
 import { useId } from "react";
 
@@ -24,9 +26,8 @@ import {
     glance,
     packRules,
 } from "@/lib/class-packs/pack-editor-words";
-import { currencySymbol } from "@/lib/format/money";
 
-import { FIELD, FieldError, HELP, LABEL, PackChip, PackSection } from "./parts";
+import { FIELD, HELP, LABEL, PackChip, PackSection } from "./parts";
 import { ValidityChips } from "./validity-chips";
 
 /*
@@ -89,7 +90,7 @@ export function Details({
                 onChange={(e) => set({ name: e.target.value })}
                 className={FIELD}
             />
-            <FieldError id={ids.nameErr} message={errors.name} />
+            <FieldError id={ids.nameErr}>{errors.name}</FieldError>
 
             <label htmlFor={ids.desc} className={cn(LABEL, "mt-3")}>
                 Description{" "}
@@ -106,9 +107,9 @@ export function Details({
                 aria-invalid={errors.description ? true : undefined}
                 aria-describedby={errors.description ? ids.descErr : undefined}
                 onChange={(e) => set({ description: e.target.value })}
-                className="mt-[5px] rounded-[8px] text-[14px]"
+                className="mt-[5px]"
             />
-            <FieldError id={ids.descErr} message={errors.description} />
+            <FieldError id={ids.descErr}>{errors.description}</FieldError>
 
             <div id={ids.kind} className={cn(LABEL, "mt-3")}>
                 Credits are for
@@ -144,7 +145,7 @@ export function Details({
             <p id={ids.kindNote} className={HELP}>
                 {kindNote(live, sold)}
             </p>
-            <FieldError id={ids.kindErr} message={errors.kind} />
+            <FieldError id={ids.kindErr}>{errors.kind}</FieldError>
         </PackSection>
     );
 }
@@ -192,30 +193,26 @@ export function CreditsAndPrice({
                 </div>
                 <div className="min-w-0">
                     <label htmlFor={ids.price} className={LABEL}>
-                        Price ({currencySymbol(values.currency)})
+                        Price
                     </label>
-                    <Input
-                        id={ids.price}
-                        inputMode="decimal"
-                        autoComplete="off"
-                        value={values.price ?? ""}
-                        aria-invalid={errors.price ? true : undefined}
-                        aria-describedby={
-                            errors.price ? ids.priceErr : undefined
-                        }
-                        onChange={(e) => {
-                            const typed = e.target.value.replace(
-                                /[^0-9.,]/g,
-                                "",
-                            );
-                            set({ price: typed || null });
-                        }}
-                        className={cn(FIELD, "w-[140px] max-w-full")}
-                    />
+                    <div className={cn(FIELD, "w-[140px] max-w-full")}>
+                        <MoneyInput
+                            id={ids.price}
+                            currency={values.currency}
+                            value={values.price ?? ""}
+                            aria-invalid={errors.price ? true : undefined}
+                            aria-describedby={
+                                errors.price ? ids.priceErr : undefined
+                            }
+                            onValueChange={(price) =>
+                                set({ price: price || null })
+                            }
+                        />
+                    </div>
                 </div>
             </div>
-            <FieldError id={ids.creditsErr} message={errors.credits} />
-            <FieldError id={ids.priceErr} message={errors.price} />
+            <FieldError id={ids.creditsErr}>{errors.credits}</FieldError>
+            <FieldError id={ids.priceErr}>{errors.price}</FieldError>
             {note ? <p className={HELP}>{note}</p> : null}
             <ValidityChips
                 value={values.validityDays}
@@ -249,7 +246,7 @@ export function WhoCanBuy({ values, set, errors }: Edit) {
                     </span>
                 </span>
             </label>
-            <FieldError id={errId} message={errors.firstPackOnly} />
+            <FieldError id={errId}>{errors.firstPackOnly}</FieldError>
         </PackSection>
     );
 }

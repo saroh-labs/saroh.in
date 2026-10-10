@@ -5,6 +5,7 @@ import { showError, showSuccess } from "@saroh/ui/toast";
 import { useRouter } from "next/navigation";
 import { useId, useState, useTransition } from "react";
 
+import { runAction } from "@/lib/api/run-action";
 import { setMembersCanPause } from "@/lib/subscriptions/actions";
 
 /**
@@ -29,7 +30,8 @@ export function MembersPauseRow({
     function change(next: boolean) {
         setOn(next);
         start(async () => {
-            const res = await setMembersCanPause(next);
+            const res = await runAction(() => setMembersCanPause(next));
+            if (!res) return setOn(!next);
             if (!res.ok) {
                 setOn(!next);
                 showError(res.error);

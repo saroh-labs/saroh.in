@@ -81,8 +81,7 @@ const FIELDS: {
     },
     {
         name: "bankName",
-        label: "Bank",
-        hint: "Optional.",
+        label: "Bank (optional)",
         width: "basis-full",
         autoCapitalize: "words",
     },

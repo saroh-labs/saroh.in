@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 
 import { useHold } from "@/components/shared/use-hold";
+import { UNREACHED } from "@/lib/api/unreached";
 import { newPayLink as makePayLink } from "@/lib/invoices/link-actions";
 import {
     cancelPlanChange,
@@ -52,7 +53,7 @@ export function useSubscriptionActions(
         // not a button left saying "Pausing…".
         const res = await call().catch((): { ok: false; error: string } => ({
             ok: false,
-            error: "Saroh couldn't be reached. Nothing was changed — try again.",
+            error: UNREACHED,
         }));
         setBusy(false);
         if (!res.ok) {
@@ -173,8 +174,8 @@ export function useSubscriptionActions(
         );
     }
     async function toggleSkip(row: CollectionRow) {
-        setBusyDate(row.date);
         const skipped = row.skipped;
+        setBusyDate(row.date);
         await run(
             () =>
                 skipped

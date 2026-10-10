@@ -39,7 +39,6 @@ export function CountBar({
             <Button
                 type="button"
                 variant="outline"
-                className="h-9 rounded-[9px] px-3.5 text-[12.5px] coarse:h-11"
                 onClick={onCancel}
                 disabled={saving}
             >
@@ -47,11 +46,12 @@ export function CountBar({
             </Button>
             <Button
                 type="button"
-                className="h-9 rounded-[9px] px-3.5 text-[12.5px] coarse:h-11"
                 onClick={onSave}
-                disabled={!canSave || saving}
+                disabled={!canSave}
+                busy={saving}
+                busyLabel="Saving…"
             >
-                {saving ? "Saving…" : "Save count"}
+                Save count
             </Button>
         </div>
     );

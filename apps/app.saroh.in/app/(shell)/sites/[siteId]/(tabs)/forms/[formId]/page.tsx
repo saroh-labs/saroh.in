@@ -73,8 +73,8 @@ export default async function FormEntriesPage({
                     <Button
                         asChild
                         variant="ghost"
-                        size="sm"
-                        className="-ml-2 mb-1 h-7 px-2 text-muted-foreground"
+                        size="xs"
+                        className="-ml-2 mb-1 text-muted-foreground"
                     >
                         <Link href={`/sites/${siteId}/forms`}>
                             <ArrowLeft className="mr-1 size-3.5" />

@@ -5,6 +5,7 @@ import { showError, showSuccess } from "@saroh/ui/toast";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 
+import { runAction } from "@/lib/api/run-action";
 import { restorePublication } from "@/lib/sites/actions";
 import { RESTORE_OVERRIDE_LINE, restoreGate } from "@/lib/sites/release-review";
 import { Notice } from "@saroh/ui/notice";
@@ -49,11 +50,10 @@ export function RestoreVersion({
 
     function restore() {
         startTransition(async () => {
-            const res = await restorePublication(
-                siteId,
-                publicationId,
-                override,
+            const res = await runAction(() =>
+                restorePublication(siteId, publicationId, override),
             );
+            if (!res) return;
             if (!res.ok) {
                 showError(res.error);
                 if (res.code === "APPROVAL_REQUIRED") router.refresh();
@@ -114,16 +114,15 @@ export function RestoreVersion({
                 <Button
                     size="sm"
                     variant={override ? "destructive" : "brand"}
-                    disabled={pending}
                     onClick={restore}
+                    busy={pending}
+                    busyLabel="Restoring…"
                 >
-                    {pending
-                        ? "Restoring…"
-                        : override
-                          ? "Restore without approval"
-                          : renderable
-                            ? "Yes, restore"
-                            : "Restore anyway"}
+                    {override
+                        ? "Restore without approval"
+                        : renderable
+                          ? "Yes, restore"
+                          : "Restore anyway"}
                 </Button>
                 <Button
                     size="sm"

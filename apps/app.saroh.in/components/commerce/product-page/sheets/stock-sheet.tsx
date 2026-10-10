@@ -9,7 +9,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 
-import { currencySymbol } from "@/lib/format/money";
+import { moneySign } from "@/lib/format/money";
 import { productEditHref } from "@/lib/products/links";
 import type { ProductOverview } from "@/lib/products/overview-rules";
 import type { SheetSize, SheetValues } from "@/lib/products/stock-sheet";
@@ -56,10 +56,11 @@ export function StockSheetButton({
     return (
         <>
             <Button
+                size="xs"
                 type="button"
                 variant="outline"
                 onClick={() => setOpen(true)}
-                className="h-[26px] gap-[5px] rounded-[7px] px-[9px] text-[12px] coarse:h-11"
+                className="gap-[5px]"
             >
                 <Pencil className="size-3" aria-hidden />
                 {label}
@@ -116,7 +117,7 @@ export function StockSheet({
         started ||
         overview.stock.mode === "variant" ||
         overview.stock.product !== null;
-    const symbol = currencySymbol(product.currency);
+    const symbol = moneySign(product.currency);
     const split = counts && (stock?.split ?? false);
     const problem = sheetProblem(draft);
     const dirty =
@@ -279,27 +280,25 @@ export function StockSheet({
                         />
                     </label>
                     <label className="flex flex-col gap-1.5">
-                        <span>MRP</span>
+                        <span>MRP (optional)</span>
                         <Input
                             value={draft.mrp}
                             onChange={(e) =>
                                 setDraft((d) => ({ ...d, mrp: e.target.value }))
                             }
                             inputMode="decimal"
-                            placeholder="Optional"
                         />
                     </label>
                 </div>
             ) : may.canWrite ? (
                 <label className="mt-4 flex max-w-[50%] flex-col gap-1.5">
-                    <span>MRP</span>
+                    <span>MRP (optional)</span>
                     <Input
                         value={draft.mrp}
                         onChange={(e) =>
                             setDraft((d) => ({ ...d, mrp: e.target.value }))
                         }
                         inputMode="decimal"
-                        placeholder="Optional"
                     />
                 </label>
             ) : null}

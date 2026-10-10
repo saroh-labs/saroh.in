@@ -9,6 +9,7 @@ import { useId, useState } from "react";
 
 import { Chip } from "@/components/shared/chip";
 import { FormDialog } from "@/components/shared/form-dialog";
+import { runAction } from "@/lib/api/run-action";
 import { extendHolder } from "@/lib/class-packs/actions";
 import {
     EXTEND_REASON_MAX,
@@ -63,10 +64,12 @@ export function ExtendDialog({
     async function save() {
         setTried(true);
         if (busy || why.length === 0) return;
-        setBusy(true);
         setError(null);
-        const res = await extendHolder(target.purchaseId, days, why);
-        setBusy(false);
+        const res = await runAction(
+            () => extendHolder(target.purchaseId, days, why),
+            { setBusy, quiet: true, onUnreached: setError },
+        );
+        if (!res) return;
         if (!res.ok) {
             setError(extendFailure(res, target.name));
             return;

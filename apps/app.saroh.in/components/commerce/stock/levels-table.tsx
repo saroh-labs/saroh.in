@@ -194,6 +194,7 @@ function Cell({
             <div className="grid min-w-0 gap-[3px] max-[759px]:flex max-[759px]:flex-wrap max-[759px]:items-center max-[759px]:gap-x-2">
                 <StoreLabel name={store} />
                 <Input
+                    dense
                     type="text"
                     inputMode="numeric"
                     autoComplete="off"
@@ -202,7 +203,7 @@ function Cell({
                     aria-label={label}
                     aria-invalid={diff.tone === "danger" || undefined}
                     onChange={(e) => onValue(key, e.target.value, cell.onHand)}
-                    className="h-8 w-[92px] rounded-[8px] border-border-strong bg-card px-[9px] text-[13px] tabular-nums coarse:h-11"
+                    className="w-[92px] border-border-strong bg-card px-[9px] tabular-nums"
                 />
                 <span
                     className={cn("text-[11.5px]", TEXT_TONE[diff.tone])}

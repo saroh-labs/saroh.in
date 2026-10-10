@@ -88,7 +88,9 @@ describe("RefundPanel", () => {
 
     it("keeps Refund off until a line is ticked or an amount typed", () => {
         const out = html([line({})]);
-        expect(out).toMatch(/<button[^>]*disabled=""[^>]*>Refund ₹0<\/button>/);
+        expect(out).toMatch(
+            /<button[^>]*disabled=""[^>]*>(?:<span[^>]*>)*Refund ₹0/,
+        );
     });
 
     it("offers the stock choice only for units that can go back on the shelf", () => {

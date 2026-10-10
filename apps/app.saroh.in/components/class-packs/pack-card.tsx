@@ -8,8 +8,6 @@ import { useId } from "react";
 import { StatusBadge } from "@/components/shared/status-badge";
 import type { CardNote } from "@/lib/class-packs/pack-card-notes";
 import type { PackCardView } from "@/lib/class-packs/pack-cards";
-
-const BUTTON = "h-[38px] rounded-[9px] px-4 text-[14px] font-semibold";
 const EYEBROW = "label";
 
 /**
@@ -127,11 +125,7 @@ export function PackCard({
             {card.openHref || canSell || canWrite ? (
                 <div className="mt-3 flex flex-wrap gap-2">
                     {card.openHref ? (
-                        <Button
-                            asChild
-                            variant="outline"
-                            className={cn(BUTTON, "coarse:h-11")}
-                        >
+                        <Button asChild variant="outline">
                             <Link
                                 href={card.openHref}
                                 aria-label={`Open ${card.name}`}
@@ -143,7 +137,6 @@ export function PackCard({
                     {canSell && card.showSell ? (
                         <Button
                             variant="outline"
-                            className={cn(BUTTON, "coarse:h-11")}
                             disabled={card.sellDisabled}
                             aria-describedby={
                                 card.sellDisabled && card.why
@@ -156,11 +149,7 @@ export function PackCard({
                         </Button>
                     ) : null}
                     {canWrite ? (
-                        <Button
-                            asChild
-                            variant="outline"
-                            className={cn(BUTTON, "coarse:h-11")}
-                        >
+                        <Button asChild variant="outline">
                             <Link
                                 href={card.editHref}
                                 aria-label={`Edit ${card.name}`}
@@ -172,7 +161,6 @@ export function PackCard({
                     {canWrite && card.canArchive ? (
                         <Button
                             variant="outline"
-                            className={cn(BUTTON, "coarse:h-11")}
                             disabled={busy}
                             onClick={onArchive}
                         >

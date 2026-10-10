@@ -97,11 +97,7 @@ export function VariantDrawer({
                                 </SheetDescription>
                             </div>
                             {overview.canWrite ? (
-                                <Button
-                                    asChild
-                                    variant="outline"
-                                    className="h-[30px] rounded-[8px] px-[11px] text-[12px] coarse:h-11"
-                                >
+                                <Button size="sm" asChild variant="outline">
                                     <Link href={edit("variants")}>Edit</Link>
                                 </Button>
                             ) : null}

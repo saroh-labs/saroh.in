@@ -1,11 +1,13 @@
 "use client";
 
+import { submitOnModEnter } from "@/lib/hooks/keyboard-save";
 import { Button } from "@saroh/ui/button";
 import { Input } from "@saroh/ui/input";
 import { cn } from "@saroh/ui/lib/utils";
 import { FilePlus } from "lucide-react";
 import { useState } from "react";
 
+import { runAction } from "@/lib/api/run-action";
 import { createPage } from "@/lib/sites/actions";
 import type { ModulePageOffer } from "@/lib/sites/page-menu";
 import type { CreatePageInput, SitePage } from "@/lib/sites/service";
@@ -53,10 +55,11 @@ export function AddPagePanel({
     const [path, setPath] = useState("");
 
     async function add(input: CreatePageInput, key: string) {
-        setBusy(key);
         setRefusal(null);
-        const res = await createPage(siteId, input);
-        setBusy(null);
+        const res = await runAction(() => createPage(siteId, input), {
+            setBusy: (on) => setBusy(on ? key : null),
+        });
+        if (!res) return;
         if (res.ok) {
             onAdded(res.data);
             return;
@@ -109,6 +112,7 @@ export function AddPagePanel({
 
             {blank ? (
                 <form
+                    onKeyDown={submitOnModEnter}
                     className="grid gap-1.5 p-1"
                     onSubmit={(e) => {
                         e.preventDefault();
@@ -119,34 +123,36 @@ export function AddPagePanel({
                     }}
                 >
                     <Input
+                        dense
                         autoFocus
                         value={title}
                         onChange={(e) => setTitle(e.target.value)}
                         placeholder="Page name"
                         aria-label="Page name"
-                        className="h-8 text-xs"
                     />
                     <Input
+                        dense
                         value={path}
                         onChange={(e) => setPath(e.target.value)}
                         placeholder="/about"
                         aria-label="Page address"
-                        className="h-8 font-mono text-xs"
+                        className="font-mono"
                     />
                     <div className="flex gap-1">
                         <Button
                             type="submit"
                             size="sm"
-                            className="h-8 flex-1 text-xs"
+                            className="flex-1"
                             disabled={busy !== null}
+                            busy={busy === "blank"}
+                            busyLabel="Adding…"
                         >
-                            {busy === "blank" ? "Adding…" : "Add page"}
+                            Add page
                         </Button>
                         <Button
                             type="button"
                             variant="ghost"
                             size="sm"
-                            className="h-8 text-xs"
                             onClick={onCancel}
                         >
                             Cancel
@@ -179,8 +185,8 @@ export function AddPagePanel({
                             <Button
                                 type="button"
                                 variant="outline"
-                                size="sm"
-                                className="h-7 justify-self-start px-2 text-xs text-foreground"
+                                size="xs"
+                                className="justify-self-start text-foreground"
                                 disabled={busy !== null}
                                 onClick={() => {
                                     const retry = refusal.retry;

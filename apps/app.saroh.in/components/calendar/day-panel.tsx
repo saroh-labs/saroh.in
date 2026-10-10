@@ -143,7 +143,7 @@ export function DayPanel({
                             asChild
                             variant="outline"
                             size="sm"
-                            className="gap-1.5 px-3 text-[12.5px] font-semibold"
+                            className="gap-1.5"
                         >
                             <Link href={s.href}>
                                 <Plus aria-hidden className="size-3" />

@@ -21,7 +21,7 @@ export function TurnOnTracking() {
         <>
             <Button
                 type="button"
-                className="mt-1.5 rounded-[9px] px-4 text-[12.5px]"
+                className="mt-1.5"
                 onClick={() => setAsking(true)}
             >
                 Turn on Track stock

@@ -8,7 +8,6 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 
-import { OptionSelect } from "@/components/shared/option-select";
 import { productHref } from "@/lib/products/links";
 import type { LogKindId } from "@/lib/stock/log";
 import {
@@ -25,9 +24,11 @@ import {
 import { loadLogPage } from "@/lib/stock/screen-actions";
 import type { StockLog, StockLogEntry } from "@/lib/stock/service";
 import { couldntLoad, nothingChanged } from "@saroh/ui/lib/state-copy";
+import { OptionSelect } from "@saroh/ui/option-select";
 
 import { chipClass } from "@/components/shared/chip";
 import { StatusBadge } from "@/components/shared/status-badge";
+import { runAction } from "@/lib/api/run-action";
 import { TextLink } from "@saroh/ui/text-link";
 import { PILL_TONE, TEXT_TONE } from "./tones";
 
@@ -137,7 +138,7 @@ export function LogList({
                 <OptionSelect
                     size="sm"
                     aria-label="Product"
-                    className="h-[30px] w-auto min-w-[160px] max-w-[260px] rounded-[8px] text-[12.5px] coarse:h-11"
+                    className="w-auto min-w-[160px] max-w-[260px]"
                     value={filter.product}
                     options={[
                         { value: "", label: "All products" },
@@ -191,15 +192,22 @@ export function LogList({
 
     const more = () =>
         start(async () => {
-            if (!loaded.next) return;
+            const cursor = loaded.next;
             setLoadError(null);
-            const res = await loadLogPage({
-                kind: logKinds(filter.kind),
-                storefront: filter.store === "all" ? undefined : filter.store,
-                product: filter.product || undefined,
-                cursor: loaded.next,
-                limit: pageSize,
-            });
+            if (!cursor) return;
+            const res = await runAction(
+                () =>
+                    loadLogPage({
+                        kind: logKinds(filter.kind),
+                        storefront:
+                            filter.store === "all" ? undefined : filter.store,
+                        product: filter.product || undefined,
+                        cursor,
+                        limit: pageSize,
+                    }),
+                { quiet: true, onUnreached: setLoadError },
+            );
+            if (!res) return;
             if (!res.ok) {
                 setLoadError(res.error);
                 return;
@@ -355,10 +363,11 @@ export function LogList({
                         type="button"
                         variant="outline"
                         size="sm"
-                        disabled={pending}
                         onClick={more}
+                        busy={pending}
+                        busyLabel="Loading…"
                     >
-                        {pending ? "Loading…" : "Show older"}
+                        Show older
                     </Button>
                     {loadError ? (
                         <span

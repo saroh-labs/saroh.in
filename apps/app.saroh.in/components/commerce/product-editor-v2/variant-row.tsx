@@ -1,19 +1,21 @@
 "use client";
 
+import { IconButton } from "@saroh/ui/icon-button";
+import { Input } from "@saroh/ui/input";
 import { cn } from "@saroh/ui/lib/utils";
 import { Trash2 } from "lucide-react";
 
-import { OptionSelect } from "@/components/shared/option-select";
 import { isMoney } from "@/lib/products/editor-sections";
 import { soldAtSummary } from "@/lib/products/listing-changes";
 import type { ProductImage } from "@/lib/products/service";
 import type { VariantRow } from "@/lib/products/variant-rows";
 import { isLegacy, legacyNote } from "@/lib/products/variant-rows";
+import { OptionSelect } from "@saroh/ui/option-select";
 
 import { chipClass } from "@/components/shared/chip";
 import { TextLink } from "@saroh/ui/text-link";
 import { Tip } from "@saroh/ui/tooltip";
-import { boxClass, FieldHelp, MoneyBox } from "./fields";
+import { FieldHelp, MoneyBox } from "./fields";
 
 export const VARIANT_GRID =
     "grid grid-cols-[minmax(0,2fr)_minmax(0,1.4fr)_minmax(0,1fr)_30px] gap-1.5";
@@ -75,6 +77,7 @@ export function VariantRowView({
         <li>
             <div className={cn(VARIANT_GRID, "items-center")}>
                 <OptionSelect
+                    size="sm"
                     value={r.valueId}
                     onValueChange={(id) =>
                         onChange({ valueId: id, legacyTitle: "" })
@@ -88,48 +91,41 @@ export function VariantRowView({
                     disabled={locked}
                     aria-label={`Variant ${i + 1} ${opt}`}
                     className={cn(
-                        "h-8 rounded-[8px] text-[13px]",
                         !r.valueId && !legacy && "border-destructive",
                     )}
                 />
-                <input
+                <Input
+                    dense
+                    aria-invalid={!r.sku.trim() || skuDupe}
                     value={r.sku}
                     onChange={(e) => onChange({ sku: e.target.value })}
                     disabled={locked}
                     aria-label={`Variant ${i + 1} SKU`}
-                    className={boxClass({
-                        small: true,
-                        mono: true,
-                        bad: !r.sku.trim() || skuDupe,
-                    })}
+                    className="font-mono"
                 />
                 <MoneyBox symbol={symbol} small>
-                    <input
+                    <Input
+                        dense
+                        aria-invalid={
+                            r.price.trim() !== "" && !isMoney(r.price)
+                        }
                         value={r.price}
                         onChange={(e) => onChange({ price: e.target.value })}
                         inputMode="decimal"
                         disabled={locked}
                         placeholder={productPrice}
                         aria-label={`Variant ${i + 1} price, blank uses the product's`}
-                        className={cn(
-                            boxClass({
-                                small: true,
-                                bad: r.price.trim() !== "" && !isMoney(r.price),
-                            }),
-                            "pl-[22px]",
-                        )}
+                        className="pl-[22px]"
                     />
                 </MoneyBox>
                 <Tip label={`Remove ${title || "this variant"}`}>
-                    <button
-                        type="button"
+                    <IconButton
+                        label={`Remove ${title || "this variant"}`}
+                        icon={<Trash2 aria-hidden className="size-[15px]" />}
                         disabled={locked}
                         onClick={onRemove}
-                        aria-label={`Remove ${title || "this variant"}`}
-                        className="flex h-8 w-[30px] items-center justify-center rounded-[7px] text-muted-foreground hover:bg-destructive-subtle disabled:cursor-not-allowed coarse:size-11"
-                    >
-                        <Trash2 aria-hidden className="size-[15px]" />
-                    </button>
+                        className="text-muted-foreground"
+                    />
                 </Tip>
             </div>
             <div className="mt-[5px] flex flex-wrap items-center gap-2">

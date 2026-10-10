@@ -10,6 +10,7 @@ import { useState } from "react";
 
 import { FormDialog, FormDialogFoot } from "@/components/shared/form-dialog";
 import type { GoLiveTarget } from "@/components/sites/editor/use-test-releases";
+import { runAction } from "@/lib/api/run-action";
 import type {
     GoLiveGate,
     GoLiveResult,
@@ -124,8 +125,11 @@ function Body({
     async function confirm() {
         setBusy(true);
         if (now) {
-            const res = await goLiveWithRelease(siteId, release.id, override);
-            setBusy(false);
+            const res = await runAction(
+                () => goLiveWithRelease(siteId, release.id, override),
+                { setBusy },
+            );
+            if (!res) return;
             if (!res.ok) return showError(res.error);
             onWentLive(res.data);
             return;
@@ -134,12 +138,16 @@ function Body({
             setBusy(false);
             return showError("Pick a date to go live.");
         }
-        const res = await scheduleGoLive(siteId, release.id, {
-            date: dayOf(date),
-            time,
-            ...(override ? { override: true } : {}),
-        });
-        setBusy(false);
+        const res = await runAction(
+            () =>
+                scheduleGoLive(siteId, release.id, {
+                    date: dayOf(date),
+                    time,
+                    ...(override ? { override: true } : {}),
+                }),
+            { setBusy },
+        );
+        if (!res) return;
         if (!res.ok) return showError(res.error);
         onScheduled(res.data);
     }

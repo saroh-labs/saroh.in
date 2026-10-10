@@ -9,6 +9,7 @@ import {
     uncollectedFrom,
 } from "../orders/uncollected";
 import { orderPartyName } from "../orders/walk-in";
+import { noticeOf } from "./notice-target";
 import type { TeamAlertPayload, WordedAlert } from "./team-alerts";
 import { enqueueTeamAlert } from "./team-alerts";
 
@@ -58,7 +59,9 @@ export async function wordUncollected(
         event: "order",
         eventKey: `team:uncollected:${order.id}`,
         notificationId: null,
-        type: ORDER_UNCOLLECTED_NOTIFICATION_TYPE,
+        ...noticeOf(ORDER_UNCOLLECTED_NOTIFICATION_TYPE, {
+            orderId: order.id,
+        }),
         title: `${notHandedOverWords(order.fulfilment)}: order ${order.orderId} from ${orderPartyName(order)}`,
         body: `Placed ${days} days ago to ${payOnHandoverWords(order.fulfilment)}, and not paid yet. ${pickup ? "Nobody has collected it" : "It hasn't been delivered"}. Cancel it to put the stock back, or keep waiting. Nothing cancels on its own.`,
         mail: {
@@ -67,7 +70,6 @@ export async function wordUncollected(
         },
         path: `/commerce/orders/${order.id}`,
         skipUserId: null,
-        orderId: order.id,
     };
 }
 

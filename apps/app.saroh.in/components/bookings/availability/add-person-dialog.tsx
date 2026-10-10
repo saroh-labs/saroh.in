@@ -7,6 +7,7 @@ import { useRouter } from "next/navigation";
 import { useId, useState } from "react";
 
 import { FormDialog } from "@/components/shared/form-dialog";
+import { runAction } from "@/lib/api/run-action";
 import { createStaff } from "@/lib/staff/actions";
 
 /**
@@ -55,13 +56,16 @@ export function AddPersonDialog({
     async function add() {
         setTried(true);
         if (!name.trim() || saving) return;
-        setSaving(true);
         setError(null);
-        const res = await createStaff({
-            name: name.trim(),
-            title: title.trim() || undefined,
-        });
-        setSaving(false);
+        const res = await runAction(
+            () =>
+                createStaff({
+                    name: name.trim(),
+                    title: title.trim() || undefined,
+                }),
+            { setBusy: setSaving, quiet: true, onUnreached: setError },
+        );
+        if (!res) return;
         if (!res.ok) {
             setError(res.error);
             return;
@@ -95,7 +99,7 @@ export function AddPersonDialog({
                 id={ids.name}
                 value={name}
                 onChange={(e) => setName(e.target.value)}
-                className="mt-1 h-9"
+                className="mt-1"
                 aria-invalid={Boolean(error) || nameless}
                 autoComplete="off"
             />
@@ -118,7 +122,7 @@ export function AddPersonDialog({
                 value={title}
                 placeholder="Trainer, Yoga teacher…"
                 onChange={(e) => setTitle(e.target.value)}
-                className="mt-1 h-9"
+                className="mt-1"
                 autoComplete="off"
             />
             {error ? (

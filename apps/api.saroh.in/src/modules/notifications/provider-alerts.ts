@@ -1,5 +1,6 @@
 import type { Prisma } from "@saroh/database";
 
+import { noticeOf } from "./notice-target";
 import type { TeamAlertPayload, WordedAlert } from "./team-alerts";
 import { enqueueTeamAlert } from "./team-alerts";
 
@@ -166,10 +167,13 @@ export async function wordProvider(
     const words = WORDS[p.channel][change](name);
     return {
         ...base,
-        type:
+        // A page, not a record: Settings › Providers.
+        ...noticeOf(
             change === "down"
                 ? PROVIDER_ATTENTION_NOTIFICATION_TYPE
                 : PROVIDER_BACK_NOTIFICATION_TYPE,
+            {},
+        ),
         title: words.heading,
         body: words.body,
         mail: words,

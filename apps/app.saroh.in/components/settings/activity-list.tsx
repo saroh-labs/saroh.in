@@ -123,10 +123,7 @@ function ActivitySheet({
             titleClassName="text-clip whitespace-normal text-pretty font-display text-[16px] font-semibold tracking-[-0.015em]"
             description={`${sentence}, ${detail.when}.`}
             footer={
-                <Button
-                    asChild
-                    className="h-[38px] min-w-[160px] flex-1 rounded-[10px] text-[13.5px]"
-                >
+                <Button asChild className="min-w-[160px] flex-1">
                     <Link href={line.where.href}>Open {line.where.label}</Link>
                 </Button>
             }

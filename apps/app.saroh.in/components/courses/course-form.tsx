@@ -1,6 +1,7 @@
 "use client";
 
 import { plural } from "@/lib/format/plural";
+import { submitOnModEnter } from "@/lib/hooks/keyboard-save";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Button } from "@saroh/ui/button";
 import { DatePicker } from "@saroh/ui/date-picker";
@@ -15,6 +16,7 @@ import {
 } from "@saroh/ui/form";
 import { Input } from "@saroh/ui/input";
 import { Label } from "@saroh/ui/label";
+import { MoneyInput } from "@saroh/ui/money-input";
 import { Textarea } from "@saroh/ui/textarea";
 import { TimeSelect } from "@saroh/ui/time-select";
 import { showError, showSuccess } from "@saroh/ui/toast";
@@ -25,18 +27,17 @@ import { useId, useState } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 
-import { OptionSelect } from "@/components/shared/option-select";
 import {
     lostChanges,
     lostNew,
     useLeaveGuard,
 } from "@/components/shared/use-leave-guard";
+import { runAction } from "@/lib/api/run-action";
 import { createCourse, updateCourse } from "@/lib/courses/actions";
 import type { CourseDetail } from "@/lib/courses/service";
 import { wallClockToIso, ymd } from "@/lib/courses/sessions";
 import { formatDate, formatTimeRange } from "@/lib/format/datetime";
-
-const CURRENCIES = ["INR", "USD", "GBP", "EUR", "AED", "SGD", "AUD", "CAD"];
+import { OptionSelect } from "@saroh/ui/option-select";
 
 const schema = z.object({
     serviceId: z.string().min(1, "Choose the service it runs on"),
@@ -131,15 +132,19 @@ export function CourseForm({
             currency: values.currency,
             seats,
         };
-        const res = course
-            ? await updateCourse(course.id, input)
-            : await createCourse({
-                  ...input,
-                  serviceId: values.serviceId,
-                  sessions,
-                  status: open ? "OPEN" : "DRAFT",
-              });
-        setBusy(false);
+        const res = await runAction(
+            () =>
+                course
+                    ? updateCourse(course.id, input)
+                    : createCourse({
+                          ...input,
+                          serviceId: values.serviceId,
+                          sessions,
+                          status: open ? "OPEN" : "DRAFT",
+                      }),
+            { setBusy },
+        );
+        if (!res) return false;
         if (!res.ok) {
             if (res.field && FIELDS.has(res.field)) {
                 form.setError(res.field as keyof Values, {
@@ -182,6 +187,7 @@ export function CourseForm({
     return (
         <Form {...form}>
             <form
+                onKeyDown={submitOnModEnter}
                 // Enter runs the form's first button: Save for a course
                 // being changed, Save and open for a new one (which waits
                 // for a session, so Enter does nothing until there is one).
@@ -265,7 +271,7 @@ export function CourseForm({
                         </FormItem>
                     )}
                 />
-                <div className="grid gap-4 sm:grid-cols-[1fr_8rem_8rem]">
+                <div className="grid gap-4 sm:grid-cols-[1fr_8rem]">
                     <FormField
                         control={form.control}
                         name="price"
@@ -273,36 +279,16 @@ export function CourseForm({
                             <FormItem>
                                 <FormLabel>Price</FormLabel>
                                 <FormControl>
-                                    <Input
+                                    <MoneyInput
                                         {...field}
-                                        inputMode="decimal"
-                                        placeholder="240.00"
+                                        currency={form.watch("currency")}
+                                        onValueChange={field.onChange}
                                     />
                                 </FormControl>
                                 <FormDescription>
                                     For the whole course. You can change it for
                                     one person when you enrol them.
                                 </FormDescription>
-                                <FormMessage />
-                            </FormItem>
-                        )}
-                    />
-                    <FormField
-                        control={form.control}
-                        name="currency"
-                        render={({ field }) => (
-                            <FormItem>
-                                <FormLabel>Currency</FormLabel>
-                                <FormControl>
-                                    <OptionSelect
-                                        value={field.value}
-                                        onValueChange={field.onChange}
-                                        options={CURRENCIES.map((c) => ({
-                                            value: c,
-                                            label: c,
-                                        }))}
-                                    />
-                                </FormControl>
                                 <FormMessage />
                             </FormItem>
                         )}
@@ -341,16 +327,23 @@ export function CourseForm({
 
                 <div className="flex flex-wrap gap-2">
                     {course ? (
-                        <Button type="submit" disabled={busy}>
-                            {busy ? "Saving…" : "Save"}
+                        <Button type="submit" busy={busy} busyLabel="Saving…">
+                            Save
                         </Button>
                     ) : (
                         <>
                             <Button
                                 type="submit"
-                                disabled={busy || sessions.length === 0}
+                                disabled={sessions.length === 0}
+                                aria-describedby={
+                                    sessions.length === 0
+                                        ? "course-open-why"
+                                        : undefined
+                                }
+                                busy={busy}
+                                busyLabel="Saving…"
                             >
-                                {busy ? "Saving…" : "Save and open"}
+                                Save and open
                             </Button>
                             <Button
                                 type="button"
@@ -372,6 +365,15 @@ export function CourseForm({
                         </Link>
                     </Button>
                 </div>
+                {!course && sessions.length === 0 ? (
+                    <p
+                        id="course-open-why"
+                        className="-mt-3 text-[0.78125rem] text-muted-foreground"
+                    >
+                        Add a session to open the course. Until then it can be
+                        saved as a draft.
+                    </p>
+                ) : null}
             </form>
             {guard.dialog}
         </Form>
@@ -445,7 +447,6 @@ function SessionPicker({
                                 type="button"
                                 variant="ghost"
                                 size="sm"
-                                className="coarse:size-11"
                                 aria-label={`Remove session ${i + 1}`}
                                 onClick={() =>
                                     onChange(value.filter((v) => v !== iso))

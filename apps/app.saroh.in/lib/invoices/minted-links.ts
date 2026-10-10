@@ -155,7 +155,7 @@ export function copyLinkLabel(state: {
     shown: boolean;
     linkOut: boolean;
 }): string {
-    if (state.busy) return "Making a link…";
+    if (state.busy) return "Making…";
     if (state.shown) return "Copy link";
     if (state.linkOut) return UNSEEN_LINK.action;
     return "Copy pay link";

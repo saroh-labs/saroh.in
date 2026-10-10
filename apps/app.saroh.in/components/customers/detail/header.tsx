@@ -17,11 +17,6 @@ import type { MoreItem } from "@/lib/customer-workspace/more-menu";
 import type { Tab, TabKey, Tag } from "@/lib/customer-workspace/view";
 import { TabStrip } from "@saroh/ui/tabs";
 import { Tip } from "@saroh/ui/tooltip";
-
-/** The ⋯ button: the design's 34px square beside Edit details. */
-const MORE_BTN =
-    "h-8 w-[34px] rounded-[9px] p-0 data-[state=open]:border-border-strong data-[state=open]:bg-accent coarse:size-11";
-
 /** A menu row: the design's 8px by 10px, 7px corners. */
 const MENU_ITEM =
     "cursor-pointer items-start rounded-[7px] px-2.5 py-2 text-[13px] active:bg-accent-active data-[disabled]:cursor-not-allowed data-[disabled]:opacity-100";
@@ -202,8 +197,9 @@ export function Header({
                                         }
                                     >
                                         <Button
+                                            size="sm"
                                             variant="outline"
-                                            className={MORE_BTN}
+                                            className="w-[34px] p-0 data-[state=open]:border-border-strong data-[state=open]:bg-accent"
                                             disabled={!canMore}
                                             aria-label="More actions"
                                         >

@@ -1,12 +1,12 @@
 "use client";
 
 import { resolveVariant } from "@saroh/block-contract";
+import { Field } from "@saroh/ui/field";
 import { Input } from "@saroh/ui/input";
 import { Textarea } from "@saroh/ui/textarea";
 
 import type { FeaturesContent } from "@/lib/sites/service";
 
-import { Field } from "./field";
 import { OptionSwitch } from "./option-switch";
 import type { SectionFieldsProps } from "./props";
 import { RepeatedItems } from "./repeated-items";
@@ -90,12 +90,12 @@ export function FeaturesFields({
                                 }
                             />
                         </Field>
-                        <Field label="Detail">
+                        <Field optional label="Detail">
                             <Textarea
                                 value={item.body ?? ""}
                                 onChange={(e) => set({ body: e.target.value })}
                                 rows={3}
-                                placeholder="A sentence or two. Optional."
+                                placeholder="A sentence or two."
                             />
                         </Field>
                     </>
@@ -110,14 +110,14 @@ export function FeaturesFields({
                     note="On a desk the points sit in two columns; on a phone, one."
                 />
             ) : null}
-            <Field label="Note under the points">
+            <Field optional label="Note under the points">
                 <Textarea
                     value={c.note ?? ""}
                     onChange={(e) =>
                         patch({ note: e.target.value || undefined })
                     }
                     rows={2}
-                    placeholder="Optional. A caveat or disclaimer, in smaller type."
+                    placeholder="A caveat or disclaimer, in smaller type."
                 />
             </Field>
         </div>

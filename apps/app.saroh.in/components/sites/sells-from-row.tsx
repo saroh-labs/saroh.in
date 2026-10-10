@@ -14,6 +14,7 @@ import {
     PROBLEM,
     useSheetControl,
 } from "@/components/sites/settings/settings-sheet";
+import { runAction } from "@/lib/api/run-action";
 import { updateSiteSettings } from "@/lib/sites/actions";
 import {
     SELLS_FROM_ANCHOR,
@@ -75,9 +76,12 @@ export function SellsFromRow({
     function save(picked: string) {
         const choice = sellsFrom.choices.find((c) => c.id === picked);
         startTransition(async () => {
-            const res = await updateSiteSettings(siteId, {
-                storefrontId: picked,
-            });
+            const res = await runAction(() =>
+                updateSiteSettings(siteId, {
+                    storefrontId: picked,
+                }),
+            );
+            if (!res) return;
             if (!res.ok) {
                 showError(res.error);
                 return;

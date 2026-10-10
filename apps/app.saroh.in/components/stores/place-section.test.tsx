@@ -376,7 +376,7 @@ describe("the Name sheet", () => {
         await press(edit("Edit name"));
         type(name(), "Linking Road");
         await press(item("Save"));
-        expect(item("Saving…")?.disabled).toBe(true);
+        expect(item("Saving…")?.getAttribute("aria-busy")).toBe("true");
         await pressEscape();
         expect(sheetName()).toBe("Name");
         await act(async () => {
@@ -865,7 +865,7 @@ describe("the Description and logo sheet", () => {
         draw();
         await open();
         expect(item("Save")?.disabled).toBe(true);
-        expect(item("Uploading…")?.disabled).toBe(true);
+        expect(item("Uploading…")?.getAttribute("aria-busy")).toBe("true");
     });
 
     it("Cancel saves nothing, even after an upload, and returns to the row's Edit", async () => {
