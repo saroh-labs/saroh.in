@@ -62,6 +62,7 @@ vi.mock("@/lib/request-path", () => ({
 }));
 vi.mock("@/lib/shop-checkout", () => ({ getCheckoutOptions: vi.fn() }));
 vi.mock("@/lib/sign-in", () => ({ getSignInOptions: vi.fn() }));
+vi.mock("@/lib/site-contact", () => ({ getSiteContact: vi.fn() }));
 vi.mock("@/lib/site-footer", () => ({ getFooterFacts: vi.fn() }));
 vi.mock("@/lib/site-relay", () => ({ relayFor: vi.fn() }));
 vi.mock("@/lib/test-release-chrome", () => ({ HEADER_BELOW_BAR: "" }));
