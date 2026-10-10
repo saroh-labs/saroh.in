@@ -308,10 +308,6 @@ test.describe("a Member", () => {
     });
 
     test("is not offered New booking on All bookings", async ({ page }) => {
-        test.fixme(
-            true,
-            "All bookings draws New booking for everyone; a Member holds no booking:write and the API refuses the save. The diary (/bookings) already asks.",
-        );
         await openNorthwindAs(page, "northwindMember");
         await page.goto("/bookings/all");
         await expect(
