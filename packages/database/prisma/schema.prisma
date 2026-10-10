@@ -425,6 +425,18 @@ model BusinessProfile {
   // no number, and the site shows no Call button rather than an empty one.
   phone String?
 
+  // The business's social links (DEC-125): one canonical https address per
+  // network it has set, keyed by network ("instagram", "whatsapp", …), each
+  // on that network's own host (`@saroh/block-contract` social-links.ts).
+  // Written only through the settings save, which rebuilds every value, and
+  // re-checked on the way out. Null: none.
+  socialLinks                Json?
+  // The website shows the registered address above as where to find the
+  // business (DEC-125). Off by default: it is the legal address, often a
+  // home, and a business with a location customers visit shows that
+  // instead. Read only while no such location has an address.
+  siteShowsRegisteredAddress Boolean @default(false)
+
   // "Members can pause from their account" (round-2 A8), beside the
   // subscriptions' time zone above: on, a member pauses their own plan for
   // 2, 4 or 8 weeks from the account area on the business's site; off, the
