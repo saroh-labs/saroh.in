@@ -104,26 +104,30 @@ export default async function BookingsPage({
                 meta={<BookingsViewSwitch current="list" />}
                 actions={
                     <>
-                        <NewBookingDialog
-                            plainTrigger
-                            services={services
-                                .filter((s) => s.status === "ACTIVE")
-                                .map((s) => ({
-                                    id: s.id,
-                                    name: s.name,
-                                    timezone: s.timezone,
-                                    minutes: s.durationMinutes,
-                                    priceCents: s.priceCents,
-                                }))}
-                            people={people}
-                            // Paying with a class pack spends one (ADR-007),
-                            // while Class packs is on (E12).
-                            canUsePacks={
-                                canReadPacks(organization) &&
-                                canUsePacksOnBookings(organization) &&
-                                packsOn(await modulesOrUnknown())
-                            }
-                        />
+                        {/* Only someone who may book: the API refuses the
+                            save otherwise, as the diary already asks. */}
+                        {may("booking:write") ? (
+                            <NewBookingDialog
+                                plainTrigger
+                                services={services
+                                    .filter((s) => s.status === "ACTIVE")
+                                    .map((s) => ({
+                                        id: s.id,
+                                        name: s.name,
+                                        timezone: s.timezone,
+                                        minutes: s.durationMinutes,
+                                        priceCents: s.priceCents,
+                                    }))}
+                                people={people}
+                                // Paying with a class pack spends one (ADR-007),
+                                // while Class packs is on (E12).
+                                canUsePacks={
+                                    canReadPacks(organization) &&
+                                    canUsePacksOnBookings(organization) &&
+                                    packsOn(await modulesOrUnknown())
+                                }
+                            />
+                        ) : null}
                     </>
                 }
             />
