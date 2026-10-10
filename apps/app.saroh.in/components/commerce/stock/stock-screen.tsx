@@ -2,12 +2,7 @@
 
 import { Button } from "@saroh/ui/button";
 import { cn } from "@saroh/ui/lib/utils";
-import {
-    dismissToasts,
-    showError,
-    showSuccess,
-    showUndo,
-} from "@saroh/ui/toast";
+import { dismissToasts, showError, showUndo } from "@saroh/ui/toast";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useRef, useState } from "react";
@@ -162,18 +157,13 @@ export function StockScreen({
         dismissToasts();
         showUndo(
             countSaved(counted, changed),
-            () => {
-                void undoStock({
+            async () => {
+                const u = await undoStock({
                     entryIds,
                     idempotencyKey: crypto.randomUUID(),
-                }).then((u) => {
-                    if (!u.ok) {
-                        showError(u.error);
-                        return;
-                    }
-                    showSuccess("Count undone.");
-                    router.refresh();
                 });
+                router.refresh();
+                return u;
             },
             notes.length ? { description: notes.join(" ") } : {},
         );

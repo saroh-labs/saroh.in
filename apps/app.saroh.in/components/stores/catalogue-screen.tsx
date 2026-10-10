@@ -224,10 +224,12 @@ export function CatalogueScreen({
                 : one
                   ? `${one.name} is on sale.`
                   : `${targets.length} products published.`;
-        showUndo(said, () => {
-            void Promise.all(
+        showUndo(said, async () => {
+            const back = await Promise.all(
                 before.map((r) => setProductStatus(r.id, r.was)),
-            ).then(() => reload());
+            );
+            await reload();
+            return back.every((r) => r.ok);
         });
     }
 

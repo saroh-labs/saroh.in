@@ -233,8 +233,9 @@ export function AvailabilityEditor({
             return;
         }
         setDraft(null);
-        showUndo(savedText(ops), () => {
-            void undo(done).then(() => router.refresh());
+        showUndo(savedText(ops), async () => {
+            await undo(done);
+            router.refresh();
         });
         if (outside.length) {
             showWarning(

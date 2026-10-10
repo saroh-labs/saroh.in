@@ -23,7 +23,6 @@ import { PackCard } from "./pack-card";
 import { SellPackDialog } from "./sell-pack-dialog";
 
 /** An Undo toast lasts ten seconds (round-2 default 136). */
-const UNDO_MS = 10_000;
 const BUTTON = "h-[38px] rounded-[9px] px-4 text-[14px] font-semibold";
 
 /** Archived, with who keeps what: the toast Undo sits beside. */
@@ -102,15 +101,12 @@ export function PacksScreen({
             // One Undo on screen at a time: an older one would undo the
             // wrong pack.
             dismissToasts();
-            showUndo(
-                archiveToast(pack, archived),
-                () =>
-                    start(async () => {
-                        const back = await setPackArchived(pack.id, !archived);
-                        if (!back.ok) showError(back.error);
-                        router.refresh();
-                    }),
-                { duration: UNDO_MS },
+            showUndo(archiveToast(pack, archived), () =>
+                start(async () => {
+                    const back = await setPackArchived(pack.id, !archived);
+                    if (!back.ok) showError(back.error);
+                    router.refresh();
+                }),
             );
         });
     }

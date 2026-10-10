@@ -69,12 +69,15 @@ export const NOT_UNDONE = "Couldn't undo. It stays as saved.";
  * default for reversible actions; only the irreversible get a confirm. Ten
  * seconds, everywhere: no screen has a window of its own.
  *
- * `undo` takes it back and says how that went; this says the rest, in one
- * wording: "Undone." when it worked, "Couldn't undo. It stays as saved."
- * when it was refused or threw (with the refusal's own sentence under it).
- * So no caller words an Undo's outcome, and none fails silently. `quiet`
- * is for a caller that draws the outcome on the page itself (a hold card
- * with its own state).
+ * `undo` takes it back and says how that went (a promise, or a result);
+ * this says the rest, in one wording: "Undone." when it worked, "Couldn't
+ * undo. It stays as saved." when it was refused or threw (with the
+ * refusal's own sentence under it). So no caller words an Undo's outcome,
+ * and none fails silently.
+ *
+ * An `undo` that returns nothing at once has kept the outcome for itself:
+ * a hold card that draws its own state on the page. Nothing is said for
+ * it here. `quiet` says the same for one that returns a promise.
  *
  * Returns the toast's id, for `dismissToast` when the window closes early.
  */
@@ -102,7 +105,10 @@ export async function settleUndo(
 ): Promise<boolean> {
     let result: UndoResult;
     try {
-        result = await undo();
+        const started = undo();
+        // Nothing came back at once: the caller draws the outcome itself.
+        if (started === undefined) return true;
+        result = await started;
     } catch {
         result = false;
     }

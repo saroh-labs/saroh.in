@@ -412,11 +412,10 @@ export function CalendarScreen({
                 setPeek(null);
                 router.refresh();
                 const to = `${dayLabel(localDateOf(slot.startAt, timezone))} at ${clock(localMinuteOf(slot.startAt, timezone))}`;
-                showUndo(`Moved ${firstName(b)} to ${to}.`, () => {
-                    void rescheduleBooking(b.id, b.startAt).then((back) => {
-                        if (!back.ok) showError(back.error);
-                        router.refresh();
-                    });
+                showUndo(`Moved ${firstName(b)} to ${to}.`, async () => {
+                    const back = await rescheduleBooking(b.id, b.startAt);
+                    router.refresh();
+                    return back;
                 });
             });
         },
