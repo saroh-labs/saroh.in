@@ -3895,3 +3895,18 @@ second. On CI's runners, beside every other package's tests, it took 5.3 to
 hashing many inputs) gets an explicit timeout. CI ran this one six times
 slower than the laptop, so the local time says little.
 **Category**: tests · `packages/ui/src/lib/qr-art.decode.test.ts`
+
+## The gate's quick API test step hung for ever on watchman
+
+**Symptom**: `pnpm prepush` (and so `git push`) sat on `api-unit:changed`
+for ten minutes or more with jest at 0% CPU, four times in one day, in the
+batch worktree and in three agent worktrees. Killed by hand, the step
+failed and the push was refused.
+**Cause**: jest uses watchman to find changed files when watchman is
+installed. With many worktrees of the same repo open, watchman never
+answered `--changedSince`, and jest waits without a timeout.
+**Fix**: `watchman: false` in `apps/api.saroh.in/jest.config.js`. Jest crawls
+the files itself, which is about a second slower and always returns.
+**Rule**: a test runner must not depend on a machine-wide daemon. A step
+that goes silent at 0% CPU is a hang, not a slow test: kill it and find why.
+**Category**: tooling · `apps/api.saroh.in/jest.config.js`

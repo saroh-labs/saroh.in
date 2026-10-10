@@ -13,6 +13,11 @@
  */
 module.exports = {
     preset: "ts-jest",
+    // Jest asks watchman which files changed when one is installed. With
+    // several worktrees open it never answers, and `--changedSince` (the
+    // gate's quick run) sat at 0% CPU until killed (DEV_LEARNINGS, 10 Oct
+    // 2026). The plain file crawl is a second slower and always returns.
+    watchman: false,
     // sanitize-html 2.17.7 uses ESM-only HTML parser packages. Node 24 loads
     // them natively; Jest's CommonJS runtime needs them transformed too.
     transform: {
