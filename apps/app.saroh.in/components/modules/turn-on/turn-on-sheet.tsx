@@ -24,6 +24,7 @@ import {
 import type { ConnectLock } from "@/lib/providers/connect-lock";
 import { connectLockFor, connectLockLine } from "@/lib/providers/connect-lock";
 
+import { Refusal } from "@/components/shared/refusal";
 import { Notice } from "@saroh/ui/notice";
 import { TextLink } from "@saroh/ui/text-link";
 import { BookingsFields } from "./bookings-fields";
@@ -271,7 +272,7 @@ function TurnOnBody({
                     </>
                 )}
 
-                {t.failure ? <Notice tone="error">{t.failure}</Notice> : null}
+                <Refusal>{t.failure}</Refusal>
             </FormSheetBody>
             <FormSheetFoot
                 saveLabel="Turn on"

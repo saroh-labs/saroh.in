@@ -10,7 +10,7 @@ import {
     DialogTitle,
 } from "@saroh/ui/dialog";
 import { planLabel } from "@saroh/ui/lib/state-copy";
-import { showError, showInfo } from "@saroh/ui/toast";
+import { showError, showRefusal } from "@saroh/ui/toast";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 
@@ -43,7 +43,9 @@ export function showPlanRefusal(refusal: PlanRefusal): void {
  * A refusal by the person's role (`denied`, `lib/api/role-denied.ts`) is a
  * notice, not an error: nothing broke, and red tells someone to try again
  * at a thing that will only be refused again. It uses the toast module's
- * neutral style (`showInfo`), which leaves after its usual few seconds.
+ * neutral style (`showRefusal`), which stays ten seconds. A result with no
+ * `denied` mark whose sentence is a refusal is said the same way, by
+ * `showError` itself (`setRefusalTest`).
  */
 export function reportFailure(
     res: { error: string; plan?: PlanRefusal; denied?: boolean },
@@ -56,7 +58,7 @@ export function reportFailure(
     const said = res.error.trim()
         ? res.error
         : (fallback ?? "That didn't work. Try again.");
-    if (res.denied) showInfo(said);
+    if (res.denied) showRefusal(said);
     else showError(said);
 }
 

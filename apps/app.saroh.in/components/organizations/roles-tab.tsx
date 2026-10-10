@@ -16,6 +16,7 @@ import { showPlanRefusal } from "@/components/billing/plan-refusal";
 import type { ConfirmResult } from "@/components/shared/confirm-dialog";
 import { ConfirmDialog } from "@/components/shared/confirm-dialog";
 import { FormSheet } from "@/components/shared/form-sheet";
+import { Refusal } from "@/components/shared/refusal";
 import { StatusBadge } from "@/components/shared/status-badge";
 import { runAction } from "@/lib/api/run-action";
 import { CAPABILITY_GROUP_LABEL as GROUP_LABEL } from "@/lib/organizations/capability-groups";
@@ -30,7 +31,6 @@ import type {
     RoleCatalogue,
 } from "@/lib/organizations/roles";
 import type { RolesLock } from "@/lib/organizations/roles-lock";
-import { Notice } from "@saroh/ui/notice";
 import { TextLink } from "@saroh/ui/text-link";
 
 /** The built-ins a new role may start from. Owner is not offered: see below. */
@@ -661,7 +661,7 @@ function RoleSheet({
                     onToggle={toggle}
                 />
             </div>
-            {refusal ? <Notice tone="error">{refusal}</Notice> : null}
+            <Refusal>{refusal}</Refusal>
         </FormSheet>
     );
 }
@@ -821,7 +821,7 @@ function NewRoleSheet({
                     </p>
                 ) : null}
             </fieldset>
-            {error ? <Notice tone="error">{error}</Notice> : null}
+            <Refusal>{error}</Refusal>
         </FormSheet>
     );
 }

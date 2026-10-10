@@ -10,16 +10,16 @@ import { toFailure } from "@/lib/api/failure";
 import { reportFailure } from "./plan-refusal";
 
 const showError = vi.fn();
-const showInfo = vi.fn();
+const showRefusal = vi.fn();
 vi.mock("@saroh/ui/toast", () => ({
     showError: (...args: unknown[]) => showError(...args) as unknown,
-    showInfo: (...args: unknown[]) => showInfo(...args) as unknown,
+    showRefusal: (...args: unknown[]) => showRefusal(...args) as unknown,
 }));
 vi.mock("@/lib/billing/access", () => ({ upgradeHref: () => "/settings" }));
 
 beforeEach(() => {
     showError.mockReset();
-    showInfo.mockReset();
+    showRefusal.mockReset();
 });
 
 describe("reportFailure", () => {
@@ -38,7 +38,7 @@ describe("reportFailure", () => {
                 "Could not move the booking.",
             ),
         );
-        expect(showInfo).toHaveBeenCalledWith(
+        expect(showRefusal).toHaveBeenCalledWith(
             "Your role can't change bookings. An owner or admin can change this in Settings › Team.",
         );
         expect(showError).not.toHaveBeenCalled();
@@ -47,7 +47,7 @@ describe("reportFailure", () => {
     it("shows a breakage as the error it is", () => {
         reportFailure(toFailure(null, "Could not move the booking."));
         expect(showError).toHaveBeenCalledWith("Could not move the booking.");
-        expect(showInfo).not.toHaveBeenCalled();
+        expect(showRefusal).not.toHaveBeenCalled();
     });
 
     it("shows an endpoint's own refusal as an error, as before", () => {

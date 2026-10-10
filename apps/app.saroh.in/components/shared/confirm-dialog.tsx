@@ -11,12 +11,13 @@ import {
 } from "@saroh/ui/alert-dialog";
 import { Button } from "@saroh/ui/button";
 import { cn } from "@saroh/ui/lib/utils";
-import { Notice } from "@saroh/ui/notice";
 import { showError } from "@saroh/ui/toast";
 import type { LucideIcon } from "lucide-react";
 import { CircleHelp, Trash2 } from "lucide-react";
 import type { ReactNode, RefObject } from "react";
 import { useState } from "react";
+
+import { Refusal } from "./refusal";
 
 /**
  * What a confirmed action said. Nothing, or `true`: it worked, and the
@@ -51,7 +52,9 @@ export const CONFIRM_FAILED = "That didn't work. Try again.";
  *   first. The button is the verb and the thing ("Delete page").
  * - `onConfirm` is waited for. While it runs the button says so
  *   ("Deleting…"), both buttons wait, and nothing closes the dialog. A
- *   refusal keeps it open with the reason. It closes only on success.
+ *   refusal keeps it open with the reason (`Refusal`: a quiet note when
+ *   the person's role refused it, the error otherwise). It closes only on
+ *   success.
  * - Red, with the bin, only when something is destroyed. A step that
  *   destroys nothing ("Turn on Track stock", "Make a new link") is
  *   `tone="neutral"`: the ink button and a plain mark.
@@ -171,11 +174,7 @@ export function ConfirmDialog({
                 {children ? (
                     <div className="px-[22px] pt-2">{children}</div>
                 ) : null}
-                {refusal ? (
-                    <Notice tone="error" className="mx-[22px] mt-2">
-                        {refusal}
-                    </Notice>
-                ) : null}
+                <Refusal className="mx-[22px] mt-2">{refusal}</Refusal>
                 <AlertDialogFooter className="px-[22px] py-[18px]">
                     <AlertDialogCancel disabled={busy}>
                         {keepLabel}

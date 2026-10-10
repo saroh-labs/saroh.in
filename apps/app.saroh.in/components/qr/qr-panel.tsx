@@ -15,8 +15,8 @@ import { instantOpens, NOT_COUNTED, QR_SHARE_HREF } from "@/lib/qr/panel";
 import type { QrCodeView } from "@/lib/qr/types";
 import { linkWords, opensWords, refusalWords } from "@/lib/qr/words";
 
+import { Refusal } from "@/components/shared/refusal";
 import { copyFailedMessage, copyText } from "@saroh/ui/copy-button";
-import { Notice } from "@saroh/ui/notice";
 import type { DownloadEnv, QrFile, QrFormat } from "./qr-download";
 import { artOf, BROWSER, downloadQr, qrFile } from "./qr-download";
 
@@ -244,7 +244,7 @@ function Saved({
                     without reprinting.
                 </p>
                 {notLive}
-                {problem ? <Notice tone="error">{problem}</Notice> : null}
+                <Refusal>{problem}</Refusal>
                 <div>
                     <Button
                         type="button"
