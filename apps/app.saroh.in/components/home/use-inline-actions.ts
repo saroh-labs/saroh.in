@@ -163,7 +163,7 @@ export function useInlineActions() {
             await takeBack();
             setDone(need.id, null);
             showSuccess(undoneText(inline, false));
-        } catch (error) {
+        } catch {
             showError("That couldn't be undone.", "Try again.");
         }
     }
