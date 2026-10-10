@@ -376,8 +376,9 @@ export function SiteEditor({
                               )
                             : null
                     }
+                    wentLive={publish.wentLive}
                     onPublish={() => void publish.onPublish(chrome.displayName)}
-                    onClose={() => publish.setChecking(false)}
+                    onClose={publish.closeCheck}
                     onJump={jumpToFlag}
                 />
             ) : null}
