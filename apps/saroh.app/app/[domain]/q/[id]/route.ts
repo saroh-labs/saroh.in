@@ -22,7 +22,12 @@ import { withRelayFrom } from "@/lib/relay-headers";
  * - Only a live site has short links: a host with no published site is a
  *   404, like its pages, and so is a test release's host (nothing a tester
  *   opens is the business's scan).
- * - A code the site doesn't have is a 404.
+ * - A code the site doesn't have, or one that can't be a code, forwards to
+ *   the home page: a torn sticker or a mistyped link still reaches the
+ *   business, never a bare "Not found".
+ * - It lands on the site's primary host: a site with its own domain
+ *   forwards there even when the code was printed with its Saroh address,
+ *   so a customer signed in on the business's domain stays signed in.
  * - Never cached: every scan is a request, so every scan is counted. The
  *   page cache passes `/q` by (`lib/page-cache/request-rules.ts`).
  * - `HEAD` gets the same redirect and is not counted. It is declared
@@ -48,11 +53,15 @@ async function answer(
     head: boolean,
 ): Promise<Response> {
     const { domain, id } = await params;
-    const origin = requestOrigin(request.headers);
+    const asked = requestOrigin(request.headers);
     const code = qrCodeOf(id);
-    if (!origin || !code) return notFound();
+    if (!asked) return notFound();
     const site = await getSiteForHost(domain);
     if (site?.mode !== "live" || !site.siteId) return notFound();
+    // The site's own domain when it has one, else where the scan arrived.
+    const origin = site.primaryHost ? `https://${site.primaryHost}` : asked;
+    // Not a code at all: the home page, and nothing to ask the API.
+    if (!code) return qrRedirect(`${origin}/`);
 
     const scan = await scanQrCode({
         apiUrl: serverApiUrl(),
@@ -62,7 +71,6 @@ async function answer(
         userAgent: request.headers.get("user-agent"),
         head,
     });
-    if (scan.kind === "missing") return notFound();
     return qrRedirect(qrRedirectLocation(origin, scan, code));
 }
 

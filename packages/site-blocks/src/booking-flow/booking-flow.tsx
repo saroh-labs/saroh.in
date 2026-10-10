@@ -1492,6 +1492,12 @@ export default function BookingFlow({
                                 />
                             ) : null}
 
+                            {/* It can't be paid for here, so it can't be
+                                booked here: the way to ask instead. */}
+                            {unpayable ? (
+                                <ReachLinks reach={callReach} />
+                            ) : null}
+
                             {message ? (
                                 // The aside says it from 700px.
                                 <div className="min-[700px]:hidden">
