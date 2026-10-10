@@ -21,10 +21,16 @@ import {
     siteNameOf,
 } from "@/lib/sites/settings-page";
 import type { SiteAddress } from "@/lib/sites/share-links";
+import {
+    shownSiteIcon,
+    SITE_ICON_ANCHOR,
+    siteIconOf,
+} from "@/lib/sites/site-icon";
 
 import { AddressGroup } from "./settings/address-group";
 import { PublishBar } from "./settings/publish-bar";
 import { SettingsSections } from "./settings/settings-sections";
+import { SiteIconSummary } from "./settings/site-icon-summary";
 
 /**
  * The site's settings, for someone who may read them and not change them
@@ -58,6 +64,7 @@ export function SiteSettingsRead({
     });
     const pagesById = new Map(site.pages.map((p) => [p.id, p]));
     const automatic = automaticMenu(site);
+    const icon = siteIconOf(site);
 
     return (
         <>
@@ -121,6 +128,19 @@ export function SiteSettingsRead({
                                     ) : (
                                         <Absent>None</Absent>
                                     )}
+                                </Row>
+                                <Row
+                                    id={SITE_ICON_ANCHOR}
+                                    label="Site icon"
+                                    draft
+                                >
+                                    <SiteIconSummary
+                                        shown={shownSiteIcon(
+                                            site,
+                                            icon.own?.url,
+                                            icon.businessLogoUrl,
+                                        )}
+                                    />
                                 </Row>
                                 <Row label="When shared">
                                     <ShareCards

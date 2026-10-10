@@ -1,6 +1,7 @@
 import { SELLS_FROM_ANCHOR } from "./sells-from";
 import type { SettingsGroupId } from "./settings-page";
 import { ROW_ANCHORS } from "./settings-page";
+import { SITE_ICON_ANCHOR } from "./site-icon";
 
 /**
  * Website › Settings, read first (owner, 10 Oct): each row says what is
@@ -15,6 +16,7 @@ export const SETTINGS_SHEETS = [
     "title",
     "description",
     "image",
+    "icon",
     "menu",
     "footer",
     "posts-path",
@@ -42,6 +44,7 @@ export const SETTINGS_ROW_ID: Record<SettingsSheet, string> = {
     title: ROW_ANCHORS.title,
     description: ROW_ANCHORS.description,
     image: ROW_ANCHORS.image,
+    icon: SITE_ICON_ANCHOR,
     menu: ROW_ANCHORS.menu,
     footer: "settings-footer",
     "posts-path": "settings-posts-path",
@@ -60,6 +63,7 @@ export function groupOfSheet(sheet: SettingsSheet): SettingsGroupId {
         case "title":
         case "description":
         case "image":
+        case "icon":
             return "search-and-sharing";
         case "menu":
         case "footer":

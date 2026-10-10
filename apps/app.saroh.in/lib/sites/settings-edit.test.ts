@@ -14,6 +14,7 @@ describe("the settings' sheets, by link", () => {
     it("reads a sheet from ?edit=, and nothing from anything else", () => {
         expect(settingsSheetFromParam("menu")).toBe("menu");
         expect(settingsSheetFromParam("sells-from")).toBe("sells-from");
+        expect(settingsSheetFromParam("icon")).toBe("icon");
         expect(settingsSheetFromParam("everything")).toBeNull();
         expect(settingsSheetFromParam("")).toBeNull();
         expect(settingsSheetFromParam(null)).toBeNull();
@@ -25,6 +26,7 @@ describe("the settings' sheets, by link", () => {
             expect(groups).toContain(groupOfSheet(sheet));
         }
         expect(groupOfSheet("image")).toBe("search-and-sharing");
+        expect(groupOfSheet("icon")).toBe("search-and-sharing");
         expect(groupOfSheet("posts-path")).toBe("menu-and-footer");
         expect(groupOfSheet("domain")).toBe("address");
     });
@@ -42,6 +44,9 @@ describe("the settings' sheets, by link", () => {
         expect(settingsEditHref("site_1", "sells-from")).toBe(
             "/sites/site_1/settings?section=shop&edit=sells-from",
         );
+        expect(settingsEditHref("site_1", "icon")).toBe(
+            "/sites/site_1/settings?section=search-and-sharing&edit=icon",
+        );
         // Address is the screen's own address: no section to name.
         expect(settingsEditHref("site_1", "domain")).toBe(
             "/sites/site_1/settings?edit=domain",
@@ -51,5 +56,6 @@ describe("the settings' sheets, by link", () => {
     it("names each row's Edit after its row", () => {
         expect(settingsEditId("title")).toBe("settings-title-edit");
         expect(settingsEditId("sells-from")).toBe("sells-from-edit");
+        expect(settingsEditId("icon")).toBe("settings-site-icon-edit");
     });
 });

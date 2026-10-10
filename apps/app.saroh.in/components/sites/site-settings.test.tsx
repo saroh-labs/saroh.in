@@ -196,8 +196,9 @@ describe("the two save models, made visible (UX-081, the audit)", () => {
             html.matchAll(/data-saves="(now|publish)"/g),
             (m: RegExpMatchArray) => m[1],
         );
-        // Title, description, share image, menu, footer and posts path.
-        expect(marks).toEqual(Array(6).fill("publish"));
+        // Title, description, share image, site icon, menu, footer and
+        // posts path.
+        expect(marks).toEqual(Array(7).fill("publish"));
         expect(text).not.toContain("Live as soon as it's saved");
         expect(text).not.toContain("Goes live with your next publish");
         expect(text).not.toContain("part of your draft");
