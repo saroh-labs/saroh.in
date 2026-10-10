@@ -12,10 +12,21 @@ export type Consent = "granted" | "refused";
 
 export const CONSENT_KEY = "saroh-analytics-consent";
 
+/**
+ * What the notice said when the answer was given. Since 10 Oct the notice
+ * can also ask about recording how the site is used (DEC-125); an "Accept"
+ * given to the older notice was for Google Analytics alone, so it never
+ * counts for recording: the notice asks again, in its new words.
+ */
+export type ConsentScope = "analytics" | "analytics+recording";
+
+export const CONSENT_SCOPE_KEY = "saroh-analytics-consent-scope";
+
 /** Fired on this window when the answer changes; `storage` covers other tabs. */
 const CHANGED = "saroh:consent";
 
 let remembered: Consent | null = null;
+let rememberedScope: ConsentScope | null = null;
 
 const isConsent = (value: unknown): value is Consent =>
     value === "granted" || value === "refused";
@@ -31,13 +42,55 @@ export function readConsent(): Consent | null {
     }
 }
 
-/** Records an answer, or forgets it (null) so the notice asks again. */
-export function writeConsent(choice: Consent | null): void {
+/**
+ * Whether the answer given covers recording too: it was given to a notice
+ * that said so. False for an answer from before, and when there is none.
+ */
+export function readConsentCoversRecording(): boolean {
+    if (typeof window === "undefined") return false;
+    try {
+        return (
+            window.localStorage.getItem(CONSENT_SCOPE_KEY) ===
+            "analytics+recording"
+        );
+    } catch {
+        return rememberedScope === "analytics+recording";
+    }
+}
+
+/**
+ * The answer as a build that records must read it: an "Accept" that was
+ * for Google Analytics alone is no answer yet, so the notice asks again
+ * and nothing loads until it is given. A refusal stays a refusal.
+ */
+export function consentFor(
+    choice: Consent | null,
+    coversRecording: boolean,
+    recording: boolean,
+): Consent | null {
+    if (recording && choice === "granted" && !coversRecording) return null;
+    return choice;
+}
+
+/**
+ * Records an answer, or forgets it (null) so the notice asks again.
+ * `scope` is what the notice that was answered asked about.
+ */
+export function writeConsent(
+    choice: Consent | null,
+    scope: ConsentScope = "analytics",
+): void {
     if (typeof window === "undefined") return;
     remembered = choice;
+    rememberedScope = choice ? scope : null;
     try {
-        if (choice) window.localStorage.setItem(CONSENT_KEY, choice);
-        else window.localStorage.removeItem(CONSENT_KEY);
+        if (choice) {
+            window.localStorage.setItem(CONSENT_KEY, choice);
+            window.localStorage.setItem(CONSENT_SCOPE_KEY, scope);
+        } else {
+            window.localStorage.removeItem(CONSENT_KEY);
+            window.localStorage.removeItem(CONSENT_SCOPE_KEY);
+        }
     } catch {
         // Storage is blocked; the in-memory answer holds for this page.
     }

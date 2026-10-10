@@ -278,6 +278,7 @@ function SendLinkBody({
                         className="mt-0.5"
                     />
                     <Label
+                        data-ph-mask=""
                         htmlFor={emailId}
                         className="text-[13px] font-normal leading-[1.5]"
                     >

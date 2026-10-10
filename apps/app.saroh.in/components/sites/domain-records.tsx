@@ -129,6 +129,7 @@ export function DomainRecords({
         <Collapsible open={open} onOpenChange={setOpen}>
             <CollapsibleTrigger asChild>
                 <Button
+                    data-ph-unmask=""
                     type="button"
                     variant="ghost"
                     size="sm"

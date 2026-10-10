@@ -86,6 +86,8 @@ const TableHead = React.forwardRef<
 >(({ className, ...props }, ref) => (
     <th
         ref={ref}
+        // A column's name is Saroh's own words: a recording may read it.
+        data-ph-unmask=""
         className={cn(
             // Labels stop at 11px: Geist 600, uppercase, at 0.1em (brand file §3).
             "h-10 px-4 text-left align-middle text-[11px] font-semibold uppercase tracking-[0.1em] text-muted-foreground [&:has([role=checkbox])]:pr-0",
@@ -102,6 +104,9 @@ const TableCell = React.forwardRef<
 >(({ className, ...props }, ref) => (
     <td
         ref={ref}
+        // A cell holds a record's data: always masked in a recording,
+        // whatever stands above it or inside it.
+        data-ph-mask=""
         className={cn(
             // 10px rows by default; density comes from space, never from
             // smaller type.

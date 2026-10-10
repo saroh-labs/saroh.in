@@ -217,7 +217,7 @@ export function CreateSiteForm({
                                         .saroh.app
                                     </span>
                                 </div>
-                                <FormDescription>
+                                <FormDescription data-ph-mask="">
                                     {address
                                         ? `Customers find this site at ${address}.saroh.app`
                                         : "Letters, numbers and hyphens."}

@@ -37,7 +37,11 @@ export function StatCard({
             <p className="text-[11px] font-semibold uppercase tracking-[0.1em] text-muted-foreground">
                 {label}
             </p>
-            <p className="mt-[7px] font-display text-[25px] font-semibold tabular-nums leading-none tracking-[-0.03em]">
+            {/* A business's figure: always masked in a session recording. */}
+            <p
+                data-ph-mask=""
+                className="mt-[7px] font-display text-[25px] font-semibold tabular-nums leading-none tracking-[-0.03em]"
+            >
                 {value}
             </p>
             {hint ? (

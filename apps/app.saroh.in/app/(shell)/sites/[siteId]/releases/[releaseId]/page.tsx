@@ -86,6 +86,7 @@ export default async function TestReleasePage({
     return (
         <PageContainer>
             <PageHeader
+                holdsData
                 title={releaseTitle(release)}
                 description={`${site.name} · ${status.line}`}
                 actions={

@@ -335,6 +335,7 @@ function EditDraft({
                 }
             >
                 <Button
+                    data-ph-unmask=""
                     type="button"
                     disabled={off}
                     onClick={() =>

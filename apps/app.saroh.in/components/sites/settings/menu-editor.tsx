@@ -117,6 +117,7 @@ export function MenuEditor({
                 <div className="flex flex-wrap gap-1.5">
                     {offered.map((p) => (
                         <Button
+                            data-ph-mask=""
                             key={p.id}
                             type="button"
                             variant="outline"

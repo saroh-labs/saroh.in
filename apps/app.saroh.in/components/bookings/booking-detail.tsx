@@ -108,6 +108,7 @@ export function BookingDetailView({
     return (
         <main className="mx-auto w-full max-w-4xl p-6 sm:p-8">
             <PageHeader
+                holdsData
                 // Where it sits (UX-083): Bookings › All bookings › this one.
                 breadcrumb={[
                     <Link
@@ -302,6 +303,7 @@ export function BookingDetailView({
                         is Customer Detail, as the peek's link is. */}
                     {contact ? (
                         <Button
+                            data-ph-mask=""
                             asChild
                             variant="outline"
                             size="sm"

@@ -111,6 +111,7 @@ export function HoldersTab({
             <>
                 {head}
                 <EmptyState
+                    data-ph-unmask=""
                     icon={<Users />}
                     title="Nobody has this pack yet"
                     description={`Once it's sold, each person shows here with the ${unitsWord} they have left and when they run out.`}

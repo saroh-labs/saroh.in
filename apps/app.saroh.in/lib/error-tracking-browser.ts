@@ -18,5 +18,7 @@ export const browserTracking = createBrowserTracking({
     load: () => import("posthog-js/dist/module.no-external"),
     // Session replay: the workspace only, off unless this is "on".
     replay: env.NEXT_PUBLIC_POSTHOG_REPLAY,
+    // Every allowed session unless this says a smaller share.
+    replaySample: env.NEXT_PUBLIC_POSTHOG_REPLAY_SAMPLE,
     loadRecorder: () => import("posthog-js/dist/posthog-recorder"),
 });

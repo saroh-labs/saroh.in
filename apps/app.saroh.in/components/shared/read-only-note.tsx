@@ -25,6 +25,8 @@ export function ReadOnlyNote({
         <p
             id={id}
             role="note"
+            // Saroh's own words: a session recording may read them.
+            data-ph-unmask=""
             className={cn(
                 "mb-3.5 rounded-[9px] bg-muted/60 px-3 py-2.5 text-[12.5px] leading-[1.5] text-foreground/75",
                 className,

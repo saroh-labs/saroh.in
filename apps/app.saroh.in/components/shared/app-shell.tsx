@@ -11,14 +11,16 @@ import { AppSidebar } from "@/components/shared/app-sidebar";
 import { BusinessZoneProvider } from "@/components/shared/business-zone";
 import { CommandMenu } from "@/components/shared/command-menu";
 import type { NavCounts } from "@/components/shared/nav-items";
-import { NOTIFICATIONS_NAV, navCan } from "@/components/shared/nav-items";
+import { navCan, NOTIFICATIONS_NAV } from "@/components/shared/nav-items";
 import {
     lockedNavHrefs,
     planLockedModuleKeys,
 } from "@/components/shared/nav-locks";
 import { TabBar } from "@/components/shared/tab-bar";
-import { WorkspaceTracking } from "@/components/shared/workspace-tracking";
-import { env } from "@/env";
+import {
+    recordingSwitchedOn,
+    UsageRecording,
+} from "@/components/shared/usage-recording";
 import { accountsUrl } from "@/lib/accounts";
 import { businessZone } from "@/lib/format/business-zone";
 import { getHome } from "@/lib/home/service";
@@ -36,7 +38,6 @@ import { listSites } from "@/lib/sites/service";
 import { getStockTracking } from "@/lib/stock/service";
 import { getStorefrontAllowance } from "@/lib/stores/storefronts";
 import { usageSharingOrNull } from "@/lib/usage-sharing/service";
-import { replaySwitchedOn, sharesUsageNow } from "@/lib/usage-sharing/sharing";
 
 /**
  * The authenticated app shell, rendered once in the root layout. It is the
@@ -89,12 +90,9 @@ export async function AppShell({ children }: { children: React.ReactNode }) {
         );
     }
 
-    // Whether masked session recording is switched on for this environment
+    // Whether session recording is switched on for this environment
     // (DEC-125): a PostHog key and the replay switch. Off, nothing is read.
-    const recordingOn = replaySwitchedOn({
-        key: env.NEXT_PUBLIC_POSTHOG_KEY,
-        replay: env.NEXT_PUBLIC_POSTHOG_REPLAY,
-    });
+    const recordingOn = recordingSwitchedOn();
 
     // Concurrently, because none of the three depends on another. They used to
     // run one after the next, which cost the sum of three round trips on every
@@ -165,9 +163,10 @@ export async function AppShell({ children }: { children: React.ReactNode }) {
         activeOrg?.lifecycleStatus === "PENDING_DELETION"
             ? closingOrNull()
             : null,
-        // "Help improve Saroh" (DEC-125): the person's own choice, read
-        // before the recorder could start, and only where session
-        // recording is switched on at all. Null when unread: not recorded.
+        // "Help improve Saroh" (DEC-125): the person's own choice and
+        // whether they have seen the notice, read before the recorder
+        // could start, and only where session recording is switched on at
+        // all. Null when unread: not recorded.
         recordingOn ? usageSharingOrNull() : null,
     ]);
     // Available modules, plus those shut only by the plan: locked, not off,
@@ -232,17 +231,6 @@ export async function AppShell({ children }: { children: React.ReactNode }) {
             >
                 Skip to content
             </a>
-            {/*
-             * PostHog in the signed-in shell (DEC-125): internal ids beside
-             * the workspace's error reports, and the masked session
-             * recording when it is switched on and this person shares.
-             * Draws nothing; does nothing without a key.
-             */}
-            <WorkspaceTracking
-                userId={session.user.id}
-                organizationId={activeOrg?.id}
-                sharesUsage={recordingOn && sharesUsageNow(usageSharing)}
-            />
             {/*
              * The role, alongside module availability, decides what the chrome
              * offers. Two different questions — does this business have the
@@ -318,6 +306,18 @@ export async function AppShell({ children }: { children: React.ReactNode }) {
                          * keeps it, on the server's first paint too.
                          */}
                         <BusinessZoneProvider zone={businessZone(activeOrg)}>
+                            {/*
+                             * PostHog in the signed-in shell (DEC-125):
+                             * internal ids beside the workspace's error
+                             * reports, the one-time notice that it is
+                             * recorded, and the recorder, which waits for
+                             * that notice. Nothing without a key.
+                             */}
+                            <UsageRecording
+                                userId={session.user.id}
+                                organizationId={activeOrg?.id}
+                                usage={usageSharing}
+                            />
                             {/* Scheduled for deletion (#921). */}
                             <ClosingBanner view={closing} />
                             {/* A plan that ends within 30 days (#805). */}

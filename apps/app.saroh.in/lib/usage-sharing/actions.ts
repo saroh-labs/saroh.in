@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 
 import type { CrmResult } from "@/lib/api/http";
 
-import { updateUsageSharing } from "./service";
+import { markUsageNoticeSeen, updateUsageSharing } from "./service";
 import type { UsageSharing } from "./sharing";
 
 /**
@@ -16,6 +16,17 @@ export async function saveUsageSharing(
     sharesUsage: boolean,
 ): Promise<CrmResult<UsageSharing>> {
     const result = await updateUsageSharing(sharesUsage);
+    if (result.ok) revalidatePath("/", "layout");
+    return result;
+}
+
+/**
+ * The one-time notice was dismissed. Kept on the person, so it never comes
+ * back on another device or in another business; the layout is refreshed so
+ * the next page already leaves it out.
+ */
+export async function dismissUsageNotice(): Promise<CrmResult<UsageSharing>> {
+    const result = await markUsageNoticeSeen();
     if (result.ok) revalidatePath("/", "layout");
     return result;
 }

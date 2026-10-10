@@ -294,6 +294,7 @@ export function CustomDomain({
                                 </p>
                                 <div className="mt-2 flex gap-2">
                                     <Button
+                                        data-ph-mask=""
                                         type="button"
                                         size="sm"
                                         variant="destructive"

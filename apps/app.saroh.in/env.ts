@@ -47,8 +47,11 @@ export const env = createEnv({
         /**
          * PostHog (DEC-125): the project's PUBLIC key (`phc_…`) and its
          * address (the EU cloud when unset). Unset, nothing is loaded or
-         * sent. The browser SDK is used for exceptions only, and for the workspace's masked session replay when
-         * NEXT_PUBLIC_POSTHOG_REPLAY is "on" (off by default).
+         * sent. The browser SDK is used for exceptions only, and for the
+         * workspace's session replay when NEXT_PUBLIC_POSTHOG_REPLAY is "on"
+         * (off by default). NEXT_PUBLIC_POSTHOG_REPLAY_SAMPLE is optional:
+         * the share of allowed sessions recorded, from 0 to 1; unset, every
+         * one (`REPLAY_SAMPLE_RATE`).
          */
         NEXT_PUBLIC_POSTHOG_KEY: z
             .string()
@@ -56,6 +59,10 @@ export const env = createEnv({
             .optional(),
         NEXT_PUBLIC_POSTHOG_HOST: z.string().url().optional(),
         NEXT_PUBLIC_POSTHOG_REPLAY: z.enum(["on", "off"]).optional(),
+        NEXT_PUBLIC_POSTHOG_REPLAY_SAMPLE: z
+            .string()
+            .regex(/^(?:0(?:\.\d+)?|1(?:\.0+)?)$/)
+            .optional(),
     },
     runtimeEnv: {
         NODE_ENV: process.env.NODE_ENV,
@@ -71,6 +78,8 @@ export const env = createEnv({
         NEXT_PUBLIC_POSTHOG_KEY: process.env.NEXT_PUBLIC_POSTHOG_KEY,
         NEXT_PUBLIC_POSTHOG_HOST: process.env.NEXT_PUBLIC_POSTHOG_HOST,
         NEXT_PUBLIC_POSTHOG_REPLAY: process.env.NEXT_PUBLIC_POSTHOG_REPLAY,
+        NEXT_PUBLIC_POSTHOG_REPLAY_SAMPLE:
+            process.env.NEXT_PUBLIC_POSTHOG_REPLAY_SAMPLE,
     },
     emptyStringAsUndefined: true,
     skipValidation: !!process.env.SKIP_ENV_VALIDATION,

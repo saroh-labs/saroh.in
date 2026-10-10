@@ -116,6 +116,7 @@ export function StorefrontsScreen({
         storefronts.at(0);
     const header = (
         <PageHeader
+            holdsData
             breadcrumb={["Sell", word]}
             title={chosen?.name ?? word}
             description={selected ? locationSubtitle(selected) : undefined}
@@ -134,6 +135,9 @@ export function StorefrontsScreen({
             <>
                 {header}
                 <EmptyState
+                    // Setup, before there is anywhere to sell from: a session
+                    // recording reads it in full, the business's name too.
+                    data-ph-unmask=""
                     title="No location yet"
                     description={`${businessName} has Sell turned on but nowhere to sell from. A location is a place you sell from, like a shop counter, a studio or a market stall, and your online shop sells from one of them.`}
                     action={

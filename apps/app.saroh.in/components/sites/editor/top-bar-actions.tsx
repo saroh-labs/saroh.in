@@ -318,6 +318,7 @@ function SecondaryActions({
 
             {p.onFeedback ? (
                 <Button
+                    data-ph-unmask=""
                     variant="outline"
                     size="sm"
                     className={cn(ACTION, touch)}

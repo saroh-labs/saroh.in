@@ -331,7 +331,9 @@ export function BusinessSetupForm({
                     name="name"
                     render={({ field }) => (
                         <FormItem>
-                            <FormLabel>{words.nameLabel}</FormLabel>
+                            <FormLabel data-ph-unmask="">
+                                {words.nameLabel}
+                            </FormLabel>
                             <FormControl>
                                 <Input
                                     placeholder={defaults.namePlaceholder}

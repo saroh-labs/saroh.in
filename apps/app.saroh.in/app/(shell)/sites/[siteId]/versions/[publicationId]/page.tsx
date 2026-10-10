@@ -71,6 +71,7 @@ export default async function PastVersionPage({
     return (
         <PageContainer>
             <PageHeader
+                holdsData
                 title={`Version from ${exactDate(publication.publishedAt, zone)}`}
                 description={
                     publication.publishedBy
@@ -133,6 +134,7 @@ export default async function PastVersionPage({
                 >
                     {pages.map((p) => (
                         <Button
+                            data-ph-mask=""
                             key={p.path}
                             asChild
                             size="sm"

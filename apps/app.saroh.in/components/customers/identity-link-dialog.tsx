@@ -67,7 +67,7 @@ export function IdentityLinkDialog({
         <Dialog open={open} onOpenChange={setOpen}>
             {controlled === undefined ? (
                 <DialogTrigger asChild>
-                    <Button variant="outline" size="sm">
+                    <Button data-ph-unmask="" variant="outline" size="sm">
                         Link commerce record
                         {suggestions.length > 0
                             ? ` (${suggestions.length})`

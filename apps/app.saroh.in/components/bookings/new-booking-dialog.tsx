@@ -337,6 +337,7 @@ export function NewBookingDialog({
             <DialogTrigger asChild>
                 {visit ? (
                     <Button
+                        data-ph-unmask=""
                         variant={primaryTrigger ? "default" : "outline"}
                         size={primaryTrigger ? "default" : "sm"}
                         disabled={services.length === 0}

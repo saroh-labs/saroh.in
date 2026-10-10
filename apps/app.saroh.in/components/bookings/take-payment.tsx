@@ -135,6 +135,7 @@ export function TakePayment({
     return (
         <>
             <Button
+                data-ph-unmask=""
                 type="button"
                 variant={variant}
                 className={cn("cursor-pointer", triggerClassName)}
@@ -267,6 +268,7 @@ export function TakePayment({
                                 Cancel
                             </Button>
                             <Button
+                                data-ph-unmask=""
                                 type="button"
                                 className="cursor-pointer"
                                 disabled={busy || Boolean(problem)}

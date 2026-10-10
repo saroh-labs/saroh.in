@@ -100,9 +100,12 @@ must keep:
   ledger** (`modules/analytics/product-milestones.ts`). The list is nine
   events and is closed: a tenth is the owner's decision, not a call site's.
   Never capture a product event from a browser.
-- **Session replay is the workspace's signed-in shell only**, masked, and
-  off by default. Mark customer data that isn't text with `data-ph-block`
-  (`frontend-design-system.md` → Session recordings).
+- **Session replay is the signed-in workspace and saroh.in only**
+  (DEC-125, amended 10 Oct), on in production only. The workspace masks
+  everything but Saroh's own words and starts after its one-time notice;
+  saroh.in starts after the cookie notice is accepted. Never accounts, the
+  admin console or a merchant site (`check:merchant-site-tracking`). What a
+  screen marks, and how: `frontend-design-system.md` → Session recordings.
 - **Degraded paths it adds, and what volume means:**
   `posthog_send_failed` (WARN): PostHog refused a batch or couldn't be
   reached; a steady stream means the key or host is wrong, or PostHog is

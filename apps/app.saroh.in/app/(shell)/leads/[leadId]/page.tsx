@@ -110,6 +110,7 @@ export default async function LeadDetailPage({
     return (
         <PageContainer>
             <PageHeader
+                holdsData
                 title={lead.title}
                 description={
                     lead.contact ? (

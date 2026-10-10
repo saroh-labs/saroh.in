@@ -32,6 +32,7 @@ export function StorefrontChooser({
     return (
         <>
             <PageHeader
+                holdsData={false}
                 breadcrumb={[
                     "Sell",
                     <Link
