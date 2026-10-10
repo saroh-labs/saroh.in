@@ -359,6 +359,153 @@ describe("a site's QR codes (DB)", () => {
         expect(scans.get(quiet.id)).toEqual({ total: 0, last7Days: 0 });
     });
 
+    it("counts the bookings that stand and the real orders each code brought in", async () => {
+        const b = await business();
+        const other = await business();
+        const made = await codes.create(b.owner, b.siteId, {
+            targetKind: "BOOK",
+            place: "COUNTER",
+        });
+        const quiet = await codes.create(b.owner, b.siteId, {
+            targetKind: "SHOP",
+            place: "CARD",
+        });
+        const service = await prisma.service.create({
+            data: {
+                organizationId: b.organizationId,
+                name: "Haircut",
+                durationMinutes: 30,
+                timezone: "UTC",
+            },
+        });
+        const at = new Date("2030-01-07T09:00:00.000Z");
+        const booking = (
+            status: "CONFIRMED" | "CANCELLED" | "PENDING",
+            sourceCode: string | null,
+            hour: number,
+        ) =>
+            prisma.booking.create({
+                data: {
+                    organizationId: b.organizationId,
+                    serviceId: service.id,
+                    startAt: new Date(at.getTime() + hour * 3_600_000),
+                    endAt: new Date(at.getTime() + (hour + 0.5) * 3_600_000),
+                    timezone: "UTC",
+                    status,
+                    snapshot: {},
+                    sourceCode,
+                    ...(status === "PENDING"
+                        ? { holdExpiresAt: new Date(Date.now() + 600_000) }
+                        : {}),
+                    ...(status === "CANCELLED"
+                        ? { cancelledAt: new Date() }
+                        : {}),
+                },
+            });
+        await booking("CONFIRMED", made.id, 0);
+        await booking("CONFIRMED", made.id, 1);
+        // Cancelled, and a pay-now hold nobody has paid: neither stands.
+        await booking("CANCELLED", made.id, 2);
+        await booking("PENDING", made.id, 3);
+        // Booked some other way: no code.
+        await booking("CONFIRMED", null, 4);
+
+        const customer = await prisma.customer.create({
+            data: {
+                storeId: b.storeId,
+                organizationId: b.organizationId,
+                email: `${uniq("qr-buyer")}@example.com`,
+            },
+        });
+        let n = 0;
+        const order = (over: {
+            sourceCode: string | null;
+            placedOnline?: boolean;
+            payOnHandover?: boolean;
+            paymentStatus?: "PAID" | "UNPAID";
+        }) =>
+            prisma.order.create({
+                data: {
+                    storeId: b.storeId,
+                    organizationId: b.organizationId,
+                    orderId: `QR-${++n}`,
+                    customerId: customer.id,
+                    subtotal: "500.00",
+                    total: "500.00",
+                    currency: "INR",
+                    status: "PENDING",
+                    paymentStatus: over.paymentStatus ?? "UNPAID",
+                    placedOnline: over.placedOnline ?? true,
+                    payOnHandover: over.payOnHandover ?? false,
+                    sourceCode: over.sourceCode,
+                },
+            });
+        // Paid online, and placed to be paid on collection: real orders.
+        await order({ sourceCode: made.id, paymentStatus: "PAID" });
+        await order({ sourceCode: made.id, payOnHandover: true });
+        // A checkout started and left unpaid is not an order.
+        await order({ sourceCode: made.id });
+        await order({ sourceCode: null, paymentStatus: "PAID" });
+
+        const view = await codes.list(b.owner, b.siteId);
+        const counts = new Map(
+            view.codes.map((c) => [c.id, [c.bookings, c.orders]]),
+        );
+        expect(counts.get(made.id)).toEqual([2, 2]);
+        expect(counts.get(quiet.id)).toEqual([0, 0]);
+
+        // What the column says is what the database holds.
+        expect(
+            await prisma.booking.count({
+                where: {
+                    organizationId: b.organizationId,
+                    sourceCode: made.id,
+                    status: "CONFIRMED",
+                },
+            }),
+        ).toBe(2);
+
+        // Another business's list reads none of it.
+        const theirs = await codes.create(other.owner, other.siteId, {
+            targetKind: "BOOK",
+            place: "COUNTER",
+        });
+        const elsewhere = await codes.list(other.owner, other.siteId);
+        expect(
+            elsewhere.codes.map((c) => [c.id, c.bookings, c.orders]),
+        ).toEqual([[theirs.id, 0, 0]]);
+    });
+
+    it("keeps a retired code's bookings and orders on its row", async () => {
+        const b = await business();
+        const made = await codes.create(b.owner, b.siteId, {
+            targetKind: "BOOK",
+            place: "FLYER",
+        });
+        const service = await prisma.service.create({
+            data: {
+                organizationId: b.organizationId,
+                name: "Haircut",
+                durationMinutes: 30,
+                timezone: "UTC",
+            },
+        });
+        await prisma.booking.create({
+            data: {
+                organizationId: b.organizationId,
+                serviceId: service.id,
+                startAt: new Date("2030-01-07T09:00:00.000Z"),
+                endAt: new Date("2030-01-07T09:30:00.000Z"),
+                timezone: "UTC",
+                status: "CONFIRMED",
+                snapshot: {},
+                sourceCode: made.id,
+            },
+        });
+        const retired = await codes.retire(b.owner, b.siteId, made.id);
+        expect(retired).toMatchObject({ retired: true, bookings: 1 });
+    });
+
     it("retires a code and keeps its scans", async () => {
         const b = await business();
         const made = await codes.create(b.owner, b.siteId, {

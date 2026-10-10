@@ -1719,6 +1719,8 @@ model Order {
   @@index([organizationId, createdAt])
   // What an account ordered, newest first (A7).
   @@index([customerAccountId, createdAt])
+  // The QR list's Orders count: the few orders that name a code.
+  @@index([sourceCode], map: "Order_sourceCode_idx", where: raw("\"sourceCode\" IS NOT NULL"))
 }
 
 model OrderItem {
@@ -4507,6 +4509,8 @@ model Booking {
   @@index([organizationId, startAt])
   // What an account booked (the double-booking check, and unlinking).
   @@index([customerAccountId, startAt])
+  // The QR list's Bookings count: the few bookings that name a code.
+  @@index([sourceCode], map: "Booking_sourceCode_idx", where: raw("\"sourceCode\" IS NOT NULL"))
 }
 
 /// Someone who takes bookings (U3, ADR-008). Usually a team member, but a

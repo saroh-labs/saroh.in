@@ -27,6 +27,7 @@ jest.mock("@saroh/database", () => {
                 findFirst: jest.fn(),
                 findMany: jest.fn(),
             },
+            qrCode: { findFirst: jest.fn() },
         },
     };
 });
@@ -71,6 +72,7 @@ const db = prisma as unknown as {
     order: { findUnique: jest.Mock; findUniqueOrThrow: jest.Mock };
     storeSettings: { findUnique: jest.Mock };
     merchantPaymentProvider: { findFirst: jest.Mock; findMany: jest.Mock };
+    qrCode: { findFirst: jest.Mock };
 };
 
 const customer = {
@@ -298,6 +300,67 @@ describe("Free takes money offline", () => {
             payment: null,
         });
         expect(createCheckoutOrder).not.toHaveBeenCalled();
+    });
+});
+
+describe("the QR code an order came from", () => {
+    // Its own callers, so the start limit the other tests count is kept.
+    const tagged = (source: unknown, hash: string) =>
+        service.start("site_1", customer, hash, {
+            lines: [{ listingId: "listing_1", quantity: 2 }],
+            fulfilment: "PICKUP",
+            key: "key-12345678", // gitleaks:allow (a checkout's idempotency key)
+            payment: "ON_HANDOVER",
+            source,
+        } as CheckoutStartDto);
+    const placedWith = () =>
+        (createCheckoutOrder as jest.Mock).mock.calls[0][2] as {
+            sourceCode: string | null;
+        };
+
+    it("looks the code up on this site and business, and hands the order its row's id", async () => {
+        onPlan("free");
+        db.qrCode.findFirst.mockResolvedValue({ id: "qr_1" });
+
+        await expect(tagged("qr-h7c", "hash_qr_1")).resolves.toMatchObject({
+            orderId: "order_1",
+        });
+        expect(db.qrCode.findFirst).toHaveBeenCalledWith({
+            where: { siteId: "site_1", organizationId: "org_1", code: "h7c" },
+            select: { id: true },
+        });
+        expect(placedWith().sourceCode).toBe("qr_1");
+    });
+
+    it("places the order all the same when the site has no such code", async () => {
+        onPlan("free");
+        db.qrCode.findFirst.mockResolvedValue(null);
+
+        await expect(tagged("qr-k9d", "hash_qr_2")).resolves.toMatchObject({
+            orderId: "order_1",
+        });
+        expect(placedWith().sourceCode).toBeNull();
+    });
+
+    it("places it without asking about a tag that isn't one, or none", async () => {
+        onPlan("free");
+
+        await tagged("ckx0000000000000000000000", "hash_qr_3");
+        expect(placedWith().sourceCode).toBeNull();
+        (createCheckoutOrder as jest.Mock).mockClear();
+        await tagged(undefined, "hash_qr_4");
+        expect(placedWith().sourceCode).toBeNull();
+        expect(db.qrCode.findFirst).not.toHaveBeenCalled();
+    });
+
+    it("places it when the code can't be read", async () => {
+        onPlan("free");
+        db.qrCode.findFirst.mockRejectedValue(new Error("connection lost"));
+
+        await expect(tagged("qr-h7c", "hash_qr_5")).resolves.toMatchObject({
+            orderId: "order_1",
+        });
+        expect(placedWith().sourceCode).toBeNull();
     });
 });
 

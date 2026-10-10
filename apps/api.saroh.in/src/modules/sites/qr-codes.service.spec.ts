@@ -65,6 +65,7 @@ import {
 import { prisma } from "@saroh/database";
 
 import type { OrganizationContext } from "../../common/types/organization-context";
+import { realOrderWhere } from "../orders/open-orders";
 import { QR_CODES_PER_SITE_MAX, QrCodesService } from "./qr-codes.service";
 import { recentSince } from "./qr-codes.view";
 import { QR_CODE_ATTEMPTS, QR_CODE_SHAPE } from "./qr-target";
@@ -618,14 +619,36 @@ describe("QrCodesService.list", () => {
         ]);
         const view = await service.list(OWNER, SITE);
         expect(view.codes[0]).toMatchObject({ bookings: 2, orders: 5 });
+        // Bookings that stand, as Home counts them: never a cancelled one
+        // or an unpaid hold.
         expect(db.booking.groupBy).toHaveBeenCalledWith(
             expect.objectContaining({
                 where: {
                     organizationId: "org_1",
                     sourceCode: { in: ["qr_1"] },
+                    status: "CONFIRMED",
                 },
             }),
         );
+        // Real orders, as the Orders list counts them: never a checkout
+        // started and left unpaid.
+        expect(db.order.groupBy).toHaveBeenCalledWith(
+            expect.objectContaining({
+                where: {
+                    organizationId: "org_1",
+                    sourceCode: { in: ["qr_1"] },
+                    ...realOrderWhere(),
+                },
+            }),
+        );
+    });
+
+    it("reads 0 for a code nothing was booked or ordered from", async () => {
+        db.qrCode.findMany.mockResolvedValue([row()]);
+        db.booking.groupBy.mockResolvedValue([]);
+        db.order.groupBy.mockResolvedValue([]);
+        const view = await service.list(OWNER, SITE);
+        expect(view.codes[0]).toMatchObject({ bookings: 0, orders: 0 });
     });
 
     it("says when the plan leaves the counts out, and still sends them", async () => {

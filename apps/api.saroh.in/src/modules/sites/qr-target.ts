@@ -154,6 +154,23 @@ export function codeOfQrSource(tag: string | null | undefined): string | null {
     return QR_CODE_SHAPE.test(code) ? code : null;
 }
 
+/** The longest tag there can be: the prefix and a six-character code. */
+export const QR_SOURCE_TAG_MAX = QR_SOURCE_PREFIX.length + QR_CODE_MAX_LENGTH;
+
+/**
+ * A request's `source` as a DTO keeps it: the tag when it is a well-formed
+ * one, otherwise nothing at all. A booking or an order is never refused
+ * over where it came from, so anything else (a number, a long string, a
+ * tag for something that isn't a QR code) is dropped here, before
+ * validation, rather than answered with a 400.
+ */
+export function qrSourceTagOf(value: unknown): string | undefined {
+    if (typeof value !== "string" || value.length > QR_SOURCE_TAG_MAX) {
+        return undefined;
+    }
+    return codeOfQrSource(value) === null ? undefined : value;
+}
+
 /**
  * What `Booking.sourceCode` and `Order.sourceCode` hold for a code: its
  * row's id. Not the short id, which is unique only within one site, and a
