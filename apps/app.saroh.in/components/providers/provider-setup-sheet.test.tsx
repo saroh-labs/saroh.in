@@ -194,15 +194,21 @@ describe("Razorpay setup, as guided steps", () => {
         expect(showSuccess).toHaveBeenCalledWith("Webhook URL copied");
     });
 
-    it("keeps Save off until the webhook secret is filled", () => {
+    it("connects nothing until the webhook secret is filled, and says what is missing", async () => {
         open("RAZORPAY");
         typeInto(byLabel("Key ID"), "rzp_live_AbC123");
         typeInto(byLabel("Key secret"), "super-secret-value");
-        expect(save().disabled).toBe(true);
         typeInto(byLabel("Webhook signing secret"), "   ");
-        expect(save().disabled).toBe(true);
-        typeInto(byLabel("Webhook signing secret"), "whsec_chosen");
+        // The button is never off: pressing it says what is missing.
         expect(save().disabled).toBe(false);
+        await act(async () => {
+            save().click();
+            await Promise.resolve();
+        });
+        expect(connectPaymentProvider).not.toHaveBeenCalled();
+        expect(text()).toContain(
+            "Enter the key ID, the key secret and the webhook signing secret to connect.",
+        );
     });
 
     it("generates a strong secret, shows it, copies it, and sends it on save", async () => {
@@ -281,7 +287,7 @@ describe("Razorpay setup, as guided steps", () => {
             "This connection was saved without its webhook signing secret",
         );
         expect(text()).toContain(
-            "No webhook signing secret — enter the keys again below",
+            "No webhook signing secret. Enter the keys again below.",
         );
     });
 });

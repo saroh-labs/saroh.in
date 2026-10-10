@@ -214,7 +214,7 @@ function typeInto(el: HTMLInputElement, value: string) {
 
 /** The dialog's Extend: the last one on the page, after the row's. */
 function saveExtend(): HTMLButtonElement {
-    const hit = buttons("Extend").at(-1);
+    const hit = buttons("Extend pack").at(-1);
     if (!hit) throw new Error("No Extend in the dialog");
     return hit;
 }
@@ -245,9 +245,8 @@ describe("Pack Detail's Who has it", () => {
 
         click(button("Extend"));
         expect(text()).toContain("Extend Asha Rao's pack");
-        // Nothing saves without a reason.
-        const extend = buttons("Extend").at(-1);
-        expect(extend?.disabled).toBe(true);
+        // The button is never off: without a reason it says so.
+        expect(saveExtend().disabled).toBe(false);
 
         click(button("+7 days"));
         expect(text()).toContain("New use-by: Tue 17 Nov");
@@ -256,7 +255,6 @@ describe("Pack Detail's Who has it", () => {
             ok: true,
             data: { ...ASHA, expiresAt: inDays(47), extendedDays: 7 },
         });
-        expect(buttons("Extend").at(-1)?.disabled).toBe(false);
         click(saveExtend());
         await flush();
         expect(actions.extendHolder).toHaveBeenCalledWith(

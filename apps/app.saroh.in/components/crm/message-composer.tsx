@@ -123,18 +123,24 @@ export function MessageComposer({
                         error: sendFailureWords(res.error, channel),
                     };
                 }
-                suppressed = res.data.status === "SUPPRESSED";
+                if (res.data.status === "SUPPRESSED") {
+                    // Recorded, not delivered: said as it is, never "sent".
+                    suppressed = true;
+                    showWarning("Message suppressed: consent is revoked");
+                    onDraft(BLANK_MESSAGE);
+                    router.refresh();
+                    return { ok: false, error: "", said: true };
+                }
                 return { ok: true };
             },
             sent: "Message sent.",
             onSent: () => {
-                if (suppressed) {
-                    showWarning("Message suppressed: consent is revoked");
-                }
                 onDraft(BLANK_MESSAGE);
                 router.refresh();
             },
-            onBack: onReopen,
+            onBack: () => {
+                if (!suppressed) onReopen();
+            },
         });
     }
 

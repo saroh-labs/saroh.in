@@ -17,7 +17,7 @@ const CONFIRMS: [what: string, file: string, verb: string, keep: string][] = [
     [
         "an order, from its page",
         "components/commerce/order-detail/cancel-panel.tsx",
-        'variant="destructive"',
+        'tone="destructive"',
         'cancelLabel="Keep order"',
     ],
     [

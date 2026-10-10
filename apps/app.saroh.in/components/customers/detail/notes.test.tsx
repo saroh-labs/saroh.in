@@ -20,6 +20,7 @@ vi.mock("@/lib/customer-workspace/actions", () => ({
 const showError = vi.fn();
 vi.mock("@saroh/ui/toast", () => ({
     showError: (...args: unknown[]) => showError(...args) as unknown,
+    showSuccess: vi.fn(),
     showUndo: vi.fn(),
 }));
 
@@ -237,15 +238,19 @@ describe("the Add note sheet", () => {
         render([note()]);
         await press(buttons("Add note")[0]);
         const add = () => buttons("Add note", dialog())[0];
-        expect(add().disabled).toBe(true);
+        // The button is never off: pressed on nothing, it says so.
+        expect(add().disabled).toBe(false);
         expect(dialog()?.textContent).toContain("0 / 500");
+        await submit();
+        expect(dialog()?.textContent).toContain("Write the note first.");
+        expect(addNoteAction).not.toHaveBeenCalled();
 
         type("a".repeat(500));
-        expect(add().disabled).toBe(false);
         expect(dialog()?.textContent).toContain("500 / 500");
 
         type("a".repeat(501));
-        expect(add().disabled).toBe(true);
         expect(dialog()?.textContent).toContain("Over 500 characters");
+        await submit();
+        expect(addNoteAction).not.toHaveBeenCalled();
     });
 });

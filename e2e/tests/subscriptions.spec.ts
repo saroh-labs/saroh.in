@@ -225,8 +225,10 @@ test.describe("a subscription's page, on Northwind", () => {
     test("pause, then resume", async ({ page }) => {
         await page.goto(`/billing/subscriptions/${own.subscription}`);
         await page.getByRole("button", { name: "Pause", exact: true }).click();
-        const sheet = page.getByRole("dialog", { name: "Pause" });
-        await sheet.getByRole("button", { name: "Pause", exact: true }).click();
+        const sheet = page.getByRole("dialog", { name: "Pause subscription" });
+        await sheet
+            .getByRole("button", { name: "Pause subscription", exact: true })
+            .click();
         await expect(
             page.getByRole("button", { name: "Resume now" }),
         ).toBeVisible();

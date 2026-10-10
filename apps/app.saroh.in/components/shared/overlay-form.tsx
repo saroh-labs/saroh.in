@@ -61,7 +61,53 @@ function useOverlay(): OverlayContextValue {
 const FIRST_FIELD =
     'input:not([type="hidden"]):not([disabled]), textarea:not([disabled]), select:not([disabled]), [role="combobox"]:not([disabled]), [contenteditable="true"]';
 
+/** Anything the keyboard can land on, for a body that starts with a switch. */
+const CONTROLS =
+    'input, textarea, select, button, a[href], [role="combobox"], [contenteditable="true"]';
+
+/** The first control in the fields the keyboard can start in. */
+function firstControl(body: Element | null | undefined): HTMLElement | null {
+    for (const el of Array.from(
+        body?.querySelectorAll<HTMLElement>(CONTROLS) ?? [],
+    )) {
+        if (
+            el.matches(":disabled") ||
+            el.getAttribute("type") === "hidden" ||
+            el.getAttribute("tabindex") === "-1" ||
+            el.getAttribute("aria-hidden") === "true"
+        ) {
+            continue;
+        }
+        return el;
+    }
+    return null;
+}
+
 const INVALID = '[aria-invalid="true"]:not([disabled])';
+
+/**
+ * The last control pressed. A press doesn't focus a button everywhere
+ * (Safari), so "what had the keyboard" alone would lose the opener there.
+ */
+let lastPressed: HTMLElement | null = null;
+let watching = false;
+function watchPresses() {
+    if (watching || typeof document === "undefined") return;
+    watching = true;
+    document.addEventListener(
+        "click",
+        (event) => {
+            const at = event.target;
+            if (!(at instanceof Element)) return;
+            // Presses inside an overlay open nothing behind it.
+            if (at.closest('[role="dialog"], [role="alertdialog"]')) return;
+            lastPressed = at.closest<HTMLElement>(
+                'button, a[href], [role="button"], [role="menuitem"]',
+            );
+        },
+        true,
+    );
+}
 
 export interface OverlayFrameOptions {
     open: boolean;
@@ -103,14 +149,16 @@ export function useOverlayFrame({
     const [footPending, setFootPending] = useState(false);
     const pending = framePending || footPending;
 
-    // What had the keyboard when it opened, before the overlay takes it.
+    // What had the keyboard when it opened, before the overlay takes it,
+    // or failing that what was last pressed.
+    useEffect(watchPresses, []);
     useLayoutEffect(() => {
         if (!open) return;
         const active = document.activeElement;
         opener.current =
             active instanceof HTMLElement && active !== document.body
                 ? active
-                : null;
+                : lastPressed;
     }, [open]);
 
     const isDirty = useCallback(
@@ -156,7 +204,9 @@ export function useOverlayFrame({
             },
             onOpenAutoFocus: (event: Event) => {
                 const first =
-                    form.current?.querySelector<HTMLElement>(FIRST_FIELD);
+                    firstControl(
+                        form.current?.querySelector("[data-overlay-body]"),
+                    ) ?? form.current?.querySelector<HTMLElement>(FIRST_FIELD);
                 if (!first) return;
                 event.preventDefault();
                 first.focus();

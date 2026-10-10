@@ -113,8 +113,8 @@ export function TrackerSetupDialog({
             }
             pending={pending}
             dirty={existing ? !unchanged : draft !== ""}
-            saveLabel={existing ? "Save" : `Connect ${words.name}`}
-            savingLabel={existing ? "Saving…" : "Connecting…"}
+            saveLabel={existing ? "Save" : "Add to your site"}
+            savingLabel={existing ? "Saving…" : "Adding…"}
             onClose={onClose}
             onSubmit={submit}
         >
