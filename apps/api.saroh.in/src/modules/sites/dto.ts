@@ -382,6 +382,19 @@ export class CreateApprovalDto {
 }
 
 /**
+ * Set a site's icon to an image the business uploaded to its library
+ * (`POST /organizations/:id/media/upload-url`, then `/complete`), as the
+ * business logo is set (DEC-120).
+ */
+export class SetSiteIconDto {
+    @Transform(trim)
+    @IsString()
+    @MinLength(1, { message: "mediaId is required" })
+    @MaxLength(64)
+    mediaId!: string;
+}
+
+/**
  * Search and social settings for a site (#188), and its name (G6).
  *
  * Every field is optional and nullable, and the two are different requests:

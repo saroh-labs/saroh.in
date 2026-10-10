@@ -47,6 +47,8 @@ const CLASS_LEVEL: Record<string, string> = {
     "sites/test-releases.controller.ts": "WEBSITE",
     // A site's Search and tracking section (DEC-108).
     "sites/site-tracking.controller.ts": "WEBSITE",
+    // A site's own icon (DEC-120).
+    "sites/site-icon.controller.ts": "WEBSITE",
     // A site's QR codes (Settings › Share).
     "sites/qr-codes.controller.ts": "WEBSITE",
     "forms/forms.controller.ts": "WEBSITE",
