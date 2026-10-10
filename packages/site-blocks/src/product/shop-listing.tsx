@@ -22,7 +22,8 @@ import { formatAmount, percentOff } from "./product-page";
  * link, so the rest of the card still opens the product.
  *
  * Follows the Customer Site design's list page: the page title and a lead,
- * then cards of a photo, an eyebrow (the sizes it comes in), the name, two
+ * then (where products are filed under two or more categories) a row of
+ * chips to narrow the list, and cards of a square photo, an eyebrow (the sizes it comes in), the name, two
  * sentences and the price. Takes everything as props (all plain data) and
  * fetches nothing. A client module only because it shares the product
  * page's money helpers. Drawn from `--site-*` only.
@@ -45,6 +46,11 @@ export interface ShopListingCard {
      */
     optionName?: string | null;
     blurb: string | null;
+    /**
+     * The category the merchant filed it under; the shop offers these as
+     * chips. Null for none; absent from an older API.
+     */
+    categoryName?: string | null;
     soldOut: boolean;
     /** The listing at the site's storefront: what the bag holds (G13). */
     listingId?: string;
@@ -68,6 +74,22 @@ const cardButton = cn(
     focusRing,
 );
 
+/**
+ * The categories a list of products is filed under, each once, in the
+ * order they first appear. A product with none is in no category, and
+ * shows under "All".
+ */
+export function categoriesOf(
+    products: readonly Pick<ShopListingCard, "categoryName">[],
+): string[] {
+    const names: string[] = [];
+    for (const p of products) {
+        const name = p.categoryName?.trim();
+        if (name && !names.includes(name)) names.push(name);
+    }
+    return names;
+}
+
 export default function ShopListing({
     title = "Shop",
     lead = null,
@@ -90,6 +112,15 @@ export default function ShopListing({
 }) {
     const [added, setAdded] = useState<ReadonlySet<string>>(() => new Set());
     const [notice, setNotice] = useState<string | null>(null);
+    // The shop's chips: the categories its products are filed under, in
+    // the order they first appear. Offered only when there is a choice to
+    // make (two or more). "All" is where the page opens.
+    const categories = categoriesOf(products);
+    const [category, setCategory] = useState<string | null>(null);
+    const picked = categories.includes(category ?? "") ? category : null;
+    const shown = picked
+        ? products.filter((p) => p.categoryName?.trim() === picked)
+        : products;
     // "‹Product› added to your bag." goes by itself after four seconds: it
     // has said what happened, and it sits over the page. Each add says it
     // afresh (`said` counts them). "Your bag is full" stays until the next
@@ -145,8 +176,37 @@ export default function ShopListing({
                     {lead}
                 </p>
             ) : null}
+            {categories.length > 1 ? (
+                <div
+                    role="radiogroup"
+                    aria-label="Category"
+                    className="-mx-[18px] mt-4 flex gap-2 overflow-x-auto px-[18px] pb-1"
+                >
+                    {[null, ...categories].map((name) => {
+                        const on = picked === name;
+                        return (
+                            <button
+                                key={name ?? ""}
+                                type="button"
+                                role="radio"
+                                aria-checked={on}
+                                onClick={() => setCategory(name)}
+                                className={cn(
+                                    "coarse:min-h-11 min-h-9 shrink-0 cursor-pointer whitespace-nowrap rounded-full border px-3.5 text-sm font-semibold transition-colors duration-100 ease-out",
+                                    focusRing,
+                                    on
+                                        ? "border-site-fg bg-site-fg text-site-bg"
+                                        : "border-site-border bg-site-surface text-site-fg",
+                                )}
+                            >
+                                {name ?? "All"}
+                            </button>
+                        );
+                    })}
+                </div>
+            ) : null}
             <ul className="mt-4 grid grid-cols-[repeat(auto-fill,minmax(260px,1fr))] gap-3">
-                {products.map((p, index) => {
+                {shown.map((p, index) => {
                     const amount = formatAmount(p.price, p.currency, locale);
                     const canAdd = Boolean(bagSite && p.listingId);
                     const href = `${basePath}/${encodeURIComponent(p.slug)}`;
@@ -166,7 +226,7 @@ export default function ShopListing({
                                 href={href}
                                 className="border-site-border bg-site-surface text-site-fg focus-visible:outline-site-accent grid h-full min-w-0 grid-rows-[auto_1fr] overflow-hidden rounded-[14px] border focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2"
                             >
-                                <span className="bg-site-bg relative block h-[140px]">
+                                <span className="bg-site-bg relative block aspect-square">
                                     {p.image ? (
                                         <img
                                             src={p.image.url}
