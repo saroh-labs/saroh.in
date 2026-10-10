@@ -37,6 +37,12 @@ function fresh(iso: string | null | undefined, now: Date): boolean {
     return age >= -60_000 && age <= MOMENT_FRESH_MS;
 }
 
+/** A name as typed, trimmed; null when there is nothing in it. */
+function said(words: string | null | undefined): string | null {
+    const trimmed = words?.trim() ?? "";
+    return trimmed === "" ? null : trimmed;
+}
+
 /** The order counts that are worth a line, and the words for each. */
 const ORDER_MOMENTS = new Map<number, { key: MomentKey; title: string }>([
     [1, { key: "first-order", title: "Your first order" }],
@@ -48,7 +54,7 @@ const ORDER_MOMENTS = new Map<number, { key: MomentKey; title: string }>([
 export function orderFact(
     row: Pick<OrderRow, "customer" | "walkIn" | "total" | "currency">,
 ): string | null {
-    const who = row.customer?.name?.trim() || row.walkIn?.name.trim() || null;
+    const who = said(row.customer?.name) ?? said(row.walkIn?.name);
     const total =
         row.total === undefined
             ? null
@@ -97,10 +103,10 @@ export function ordersMoment(
 /** The name the business keeps for whoever booked, else what they typed. */
 function bookedBy(booking: BookingWithService): string | null {
     const kept = [booking.contact?.firstName, booking.contact?.lastName]
-        .map((part) => part?.trim())
+        .map(said)
         .filter(Boolean)
         .join(" ");
-    return kept || booking.bookerName?.trim() || null;
+    return said(kept) ?? said(booking.bookerName);
 }
 
 /**
@@ -125,7 +131,7 @@ export function firstBookingMoment(
         weekday: "short",
         relative: true,
     });
-    const fact = [bookedBy(booking), booking.service?.name.trim(), when]
+    const fact = [bookedBy(booking), said(booking.service?.name), when]
         .filter(Boolean)
         .join(" · ");
     return {

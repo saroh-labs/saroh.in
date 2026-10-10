@@ -85,5 +85,5 @@ async function readOrdersSoftly(): Promise<OrderListPage | null> {
     );
     if (!res?.ok) return null;
     const page = (await res.json().catch(() => null)) as OrderListPage | null;
-    return page && Array.isArray(page.rows) && page.counts ? page : null;
+    return page && Array.isArray(page.rows) ? page : null;
 }

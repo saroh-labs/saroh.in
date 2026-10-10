@@ -118,29 +118,30 @@ describe("the 10th and 100th order", () => {
     });
 });
 
-const booking = (over: Partial<BookingWithService> = {}): BookingWithService =>
-    ({
-        id: "b1",
-        serviceId: "sv1",
-        startAt: "2026-10-12T04:00:00.000Z",
-        endAt: "2026-10-12T04:30:00.000Z",
-        timezone: "Asia/Kolkata",
-        status: "CONFIRMED",
-        outcome: null,
-        bookerName: "asha",
-        bookerEmail: "asha.rao@example.com",
-        bookerPhone: null,
-        createdAt: AN_HOUR_AGO,
-        cancelledAt: null,
-        contact: {
-            id: "c1",
-            firstName: "Asha",
-            lastName: "Rao",
-            email: "asha.rao@example.com",
-        },
-        service: { id: "sv1", name: "Haircut", timezone: "Asia/Kolkata" },
-        ...over,
-    }) as BookingWithService;
+const booking = (
+    over: Partial<BookingWithService> = {},
+): BookingWithService => ({
+    id: "b1",
+    serviceId: "sv1",
+    startAt: "2026-10-12T04:00:00.000Z",
+    endAt: "2026-10-12T04:30:00.000Z",
+    timezone: "Asia/Kolkata",
+    status: "CONFIRMED",
+    outcome: null,
+    bookerName: "asha",
+    bookerEmail: "asha.rao@example.com",
+    bookerPhone: null,
+    createdAt: AN_HOUR_AGO,
+    cancelledAt: null,
+    contact: {
+        id: "c1",
+        firstName: "Asha",
+        lastName: "Rao",
+        email: "asha.rao@example.com",
+    },
+    service: { id: "sv1", name: "Haircut", timezone: "Asia/Kolkata" },
+    ...over,
+});
 
 const READS = { reads: true, now: NOW };
 
