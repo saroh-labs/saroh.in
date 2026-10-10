@@ -8,8 +8,12 @@ import type { ReactNode } from "react";
 import { PlanLocked } from "@/components/billing/plan-locked";
 import { AccessDenied } from "@/components/shared/access-denied";
 import { PageContainer } from "@/components/shared/page-container";
+import { whoCanChange } from "@/components/shared/who-can-change";
 import { moduleAccess } from "@/lib/modules/guard";
+import { moduleName } from "@/lib/modules/names";
 import type { ModuleView } from "@/lib/modules/schema";
+import { knownRoleName } from "@/lib/organizations/role-name";
+import { resolveActiveOrganization } from "@/lib/organizations/service";
 
 /**
  * Renders a section only when its capability is available (#117, §21).
@@ -37,19 +41,21 @@ function Unavailable({
     switchedOnAt?: SwitchedOnAt;
 }) {
     const archived = capability.lifecycle === "ARCHIVED";
+    // The menu's name for it (Sell, Contacts), never the registry's.
+    const name = moduleName(capability.key, [capability]);
     return (
         // The page keeps its skeleton. A gate that replaces the whole screen
         // leaves the person with a card and no title, unsure whether they even
         // arrived where they meant to — the workspace design draws every state
         // INSIDE the page, under its own heading.
         <PageContainer>
-            <PageHeader title={capability.label} className="mb-6" />
+            <PageHeader title={name} className="mb-6" />
             <CapabilityOffState
-                title={`${capability.label} is turned off`}
+                title={`${name} is turned off`}
                 description={
                     archived
-                        ? `${capability.label} has been archived for this organization. Nothing it holds has been deleted — turning it back on restores this section.`
-                        : `${capability.label} is not switched on for this organization. Nothing it holds has been deleted; turning it on brings this section back.`
+                        ? `${name} has been archived for this business. Nothing it holds has been deleted. Turning it back on restores this section.`
+                        : `${name} is not switched on for this business. Nothing it holds has been deleted. Turning it on brings this section back.`
                 }
                 action={
                     capability.canManage ? (
@@ -57,14 +63,15 @@ function Unavailable({
                             <Link
                                 href={switchedOnAt?.href ?? "/settings/modules"}
                             >
-                                {switchedOnAt?.label ?? "Manage capabilities"}
+                                {switchedOnAt?.label ?? "Turn on in Modules"}
                             </Link>
                         </Button>
                     ) : (
                         // Say what is true: a MEMBER cannot fix this themselves, so
                         // offering them a settings button would be a dead end.
                         <p className="text-sm text-muted-foreground">
-                            An owner or admin can switch it on in Settings.
+                            An owner or admin can turn it on in Settings ›
+                            Modules.
                         </p>
                     )
                 }
@@ -102,7 +109,7 @@ export async function ModuleGate({
          * Readiness is DISABLED for ANY closed gate, and authorization is one
          * of them. Rendering every DISABLED as "turned off" told a MEMBER that
          * a capability their colleagues were using had been switched off for
-         * the whole organization (#274). A role that does not reach a module
+         * the whole business (#274). A role that does not reach a module
          * is a denial, and says so. When the module is off AND out of reach,
          * the denial wins: the person reading this can do nothing about the
          * switch.
@@ -111,10 +118,14 @@ export async function ModuleGate({
             (b) => b.code === "UNAUTHORIZED",
         );
         if (unauthorized) {
+            const organization = await resolveActiveOrganization();
             const standard = (
                 <AccessDenied
-                    title={`You do not have access to ${access.module.label}`}
-                    description={`Your role in this organization doesn't include ${access.module.label}. An owner or admin can change what you can reach.`}
+                    {...whoCanChange({
+                        thing: moduleName(access.module.key, [access.module]),
+                        business: organization?.name,
+                        role: organization ? knownRoleName(organization) : null,
+                    })}
                 />
             );
             return denied ? await denied(standard) : standard;

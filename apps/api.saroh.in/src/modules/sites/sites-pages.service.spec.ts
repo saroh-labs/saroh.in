@@ -23,6 +23,7 @@ import { BadRequestException, NotFoundException } from "@nestjs/common";
 import { prisma } from "@saroh/database";
 
 import type { OrganizationContext } from "../../common/types/organization-context";
+import { roleDenial } from "../organizations/organization-policy";
 import { SitesService } from "./sites.service";
 
 const siteFindFirst = prisma.site.findFirst as jest.Mock;
@@ -200,7 +201,9 @@ describe("SitesService.createPage", () => {
                 title: "About",
                 path: "/about",
             }),
-        ).rejects.toThrow(/MEMBER.*site:update/);
+        ).rejects.toMatchObject({
+            response: roleDenial("site:update"),
+        });
         expect(siteFindFirst).not.toHaveBeenCalled();
         expect(pageCreate).not.toHaveBeenCalled();
     });
@@ -480,7 +483,9 @@ describe("SitesService.updatePage", () => {
             service.updatePage(ctx({ role: "MEMBER" }), "site_1", "page_2", {
                 title: "Our story",
             }),
-        ).rejects.toThrow(/MEMBER.*site:update/);
+        ).rejects.toMatchObject({
+            response: roleDenial("site:update"),
+        });
         expect(siteFindFirst).not.toHaveBeenCalled();
         expect(pageFindFirst).not.toHaveBeenCalled();
         expect(pageUpdate).not.toHaveBeenCalled();
@@ -511,7 +516,9 @@ describe("SitesService.deletePage", () => {
     it("denies site:update to a MEMBER", async () => {
         await expect(
             service.deletePage(ctx({ role: "MEMBER" }), "site_1", "page_2"),
-        ).rejects.toThrow(/MEMBER.*site:update/);
+        ).rejects.toMatchObject({
+            response: roleDenial("site:update"),
+        });
         expect(pageDelete).not.toHaveBeenCalled();
     });
 });

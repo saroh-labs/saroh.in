@@ -10,9 +10,10 @@
  * API's capabilities module and fails when a code it can send has no line
  * here, and scans the app for a code rendered directly.
  */
+import { WHO_CAN_CHANGE } from "@/lib/access/who-can-change";
+
 /** Said when a role doesn't reach a module, or may not change one. */
-export const ROLE_REFUSAL =
-    "Your role doesn't include this. An owner or admin can change what you can reach.";
+export const ROLE_REFUSAL = `Your role doesn't include this. ${WHO_CAN_CHANGE}`;
 
 export const BLOCKER_COPY: Readonly<Record<string, string>> = {
     // The gates, in the API's order.
@@ -100,17 +101,25 @@ export function blockerSentence(blocker: {
 const BARE_CODE = /^[A-Z][A-Z0-9_]{2,}$/;
 
 /**
- * Words the API means for a developer: a role and a permission key
- * (`Role "MEMBER" may not perform "module:manage"`), a registry key, a
- * request's path and status.
+ * Words the API means for a developer: a registry key, a permission key in
+ * quotes, a request's path and status. A refusal by role is no longer among
+ * them: the API sends it as a sentence (`ROLE_DENIED`, `role-denied.ts`),
+ * which reads as it is.
  */
 const FOR_DEVELOPERS =
-    /may not perform|unknown module|\bfailed:\s*\d{3}\b|"[a-z_]+:[a-z_]+"|internal server error/i;
+    /unknown module|\bfailed:\s*\d{3}\b|"[a-z_]+:[a-z_]+"|internal server error/i;
+
+/**
+ * A refusal by role from an API older than `ROLE_DENIED`
+ * (`Role "MEMBER" may not perform "module:manage"`). Kept so a deploy where
+ * the app is ahead of the API never shows it.
+ */
+const OLD_ROLE_REFUSAL = /\bmay not perform\b/i;
 
 /**
  * The words for a refused module write's message (DEC-057): the API's
- * sentence when it is one a merchant can read, the words for a bare code,
- * the role line for a permission key, and otherwise the plain fallback.
+ * sentence when it is one a merchant can read (a refusal by role included),
+ * the words for a bare code, and otherwise the plain fallback.
  * Never a code, a key or a status.
  */
 export function moduleErrorSentence(
@@ -120,7 +129,7 @@ export function moduleErrorSentence(
     const said = message?.trim();
     if (!said) return fallback;
     if (BARE_CODE.test(said)) return BLOCKER_COPY[said] ?? fallback;
-    if (/may not perform/i.test(said)) return ROLE_REFUSAL;
+    if (OLD_ROLE_REFUSAL.test(said)) return ROLE_REFUSAL;
     if (FOR_DEVELOPERS.test(said)) return fallback;
     return said;
 }

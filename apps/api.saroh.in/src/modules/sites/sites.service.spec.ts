@@ -70,6 +70,7 @@ import type { OrganizationContext } from "../../common/types/organization-contex
 import type { EntitlementService } from "../billing/entitlement.service";
 import { planMeter } from "../billing/metering.service";
 import { MAX_WEBSITES_PER_BUSINESS } from "../organizations/business-limits";
+import { roleDenial } from "../organizations/organization-policy";
 import type { CreateSiteFromTemplateDto } from "./dto";
 import { SitesService } from "./sites.service";
 
@@ -506,7 +507,9 @@ describe("SitesService.createFromTemplate", () => {
             service.createFromTemplate(ctx({ role: "MEMBER" }), {
                 name: "Acme",
             }),
-        ).rejects.toThrow(/MEMBER.*site:create/);
+        ).rejects.toMatchObject({
+            response: roleDenial("site:create"),
+        });
 
         // Denied before any DB work.
         expect(orgFindUnique).not.toHaveBeenCalled();

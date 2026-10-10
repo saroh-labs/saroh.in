@@ -133,12 +133,12 @@ describe("who may touch the roster", () => {
                     email: "someone@example.test",
                     role: "MEMBER",
                 }),
-            ).rejects.toThrow(/may not perform/);
+            ).rejects.toThrow(/Your role can't do this/);
             await expect(
                 service.updateRole(ctx(role), "user_2", { role: "ADMIN" }),
-            ).rejects.toThrow(/may not perform/);
+            ).rejects.toThrow(/Your role can't do this/);
             await expect(service.remove(ctx(role), "user_2")).rejects.toThrow(
-                /may not perform/,
+                /Your role can't do this/,
             );
         }
     });
@@ -148,7 +148,7 @@ describe("who may touch the roster", () => {
         db.siteReviewer.findMany.mockResolvedValue([]);
 
         await expect(service.list(ctx("REVIEWER"))).rejects.toThrow(
-            /may not perform/,
+            /Your role can't do this/,
         );
         await expect(service.list(ctx("MEMBER"))).resolves.toEqual([]);
     });
@@ -210,7 +210,7 @@ describe("who may touch the roster", () => {
         db.organizationInvitation.findMany.mockResolvedValue([]);
 
         await expect(service.listInvitations(ctx("MEMBER"))).rejects.toThrow(
-            /may not perform/,
+            /Your role can't do this/,
         );
         await expect(service.listInvitations(ctx("ADMIN"))).resolves.toEqual(
             [],

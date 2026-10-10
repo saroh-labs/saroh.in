@@ -1,10 +1,13 @@
 // @covers app:/ app:/sites app:/sites/[siteId]/review app:/settings/organization app:/settings/people
 // @covers app:/contacts app:/commerce/orders app:/commerce/products app:/bookings app:/bookings/all
-// @covers app:/billing/invoices app:/billing/subscriptions
+// @covers app:/billing/invoices app:/billing/subscriptions app:/commerce/customers/new
 import type { BrowserContext } from "@playwright/test";
 import { expect, test } from "@playwright/test";
 
 import { appHost, appIsSecure } from "../permissions.config";
+
+/** Who can lift a denial: the one line every denied screen ends on. */
+const WHO_CAN_CHANGE = "An owner or admin can change this in Settings › Team.";
 
 /**
  * The host and scheme come from the config, not from a literal (#287): this
@@ -164,7 +167,7 @@ test("production 403 uses the editor permission boundary", async ({
     await page.goto("/sites/site_1");
     await expect(
         page.getByRole("heading", {
-            name: "You do not have access to this",
+            name: "You can't open this",
             exact: true,
         }),
     ).toBeVisible();
@@ -184,7 +187,7 @@ test("settings does not swallow the forbidden interrupt", async ({
     await page.goto("/settings/organization");
     await expect(
         page.getByRole("heading", {
-            name: "You do not have access to this",
+            name: "You can't open this",
             exact: true,
         }),
     ).toBeVisible();
@@ -201,7 +204,7 @@ test("a server failure still offers retry", async ({ page, context }) => {
     ).toBeVisible();
     await expect(
         page.getByRole("heading", {
-            name: "You do not have access to this",
+            name: "You can't open this",
             exact: true,
         }),
     ).toHaveCount(0);
@@ -231,15 +234,16 @@ test("a Reviewer opening Bookings sees the locked card, not an error", async ({
         await page.goto(path);
         await expect(
             page.getByRole("heading", {
-                name: "You can't open bookings",
+                name: "You can't open Bookings",
                 exact: true,
             }),
         ).toBeVisible();
         await expect(
             page.getByText(
-                "Your role is Reviewer, which can see the website but not bookings. An owner or admin can change that in Team.",
+                "Your role in Permission tests is Reviewer. It doesn't include Bookings.",
             ),
         ).toBeVisible();
+        await expect(page.getByText(WHO_CAN_CHANGE)).toBeVisible();
         await expect(
             page.getByRole("link", { name: "Back to Home", exact: true }),
         ).toBeVisible();
@@ -258,10 +262,17 @@ test("a denied module explains access instead of saying it is off", async ({
     await page.goto("/contacts");
     await expect(
         page.getByRole("heading", {
-            name: "You do not have access to CRM",
+            // The menu's name for it, never the registry's "CRM".
+            name: "You can't open Contacts",
             exact: true,
         }),
     ).toBeVisible();
+    await expect(
+        page.getByText(
+            "Your role in Permission tests is Reviewer. It doesn't include Contacts.",
+        ),
+    ).toBeVisible();
+    await expect(page.getByText(WHO_CAN_CHANGE)).toBeVisible();
 });
 
 test("someone who can't read or stage orders sees the locked card", async ({
@@ -276,20 +287,18 @@ test("someone who can't read or stage orders sees the locked card", async ({
     ).toBeVisible();
     await expect(
         page.getByRole("heading", {
-            name: "You do not have access to this",
+            name: "You can't open Orders",
             exact: true,
         }),
     ).toBeVisible();
     await expect(
         page.getByText(
-            "Your role in Permission tests is Reviewer, which covers one website and nothing about the business around it. Orders are not part of it.",
+            "Your role in Permission tests is Reviewer. It doesn't include Orders.",
         ),
     ).toBeVisible();
-    await expect(
-        page.getByText(
-            "The rail does not offer Sell to this role, so you have reached it by address. Ask an Owner or Admin of Permission tests if you need it.",
-        ),
-    ).toBeVisible();
+    await expect(page.getByText(WHO_CAN_CHANGE)).toBeVisible();
+    // Never how they got here: a link leads here as well as an address.
+    await expect(page.getByText(/reached it by address/)).toHaveCount(0);
     // A denial, not a failure: nothing to retry, and no tabs.
     await expect(page.getByRole("button", { name: /try again/i })).toHaveCount(
         0,
@@ -303,13 +312,13 @@ test("someone who can't read or stage orders sees the locked card", async ({
     await page.goto("/commerce/orders/ord_1");
     await expect(
         page.getByRole("heading", {
-            name: "You can't open orders",
+            name: "You can't open Orders",
             exact: true,
         }),
     ).toBeVisible();
     await expect(
         page.getByText(
-            "Your role is Reviewer, which can see the website but not this. An owner or admin can change that in Team.",
+            `Your role is Reviewer. It doesn't include Orders. ${WHO_CAN_CHANGE}`,
         ),
     ).toBeVisible();
     await expect(
@@ -321,14 +330,14 @@ test("someone who can't read or stage orders sees the locked card", async ({
     await page.goto("/commerce/products");
     await expect(
         page.getByRole("heading", {
-            name: "You do not have access to Sell",
+            name: "You can't open Sell",
             exact: true,
         }),
     ).toBeVisible();
-    await expect(page.getByText("You can't open orders")).toHaveCount(0);
+    await expect(page.getByText("You can't open Orders")).toHaveCount(0);
 });
 
-test("a Member opening Payments sees the locked card, in the design's words (D18)", async ({
+test("a Member opening Payments sees the locked card, in the one sentence (D18)", async ({
     page,
     context,
 }) => {
@@ -343,13 +352,13 @@ test("a Member opening Payments sees the locked card, in the design's words (D18
         await page.goto(path);
         await expect(
             page.getByRole("heading", {
-                name: "Only owners and admins see payments",
+                name: "You can't open Payments",
                 exact: true,
             }),
         ).toBeVisible();
         await expect(
             page.getByText(
-                "Your role is Member — money stays with owners and admins. An owner or admin can change that in Team.",
+                `Your role is Member. It doesn't include Payments. ${WHO_CAN_CHANGE}`,
             ),
         ).toBeVisible();
         const back = page.getByRole("link", {
@@ -369,7 +378,7 @@ test("a Member opening Payments sees the locked card, in the design's words (D18
     }
 });
 
-test("a Reviewer opening Invoices is told what their role covers (D18)", async ({
+test("a Reviewer opening Invoices is told their role doesn't include Payments (D18)", async ({
     page,
     context,
 }) => {
@@ -377,13 +386,13 @@ test("a Reviewer opening Invoices is told what their role covers (D18)", async (
     await page.goto("/billing/invoices");
     await expect(
         page.getByRole("heading", {
-            name: "You can't open payments",
+            name: "You can't open Payments",
             exact: true,
         }),
     ).toBeVisible();
     await expect(
         page.getByText(
-            "Your role is Reviewer, which can see the website but not payments. An owner or admin can change that in Team.",
+            `Your role is Reviewer. It doesn't include Payments. ${WHO_CAN_CHANGE}`,
         ),
     ).toBeVisible();
 });
@@ -397,15 +406,42 @@ test("a role the business made without invoices is named (D18)", async ({
     await page.goto("/billing/invoices");
     await expect(
         page.getByRole("heading", {
-            name: "You can't open invoices",
+            name: "You can't open Invoices",
             exact: true,
         }),
     ).toBeVisible();
     await expect(
         page.getByText(
-            "Your role is Front desk, which doesn't include invoices. An owner or admin can change that in Team.",
+            `Your role is Front desk. It doesn't include Invoices. ${WHO_CAN_CHANGE}`,
         ),
     ).toBeVisible();
+});
+
+test("a Member who types Add customer's address is told before any form", async ({
+    page,
+    context,
+}) => {
+    // A Member reads customers (`contact:read`) and can't add one. The page
+    // used to open, take the details and refuse on Save.
+    await scenario(context, "MEMBER");
+    await page.goto("/commerce/customers/new");
+    await expect(
+        page.getByRole("heading", {
+            name: "You can't open Add customer",
+            exact: true,
+        }),
+    ).toBeVisible();
+    await expect(
+        page.getByText(
+            "Your role in Permission tests is Member. It doesn't include Add customer.",
+        ),
+    ).toBeVisible();
+    await expect(page.getByText(WHO_CAN_CHANGE)).toBeVisible();
+    await expect(page.getByRole("textbox")).toHaveCount(0);
+    await expect(page.getByRole("button", { name: /try again/i })).toHaveCount(
+        0,
+    );
+    await expect(page.getByText(/contact:write|ROLE_DENIED/)).toHaveCount(0);
 });
 
 test("a failed Orders read says so, and is never an empty list", async ({

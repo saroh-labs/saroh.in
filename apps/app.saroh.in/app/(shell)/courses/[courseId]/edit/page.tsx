@@ -5,6 +5,7 @@ import { notFound } from "next/navigation";
 
 import { CourseForm } from "@/components/courses/course-form";
 import { PageContainer } from "@/components/shared/page-container";
+import { requireCan } from "@/lib/access/require-can";
 import { getCourse } from "@/lib/courses/service";
 import { requireSession } from "@/lib/session";
 
@@ -18,6 +19,17 @@ export default async function EditCoursePage({
 }) {
     await requireSession();
     const { courseId } = await params;
+    // Asked before the form is drawn: `course:write` is what the API asks of
+    // the save (`requireCan`).
+    const access = await requireCan("course:write", {
+        thing: "Edit course",
+        back: {
+            href: `/courses/${courseId}`,
+            label: "Back to the course",
+            needs: "course:read",
+        },
+    });
+    if (access.denied) return access.denied;
     const course = await getCourse(courseId);
     if (!course) notFound();
 

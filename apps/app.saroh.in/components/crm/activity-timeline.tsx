@@ -97,9 +97,12 @@ function CompleteTaskButton({
 export function ActivityTimeline({
     leadId,
     activities,
+    canWrite = true,
 }: {
     leadId: string;
     activities: LeadActivity[];
+    /** `activity:write`: may mark a follow-up done. */
+    canWrite?: boolean;
 }) {
     if (activities.length === 0) {
         return (
@@ -165,7 +168,7 @@ export function ActivityTimeline({
                                 )}
                             </p>
                         </div>
-                        {isTask && !done && (
+                        {isTask && !done && canWrite && (
                             <CompleteTaskButton
                                 leadId={leadId}
                                 activityId={entry.id}

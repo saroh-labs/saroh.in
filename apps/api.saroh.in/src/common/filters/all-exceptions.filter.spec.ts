@@ -11,6 +11,7 @@ import {
 } from "@nestjs/common";
 import type { Request } from "express";
 
+import { authorize } from "../../modules/organizations/organization-policy";
 import { logHttpRequestOnce } from "../logging/http-request-log";
 import { structuredLogger } from "../logging/structured-logger";
 import { AllExceptionsFilter } from "./all-exceptions.filter";
@@ -145,6 +146,30 @@ describe("AllExceptionsFilter", () => {
         expect(err.code).toBe("GONE");
         expect(err.message).toBe("This preview link was taken back.");
         expect(err.details).toEqual({ reason: "revoked" });
+    });
+
+    it("sends a refusal by role as a sentence, with the permission in details", () => {
+        const res = makeResponse();
+        try {
+            authorize(
+                { organizationId: "org_1", userId: "user_1", role: "MEMBER" },
+                "store:create",
+            );
+        } catch (error) {
+            filter.catch(error, makeHost(res));
+        }
+
+        expect(res.statusCode).toBe(403);
+        const err = envelope(res);
+        expect(err.code).toBe("FORBIDDEN");
+        expect(err.message).toBe(
+            "Your role can't do this. An owner or admin can change that in Settings › Team.",
+        );
+        expect(err.details).toEqual({
+            code: "ROLE_DENIED",
+            action: "store:create",
+        });
+        expect(JSON.stringify(res.body)).not.toMatch(/MEMBER|may not perform/);
     });
 
     it("collapses an unknown error into an opaque 500 (no leak)", () => {

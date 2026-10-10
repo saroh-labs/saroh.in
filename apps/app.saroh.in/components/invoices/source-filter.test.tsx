@@ -67,9 +67,14 @@ describe("PaymentsLocked", () => {
         />,
     );
 
-    it("is the design's card, in the merchant's words, with the way back", () => {
-        expect(html).toContain("Only owners and admins see payments");
-        expect(html).toContain("money stays with owners and admins");
+    it("is the one denial sentence, with the way back", () => {
+        // The markup escapes an apostrophe, so the words are read around it.
+        expect(html).toContain("open Payments<");
+        expect(html).toContain("Your role is Member. It doesn");
+        expect(html).toContain(
+            "include Payments. An owner or admin can change this in Settings › Team.",
+        );
+        expect(html).not.toContain("money stays with owners and admins");
         expect(html).toContain("Back to Home");
         expect(html).toContain('href="/"');
     });

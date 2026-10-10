@@ -5,7 +5,7 @@ import { Globe, Plus } from "lucide-react";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 
-import { navRoleCan } from "@/components/shared/nav-items";
+import { navCan } from "@/components/shared/nav-items";
 import { PageContainer } from "@/components/shared/page-container";
 import { resolveActiveOrganization } from "@/lib/organizations/service";
 import { requireSession } from "@/lib/session";
@@ -39,7 +39,12 @@ export default async function SitesPage() {
     if (first) redirect(`/sites/${first.id}/pages`);
 
     const role = organization?.role ?? null;
-    const mayCreate = navRoleCan(role, "site:create");
+    // By what the role was given, never by its name: a role the business
+    // made with `site:create` ticked may make one.
+    const mayCreate = navCan(
+        { role, actions: organization?.actions },
+        "site:create",
+    );
 
     /*
      * Three roles reach this screen with nothing on it, and it said the same

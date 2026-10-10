@@ -68,6 +68,7 @@ import { starterTemplate } from "@saroh/templates";
 import { draftFingerprint } from "./review-route";
 
 import type { OrganizationContext } from "../../common/types/organization-context";
+import { roleDenial } from "../organizations/organization-policy";
 import type { UpdateDraftSectionsDto } from "./dto";
 import { defaultSiteStyle } from "./site-style";
 import { SitesService } from "./sites.service";
@@ -287,7 +288,9 @@ describe("SitesService.replaceDraftSections", () => {
                     sections: [],
                 },
             ),
-        ).rejects.toThrow(/MEMBER.*section:write/);
+        ).rejects.toMatchObject({
+            response: roleDenial("section:write"),
+        });
 
         expect(siteFindFirst).not.toHaveBeenCalled();
         expect(transaction).not.toHaveBeenCalled();
@@ -355,7 +358,9 @@ describe("SitesService.getPageDraft", () => {
     it("denies section:write to a MEMBER", async () => {
         await expect(
             service.getPageDraft(ctx({ role: "MEMBER" }), "site_1", "page_1"),
-        ).rejects.toThrow(/MEMBER.*section:write/);
+        ).rejects.toMatchObject({
+            response: roleDenial("section:write"),
+        });
     });
 
     it("SANITIZES a stored draft on the way out, so the editor preview never renders it raw (#280)", async () => {
@@ -673,7 +678,9 @@ describe("SitesService.restorePublication (#279)", () => {
                 "site_1",
                 "pub_old",
             ),
-        ).rejects.toThrow(/MEMBER.*site:publish/);
+        ).rejects.toMatchObject({
+            response: roleDenial("site:publish"),
+        });
         expect(siteFindFirst).not.toHaveBeenCalled();
         expect(transaction).not.toHaveBeenCalled();
     });
@@ -1127,7 +1134,9 @@ describe("SitesService.publishSite", () => {
     it("denies site:publish to a MEMBER before any DB work", async () => {
         await expect(
             service.publishSite(ctx({ role: "MEMBER" }), "site_1"),
-        ).rejects.toThrow(/MEMBER.*site:publish/);
+        ).rejects.toMatchObject({
+            response: roleDenial("site:publish"),
+        });
         expect(siteFindFirst).not.toHaveBeenCalled();
     });
 });

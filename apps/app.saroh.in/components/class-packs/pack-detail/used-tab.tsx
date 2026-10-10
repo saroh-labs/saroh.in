@@ -3,6 +3,7 @@
 import { Button } from "@saroh/ui/button";
 import { FailedState, PermissionDeniedState } from "@saroh/ui/data-state";
 
+import { WHO_CAN_CHANGE } from "@/components/shared/who-can-change";
 import { Pill } from "@/components/subscriptions/pill";
 import type { UseRow } from "@/lib/class-packs/pack-activity";
 
@@ -41,7 +42,7 @@ export function UsedTab({
                 <PermissionDeniedState
                     title="You can't see what this pack paid for"
                     description="Your role doesn't reach the bookings paid with packs."
-                    note="An owner or admin can change what your role reaches in Team."
+                    note={WHO_CAN_CHANGE}
                 />
             </>
         );

@@ -37,7 +37,16 @@ export function LeadActions({
     contactId,
     consent,
     gates,
+    canLog = true,
+    canMessage = true,
 }: {
+    /**
+     * `activity:write`: may add a note or a follow-up. Without it neither
+     * button is drawn. The page says why in its read-only note.
+     */
+    canLog?: boolean;
+    /** `message:write`: may send this lead's contact a message. */
+    canMessage?: boolean;
     leadId: string;
     /** The lead's contact; null when none is linked. */
     contactId: string | null;
@@ -70,46 +79,59 @@ export function LeadActions({
             Link a contact to this lead to send a message.
         </p>
     );
-    const hidden = off !== null && !off.canManage;
+    const hidden = !canMessage || (off !== null && !off.canManage);
+
+    // Nothing this person may do here: no row of buttons that only refuse.
+    if (!canLog && hidden) return null;
 
     return (
         <div className="mb-8 grid gap-2">
             <div className="flex flex-wrap items-center gap-2">
-                <Sheet open={open === "note"} onOpenChange={toggle("note")}>
-                    <SheetTrigger asChild>
-                        <Button className="wk-press">Add note</Button>
-                    </SheetTrigger>
-                    <ActionSheetContent
-                        title="Add note"
-                        description="Write down a call, a visit or anything the team should remember about this lead. Only your team sees it."
-                        dirty={dirty}
-                    >
-                        <ActivityComposer
-                            leadId={leadId}
-                            onDone={done}
-                            onDirtyChange={setDirty}
-                        />
-                    </ActionSheetContent>
-                </Sheet>
+                {canLog ? (
+                    <>
+                        <Sheet
+                            open={open === "note"}
+                            onOpenChange={toggle("note")}
+                        >
+                            <SheetTrigger asChild>
+                                <Button className="wk-press">Add note</Button>
+                            </SheetTrigger>
+                            <ActionSheetContent
+                                title="Add note"
+                                description="Write down a call, a visit or anything the team should remember about this lead. Only your team sees it."
+                                dirty={dirty}
+                            >
+                                <ActivityComposer
+                                    leadId={leadId}
+                                    onDone={done}
+                                    onDirtyChange={setDirty}
+                                />
+                            </ActionSheetContent>
+                        </Sheet>
 
-                <Sheet open={open === "task"} onOpenChange={toggle("task")}>
-                    <SheetTrigger asChild>
-                        <Button variant="outline" className="wk-press">
-                            Schedule follow-up
-                        </Button>
-                    </SheetTrigger>
-                    <ActionSheetContent
-                        title="Schedule follow-up"
-                        description="Say what to do next and when. It shows in this lead's activity with its due date."
-                        dirty={dirty}
-                    >
-                        <TaskForm
-                            leadId={leadId}
-                            onDone={done}
-                            onDirtyChange={setDirty}
-                        />
-                    </ActionSheetContent>
-                </Sheet>
+                        <Sheet
+                            open={open === "task"}
+                            onOpenChange={toggle("task")}
+                        >
+                            <SheetTrigger asChild>
+                                <Button variant="outline" className="wk-press">
+                                    Schedule follow-up
+                                </Button>
+                            </SheetTrigger>
+                            <ActionSheetContent
+                                title="Schedule follow-up"
+                                description="Say what to do next and when. It shows in this lead's activity with its due date."
+                                dirty={dirty}
+                            >
+                                <TaskForm
+                                    leadId={leadId}
+                                    onDone={done}
+                                    onDirtyChange={setDirty}
+                                />
+                            </ActionSheetContent>
+                        </Sheet>
+                    </>
+                ) : null}
 
                 {hidden ? null : blocked || !contactId ? (
                     <Button
@@ -146,7 +168,7 @@ export function LeadActions({
                     </Sheet>
                 )}
             </div>
-            {blocked ? <div id={reasonId}>{blocked}</div> : null}
+            {blocked && !hidden ? <div id={reasonId}>{blocked}</div> : null}
         </div>
     );
 }

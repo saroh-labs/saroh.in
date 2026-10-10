@@ -230,6 +230,7 @@ export function OrdersLocked({
             <OrdersHeading />
             <PermissionDeniedState
                 className="rounded-[11px] border-border-strong"
+                title="You can't open Orders"
                 description={description}
                 note={note}
             />
@@ -246,7 +247,7 @@ export function OrderLocked({ text }: { text: string }) {
         <div className="px-4 py-[60px] sm:px-[22px]">
             <PermissionDeniedState
                 className="gap-[9px] border-border-strong py-9 sm:py-9"
-                title="You can't open orders"
+                title="You can't open Orders"
                 description={text}
                 action={
                     <Button asChild variant="outline" className="wk-press mt-1">

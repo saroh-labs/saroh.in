@@ -21,7 +21,10 @@ import type { OpenTask } from "@/lib/leads/service";
 export function FollowUpsList({
     tasks,
     leads,
+    canWrite = true,
 }: {
+    /** `activity:write`: may mark one done. Without it the list only reads. */
+    canWrite?: boolean;
     tasks: OpenTask[] | null;
     /** Lead titles and who they are for, by id, to name each task's lead. */
     leads: Record<string, { title: string; who: string | null }>;
@@ -114,15 +117,17 @@ export function FollowUpsList({
                                             "No date"
                                         )}
                                     </span>
-                                    <Button
-                                        size="sm"
-                                        variant="outline"
-                                        disabled={busy === t.id}
-                                        aria-label={`Mark "${t.body ?? "follow-up"}" done`}
-                                        onClick={() => void done(t)}
-                                    >
-                                        Done
-                                    </Button>
+                                    {canWrite ? (
+                                        <Button
+                                            size="sm"
+                                            variant="outline"
+                                            disabled={busy === t.id}
+                                            aria-label={`Mark "${t.body ?? "follow-up"}" done`}
+                                            onClick={() => void done(t)}
+                                        >
+                                            Done
+                                        </Button>
+                                    ) : null}
                                 </>
                             }
                         />

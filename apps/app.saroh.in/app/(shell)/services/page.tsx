@@ -1,11 +1,18 @@
 import { Button } from "@saroh/ui/button";
-import { FailedState, PartialNotice } from "@saroh/ui/data-state";
+import {
+    FailedState,
+    PartialNotice,
+    PermissionDeniedState,
+} from "@saroh/ui/data-state";
 import Link from "next/link";
 
 import { BARE, BookingsTopBar } from "@/components/bookings/calendar/parts";
 import { ServicesScreen } from "@/components/services/services-screen";
 import { PageContainer } from "@/components/shared/page-container";
+import { whoCanChange } from "@/components/shared/who-can-change";
 import { modulesOrUnknown } from "@/lib/modules/guard";
+import { knownRoleName } from "@/lib/organizations/role-name";
+import { resolveActiveOrganization } from "@/lib/organizations/service";
 import { alsoSellFeatures } from "@/lib/services/also-sell";
 import {
     businessCurrencyOf,
@@ -28,6 +35,16 @@ import { readBookingPayment } from "@/lib/staff/service";
  */
 export const metadata = { title: "Services" };
 
+/** What someone whose role can't read services is told. */
+async function servicesDenied() {
+    const organization = await resolveActiveOrganization();
+    return whoCanChange({
+        thing: "Services",
+        business: organization?.name,
+        role: organization ? knownRoleName(organization) : null,
+    });
+}
+
 export default async function ServicesPage() {
     await requireSession();
     const [read, staffList, hasPage, canEdit, modules, payment] =
@@ -45,25 +62,22 @@ export default async function ServicesPage() {
             <PageContainer width="full" className={BARE}>
                 <BookingsTopBar page="Services" />
                 <div className="px-[22px] pb-6 pt-[18px]">
-                    <FailedState
-                        title={
-                            read.forbidden
-                                ? "Your role can't see services"
-                                : "Couldn't load your services"
-                        }
-                        description={
-                            read.forbidden
-                                ? "An owner or admin can change what your role reaches in Team."
-                                : "Nothing has been changed. Try again in a moment."
-                        }
-                        action={
-                            read.forbidden ? undefined : (
+                    {read.forbidden ? (
+                        // A denial is not a failure: nothing broke and
+                        // trying again does the same thing. The denied
+                        // card, never the red one (`saroh-product-states`).
+                        <PermissionDeniedState {...await servicesDenied()} />
+                    ) : (
+                        <FailedState
+                            title="Couldn't load your services"
+                            description="Nothing has been changed. Try again in a moment."
+                            action={
                                 <Button asChild variant="outline">
                                     <Link href="/services">Try again</Link>
                                 </Button>
-                            )
-                        }
-                    />
+                            }
+                        />
+                    )}
                 </div>
             </PageContainer>
         );

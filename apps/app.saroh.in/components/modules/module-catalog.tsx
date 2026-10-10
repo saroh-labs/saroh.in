@@ -30,7 +30,7 @@ export function ModuleCatalog({
         return (
             <EmptyState
                 title="No modules to show"
-                description="Modules appear here once your organization is set up."
+                description="Modules appear here once your business is set up."
             />
         );
     }

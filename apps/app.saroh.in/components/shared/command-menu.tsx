@@ -9,24 +9,17 @@ import {
     CommandList,
 } from "@saroh/ui/command";
 import {
-    CalendarPlus,
     CircleHelp,
     Globe,
-    GraduationCap,
     Receipt,
-    ReceiptText,
-    Repeat,
     SlidersHorizontal,
-    Store,
     Target,
-    Ticket,
     UserRound,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 
 import type { StorefrontAllowance } from "@/lib/business-limits";
-import { mayAddStorefront, mayAddWebsite } from "@/lib/business-limits";
 import type { HelpTopic } from "@/lib/help/links";
 import {
     HELP_ARTICLES,
@@ -40,7 +33,7 @@ import { mayNavigate } from "@/lib/nav/leave-request";
 import type { SearchHit, SearchKind } from "@/lib/search/service";
 import { searchSettings, settingsPageLabel } from "@/lib/settings/search";
 
-import type { NavAction, NavRole } from "./nav-items";
+import type { NavRole } from "./nav-items";
 import {
     NOTIFICATIONS_NAV,
     WEBSITE_HREF,
@@ -48,6 +41,7 @@ import {
     navFor,
     settingsPagesFor,
 } from "./nav-items";
+import { quickActionsFor } from "./quick-actions";
 
 const OPEN_EVENT = "saroh:open-command";
 
@@ -138,96 +132,6 @@ function helpItems(now: Date): { key: string; label: string; href: string }[] {
 }
 
 /**
- * Things you can DO, not just places you can go. Each is gated on the module
- * that owns it, so a merchant without Commerce is never offered "New store".
- *
- * ONLY ROUTES THAT EXIST. "New lead" belongs on this list by every argument
- * except the one that counts — there is no `/leads/new`; a lead is created from
- * a contact. Adding it would have rebuilt the exact defect this audit opened
- * with: a confident call to action that terminates in "Page not found".
- * `pnpm check:routes` fails the build on these, and it is checked here.
- */
-/*
- * Quick actions. Every one of them MAKES something, so every one of them needs
- * a role that may: the palette was offering "New site" to a reviewer, whose
- * only powers are reading a site and saying what they think (#313).
- *
- * The other two are module-gated and the module gate already asks the API
- * whether this actor is authorized, so `COMMERCE` and `APPOINTMENTS` never
- * reach a role that could not use them.
- */
-const ACTIONS: {
-    href: string;
-    label: string;
-    icon: typeof UserRound;
-    moduleKey?: string;
-    action?: NavAction | readonly NavAction[];
-    /**
-     * Offered only while the business may still make one: one website
-     * (ADR-006), storefronts up to the plan (ADR-010).
-     */
-    limit?: "website" | "storefront";
-}[] = [
-    {
-        href: "/services/new",
-        label: "New service",
-        icon: CalendarPlus,
-        moduleKey: "APPOINTMENTS",
-    },
-    {
-        href: "/courses/new",
-        label: "New course",
-        icon: GraduationCap,
-        moduleKey: "COURSES",
-        action: "course:write",
-    },
-    {
-        href: "/class-packs/new",
-        label: "New class pack",
-        icon: Ticket,
-        moduleKey: "CLASS_PACKS",
-        action: "pack:write",
-    },
-    {
-        href: "/class-packs?sell=1",
-        label: "Sell a pack",
-        icon: Ticket,
-        moduleKey: "CLASS_PACKS",
-        // `pack:sell` (E26); an API from before it asked `pack:write`.
-        action: ["pack:sell", "pack:write"],
-    },
-    {
-        href: "/sites/new",
-        label: "New site",
-        icon: Globe,
-        moduleKey: "WEBSITE",
-        action: "site:create",
-        limit: "website",
-    },
-    {
-        href: "/billing/subscriptions?subscribe=1",
-        label: "Subscribe someone",
-        icon: Repeat,
-        moduleKey: "PAYMENTS",
-        action: "subscription:write",
-    },
-    {
-        href: "/billing/invoices/new",
-        label: "New invoice",
-        icon: ReceiptText,
-        // Invoicing needs no module (DEC-070): only the permission.
-        action: "invoice:write",
-    },
-    {
-        href: "/commerce/locations/new",
-        label: "New location",
-        icon: Store,
-        moduleKey: "COMMERCE",
-        limit: "storefront",
-    },
-];
-
-/**
  * Global ⌘K / Ctrl-K command palette.
  *
  * ## What changed, and why it was worth changing
@@ -305,14 +209,13 @@ export function CommandMenu({
         stockTracked,
     });
 
-    const available = moduleKeys === null ? null : new Set(moduleKeys);
-    const actions = ACTIONS.filter(
-        (a) =>
-            (!a.moduleKey || !available || available.has(a.moduleKey)) &&
-            (!a.action || navCan({ role, actions: permissions }, a.action)) &&
-            (a.limit !== "website" || mayAddWebsite(sites.length)) &&
-            (a.limit !== "storefront" || mayAddStorefront(storefronts)),
-    );
+    const actions = quickActionsFor({
+        moduleKeys,
+        role,
+        actions: permissions,
+        siteCount: sites.length,
+        storefronts,
+    });
 
     useEffect(() => {
         const onKey = (e: KeyboardEvent) => {

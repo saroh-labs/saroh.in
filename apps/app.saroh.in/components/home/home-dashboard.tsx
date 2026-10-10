@@ -18,6 +18,7 @@ import { rolledOut } from "@/lib/modules/rollout";
 import type { ModuleView } from "@/lib/modules/schema";
 import type { ReadyChecklist } from "@/lib/settings/ready";
 
+import { WHO_CAN_CHANGE } from "@/components/shared/who-can-change";
 import { FirstRunJobs } from "./first-run-jobs";
 import { NeedsYou } from "./needs-you";
 import { TakeMoneyChecklist } from "./take-money-checklist";
@@ -198,7 +199,7 @@ function FirstRun({
             <EmptyState
                 icon={<Home aria-hidden />}
                 title="Nothing here is open to you yet"
-                description={`${businessName} runs on Saroh, but your role doesn't reach any of it yet. An owner or admin can change what you can reach, in Team.`}
+                description={`${businessName} runs on Saroh, but your role doesn't reach any of it yet. ${WHO_CAN_CHANGE}`}
             />
         );
     }

@@ -108,7 +108,9 @@ export default async function SitePostsPage({
                         >
                             <Link
                                 href={`${base}/${post.id}`}
-                                aria-label={`${post.title}, ${pill.label.toLowerCase()}${isPaused(post) ? ", paused" : ""}`}
+                                // A reader opens it to read (`PostReadView`),
+                                // and the row says so.
+                                aria-label={`${site.can.edit ? "" : "View "}${post.title}, ${pill.label.toLowerCase()}${isPaused(post) ? ", paused" : ""}`}
                                 className="block bg-card transition-colors duration-fast hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
                             >
                                 <ListRow
@@ -144,10 +146,15 @@ export default async function SitePostsPage({
                                         </>
                                     }
                                     end={
-                                        <span className="whitespace-nowrap text-[12px] tabular-nums text-muted-foreground">
+                                        <span className="flex items-center gap-3 whitespace-nowrap text-[12px] tabular-nums text-muted-foreground">
                                             <ViewerDate
                                                 iso={postUpdatedIso(post)}
                                             />
+                                            {site.can.edit ? null : (
+                                                <span className="font-medium text-foreground">
+                                                    View
+                                                </span>
+                                            )}
                                         </span>
                                     }
                                 />

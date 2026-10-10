@@ -3,6 +3,7 @@ import Link from "next/link";
 
 import { AddCustomerForm } from "@/components/customers/add-customer-form";
 import { PageContainer } from "@/components/shared/page-container";
+import { requireCan } from "@/lib/access/require-can";
 import { requireSession } from "@/lib/session";
 
 export const metadata = { title: "Add customer" };
@@ -15,6 +16,17 @@ export const metadata = { title: "Add customer" };
  */
 export default async function NewCustomerPage() {
     await requireSession();
+    // Asked before the form is drawn: `contact:write` is what the API asks of
+    // the save (`requireCan`).
+    const access = await requireCan("contact:write", {
+        thing: "Add customer",
+        back: {
+            href: "/commerce/customers",
+            label: "Back to Customers",
+            needs: "contact:read",
+        },
+    });
+    if (access.denied) return access.denied;
 
     return (
         <PageContainer width="form">

@@ -1,5 +1,6 @@
 import { AccessDenied } from "@/components/shared/access-denied";
 import { PageContainer } from "@/components/shared/page-container";
+import { whoCanChange } from "@/components/shared/who-can-change";
 
 import { StockHeader } from "./stock-header";
 import { TurnOnTracking } from "./turn-on-tracking";
@@ -18,12 +19,7 @@ export function StockLocked({
     role: string;
 }) {
     return (
-        <AccessDenied
-            title="You can't open stock"
-            description={`You're signed in as ${role} in ${business}. That role doesn't include seeing products or stock. An owner or admin can give you access in Team.`}
-            note={null}
-            backLabel="Go to Home"
-        />
+        <AccessDenied {...whoCanChange({ thing: "Stock", business, role })} />
     );
 }
 

@@ -7,6 +7,7 @@ import {
 } from "@/components/bookings/calendar/parts";
 import { ModuleGate } from "@/components/modules/module-gate";
 import { PageContainer } from "@/components/shared/page-container";
+import { knownRoleName } from "@/lib/organizations/role-name";
 import { resolveActiveOrganization } from "@/lib/organizations/service";
 import { canReadBookings } from "@/lib/services/access";
 
@@ -30,8 +31,8 @@ export default async function Layout({ children }: { children: ReactNode }) {
             <PageContainer width="full" className={BARE}>
                 <BookingsTopBar />
                 <BookingsLocked
-                    role={organization.role}
-                    roleLabel={organization.roleLabel ?? null}
+                    business={organization.name}
+                    role={knownRoleName(organization)}
                 />
             </PageContainer>
         );

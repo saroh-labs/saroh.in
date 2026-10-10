@@ -268,6 +268,17 @@ what the API allows.
 
 ## Rules
 
+- **Current** (10 Oct 2026) — **A refusal by role is a sentence, with the
+  permission in `details`.** `authorize()` throws a 403 whose message is
+  "Your role can't do this. An owner or admin can change that in Settings ›
+  Team." and whose envelope carries `details: { code: "ROLE_DENIED", action }`
+  (`roleDenial(action)` in `organization-policy.ts`). Never a role's key or a
+  permission's in the message: it reaches the screen. An endpoint that says
+  its own sentence (`requireBookingPower`, `customer-access.ts`) keeps it. A
+  spec pins which permission refused with
+  `rejects.toMatchObject({ response: roleDenial("site:update") })`, not by
+  reading the message. The app reads it in `lib/api/role-denied.ts`
+  (`frontend-error-feedback.md`).
 - **Current** — **Derive the organization; never accept it.** `:organizationId`
   or `x-organization-id` is a hint the guard re-validates against real
   membership. Public routes derive the organization from the resource (a Site),

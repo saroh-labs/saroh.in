@@ -1,4 +1,6 @@
+import { whoCanChange } from "@/lib/access/who-can-change";
 import { permits } from "@/lib/organizations/permits";
+import { knownRoleName } from "@/lib/organizations/role-name";
 import type { Organization } from "@/lib/organizations/service";
 
 /**
@@ -47,38 +49,42 @@ export interface LockedCopy {
     text: string;
 }
 
+/** The menu's name for each. */
+const WHAT = {
+    payments: "Payments",
+    invoices: "Invoices",
+    subscriptions: "Subscriptions",
+} as const;
+
 /**
- * The locked card's words: why, and who can change it — never a code
- * (DEC-057). A Member and a Reviewer get the design's own sentences. A
- * role the business made is named, and told what it doesn't include:
- * `what` is "payments" at the section's door, or the one screen ("invoices")
- * when the role reaches Payments but not that screen — as does a Member
- * the business let see payments, for whom "money stays with owners and
- * admins" would not be true.
+ * The locked card's words: what the person can't open, their role and that
+ * it doesn't include it, and who can change that (`whoCanChange`). Never a
+ * code (DEC-057).
+ *
+ * `what` is the one screen (Invoices, Subscriptions) for a role that reaches
+ * Payments but not that screen, and for a role the business made. A built-in
+ * Member or Reviewer who doesn't see payments at all is told Payments,
+ * whichever of its screens they opened, as before.
+ *
+ * It used to have three wordings of its own, one per built-in role. A
+ * Member was told "money stays with owners and admins", which stopped being
+ * true once a business could give any role a money permission.
  */
 export function paymentsLockedCopy(
     viewer: Viewer,
     what: "payments" | "invoices" | "subscriptions" = "payments",
 ): LockedCopy {
-    // A built-in is stored under its own name; a role the business made
-    // under its key. Words only — what the role may open is `mayRead`'s.
+    // A built-in is stored under its own name, a role the business made
+    // under its key. Words only: what the role may open is `mayRead`'s.
     const builtIn = (viewer.roleKey ?? viewer.role) === viewer.role;
-    const named = viewer.roleLabel?.trim();
     const seesPayments = viewer.actions?.includes("payment:read") ?? false;
-    if (builtIn && viewer.role === "REVIEWER" && !seesPayments) {
-        return {
-            title: "You can't open payments",
-            text: "Your role is Reviewer, which can see the website but not payments. An owner or admin can change that in Team.",
-        };
-    }
-    if (builtIn && viewer.role === "MEMBER" && !seesPayments) {
-        return {
-            title: "Only owners and admins see payments",
-            text: "Your role is Member — money stays with owners and admins. An owner or admin can change that in Team.",
-        };
-    }
-    return {
-        title: `You can't open ${what}`,
-        text: `Your role${named ? ` is ${named}, which` : ""} doesn't include ${what}. An owner or admin can change that in Team.`,
-    };
+    const outside =
+        builtIn &&
+        (viewer.role === "MEMBER" || viewer.role === "REVIEWER") &&
+        !seesPayments;
+    const { title, description, note } = whoCanChange({
+        thing: WHAT[outside ? "payments" : what],
+        role: knownRoleName(viewer),
+    });
+    return { title, text: `${description} ${note}` };
 }

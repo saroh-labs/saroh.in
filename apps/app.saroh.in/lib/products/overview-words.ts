@@ -1,3 +1,4 @@
+import { WHO_CAN_CHANGE } from "@/lib/access/who-can-change";
 /**
  * The product page's Overview in words (#522), after "Saroh Product Detail":
  * the availability card, the "Linked to this product" cards, the Details
@@ -255,7 +256,7 @@ export function accessLine(may: {
     const does = can.length
         ? `You can ${can.join(" and ")} here.`
         : "You can look, but not change anything.";
-    return `You're signed in as ${may.roleLabel}. ${does} An owner or admin can change what you can do in Team.`;
+    return `You're signed in as ${may.roleLabel}. ${does} ${WHO_CAN_CHANGE}`;
 }
 
 /**

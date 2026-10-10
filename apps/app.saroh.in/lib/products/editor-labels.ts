@@ -1,3 +1,5 @@
+import { WHO_CAN_CHANGE } from "@/lib/access/who-can-change";
+
 import type { SectionKey } from "./editor-sections";
 import { LIMITS, SECTION_JUMPS, SECTION_NAMES } from "./editor-sections";
 
@@ -6,21 +8,8 @@ import { LIMITS, SECTION_JUMPS, SECTION_NAMES } from "./editor-sections";
  * sells (#525) — pure and client-safe; tested in `editor-labels.test.ts`.
  */
 
-const BUILT_IN_ROLES: Record<string, string> = {
-    OWNER: "Owner",
-    ADMIN: "Admin",
-    MEMBER: "Member",
-    REVIEWER: "Reviewer",
-};
-
-/** A role as the screen names it: the business's own label, else the built-in's. */
-export function roleName(org: {
-    role?: string | null;
-    roleLabel?: string | null;
-}): string {
-    if (org.roleLabel?.trim()) return org.roleLabel.trim();
-    return (org.role && BUILT_IN_ROLES[org.role]) ?? "Member";
-}
+/** Kept here for the editor's importers. The rule is `role-name.ts`. */
+export { roleName } from "@/lib/organizations/role-name";
 
 /**
  * The note under the header for someone who can't change the product, after
@@ -28,15 +17,10 @@ export function roleName(org: {
  * `store:write`) is told the one section it can change.
  */
 export function readOnlyBanner(role: string, stockOnly: boolean): string {
-    const line = `You're viewing as ${role}. You can read this product but not change it — an owner or admin can change your role in Team.`;
+    const line = `You're viewing as ${role}. You can read this product but not change it. ${WHO_CAN_CHANGE}`;
     return stockOnly
         ? `${line} Only the Stock section below can be changed.`
         : line;
-}
-
-/** Why a role that can't see products is stopped at the door. */
-export function noAccessLine(role: string, business: string): string {
-    return `You're signed in as ${role} in ${business}. That role doesn't include seeing products. An owner or admin can give you access in Team.`;
 }
 
 /** Whether this person can change a section: everything, or Stock alone. */

@@ -7,6 +7,7 @@ import Link from "next/link";
 import { sellCrumbs } from "@/components/commerce/sell-crumbs";
 import { PageContainer } from "@/components/shared/page-container";
 import { CreateStoreForm } from "@/components/stores/create-store-form";
+import { requireCan } from "@/lib/access/require-can";
 import { mayAddStorefront } from "@/lib/business-limits";
 import { requireSession } from "@/lib/session";
 import { locationsWord } from "@/lib/stores/pick";
@@ -29,6 +30,17 @@ export const metadata = { title: "New location" };
  */
 export default async function NewStorefrontPage() {
     await requireSession();
+    // Asked before the form is drawn: `store:create` is what the API asks of
+    // the save (`requireCan`).
+    const access = await requireCan("store:create", {
+        thing: "New location",
+        back: {
+            href: "/commerce/locations",
+            label: "Back to Locations",
+            needs: "store:read",
+        },
+    });
+    if (access.denied) return access.denied;
     const [storefronts, allowance] = await Promise.all([
         listStorefronts(),
         getStorefrontAllowance().catch(() => null),

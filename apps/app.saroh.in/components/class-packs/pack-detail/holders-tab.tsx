@@ -11,6 +11,7 @@ import { Users } from "lucide-react";
 import Link from "next/link";
 import { useId, useState } from "react";
 
+import { WHO_CAN_CHANGE } from "@/components/shared/who-can-change";
 import { MAX_EXTEND_DAYS } from "@/lib/class-packs/pack-detail";
 import type { HolderRow } from "@/lib/class-packs/pack-holders";
 
@@ -85,7 +86,7 @@ export function HoldersTab({
                 <PermissionDeniedState
                     title="You can't see who has this pack"
                     description="Your role doesn't reach the people holding packs."
-                    note="An owner or admin can change what your role reaches in Team."
+                    note={WHO_CAN_CHANGE}
                 />
             </>
         );
