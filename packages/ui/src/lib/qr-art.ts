@@ -1,4 +1,4 @@
-import { encode } from "uqr";
+import { encode, QrCodeDataType } from "uqr";
 
 /**
  * QR art: a link drawn as a code a business can put on its counter, plain
@@ -6,7 +6,8 @@ import { encode } from "uqr";
  * logo). Pure functions, no DOM: the workspace, the marketing site's free
  * maker and the API's print files all draw from the same geometry.
  *
- * The proportions are the "Saroh QR Codes" design's, unchanged:
+ * The proportions are the "Saroh QR Codes" design's, with two departures
+ * made so the code scans (`QR_ALIGNMENT_RADII`, `QR_LOGO_MIN_VERSION`):
  * - error correction H, so the code survives the logo box and a worn print;
  * - a quiet zone of 4 modules (`viewBox` starts at -4);
  * - the three finder corners are left out of the dots and drawn as "eyes":
@@ -34,7 +35,10 @@ export interface QrArt {
     viewBox: string;
     /** The data modules, one mark each, as a path `d`. */
     dots: string;
-    /** The three finder eyes as a path `d`; fill with `fill-rule="evenodd"`. */
+    /**
+     * The three finder eyes, and in a branded code the small alignment
+     * eyes, as a path `d`; fill with `fill-rule="evenodd"`.
+     */
     eyes: string;
     /**
      * The white box knocked out of the centre, in modules: the logo tile
@@ -56,6 +60,44 @@ export const QR_GROUND = "#FFFFFF";
 /** The initials tile, as the design draws it: Ink with Paper letters. */
 export const QR_TILE_FILL = "#1C1C1A";
 export const QR_TILE_TEXT = "#F5F2EC";
+
+/** A branded dot's radius, in modules: the design's value, unchanged. */
+export const QR_DOT_RADIUS = 0.42;
+
+/**
+ * Branded codes draw each alignment pattern (the small 5×5 square that
+ * versions 2 and up carry) as one solid mark, a small eye, instead of as
+ * separate dots. These are its corner radii: the 5 module ring, the 3
+ * module hole and the 1 module centre.
+ *
+ * Measured 10 Oct 2026 on the rendered SVG, versions 2–10, 5 colours, with
+ * and without the logo box (90 codes a row), decoded by jsQR 1.4 and ZXing:
+ *
+ * | branded dots, alignment drawn as  | jsQR 1200px | jsQR 280px | ZXing* |
+ * | --------------------------------- | ----------- | ---------- | ------ |
+ * | r=.42 dots (the design)           | 0           | 58         | 77     |
+ * | r=.50 dots, touching              | 56          | 85         | 85     |
+ * | r=.42 dots, small eye (this)      | 83          | 85         | 85     |
+ * | plain squares, for reference      | 83          | 85         | 85     |
+ *
+ * (* ZXing at 280px with a label, blurred and turned 7°; on a clean image
+ * it read 85 of 90 in every row.) A reader finds the grid from this
+ * pattern, and dots with gaps do not look like one to jsQR. Dot radius
+ * (.44 to .5), rounded squares and square eyes made no difference once the
+ * pattern was solid, so the dots and eyes stay as designed. The misses
+ * every row shares with plain squares are version 2 under the logo box
+ * (`QR_LOGO_MIN_VERSION`) and jsQR on version 7 at 1200px.
+ */
+export const QR_ALIGNMENT_RADII = [1.4, 0.8, 0.5] as const;
+
+/**
+ * With a logo the code is at least version 3 (29 modules). The box is 7
+ * or 9 modules on the smallest codes, 11% of a version 1 and 13% of a
+ * version 2. Measured on 40 links each, plain squares: version 1 read 31
+ * of 40 in both decoders, version 2 read 0 of 40 in jsQR and 31 in ZXing,
+ * versions 3 to 6 read 40 of 40 in both.
+ */
+export const QR_LOGO_MIN_VERSION = 3;
 
 /** A finder pattern with its separator: 8 modules at three corners. */
 const FINDER = 8;
@@ -129,8 +171,13 @@ export function qrArt(text: string, options: QrArtOptions = {}): QrArt {
     if (typeof text !== "string" || text.trim() === "") return emptyQrArt();
 
     let data: boolean[][];
+    let types: QrCodeDataType[][];
     try {
-        data = encode(text, { ecc: "H", border: 0 }).data;
+        ({ data, types } = encode(text, {
+            ecc: "H",
+            border: 0,
+            minVersion: logo ? QR_LOGO_MIN_VERSION : 1,
+        }));
     } catch {
         // uqr throws when the text does not fit version 40.
         return emptyQrArt();
@@ -147,14 +194,52 @@ export function qrArt(text: string, options: QrArtOptions = {}): QrArt {
         col >= box.x &&
         col < box.x + box.size;
 
+    // Branded: each alignment pattern that is whole (clear of the logo box)
+    // is one small eye. One the box cuts into keeps solid squares for the
+    // modules that are left, which read the same.
+    const isAlignment = (row: number, col: number) =>
+        types[row]?.[col] === QrCodeDataType.Alignment;
+    const smallEyes: string[] = [];
+    const inSmallEye = new Set<number>();
+    if (rounded) {
+        const around = [-2, -1, 0, 1, 2];
+        const [ring, hole, centre] = QR_ALIGNMENT_RADII;
+        for (let row = 2; row < n - 2; row++) {
+            for (let col = 2; col < n - 2; col++) {
+                const whole = around.every((dr) =>
+                    around.every(
+                        (dc) =>
+                            isAlignment(row + dr, col + dc) &&
+                            !inBox(row + dr, col + dc),
+                    ),
+                );
+                if (!whole) continue;
+                for (const dr of around) {
+                    for (const dc of around) {
+                        inSmallEye.add((row + dr) * n + col + dc);
+                    }
+                }
+                smallEyes.push(
+                    rr(col - 2, row - 2, 5, 5, ring) +
+                        rr(col - 1, row - 1, 3, 3, hole) +
+                        rr(col, row, 1, 1, centre),
+                );
+            }
+        }
+    }
+
+    const r = QR_DOT_RADIUS;
+    const arc = `a${f(r)} ${f(r)} 0 1 0`;
+    const dot = `${arc} ${f(2 * r)} 0${arc} ${f(-2 * r)} 0z`;
     const dots: string[] = [];
     for (let row = 0; row < n; row++) {
         for (let col = 0; col < n; col++) {
             if (!data[row]?.[col]) continue;
             if (isQrFinderCell(n, row, col) || inBox(row, col)) continue;
+            if (inSmallEye.has(row * n + col)) continue;
             dots.push(
-                rounded
-                    ? `M${f(col + 0.08)} ${f(row + 0.5)}a.42 .42 0 1 0 .84 0a.42 .42 0 1 0 -.84 0z`
+                rounded && !isAlignment(row, col)
+                    ? `M${f(col + 0.5 - r)} ${f(row + 0.5)}${dot}`
                     : `M${col} ${row}h1v1h-1z`,
             );
         }
@@ -167,7 +252,8 @@ export function qrArt(text: string, options: QrArtOptions = {}): QrArt {
         eyes:
             eye(0, 0, rounded) +
             eye(n - 7, 0, rounded) +
-            eye(0, n - 7, rounded),
+            eye(0, n - 7, rounded) +
+            smallEyes.join(""),
         logoBox: box,
         boxPct: box ? (box.size / (n + QR_QUIET_ZONE * 2)) * 100 : 0,
         tilePct: box ? ((box.size - 2) / box.size) * 100 : 0,
