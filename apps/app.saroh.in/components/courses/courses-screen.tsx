@@ -2,7 +2,7 @@
 
 import { Badge } from "@saroh/ui/badge";
 import { Button } from "@saroh/ui/button";
-import { PageHeader } from "@saroh/ui/page-header";
+import { countLabel, PageHeader } from "@saroh/ui/page-header";
 import { GraduationCap } from "lucide-react";
 import Link from "next/link";
 
@@ -114,7 +114,12 @@ export function CoursesScreen({
     return (
         <>
             <PageHeader
+                breadcrumb={["Bookings", "Courses"]}
                 title="Courses"
+                count={countLabel(courses.length, {
+                    one: "course",
+                    other: "courses",
+                })}
                 className="mb-0"
                 actions={
                     canWrite ? (
@@ -135,6 +140,7 @@ export function CoursesScreen({
                 filters={FILTERS}
                 initialFilterId={initialFilterId}
                 noun={{ one: "course", other: "courses" }}
+                showTotal={false}
                 searchPlaceholder="Search courses"
                 searchableColumnIds={["course"]}
                 emptyState={{

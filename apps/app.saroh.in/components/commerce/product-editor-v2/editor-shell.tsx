@@ -327,7 +327,7 @@ function EditorBody({
 
                 <nav
                     aria-label="Sections"
-                    className="flex flex-wrap gap-1 border-b border-border px-4 py-2 max-[760px]:flex-nowrap max-[760px]:overflow-x-auto"
+                    className="flex flex-wrap gap-1 border-b border-border px-4 py-2 max-desk:flex-nowrap max-desk:overflow-x-auto"
                 >
                     {jumps.map((k) => (
                         <a
@@ -354,7 +354,7 @@ function EditorBody({
                 </nav>
             </div>
 
-            <div className="flex flex-wrap items-stretch max-[760px]:flex-col">
+            <div className="flex flex-wrap items-stretch max-desk:flex-col">
                 <div className="flex min-w-0 flex-[1_1_440px] flex-col gap-4 px-5 pb-[30px] pt-5 max-[480px]:px-4">
                     <BasicsSection
                         product={product}
@@ -380,7 +380,7 @@ function EditorBody({
                     />
                     <PhotosSection product={product} />
                 </div>
-                <div className="flex min-w-[300px] flex-[1_1_380px] flex-col gap-4 border-l border-border px-5 pb-[30px] pt-5 max-[760px]:min-w-0 max-[760px]:border-l-0 max-[760px]:border-t max-[480px]:px-4">
+                <div className="flex min-w-[300px] flex-[1_1_380px] flex-col gap-4 border-l border-border px-5 pb-[30px] pt-5 max-desk:min-w-0 max-desk:border-l-0 max-desk:border-t max-[480px]:px-4">
                     <VisibilitySection
                         product={product}
                         storeId={storeId}

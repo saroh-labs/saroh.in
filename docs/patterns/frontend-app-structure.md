@@ -27,10 +27,12 @@ components/shared/             app shell, navigation, command menu
 
 - **Current** — **Every shell page renders inside `PageContainer`.**
   `components/shared/page-container.tsx` owns the page's gutter and measure, so
-  a screen cannot arrive with its own. Three widths, the scale
-  `docs/design-system/04_LAYOUT_SYSTEM.md` proposed: `form` (`max-w-2xl`,
-  settings and create/edit forms), the default (`max-w-5xl`, lists, details and
-  dashboards) and `wide` (`max-w-7xl`, tables, boards and analytics grids).
+  a screen cannot arrive with its own. Four widths: `full` (the whole work
+  area, for lists, boards and dashboards), `form` (`max-w-2xl`, create and
+  edit forms), the default (`max-w-5xl`, a record) and `wide` (`max-w-7xl`).
+  Which screen takes which, and the page header and loader every screen
+  shares, are in `frontend-design-system.md` → Components and status and
+  `frontend-error-feedback.md`.
   It is LEFT-ALIGNED: centring each page inside its own max-width moved the
   heading between screens, which is what made the app feel unsettled. Full-bleed
   editors — the site editor, the post editor — are deliberately outside it.
@@ -38,9 +40,9 @@ components/shared/             app shell, navigation, command menu
   "Saroh Product Detail" design draws its header, access line, archived
   banner and tab bar edge to edge, each ruled off by a full-width border,
   with a 22px gutter inside them (`px-4 sm:px-[22px]`, the design's own) —
-  not PageContainer's 26px. Its header, banners and tab panel carry that
-  gutter themselves, and the crumbs bar above them the design's `9px 14px`
-  (`px-3.5`); keep them in step if one changes.
+  not PageContainer's 26px. Its header (the one `PageHeader`, with the
+  breadcrumb in it since 10 Oct 2026), banners and tab panel carry that
+  gutter themselves; keep them in step if one changes.
 - **Current** — **Pages are Server Components that read.** A `page.tsx` calls
   `requireSession()` and its `lib/<domain>/service.ts`, and may hold
   view-shaping helpers for that page (`siteState()` in `sites/page.tsx`).

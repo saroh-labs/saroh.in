@@ -45,7 +45,7 @@ export function YourProfile({
     ];
 
     return (
-        <div className="grid max-w-[760px] gap-4">
+        <div className="grid gap-4">
             <section
                 aria-label="You"
                 className="overflow-hidden rounded-xl border border-border bg-card"

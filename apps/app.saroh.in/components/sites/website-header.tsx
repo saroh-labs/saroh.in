@@ -179,6 +179,7 @@ export function WebsiteHeader({
     return (
         <div className="flex flex-col gap-5">
             <PageHeader
+                breadcrumb={["Website"]}
                 title="Website"
                 className="mb-0"
                 description={
@@ -397,10 +398,7 @@ function TabActions({
                     />
                 )}
                 <Button asChild>
-                    <Link href={`${base}/posts/new`}>
-                        <Plus className="mr-1.5 size-4" />
-                        New post
-                    </Link>
+                    <Link href={`${base}/posts/new`}>New post</Link>
                 </Button>
             </>
         );

@@ -1,8 +1,9 @@
 import { FailedState, PartialNotice } from "@saroh/ui/data-state";
+import { PageHeader } from "@saroh/ui/page-header";
 
 import { PlanLimitNotice } from "@/components/billing/plan-limit-notice";
 import { AvailabilityEditor } from "@/components/bookings/availability/availability-editor";
-import { BARE, BookingsTopBar } from "@/components/bookings/calendar/parts";
+
 import { PageContainer } from "@/components/shared/page-container";
 import { resolveActiveOrganization } from "@/lib/organizations/service";
 import type { KeptBooking } from "@/lib/services/availability-rules";
@@ -67,9 +68,12 @@ export default async function AvailabilityPage() {
 
     if (!staffList) {
         return (
-            <PageContainer width="full" className={BARE}>
-                <BookingsTopBar page="Availability" />
-                <div className="px-[22px] pb-6 pt-[18px]">
+            <PageContainer width="full">
+                <PageHeader
+                    breadcrumb={["Bookings", "Availability"]}
+                    title="Availability"
+                />
+                <div>
                     <FailedState
                         title={couldntLoad("everyone's hours")}
                         retryHref="/bookings/availability"
@@ -142,9 +146,8 @@ export default async function AvailabilityPage() {
     );
 
     return (
-        <PageContainer width="full" className={BARE}>
-            <BookingsTopBar page="Availability" />
-            <div className="px-[22px] pb-6 pt-[18px] max-[759px]:px-4">
+        <PageContainer width="full">
+            <div>
                 {calendar ? null : (
                     <PartialNotice className="mb-3">
                         Bookings could not be loaded, so the hours below

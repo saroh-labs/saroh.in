@@ -159,8 +159,25 @@ digest })` from `@saroh/ui/lib/report-error` (#103): it logs, and it forwards
   the _root_ boundary, where the merchant's palette never loaded, so that
   boundary mounts `SiteTheme` on its neutral defaults. New files there go on the
   G6 allowlist (`frontend-design-system.md`).
-- **Current** — **A loading state has the shape of the page.** 49 of 51
-  `loading.tsx` files use `Skeleton` or `LoadingState`; none use a spinner.
+- **Current** — **One loading shell: `PageLoading`**
+  (`components/shared/page-loading.tsx`, 10 Oct 2026). Every `loading.tsx`
+  under `app/(shell)` returns it with the page's `shape` (`list`, `detail`,
+  `form`, `editor`, `dashboard`, `settings`) and the page's own `width`,
+  the same `PageContainer` width its `page.tsx` sits at, left-aligned. It
+  draws the page's REAL header (the breadcrumb and title the route knows,
+  and its tabs: the tab component itself or just the labels, without
+  counts) and greys only the body. A record's page leaves `title` out and a
+  bar stands in its place. A Settings section returns `SettingsLoading`
+  (`components/settings/settings-loading.tsx`), so it loads inside the
+  panel with the side list in place. A tab whose layout already drew the
+  header passes `bare`. The two arrival screens use `ArrivalLoading`.
+  One drawing (`Skeleton`'s sweep; never `animate-pulse`, a spinner, a bare
+  `bg-muted` block or "Loading…" as a page or panel loader) and one way of
+  saying it: `role="status"`, `aria-busy`, one `sr-only` sentence, the grey
+  `aria-hidden`. A new route gets its own `loading.tsx` when its shape or
+  width differs from its parent's. `components/shared/page-chrome.test.ts`
+  fails on a page with no loader of its width, on one that falls back to
+  Home's, and on a loader drawn by hand.
 
 ### States are part of the product
 

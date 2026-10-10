@@ -2,6 +2,7 @@
 
 import { Button } from "@saroh/ui/button";
 import { cn } from "@saroh/ui/lib/utils";
+import { Skeleton } from "@saroh/ui/skeleton";
 import { ChevronRight } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useState } from "react";
@@ -219,11 +220,11 @@ export function OrderQuickView({
             ) : order ? (
                 <QuickViewBody order={order} />
             ) : (
-                <div className="grid gap-3" role="status">
+                <div className="grid gap-3" role="status" aria-busy="true">
                     <span className="sr-only">Loading order {ref}</span>
-                    <div className="h-6 w-3/4 rounded-full bg-muted" />
-                    <div className="h-24 rounded-[11px] bg-muted" />
-                    <div className="h-4 w-1/2 rounded-[6px] bg-muted" />
+                    <Skeleton aria-hidden className="h-6 w-3/4" />
+                    <Skeleton aria-hidden className="h-24" />
+                    <Skeleton aria-hidden className="h-4 w-1/2" />
                 </div>
             )}
         </QuickLook>

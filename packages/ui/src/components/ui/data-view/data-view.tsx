@@ -74,7 +74,8 @@ export function DataView<TRow>({
     filterStyle = "tabs",
     isLoading = false,
     error = null,
-    noun = { one: "row", other: "rows" },
+    noun,
+    showTotal = true,
     searchPlaceholder = "Search…",
     toolbarExtra,
     countLabel,
@@ -778,10 +779,14 @@ export function DataView<TRow>({
                         className="ml-auto text-xs text-muted-foreground"
                         aria-live="polite"
                     >
-                        {countLabel
-                            ? countLabel(visible.length, rows.length)
-                            : visible.length === rows.length
-                              ? count(rows.length)
+                        {visible.length === rows.length
+                            ? showTotal
+                                ? countLabel
+                                    ? countLabel(visible.length, rows.length)
+                                    : count(rows.length)
+                                : null
+                            : countLabel
+                              ? countLabel(visible.length, rows.length)
                               : `${visible.length} of ${count(rows.length)}`}
                     </p>
                 </div>
@@ -919,7 +924,8 @@ export function DataView<TRow>({
 
             {/* Shown when neither search nor density is on offer, so a list
                 still says how much it holds. */}
-            {searchable.length === 0 &&
+            {showTotal &&
+            searchable.length === 0 &&
             !showModes &&
             !toolbarExtra &&
             visible.length > 0 ? (

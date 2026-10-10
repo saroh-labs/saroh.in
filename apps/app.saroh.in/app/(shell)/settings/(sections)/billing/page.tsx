@@ -172,7 +172,7 @@ export default async function PlanBillingPage() {
 
     return (
         <SettingsPanel header={header}>
-            <div className="grid max-w-[760px] gap-4">
+            <div className="grid gap-4">
                 {partial ? <PartialNotice>{partial}</PartialNotice> : null}
                 <YourPlan {...plan} />
                 <PlanChooser

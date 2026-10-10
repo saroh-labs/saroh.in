@@ -8,9 +8,8 @@ import {
     PermissionDeniedState,
 } from "@saroh/ui/data-state";
 import { backTo, couldntLoad, nothingChanged } from "@saroh/ui/lib/state-copy";
-import { cn } from "@saroh/ui/lib/utils";
 import { PageHeader } from "@saroh/ui/page-header";
-import { Skeleton } from "@saroh/ui/skeleton";
+
 import { Check, ListFilter, Receipt, RotateCcw, Search } from "lucide-react";
 import Link from "next/link";
 import type { ReactNode } from "react";
@@ -19,10 +18,8 @@ import { ShareLinkButton } from "@/components/sites/share-link-button";
 import type { OrderFilterOptions } from "@/lib/orders/business-service";
 import { NO_FILTERS } from "@/lib/orders/list-filters";
 import type { OrdersQuery } from "@/lib/orders/list-query";
-import { ORDERS_TABS, ordersEmptyCopy } from "@/lib/orders/list-query";
+import { ordersEmptyCopy } from "@/lib/orders/list-query";
 import type { ShareLink } from "@/lib/sites/share-links";
-
-import { ORDER_GRID } from "./order-row";
 
 /**
  * Every state the Orders list and Order Detail draw besides their rows, after
@@ -41,101 +38,22 @@ import { ORDER_GRID } from "./order-row";
  */
 
 /** The page's heading, which every state keeps so no one wonders where they are. */
-export function OrdersHeading({ actions }: { actions?: ReactNode }) {
+export function OrdersHeading({
+    actions,
+    count,
+}: {
+    actions?: ReactNode;
+    /** "12 orders", every order the business has; nothing at none. */
+    count?: string;
+}) {
     return (
         <PageHeader
             breadcrumb={["Sell", "Orders"]}
             title="Orders"
+            count={count}
             className="mb-3"
             actions={actions}
         />
-    );
-}
-
-/**
- * The rows while they arrive: the design's grid at the desk (a head bar,
- * then an avatar and two lines, the status, when and the total), cards on a
- * phone. Only the first line of each row sweeps; the rest wait still.
- */
-export function OrdersLoadingRows({ rows = 4 }: { rows?: number }) {
-    const each = Array.from({ length: rows }, (_, i) => i);
-    return (
-        <div aria-busy="true" aria-live="polite">
-            <span className="sr-only">Loading orders</span>
-            <div
-                aria-hidden
-                className="overflow-hidden rounded-[11px] border border-border bg-card max-[759px]:hidden"
-            >
-                <div className="h-10 border-b border-border bg-muted" />
-                {each.map((i) => (
-                    <div
-                        key={i}
-                        className={cn(
-                            ORDER_GRID,
-                            "border-b border-border py-[11px] last:border-b-0",
-                        )}
-                    >
-                        <div className="flex min-w-0 items-center gap-[11px] pr-3.5">
-                            <Skeleton className="size-[30px] flex-none rounded-full" />
-                            <div className="min-w-0 flex-1">
-                                <Skeleton className="h-2.5 w-[68%] rounded-[4px]" />
-                                <div className="mt-1.5 h-2.5 w-[40%] rounded-[4px] bg-muted/70" />
-                            </div>
-                        </div>
-                        <div className="h-2.5 w-[62px] rounded-[4px] bg-muted/70" />
-                        <div className="h-2.5 w-[74px] rounded-[4px] bg-muted/70" />
-                        <div className="flex justify-end">
-                            <div className="h-2.5 w-[54px] rounded-[4px] bg-muted/70" />
-                        </div>
-                    </div>
-                ))}
-            </div>
-            <div aria-hidden className="flex flex-col gap-2 min-[760px]:hidden">
-                {each.map((i) => (
-                    <div
-                        key={i}
-                        className="flex flex-col gap-2 rounded-[11px] border border-border bg-card p-3"
-                    >
-                        <div className="flex items-center gap-2">
-                            <Skeleton className="h-3 w-[55%] rounded-[4px]" />
-                            <div className="ml-auto h-3 w-14 rounded-[4px] bg-muted/70" />
-                        </div>
-                        <div className="h-2.5 w-[70%] rounded-[4px] bg-muted/70" />
-                    </div>
-                ))}
-            </div>
-        </div>
-    );
-}
-
-/**
- * The whole page while it loads: the heading, the tabs without their counts
- * (an unknown count is left out, never shown as 0), the search, the rows.
- */
-export function OrdersLoading() {
-    return (
-        <>
-            <OrdersHeading />
-            <div
-                aria-hidden
-                className="flex flex-wrap gap-0.5 border-b border-border"
-            >
-                {ORDERS_TABS.map((tab) => (
-                    <span
-                        key={tab.id}
-                        className="px-[13px] py-[9px] text-[13.5px] font-medium text-muted-foreground"
-                    >
-                        {tab.label}
-                    </span>
-                ))}
-            </div>
-            <div aria-hidden className="pt-3.5">
-                <Skeleton className="h-[38px] w-full max-w-[320px] rounded-[9px] coarse:h-11" />
-            </div>
-            <div className="pt-3.5">
-                <OrdersLoadingRows />
-            </div>
-        </>
     );
 }
 

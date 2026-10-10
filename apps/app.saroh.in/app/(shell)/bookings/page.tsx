@@ -1,9 +1,10 @@
 import { FailedState } from "@saroh/ui/data-state";
+import { PageHeader } from "@saroh/ui/page-header";
 
 import { PlanLimitNotice } from "@/components/billing/plan-limit-notice";
 import { BookingsViewSwitch } from "@/components/bookings/bookings-view-switch";
 import { CalendarScreen } from "@/components/bookings/calendar/calendar-screen";
-import { BARE, BookingsTopBar } from "@/components/bookings/calendar/parts";
+
 import { NewBookingDialog } from "@/components/bookings/new-booking-dialog";
 import { PageContainer } from "@/components/shared/page-container";
 import { takesOnlinePayment } from "@/lib/billing/access";
@@ -134,11 +135,13 @@ export default async function BookingsPage({
 
     if (!calendar) {
         return (
-            <PageContainer width="full" className={BARE}>
-                <BookingsTopBar page="Calendar">
-                    <BookingsViewSwitch current="calendar" />
-                </BookingsTopBar>
-                <div className="px-[22px] pb-6 pt-[18px]">
+            <PageContainer width="full">
+                <PageHeader
+                    breadcrumb={["Bookings", "Calendar"]}
+                    title="Calendar"
+                    meta={<BookingsViewSwitch current="calendar" />}
+                />
+                <div>
                     <FailedState
                         title={couldntLoad("the calendar")}
                         retryHref={calendarHref(layout, date)}
@@ -160,7 +163,7 @@ export default async function BookingsPage({
             ? await readCustomerPick(forContact)
             : null;
     return (
-        <PageContainer width="full" className={BARE}>
+        <PageContainer width="full">
             <CalendarScreen
                 layout={layout}
                 date={date}
@@ -193,7 +196,6 @@ export default async function BookingsPage({
                             // Keyed: it renders among the screen's own children.
                             key="new-booking"
                             plainTrigger
-                            triggerClassName="h-[38px] rounded-[9px] px-4 text-[13px]"
                             services={active.map((s) => ({
                                 id: s.id,
                                 name: s.name,

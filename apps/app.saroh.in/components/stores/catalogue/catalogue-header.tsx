@@ -10,7 +10,7 @@ import {
 } from "@saroh/ui/dropdown-menu";
 import { planLabel } from "@saroh/ui/lib/state-copy";
 import { PageHeader } from "@saroh/ui/page-header";
-import { ChevronDown, Plus, Store } from "lucide-react";
+import { ChevronDown, Store } from "lucide-react";
 import Link from "next/link";
 
 import type { PlanMeter } from "@/lib/billing/meter";
@@ -34,7 +34,10 @@ export function CatalogueHeader({
     canWrite,
     meter = null,
     bannerShown = false,
+    count,
 }: {
+    /** "12 products across 2 locations", beside the title; none at zero. */
+    count?: string;
     stores: { id: string; name: string }[];
     /** The storefront filter, if one is picked. */
     storeId: string | null;
@@ -78,21 +81,9 @@ export function CatalogueHeader({
                         </DropdownMenuItem>
                     </DropdownMenuContent>
                 </DropdownMenu>
-                {meter && beside.label ? (
-                    <span
-                        className={
-                            meter.full
-                                ? "text-[12.5px] font-semibold text-destructive-subtle-foreground"
-                                : "text-[12.5px] text-muted-foreground"
-                        }
-                    >
-                        {beside.label}
-                    </span>
-                ) : null}
                 {meter?.full ? (
                     <>
                         <Button disabled title={meter.reason ?? undefined}>
-                            <Plus className="mr-1.5 size-4" />
                             New product
                         </Button>
                         <span className="sr-only">{meter.reason}</span>
@@ -108,7 +99,6 @@ export function CatalogueHeader({
                     <DropdownMenu>
                         <DropdownMenuTrigger asChild>
                             <Button>
-                                <Plus className="mr-1.5 size-4" />
                                 New product
                                 <ChevronDown className="ml-1 size-4" />
                             </Button>
@@ -130,7 +120,6 @@ export function CatalogueHeader({
                 ) : (
                     <Button asChild>
                         <Link href={newProductHref((here ?? first).id)}>
-                            <Plus className="mr-1.5 size-4" />
                             New product
                         </Link>
                     </Button>
@@ -141,7 +130,22 @@ export function CatalogueHeader({
         <PageHeader
             breadcrumb={["Sell", "Products"]}
             title="Products"
+            count={count}
             className="mb-0"
+            // The plan's meter is a figure, not a button: before them.
+            meta={
+                actions && meter && beside.label ? (
+                    <span
+                        className={
+                            meter.full
+                                ? "text-[12.5px] font-semibold text-destructive-subtle-foreground"
+                                : "text-[12.5px] text-muted-foreground"
+                        }
+                    >
+                        {beside.label}
+                    </span>
+                ) : undefined
+            }
             actions={actions}
         />
     );

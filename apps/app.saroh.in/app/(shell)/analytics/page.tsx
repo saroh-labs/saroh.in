@@ -82,8 +82,9 @@ export default async function AnalyticsPage({
               : null;
 
     return (
-        <PageContainer width="wide">
+        <PageContainer width="full">
             <PageHeader
+                breadcrumb={["Insights"]}
                 title="Insights"
                 description="How this week is going, what the business took week by week, and how your website is doing."
             />

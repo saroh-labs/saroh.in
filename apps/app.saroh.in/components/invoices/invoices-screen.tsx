@@ -3,13 +3,12 @@
 import { Button } from "@saroh/ui/button";
 import { EmptyState } from "@saroh/ui/empty-state";
 import { cn } from "@saroh/ui/lib/utils";
-import { PageHeader } from "@saroh/ui/page-header";
+import { countLabel, PageHeader } from "@saroh/ui/page-header";
 import { ReceiptText } from "lucide-react";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useState } from "react";
 
-import { InvoiceCrumbs } from "@/components/invoices/invoice-crumbs";
 import { InvoiceQuickLook } from "@/components/invoices/invoice-quick-look";
 import { InvoiceRow } from "@/components/invoices/invoice-row";
 import { ScopeNotice, SourceChips } from "@/components/invoices/source-filter";
@@ -166,26 +165,30 @@ export function InvoicesScreen({
         // One block: the page container spaces its children apart, and the
         // design sets the title, note and tabs close together.
         <div>
-            <InvoiceCrumbs />
             <PageHeader
+                breadcrumb={["Payments", "Invoices"]}
                 title="Invoices"
+                count={countLabel(mine.length, {
+                    one: "invoice",
+                    other: "invoices",
+                })}
                 className="mb-1.5"
-                actions={
-                    <>
-                        <span className="text-[12.5px] text-muted-foreground">
+                // A summary, not a count of the list: before the button.
+                meta={
+                    mine.length > 0 ? (
+                        <span>
                             {sums(owed)} owed to you · {overdueCount} overdue
                         </span>
-                        {canWrite ? (
-                            <Button
-                                asChild
-                                className="h-[38px] px-4 text-[13px]"
-                            >
-                                <Link href="/billing/invoices/new">
-                                    New invoice
-                                </Link>
-                            </Button>
-                        ) : null}
-                    </>
+                    ) : undefined
+                }
+                actions={
+                    canWrite ? (
+                        <Button asChild>
+                            <Link href="/billing/invoices/new">
+                                New invoice
+                            </Link>
+                        </Button>
+                    ) : undefined
                 }
             />
             <p className="mb-3 text-[12px] text-muted-foreground">

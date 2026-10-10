@@ -2,9 +2,9 @@ import { AccessDenied } from "@/components/shared/access-denied";
 import { PageContainer } from "@/components/shared/page-container";
 import { whoCanChange } from "@/components/shared/who-can-change";
 import { ModuleOffState } from "@saroh/ui/data-state";
+import { PageHeader } from "@saroh/ui/page-header";
 import { Boxes } from "lucide-react";
 
-import { StockHeader } from "./stock-header";
 import { TurnOnTracking } from "./turn-on-tracking";
 
 /**
@@ -39,7 +39,7 @@ export function StockTrackingOff({
 }) {
     return (
         <PageContainer width="full">
-            <StockHeader subline={null} />
+            <PageHeader breadcrumb={["Sell", "Stock"]} title="Stock" />
             <div className="px-0 py-10 sm:py-[60px]">
                 <ModuleOffState
                     className="mx-auto max-w-[560px]"

@@ -1,20 +1,24 @@
 import { NotFound } from "@saroh/ui/not-found";
+import { PageHeader } from "@saroh/ui/page-header";
+import Link from "next/link";
 
 import { PageContainer } from "@/components/shared/page-container";
-import { PaymentsCrumbs } from "@/components/subscriptions/payments-crumbs";
 
 /** The design's not-found: said plainly, with the way back. */
 export default function NotFoundPage() {
     return (
-        <PageContainer width="full" className="space-y-0 p-0 sm:p-0">
-            <PaymentsCrumbs
-                here="Not found"
-                back={{
-                    href: "/billing/subscriptions",
-                    label: "Subscriptions",
-                }}
+        <PageContainer width="full">
+            <PageHeader
+                breadcrumb={[
+                    "Payments",
+                    <Link key="list" href="/billing/subscriptions">
+                        Subscriptions
+                    </Link>,
+                    "Not found",
+                ]}
+                title="Subscription"
             />
-            <div className="px-4 py-10 sm:px-6">
+            <div>
                 <NotFound
                     variant="card"
                     title="Subscription not found"

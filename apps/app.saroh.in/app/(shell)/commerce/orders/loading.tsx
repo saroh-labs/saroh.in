@@ -1,15 +1,15 @@
-import { OrdersLoading } from "@/components/commerce/orders/orders-states";
-import { PageContainer } from "@/components/shared/page-container";
+import { PageLoading } from "@/components/shared/page-loading";
+import { ORDERS_TABS } from "@/lib/orders/list-query";
 
-/**
- * The Orders list while it arrives (B7): its heading, the tabs without
- * counts, the search and rows the shape of the ones on their way — a
- * loading read, never an empty one.
- */
 export default function Loading() {
     return (
-        <PageContainer width="full">
-            <OrdersLoading />
-        </PageContainer>
+        <PageLoading
+            shape="list"
+            width="full"
+            breadcrumb={["Sell", "Orders"]}
+            title="Orders"
+            label="Loading orders"
+            tabs={ORDERS_TABS.map((t) => t.label)}
+        />
     );
 }

@@ -71,6 +71,15 @@ export default async function PastVersionPage({
     return (
         <PageContainer>
             <PageHeader
+                breadcrumb={[
+                    <Link key="site" href={`/sites/${siteId}/pages`}>
+                        Website
+                    </Link>,
+                    <Link key="versions" href={`/sites/${siteId}/versions`}>
+                        Version history
+                    </Link>,
+                    exactDate(publication.publishedAt, zone),
+                ]}
                 title={`Version from ${exactDate(publication.publishedAt, zone)}`}
                 description={
                     publication.publishedBy

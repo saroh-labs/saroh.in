@@ -1,6 +1,7 @@
 "use client";
 
 import { cn } from "@saroh/ui/lib/utils";
+import { Skeleton } from "@saroh/ui/skeleton";
 import { useEffect, useState } from "react";
 
 import { listLibrary } from "@/lib/media/actions";
@@ -51,9 +52,12 @@ export function LibraryPanel({
                 </button>
             </div>
             {items === "loading" ? (
-                <p role="status" className="text-[12px] text-muted-foreground">
-                    Loading your photos…
-                </p>
+                <div role="status" aria-busy="true" className="flex gap-2">
+                    <span className="sr-only">Loading your photos</span>
+                    <Skeleton aria-hidden className="h-16 w-20" />
+                    <Skeleton aria-hidden className="h-16 w-20" />
+                    <Skeleton aria-hidden className="h-16 w-20" />
+                </div>
             ) : items === null ? (
                 <p role="alert" className="text-[12px] text-destructive">
                     Couldn&apos;t load your photos. Close this and try again, or

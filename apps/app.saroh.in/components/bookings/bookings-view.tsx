@@ -230,10 +230,11 @@ export function BookingsView({
             rowHref={(b) => `/bookings/${b.id}`}
             modes={["table", "list"]}
             defaultMode="table"
+            noun={{ one: "booking", other: "bookings" }}
+            showTotal={false}
             filters={FILTERS}
             initialFilterId={initialView ?? "upcoming"}
             searchableColumnIds={["service", "booker"]}
-            noun={{ one: "booking", other: "bookings" }}
             emptyState={{
                 icon: <CalendarDays />,
                 title: "No bookings yet",

@@ -7,7 +7,6 @@ import { CustomerView } from "@/components/commerce/product-page/customer-view";
 import { ProductDiscountsTab } from "@/components/commerce/product-page/discounts-tab";
 import {
     AccessLine,
-    ProductCrumbs,
     ProductHeader,
 } from "@/components/commerce/product-page/header";
 import { ProductOrdersTab } from "@/components/commerce/product-page/orders-tab";
@@ -183,17 +182,13 @@ export default async function ProductPage({
 
     return (
         <main className="w-full">
-            <ProductCrumbs
-                overview={overview}
-                storeId={store.id}
-                view={view}
-                shopUrl={shopUrl}
-            />
             <ProductHeader
                 overview={overview}
                 storeId={store.id}
                 photosHref={href("photos")}
                 paused={isPaused}
+                view={view}
+                shopUrl={shopUrl}
             />
             {isPaused ? (
                 <div className="border-b border-border px-4 py-2.5 sm:px-[22px]">

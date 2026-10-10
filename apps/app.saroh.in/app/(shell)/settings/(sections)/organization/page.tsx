@@ -3,11 +3,15 @@ import { couldntLoad } from "@saroh/ui/lib/state-copy";
 
 import { OrganizationSettingsForm } from "@/components/organizations/organization-settings-form";
 import { WebAddressSection } from "@/components/organizations/web-address-section";
-import { ReadyChecklist } from "@/components/settings/ready-checklist";
+import {
+    ReadyChecklist,
+    readyHasLeft,
+} from "@/components/settings/ready-checklist";
 import {
     SettingsPanel,
     SettingsPanelHeader,
 } from "@/components/settings/settings-panel";
+import { SettingsColumns } from "@/components/shared/settings-columns";
 import { kindWords } from "@/lib/organizations/kind";
 import { resolveActiveOrganization } from "@/lib/organizations/service";
 import { getOrganizationSettings } from "@/lib/organizations/settings-service";
@@ -29,11 +33,11 @@ import { listStorefrontHours } from "@/lib/stores/storefronts";
  * Under Identity, the business's web address (DEC-069, L4): the owner
  * changes it there, and everyone else who can see it reads it.
  *
- * Above the tabs, for someone who may change things, "Ready to take
- * payments": what is left to set up — Home's steps, then the email, business
- * type, logo and pipeline nudges (`loadSettingsChecklist`, DEC-056). Its
- * extra reads are best-effort — one that fails drops its steps, never the
- * page.
+ * For someone who may change things, one "what's left" card: Home's steps,
+ * then the email, business type, logo and pipeline nudges
+ * (`loadSettingsChecklist`, DEC-056), above the tabs and to their right on
+ * a wide screen (`SettingsColumns`, as Sell › Location). Its extra reads
+ * are best-effort — one that fails drops its steps, never the page.
  *
  * Named in the words of what is being set up (DEC-070, K5): "Business" for
  * a business, "Your details" for Just me and A site for my work. Identity
@@ -76,50 +80,59 @@ export default async function OrganizationSettingsPage() {
 
     return (
         <SettingsPanel
+            width="full"
             header={
-                <>
-                    <SettingsPanelHeader
-                        // The settings read has the kind as saved; the
-                        // organization list is the fallback.
-                        title={
-                            kindWords(settings?.kind ?? organization?.kind)
-                                .settingsTab
-                        }
-                        readOnlyNote={
-                            canEdit
-                                ? undefined
-                                : "Only owners and admins can change this."
-                        }
-                    />
-                    {ready ? <ReadyChecklist list={ready} /> : null}
-                </>
-            }
-        >
-            {settings ? (
-                <OrganizationSettingsForm
-                    // Keyed by business: the form keeps what it last saved,
-                    // so switching business must start it afresh rather
-                    // than show (and save over) the last one's details.
-                    key={settings.slug}
-                    settings={settings}
-                    canEdit={canEdit}
-                    hours={hours}
-                    canEditHours={may("store:write")}
-                    webAddress={
-                        <WebAddressSection
-                            read={webAddress}
-                            zone={
-                                settings.profile?.timezone ?? DEFAULT_TIMEZONE
-                            }
-                        />
+                <SettingsPanelHeader
+                    // The settings read has the kind as saved; the
+                    // organization list is the fallback.
+                    title={
+                        kindWords(settings?.kind ?? organization?.kind)
+                            .settingsTab
+                    }
+                    readOnlyNote={
+                        canEdit
+                            ? undefined
+                            : "Only owners and admins can change this."
                     }
                 />
-            ) : (
-                <FailedState
-                    title={couldntLoad("your business details")}
-                    retryHref="/settings/organization"
-                />
-            )}
+            }
+        >
+            <SettingsColumns
+                // The Settings side list is already beside the rows.
+                beside
+                aside={
+                    ready && readyHasLeft(ready) ? (
+                        <ReadyChecklist list={ready} />
+                    ) : undefined
+                }
+            >
+                {settings ? (
+                    <OrganizationSettingsForm
+                        // Keyed by business: the form keeps what it last saved,
+                        // so switching business must start it afresh rather
+                        // than show (and save over) the last one's details.
+                        key={settings.slug}
+                        settings={settings}
+                        canEdit={canEdit}
+                        hours={hours}
+                        canEditHours={may("store:write")}
+                        webAddress={
+                            <WebAddressSection
+                                read={webAddress}
+                                zone={
+                                    settings.profile?.timezone ??
+                                    DEFAULT_TIMEZONE
+                                }
+                            />
+                        }
+                    />
+                ) : (
+                    <FailedState
+                        title={couldntLoad("your business details")}
+                        retryHref="/settings/organization"
+                    />
+                )}
+            </SettingsColumns>
         </SettingsPanel>
     );
 }

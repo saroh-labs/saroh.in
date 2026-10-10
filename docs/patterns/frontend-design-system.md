@@ -159,9 +159,46 @@
   4.5:1, never an opacity. Say why a control is disabled, nearby.
 - **Adopted** — **One primary action per screen;** button labels are verb plus
   noun; sentence case everywhere; the product is always "Saroh" (07 §2, §4).
-- **Adopted** — **Containers come from a small named set** (04 §1): narrow for
-  auth and wizards, form, default, wide. Gap: pages still pick their own
-  `max-w-*`.
+- **Current** — **One page header: `PageHeader`** (`@saroh/ui/page-header`,
+  10 Oct 2026). Every list, record, editor and Settings section in
+  `app.saroh.in` draws it and nothing else: the breadcrumb inline above the
+  title, in the menu's names ("Bookings › Class packs", each step but the
+  last a link where it has a page); the title at 30px, wrapping balanced
+  rather than cut; then its slots. `count` is how many the page holds, in
+  the thing's own word ("3 bookings", from `countLabel`), and is left out
+  at zero. `badge` is a record's status pill, `lead` its picture or
+  initials. `description` is one line. `meta` is what sits before the
+  buttons and is not one: a view switch, or a figure that is not a count
+  ("₹12,400 owed to you · 2 overdue"). `actions` are the buttons: the
+  primary LAST, a default `Button` with no icon and no custom height or
+  radius, named "New {thing}" when it starts a new record; secondary
+  actions before it. No bordered breadcrumb strip, no hand-written `<h1>`
+  and no hand-written `aria-label="Breadcrumb"`: a screen that needs
+  something the header lacks adds a slot to it.
+  `components/shared/page-chrome.test.ts` fails on either. A Settings
+  section's header is `SettingsPanelHeader`, which draws the same component
+  with "Settings › {section}". An editor's sticky bar holds it too
+  (`components/editor-shell/publish-banner.tsx`).
+- **Current** — **A list names its rows.** `DataView`'s `noun` is required
+  ("No codes match…", never "rows"), and a screen whose header carries the
+  count passes `showTotal={false}`: the list then speaks only when it is
+  narrowed ("3 of 12 bookings").
+- **Current** — **One width per kind of screen, through `PageContainer`**
+  (04 §1): lists, boards and dashboards `full`; create and edit forms
+  `form`; a record keeps its named width (`default`, or `full` where its
+  page runs edge to edge). No inner `max-w-*` wrapper narrows a list inside
+  a wider container. A settings-style screen made of rows (Sell › Location,
+  Website › Settings, Settings › Business) lays out through
+  `SettingsColumns` (`components/shared/settings-columns.tsx`): rows at
+  760px, growing to 1040px from a 1440px window, with the one "what's left"
+  card above the tabs and to their right from 1440px (1760px where a list
+  already sits beside the rows). The other Settings sections share that
+  measure through `SettingsPanel` (`rows`), or take the panel (`full`) for
+  a table.
+- **Current** — **`desk:` is 760px**, where the rail appears and the phone
+  layouts end, and `max-desk:` is its exact complement. New code uses them.
+  The older `min-[760px]:` and `max-[759px]:` mean the same and are not yet
+  replaced; `max-[760px]:` overlapped by a pixel and is gone.
 - **Current** — **`--warning` is a fill;** text on a pale tint uses
   `--warning-subtle-foreground`.
 - **Current** (10 Oct 2026) — **A state has one look.** Nothing here, couldn't

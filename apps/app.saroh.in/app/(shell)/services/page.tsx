@@ -3,8 +3,8 @@ import {
     PartialNotice,
     PermissionDeniedState,
 } from "@saroh/ui/data-state";
+import { PageHeader } from "@saroh/ui/page-header";
 
-import { BARE, BookingsTopBar } from "@/components/bookings/calendar/parts";
 import { ServicesScreen } from "@/components/services/services-screen";
 import { PageContainer } from "@/components/shared/page-container";
 import { whoCanChange } from "@/components/shared/who-can-change";
@@ -58,9 +58,12 @@ export default async function ServicesPage() {
 
     if (!read.ok) {
         return (
-            <PageContainer width="full" className={BARE}>
-                <BookingsTopBar page="Services" />
-                <div className="px-[22px] pb-6 pt-[18px]">
+            <PageContainer width="full">
+                <PageHeader
+                    breadcrumb={["Bookings", "Services"]}
+                    title="Services"
+                />
+                <div>
                     {read.forbidden ? (
                         // A denial is not a failure: nothing broke and
                         // trying again does the same thing. The denied
@@ -86,9 +89,8 @@ export default async function ServicesPage() {
     );
 
     return (
-        <PageContainer width="full" className={BARE}>
-            <BookingsTopBar page="Services" />
-            <div className="px-[22px] pb-6 pt-[18px] max-[759px]:px-4">
+        <PageContainer width="full">
+            <div>
                 {staffList && usage ? null : (
                     <PartialNotice className="mb-3">
                         {!staffList && !usage

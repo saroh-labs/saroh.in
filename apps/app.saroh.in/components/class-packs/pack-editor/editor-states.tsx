@@ -1,16 +1,18 @@
+import { PageContainer } from "@/components/shared/page-container";
 import { Button } from "@saroh/ui/button";
 import {
     EmptyState,
     FailedState,
     PermissionDeniedState,
 } from "@saroh/ui/data-state";
+import { couldntLoad } from "@saroh/ui/lib/state-copy";
+import { NotFound } from "@saroh/ui/not-found";
+import { PageHeader } from "@saroh/ui/page-header";
+import { Archive } from "lucide-react";
 import Link from "next/link";
 
 import { readOnlyLine, whoCanChange } from "@/components/shared/who-can-change";
-import { couldntLoad } from "@saroh/ui/lib/state-copy";
-import { NotFound } from "@saroh/ui/not-found";
-import { Archive } from "lucide-react";
-import { PackCrumbs } from "./pack-crumbs";
+import { packCrumbs } from "./pack-crumbs";
 
 export type PackEditorStateKind =
     "missing" | "failed" | "forbidden" | "readOnly" | "archived";
@@ -40,10 +42,13 @@ export function PackEditorState({
     here?: string | null;
 }) {
     return (
-        <main className="w-full">
-            <PackCrumbs here={here} />
+        <PageContainer width="full">
+            <PageHeader
+                breadcrumb={packCrumbs(here)}
+                title={here ?? "Class pack"}
+            />
             {state === "missing" || state === "archived" ? (
-                <div className="px-6 py-10 max-[759px]:px-4">
+                <div>
                     {state === "missing" ? (
                         <NotFound
                             variant="card"
@@ -74,7 +79,7 @@ export function PackEditorState({
                     )}
                 </div>
             ) : (
-                <div className="px-[22px] py-[60px] max-[759px]:px-4">
+                <div>
                     {state === "failed" ? (
                         <FailedState
                             title={couldntLoad("this pack")}
@@ -119,6 +124,6 @@ export function PackEditorState({
                     )}
                 </div>
             )}
-        </main>
+        </PageContainer>
     );
 }

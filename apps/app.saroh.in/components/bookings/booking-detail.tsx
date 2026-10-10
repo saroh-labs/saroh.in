@@ -1,3 +1,4 @@
+import { PageContainer } from "@/components/shared/page-container";
 import { Badge } from "@saroh/ui/badge";
 import { Button } from "@saroh/ui/button";
 import { PageHeader } from "@saroh/ui/page-header";
@@ -118,7 +119,7 @@ export function BookingDetailView({
             (packs.canWrite && packs.usable.length > 0));
 
     return (
-        <main className="mx-auto w-full max-w-4xl p-6 sm:p-8">
+        <PageContainer width="default">
             <PageHeader
                 // Where it sits (UX-083): Bookings › All bookings › this one.
                 breadcrumb={[
@@ -391,7 +392,7 @@ export function BookingDetailView({
                     ) : null}
                 </ol>
             </section>
-        </main>
+        </PageContainer>
     );
 }
 

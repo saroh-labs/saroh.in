@@ -30,7 +30,7 @@ import {
 } from "@/lib/class-packs/pack-editor-words";
 import type { EditorAdapter } from "@/lib/editor-shell/types";
 
-import { PackCrumbs } from "./pack-crumbs";
+import { packCrumbs } from "./pack-crumbs";
 import {
     CreditsAndPrice,
     Details,
@@ -90,17 +90,12 @@ export function PackEditor({
             initial={initial}
             emptyValues={emptyValues}
             canEdit={canEdit}
-            crumbs={
-                <PackCrumbs
-                    here={
-                        initial
-                            ? (initial.published?.name ??
-                                  initial.values.name) ||
-                              "Untitled pack"
-                            : "New pack"
-                    }
-                />
-            }
+            breadcrumb={packCrumbs(
+                initial
+                    ? (initial.published?.name ?? initial.values.name) ||
+                          "Untitled pack"
+                    : "New pack",
+            )}
             titleOf={(values, record) =>
                 values.name.trim() || (record ? "Untitled pack" : "New pack")
             }

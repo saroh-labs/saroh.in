@@ -2,6 +2,7 @@
 
 import { Button } from "@saroh/ui/button";
 import { cn } from "@saroh/ui/lib/utils";
+import { PageHeader } from "@saroh/ui/page-header";
 import { showError, showUndo, showWarning } from "@saroh/ui/toast";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -326,9 +327,11 @@ export function AvailabilityEditor({
         // booking, so they are here all the same (UX-022).
         return (
             <>
-                <h1 className="mb-3.5 font-display text-[28px] font-semibold leading-tight tracking-[-0.03em]">
-                    Availability
-                </h1>
+                <PageHeader
+                    className="mb-5"
+                    breadcrumb={["Bookings", "Availability"]}
+                    title="Availability"
+                />
                 {canEdit ? null : (
                     <ReadOnlyNote>
                         Your role can see these rules but not change them.
@@ -380,19 +383,13 @@ export function AvailabilityEditor({
 
     return (
         <>
-            <div className="mb-1 flex flex-wrap items-center gap-3">
-                <h1 className="m-0 font-display text-[28px] font-semibold leading-tight tracking-[-0.03em]">
-                    Availability
-                </h1>
-                <span className="ml-auto text-[12.5px] text-muted-foreground">
-                    {me.name} · {weeklyHours(hours)} hours a week
-                </span>
-            </div>
-            <p className="mb-3.5 max-w-[70ch] text-[12.5px] text-muted-foreground">
-                When each person can be booked. Customers only ever see free
-                times inside these hours, minus bookings and the gap after each.
-                Changing hours never moves a booking that&apos;s already made.
-            </p>
+            <PageHeader
+                className="mb-5"
+                breadcrumb={["Bookings", "Availability"]}
+                title="Availability"
+                description="When each person can be booked. Customers only ever see free times inside these hours, minus bookings and the gap after each. Changing hours never moves a booking that's already made."
+                meta={`${me.name} · ${weeklyHours(hours)} hours a week`}
+            />
             {openingHours ? (
                 <p className="-mt-2 mb-3.5 max-w-[70ch] text-[12.5px] text-muted-foreground">
                     In-person bookings are only offered while you&apos;re open,

@@ -1,3 +1,4 @@
+import { PageHeader } from "@saroh/ui/page-header";
 import Link from "next/link";
 import type { ReactNode } from "react";
 
@@ -11,25 +12,27 @@ export function ProductPageFrame({ children }: { children: ReactNode }) {
     return (
         <main className="w-full">
             <ProductPageBar />
-            <div className="px-4 py-[60px] sm:px-[22px]">{children}</div>
+            <div className="px-4 pb-[60px] sm:px-[22px]">{children}</div>
         </main>
     );
 }
 
-/** The "‹ Products / Product" bar every whole-page state sits under. */
+/**
+ * "Sell › Products", and "Product" as the title: the page header every
+ * whole-page state sits under, in the product page's own gutter.
+ */
 export function ProductPageBar() {
     return (
-        <div className="flex flex-wrap items-center gap-2 border-b border-border px-3.5 py-[9px]">
-            <Link
-                href="/commerce/products"
-                className="flex items-center gap-[7px] rounded-lg px-[9px] py-1.5 text-[12.5px] text-neutral-700 hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring active:bg-accent-active coarse:min-h-11 dark:text-muted-foreground"
-            >
-                <span aria-hidden>‹</span> Products
-            </Link>
-            <span aria-hidden className="text-[15px] text-muted-foreground">
-                /
-            </span>
-            <span className="text-[13.5px] font-semibold">Product</span>
+        <div className="px-4 pt-5 sm:px-[22px]">
+            <PageHeader
+                breadcrumb={[
+                    "Sell",
+                    <Link key="list" href="/commerce/products">
+                        Products
+                    </Link>,
+                ]}
+                title="Product"
+            />
         </div>
     );
 }

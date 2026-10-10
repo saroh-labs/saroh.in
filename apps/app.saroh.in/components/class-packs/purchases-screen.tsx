@@ -2,7 +2,7 @@
 
 import { Badge } from "@saroh/ui/badge";
 import { Button } from "@saroh/ui/button";
-import { PageHeader } from "@saroh/ui/page-header";
+import { countLabel, PageHeader } from "@saroh/ui/page-header";
 import { Ticket } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -157,7 +157,17 @@ export function PurchasesScreen({
     return (
         <>
             <PageHeader
+                breadcrumb={[
+                    <Link key="bookings" href="/bookings">
+                        Bookings
+                    </Link>,
+                    "Class packs",
+                ]}
                 title="Class packs"
+                count={countLabel(purchases.length, {
+                    one: "pack sold",
+                    other: "packs sold",
+                })}
                 className="mb-0"
                 actions={
                     canWrite ? (
@@ -179,6 +189,7 @@ export function PurchasesScreen({
                 filters={FILTERS}
                 initialFilterId={initialFilterId}
                 noun={{ one: "pack sold", other: "packs sold" }}
+                showTotal={false}
                 searchPlaceholder="Search people or packs"
                 searchableColumnIds={["who", "pack"]}
                 emptyState={{
