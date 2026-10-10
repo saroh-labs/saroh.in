@@ -1073,8 +1073,10 @@ const CASHFREE_KEYS: Step[] = [
  * of its loaves, looked at only. The Rye & caraway loaf sells as itself, so
  * its Variants section shows Add variants; pressing it, picking sizes and
  * Add to list only stage rows in the page (Save variants is never pressed).
- * A value typed on the Size option is never entered (Enter would add it).
- * The Sourdough loaf's 400g is sold only Online, which "Sell it at" shows. */
+ * Edit on the Size option opens its sheet; a value typed there is never
+ * added and the sheet is never saved (nothing reaches the catalogue until
+ * Save). The Sourdough loaf's 400g is sold only Online, which "Sell it at"
+ * shows. */
 const RYE_OPTIONS = "/commerce/products/settings?tab=options";
 const RYE_CARAWAY =
     "/commerce/products/seed_sc_rc_product_1/edit?storefront=seed_sc_rc_store";
@@ -1102,18 +1104,16 @@ const SIZES_SHOTS: Shot[] = [
         route: RYE_OPTIONS,
         viewport: { width: 1024, height: 900 },
         steps: [
+            { waitFor: 'button[aria-label="Edit Size"]' },
+            { click: 'button[aria-label="Edit Size"]' },
             { waitFor: 'input[aria-label="Add a value to Size"]' },
             { fill: 'input[aria-label="Add a value to Size"]', value: "1kg" },
-            { click: 'h2:text-is("Options")' },
         ],
-        clip: {
-            selector: 'section:has(input[aria-label="New option name"])',
-            pad: 12,
-        },
+        clip: { selector: '[role="dialog"]', pad: 12 },
         mark: 'input[aria-label="Add a value to Size"]',
-        alt: "Product settings › Options at Rye & Co. (demo bakery): Size, Grind and Pack with their values, and 1kg typed into Size's new value",
+        alt: "Product settings › Options at Rye & Co. (demo bakery): the Edit Size sheet with its values, and 1kg typed into the box for a new value",
         caption:
-            "Rye & Co.'s options: Size, Grind and Pack, each with its values",
+            "Editing Size at Rye & Co.: its values, and 1kg typed in to add",
     },
     {
         key: "help-add-sizes-2",
