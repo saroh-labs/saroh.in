@@ -35,7 +35,7 @@ import { LEGAL_HOLD_CHECKBOX, LifecycleActions } from "./lifecycle-actions";
 
 /**
  * The console's words and controls for a legal hold and for how long a
- * deleted business's data is kept (DEC-119, owner 10 Oct).
+ * deleted business's data is kept (DEC-122, owner 10 Oct).
  */
 const buttons = () =>
     screen.queryAllByRole("button").map((b) => b.textContent.trim());

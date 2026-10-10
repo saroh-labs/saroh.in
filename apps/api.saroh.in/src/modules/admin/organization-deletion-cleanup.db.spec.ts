@@ -2,7 +2,7 @@
  * A deleted business against a real Postgres (#921): the deletion sweep
  * queues its clean-up, the clean-up shuts its access off — Saroh's
  * subscription at the provider, custom hostnames, payment keys, pending
- * jobs — and keeps its data and its files for the 180 days (DEC-119); its
+ * jobs — and keeps its data and its files for the 180 days (DEC-122); its
  * site answers as never published and its members are refused. On legal
  * hold the clean-up removes nothing. A business inside its window is charged no
  * renewal but keeps its site and its door. Runs in the integration project
@@ -225,7 +225,7 @@ describe("the deletion sweep queues the clean-up (#921)", () => {
 });
 
 describe("the clean-up of a deleted business (#921)", () => {
-    it("shuts its access off and keeps its data and its files (DEC-119)", async () => {
+    it("shuts its access off and keeps its data and its files (DEC-122)", async () => {
         const b = await business("DELETED_RETAINED");
 
         const result = await cleanup.run(b.org.id);
@@ -250,7 +250,7 @@ describe("the clean-up of a deleted business (#921)", () => {
             await prisma.domain.count({ where: { organizationId: b.org.id } }),
         ).toBe(0);
         // Its files stay, in storage and as rows: they go with its data,
-        // 180 days on (`organization.retention.erase`). Until DEC-119 this
+        // 180 days on (`organization.retention.erase`). Until DEC-122 this
         // run deleted them on day one.
         expect(storage.has(b.key)).toBe(true);
         expect(
@@ -285,7 +285,7 @@ describe("the clean-up of a deleted business (#921)", () => {
         expect(await prisma.site.count({ where: { id: b.site.id } })).toBe(1);
     });
 
-    it("removes nothing of a business on legal hold, and runs when the hold is lifted (DEC-119)", async () => {
+    it("removes nothing of a business on legal hold, and runs when the hold is lifted (DEC-122)", async () => {
         const b = await business("DELETED_RETAINED");
         await prisma.organization.update({
             where: { id: b.org.id },

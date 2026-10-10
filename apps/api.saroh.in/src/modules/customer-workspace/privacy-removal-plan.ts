@@ -152,7 +152,7 @@ export const REVIEWER_NAME = "A customer";
 
 /**
  * Why a removal is refused; `autopay` comes from `payments/mandate-gate.ts`
- * and `legal-hold` from `organizations/legal-hold.ts` (DEC-119: a held
+ * and `legal-hold` from `organizations/legal-hold.ts` (DEC-122: a held
  * business's data is kept, a customer's details included).
  */
 export type RemovalRefusalReason =

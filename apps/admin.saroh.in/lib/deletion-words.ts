@@ -3,7 +3,7 @@ import { formatDate } from "./format";
 /**
  * A business's way out, in words (#921, owner 9 Oct): the deletion trail
  * and the refunds a deletion waits on, as the business page shows them —
- * and, since DEC-119 (owner 10 Oct), its legal hold and how long its data
+ * and, since DEC-122 (owner 10 Oct), its legal hold and how long its data
  * is kept after deletion. Client-safe: no server imports.
  */
 
@@ -39,7 +39,7 @@ const STEP: Record<string, string> = {
     domains: "Custom domains",
     memberships: "Autopay mandates read",
     keys: "Payment and messaging keys",
-    // The erase, 180 days on (and, before DEC-119, the clean-up's own).
+    // The erase, 180 days on (and, before DEC-122, the clean-up's own).
     media: "Files",
     waitlist: "Class waitlists",
     contacts: "Customers",
@@ -132,7 +132,7 @@ export const LEGAL_HOLD_MEANS =
     "Its data is kept. Nothing deletes or erases it, its deletion can't be scheduled, it can't be reinstated, and its people can't remove a customer's details or download its data, until a Platform Owner lifts the hold.";
 
 /**
- * How long a deleted business's data is kept (DEC-119): "Data kept until
+ * How long a deleted business's data is kept (DEC-122): "Data kept until
  * 8 Apr 2027", then "Data erased on …". On legal hold nothing is erased on
  * that day, and the line says so. Null for a business that isn't deleted.
  */

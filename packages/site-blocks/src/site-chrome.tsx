@@ -86,7 +86,7 @@ export interface SiteContact {
 export interface SiteCredit {
     href: string;
     /**
-     * "Report", beside the credit (DEC-118): where a customer reports the
+     * "Report", beside the credit (DEC-121): where a customer reports the
      * business to Saroh (`reportBusinessHref`). Free only, as the credit is:
      * a paid site carries no Saroh link at all.
      */
@@ -147,7 +147,7 @@ export function SiteFooter({
      */
     cookieChoices?: boolean;
     /**
-     * "Sold by ‹legal name›" with the registered address (DEC-118), on
+     * "Sold by ‹legal name›" with the registered address (DEC-121), on
      * every plan, in the business's own details. The renderer passes it for
      * a published site; null draws none (the editor's canvas, the catalog).
      * Its email and phone are drawn only in the `left` layout, which has no
@@ -288,7 +288,7 @@ function MadeWithSaroh({
 }
 
 /**
- * "Report" (DEC-118), beside the credit on Free: a customer's way to tell
+ * "Report" (DEC-121), beside the credit on Free: a customer's way to tell
  * Saroh about the business. In the footer's own colours, as the credit is.
  */
 function ReportLink({ href }: { href: string }) {
@@ -325,7 +325,7 @@ function LeftFooter({
     name: string;
     credit: SiteCredit | null;
     cookieChoices: boolean;
-    /** "Sold by ‹legal name›", under the row (DEC-118); null draws none. */
+    /** "Sold by ‹legal name›", under the row (DEC-121); null draws none. */
     owner: ReactNode;
 }) {
     const line = written ? footerLine(written) : null;

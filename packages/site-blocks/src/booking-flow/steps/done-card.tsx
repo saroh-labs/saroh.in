@@ -35,7 +35,7 @@ export function DoneCard({
     rules: BookingPageData["rules"];
     /** More than one: visit 1 of a treatment was booked (E10). */
     visits?: number;
-    /** "Run by ‹legal name›" (DEC-118); null draws none. */
+    /** "Run by ‹legal name›" (DEC-121); null draws none. */
     soldBy?: string | null;
     onAgain: () => void;
 }) {
@@ -169,7 +169,7 @@ export function DoneCard({
                 </a>
                 .{changeRules(rules, phase.paid)}
             </p>
-            {/* Who the booking is with, in its own name (DEC-118). */}
+            {/* Who the booking is with, in its own name (DEC-121). */}
             <SoldByLine line={soldBy} className="text-site-muted mt-2" />
         </div>
     );

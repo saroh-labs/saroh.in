@@ -56,7 +56,7 @@
   alone keeps. `left` is the designs' row (name, line, and on Free
   "Made with Saroh" at the end, DEC-102) with its margins inside `max-w-site-content`, as the header's.
   Under either layout, "Sold by ‹legal name›" with the business's
-  registered address and contact (`sold-by.tsx`, DEC-118), in the footer's
+  registered address and contact (`sold-by.tsx`, DEC-121), in the footer's
   own colours; on Free, "Report" follows the credit.
 - **Current** — **Template round 2.** A palette may name two optional
   status roles, `status` (the "open now" dot on the page) and

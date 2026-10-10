@@ -16,7 +16,7 @@ Every provider sits behind a port, with adapters under the module's
 | `BillingProvider`  | `modules/billing`         | Saroh charging the Organization                                                                                                                        |
 | `WebhookProvider`  | `modules/webhooks`        | Signed inbound events                                                                                                                                  |
 | `CommsProvider`    | `modules/communications`  | Email and WhatsApp adapters, chosen by a factory per channel                                                                                           |
-| `ObjectStorage`    | `packages/object-storage` | Media, with an R2 adapter and an in-memory adapter; `putObject` and `readObject` for what the server writes and copies itself (a data export, DEC-117) |
+| `ObjectStorage`    | `packages/object-storage` | Media, with an R2 adapter and an in-memory adapter; `putObject` and `readObject` for what the server writes and copies itself (a data export, DEC-120) |
 | `DomainHosting`    | `modules/domains`         | A verified custom domain's hostname on Cloudflare for SaaS                                                                                             |
 
 `DomainHosting` (#859) registers a domain's hostname as a custom hostname on

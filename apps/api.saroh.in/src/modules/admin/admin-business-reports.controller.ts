@@ -14,7 +14,7 @@ import { ListBusinessReportsDto, MarkBusinessReportDoneDto } from "./dto";
  * `POST /public/business-reports`). Reading them is `organization:read`,
  * the reporter's email additionally `organization:pii:read` (decided in the
  * service, per caller). Marking one done needs `reports:resolve`, which
- * Support holds (DEC-118, amended 10 Oct): closing a report changes nothing
+ * Support holds (DEC-121, amended 10 Oct): closing a report changes nothing
  * for the business, so it never needed the lifecycle write a suspension
  * does.
  */

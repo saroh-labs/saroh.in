@@ -84,7 +84,7 @@ export interface EraseSweep {
 
 /**
  * Erases a deleted business's files and personal data when its retention
- * ends (DEC-119, owner 10 Oct). The Privacy Policy: "Access ends at once.
+ * ends (DEC-122, owner 10 Oct). The Privacy Policy: "Access ends at once.
  * We keep the account's data for 180 days, as Indian law requires, then
  * remove it from live systems."
  *

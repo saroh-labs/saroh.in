@@ -325,7 +325,7 @@ export function sendTeamAlertEmail(
     return Promise.resolve();
 }
 
-/** What the "your data is ready" email says (DEC-117). */
+/** What the "your data is ready" email says (DEC-120). */
 export interface DataExportReadyMail {
     /** The business's name; escaped here. */
     businessName: string;
@@ -349,7 +349,7 @@ function dayOf(date: Date): string {
 }
 
 /**
- * "Your data is ready" to the owner who asked for it (DEC-117): Saroh
+ * "Your data is ready" to the owner who asked for it (DEC-120): Saroh
  * speaking to its own user about their own business (DEC-011 amended
  * 2026-10-07, sent as DEC-085 has it), so Saroh sends it, provider or not.
  * The link is a signed one to the zip that stops working after a day; the

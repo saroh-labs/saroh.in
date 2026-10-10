@@ -13,12 +13,12 @@ import {
 } from "./retention-erase-plan";
 
 /**
- * What the retention eraser removes and keeps (DEC-119), held to the
+ * What the retention eraser removes and keeps (DEC-122), held to the
  * privacy removal's two registries: whatever a single removal *keeps* must
  * be decided again for a business that is gone — erased, or kept and why —
  * so a new "kept" field can't silently outlive a deleted business.
  */
-describe("the retention erase plan (DEC-119)", () => {
+describe("the retention erase plan (DEC-122)", () => {
     it("decides every personal field a privacy removal keeps", () => {
         const kept = Object.entries(PERSONAL_FIELDS)
             .filter(([, field]) => field.rule === "kept")

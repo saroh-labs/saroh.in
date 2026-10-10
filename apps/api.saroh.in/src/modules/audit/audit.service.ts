@@ -76,7 +76,7 @@ export const AuditAction = {
     // Counts only (what was deleted, blanked or cancelled), never a value.
     CustomerRemoved: "customer.removed",
     // A privacy removal refused because the business is on legal hold
-    // (DEC-119): the contact as the target, DENIED, the reason as a code.
+    // (DEC-122): the contact as the target, DENIED, the reason as a code.
     CustomerRemovalRefused: "customer.removal.refused",
     // Someone changed one of their own alerts (F14): which alert, which
     // channel, and on or off as it was and became. Their own choice, about
@@ -96,7 +96,7 @@ export const AuditAction = {
     // the publication. Metadata: how it went live (`source`), and the test
     // release when it was one. The target is the new publication.
     SitePublishOverride: "site.publish_approval.override",
-    // "Download your data" (DEC-117): an owner asked for the business's
+    // "Download your data" (DEC-120): an owner asked for the business's
     // zip, and each time one made a link to download it. The target is the
     // export; metadata is counts and sizes, never a link or a key.
     DataExportRequested: "organization.data_export.requested",

@@ -4,7 +4,7 @@ export const DATA_EXPORT_BUILD_TYPE = "data-export.build";
 /** Deletes a zip 7 days after it was ready (`data-export.handler.ts`). */
 export const DATA_EXPORT_EXPIRE_TYPE = "data-export.expire";
 
-/** How long a finished export is kept (owner, 9 Oct, DEC-117). */
+/** How long a finished export is kept (owner, 9 Oct, DEC-120). */
 export const DATA_EXPORT_KEPT_DAYS = 7;
 
 /** How long the emailed link works; the workspace makes fresh ones. */

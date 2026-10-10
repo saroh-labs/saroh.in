@@ -302,10 +302,10 @@ export class MediaService {
      * one loses it (`SetNull`); the invoices keep their records, printed
      * without the logo.
      *
-     * Run by `organization.retention.erase` (DEC-119), 180 days after the
+     * Run by `organization.retention.erase` (DEC-122), 180 days after the
      * business was deleted, with no caller context, in batches; a storage
      * failure leaves that row for the retry (and out of this run's next
-     * batch), the rest go on, and the call throws at the end. Until DEC-119
+     * batch), the rest go on, and the call throws at the end. Until DEC-122
      * the deletion clean-up ran it on day one.
      *
      * **Never for a business on legal hold.** `mayErase` is asked before

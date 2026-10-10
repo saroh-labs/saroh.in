@@ -12,7 +12,7 @@
  *
  * - `activity`: activity in the business — a workspace write, an enquiry,
  *   booking or payment from its pages (`organization-lifecycle.gate.ts`).
- *   `open` takes anything; `wind-down` (DEC-117) takes nothing new but lets
+ *   `open` takes anything; `wind-down` (DEC-120) takes nothing new but lets
  *   the business finish what it already started — progress, cancel and
  *   refund existing orders, bookings and memberships, and take payment for
  *   ones already owed; `closed` takes nothing. Which workspace write is
@@ -30,7 +30,7 @@
  * database's CHECK constraint names no state this table lacks and that each
  * consumer still asks it.
  *
- * **A legal hold is not a state** (DEC-119, `legal-hold.ts`): a held
+ * **A legal hold is not a state** (DEC-122, `legal-hold.ts`): a held
  * business keeps the row it is in. What the hold adds is decided here too,
  * per state, in {@link LEGAL_HOLD_DECISIONS}: whether a hold may be placed
  * on a business in that state, and whether a held business may be moved
@@ -72,7 +72,7 @@ export const LIFECYCLE_DECISIONS: Readonly<
     },
     // The window (owner, 9 Oct, #921): no renewal is charged and nothing new
     // can start, but it can still be reinstated, so the site and the door
-    // stay as they were. It winds down (owner, 9 Oct, DEC-117): what was
+    // stay as they were. It winds down (owner, 9 Oct, DEC-120): what was
     // already started can be finished, cancelled or refunded.
     PENDING_DELETION: {
         activity: "wind-down",
@@ -102,7 +102,7 @@ export interface LegalHoldDecision {
 }
 
 /**
- * What a legal hold means for each state (DEC-119, owner 10 Oct). The hold
+ * What a legal hold means for each state (DEC-122, owner 10 Oct). The hold
  * keeps a business's data "even if deletion was requested", so a held
  * business never moves towards deletion; and it is never active, so its
  * workspace takes no write that could delete a record.
@@ -160,7 +160,7 @@ export function activityOpen(status: string): boolean {
 }
 
 /**
- * Is the business winding down (DEC-117)? Nothing new, but what it already
+ * Is the business winding down (DEC-120)? Nothing new, but what it already
  * started can be finished.
  */
 export function windingDown(status: string): boolean {
@@ -169,7 +169,7 @@ export function windingDown(status: string): boolean {
 
 /**
  * What a write in the workspace does, for the lifecycle (owner, 9 Oct,
- * DEC-117). Every route is `new` unless it says otherwise
+ * DEC-120). Every route is `new` unless it says otherwise
  * (`@LifecycleWrite`, `common/decorators/lifecycle-write.decorator.ts`):
  *
  * - `new`: starts or changes something — an order, a booking, a sale, a

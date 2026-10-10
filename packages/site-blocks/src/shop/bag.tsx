@@ -71,7 +71,7 @@ export interface ShopBagProps {
     /** The site the bag belongs to (its id). */
     site: string;
     businessName: string;
-    /** "Sold by ‹legal name›" (DEC-118); null draws none. */
+    /** "Sold by ‹legal name›" (DEC-121); null draws none. */
     soldBy?: string | null;
     api: ShopCheckoutApi;
     account: {

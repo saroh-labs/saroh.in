@@ -298,7 +298,7 @@ describe("AdminLifecycleService — lifecycle", () => {
     });
 });
 
-describe("AdminLifecycleService — legal hold (DEC-119)", () => {
+describe("AdminLifecycleService — legal hold (DEC-122)", () => {
     const HELD_AT = new Date("2026-10-10T06:00:00.000Z");
     const suspended = { ...northwind, lifecycleStatus: "SUSPENDED" };
     const held = {

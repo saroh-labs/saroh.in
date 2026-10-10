@@ -30,7 +30,7 @@ export interface OrganizationDirectoryQuery {
     moduleKey?: string;
     /** `attention`: only businesses with something an operator should look at. */
     health?: "attention";
-    /** `on`: only businesses on legal hold (DEC-119). */
+    /** `on`: only businesses on legal hold (DEC-122). */
     legalHold?: "on";
     cursor?: string;
     limit?: number;
@@ -55,7 +55,7 @@ export interface OrganizationDirectoryRow {
     slug: string;
     lifecycleStatus: string;
     /**
-     * On legal hold (DEC-119): its data is kept whatever is asked. Who,
+     * On legal hold (DEC-122): its data is kept whatever is asked. Who,
      * when and why are on the business page, behind a support session.
      */
     legalHold: boolean;

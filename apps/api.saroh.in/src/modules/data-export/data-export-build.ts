@@ -16,7 +16,7 @@ import {
 import { ZipFile } from "./zip-file";
 
 /**
- * How much of the media library one zip carries (DEC-117). The zip format
+ * How much of the media library one zip carries (DEC-120). The zip format
  * this writes has no ZIP64, so an archive stays under 4 GiB; 2 GiB of
  * photos and videos leaves room for every CSV. A file past it is listed
  * in `media.csv` as left out, with its name, so nothing is silently lost.
@@ -74,7 +74,7 @@ const README = (businessName: string, made: Date) =>
     ].join("\r\n");
 
 /**
- * Build one business's zip and put it in object storage (DEC-117).
+ * Build one business's zip and put it in object storage (DEC-120).
  *
  * Written to a file in the temp directory as it is made — every CSV a page
  * at a time, every media file streamed from storage — then uploaded from

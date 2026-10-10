@@ -1,5 +1,5 @@
 /**
- * Nothing a job deletes escapes a legal hold — pinned (DEC-119).
+ * Nothing a job deletes escapes a legal hold — pinned (DEC-122).
  *
  * The Terms keep a held business's data "for as long as the law requires…
  * even if deletion was requested". That holds only while every job that
@@ -143,7 +143,7 @@ const deletingJobs = files
     .map((f) => f.rel)
     .sort();
 
-describe("every job that deletes is decided for a legal hold (DEC-119)", () => {
+describe("every job that deletes is decided for a legal hold (DEC-122)", () => {
     it("finds the deleting jobs it expects to scan", () => {
         // A scan that finds nothing would pass every test below.
         expect(deletingJobs).toEqual(

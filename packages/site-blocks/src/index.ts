@@ -439,7 +439,7 @@ export type {
     SiteCredit,
     SiteFooterContent,
 } from "./site-chrome";
-// Who a customer is buying from, in the business's own details (DEC-118).
+// Who a customer is buying from, in the business's own details (DEC-121).
 export {
     SoldByBlock,
     SoldByLine,

@@ -83,7 +83,7 @@ describe("deletion trail words (#921)", () => {
         expect(trailDetail(row({}))).toBe("Saroh, automatically");
     });
 
-    it("names a legal hold placed and lifted (DEC-119)", () => {
+    it("names a legal hold placed and lifted (DEC-122)", () => {
         expect(
             trailTitle(row({ action: "organization.legal_hold.placed" })),
         ).toBe("Legal hold placed");

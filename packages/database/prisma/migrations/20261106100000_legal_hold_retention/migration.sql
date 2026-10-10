@@ -1,4 +1,4 @@
--- Legal hold, and 180 days' retention after deletion (DEC-119, owner 10 Oct).
+-- Legal hold, and 180 days' retention after deletion (DEC-122, owner 10 Oct).
 -- Additive only: four nullable columns on Organization, one index and two
 -- "one waiting run" indexes for the new daily chains. The image still
 -- serving during the deploy reads and writes none of them.

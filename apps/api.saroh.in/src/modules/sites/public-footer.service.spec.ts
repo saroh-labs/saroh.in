@@ -154,7 +154,7 @@ describe("the footer's email (DEC-101)", () => {
     });
 });
 
-describe("who the customer is buying from (DEC-118)", () => {
+describe("who the customer is buying from (DEC-121)", () => {
     it("is the legal name, the registered address and the public phone, on any plan", async () => {
         site(null);
         profileFind.mockResolvedValue({

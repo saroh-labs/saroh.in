@@ -30,7 +30,7 @@ describe("fileSize", () => {
     });
 });
 
-describe("dataExportLine (DEC-117)", () => {
+describe("dataExportLine (DEC-120)", () => {
     it("offers a ready download, with its size and the day it goes", () => {
         expect(dataExportLine(view({}), NOW)).toEqual({
             id: "exp_1",

@@ -3,7 +3,7 @@ jest.mock("@saroh/database", () => ({
     prisma: {
         analyticsEvent: { findMany: jest.fn(), deleteMany: jest.fn() },
         analyticsDailyAggregate: { deleteMany: jest.fn() },
-        // Businesses on legal hold (DEC-119): none unless a test says so.
+        // Businesses on legal hold (DEC-122): none unless a test says so.
         organization: { findMany: jest.fn() },
         job: { create: jest.fn(), count: jest.fn() },
     },
@@ -110,7 +110,7 @@ describe("AnalyticsRetentionHandler", () => {
         );
     });
 
-    it("leaves the events of a business on legal hold, in the read and in the delete (DEC-119)", async () => {
+    it("leaves the events of a business on legal hold, in the read and in the delete (DEC-122)", async () => {
         held.mockResolvedValue([{ id: "org_held" }, { id: "org_held_2" }]);
         findMany.mockResolvedValueOnce(ids(2));
         deleteMany.mockResolvedValueOnce({ count: 2 });

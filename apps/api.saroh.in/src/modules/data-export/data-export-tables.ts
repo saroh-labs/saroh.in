@@ -2,7 +2,7 @@ import { Prisma, prisma, runInOrgContext } from "@saroh/database";
 
 /**
  * What "Download your data" puts in its zip, one CSV per table (owner,
- * 9 Oct, DEC-117): the business's own records, every column a person can
+ * 9 Oct, DEC-120): the business's own records, every column a person can
  * read, keyed by the same ids the files share (an order line's `orderId`,
  * a booking's `contactId`), so a spreadsheet can join them.
  *

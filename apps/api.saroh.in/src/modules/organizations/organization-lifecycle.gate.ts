@@ -11,7 +11,7 @@ import {
 
 /**
  * What a customer is told when a business isn't taking anything new for a
- * lifecycle reason (DEC-117): the paused words of #800,
+ * lifecycle reason (DEC-120): the paused words of #800,
  * never why. A customer never learns that a business is suspended or
  * closing.
  */
@@ -48,7 +48,7 @@ function notTakingNew(): ForbiddenException {
  * offline (#921). Which state does what is `organization-lifecycle.policy.ts`.
  *
  * The refusal names no state: a customer is never told a business is
- * suspended or closing (DEC-117).
+ * suspended or closing (DEC-120).
  *
  * Read on every call, never cached, so lifting a suspension works on the very
  * next request.
@@ -64,7 +64,7 @@ export async function assertOrganizationOpen(
 }
 
 /**
- * A customer finishing something already started (DEC-117): paying an order
+ * A customer finishing something already started (DEC-120): paying an order
  * or invoice the business already sent them, or signing in to see what they
  * have. Open while the business is open or winding down
  * (`PENDING_DELETION`); refused, in the same words as
@@ -95,7 +95,7 @@ export function workspaceRefusalMessage(
 }
 
 /**
- * A write in the workspace, by its lifecycle class (DEC-117): `new` only
+ * A write in the workspace, by its lifecycle class (DEC-120): `new` only
  * while the business is open, `wind-down` while it is open or closing, and
  * `takeout` whenever its members may open it. Asked by `OrganizationGuard`
  * and `StoreLifecycleGuard` with the route's `@LifecycleWrite` class

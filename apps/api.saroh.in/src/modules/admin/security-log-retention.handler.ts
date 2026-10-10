@@ -9,7 +9,7 @@ import {
     securityLogCutoff,
 } from "../organizations/retention";
 
-/** The daily job that deletes security log rows past a year (DEC-119). */
+/** The daily job that deletes security log rows past a year (DEC-122). */
 export const SECURITY_LOG_RETENTION_TYPE = "security-logs.retention";
 
 /** Once a day: the rule is counted in days. */
@@ -42,7 +42,7 @@ export interface SecurityLogSweep {
 }
 
 /**
- * Deletes security log rows a year after they ended (DEC-119, owner
+ * Deletes security log rows a year after they ended (DEC-122, owner
  * 10 Oct). The Privacy Policy: "Security logs: IP address, browser,
  * sign-in times, errors … 1 year". Nothing pruned these before: they were
  * kept for ever, while the policy said 90 days.
@@ -123,7 +123,7 @@ export class SecurityLogRetentionHandler {
         days: number = SECURITY_LOG_RETENTION_DAYS,
     ): Promise<SecurityLogSweep> {
         const cutoff = securityLogCutoff(now, days);
-        // On legal hold: read once a run; there are few (DEC-119).
+        // On legal hold: read once a run; there are few (DEC-122).
         const held = await heldOrganizationIds(prisma);
         const heldUsers =
             held.length > 0

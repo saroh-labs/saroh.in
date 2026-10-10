@@ -34,7 +34,7 @@ module.exports = {
         // S1-009 audit: append-only AuditService + read-authorization specs,
         // pure unit tests with a jest-mocked Prisma (never touch a DB).
         "<rootDir>/src/modules/audit/**/*.spec.ts",
-        // DEC-117: the export's cells and zip, DB-free; its rows are in
+        // DEC-120: the export's cells and zip, DB-free; its rows are in
         // data-export.db.spec.ts.
         "<rootDir>/src/modules/data-export/**/*.spec.ts",
         // Internal control plane: fixed staff permissions, admin read models,

@@ -44,7 +44,7 @@ export interface ClosingView {
         } | null;
         /**
          * False when customers paid online and no payment provider is
-         * connected now (DEC-117): Saroh can't send a refund. Absent from
+         * connected now (DEC-120): Saroh can't send a refund. Absent from
          * an API before it, which reads as true.
          */
         refundsOnline?: boolean;
@@ -57,7 +57,7 @@ export interface ClosingView {
 export const DATA_EXPORT_HREF = "/settings/data";
 
 /**
- * What still works while the business winds down (owner, 9 Oct, DEC-117).
+ * What still works while the business winds down (owner, 9 Oct, DEC-120).
  * One sentence, the same for everyone; what a role may do is the API's.
  */
 export const CLOSING_BODY =
@@ -95,7 +95,7 @@ export interface ClosingBannerWords {
         warnings: string[];
         lines: { key: string; label: string; href: string }[];
     } | null;
-    /** Refund in the provider's dashboard: its keys are gone (DEC-117). */
+    /** Refund in the provider's dashboard: its keys are gone (DEC-120). */
     refundInDashboard: string | null;
     /** "Download your data", for an owner. */
     data: { label: string; href: string } | null;

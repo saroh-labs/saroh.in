@@ -379,7 +379,7 @@ export default async function SiteLayout({
                             }}
                             // "Made with Saroh" on Free only (DEC-102).
                             // "Report" rides with it: no Saroh link on a
-                            // paid site (DEC-118).
+                            // paid site (DEC-121).
                             credit={
                                 footerFacts?.credit
                                     ? {
@@ -393,7 +393,7 @@ export default async function SiteLayout({
                             // "Cookie choices" while a tracker asks (DEC-108).
                             cookieChoices={asksConsent}
                             // "Sold by ‹legal name›" in the business's own
-                            // details, on every plan (DEC-118).
+                            // details, on every plan (DEC-121).
                             seller={siteSeller(
                                 footerFacts,
                                 snapshot.site.name,

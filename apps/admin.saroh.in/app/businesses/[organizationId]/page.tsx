@@ -192,7 +192,7 @@ function Business({
 
     return (
         <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_380px]">
-            {/* Before anything else on the page (DEC-119). */}
+            {/* Before anything else on the page (DEC-122). */}
             {hold && (
                 <div className="xl:col-span-2">
                     <LegalHoldNotice hold={hold} />

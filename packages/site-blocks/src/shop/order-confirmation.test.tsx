@@ -204,7 +204,7 @@ describe("OrderConfirmation (P4)", () => {
         ).toHaveAttribute("href", "/shop");
     });
 
-    it("says who sold a placed order, in the business's legal name (DEC-118)", () => {
+    it("says who sold a placed order, in the business's legal name (DEC-121)", () => {
         render(
             <OrderConfirmation
                 lookup={{ ok: true, order: ORDER }}

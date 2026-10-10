@@ -17,7 +17,7 @@ export interface FooterFacts {
     /** "Made with Saroh" on Free; null on a paid plan. */
     credit: SiteCredit | null;
     /**
-     * Who a customer is buying from (DEC-118), from Settings › Business:
+     * Who a customer is buying from (DEC-121), from Settings › Business:
      * each null when the business has set none.
      */
     seller: SellerFacts;
@@ -50,7 +50,7 @@ function sellerFacts(body: unknown): SellerFacts {
 }
 
 /**
- * The footer's "Sold by" block (DEC-118): the legal name, or the site's own
+ * The footer's "Sold by" block (DEC-121): the legal name, or the site's own
  * name when the business has set none, then whatever else it has set. "Sold
  * by" where the site's shop serves, "Run by" where it doesn't (bookings, a
  * portfolio). With nothing read (`facts` null), the name alone.

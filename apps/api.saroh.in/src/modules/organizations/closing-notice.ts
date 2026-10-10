@@ -65,7 +65,7 @@ export interface ClosingNoticeView {
             rows: ClosingMembershipRow[];
         } | null;
         /**
-         * Whether Saroh can still send a refund online (DEC-117): a payment
+         * Whether Saroh can still send a refund online (DEC-120): a payment
          * provider is connected. `false` only when customers have paid
          * online and no provider is connected now — Refund isn't offered,
          * and the banner says to refund in the provider's dashboard and

@@ -47,7 +47,7 @@ beforeEach(() => {
     lifecycle.mockResolvedValue({ lifecycleStatus: "ACTIVE" });
 });
 
-describe("a business suspended or closing (DEC-117)", () => {
+describe("a business suspended or closing (DEC-120)", () => {
     it.each(["SUSPENDED", "PENDING_DELETION"])(
         "reads as a paused site while %s: no orders, no bookings",
         async (status) => {

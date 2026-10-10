@@ -27,7 +27,7 @@ export interface BusinessRow {
     slug: string;
     lifecycleStatus: LifecycleStatus;
     /**
-     * On legal hold (DEC-119): its data is kept whatever is asked. Absent
+     * On legal hold (DEC-122): its data is kept whatever is asked. Absent
      * from an older API.
      */
     legalHold?: boolean;
@@ -164,7 +164,7 @@ export interface BusinessView {
         suspensionReason: string | null;
         deletionScheduledAt: string | null;
         deletionReason: string | null;
-        /** Its legal hold (DEC-119): when, why and who; null when none. */
+        /** Its legal hold (DEC-122): when, why and who; null when none. */
         legalHold?: LegalHoldFacts | null;
         /** When its deletion window ended and access was shut off. */
         deletedRetainedAt?: string | null;
@@ -251,7 +251,7 @@ export interface BusinessView {
     deletionRefunds?: Panel<DeletionRefundRow[]>;
 }
 
-/** A business's legal hold, as its page shows it (DEC-119). */
+/** A business's legal hold, as its page shows it (DEC-122). */
 export interface LegalHoldFacts {
     at: string;
     reason: string | null;

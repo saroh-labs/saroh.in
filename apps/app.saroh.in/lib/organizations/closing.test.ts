@@ -47,7 +47,7 @@ describe("closingBanner (#921)", () => {
         expect(b?.memberships).toBeNull();
     });
 
-    it("says it winds down: what is finished, never started (DEC-117)", () => {
+    it("says it winds down: what is finished, never started (DEC-120)", () => {
         const b = closingBanner(view(), NOW);
         expect(b?.body).toMatch(/finish, cancel and refund/);
         // An older API, or anyone but an owner: no data link, no warning.

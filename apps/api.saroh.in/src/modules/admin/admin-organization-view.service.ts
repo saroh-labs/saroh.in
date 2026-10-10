@@ -46,7 +46,7 @@ export interface OrganizationFacts {
     deletionScheduledAt: Date | null;
     deletionReason: string | null;
     /**
-     * Its legal hold (DEC-119), or null: when it was placed, the operator's
+     * Its legal hold (DEC-122), or null: when it was placed, the operator's
      * reason, and who placed it (a name; an email only to a PII reader).
      */
     legalHold: {

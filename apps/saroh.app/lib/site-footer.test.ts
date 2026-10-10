@@ -94,7 +94,7 @@ describe("getFooterFacts", () => {
     });
 });
 
-describe("who the customer is buying from (DEC-118)", () => {
+describe("who the customer is buying from (DEC-121)", () => {
     const facts = footerFacts({
         email: "hi@rye.example",
         credit: null,

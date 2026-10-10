@@ -31,7 +31,7 @@ data was in no list at all, because the rows had to stay for the tax
 records. Nobody had written down how long anything is kept, so the code,
 the policy and the law each had a different number. Security logs were the
 same: the policy said 90 days and nothing pruned them.
-**Fix** (DEC-119): the clean-up now only shuts access off and deletes
+**Fix** (DEC-122): the clean-up now only shuts access off and deletes
 secrets; `organization.retention.erase` erases the files and the personal
 data 180 days after `deletedRetainedAt`, never the tax records; a legal
 hold (`Organization.legalHoldAt`) stops scheduling, the sweep, the
@@ -3709,7 +3709,7 @@ ask `assertMembersMayOpen`. A new state, site controller or member door fails
 it until it is decided.
 **Category**: lifecycle · `apps/api.saroh.in/src/modules/organizations/organization-lifecycle.policy.ts`
 
-## Lifecycle — store-scoped writes never asked the lifecycle (DEC-117)
+## Lifecycle — store-scoped writes never asked the lifecycle (DEC-120)
 
 **Symptom**: found 9 Oct 2026 building the deletion window's wind-down. A
 suspended business, or one scheduled for deletion, was documented as taking

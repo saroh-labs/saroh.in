@@ -1,7 +1,7 @@
 import { env } from "../../env";
 
 /**
- * How long Saroh keeps things, in one place (DEC-119, owner 10 Oct). The
+ * How long Saroh keeps things, in one place (DEC-122, owner 10 Oct). The
  * Privacy Policy states both numbers; change one here and there together.
  */
 

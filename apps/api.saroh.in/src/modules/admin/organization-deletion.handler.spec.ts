@@ -4,7 +4,7 @@ jest.mock("@saroh/database", () => {
             findMany: jest.fn(),
             findUnique: jest.fn(),
             updateMany: jest.fn(),
-            // Past their window and on legal hold (DEC-119): for the log.
+            // Past their window and on legal hold (DEC-122): for the log.
             count: jest.fn(),
         },
         auditEvent: { create: jest.fn() },
@@ -302,7 +302,7 @@ describe("OrganizationDeletionHandler.sweep (#907)", () => {
     });
 });
 
-describe("OrganizationDeletionHandler and a legal hold (DEC-119)", () => {
+describe("OrganizationDeletionHandler and a legal hold (DEC-122)", () => {
     it("never deletes a business on legal hold, even one listed before the hold", async () => {
         list.mockResolvedValueOnce([{ id: "o1" }]);
         read.mockResolvedValue(

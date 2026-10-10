@@ -27,7 +27,7 @@ import { newRefCode } from "../waitlist/waitlist-keys";
  *   on Free only. Paid plans show no Saroh credit (DEC-102).
  *
  * - `seller`: who a customer is buying from, in the business's own details
- *   (DEC-118): its legal name (null when it has set none; the site then says
+ *   (DEC-121): its legal name (null when it has set none; the site then says
  *   its own name), its registered address on one line as its invoices print
  *   it, and its public phone (DEC-053). Never the GSTIN, the business type
  *   or anything else Settings › Business holds.

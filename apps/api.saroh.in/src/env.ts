@@ -302,7 +302,7 @@ const envSchema = z.object({
     JOB_VISIBILITY_MS: z.coerce.number().int().positive().default(300_000),
 
     // How long a deleted business's data is kept before the retention
-    // eraser removes its files and personal data (DEC-119): 180 days, as the
+    // eraser removes its files and personal data (DEC-122): 180 days, as the
     // Privacy Policy says. An override can only lengthen it; a lower value
     // is refused here and floored again where it is read
     // (`organizations/retention.ts`), so a typo can never erase early.

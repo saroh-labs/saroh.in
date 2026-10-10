@@ -2,7 +2,7 @@ import type { LegalHoldFacts } from "@/lib/businesses";
 import { LEGAL_HOLD_MEANS, legalHoldLine } from "@/lib/deletion-words";
 
 /**
- * A business's legal hold, at the top of its page (DEC-119): that it is
+ * A business's legal hold, at the top of its page (DEC-122): that it is
  * held, who placed the hold and when, why, and what that means for whoever
  * is about to act on it. Shown to every operator who opens the business;
  * the reason is the operator's own, from the admin ledger.

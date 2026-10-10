@@ -3,7 +3,7 @@ import { getJson, mutate, orgBase } from "@/lib/api/http";
 import type { DataExportList, DataExportView } from "./words";
 
 /**
- * Settings › Your data (DEC-117): the owner's downloads. Server-only. The
+ * Settings › Your data (DEC-120): the owner's downloads. Server-only. The
  * read throws on an outage (the tab's error boundary says so) and a 403 —
  * someone who isn't an owner typing the address — renders as a denial
  * (`getJson`).

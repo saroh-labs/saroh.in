@@ -519,7 +519,7 @@ export class PublicInvoicesService {
             throw tooManyRequests();
         }
         const found = await this.find(tokenHash);
-        // Paying an invoice already sent is finishing it (DEC-117); a new
+        // Paying an invoice already sent is finishing it (DEC-120); a new
         // autopay mandate, below, is not.
         await assertOrganizationWindingDown(found.organizationId);
         return runInOrgContext(found.organizationId, async () => {

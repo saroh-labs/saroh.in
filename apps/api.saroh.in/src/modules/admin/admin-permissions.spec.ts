@@ -91,7 +91,7 @@ describe("admin permission policy", () => {
         );
     });
 
-    it("lets only a Platform Owner lift a legal hold, while placing one needs the lifecycle write (DEC-119)", () => {
+    it("lets only a Platform Owner lift a legal hold, while placing one needs the lifecycle write (DEC-122)", () => {
         const holders = (permission: AdminPermission) =>
             Object.values(AdminRole)
                 .filter((role) => permissionsFor([role]).includes(permission))

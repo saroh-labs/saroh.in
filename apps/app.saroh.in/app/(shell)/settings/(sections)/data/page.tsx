@@ -11,7 +11,7 @@ import { resolveActiveOrganization } from "@/lib/organizations/service";
 import { requireSession } from "@/lib/session";
 
 /**
- * Settings → Your data (owner, 9 Oct, DEC-117): an owner downloads
+ * Settings → Your data (owner, 9 Oct, DEC-120): an owner downloads
  * everything the business keeps in Saroh as one zip, whenever they like —
  * and from the closing banner while the business is scheduled for deletion.
  *

@@ -29,7 +29,7 @@
   when not, every value squeezed to an id's characters, so no personal
   data, card data or key can ride along. The steps and their results are on
   the admin ledger and the console's deletion trail.
-- **What a legal hold stopped is in the log too** (DEC-119), ids only,
+- **What a legal hold stopped is in the log too** (DEC-122), ids only,
   WARN: `organization_deletion_cleanup_held org=… reason=legal-hold`
   (a clean-up stood aside), `organization_deletion_cleanup_step_held
 org=… step=…` (a hold landed mid-run),
@@ -57,7 +57,7 @@ erased=… more=… failed=… waiting=… held=…` with business ids, one
 - **Adopted** — Frontend boundaries show `error.digest` and log the error. Gap:
   `app.saroh.in/app/error.tsx` does not show the digest.
 
-## How long logs are kept — **Current** (DEC-119)
+## How long logs are kept — **Current** (DEC-122)
 
 The Privacy Policy: security logs (IP address, browser, sign-in times,
 errors) are kept one year.

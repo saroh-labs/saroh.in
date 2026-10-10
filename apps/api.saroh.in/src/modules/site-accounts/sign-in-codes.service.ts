@@ -213,7 +213,7 @@ export class SignInCodesService {
         const site = await resolveSiteHost(relay.host);
         return runInOrgContext(site.organizationId, async () => {
             // Signing in to see, pay or cancel what they already have
-            // stays open while the business winds down (DEC-117).
+            // stays open while the business winds down (DEC-120).
             await assertOrganizationWindingDown(site.organizationId);
             const now = new Date();
             const email = normaliseAccountEmail(dto.email);
@@ -340,7 +340,7 @@ export class SignInCodesService {
         const site = await resolveSiteHost(relay.host);
         return runInOrgContext(site.organizationId, async () => {
             // Signing in to see, pay or cancel what they already have
-            // stays open while the business winds down (DEC-117).
+            // stays open while the business winds down (DEC-120).
             await assertOrganizationWindingDown(site.organizationId);
             const now = new Date();
             const email = normaliseAccountEmail(dto.email);

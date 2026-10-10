@@ -16,7 +16,7 @@ import { providerName } from "@/lib/what-they-see";
  * deletion waits on, and the deletion trail from the admin ledger. Each
  * shows only when there is something to show; neither offers a write.
  * A deleted business's trail opens with how long its data is kept
- * ("Data kept until ‹date›", DEC-119).
+ * ("Data kept until ‹date›", DEC-122).
  */
 export function DeletionPanels({
     view,

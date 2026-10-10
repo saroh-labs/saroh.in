@@ -166,7 +166,7 @@ export default async function BookPage({
             getBookingVisit(resolved.siteId),
             getSignedInCustomer().catch((): SignedInCustomer | null => null),
             getSignInOptions().catch((): SignInOptions | null => null),
-            // "Sold by" or "Run by ‹legal name›" on the confirmation (DEC-118):
+            // "Sold by" or "Run by ‹legal name›" on the confirmation (DEC-121):
             // the layout's own reads, shared through `cache`.
             getFooterFacts(resolved.siteId),
             getCatalogue(resolved.siteId),

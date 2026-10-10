@@ -23,7 +23,7 @@ export function LifecycleBadge({ status }: { status: LifecycleStatus }) {
 }
 
 /**
- * On legal hold (DEC-119): shown beside the state wherever a business is
+ * On legal hold (DEC-122): shown beside the state wherever a business is
  * listed or opened, so nobody acts on one without seeing it.
  */
 export function LegalHoldBadge() {

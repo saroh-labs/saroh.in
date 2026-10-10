@@ -146,7 +146,7 @@ export interface ObjectStorage {
     /**
      * Write an object the SERVER made (never a client upload, which goes
      * through {@link createSignedUploadUrl}): a business's data export
-     * (DEC-117). The caller derives the key, tenant-scoped like every other
+     * (DEC-120). The caller derives the key, tenant-scoped like every other
      * (`org/<organizationId>/…`); this never accepts one from a request.
      */
     putObject(

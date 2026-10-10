@@ -6,7 +6,7 @@ export const LIFECYCLE_WRITE_KEY = "lifecycle:write";
 
 /**
  * What a write route does to a business, for its lifecycle (owner, 9 Oct,
- * DEC-117): `wind-down` finishes, cancels or refunds something already
+ * DEC-120): `wind-down` finishes, cancels or refunds something already
  * started, or takes money already owed for it; `takeout` is the business
  * taking its own data away. A route that names none is `new`, and a
  * business that is closing (`PENDING_DELETION`) or suspended refuses it.

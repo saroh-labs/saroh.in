@@ -11,7 +11,7 @@ jest.mock("@saroh/database", () => {
         storePaymentConfig: { deleteMany: jest.fn(), findMany: jest.fn() },
         integrationSecret: { deleteMany: jest.fn(), findMany: jest.fn() },
         adminAuditEvent: { create: jest.fn() },
-        // The keys' transaction reads the hold under the row lock (DEC-119).
+        // The keys' transaction reads the hold under the row lock (DEC-122).
         $queryRaw: jest.fn(async () => [{ legalHoldAt: null }]),
         $transaction: jest.fn((fn: (tx: unknown) => unknown) => fn(prisma)),
     };
@@ -144,7 +144,7 @@ describe("OrganizationDeletionCleanupHandler (#921)", () => {
         expect(domains.releaseForDeletedBusiness).toHaveBeenCalledWith("org_1");
     });
 
-    it("keeps the business's files: no step removes media (DEC-119)", () => {
+    it("keeps the business's files: no step removes media (DEC-122)", () => {
         // Day one shuts access off; the files go with the data, 180 days on
         // (`organization.retention.erase`).
         expect(CLEANUP_STEPS).toEqual([
@@ -284,7 +284,7 @@ describe("OrganizationDeletionCleanupHandler (#921)", () => {
         },
     );
 
-    describe("on legal hold (DEC-119)", () => {
+    describe("on legal hold (DEC-122)", () => {
         it("removes nothing, says so on the ledger, and ends without failing", async () => {
             readOrg.mockResolvedValue({
                 lifecycleStatus: "DELETED_RETAINED",

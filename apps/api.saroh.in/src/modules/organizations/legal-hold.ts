@@ -2,7 +2,7 @@ import { ConflictException } from "@nestjs/common";
 import type { Prisma } from "@saroh/database";
 
 /**
- * A legal hold on a business (DEC-119, owner 10 Oct).
+ * A legal hold on a business (DEC-122, owner 10 Oct).
  *
  * The Terms say an account found doing something the law prohibits is
  * suspended at once and its data kept "for as long as the law requires, or

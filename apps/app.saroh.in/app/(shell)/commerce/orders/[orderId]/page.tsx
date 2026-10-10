@@ -133,7 +133,7 @@ export default async function OrderPage({
                       )
                       .catch(() => "unavailable" as const)
                 : Promise.resolve(null),
-            // Whether a refund can still go back online (DEC-117): asked
+            // Whether a refund can still go back online (DEC-120): asked
             // only of someone who may refund an order that shows money.
             powers.refund && order.money
                 ? refundsOnlineOrUnknown()

@@ -348,7 +348,7 @@ export class PublicBookingsService {
         if (signedIn && service.organizationId !== signedIn.organizationId) {
             throw new NotFoundException("Service not found");
         }
-        // A business suspended or closing takes no new booking (DEC-117),
+        // A business suspended or closing takes no new booking (DEC-120),
         // and its booker hears what a paused site says (#800), never why.
         if (!(await takingNewActivity(service.organizationId))) {
             throw notTakingOrders("bookings");

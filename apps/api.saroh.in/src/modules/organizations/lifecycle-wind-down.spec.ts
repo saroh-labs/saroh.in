@@ -49,7 +49,7 @@ import {
 import type { OrganizationContextService } from "./organization-context.service";
 
 /**
- * A business that is closing winds down (owner, 9 Oct, DEC-117): nothing
+ * A business that is closing winds down (owner, 9 Oct, DEC-120): nothing
  * new starts, but what it already started can be finished, cancelled or
  * refunded until its deletion date.
  *
@@ -255,7 +255,7 @@ const guard = new OrganizationGuard(
 
 beforeEach(() => jest.clearAllMocks());
 
-describe("a closing business winds down (DEC-117)", () => {
+describe("a closing business winds down (DEC-120)", () => {
     describe.each(CASES)(
         "$controller.name",
         ({ controller, windDown, refused }) => {
@@ -347,7 +347,7 @@ describe("a closing business winds down (DEC-117)", () => {
     });
 });
 
-describe("StoreLifecycleGuard (DEC-117)", () => {
+describe("StoreLifecycleGuard (DEC-120)", () => {
     const storeGuard = new StoreLifecycleGuard(new Reflector());
     const create = handlerOf(OrdersController, "create");
     const update = handlerOf(OrdersController, "update");
@@ -392,7 +392,7 @@ describe("StoreLifecycleGuard (DEC-117)", () => {
  * so it must carry the store guard, or a suspended or closing business
  * takes its writes.
  */
-describe("every store-scoped controller asks the lifecycle (DEC-117)", () => {
+describe("every store-scoped controller asks the lifecycle (DEC-120)", () => {
     const MODULES = join(__dirname, "..");
     const files = readdirSync(MODULES, { recursive: true, encoding: "utf8" })
         .map((f) => f.split("\\").join("/"))

@@ -34,7 +34,7 @@ import {
 } from "./security-log-retention.handler";
 
 /**
- * The daily security log sweep (DEC-119): rows a year past their end go,
+ * The daily security log sweep (DEC-122): rows a year past their end go,
  * in batches; the audit trails never do; a business on legal hold keeps
  * its rows; and the chain reschedules itself.
  */
@@ -68,7 +68,7 @@ function nextRun(): Date | undefined {
     return (call?.[0] as { data: { runAt: Date } } | undefined)?.data.runAt;
 }
 
-describe("SecurityLogRetentionHandler (DEC-119)", () => {
+describe("SecurityLogRetentionHandler (DEC-122)", () => {
     let log: jest.SpyInstance;
     let error: jest.SpyInstance;
 

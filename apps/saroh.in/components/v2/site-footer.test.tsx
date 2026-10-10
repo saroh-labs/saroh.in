@@ -29,7 +29,7 @@ describe("SiteFooter", () => {
         ).toBe("mailto:contact@saroh.in");
     });
 
-    it("links customers of a business to /customers, always (DEC-118)", () => {
+    it("links customers of a business to /customers, always (DEC-121)", () => {
         render(<SiteFooter />);
         expect(
             screen

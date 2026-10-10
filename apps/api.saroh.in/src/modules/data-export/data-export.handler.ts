@@ -27,7 +27,7 @@ function exportIdOf(job: Job): string | null {
 }
 
 /**
- * The two jobs behind "Download your data" (DEC-117).
+ * The two jobs behind "Download your data" (DEC-120).
  *
  * **`data-export.build`** makes one business's zip (`data-export-build.ts`),
  * stores it, marks the export READY with its 7-day end, queues its own
@@ -81,7 +81,7 @@ export class DataExportHandler {
             await this.fail(exportId, "The business was deleted first.");
             return;
         }
-        // Put on legal hold since it was asked for (DEC-119): no export
+        // Put on legal hold since it was asked for (DEC-122): no export
         // is made while the hold lasts.
         if (row.organization.legalHoldAt) {
             await this.fail(exportId, LEGAL_HOLD_MESSAGE);

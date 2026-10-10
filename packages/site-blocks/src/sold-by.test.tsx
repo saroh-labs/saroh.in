@@ -11,7 +11,7 @@ import {
 } from "./sold-by";
 
 /**
- * Who a customer is buying from (DEC-118, amended 10 Oct): the business's
+ * Who a customer is buying from (DEC-121, amended 10 Oct): the business's
  * own details, never a sentence of Saroh's; and "Report" only beside the
  * Free credit, so a paid site carries no Saroh link. Made-up businesses.
  */

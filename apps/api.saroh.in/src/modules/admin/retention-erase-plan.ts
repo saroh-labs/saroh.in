@@ -1,6 +1,6 @@
 /**
  * What `organization.retention.erase` removes from a deleted business, 180
- * days after it was deleted, and what it keeps (DEC-119, owner 10 Oct). Pure
+ * days after it was deleted, and what it keeps (DEC-122, owner 10 Oct). Pure
  * rules; `retention-erase-writes.ts` writes them and
  * `organization-retention-erase.handler.ts` runs the chain.
  *

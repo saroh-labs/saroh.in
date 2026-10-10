@@ -210,7 +210,7 @@ export class AdminOrganizationsController {
 
     /**
      * Place a legal hold on a business already suspended or on its way out
-     * (DEC-119): nothing deletes or erases its data until it is lifted.
+     * (DEC-122): nothing deletes or erases its data until it is lifted.
      */
     @Post("organizations/:organizationId/legal-hold")
     @RequireAdminPermission(AdminPermission.OrganizationLifecycleWrite)
@@ -233,7 +233,7 @@ export class AdminOrganizationsController {
         );
     }
 
-    /** Lift a legal hold. Platform Owners only (DEC-119). */
+    /** Lift a legal hold. Platform Owners only (DEC-122). */
     @Post("organizations/:organizationId/legal-hold/lift")
     @RequireAdminPermission(AdminPermission.OrganizationLegalHoldLift)
     liftLegalHold(

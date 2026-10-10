@@ -224,7 +224,7 @@ export function OrderConfirmation({
 }: {
     lookup: OrderConfirmationLookup;
     businessName: string;
-    /** "Sold by ‹legal name›" (DEC-118); null draws none. */
+    /** "Sold by ‹legal name›" (DEC-121); null draws none. */
     soldBy?: string | null;
     /** Back to the shop. */
     shopHref?: string;
@@ -292,7 +292,7 @@ export function OrderConfirmation({
                     </Link>
                 ) : null}
             </div>
-            {/* Who sold it, in the business's own name (DEC-118). */}
+            {/* Who sold it, in the business's own name (DEC-121). */}
             <SoldByLine line={soldBy} className="text-site-muted mt-6" />
         </Frame>
     );

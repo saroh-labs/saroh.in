@@ -1,5 +1,5 @@
 /**
- * Settings › Your data, as it reads (DEC-117). The API decides what an
+ * Settings › Your data, as it reads (DEC-120). The API decides what an
  * export is and holds (`GET organizations/:org/data-exports`); this only
  * words it. Client-safe: no server imports.
  */

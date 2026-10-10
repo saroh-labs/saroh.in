@@ -243,7 +243,7 @@
   `Customer` needs an entry in `personal-data.ts` — a rule, or "kept" and
   why (`personal-data.spec.ts`).
 - **Current** — **What a removal keeps is decided again for a deleted
-  business** (DEC-119). 180 days after a business is deleted,
+  business** (DEC-122). 180 days after a business is deleted,
   `organization.retention.erase` runs the privacy removal's own writes for
   every contact, then erases what no single removal reaches (store
   customers with no contact, a walk-in's name on an order) and the CRM a

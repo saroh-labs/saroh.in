@@ -34,9 +34,9 @@ export const DELETION_TRAIL_ACTIONS = [
     ORGANIZATION_DELETION_WAITING_ACTION,
     ORGANIZATION_DELETED_ACTION,
     ORGANIZATION_DELETION_CLEANUP_ACTION,
-    // 180 days on: its files and personal data erased (DEC-119).
+    // 180 days on: its files and personal data erased (DEC-122).
     ORGANIZATION_RETENTION_ERASE_ACTION,
-    // A legal hold stops every step above (DEC-119).
+    // A legal hold stops every step above (DEC-122).
     LEGAL_HOLD_PLACED_ACTION,
     LEGAL_HOLD_LIFTED_ACTION,
 ] as const;

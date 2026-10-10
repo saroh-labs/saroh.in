@@ -98,7 +98,7 @@ model Organization {
   deletionReason      String?
   deletedRetainedAt   DateTime?
 
-  // Legal hold (DEC-119, owner 10 Oct): set by an operator on a business
+  // Legal hold (DEC-122, owner 10 Oct): set by an operator on a business
   // found doing something the law prohibits, lifted only by a Platform
   // Owner. While set, nothing deletes or erases the business's data: no
   // deletion can be scheduled, the deletion sweep, its clean-up, the
@@ -110,7 +110,7 @@ model Organization {
   legalHoldByUserId String?
   // When `organization.retention.erase` finished erasing a deleted
   // business's files and personal data, RETENTION_AFTER_DELETION_DAYS (180)
-  // after `deletedRetainedAt` (DEC-119). Null until then.
+  // after `deletedRetainedAt` (DEC-122). Null until then.
   retentionErasedAt DateTime?
 
   // Relations
@@ -156,7 +156,7 @@ model Organization {
   // (R2); this is the tenant-scoped metadata index.
   media Media[]
 
-  // "Download your data" (DEC-117): each zip an owner asked for.
+  // "Download your data" (DEC-120): each zip an owner asked for.
   dataExports DataExport[]
 
   // Products v2 (#460): photos, per-variant stock, store options, defaults.
@@ -672,7 +672,7 @@ model Media {
   @@index([organizationId])
 }
 
-// "Download your data" (owner, 9 Oct, DEC-117): one zip of a business's
+// "Download your data" (owner, 9 Oct, DEC-120): one zip of a business's
 // records as CSV files and its uploaded media, built by the
 // `data-export.build` job, kept in object storage behind a signed link and
 // deleted 7 days after it is ready (`data-export.expire`). One QUEUED or
@@ -2340,7 +2340,7 @@ model Session {
 
   @@unique([token])
   @@index([userId])
-  // The security-log retention sweep reads ended sessions in this order (DEC-119).
+  // The security-log retention sweep reads ended sessions in this order (DEC-122).
   @@index([expiresAt])
 }
 
@@ -4145,9 +4145,9 @@ model Job {
   @@unique([type], map: "Job_one_pending_analytics_retention", where: raw("type = 'analytics.retention' AND status = 'PENDING'"))
   // One waiting run of the daily business deletion sweep (#907), like the renewal chain.
   @@unique([type], map: "Job_one_pending_organization_deletion", where: raw("type = 'organization.deletion' AND status = 'PENDING'"))
-  // One waiting run of the daily retention eraser (DEC-119), like the renewal chain.
+  // One waiting run of the daily retention eraser (DEC-122), like the renewal chain.
   @@unique([type], map: "Job_one_pending_organization_retention_erase", where: raw("type = 'organization.retention.erase' AND status = 'PENDING'"))
-  // One waiting run of the daily security-log retention sweep (DEC-119), like the renewal chain.
+  // One waiting run of the daily security-log retention sweep (DEC-122), like the renewal chain.
   @@unique([type], map: "Job_one_pending_security_logs_retention", where: raw("type = 'security-logs.retention' AND status = 'PENDING'"))
   @@index([status, runAt])
   @@index([organizationId])

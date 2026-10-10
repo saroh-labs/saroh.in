@@ -18,7 +18,7 @@ jest.mock("@saroh/database", () => {
         ...actual,
         runInOrgContext: jest.fn((_org: string, cb: () => unknown) => cb()),
         prisma: {
-            // An active business (DEC-117): its shop takes orders.
+            // An active business (DEC-120): its shop takes orders.
             organization: {
                 findUnique: jest
                     .fn()

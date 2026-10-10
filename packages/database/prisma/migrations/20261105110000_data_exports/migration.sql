@@ -1,4 +1,4 @@
--- "Download your data" (owner, 9 Oct, DEC-117): one zip of a business's
+-- "Download your data" (owner, 9 Oct, DEC-120): one zip of a business's
 -- records and media, built in the background, kept 7 days. Additive only:
 -- one new table. The image still serving during the deploy neither reads nor
 -- writes it.

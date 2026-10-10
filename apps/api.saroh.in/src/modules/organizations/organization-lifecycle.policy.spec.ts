@@ -137,7 +137,7 @@ describe("the lifecycle decision table (#921)", () => {
         },
     );
 
-    // DEC-117 (owner, 9 Oct): a business winding down starts nothing new,
+    // DEC-120 (owner, 9 Oct): a business winding down starts nothing new,
     // finishes what it started, and can always take its data away.
     it.each([
         ["ACTIVE", { new: true, "wind-down": true, takeout: true }],
@@ -183,7 +183,7 @@ const CONSUMERS: Record<
             asks: /\blifecycleAllows\(/,
         },
         // The site's shop, booking page, packs and plans say the business
-        // isn't taking orders or bookings when it isn't (DEC-117).
+        // isn't taking orders or bookings when it isn't (DEC-120).
         {
             file: "modules/orders/checkout-paused.ts",
             asks: /\bactivityOpen\(/,
@@ -278,7 +278,7 @@ const CONSUMERS: Record<
     ],
 };
 
-describe("a legal hold is decided for every state (DEC-119)", () => {
+describe("a legal hold is decided for every state (DEC-122)", () => {
     it("has a row for every state, and no other", () => {
         expect(Object.keys(LEGAL_HOLD_DECISIONS).sort()).toEqual(
             [...ORGANIZATION_LIFECYCLE_STATES].sort(),

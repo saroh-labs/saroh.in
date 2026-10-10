@@ -131,7 +131,7 @@ describe("closingNotice (#921)", () => {
         expect(view.closing?.memberships?.rows[0]).toMatchObject({
             href: "/billing/subscriptions/sub_1",
         });
-        // DEC-117: keys connected, so refunds still go online; and an
+        // DEC-120: keys connected, so refunds still go online; and an
         // owner is offered their data.
         expect(view.closing).toMatchObject({
             refundsOnline: true,
@@ -139,7 +139,7 @@ describe("closingNotice (#921)", () => {
         });
     });
 
-    it("says online refunds are off once the keys are gone, only where customers paid online (DEC-117)", async () => {
+    it("says online refunds are off once the keys are gone, only where customers paid online (DEC-120)", async () => {
         (prisma.organization.findUnique as jest.Mock).mockResolvedValue({
             lifecycleStatus: "PENDING_DELETION",
             deletionScheduledAt: SINCE,

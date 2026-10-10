@@ -217,7 +217,7 @@ organizations/:org/customers`: everyone who has paid (an order through a
 
 ## Closing a business
 
-- **Current** (DEC-117, owner 9 Oct) — **A business scheduled for deletion
+- **Current** (DEC-120, owner 9 Oct) — **A business scheduled for deletion
   winds down.** Until its date nothing new starts, and what is already made
   can be finished, cancelled and refunded; the banner on every page says so
   and, to an owner, offers **Download your data** (Settings › Your data, the
@@ -225,7 +225,7 @@ organizations/:org/customers`: everyone who has paid (an order through a
   files, emailed as a link and kept 7 days. Copy never promises a refund can
   be sent online once the payment provider is disconnected: it says to
   refund in the provider's dashboard and record it.
-- **Current** (DEC-117) — **Customers are never told a business is closing,
+- **Current** (DEC-120) — **Customers are never told a business is closing,
   suspended or deleted.** Its site says "This business isn't taking orders
   right now." / "…isn't taking bookings online right now." (the paused
   words, #800), and a refusal names no state.
@@ -352,7 +352,7 @@ organizations/:org/customers`: everyone who has paid (an order through a
   `packages/block-contract/src/section-contract.ts`. A breaking change ships as a
   new version beside the old one, never an in-place edit, so existing
   publications keep validating.
-- **Current** (DEC-118, amended 10 Oct) — **A site says who the customer
+- **Current** (DEC-121, amended 10 Oct) — **A site says who the customer
   is buying from, in the business's own details, never in Saroh's words.**
   The footer's "Sold by ‹legal name›" (the site's name when none is set;
   "Run by" where the shop doesn't serve), its registered address and its

@@ -7,7 +7,7 @@ export function refundsOnline(rows: ProviderConnection[]): boolean {
 }
 
 /**
- * Whether Saroh can still send a refund online (DEC-117): true while a
+ * Whether Saroh can still send a refund online (DEC-120): true while a
  * payment provider is connected, false once its keys are gone — then
  * Order Detail doesn't offer Refund and says to refund in the provider's
  * dashboard. Server-only. `undefined` when it couldn't be found out:

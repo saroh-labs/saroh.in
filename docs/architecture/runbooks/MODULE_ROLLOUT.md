@@ -104,7 +104,7 @@ purchase yet; one added would be wind-down.
 `capabilities/history-reads.gate.spec.ts` names every handler of those
 controllers as a history read, wind-down or gated.
 
-**The lifecycle's wind-down is a second, wider list** (DEC-117): a business
+**The lifecycle's wind-down is a second, wider list** (DEC-120): a business
 scheduled for deletion may also progress, take payment for and refund what
 it already has, with its modules on. That list is
 `organizations/lifecycle-wind-down.spec.ts`, marked on the route with

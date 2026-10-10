@@ -17,7 +17,7 @@ import type { DataExportList, DataExportView } from "./data-export.service";
 import { DataExportService } from "./data-export.service";
 
 /**
- * Settings › Your data (owner, 9 Oct, DEC-117): an owner downloads
+ * Settings › Your data (owner, 9 Oct, DEC-120): an owner downloads
  * everything the business keeps in Saroh as one zip. Owner only, checked
  * in the service. No module gates it and no lifecycle state short of
  * deleted closes it: a business that is closing or suspended can still

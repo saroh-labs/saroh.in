@@ -223,7 +223,7 @@ export class PublicOrderPayService {
             throw tooManyRequests();
         }
         const found = await this.find(tokenHash);
-        // Paying what the business already asked for (DEC-117).
+        // Paying what the business already asked for (DEC-120).
         await assertOrganizationWindingDown(found.organizationId);
         return runInOrgContext(found.organizationId, async () => {
             const order = await prisma.order.findFirst({

@@ -1,5 +1,5 @@
 /**
- * "Download your data" against a real Postgres (DEC-117): an owner asks,
+ * "Download your data" against a real Postgres (DEC-120): an owner asks,
  * the job builds one zip of the business's own rows and media, a signed
  * link is made and audited, and the file goes after its 7 days. Runs in
  * the integration project (TEST_DATABASE_URL).
@@ -84,7 +84,7 @@ async function unzipped(key: string): Promise<Record<string, string>> {
     );
 }
 
-describe("Download your data (DEC-117)", () => {
+describe("Download your data (DEC-120)", () => {
     it("builds one zip of the business's own records and media, and no other's", async () => {
         const { org, ctx } = await business();
         const other = await business();

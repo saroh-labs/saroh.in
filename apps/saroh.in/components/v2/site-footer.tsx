@@ -23,7 +23,7 @@ const LINK =
  * legal pages that are published (R6): Privacy from its date, and "Cookie
  * choices" where the cookie notice can appear. No Terms until they're
  * published. Before them, always, "Bought from a business on Saroh?" to
- * /customers (DEC-118).
+ * /customers (DEC-121).
  *
  * `resources` and `legal` are the pages the server says are live and built
  * (`content/resources.ts`).
@@ -109,7 +109,7 @@ export function SiteFooter({
             <div className="col-[1/-1] flex flex-wrap items-center justify-between gap-x-6 gap-y-2 border-t border-border pt-6 text-[13.5px]">
                 <span>{MADE_BY}</span>
                 <div className="flex flex-wrap items-center gap-x-5 gap-y-2">
-                    {/* For a business's customers (DEC-118): always here,
+                    {/* For a business's customers (DEC-121): always here,
                         since a paid merchant site links to Saroh nowhere. */}
                     <Link href={CUSTOMERS.href} className={LINK}>
                         {CUSTOMERS.footerLabel}

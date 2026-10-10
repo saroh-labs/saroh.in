@@ -24,7 +24,7 @@ export const LEGAL_HOLD_CHECKBOX =
  * will do before it does it; the two that take a business down need its name
  * typed back. Nothing here deletes anything — deletion only starts a window.
  *
- * A legal hold (DEC-119) is placed with the suspension (the checkbox), or on
+ * A legal hold (DEC-122) is placed with the suspension (the checkbox), or on
  * a business already suspended or on its way out; only a Platform Owner is
  * offered Lift legal hold (`canLiftHold`). While it is held, lifting the
  * suspension, cancelling or scheduling deletion are not offered: the API

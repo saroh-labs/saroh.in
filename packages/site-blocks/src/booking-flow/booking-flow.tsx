@@ -184,7 +184,7 @@ export interface BookingFlowProps {
     /** With it, a day and time to choose (`?date=&start=`, On today, G18). */
     initialDate?: string | null;
     initialStart?: string | null;
-    /** "Run by ‹legal name›" on the confirmation (DEC-118); null draws none. */
+    /** "Run by ‹legal name›" on the confirmation (DEC-121); null draws none. */
     soldBy?: string | null;
 }
 

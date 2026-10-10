@@ -15,7 +15,7 @@ import {
  */
 @Module({
     providers: [MediaService, objectStorageProvider],
-    // The storage port too: a data export writes its zip through it (DEC-117).
+    // The storage port too: a data export writes its zip through it (DEC-120).
     exports: [MediaService, OBJECT_STORAGE],
 })
 export class MediaStorageModule {}

@@ -17,7 +17,7 @@ interface StoreRequest {
 }
 
 /**
- * The lifecycle's say on a storefront's writes (DEC-117).
+ * The lifecycle's say on a storefront's writes (DEC-120).
  *
  * Store-scoped routes (`stores/:storeId/…`) carry no `:organizationId`
  * and don't run `OrganizationGuard`, so before this a suspended or closing

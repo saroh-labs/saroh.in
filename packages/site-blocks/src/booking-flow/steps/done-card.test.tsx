@@ -109,7 +109,7 @@ describe("the confirmation's way to change it (UX-055)", () => {
     });
 });
 
-describe("who the booking is with (DEC-118)", () => {
+describe("who the booking is with (DEC-121)", () => {
     const phase = {
         kind: "done" as const,
         booking: BOOKING,

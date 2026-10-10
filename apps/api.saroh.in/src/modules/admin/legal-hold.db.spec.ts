@@ -1,5 +1,5 @@
 /**
- * A legal hold against a real Postgres (DEC-119): placed with a suspension
+ * A legal hold against a real Postgres (DEC-122): placed with a suspension
  * or on a business on its way out, lifted by a Platform Owner; and while it
  * lasts nothing deletes the business's data — no deletion can be scheduled,
  * the sweep leaves it, a privacy removal and "Download your data" are
@@ -97,7 +97,7 @@ async function business(
 const read = (id: string) =>
     prisma.organization.findUniqueOrThrow({ where: { id } });
 
-describe("placing and lifting a legal hold (DEC-119)", () => {
+describe("placing and lifting a legal hold (DEC-122)", () => {
     it("suspends with the hold: the business is suspended, held, and both ledgers say so", async () => {
         const b = await business();
 
@@ -242,7 +242,7 @@ describe("placing and lifting a legal hold (DEC-119)", () => {
     });
 });
 
-describe("the deletion sweep and a legal hold (DEC-119)", () => {
+describe("the deletion sweep and a legal hold (DEC-122)", () => {
     it("leaves a held business past its window, and deletes it once the hold is lifted", async () => {
         const now = new Date();
         const b = await business({
@@ -283,7 +283,7 @@ describe("the deletion sweep and a legal hold (DEC-119)", () => {
     });
 });
 
-describe("Download your data and a legal hold (DEC-119)", () => {
+describe("Download your data and a legal hold (DEC-122)", () => {
     it("refuses a new export in words, and puts the refusal on the business's history", async () => {
         const b = await business({ lifecycleStatus: "SUSPENDED", held: true });
 
@@ -348,7 +348,7 @@ describe("Download your data and a legal hold (DEC-119)", () => {
     });
 });
 
-describe("a customer's privacy removal and a legal hold (DEC-119)", () => {
+describe("a customer's privacy removal and a legal hold (DEC-122)", () => {
     async function customer(organizationId: string) {
         return prisma.contact.create({
             data: {
@@ -443,7 +443,7 @@ describe("a customer's privacy removal and a legal hold (DEC-119)", () => {
     });
 });
 
-describe("the retention sweeps and a legal hold (DEC-119)", () => {
+describe("the retention sweeps and a legal hold (DEC-122)", () => {
     const now = new Date();
 
     async function expiredEvent(organizationId: string) {

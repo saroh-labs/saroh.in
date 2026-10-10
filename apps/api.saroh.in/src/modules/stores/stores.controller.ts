@@ -63,7 +63,7 @@ export class StoresController {
         return this.storesService.getForUser(id, user.id);
     }
 
-    /** A setting: refused while the business is closing or suspended (DEC-117). */
+    /** A setting: refused while the business is closing or suspended (DEC-120). */
     @Put(":id")
     @UseGuards(BetterAuthGuard, storeLifecycleGuard("id"))
     update(

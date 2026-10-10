@@ -15,7 +15,7 @@ import { activityOpen } from "../organizations/organization-lifecycle.policy";
  * Orders already placed are never touched.
  *
  * A business that isn't taking new activity — suspended, or closing
- * (`PENDING_DELETION`, DEC-117) — reads exactly as a paused one: its
+ * (`PENDING_DELETION`, DEC-120) — reads exactly as a paused one: its
  * site stays up and says it isn't taking orders or bookings right now,
  * never why (`organization-lifecycle.policy.ts`).
  */
@@ -28,7 +28,7 @@ export interface ShopPause {
 
 /**
  * Whether the business takes new orders and bookings at all, for its
- * lifecycle (DEC-117). A missing business is the caller's own 404.
+ * lifecycle (DEC-120). A missing business is the caller's own 404.
  */
 export async function takingNewActivity(
     organizationId: string,
@@ -73,7 +73,7 @@ export async function assertLocationTakingOrders(
 
 /**
  * Whether a website stopped taking bookings (#800): a paused site, or a
- * business suspended or closing (DEC-117).
+ * business suspended or closing (DEC-120).
  */
 export async function siteTakingBookings(
     organizationId: string,

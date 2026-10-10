@@ -153,7 +153,7 @@ export class ConfirmedOperatorDto extends OperatorReasonDto {
 }
 
 /**
- * Suspend, optionally with a legal hold (DEC-119): "Suspended for activity
+ * Suspend, optionally with a legal hold (DEC-122): "Suspended for activity
  * the law prohibits — keep its data". The reason given is the hold's.
  */
 export class SuspendDto extends ConfirmedOperatorDto {
@@ -246,7 +246,7 @@ export class ListOrganizationsDto {
     @IsIn(["attention"])
     health?: "attention";
 
-    /** `on`: only businesses on legal hold (DEC-119). */
+    /** `on`: only businesses on legal hold (DEC-122). */
     @IsOptional()
     @IsIn(["on"])
     legalHold?: "on";

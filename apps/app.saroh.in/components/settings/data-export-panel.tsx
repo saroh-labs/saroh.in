@@ -17,7 +17,7 @@ import {
 } from "@/lib/data-export/words";
 
 /**
- * Settings › Your data (DEC-117): what a download holds, the button that
+ * Settings › Your data (DEC-120): what a download holds, the button that
  * asks for one, and the downloads so far — each said in words, with
  * Download on a ready one. One is made at a time: while one is being put
  * together the button is off and says why, and "Check again" re-reads it.

@@ -9,7 +9,7 @@ import {
 } from "./retention";
 
 /**
- * How long Saroh keeps things (DEC-119): the two numbers the Privacy Policy
+ * How long Saroh keeps things (DEC-122): the two numbers the Privacy Policy
  * states. A change here is a change to a published promise.
  */
 describe("retention after deletion", () => {

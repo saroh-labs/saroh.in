@@ -46,7 +46,7 @@ export interface RetentionSweep {
  * configured and is kept. It logs counts only, never a business, event or
  * visitor.
  *
- * **A business on legal hold keeps its events** (DEC-119,
+ * **A business on legal hold keeps its events** (DEC-122,
  * `organizations/legal-hold.ts`): its rows are left out of the read and of
  * the delete until the hold is lifted, when the next run takes them.
  *

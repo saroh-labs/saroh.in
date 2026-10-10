@@ -1260,7 +1260,7 @@ describe("settings tabs — owner only, and everyone's", () => {
         ]);
     });
 
-    it("keeps Your data to the owner (DEC-117)", () => {
+    it("keeps Your data to the owner (DEC-120)", () => {
         expect(tabsFor({ role: "OWNER" })).toContain("/settings/data");
         expect(tabsFor({ role: "ADMIN" })).not.toContain("/settings/data");
         expect(

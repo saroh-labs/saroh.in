@@ -43,14 +43,14 @@ export const OPERATOR_LIFECYCLE_ACTIONS = [
     "organization.deletion.scheduled",
     // Written by the deletion sweep when the window ends (#907).
     "organization.deleted",
-    // A legal hold placed or lifted (DEC-119).
+    // A legal hold placed or lifted (DEC-122).
     "organization.legal_hold.placed",
     "organization.legal_hold.lifted",
-    // Written by the retention eraser, 180 days after deletion (DEC-119).
+    // Written by the retention eraser, 180 days after deletion (DEC-122).
     "organization.retention.erased",
 ] as const;
 
-/** The admin ledger's and the business's history's rows for a hold (DEC-119). */
+/** The admin ledger's and the business's history's rows for a hold (DEC-122). */
 export const LEGAL_HOLD_PLACED_ACTION = "organization.legal_hold.placed";
 export const LEGAL_HOLD_LIFTED_ACTION = "organization.legal_hold.lifted";
 
@@ -88,7 +88,7 @@ export interface OperatorCommand {
  * transaction (#921). When the window ends the daily sweep
  * (`organization-deletion.handler.ts`, #907) takes it to `DELETED_RETAINED`.
  *
- * **Legal hold** (DEC-119, owner 10 Oct, `organizations/legal-hold.ts`): an
+ * **Legal hold** (DEC-122, owner 10 Oct, `organizations/legal-hold.ts`): an
  * operator places one when suspending a business for activity the law
  * prohibits, or on a business that is already suspended or on its way out;
  * only a Platform Owner lifts it (`organization:legal-hold:lift`). Both take
@@ -108,7 +108,7 @@ export class AdminLifecycleService {
     /**
      * Suspend: the business keeps its data and can read it; nothing new
      * happens. With `legalHold` ("Suspended for activity the law prohibits —
-     * keep its data", DEC-119) the hold is placed on the same transaction,
+     * keep its data", DEC-122) the hold is placed on the same transaction,
      * with the same reason, and written to both ledgers as its own row.
      */
     async suspend(
@@ -147,7 +147,7 @@ export class AdminLifecycleService {
 
     /**
      * Place a legal hold on a business that is already suspended, scheduled
-     * for deletion or deleted (DEC-119). An active business is suspended
+     * for deletion or deleted (DEC-122). An active business is suspended
      * with the hold instead: the Terms suspend such an account at once.
      * Guarded on `lifecycleVersion`, which it bumps, so a deletion the sweep
      * is writing at the same moment and this hold can't both win.
@@ -192,7 +192,7 @@ export class AdminLifecycleService {
     }
 
     /**
-     * Lift a legal hold (DEC-119): a Platform Owner's, with a reason
+     * Lift a legal hold (DEC-122): a Platform Owner's, with a reason
      * (`organization:legal-hold:lift`, which no other role carries). The
      * business stays in the state it is in. A deleted one gets its clean-up
      * queued again, since the one that ran while it was held stood aside;
@@ -713,7 +713,7 @@ export class AdminLifecycleService {
             if (from === to) return { ok: true, changed: false, status: to };
             assertOrganizationLifecycleTransition(from, to);
             // A held business's data is kept "even if deletion was
-            // requested" (the Terms; DEC-119): no window starts. Placing a
+            // requested" (the Terms; DEC-122): no window starts. Placing a
             // hold bumps the version this write is fenced on, so a hold set
             // since this read refuses it too.
             // Nor does it go back to active: while it is held its workspace

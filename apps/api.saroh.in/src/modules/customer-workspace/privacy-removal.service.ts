@@ -65,7 +65,7 @@ import { removeDetailsInTx } from "./privacy-removal-writes";
  * `customer:remove`, on its own from the day it ships (R15): never implied
  * by `contact:write`.
  *
- * **Refused while the business is on legal hold** (DEC-119,
+ * **Refused while the business is on legal hold** (DEC-122,
  * `organizations/legal-hold.ts`): its data is kept, a customer's details
  * included. The preview says so as its first refusal and Remove answers
  * 409 before anything is touched (and again under the business's row lock
@@ -145,7 +145,7 @@ export class PrivacyRemovalService {
         requireCustomerPower(ctx, "customer:remove");
         const organizationId = ctx.organizationId;
 
-        // 0. On legal hold nothing of the business's is removed (DEC-119).
+        // 0. On legal hold nothing of the business's is removed (DEC-122).
         if (await onLegalHold(this.db, organizationId)) {
             await this.db.$transaction((tx) =>
                 findContact(tx, organizationId, contactId),
@@ -245,7 +245,7 @@ export class PrivacyRemovalService {
     }
 
     /**
-     * The refusal on the business's history (DEC-119): who asked, for which
+     * The refusal on the business's history (DEC-122): who asked, for which
      * contact, and why, as a code. Ids only. A failed write is logged and
      * never turns the refusal into an error.
      */

@@ -5,7 +5,7 @@ import { createWriteStream } from "node:fs";
 import { finished } from "node:stream/promises";
 
 /**
- * A zip written to a file on disk as it is made (DEC-117): one entry at a
+ * A zip written to a file on disk as it is made (DEC-120): one entry at a
  * time, each streamed in, so a big business's export never sits in memory.
  * The file waits for the disk when the disk is behind.
  *

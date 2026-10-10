@@ -12,7 +12,7 @@ import { OrganizationLifecycleStatus } from "../organizations/organization-lifec
 import { ERASED_LEAD_TITLE, ERASED_STAFF_NAME } from "./retention-erase-plan";
 
 /**
- * The writes of `organization.retention.erase` (DEC-119), each by its line
+ * The writes of `organization.retention.erase` (DEC-122), each by its line
  * in `retention-erase-plan.ts`. No reads of a caller's context: the job
  * runs with none, as the deletion clean-up does.
  *

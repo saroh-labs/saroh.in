@@ -37,7 +37,7 @@ export default async function ShopOrderPage({
 
     const [lookup, facts] = await Promise.all([
         getOrderConfirmation(resolved.siteId, orderId),
-        // "Sold by ‹legal name›" (DEC-118): the footer's own read, shared
+        // "Sold by ‹legal name›" (DEC-121): the footer's own read, shared
         // with the layout's through `cache`.
         getFooterFacts(resolved.siteId),
     ]);

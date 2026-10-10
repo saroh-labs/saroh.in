@@ -20,7 +20,7 @@
 | Does the plan allow it?               | Entitlements                        | `EntitlementService` (`check`, `can`)                                                                                                                                                             |
 | Is this person Saroh staff?           | The API                             | `PlatformAdminGuard`, `PlatformPermissionGuard`                                                                                                                                                   |
 | May this operator do this?            | The permission vocabulary           | `admin-permissions.ts` (code); grants in `PlatformAdminRoleAssignment` (data)                                                                                                                     |
-| Is this business open for this write? | Its lifecycle, by the route's class | `assertWorkspaceWrite` (`organization-lifecycle.gate.ts`) in `OrganizationGuard` and `StoreLifecycleGuard`; `assertOrganizationOpen` / `assertOrganizationWindingDown` on public writes (DEC-117) |
+| Is this business open for this write? | Its lifecycle, by the route's class | `assertWorkspaceWrite` (`organization-lifecycle.gate.ts`) in `OrganizationGuard` and `StoreLifecycleGuard`; `assertOrganizationOpen` / `assertOrganizationWindingDown` on public writes (DEC-120) |
 | What does its state close?            | The lifecycle table                 | `organization-lifecycle.policy.ts` (#921): activity, billing, public site, members' door                                                                                                          |
 
 The frontends, `admin.saroh.in` included, decide none of these. They render
@@ -435,7 +435,7 @@ orgId)` (`organizations/organization-kind.ts`).
   returns what decides whether to act — never a business's customers, orders
   or messages — and reads personal data only behind `organization:pii:read`.
   A tenant path never calls one.
-- **Current** (DEC-118) — **Customers' reports about a business** are read
+- **Current** (DEC-121) — **Customers' reports about a business** are read
   with `organization:read` (the reporter's email only with
   `organization:pii:read`) and marked done with `reports:resolve`, which
   Platform Owners and Support hold. Closing a report changes nothing for
@@ -468,7 +468,7 @@ orgId)` (`organizations/organization-kind.ts`).
   `public/sites` controller). A new state, a new `public/sites` controller or
   a new membership door fails `organization-lifecycle.policy.spec.ts` until it
   is decided.
-- **Current** (DEC-117, owner 9 Oct) — **A closing business winds down;
+- **Current** (DEC-120, owner 9 Oct) — **A closing business winds down;
   every write route has a lifecycle class.** A route is `new` unless it
   carries `@LifecycleWrite("wind-down")` (finishes, cancels or refunds
   something already made, or takes money already owed) or
@@ -487,7 +487,7 @@ orgId)` (`organizations/organization-kind.ts`).
   refusal names no state, and the site's shop, booking page, packs and plans
   read the lifecycle through `orders/checkout-paused.ts`
   (`takingNewActivity`) and say what a paused site says (#800).
-- **Current** (DEC-119) — **A legal hold keeps a business's data, in
+- **Current** (DEC-122) — **A legal hold keeps a business's data, in
   every state.** `Organization.legalHoldAt`, read only through
   `organizations/legal-hold.ts`. An operator places one with
   `organization:lifecycle:write` — with the suspension, or on a business
@@ -503,7 +503,7 @@ orgId)` (`organizations/organization-kind.ts`).
   `details.code` `LEGAL_HOLD` and the words "This business's data is on
   hold. Write to contact@saroh.in.", each refusal audited DENIED; every
   job that deletes leaves the business alone (`backend-jobs.md`).
-- **Current** (DEC-117) — **Download your data is the owner's, by role.**
+- **Current** (DEC-120) — **Download your data is the owner's, by role.**
   `data-export/`: `POST`/`GET organizations/:org/data-exports` and
   `POST …/:id/link`, `isOwner` in the service (no new permission, DEC-039),
   one being made at a time, each ask and each link audited

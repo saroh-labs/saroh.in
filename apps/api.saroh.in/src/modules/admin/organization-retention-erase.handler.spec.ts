@@ -111,7 +111,7 @@ afterEach(() => {
     jest.useRealTimers();
 });
 
-describe("OrganizationRetentionEraseHandler.sweep (DEC-119)", () => {
+describe("OrganizationRetentionEraseHandler.sweep (DEC-122)", () => {
     it("lists only deleted businesses 180 days on, not erased and not on legal hold", async () => {
         await build().handler.sweep(NOW);
         expect(list).toHaveBeenCalledWith(
@@ -258,7 +258,7 @@ describe("OrganizationRetentionEraseHandler.sweep (DEC-119)", () => {
     });
 });
 
-describe("OrganizationRetentionEraseHandler.handle (DEC-119)", () => {
+describe("OrganizationRetentionEraseHandler.handle (DEC-122)", () => {
     it("schedules the next run a day on", async () => {
         await build().handler.handle(job());
         expect(nextRun()).toEqual(

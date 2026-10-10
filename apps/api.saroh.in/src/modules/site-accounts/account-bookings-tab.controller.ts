@@ -121,7 +121,7 @@ export class AccountBookingsTabController {
 
 /**
  * Moving a booking or booking a treatment's next visit takes a new time: a
- * business suspended or closing takes none (DEC-117), and the customer
+ * business suspended or closing takes none (DEC-120), and the customer
  * hears what a paused site says, never why. Cancelling stays open.
  */
 async function assertTakingBookings(customer: CustomerContext): Promise<void> {

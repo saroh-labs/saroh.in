@@ -61,7 +61,7 @@
   state and handles "it was deleted" (`enquiry-notify.handler.ts`).
 - **Current** — **Advisory locks have a registry** (below). A new
   `pg_advisory_xact_lock` adds its row in the same change.
-- **Current** (DEC-119) — **A job that deletes asks about the legal hold.**
+- **Current** (DEC-122) — **A job that deletes asks about the legal hold.**
   A business on legal hold (`organizations/legal-hold.ts`) keeps every row
   and file. A sweep reads the held ids once a run (`heldOrganizationIds`)
   and leaves them out of the read and of the delete; a job that erases one
@@ -78,7 +78,7 @@ waits while holding one.
 
 | Key                                       | Serialises                                                                                                                                                  | Where                                                                                                                                           |
 | ----------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------- |
-| `data-export:<organizationId>`            | Asking for a business's data download: one QUEUED or RUNNING at a time (DEC-117), with the partial unique index behind it                                   | `data-export/data-export.service.ts` (`request`)                                                                                                |
+| `data-export:<organizationId>`            | Asking for a business's data download: one QUEUED or RUNNING at a time (DEC-120), with the partial unique index behind it                                   | `data-export/data-export.service.ts` (`request`)                                                                                                |
 | `first-pack:<organizationId>:<contactId>` | Selling a "first pack only" pack to one person                                                                                                              | `class-packs/first-pack.ts`                                                                                                                     |
 | `subscription-plan-name:<organizationId>` | Saving a subscription plan's name in one business                                                                                                           | `subscriptions/plans.ts` (`lockPlanNames`)                                                                                                      |
 | `domain-alert:<domainId>`                 | Telling one custom domain's down or back (#917), so a "Check now" and a run that both saw the change tell it once                                           | `notifications/domain-alerts.ts` (`wordDomain`)                                                                                                 |
@@ -88,7 +88,7 @@ waits while holding one.
 Race tests wait on an advisory lock with `waitUntilAdvisoryBlockedBy`
 (`test/lock-wait.ts`).
 
-Two row locks do the same work without an advisory key (DEC-119), both on
+Two row locks do the same work without an advisory key (DEC-122), both on
 the business's own `Organization` row, `FOR SHARE`, held to the end of the
 transaction:
 
@@ -152,7 +152,7 @@ nobody was told. Round-2 A14 closed it (`bookings/booking-notify.handler.ts`).
   `PENDING_DELETION` window has ended (`deletionScheduledAt` passed) to
   `DELETED_RETAINED`, stamping `deletedRetainedAt` — the lifecycle's own
   last step (`admin-access.service.ts`) — and queues its clean-up on the
-  same transaction. **Never a business on legal hold** (DEC-119): it isn't
+  same transaction. **Never a business on legal hold** (DEC-122): it isn't
   listed, the write is fenced on `legalHoldAt`, and it stays
   `PENDING_DELETION` until a Platform Owner lifts the hold. **Not while its customers are owed a refund** (owner,
   9 Oct): `payments/refunds-outstanding.ts`, read inside that transaction,
@@ -169,7 +169,7 @@ nobody was told. Round-2 A14 closed it (`bookings/booking-notify.handler.ts`).
   records, ADR-008).
 - **`organization.deletion.cleanup`** (#921, one per business,
   `admin/organization-deletion-cleanup.handler.ts`) shuts a deleted
-  business's access off, and **keeps its data and its files** (DEC-119:
+  business's access off, and **keeps its data and its files** (DEC-122:
   until then it deleted the files on day one). Each step is idempotent and
   tried whatever the others did: its pending jobs cancelled (but the clean-up itself,
   `billing.provider.cancel`, `subscription.charge`, which stands aside on
@@ -206,7 +206,7 @@ nobody was told. Round-2 A14 closed it (`bookings/booking-notify.handler.ts`).
   business's own history in that transaction; the log line carries counts
   and ids only.
 
-## Retention — **Current** (DEC-119)
+## Retention — **Current** (DEC-122)
 
 How long things are kept is one file, `organizations/retention.ts`
 (`RETENTION_AFTER_DELETION_DAYS` 180, `SECURITY_LOG_RETENTION_DAYS` 365);
@@ -259,7 +259,7 @@ the Privacy Policy states both.
   members their sign-in sessions. It logs counts per table.
 - **`analytics.retention`** (below) leaves a held business's events too.
 
-## Data export — **Current** (DEC-117)
+## Data export — **Current** (DEC-120)
 
 - **`data-export.build`** (one per ask, `data-export/data-export.handler.ts`)
   builds a business's zip: each table's CSV read 500 rows at a time by id
@@ -281,7 +281,7 @@ the Privacy Policy states both.
   export EXPIRED (storage first: a failed delete is retried with the key
   still on the row). The deletion clean-up never cancels it
   (`CLEANUP_KEEPS_JOB_TYPES`), so a deleted business's zip still goes.
-- **On legal hold no export is made** (DEC-119): asking and linking are
+- **On legal hold no export is made** (DEC-122): asking and linking are
   refused in the service, and a build queued before the hold marks its
   export FAILED with the hold's sentence. `data-export.expire` still runs
   for a held business: the zip is a copy, and the records stay.
@@ -309,7 +309,7 @@ the Privacy Policy states both.
   outlive their events, and `analytics.aggregate` refuses to rebuild a day
   that starts before the 400-day cutoff (`pastRetention`), since what is
   left of it would shrink its rollup. It logs counts only. A business
-  on legal hold keeps its events until the hold is lifted (DEC-119).
+  on legal hold keeps its events until the hold is lifted (DEC-122).
 
 ## Custom-domain re-check — **Current** (#860)
 

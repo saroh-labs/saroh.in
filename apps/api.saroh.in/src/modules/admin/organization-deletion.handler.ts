@@ -47,7 +47,7 @@ export interface DeletionSweep {
     deleted: string[];
     /** Past their window and left PENDING_DELETION: refunds are owed (#921). */
     waiting: string[];
-    /** Past their window and left alone: on legal hold (DEC-119). */
+    /** Past their window and left alone: on legal hold (DEC-122). */
     held: number;
     /** Due when listed, but no longer due or no longer scheduled when re-read. */
     passed: number;
@@ -72,7 +72,7 @@ export interface DeletionSweep {
  * keys and pending jobs — is shut off by `organization.deletion.cleanup`,
  * queued on the same transaction (`organization-deletion-cleanup.handler.ts`).
  * Its data and files are kept for 180 days and then erased by
- * `organization.retention.erase` (DEC-119,
+ * `organization.retention.erase` (DEC-122,
  * `organization-retention-erase.handler.ts`).
  *
  * Conservative by construction: it lists only businesses still
@@ -93,7 +93,7 @@ export interface DeletionSweep {
  * which flags it "Deletion waiting on refunds" on the console. Each daily
  * run asks again.
  *
- * **A legal hold holds it back for good** (DEC-119, owner 10 Oct): a
+ * **A legal hold holds it back for good** (DEC-122, owner 10 Oct): a
  * business on legal hold (`organizations/legal-hold.ts`) is never listed,
  * and the write is fenced on the hold as well, so one placed between the
  * list and the write wins. It stays `PENDING_DELETION` past its window
@@ -173,7 +173,7 @@ export class OrganizationDeletionHandler {
                     lifecycleStatus:
                         OrganizationLifecycleStatus.PendingDeletion,
                     deletionScheduledAt: { not: null, lte: now },
-                    // On legal hold: its data is kept (DEC-119).
+                    // On legal hold: its data is kept (DEC-122).
                     ...NOT_ON_LEGAL_HOLD,
                     ...(tried.length > 0 ? { id: { notIn: tried } } : {}),
                 },
@@ -208,7 +208,7 @@ export class OrganizationDeletionHandler {
     /**
      * Take one business to `DELETED_RETAINED` if, read again inside the
      * transaction, it is still `PENDING_DELETION`, its window has ended, it
-     * is not on legal hold (DEC-119) and
+     * is not on legal hold (DEC-122) and
      * it owes its customers no refund (#921, owner 9 Oct). True when it was
      * deleted; false when it was left alone; `{ refunds }` when a refund is
      * still owed, being sent or unconfirmed by its provider

@@ -82,7 +82,7 @@ export interface OrderPermissions {
     payOnline?: boolean;
     /**
      * Saroh can still send a refund online: a payment provider is
-     * connected (DEC-117). False, Refund isn't offered on an order paid
+     * connected (DEC-120). False, Refund isn't offered on an order paid
      * online, and says where to refund it instead. Unknown reads as true:
      * the API refuses a refund it can't send either way.
      */

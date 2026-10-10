@@ -452,7 +452,7 @@ describe("the email nudge follows the plan (DEC-091, #850)", () => {
     });
 });
 
-describe("who customers are buying from (DEC-118)", () => {
+describe("who customers are buying from (DEC-121)", () => {
     const published = { ...invoicing, sites: 1, sitesNotLive: 0 };
     const noAddress = {
         line1: null,

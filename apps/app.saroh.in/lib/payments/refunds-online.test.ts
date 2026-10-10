@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import { refundsOnline } from "./refunds-online";
 
-describe("refundsOnline (DEC-117)", () => {
+describe("refundsOnline (DEC-120)", () => {
     it("is true while any payment provider is connected", () => {
         expect(
             refundsOnline([

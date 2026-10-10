@@ -1,5 +1,5 @@
 /**
- * The retention eraser against a real Postgres (DEC-119): 180 days after a
+ * The retention eraser against a real Postgres (DEC-122): 180 days after a
  * business was deleted its files and personal data go and its tax records
  * stay; a day earlier nothing does; a business on legal hold, or one still
  * owing refunds, is left alone; and a hold placed while it runs stops it.
@@ -362,7 +362,7 @@ async function expectUntouched(b: Business) {
     ).toBeNull();
 }
 
-describe("the retention eraser (DEC-119)", () => {
+describe("the retention eraser (DEC-122)", () => {
     it("keeps everything one day before the 180 days are up", async () => {
         const b = await deletedBusiness(
             daysAgo(RETENTION_AFTER_DELETION_DAYS - 1),

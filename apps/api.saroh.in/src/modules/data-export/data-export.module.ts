@@ -15,7 +15,7 @@ import { DataExportHandler } from "./data-export.handler";
 import { DataExportService } from "./data-export.service";
 
 /**
- * "Download your data" (DEC-117): the owner's route, and the two jobs that
+ * "Download your data" (DEC-120): the owner's route, and the two jobs that
  * build a business's zip and delete it 7 days later. Storage is the media
  * library's port (`MediaStorageModule`), so the app holds one.
  */

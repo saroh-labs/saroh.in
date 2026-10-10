@@ -1187,7 +1187,7 @@ export const SETTINGS_PAGES = [
         action: "provider:read",
     },
     {
-        // "Download your data" (DEC-117): the owner's alone, by role, as
+        // "Download your data" (DEC-120): the owner's alone, by role, as
         // the API has it. Last, after everything the business runs on.
         href: "/settings/data",
         label: "Your data",

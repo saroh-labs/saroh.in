@@ -60,7 +60,7 @@ export function OrderPlacedToPay({
 }: {
     started: CheckoutStarted;
     businessName: string;
-    /** "Sold by ‹legal name›" (DEC-118); null draws none. */
+    /** "Sold by ‹legal name›" (DEC-121); null draws none. */
     soldBy?: string | null;
     /** "Pay when you collect" or "Pay on delivery", as the bag offered it. */
     toPay: string;
@@ -112,7 +112,7 @@ export function CheckoutPay({
     started: OnlineStarted;
     api: ShopCheckoutApi;
     businessName: string;
-    /** "Sold by ‹legal name›" (DEC-118); null draws none. */
+    /** "Sold by ‹legal name›" (DEC-121); null draws none. */
     soldBy?: string | null;
     customer: SignedInCustomer;
     /**

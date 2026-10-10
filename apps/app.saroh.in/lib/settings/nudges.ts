@@ -29,7 +29,7 @@ import {
  *
  * - **Email**, while Communications is on and no email provider sends
  *   (`emailAttention`) — the danger dot when one that was sending stopped.
- * - **Who customers are buying from** (DEC-118), for a business with a
+ * - **Who customers are buying from** (DEC-121), for a business with a
  *   published website, until it has a legal name, a registered address and
  *   a contact (an email or the website's phone): its site says "Sold by" in
  *   those details, and with none set says only its name.
@@ -110,7 +110,7 @@ function email(
 const filled = (v: string | null | undefined) => !!v?.trim();
 
 /**
- * The details the website's "Sold by" block shows (DEC-118). Asked only
+ * The details the website's "Sold by" block shows (DEC-121). Asked only
  * with a website published now: `setup` counts them, and unread (an older
  * API) is not asked. The address is the one the site prints: a first line.
  */

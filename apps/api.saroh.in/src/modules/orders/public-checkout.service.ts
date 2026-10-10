@@ -304,7 +304,7 @@ export class PublicCheckoutService {
                 throw signedOut();
             }
             // Not taking orders — a paused site (#800), or a business
-            // suspended or closing (DEC-117) — answers in the paused words
+            // suspended or closing (DEC-120) — answers in the paused words
             // first; the lifecycle gate stays behind it.
             if (scope.takingOrders === false) throw notTakingOrders();
             await assertOrganizationOpen(scope.organizationId);

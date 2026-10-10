@@ -70,7 +70,7 @@ export function toDataExportView(row: DataExport): DataExportView {
 }
 
 /**
- * "Download your data" (owner, 9 Oct, DEC-117): an owner asks for one zip
+ * "Download your data" (owner, 9 Oct, DEC-120): an owner asks for one zip
  * of everything the business keeps in Saroh; a job builds it
  * (`data-export.handler.ts`), Saroh emails the owner a signed link, and
  * Settings › Your data makes a fresh one until the file is deleted, 7 days
@@ -82,7 +82,7 @@ export function toDataExportView(row: DataExport): DataExportView {
  * owner. Open in every state the business's members may open it, a closing
  * or suspended one included (`@LifecycleWrite("takeout")`).
  *
- * **Refused while the business is on legal hold** (DEC-119): asking for an
+ * **Refused while the business is on legal hold** (DEC-122): asking for an
  * export and making a link both answer "This business's data is on hold.
  * Write to contact@saroh.in.", and each refusal is on the business's audit
  * trail as DENIED. The list still reads.

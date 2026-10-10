@@ -9,7 +9,7 @@ export const LEASE_RENEW_MS = 60_000;
 
 /**
  * Keep a claimed job's lease while a handler that can outlive
- * `JOB_VISIBILITY_MS` runs (a data export, DEC-117): every
+ * `JOB_VISIBILITY_MS` runs (a data export, DEC-120): every
  * {@link LEASE_RENEW_MS} it moves `lockedAt` on, fenced on the lease like
  * the queue's own writes (`status = PROCESSING AND lockedBy = <worker>`),
  * so another worker never reclaims a job that is still being worked on.

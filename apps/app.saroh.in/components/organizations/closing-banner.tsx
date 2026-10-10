@@ -10,7 +10,7 @@ const FIRST_ROWS = 3;
 /**
  * Above every page while the business is scheduled for deletion (#921,
  * owner 9 Oct): when, what still works while it winds down and, for an
- * owner, "Download your data" (DEC-117); the refunds not yet back with its
+ * owner, "Download your data" (DEC-120); the refunds not yet back with its
  * customers — each linked to its order or invoice, with what to find it by
  * in the provider's dashboard — and the autopay memberships deletion won't
  * cancel at the provider. Said in words, never only a colour. The API

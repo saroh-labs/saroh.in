@@ -57,7 +57,7 @@ export function lifecycleWriteClassOf(
  *   - `NotFoundException` / `ForbiddenException` from the resolver otherwise.
  *   - `ForbiddenException` for a write the business's lifecycle refuses: a
  *     suspended business takes none, a closing one only what finishes work
- *     already started (`@LifecycleWrite("wind-down")`, DEC-117), and either
+ *     already started (`@LifecycleWrite("wind-down")`, DEC-120), and either
  *     lets its people download their data (`"takeout"`). Reads still pass,
  *     so its people can see what happened and take their data
  *     (`organization-lifecycle.gate.ts`).

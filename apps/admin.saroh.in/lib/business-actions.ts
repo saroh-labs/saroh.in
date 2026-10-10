@@ -91,7 +91,7 @@ export async function suspendAction(
     );
 }
 
-/** Place a legal hold on a business already suspended or closing (DEC-119). */
+/** Place a legal hold on a business already suspended or closing (DEC-122). */
 export async function placeLegalHoldAction(
     organizationId: string,
     input: Reasoned,

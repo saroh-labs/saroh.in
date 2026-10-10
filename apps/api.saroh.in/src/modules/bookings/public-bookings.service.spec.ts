@@ -433,7 +433,7 @@ describe("PublicBookingsService.book — capacity-one reservation", () => {
     });
 
     it.each(["SUSPENDED", "PENDING_DELETION"])(
-        "a %s business takes no booking, in the paused words that name no state (DEC-117)",
+        "a %s business takes no booking, in the paused words that name no state (DEC-120)",
         async (lifecycleStatus) => {
             const service = new PublicBookingsService();
             serviceFindUnique.mockResolvedValue({

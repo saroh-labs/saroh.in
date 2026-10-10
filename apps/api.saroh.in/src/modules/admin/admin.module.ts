@@ -86,7 +86,7 @@ const CHAIN_CHECK_MS = 6 * 60 * 60 * 1000;
         WaitlistModule,
         JobsModule,
         // A deleted business's files, erased when its retention ends
-        // (`organization.retention.erase`, DEC-119).
+        // (`organization.retention.erase`, DEC-122).
         MediaStorageModule,
     ],
     controllers: [
@@ -131,9 +131,9 @@ const CHAIN_CHECK_MS = 6 * 60 * 60 * 1000;
         // and what a deleted business leaves behind (#921).
         OrganizationDeletionHandler,
         OrganizationDeletionCleanupHandler,
-        // 180 days after deletion: files and personal data erased (DEC-119).
+        // 180 days after deletion: files and personal data erased (DEC-122).
         OrganizationRetentionEraseHandler,
-        // Security logs kept one year (DEC-119).
+        // Security logs kept one year (DEC-122).
         SecurityLogRetentionHandler,
     ],
 })

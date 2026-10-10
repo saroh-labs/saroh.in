@@ -1690,7 +1690,7 @@ export class PaymentsService {
     ): Promise<CreateIntentResult> {
         const order = await this.requirePayableOrder(orderId);
         // Paying an order already made is finishing it: open while the
-        // business winds down (DEC-117).
+        // business winds down (DEC-120).
         await assertOrganizationWindingDown(order.organizationId);
         await assertCustomerCanPayOnline(order.organizationId);
         return this.createIntentInternal(order.organizationId, order, options);

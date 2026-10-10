@@ -47,7 +47,7 @@ Signing in needs a staff grant or an address on the API's `ADMIN_ALLOWLIST`
   audit trail for every start, and for every one refused for its
   environment, by the rate limit or by GitHub. A console deploy always
   builds; merges still deploy only what changed.
-- **A legal hold shows wherever a business does** (DEC-119): a "Legal
+- **A legal hold shows wherever a business does** (DEC-122): a "Legal
   hold" badge on the directory (filter "On legal hold") and the summary
   strip, and a notice at the top of the business page with who placed it,
   when and why. Suspend carries the checkbox "Suspended for activity the

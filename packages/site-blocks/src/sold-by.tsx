@@ -2,7 +2,7 @@ import { phoneText } from "./lib/phone";
 import { cn } from "./lib/utils";
 
 /**
- * Who a customer is buying from (DEC-118, as amended 10 Oct): the business,
+ * Who a customer is buying from (DEC-121, as amended 10 Oct): the business,
  * in its own details — its legal name, registered address and a contact —
  * never a sentence Saroh wrote about it. In the site's own tokens and type.
  * The footer carries the whole block; an order or booking confirmation

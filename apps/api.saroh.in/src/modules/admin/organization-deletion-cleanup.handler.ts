@@ -35,7 +35,7 @@ export const ORGANIZATION_DELETION_CLEANUP_ACTION =
 
 /**
  * A deleted business's access is shut off (owner, 9 Oct, #921; 10 Oct,
- * DEC-119): the step after the deletion sweep marks it `DELETED_RETAINED`,
+ * DEC-122): the step after the deletion sweep marks it `DELETED_RETAINED`,
  * queued on the same transaction (the outbox), one job per business.
  */
 export const ORGANIZATION_DELETION_CLEANUP_TYPE =
@@ -66,7 +66,7 @@ export const CLEANUP_KEEPS_JOB_TYPES: readonly string[] = [
     SUBSCRIPTION_CHARGE_TYPE,
     SEND_REFUND_TYPE,
     // A data export's zip is deleted on its day whatever became of the
-    // business (DEC-117): called off, the file would never go.
+    // business (DEC-120): called off, the file would never go.
     DATA_EXPORT_EXPIRE_TYPE,
 ];
 
@@ -89,7 +89,7 @@ export type CleanupStep =
 
 /**
  * Every step, in the order a run takes them. There is no `media` step
- * since DEC-119: a deleted business's files are kept with its data for 180
+ * since DEC-122: a deleted business's files are kept with its data for 180
  * days and erased by `organization.retention.erase`.
  */
 export const CLEANUP_STEPS: readonly CleanupStep[] = [
@@ -102,7 +102,7 @@ export const CLEANUP_STEPS: readonly CleanupStep[] = [
 
 /**
  * The steps that remove something of the business's: none of them runs
- * while it is on legal hold (DEC-119).
+ * while it is on legal hold (DEC-122).
  */
 export const CLEANUP_DESTRUCTIVE_STEPS: readonly CleanupStep[] = [
     "jobs",
@@ -135,7 +135,7 @@ export interface CleanupResult {
     ran: boolean;
     counts: Record<string, number>;
     failed: CleanupStep[];
-    /** Steps not taken because the business is on legal hold (DEC-119). */
+    /** Steps not taken because the business is on legal hold (DEC-122). */
     held: CleanupStep[];
 }
 
@@ -155,9 +155,9 @@ export async function enqueueDeletionCleanup(
 
 /**
  * Shuts off a deleted business's access (#921). **Its data and files stay**
- * (DEC-119, owner 10 Oct): the Privacy Policy keeps them 180 days after
+ * (DEC-122, owner 10 Oct): the Privacy Policy keeps them 180 days after
  * deletion, and `organization.retention.erase` removes them then. Until
- * DEC-119 this run deleted the files on day one. Each step is idempotent,
+ * DEC-122 this run deleted the files on day one. Each step is idempotent,
  * re-reads what it acts on, and is tried whatever the others did:
  *
  * 1. **jobs** — its pending jobs are cancelled (`CANCELLED`, as an operator
@@ -176,7 +176,7 @@ export async function enqueueDeletionCleanup(
  *    older ones (`StorePaymentConfig`, `IntegrationSecret`) — never while a
  *    customer is still owed a refund.
  *
- * **On legal hold it removes nothing** (DEC-119): a run that finds the
+ * **On legal hold it removes nothing** (DEC-122): a run that finds the
  * business held stands aside whole, notes it on the ledger and ends without
  * failing; lifting the hold queues the clean-up again
  * (`AdminLifecycleService.liftLegalHold`). A hold placed while a run is
@@ -240,7 +240,7 @@ export class OrganizationDeletionCleanupHandler {
             );
             return { ran: false, counts: {}, failed: [], held: [] };
         }
-        // On legal hold nothing is removed (DEC-119): the run stands aside
+        // On legal hold nothing is removed (DEC-122): the run stands aside
         // whole, says so on the ledger, and ends without failing. Lifting
         // the hold queues the clean-up again.
         if (await onLegalHold(prisma, organizationId)) {
@@ -426,7 +426,7 @@ export class OrganizationDeletionCleanupHandler {
         const cancelled = await prisma.job.updateMany({
             where: {
                 organizationId,
-                // Fenced on the hold in the write itself (DEC-119).
+                // Fenced on the hold in the write itself (DEC-122).
                 organization: NOT_ON_LEGAL_HOLD,
                 status: "PENDING",
                 type: { notIn: [...CLEANUP_KEEPS_JOB_TYPES] },
@@ -464,7 +464,7 @@ export class OrganizationDeletionCleanupHandler {
         }
         const removed = await prisma.$transaction(async (tx) => {
             // Under the business's row lock: a hold placed now waits for
-            // this transaction, and one already placed stops it (DEC-119).
+            // this transaction, and one already placed stops it (DEC-122).
             if (await onLegalHoldLocked(tx, organizationId)) {
                 throw new HeldMidStepError();
             }
