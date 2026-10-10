@@ -2,8 +2,14 @@
 
 import { Search } from "lucide-react";
 import { usePathname } from "next/navigation";
+import { useSyncExternalStore } from "react";
 
 import { SettingsSearch } from "@/components/settings/settings-search";
+import {
+    isApplePlatform,
+    searchShortcut,
+    searchShortcutSpoken,
+} from "@/lib/nav/shortcut";
 import type { SettingsActor } from "@/lib/settings/search";
 import { isSettingsScreen } from "@/lib/settings/search";
 
@@ -29,16 +35,25 @@ const BUTTON =
  * opens the command menu everywhere, settings included, so nothing the
  * keyboard knew is lost.
  */
+/** The keyboard never changes in a session: nothing to subscribe to. */
+const subscribe = () => () => undefined;
+const onApple = () => isApplePlatform(navigator);
+// The server can't know: it says Ctrl, and a Mac corrects it on arrival.
+const onServer = () => false;
+
 export function CommandTrigger({ actor }: { actor: SettingsActor }) {
+    // ⌘K on a Mac, Ctrl K on Windows and Linux: the hint names the key
+    // this keyboard has.
+    const apple = useSyncExternalStore(subscribe, onApple, onServer);
     if (isSettingsScreen(usePathname())) {
         return <SettingsSearch actor={actor} className={BUTTON} />;
     }
     return (
-        <Tip label="Search  ⌘K">
+        <Tip label={`Search  ${searchShortcut(apple)}`}>
             <button
                 type="button"
                 onClick={openCommandMenu}
-                aria-label="Search Saroh (Command K)"
+                aria-label={`Search Saroh (${searchShortcutSpoken(apple)})`}
                 className={BUTTON}
             >
                 <Search className="size-4" />

@@ -25,7 +25,10 @@ export const dynamic = "force-dynamic";
 export async function GET(request: Request) {
     const q = new URL(request.url).searchParams.get("q") ?? "";
     const result = await searchWorkspace(q);
+    // A search that couldn't be read is a 503, so the palette can tell it
+    // from one that found nothing.
     return NextResponse.json(result, {
+        status: result.failed ? 503 : 200,
         headers: { "cache-control": "no-store" },
     });
 }

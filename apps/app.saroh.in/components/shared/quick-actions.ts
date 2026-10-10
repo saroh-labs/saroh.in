@@ -1,12 +1,17 @@
 import type { LucideIcon } from "lucide-react";
 import {
+    CalendarCheck,
     CalendarPlus,
     Globe,
     GraduationCap,
+    Package,
     ReceiptText,
     Repeat,
+    ShoppingBag,
     Store,
+    Tag,
     Ticket,
+    UserPlus,
 } from "lucide-react";
 
 import type { StorefrontAllowance } from "@/lib/business-limits";
@@ -60,6 +65,49 @@ export interface QuickAction {
 }
 
 export const QUICK_ACTIONS: readonly QuickAction[] = [
+    /*
+     * The daily jobs first (10 Oct 2026): the menu could start a service,
+     * a course or a site, and none of what a shop does forty times a day.
+     * There is no "Take payment" here: it is taken on a booking or an
+     * order, and has no page of its own to open.
+     */
+    {
+        // The Orders list opens New order on arrival.
+        href: "/commerce/orders?new=1",
+        label: "New order",
+        icon: ShoppingBag,
+        moduleKey: "COMMERCE",
+        action: "order:create",
+    },
+    {
+        // The bookings calendar opens New booking on arrival.
+        href: "/bookings?new=1",
+        label: "New booking",
+        icon: CalendarCheck,
+        moduleKey: "APPOINTMENTS",
+        action: "booking:write",
+    },
+    {
+        href: "/commerce/products/new",
+        label: "New product",
+        icon: Package,
+        moduleKey: "COMMERCE",
+        action: "store:write",
+    },
+    {
+        href: "/commerce/customers/new",
+        label: "New customer",
+        icon: UserPlus,
+        // A customer is a contact (DEC-041): no module of its own.
+        action: "contact:write",
+    },
+    {
+        href: "/commerce/discounts/new",
+        label: "New discount code",
+        icon: Tag,
+        moduleKey: "COMMERCE",
+        action: "discount:write",
+    },
     {
         href: "/services/new",
         label: "New service",

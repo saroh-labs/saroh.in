@@ -253,6 +253,8 @@ export async function AppShell({ children }: { children: React.ReactNode }) {
                 roleKey={roleKey}
                 actions={actions}
                 kind={activeOrg?.kind}
+                // What was opened in this business, not in another.
+                recentsScope={activeOrg?.id ?? ""}
                 sites={navSites}
                 stockTracked={stockTracked}
                 storefronts={storefronts}
