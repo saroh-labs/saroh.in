@@ -1,3 +1,4 @@
+import { dayWords, isTimeZone, timeWords } from "../../common/words-format";
 import type {
     NoticeTemplate,
     RenderedMessage,
@@ -98,33 +99,14 @@ export function orderNoticeKind(stage: string): NoticeKind | null {
     return null;
 }
 
-/** "Tue 6 Oct at 11:00", in the business's zone. */
+/** "Tue 6 Oct at 11:00 am", in the business's zone. */
 export function noticeWhen(at: Date, timeZone: string): string {
     const zone = safeZone(timeZone);
-    const day = new Intl.DateTimeFormat("en-GB", {
-        weekday: "short",
-        day: "numeric",
-        month: "short",
-        timeZone: zone,
-    })
-        .format(at)
-        .replace(",", "");
-    const time = new Intl.DateTimeFormat("en-GB", {
-        hour: "2-digit",
-        minute: "2-digit",
-        hourCycle: "h23",
-        timeZone: zone,
-    }).format(at);
-    return `${day} at ${time}`;
+    return `${dayWords(at, zone, { weekday: true })} at ${timeWords(at, zone)}`;
 }
 
 function safeZone(timeZone: string): string {
-    try {
-        new Intl.DateTimeFormat("en-GB", { timeZone });
-        return timeZone;
-    } catch {
-        return "Asia/Kolkata";
-    }
+    return isTimeZone(timeZone) ? timeZone : "Asia/Kolkata";
 }
 
 /** The sentence the customer's thread gets. Plain text. */

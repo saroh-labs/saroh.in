@@ -1,8 +1,8 @@
 import type { Logger } from "@nestjs/common";
 import { prisma } from "@saroh/database";
 
+import { dayWords } from "../../common/words-format";
 import { businessTimezone } from "../bookings/staff-availability";
-import { paperDay } from "../invoices/invoice-paper-view";
 import { noticeOf } from "../notifications/notice-target";
 import { enqueueBillingEmail } from "./billing-email.job";
 import { freeChosenNotice, termEndingNotice } from "./billing-emails";
@@ -59,7 +59,7 @@ async function remindTerm(
     const zone = await businessTimezone(prisma, organizationId);
     const said = {
         planName: ending.planName,
-        endsOn: paperDay(term.endsAt.toISOString(), zone),
+        endsOn: dayWords(term.endsAt, zone, { year: true }),
     };
     // Not paid for again, the term moves to Free at its end (`term-end.ts`).
     const measure = await svc.previewOnPlan(

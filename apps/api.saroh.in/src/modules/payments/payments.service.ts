@@ -2280,7 +2280,7 @@ export class PaymentsService {
             });
             if (!row) {
                 throw new BadRequestException(
-                    `Provider "${name}" is not connected for this organization`,
+                    `Provider "${name}" isn't connected for this business`,
                 );
             }
             if (row.status !== "CONNECTED") {
@@ -2297,12 +2297,12 @@ export class PaymentsService {
         });
         if (connected.length === 0) {
             throw new BadRequestException(
-                "No connected payment provider for this organization",
+                "No payment provider is connected for this business",
             );
         }
         if (connected.length > 1) {
             throw new ConflictException(
-                "Multiple providers connected — specify which provider to use",
+                "More than one provider is connected. Choose which one to use.",
             );
         }
         return connected[0];

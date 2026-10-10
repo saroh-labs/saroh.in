@@ -120,7 +120,7 @@ export class QrCodesService {
             }
         }
         throw new ConflictException({
-            message: "We couldn't make a code just now. Try again.",
+            message: "We couldn't make a code. Try again.",
             details: { reason: "no-free-code" },
         });
     }

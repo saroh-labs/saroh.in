@@ -108,7 +108,7 @@ const EVENT_TAGS: Record<RenewalEventKind, string> = {
  * (RENEWAL_FAILED with reason CHECKOUT_OPEN): nothing was declined, so not
  * "Payment failed". Worded as the subscription's history says it.
  */
-export const CHECKOUT_OPEN_TAG = "Autopay didn't charge — paying by link";
+export const CHECKOUT_OPEN_TAG = "Autopay didn't charge, paying by link";
 
 /** The tag of a renewal above its autopay's limit (D13): it needs a new set-up (D14). */
 export const LIMIT_LOW_TAG = EVENT_TAGS.MANDATE_LIMIT_LOW;

@@ -424,4 +424,4 @@ export function pauseLines(s: PauseSummary): string[] {
 
 /** The sentence every notice ends with: how to keep everything. */
 export const KEEP_EVERYTHING =
-    "Nothing is deleted. To keep everything, choose or renew a plan in Plan and billing; moving back up restores everything at once.";
+    "Nothing is deleted. To keep everything, choose or renew a plan in Plan and billing. Moving back up restores everything at once.";

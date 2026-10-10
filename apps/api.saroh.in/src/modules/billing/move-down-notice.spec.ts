@@ -350,7 +350,7 @@ describe("the words (#801)", () => {
         });
         expect(n.title).toBe("Some things pause on 27 Nov 2026");
         expect(n.body).toBe(
-            "Your business is now on the Free plan, and has more than it includes. On 27 Nov 2026, what's over your plan's limits becomes read-only: Asha is paused: they can't open the business until you move up again. Nothing is deleted. To keep everything, choose or renew a plan in Plan and billing; moving back up restores everything at once.",
+            "Your business is now on the Free plan, and has more than it includes. On 27 Nov 2026, what's over your plan's limits becomes read-only: Asha is paused: they can't open the business until you move up again. Nothing is deleted. To keep everything, choose or renew a plan in Plan and billing. Moving back up restores everything at once.",
         );
         const e = moveDownEmail({
             businessName: "Rye & Co.",

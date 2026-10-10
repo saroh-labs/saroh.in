@@ -64,14 +64,10 @@ import { ForbiddenException } from "@nestjs/common";
 import { prisma } from "@saroh/database";
 
 import type { OrganizationContext } from "../../common/types/organization-context";
+import { dayWords, moneyWords, whenWords } from "../../common/words-format";
 import { accountThreadOn } from "../communications/account-thread";
 import type { CommunicationsService } from "../communications/communications.service";
-import {
-    formatDay,
-    formatMoney,
-    formatWhen,
-    InvoiceSendService,
-} from "./invoice-send.service";
+import { InvoiceSendService } from "./invoice-send.service";
 import type { InvoicesService } from "./invoices.service";
 
 type Mocked = Record<string, jest.Mock>;
@@ -287,7 +283,7 @@ describe("sending", () => {
                 business: "Rye & Co.",
                 firstName: "Asha",
                 number: "INV-0042",
-                total: "₹2,400.00",
+                total: "₹2,400",
                 dueOn: null,
                 overdue: false,
                 payOnline: true,
@@ -393,15 +389,17 @@ describe("the link on the business's own address (DEC-069, L7)", () => {
 });
 
 describe("the words", () => {
-    it("formats money from its decimal string, Indian grouping", () => {
-        expect(formatMoney(decimal("2400"), "INR")).toBe("₹2,400.00");
-        expect(formatMoney(decimal("1234567.5"), "INR")).toBe("₹12,34,567.50");
+    it("writes money from its decimal string, Indian grouping", () => {
+        expect(moneyWords(decimal("2400"), "INR")).toBe("₹2,400");
+        expect(moneyWords(decimal("1234567.5"), "INR")).toBe("₹12,34,567.50");
     });
 
-    it("formats a day and a moment in the business's zone", () => {
+    it("writes a day and a moment in the business's zone", () => {
         const late = new Date("2026-10-02T20:00:00Z"); // 3 Oct, 1:30 am in India
-        expect(formatDay(late, "Asia/Kolkata")).toBe("3 Oct 2026");
-        expect(formatDay(late, "UTC")).toBe("2 Oct 2026");
-        expect(formatWhen(late, "Asia/Kolkata")).toMatch(/^3 Oct, 1:30 am$/i);
+        expect(dayWords(late, "Asia/Kolkata", { year: true })).toBe(
+            "3 Oct 2026",
+        );
+        expect(dayWords(late, "UTC", { year: true })).toBe("2 Oct 2026");
+        expect(whenWords(late, "Asia/Kolkata")).toBe("3 Oct, 1:30 am");
     });
 });

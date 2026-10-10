@@ -149,7 +149,7 @@ export async function createModulePage(
             });
             if (raced) throw alreadyHas(kind);
             throw new ConflictException({
-                message: `Another page took ${path} just now. Pick another path.`,
+                message: `Another page took ${path}. Pick another path.`,
                 details: { field: "path", reason: "taken" },
             });
         }

@@ -33,7 +33,7 @@ export const INVITE_REFUSALS = {
         "This invite was sent to a different email address. Sign up or sign in with that address to use it.",
     unverified: "Confirm your email address first, then use the invite.",
     unavailable:
-        "The launch offer isn't available right now. Your business is set up; ask us and we'll add it.",
+        "The launch offer isn't available right now. Your business is set up. Ask us and we'll add it.",
 } as const;
 
 export type InviteCheck =

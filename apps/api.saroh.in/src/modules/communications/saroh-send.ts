@@ -92,7 +92,7 @@ export async function deliverThroughSaroh(
             await record(deliveryId, message.id, {
                 delivery: SAROH_UNKNOWN,
                 message: SAROH_UNKNOWN,
-                error: "The connection dropped before SES replied; not retried, in case it went",
+                error: "The connection dropped before SES replied. Not sent again, in case it went",
             });
             return false;
         case "not-configured":

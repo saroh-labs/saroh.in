@@ -1,3 +1,4 @@
+import { clockWords } from "../../common/words-format";
 import type { OpeningHoursDay } from "./storefronts.dto";
 
 const DAY_NAMES: Record<OpeningHoursDay["day"], string> = {
@@ -21,8 +22,8 @@ const ORDER: readonly OpeningHoursDay["day"][] = [
 ];
 
 /**
- * A shop's week as a person reads it — "Mon–Fri 09:00–18:00, Sat
- * 10:00–14:00, Sun closed" — with neighbouring days that keep the same
+ * A shop's week as a person reads it — "Mon to Fri 9:00 am to 6:00 pm, Sat
+ * 10:00 am to 2:00 pm, Sun closed" — with neighbouring days that keep the same
  * hours said once. What Settings › Activity shows as a storefront's hours
  * before and after a save (#509); null for a week never set.
  */
@@ -32,7 +33,9 @@ export function openingHoursText(
     if (!week || week.length === 0) return null;
     const byDay = new Map(week.map((d) => [d.day, d]));
     const hours = (d: OpeningHoursDay | undefined) =>
-        !d || d.closed ? "closed" : `${d.open}–${d.close}`;
+        !d || d.closed
+            ? "closed"
+            : `${clockWords(d.open)} to ${clockWords(d.close)}`;
 
     type Day = OpeningHoursDay["day"];
     const runs: { from: Day; to: Day; hours: string }[] = [];
@@ -50,7 +53,7 @@ export function openingHoursText(
             const days =
                 run.from === run.to
                     ? DAY_NAMES[run.from]
-                    : `${DAY_NAMES[run.from]}–${DAY_NAMES[run.to]}`;
+                    : `${DAY_NAMES[run.from]} to ${DAY_NAMES[run.to]}`;
             return `${days} ${run.hours}`;
         })
         .join(", ");

@@ -195,7 +195,8 @@ describe("StaffService — hours", () => {
             ]),
         );
         expect(body).toEqual({
-            message: "Monday's hours overlap: 9:00–12:00 and 11:00–13:00.",
+            message:
+                "Monday's hours overlap: 9:00 am to 12:00 pm and 11:00 am to 1:00 pm.",
             field: "hours",
         });
         expect(db.staffHours!.deleteMany).not.toHaveBeenCalled();

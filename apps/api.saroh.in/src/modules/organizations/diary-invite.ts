@@ -52,7 +52,7 @@ export function diaryInviteRefusal(
     }
     if (person.membershipId) {
         return {
-            message: `${person.name} already has a login here.`,
+            message: `${person.name} already signs in here.`,
             field: "staffId",
         };
     }

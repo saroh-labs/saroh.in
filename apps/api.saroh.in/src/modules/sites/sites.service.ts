@@ -3286,7 +3286,7 @@ export class SitesService {
         }
         if (page.isHome) {
             throw new BadRequestException(
-                "The home page cannot be deleted — it is what this site's address serves.",
+                "The home page can't be deleted. It is what this site's address serves.",
             );
         }
 

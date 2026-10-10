@@ -136,7 +136,7 @@ export class AnalyticsService {
             const allowed = this.rateLimiter.take(`${siteId}:${ipHash}`);
             if (!allowed) {
                 throw new HttpException(
-                    "Too many events — please slow down",
+                    "Too many events. Wait a moment, then try again.",
                     429,
                 );
             }

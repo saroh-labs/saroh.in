@@ -348,7 +348,7 @@ export class ProjectAccessService {
         });
         if (!membership) {
             throw new BadRequestException(
-                "User must be a member of the organization before being granted project access",
+                "They need to be a member of the business before they can be given project access.",
             );
         }
     }

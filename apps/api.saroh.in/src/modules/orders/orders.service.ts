@@ -9,6 +9,7 @@ import {
 import { nextOrderNumberInTx, Prisma, prisma } from "@saroh/database";
 
 import { isSerializationFailure } from "../../common/prisma-errors";
+import { moneyWordsMinor } from "../../common/words-format";
 import { ActivationEvents } from "../analytics/activation-events";
 import { recordOrderPaidInTx } from "../analytics/order-events";
 import { planMeter } from "../billing/metering.service";
@@ -17,7 +18,6 @@ import type { AppliedDiscount } from "../discounts/discounts.service";
 import { DiscountsService } from "../discounts/discounts.service";
 import { recordRedemptionInTx } from "../discounts/redemption";
 import { assertBusinessDetails } from "../invoices/business-details";
-import { formatMoney } from "../invoices/invoice-send.service";
 import { gstInsideOrder } from "../invoices/order-invoice";
 import {
     ensureOrderInvoice,
@@ -93,9 +93,9 @@ const ORDER_WRITE_REFUSAL = {
  */
 const MONEY_WRITE_REFUSAL = {
     "order:create":
-        "Your role can't take payments — leave it to pay later, or ask the owner or an admin.",
+        "Your role can't take payments. Leave it to pay later, or ask the owner or an admin.",
     "order:edit":
-        "Your role can't record payments — ask the owner or an admin to mark it paid.",
+        "Your role can't record payments. Ask the owner or an admin to mark it paid.",
 } as const;
 
 /**
@@ -338,8 +338,7 @@ export class OrdersService {
                               ? cashReceivedCents(
                                     dto.payment.received,
                                     totalCents,
-                                    (cents) =>
-                                        formatMoney(fromCents(cents), currency),
+                                    (cents) => moneyWordsMinor(cents, currency),
                                 )
                               : null,
                   }
@@ -525,7 +524,7 @@ export class OrdersService {
                 }
                 if (applied && isSerializationFailure(err)) {
                     throw new ConflictException({
-                        message: `${applied.code} was just used by another order. Try again, or remove it.`,
+                        message: `${applied.code} was used by another order a moment ago. Try again, or remove it.`,
                         details: { field: "discountCode" },
                     });
                 }

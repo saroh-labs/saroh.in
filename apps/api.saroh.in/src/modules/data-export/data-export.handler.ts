@@ -144,7 +144,7 @@ export class DataExportHandler {
             if (job.attempts + 1 >= job.maxAttempts) {
                 await this.fail(
                     exportId,
-                    "We couldn't put your data together. Ask for it again; if it fails again, write to us.",
+                    "We couldn't put your data together. Ask for it again. If it fails again, write to us.",
                 );
             }
             throw error;

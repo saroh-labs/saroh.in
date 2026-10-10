@@ -85,12 +85,12 @@ export function nextPeriod(
     return periodContaining(anchor, interval, timezone, end);
 }
 
-/** "1 Sep – 30 Sep 2026": the last day shown is the day before the end. */
+/** "1 Sep to 30 Sep 2026": the last day shown is the day before the end. */
 export function periodLabel(period: Period, timezone: string): string {
     const start = DateTime.fromJSDate(period.start, { zone: timezone });
     const last = DateTime.fromJSDate(period.end, { zone: timezone }).minus({
         days: 1,
     });
     const sameYear = start.year === last.year;
-    return `${start.toFormat(sameYear ? "d LLL" : "d LLL yyyy")} – ${last.toFormat("d LLL yyyy")}`;
+    return `${start.toFormat(sameYear ? "d LLL" : "d LLL yyyy")} to ${last.toFormat("d LLL yyyy")}`;
 }

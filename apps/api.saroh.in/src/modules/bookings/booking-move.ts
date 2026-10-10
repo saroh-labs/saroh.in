@@ -124,7 +124,7 @@ export async function moveFoundBooking(
     } else {
         if (!isValidSlotStart(availService, rules, startAt)) {
             throw new BadRequestException(
-                "That is not a bookable slot for this service",
+                "That isn't a time this service can be booked.",
             );
         }
         if (booking.staffId) {
@@ -180,7 +180,7 @@ export async function moveFoundBooking(
                     );
                     if (count + held >= service.capacity) {
                         throw taken(
-                            new ConflictException("That slot is fully booked"),
+                            new ConflictException("That time is fully booked."),
                         );
                     }
                 }
@@ -286,7 +286,7 @@ export async function moveFoundBooking(
     } catch (err) {
         // Lost the race with a concurrent booking for the same seat.
         if (isSerializationFailure(err)) {
-            throw taken(new ConflictException("That slot is fully booked"));
+            throw taken(new ConflictException("That time is fully booked."));
         }
         throw err;
     }

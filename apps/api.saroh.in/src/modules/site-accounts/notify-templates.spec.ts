@@ -45,27 +45,29 @@ function order(over: Partial<OrderNoticeVars> = {}): OrderNoticeVars {
 
 describe("notice words (A14)", () => {
     it("says when in the business's zone", () => {
-        expect(noticeWhen(AT, "Asia/Kolkata")).toBe("Tue 6 Oct at 11:00");
-        expect(noticeWhen(AT, "Europe/London")).toBe("Tue 6 Oct at 06:30");
+        expect(noticeWhen(AT, "Asia/Kolkata")).toBe("Tue 6 Oct at 11:00 am");
+        expect(noticeWhen(AT, "Europe/London")).toBe("Tue 6 Oct at 6:30 am");
         // A zone that doesn't exist falls back to the default, never throws.
-        expect(noticeWhen(AT, "Not/AZone")).toBe("Tue 6 Oct at 11:00");
+        expect(noticeWhen(AT, "Not/AZone")).toBe("Tue 6 Oct at 11:00 am");
     });
 
     it("tells the customer a booking is confirmed, moved or cancelled", () => {
         expect(
             noticeSentence({ kind: "BOOKING_CONFIRMED", booking: booking() }),
-        ).toBe("Your Check-up with Dr Kavi on Tue 6 Oct at 11:00 is booked.");
+        ).toBe(
+            "Your Check-up with Dr Kavi on Tue 6 Oct at 11:00 am is booked.",
+        );
         expect(
             noticeSentence({
                 kind: "BOOKING_MOVED",
                 booking: booking({ fromStartAt: WAS }),
             }),
         ).toBe(
-            "Your Check-up with Dr Kavi has moved to Tue 6 Oct at 11:00. It was Mon 5 Oct at 10:00.",
+            "Your Check-up with Dr Kavi has moved to Tue 6 Oct at 11:00 am. It was Mon 5 Oct at 10:00 am.",
         );
         expect(
             noticeSentence({ kind: "BOOKING_CANCELLED", booking: booking() }),
-        ).toBe("Your Check-up on Tue 6 Oct at 11:00 has been cancelled.");
+        ).toBe("Your Check-up on Tue 6 Oct at 11:00 am has been cancelled.");
     });
 
     it("words what the customer did themselves as theirs", () => {
@@ -74,13 +76,13 @@ describe("notice words (A14)", () => {
                 kind: "BOOKING_MOVED",
                 booking: booking({ byCustomer: true, fromStartAt: WAS }),
             }),
-        ).toBe("You moved your Check-up to Tue 6 Oct at 11:00.");
+        ).toBe("You moved your Check-up to Tue 6 Oct at 11:00 am.");
         expect(
             noticeSentence({
                 kind: "BOOKING_CANCELLED",
                 booking: booking({ byCustomer: true }),
             }),
-        ).toBe("You cancelled your Check-up on Tue 6 Oct at 11:00.");
+        ).toBe("You cancelled your Check-up on Tue 6 Oct at 11:00 am.");
     });
 
     it("leaves out the person when the booking has none", () => {
@@ -89,7 +91,7 @@ describe("notice words (A14)", () => {
                 kind: "BOOKING_CONFIRMED",
                 booking: booking({ staff: null }),
             }),
-        ).toBe("Your Check-up on Tue 6 Oct at 11:00 is booked.");
+        ).toBe("Your Check-up on Tue 6 Oct at 11:00 am is booked.");
     });
 
     it("tells an order's Ready by how it leaves, and its handover with the courier", () => {
@@ -142,7 +144,7 @@ describe("notice words (A14)", () => {
                 },
             }),
         ).toBe(
-            "A place opened in Spin on Tue 6 Oct at 11:00. It's held for you until Mon 5 Oct at 10:00.",
+            "A place opened in Spin on Tue 6 Oct at 11:00 am. It's held for you until Mon 5 Oct at 10:00 am.",
         );
     });
 
@@ -171,7 +173,7 @@ describe("the notice email (A14)", () => {
         expect(mail.subject).toBe("You're booked with Kavi Dental");
         expect(mail.body).toContain("<p>Hi Asha,</p>");
         expect(mail.body).toContain(
-            "Your Check-up with Dr Kavi on Tue 6 Oct at 11:00 is booked.",
+            "Your Check-up with Dr Kavi on Tue 6 Oct at 11:00 am is booked.",
         );
         expect(mail.body).toContain("<p>Kavi Dental</p>");
     });
@@ -284,7 +286,7 @@ describe("the team's inbox line (A14)", () => {
             }),
         ).toEqual({
             title: "Asha Rao moved their Check-up",
-            body: "Now Tue 6 Oct at 11:00. It was Mon 5 Oct at 10:00.",
+            body: "Now Tue 6 Oct at 11:00 am. It was Mon 5 Oct at 10:00 am.",
         });
         expect(
             teamNotice("BOOKING_CANCELLED", "Asha Rao", {
@@ -295,7 +297,7 @@ describe("the team's inbox line (A14)", () => {
             }),
         ).toEqual({
             title: "Asha Rao cancelled their Check-up",
-            body: "It was Tue 6 Oct at 11:00.",
+            body: "It was Tue 6 Oct at 11:00 am.",
         });
     });
 });

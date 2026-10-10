@@ -1,7 +1,7 @@
 import type { Prisma } from "@saroh/database";
 
+import { dayWords, moneyWordsMinor } from "../../common/words-format";
 import { businessTimezone } from "../bookings/staff-availability";
-import { paperDay, paperMoney } from "../invoices/invoice-paper-view";
 import type { RenderedEmail } from "./billing-emails";
 import { renewalReminderEmail } from "./billing-emails";
 import type { TermCheckout } from "./billing-term";
@@ -9,7 +9,6 @@ import { isOneTime, termOf } from "./billing-term";
 import type { SarohLineInput } from "./saroh-invoice-terms";
 import {
     FIRST_MONTH_KEY,
-    paiseToRupees,
     samePeriodWindow,
     taxSarohLines,
 } from "./saroh-invoice-terms";
@@ -310,8 +309,8 @@ export async function composeRenewalReminder(
     return renewalReminderEmail({
         businessName: org?.name ?? "your business",
         planName: r.planName,
-        renewsOn: paperDay(r.renewsAt.toISOString(), zone),
-        total: paperMoney(paiseToRupees(r.totalPaise), "INR"),
+        renewsOn: dayWords(r.renewsAt, zone, { year: true }),
+        total: moneyWordsMinor(r.totalPaise, "INR"),
         cycle: r.cycle,
         withAddons: r.withAddons,
         url,

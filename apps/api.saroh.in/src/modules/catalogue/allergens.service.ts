@@ -127,7 +127,7 @@ export class AllergensService {
         const used = allergen._count.products;
         if (used > 0) {
             throw new ConflictException({
-                message: `${allergen.name} is on ${used} ${used === 1 ? "product" : "products"} — take it off them first.`,
+                message: `${allergen.name} is on ${used} ${used === 1 ? "product" : "products"}. Take it off them first.`,
                 field: "allergenId",
             });
         }
@@ -137,7 +137,7 @@ export class AllergensService {
         const onRecords = allergen._count.contactAttention;
         if (onRecords > 0) {
             throw new ConflictException({
-                message: `${allergen.name} is on ${onRecords} ${onRecords === 1 ? "customer's" : "customers'"} Needs attention — take it off first.`,
+                message: `${allergen.name} is on ${onRecords} ${onRecords === 1 ? "customer's" : "customers'"} Needs attention. Take it off first.`,
                 field: "allergenId",
             });
         }

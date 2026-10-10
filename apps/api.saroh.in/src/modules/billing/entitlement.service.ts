@@ -149,7 +149,7 @@ export class EntitlementService {
 
         if (currentCount >= limit) {
             throw new ForbiddenException(
-                `Plan limit reached for "${key}" (limit ${limit}); upgrade to add more.`,
+                `Plan limit reached for "${key}" (limit ${limit}). Upgrade to add more.`,
             );
         }
         return true;

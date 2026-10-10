@@ -853,7 +853,7 @@ export class ProductsService {
                 const sold = await tx.orderItem.count({ where: { productId } });
                 if (sold > 0) {
                     throw new ConflictException(
-                        "This product has been ordered, so it can't be deleted. Archive it instead — it leaves the location and its order history stays.",
+                        "This product has been ordered, so it can't be deleted. Archive it instead: it leaves the location and its order history stays.",
                     );
                 }
                 // The stock log is never edited (DEC-032): deleting the

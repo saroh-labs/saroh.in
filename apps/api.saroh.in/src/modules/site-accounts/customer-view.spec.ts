@@ -351,7 +351,7 @@ describe("the account's allow-list", () => {
             expect(view).toMatchObject({
                 state: "refunded",
                 status: "Refunded",
-                refund: "Money back in 5–7 days",
+                refund: "Money back in 5 to 7 days",
             });
             expect(view.steps.map((s) => [s.label, s.state])).toEqual([
                 ["New", "done"],
@@ -361,7 +361,7 @@ describe("the account's allow-list", () => {
                 ["Delivered", "done"],
                 ["Refunded", "done"],
             ]);
-            expect(view.steps.at(-1)?.line).toBe("Money back in 5–7 days");
+            expect(view.steps.at(-1)?.line).toBe("Money back in 5 to 7 days");
 
             // Refunded before it left: it never claims it was delivered.
             const early = orderDetailView({

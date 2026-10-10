@@ -3,8 +3,8 @@ import type { Job } from "@saroh/database";
 import { prisma } from "@saroh/database";
 
 import { prismaErrorCode } from "../../common/prisma-errors";
+import { dayWords } from "../../common/words-format";
 import { businessTimezone } from "../bookings/staff-availability";
-import { paperDay } from "../invoices/invoice-paper-view";
 import { noticeOf } from "../notifications/notice-target";
 import { enqueueBillingEmail } from "./billing-email.job";
 import { planEndingNotice } from "./billing-emails";
@@ -275,7 +275,7 @@ export class MovesApplyHandler {
             stage,
         );
         const zone = await businessTimezone(prisma, organizationId);
-        const endsOn = paperDay(ending.endsAt.toISOString(), zone);
+        const endsOn = dayWords(ending.endsAt, zone, { year: true });
         // What the end pauses (#801), read as the business will be then.
         const measure = await this.paused.previewAt(
             organizationId,

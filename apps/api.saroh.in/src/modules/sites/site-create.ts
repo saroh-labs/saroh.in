@@ -401,7 +401,7 @@ export async function writeSiteFromTemplate(
     });
     if (existing) {
         throw new ConflictException(
-            `A site with the slug "${plan.slug}" already exists in this organization`,
+            `A site with the slug "${plan.slug}" already exists in this business`,
         );
     }
 
@@ -449,7 +449,7 @@ export async function writeSiteFromTemplate(
         // asking again gets one.
         if (isUniqueViolation(error, "subdomain")) {
             throw new ConflictException({
-                message: `${subdomain}.saroh.app was just taken. Choose another address.`,
+                message: `${subdomain}.saroh.app has been taken. Choose another address.`,
                 details: { field, reason: "taken" },
             });
         }

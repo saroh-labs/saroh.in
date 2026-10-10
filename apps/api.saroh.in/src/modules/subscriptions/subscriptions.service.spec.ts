@@ -298,7 +298,7 @@ describe("subscribing", () => {
                 lines: [
                     {
                         description:
-                            "Monthly membership · 15 Sep – 14 Oct 2026",
+                            "Monthly membership · 15 Sep to 14 Oct 2026",
                         quantity: 1,
                         unitPrice: "1200.00",
                     },

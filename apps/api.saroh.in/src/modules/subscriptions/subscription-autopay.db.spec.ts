@@ -737,7 +737,7 @@ describe("telling the customer their autopay was cancelled (D14)", () => {
         expect(post).toMatchObject({ author: "SYSTEM" });
         expect(post.thread.contactId).toBe(m.contactId);
         expect(post.body).toBe(
-            "Pulse Fitness turned off autopay for Monthly unlimited. Nothing more is taken automatically — your next renewal comes as an invoice with a link to pay.",
+            "Pulse Fitness turned off autopay for Monthly unlimited. Nothing more is taken automatically. Your next renewal comes as an invoice with a link to pay.",
         );
     });
 

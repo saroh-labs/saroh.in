@@ -174,12 +174,12 @@ const LINES: Partial<Record<ModuleKey, readonly ImpactLine[]>> = {
                 ),
             say: (c) => {
                 if (c === undefined)
-                    return "Bookings already made stay booked; the booking page stops taking new ones.";
+                    return "Bookings already made stay booked. The booking page stops taking new ones.";
                 if (c === null)
-                    return "We couldn't count your upcoming bookings. They stay booked; the booking page stops taking new ones.";
+                    return "We couldn't count your upcoming bookings. They stay booked. The booking page stops taking new ones.";
                 if (c.count === 0)
                     return "The booking page stops taking new bookings.";
-                return `${n(c.count, "upcoming booking stays", "upcoming bookings stay")} booked; the booking page stops taking new ones.`;
+                return `${n(c.count, "upcoming booking stays", "upcoming bookings stay")} booked. The booking page stops taking new ones.`;
             },
         },
         {
@@ -269,7 +269,7 @@ const LINES: Partial<Record<ModuleKey, readonly ImpactLine[]>> = {
                 if (c === undefined)
                     return "Live subscriptions stop renewing until it's back on. Nobody is charged in between.";
                 if (c === null)
-                    return "We couldn't count your live subscriptions. Any that are live stop renewing until it's back on; nobody is charged in between.";
+                    return "We couldn't count your live subscriptions. Any that are live stop renewing until it's back on. Nobody is charged in between.";
                 if (c.count === 0) return null;
                 return `${n(c.count, "live subscription stops", "live subscriptions stop")} renewing until it's back on. Nobody is charged in between.`;
             },
@@ -438,8 +438,8 @@ const LINES: Partial<Record<ModuleKey, readonly ImpactLine[]>> = {
                     return "We couldn't count your live sites. Any that are live stay up as last published.";
                 if (c.count === 0) return null;
                 if (c.count === 1)
-                    return "Your live site stays up as last published; changes wait until it's back on.";
-                return `Your ${c.count} live sites stay up as last published; changes wait until it's back on.`;
+                    return "Your live site stays up as last published. Changes wait until it's back on.";
+                return `Your ${c.count} live sites stay up as last published. Changes wait until it's back on.`;
             },
         },
     ],

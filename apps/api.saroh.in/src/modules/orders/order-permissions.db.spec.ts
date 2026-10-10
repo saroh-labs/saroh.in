@@ -829,7 +829,7 @@ describe("a storefront Manager and money (DEC-106)", () => {
                 paymentStatus: "PAID",
             }),
         ).rejects.toThrow(
-            "Your role can't record payments — ask the owner or an admin to mark it paid.",
+            "Your role can't record payments. Ask the owner or an admin to mark it paid.",
         );
         expect(
             (await prisma.order.findUniqueOrThrow({ where: { id } }))

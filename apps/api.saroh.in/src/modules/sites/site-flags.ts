@@ -278,7 +278,7 @@ function checkSection(
         at(
             "placeholderText",
             // "FAQ" stays "FAQ"; "Rich text" reads "rich text" mid-sentence.
-            `This ${label === label.toUpperCase() ? label : label.toLowerCase()} still has example text in it ("${quoted}") — replace it with your own before going live.`,
+            `This ${label === label.toUpperCase() ? label : label.toLowerCase()} still has example text in it ("${quoted}"). Replace it with your own before going live.`,
             null,
         );
     }
@@ -310,7 +310,7 @@ function checkSection(
                 found.length > 60 ? `${found.slice(0, 57).trimEnd()}…` : found;
             at(
                 "placeholderText",
-                `This ${label} block still has the template's placeholder words in it ("${quoted}") — replace them with your own before going live.`,
+                `This ${label} block still has the template's placeholder words in it ("${quoted}"). Replace them with your own before going live.`,
                 null,
             );
         }
@@ -852,7 +852,7 @@ export function untouchedTemplateFooter(
     return {
         type: "placeholderText",
         message:
-            "The footer still has the template's line in it — write your own (an address, the days you open) in Site settings before going live.",
+            "The footer still has the template's line in it. Write your own (an address, the days you open) in Site settings before going live.",
         pageId: null,
         sectionIndex: null,
         field: "footer",

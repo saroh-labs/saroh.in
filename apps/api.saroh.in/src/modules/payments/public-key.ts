@@ -45,12 +45,12 @@ export function publicKeyFor(input: {
     const keyId = input.keyId.trim();
     if (!RAZORPAY_KEY_ID.test(keyId)) {
         throw new BadRequestException(
-            "That isn't a Razorpay key id. It starts rzp_live_ or rzp_test_ — copy it from API Keys in Razorpay's dashboard.",
+            "That isn't a Razorpay key id. It starts rzp_live_ or rzp_test_. Copy it from API Keys in Razorpay's dashboard.",
         );
     }
     if (input.keySecret.trim() === keyId) {
         throw new BadRequestException(
-            "The key secret is the key id again. Razorpay shows the secret once, when the key is made — regenerate the key if you no longer have it.",
+            "The key secret is the key id again. Razorpay shows the secret once, when the key is made. Regenerate the key if you no longer have it.",
         );
     }
     if (sent && sent !== keyId) {

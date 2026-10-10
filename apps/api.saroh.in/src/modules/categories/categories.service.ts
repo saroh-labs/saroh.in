@@ -356,7 +356,7 @@ export class CategoriesService {
         if (clash) {
             throw new ConflictException({
                 message: exceptId
-                    ? "That name is taken — use Merge to combine them."
+                    ? "That name is taken. Use Merge to combine them."
                     : `There is already a category called ${clash.name}.`,
                 field: "name",
             });
