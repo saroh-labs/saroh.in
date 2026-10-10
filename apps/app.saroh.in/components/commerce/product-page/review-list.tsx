@@ -4,13 +4,13 @@ import { Button } from "@saroh/ui/button";
 import { Card } from "@saroh/ui/card";
 import { cn } from "@saroh/ui/lib/utils";
 import { Textarea } from "@saroh/ui/textarea";
-import Link from "next/link";
 
 import { ViewerDate } from "@/components/shared/viewer-date";
 import { customerHref } from "@/lib/customers/links";
 import type { OverviewReview } from "@/lib/products/overview-rules";
 
 import { StatusBadge } from "@/components/shared/status-badge";
+import { TextLink } from "@saroh/ui/text-link";
 import { REPLY_MAX, useReviewActions } from "./use-review-actions";
 
 /**
@@ -53,21 +53,21 @@ export function ReviewList({
                                 <span
                                     role="img"
                                     aria-label={`${r.rating} out of 5`}
-                                    className="tracking-[1px] text-highlight"
+                                    className="tracking-[1px] text-foreground"
                                 >
                                     {"★".repeat(r.rating)}
                                     {"☆".repeat(5 - r.rating)}
                                 </span>
                                 {r.customerId ? (
-                                    <Link
+                                    <TextLink
                                         href={customerHref(
                                             storeId,
                                             r.customerId,
                                         )}
-                                        className="text-[13px] font-semibold text-brand transition-colors hover:text-foreground active:text-muted-foreground"
+                                        className="text-[13px]"
                                     >
                                         {r.displayName}
-                                    </Link>
+                                    </TextLink>
                                 ) : (
                                     <span className="text-[13px] font-semibold">
                                         {r.displayName}
@@ -154,14 +154,13 @@ export function ReviewList({
                             {canReply && replyingTo !== r.id ? (
                                 <div className="mt-[9px] flex gap-3.5">
                                     {r.reply ? null : (
-                                        <button
-                                            type="button"
+                                        <TextLink
                                             onClick={() => startReply(r.id)}
                                             disabled={pending}
-                                            className="text-[12.5px] font-semibold text-brand hover:text-foreground disabled:opacity-50 coarse:min-h-11"
+                                            className="text-[12.5px] disabled:opacity-50 coarse:min-h-11"
                                         >
                                             Reply
-                                        </button>
+                                        </TextLink>
                                     )}
                                     <button
                                         type="button"

@@ -176,7 +176,7 @@ export function FieldsTab({
                                 ) : (
                                     <p
                                         role="status"
-                                        className="mt-2 text-[12px] text-brand-subtle-foreground"
+                                        className="mt-2 text-[12px] text-foreground"
                                     >
                                         In no category, so no product asks for
                                         it

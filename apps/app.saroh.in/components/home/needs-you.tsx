@@ -19,6 +19,7 @@ import {
 } from "@/lib/home/needs";
 import type { HomeNeed, HomeUnavailable } from "@/lib/home/service";
 
+import { TextLink } from "@saroh/ui/text-link";
 import {
     InlineButton,
     InlineConfirm,
@@ -113,14 +114,13 @@ export function NeedsYou({
             ) : null}
 
             {more || expanded ? (
-                <button
-                    type="button"
+                <TextLink
                     aria-expanded={expanded}
                     onClick={() => setExpanded((open) => !open)}
-                    className="justify-self-start rounded text-[12.5px] font-semibold text-brand underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 active:text-muted-foreground coarse:min-h-11"
+                    className="justify-self-start text-[12.5px] coarse:min-h-11"
                 >
                     {expanded ? "Show fewer" : seeAllLabel(needs)}
-                </button>
+                </TextLink>
             ) : null}
         </section>
     );
@@ -154,7 +154,7 @@ function NeedRow({
                     a thumb, and it wraps before the tag is squeezed (§17). */}
                 <Link
                     href={need.href}
-                    className="grid min-w-0 flex-[1_1_260px] content-center gap-[3px] rounded text-foreground hover:text-brand-subtle-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 coarse:min-h-11"
+                    className="grid min-w-0 flex-[1_1_260px] content-center gap-[3px] rounded text-foreground hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 coarse:min-h-11"
                 >
                     <span
                         className={cn(

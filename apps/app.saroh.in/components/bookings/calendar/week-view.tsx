@@ -71,7 +71,7 @@ export function WeekView({
                         key={d.date}
                         className={cn(
                             "relative border-l border-border/60",
-                            d.today && "bg-brand-subtle",
+                            d.today && "bg-muted",
                         )}
                         style={{ height: `${(to - from) * PX}px` }}
                     >
@@ -87,7 +87,7 @@ export function WeekView({
                                         "absolute z-[2] box-border flex cursor-pointer flex-col items-stretch justify-start overflow-hidden rounded-[7px] px-[5px] py-0.5 text-left transition-[filter] duration-fast hover:brightness-110 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1 active:brightness-90",
                                         blockColour(b),
                                         selected === b.key &&
-                                            "ring-2 ring-highlight",
+                                            "ring-2 ring-foreground",
                                         b.state === "cancelled" &&
                                             "line-through",
                                     )}

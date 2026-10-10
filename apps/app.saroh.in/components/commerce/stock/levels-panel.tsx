@@ -14,6 +14,7 @@ import { Boxes } from "lucide-react";
 
 import { chipClass } from "@/components/shared/chip";
 import { ListSearch } from "@saroh/ui/list-search";
+import { TextLink } from "@saroh/ui/text-link";
 import { LevelsTable } from "./levels-table";
 
 /**
@@ -236,12 +237,11 @@ export function LevelsPanel({
                         return (
                             <Fragment key={p.productId}>
                                 <span>
-                                    <Link
+                                    <TextLink
                                         href={productHref(null, p.productId)}
-                                        className="font-semibold text-brand transition-colors hover:text-foreground active:text-muted-foreground"
                                     >
                                         {p.name}
-                                    </Link>
+                                    </TextLink>
                                     {soldOut ? (
                                         <span className="text-destructive">
                                             {` · ${soldOut}`}

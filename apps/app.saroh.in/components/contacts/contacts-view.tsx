@@ -319,7 +319,7 @@ export function ContactsView({
                                 </p>
                             ) : null}
                             {c.openLeadCount > 0 ? (
-                                /* `text-foreground`, not `text-brand`. Brand is
+                                /* `text-foreground`, not `text-foreground`. Brand is
                                    the link colour everywhere else in the
                                    product, and this line sits INSIDE a link
                                    whose target is the whole card — colouring

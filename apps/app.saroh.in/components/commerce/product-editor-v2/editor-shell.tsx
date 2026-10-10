@@ -352,7 +352,7 @@ function EditorBody({
                                         "size-[7px] rounded-full",
                                         problems[k]
                                             ? "bg-destructive"
-                                            : "bg-highlight",
+                                            : "bg-foreground",
                                     )}
                                 />
                             ) : null}

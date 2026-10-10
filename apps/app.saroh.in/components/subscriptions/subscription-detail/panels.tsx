@@ -11,6 +11,7 @@ import { personHref } from "@/lib/contacts/person-href";
 import type { ChargeRow, CollectionRow } from "@/lib/subscriptions/view";
 import { chargeHref } from "@/lib/subscriptions/view";
 import { EmptyState } from "@saroh/ui/data-state";
+import { TextLink } from "@saroh/ui/text-link";
 
 const CARD = "rounded-xl border border-border bg-card";
 const TITLE = "font-display text-[15px] font-semibold tracking-[-0.02em]";
@@ -142,25 +143,24 @@ export function ChargesCard({
                             {c.amount}
                         </span>
                         {c.number ? (
-                            <Link
+                            <TextLink
                                 href={chargeHref(c.id)}
-                                className="font-mono text-[11.5px] text-brand transition-colors hover:text-foreground active:text-muted-foreground"
+                                className="font-mono text-[11.5px]"
                             >
                                 {c.number}
-                            </Link>
+                            </TextLink>
                         ) : null}
                     </div>
                 ))
             )}
             {state === "ok" && all.length > rows.length ? (
                 <div className="border-t border-border/70 px-4 py-2">
-                    <button
-                        type="button"
+                    <TextLink
                         onClick={() => setEverything(true)}
-                        className="text-[12.5px] font-semibold text-brand hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring active:bg-accent-active coarse:min-h-11"
+                        className="text-[12.5px] coarse:min-h-11"
                     >
                         Show all {all.length} charges
-                    </button>
+                    </TextLink>
                 </div>
             ) : null}
             {footer ? (
@@ -244,7 +244,9 @@ export function PlanCard({
                 {price}
             </div>
             {older ? (
-                <div className="mt-[3px] text-[12px] text-brand">{older}</div>
+                <div className="mt-[3px] text-[12px] text-foreground">
+                    {older}
+                </div>
             ) : null}
             <div className="mt-2 text-[12px] text-muted-foreground">
                 {paysBy}

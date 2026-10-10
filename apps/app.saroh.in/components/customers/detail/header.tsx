@@ -102,7 +102,7 @@ export function Header({
                 lead={
                     <div
                         aria-hidden
-                        className="flex size-[52px] items-center justify-center rounded-full bg-brand-subtle font-display text-[18px] font-semibold text-brand-subtle-foreground"
+                        className="flex size-[52px] items-center justify-center rounded-full bg-muted font-display text-[18px] font-semibold text-foreground"
                     >
                         {initials}
                     </div>
@@ -138,7 +138,7 @@ export function Header({
                                 // rather than pushing the page sideways.
                                 <a
                                     href={`mailto:${email}`}
-                                    className="min-w-0 max-w-full text-brand transition-colors [overflow-wrap:anywhere] hover:text-foreground active:text-muted-foreground"
+                                    className="min-w-0 max-w-full text-foreground underline decoration-border-strong underline-offset-4 transition-colors [overflow-wrap:anywhere] hover:decoration-foreground active:text-muted-foreground"
                                 >
                                     {email}
                                 </a>

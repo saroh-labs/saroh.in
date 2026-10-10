@@ -4,7 +4,6 @@ import { Button } from "@saroh/ui/button";
 import { Card } from "@saroh/ui/card";
 import { cn } from "@saroh/ui/lib/utils";
 import { Textarea } from "@saroh/ui/textarea";
-import Link from "next/link";
 
 import {
     REPLY_MAX,
@@ -16,6 +15,7 @@ import type { Review } from "@/lib/product-reviews/service";
 import { productHref } from "@/lib/products/links";
 
 import { StatusBadge } from "@/components/shared/status-badge";
+import { TextLink } from "@saroh/ui/text-link";
 import { Empty } from "./parts";
 
 /** A text action under a review: pointer, hover, focus and pressed. */
@@ -70,21 +70,21 @@ export function ReviewsTab({
                                 <span
                                     role="img"
                                     aria-label={`${r.rating} out of 5`}
-                                    className="tracking-[1px] text-highlight"
+                                    className="tracking-[1px] text-foreground"
                                 >
                                     {stars(r.rating)}
                                 </span>
                                 {r.productId ? (
-                                    <Link
+                                    <TextLink
                                         href={productHref(
                                             r.storeId,
                                             r.productId,
                                             "reviews",
                                         )}
-                                        className="cursor-pointer rounded-sm text-[13px] font-semibold text-brand underline-offset-2 transition-colors duration-fast hover:text-foreground hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 active:text-muted-foreground"
+                                        className="text-[13px]"
                                     >
                                         {r.productName}
-                                    </Link>
+                                    </TextLink>
                                 ) : (
                                     <span className="text-[13px] font-semibold">
                                         {r.productName}
@@ -176,7 +176,7 @@ export function ReviewsTab({
                                             disabled={pending}
                                             className={cn(
                                                 TEXT_ACTION,
-                                                "font-semibold text-brand",
+                                                "font-semibold text-foreground",
                                             )}
                                         >
                                             Reply

@@ -118,7 +118,7 @@ export function ExtrasCell({ labels }: { labels: string[] }) {
             {labels.map((label) => (
                 <li
                     key={label}
-                    className="whitespace-nowrap rounded-full bg-brand-subtle px-[9px] py-[3px] text-[11px] font-medium text-brand-subtle-foreground"
+                    className="whitespace-nowrap rounded-full bg-muted px-[9px] py-[3px] text-[11px] font-medium text-foreground"
                 >
                     {label}
                 </li>

@@ -46,7 +46,7 @@ export function LateRuleNoticeCard({
     return (
         <Notice tone="info" role="note" className="mb-4">
             <div className="flex flex-wrap items-center gap-2">
-                <span className="flex-[1_1_260px] text-pretty text-[13px] text-brand-subtle-foreground">
+                <span className="flex-[1_1_260px] text-pretty text-[13px] text-foreground">
                     <strong className="font-semibold">
                         Pick-up orders at {notice.name} now count as late after{" "}
                         {lateAfterWords(notice.pickupLateAfterMinutes)}.
@@ -59,7 +59,7 @@ export function LateRuleNoticeCard({
                     <Button
                         asChild
                         variant="outline"
-                        className="h-[30px] rounded-[8px] border-highlight px-[11px] text-[12.5px] font-semibold coarse:h-11"
+                        className="h-[30px] rounded-[8px] border-border-strong px-[11px] text-[12.5px] font-semibold coarse:h-11"
                     >
                         <Link
                             href={`${storefrontHref(notice.storeId, "delivery")}#${LATE_AFTER_ANCHOR}`}
@@ -79,7 +79,7 @@ export function LateRuleNoticeCard({
                     disabled={pending}
                     onClick={dismiss}
                     aria-label={`Dismiss this notice for ${notice.name}`}
-                    className="size-[30px] text-brand-subtle-foreground coarse:size-11"
+                    className="size-[30px] text-foreground coarse:size-11"
                 >
                     <X aria-hidden className="size-4" />
                 </Button>

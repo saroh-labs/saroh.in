@@ -89,7 +89,7 @@ export function WebhookAddressStep({
                 . Paste this address, tick the events below and save.
             </p>
             {testMode ? (
-                <p className="rounded-[10px] bg-highlight-subtle px-3 py-2 text-[12px] leading-[1.45] text-highlight-subtle-foreground">
+                <p className="rounded-[10px] bg-muted px-3 py-2 text-[12px] leading-[1.45] text-foreground">
                     Test mode — use {name}&apos;s test dashboard for the webhook
                     too.
                 </p>

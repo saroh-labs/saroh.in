@@ -21,7 +21,7 @@ import { qrStyleLockOfRefusal } from "./qr-style-lock";
 const HEADING = "font-display text-[19px] font-semibold tracking-[-0.02em]";
 
 const linkClass =
-    "rounded-[4px] font-semibold text-brand underline underline-offset-2 transition-colors duration-fast hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 active:text-muted-foreground";
+    "rounded-[4px] font-semibold text-foreground underline decoration-border-strong underline-offset-4 transition-colors duration-fast hover:decoration-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 active:text-muted-foreground";
 
 /** Said while the maker still shows a sample. */
 export const PRINT_NEEDS_CODE =

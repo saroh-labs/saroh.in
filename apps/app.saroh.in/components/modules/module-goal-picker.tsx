@@ -3,7 +3,6 @@
 import { Button } from "@saroh/ui/button";
 import { Checkbox } from "@saroh/ui/checkbox";
 import { Check } from "lucide-react";
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
 
@@ -12,6 +11,7 @@ import { StatusBadge } from "@/components/shared/status-badge";
 import { rolledOutKeys } from "@/lib/modules/rollout";
 import type { ModuleView } from "@/lib/modules/schema";
 import { kindWords, preselect } from "@/lib/organizations/kind";
+import { TextLink } from "@saroh/ui/text-link";
 
 /**
  * Need-based module onboarding (#119). Asks what the business needs to *do* —
@@ -280,9 +280,9 @@ export function ModuleGoalPicker({
                                 style={
                                     { "--wk-i": index } as React.CSSProperties
                                 }
-                                className={`wk-choice wk-item flex cursor-pointer items-start gap-4 rounded-lg border p-4 hover:border-brand/40 has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-ring has-[:focus-visible]:ring-offset-2 ${
+                                className={`wk-choice wk-item flex cursor-pointer items-start gap-4 rounded-lg border p-4 hover:border-border-strong has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-ring has-[:focus-visible]:ring-offset-2 ${
                                     isSelected
-                                        ? "border-brand bg-brand-subtle/40"
+                                        ? "border-border-strong bg-muted"
                                         : "border-border"
                                 }`}
                             >
@@ -350,12 +350,9 @@ export function ModuleGoalPicker({
                     </ul>
                     <p className="text-sm text-muted-foreground">
                         Turn these off any time in{" "}
-                        <Link
-                            href="/settings/modules"
-                            className="text-brand underline-offset-4 hover:underline"
-                        >
+                        <TextLink href="/settings/modules">
                             Settings → Modules
-                        </Link>
+                        </TextLink>
                         .
                     </p>
                 </div>

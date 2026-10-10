@@ -158,7 +158,7 @@ export function SellPackDialog({
                         There is no pack on sale yet.{" "}
                         <Link
                             href="/class-packs/new"
-                            className="font-medium text-foreground underline underline-offset-4 hover:text-brand focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                            className="font-medium text-foreground underline underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
                         >
                             Make one
                         </Link>{" "}

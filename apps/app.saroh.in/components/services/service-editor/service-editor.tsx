@@ -258,7 +258,7 @@ export function ServiceEditor({
                             className={cn(
                                 "text-[12.5px]",
                                 dirty && canEdit
-                                    ? "text-brand"
+                                    ? "text-foreground"
                                     : "text-muted-foreground",
                             )}
                         >

@@ -1,7 +1,5 @@
 "use client";
 
-import Link from "next/link";
-
 import { OrderCardFrame } from "@/components/commerce/orders/order-row";
 
 import type { DetailOrder } from "@/lib/customer-workspace/detail";
@@ -16,6 +14,7 @@ import {
 import { money } from "@/lib/subscriptions/view";
 
 import { StatusBadge } from "@/components/shared/status-badge";
+import { TextLink } from "@saroh/ui/text-link";
 import { Chips, Empty } from "./parts";
 
 const COLS =
@@ -81,12 +80,12 @@ export function OrdersTab({
                             key={o.id}
                             className={`${COLS} items-center border-b border-foreground/10 py-2.5 text-[13px] last:border-b-0`}
                         >
-                            <Link
+                            <TextLink
                                 href={`/commerce/orders/${o.id}`}
-                                className="font-mono text-[12px] text-brand transition-colors hover:text-foreground active:text-muted-foreground"
+                                className="font-mono text-[12px]"
                             >
                                 #{o.number}
-                            </Link>
+                            </TextLink>
                             <span className="text-foreground/75">
                                 {orderWhat(o)}
                             </span>
@@ -172,12 +171,7 @@ export function OrdersTab({
             {count > rows.length ? (
                 <p className="mt-2 text-[12px] text-muted-foreground">
                     The latest {rows.length} of {count} orders.{" "}
-                    <Link
-                        href="/commerce/orders"
-                        className="font-semibold text-brand transition-colors hover:text-foreground active:text-muted-foreground"
-                    >
-                        All orders
-                    </Link>
+                    <TextLink href="/commerce/orders">All orders</TextLink>
                 </p>
             ) : null}
         </>

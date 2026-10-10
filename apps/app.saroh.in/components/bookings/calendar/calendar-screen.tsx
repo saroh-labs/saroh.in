@@ -54,6 +54,7 @@ import type { BookingRules, StaffView } from "@/lib/staff/types";
 import { Users } from "lucide-react";
 
 import { Segmented } from "@saroh/ui/segmented";
+import { TextLink } from "@saroh/ui/text-link";
 import { AddPersonDialog } from "../availability/add-person-dialog";
 import { BookingsViewSwitch } from "../bookings-view-switch";
 import { AgendaList, AgendaMonth } from "./agenda-month";
@@ -618,13 +619,12 @@ export function CalendarScreen({
                             ? "Customers book each service in its own hours, shown here as free time. Add the people who take bookings to give each their own column."
                             : "Nobody is on the diary and no service has hours of its own yet, so customers have no free times to book."}{" "}
                         {can.hours ? (
-                            <button
-                                type="button"
+                            <TextLink
                                 onClick={() => setAddingPerson(true)}
-                                className="rounded-sm font-semibold text-brand underline underline-offset-2 transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring active:text-muted-foreground coarse:min-h-11"
+                                className="coarse:min-h-11"
                             >
                                 Add who takes bookings
-                            </button>
+                            </TextLink>
                         ) : null}
                     </p>
                 ) : null}

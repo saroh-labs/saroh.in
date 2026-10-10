@@ -133,7 +133,7 @@ export function BlockInspector({
              * field that would fork it (#338).
              */}
             {bound ? (
-                <div className="flex gap-2.5 rounded-lg bg-brand-subtle p-3 text-[0.8125rem] leading-relaxed text-brand-subtle-foreground">
+                <div className="flex gap-2.5 rounded-lg bg-muted p-3 text-[0.8125rem] leading-relaxed text-foreground">
                     <Info aria-hidden className="mt-0.5 size-4 shrink-0" />
                     <div className="space-y-2">
                         <p>{bound.notice}</p>
@@ -188,7 +188,7 @@ export function BlockInspector({
                         >
                             <span
                                 aria-hidden="true"
-                                className="mt-1.5 size-1 shrink-0 rounded-full bg-highlight"
+                                className="mt-1.5 size-1 shrink-0 rounded-full bg-foreground"
                             />
                             <span>{flag.message}</span>
                         </li>

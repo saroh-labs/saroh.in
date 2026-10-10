@@ -38,7 +38,7 @@ export function PossibleMatch({
     return (
         <Notice tone="info" role="note" className="mb-4">
             <div className="flex flex-wrap items-center gap-2.5">
-                <span className="min-w-0 flex-[1_1_240px] text-[13px] text-brand-subtle-foreground [overflow-wrap:anywhere]">
+                <span className="min-w-0 flex-[1_1_240px] text-[13px] text-foreground [overflow-wrap:anywhere]">
                     <strong className="font-semibold">
                         Possible match — link?
                     </strong>{" "}
@@ -48,7 +48,7 @@ export function PossibleMatch({
                     <Button
                         variant="outline"
                         onClick={onLink}
-                        className="h-[30px] rounded-[8px] border-highlight px-[11px] text-[12.5px] font-semibold coarse:h-11"
+                        className="h-[30px] rounded-[8px] border-border-strong px-[11px] text-[12.5px] font-semibold coarse:h-11"
                     >
                         Review and link
                     </Button>

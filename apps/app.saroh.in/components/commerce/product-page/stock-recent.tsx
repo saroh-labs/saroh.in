@@ -13,6 +13,7 @@ import { changeTone, weekLine } from "@/lib/stock/product-stock";
 import type { StockCheck, StockLogEntry } from "@/lib/stock/service";
 import { EmptyState } from "@saroh/ui/data-state";
 import { Notice } from "@saroh/ui/notice";
+import { TextLink } from "@saroh/ui/text-link";
 
 const noop = () => undefined;
 const subscribe = () => noop;
@@ -97,12 +98,12 @@ export function RecentChanges({
                 <h2 className="flex-1 font-display text-[15px] font-semibold tracking-[-0.015em]">
                     Recent changes
                 </h2>
-                <Link
+                <TextLink
                     href={stockLogHref(productId)}
-                    className="rounded-sm text-[12.5px] font-semibold text-brand hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring coarse:min-h-11"
+                    className="text-[12.5px] coarse:min-h-11"
                 >
                     See the full log
-                </Link>
+                </TextLink>
             </div>
             {log === null ? (
                 <p
@@ -144,12 +145,11 @@ export function RecentChanges({
                                     {e.order ? (
                                         <>
                                             {" · "}
-                                            <Link
+                                            <TextLink
                                                 href={`/commerce/orders/${encodeURIComponent(e.order.id)}`}
-                                                className="text-brand transition-colors hover:text-foreground active:text-muted-foreground"
                                             >
                                                 Order {orderRef(e.order.number)}
-                                            </Link>
+                                            </TextLink>
                                         </>
                                     ) : e.by ? (
                                         ` · ${e.by.name}`

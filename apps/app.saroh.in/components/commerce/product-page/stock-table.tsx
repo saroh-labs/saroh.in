@@ -13,6 +13,7 @@ import type {
     SizeStock,
 } from "@/lib/stock/product-stock";
 import { shelfName, warnsAt } from "@/lib/stock/product-stock";
+import { TextLink } from "@saroh/ui/text-link";
 
 /** In stock green, "Only N left" the warning tint, short or sold out red. */
 export const TONE_BADGE: Record<
@@ -240,14 +241,13 @@ export function StockTable({
                                                       className="text-right tabular-nums"
                                                   >
                                                       {shelf.promised > 0 ? (
-                                                          <Link
+                                                          <TextLink
                                                               href={ordersHref}
                                                               scroll={false}
                                                               aria-label={`${shelf.promised} promised to open ${shelf.name} orders — open them`}
-                                                              className="rounded-sm text-brand underline underline-offset-2 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                                                           >
                                                               {shelf.promised}
-                                                          </Link>
+                                                          </TextLink>
                                                       ) : (
                                                           <span className="text-muted-foreground">
                                                               0
@@ -463,7 +463,7 @@ export function StockCards({
                                                         href={ordersHref}
                                                         scroll={false}
                                                         aria-label={`${shelf.promised} promised to open ${shelf.name} orders — open them`}
-                                                        className="relative z-[1] inline-flex items-center rounded-sm text-brand underline underline-offset-2 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring coarse:min-h-11"
+                                                        className="relative z-[1] inline-flex items-center rounded-sm text-foreground underline decoration-border-strong underline-offset-4 hover:decoration-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring coarse:min-h-11"
                                                     >
                                                         {shelf.promised}{" "}
                                                         promised

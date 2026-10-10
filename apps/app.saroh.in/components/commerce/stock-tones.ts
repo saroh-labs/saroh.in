@@ -9,7 +9,7 @@
  */
 export const STOCK_TEXT = {
     danger: "text-destructive-subtle-foreground",
-    warn: "text-brand-subtle-foreground",
+    warn: "text-foreground",
     ok: "text-success-subtle-foreground",
     muted: "text-muted-foreground",
 } as const;

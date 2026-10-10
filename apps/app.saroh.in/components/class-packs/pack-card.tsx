@@ -50,7 +50,7 @@ export function PackCard({
                 {card.href ? (
                     <Link
                         href={card.href}
-                        className="min-w-0 flex-1 rounded-sm text-[15px] font-semibold text-foreground hover:text-brand focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 active:text-brand"
+                        className="min-w-0 flex-1 rounded-sm text-[15px] font-semibold text-foreground hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 active:text-foreground"
                     >
                         {card.name}
                     </Link>
@@ -107,7 +107,7 @@ export function PackCard({
                             key={n.text}
                             className={
                                 n.tone === "accent"
-                                    ? "font-semibold text-brand"
+                                    ? "font-semibold text-foreground"
                                     : "text-muted-foreground"
                             }
                         >

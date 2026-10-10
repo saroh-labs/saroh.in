@@ -53,7 +53,7 @@ export function PayWayRow({
                                     ? "/settings/modules"
                                     : "/settings/providers"
                             }
-                            className="rounded-sm font-medium text-foreground underline underline-offset-2 hover:text-brand focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                            className="rounded-sm font-medium text-foreground underline underline-offset-2 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                         >
                             {blocker === "PAYMENTS_OFF"
                                 ? "Turn on Payments"

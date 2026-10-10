@@ -160,6 +160,6 @@ export function PanelDivider({
  */
 export function railRowState(selected: boolean): string {
     return selected
-        ? "bg-secondary font-medium before:absolute before:-left-2 before:inset-y-1.5 before:w-0.5 before:rounded-full before:bg-highlight"
+        ? "bg-secondary font-medium before:absolute before:-left-2 before:inset-y-1.5 before:w-0.5 before:rounded-full before:bg-foreground"
         : "hover:bg-muted active:bg-secondary";
 }

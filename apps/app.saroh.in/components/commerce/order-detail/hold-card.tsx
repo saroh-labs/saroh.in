@@ -72,7 +72,7 @@ export function HoldCard({
                         "h-[30px] rounded-lg border bg-card px-3 text-[12.5px] font-semibold transition-colors duration-fast hover:bg-accent active:bg-accent-active coarse:h-11",
                         refund
                             ? "border-destructive-subtle-foreground"
-                            : "border-highlight-border",
+                            : "border-border-strong",
                     )}
                 >
                     {undoLabel}
@@ -85,7 +85,7 @@ export function HoldCard({
                         "h-[30px] rounded-lg px-3 text-[12.5px] font-semibold hover:underline active:bg-card/60 coarse:h-11",
                         refund
                             ? "text-destructive-subtle-foreground"
-                            : "text-brand-subtle-foreground",
+                            : "text-foreground",
                     )}
                 >
                     {nowLabel}
@@ -108,7 +108,7 @@ export function HoldCard({
                         "h-[3px] rounded-full transition-[width] duration-200 ease-linear",
                         refund
                             ? "bg-destructive-subtle-foreground"
-                            : "bg-highlight",
+                            : "bg-foreground",
                     )}
                     style={{ width: `${(left / HOLD_MS) * 100}%` }}
                 />

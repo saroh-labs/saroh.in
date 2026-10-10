@@ -11,7 +11,7 @@ import {
     SheetHeader,
     SheetTitle,
 } from "@saroh/ui/sheet";
-import Link from "next/link";
+import { TextLink } from "@saroh/ui/text-link";
 import type { ReactNode } from "react";
 import { useState } from "react";
 
@@ -134,14 +134,14 @@ export function QuickSheet({
                     ) : null}
                     <SheetFooter className="flex flex-row flex-wrap items-center gap-2 border-t border-border px-[18px] py-3 sm:justify-start sm:space-x-0">
                         {fullEditorHref || moreLink ? (
-                            <Link
+                            <TextLink
                                 href={fullEditorHref ?? moreLink?.href ?? ""}
-                                className="flex-[1_1_150px] text-[12.5px] text-brand transition-colors hover:text-foreground active:text-muted-foreground"
+                                className="flex-[1_1_150px] text-[12.5px]"
                             >
                                 {fullEditorHref
                                     ? "More in the full editor"
                                     : moreLink?.label}
-                            </Link>
+                            </TextLink>
                         ) : (
                             <span className="flex-[1_1_150px]" />
                         )}

@@ -153,7 +153,7 @@ export function ReleaseRow({
                         <li className="flex items-start gap-1.5 text-muted-foreground">
                             <span
                                 aria-hidden
-                                className="mx-[5px] mt-[7px] size-1 shrink-0 rounded-full bg-highlight"
+                                className="mx-[5px] mt-[7px] size-1 shrink-0 rounded-full bg-foreground"
                             />
                             Your draft has changed since
                         </li>

@@ -142,7 +142,7 @@ export function SkinSwitcher() {
                                         {option.name}
                                     </span>
                                     {selected ? (
-                                        <Check className="size-3.5 text-brand" />
+                                        <Check className="size-3.5 text-foreground" />
                                     ) : null}
                                 </span>
                                 <span className="mt-0.5 block text-xs leading-snug text-muted-foreground">

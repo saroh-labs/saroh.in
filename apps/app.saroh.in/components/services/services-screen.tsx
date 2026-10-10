@@ -185,7 +185,7 @@ export function ServicesScreen({
                                     />
                                     <Link
                                         href={`/services/${s.id}`}
-                                        className="min-w-0 flex-1 truncate text-[15px] font-semibold text-foreground hover:text-brand"
+                                        className="min-w-0 flex-1 truncate text-[15px] font-semibold text-foreground hover:underline"
                                     >
                                         {s.name}
                                     </Link>

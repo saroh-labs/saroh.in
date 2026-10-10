@@ -2,7 +2,6 @@ import { Badge } from "@saroh/ui/badge";
 import { Card } from "@saroh/ui/card";
 import { cn } from "@saroh/ui/lib/utils";
 import { Tag } from "lucide-react";
-import Link from "next/link";
 
 import { ViewerDate } from "@/components/shared/viewer-date";
 import { formatMoneyMajor } from "@/lib/format/money";
@@ -13,6 +12,7 @@ import {
     plural,
 } from "@/lib/products/overview-rules";
 
+import { TextLink } from "@saroh/ui/text-link";
 import {
     PanelFailed,
     PanelForbidden,
@@ -92,12 +92,12 @@ export function ProductDiscountsTab({
                                     <Badge variant={state.variant} size="sm">
                                         {state.label}
                                     </Badge>
-                                    <Link
+                                    <TextLink
                                         href="/commerce/discounts"
-                                        className="ml-auto text-[12px] text-brand transition-colors hover:text-foreground active:text-muted-foreground"
+                                        className="ml-auto text-[12px]"
                                     >
                                         Open in Discounts
-                                    </Link>
+                                    </TextLink>
                                 </div>
                                 <p className="mt-1.5 text-[13.5px]">
                                     {discountAmount(d, money)}{" "}

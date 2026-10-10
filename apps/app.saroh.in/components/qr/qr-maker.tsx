@@ -7,6 +7,7 @@ import { targetAddress } from "@/lib/qr/targets";
 import { linkWords, placeWords } from "@/lib/qr/words";
 
 import { Notice } from "@saroh/ui/notice";
+import { TextLink } from "@saroh/ui/text-link";
 import { QrCodeCard } from "./qr-code-card";
 import { QrLookControls } from "./qr-look-controls";
 import { QrPrintSlot } from "./qr-print-slot";
@@ -138,13 +139,9 @@ export function QrMaker({
                         {bound && !m.isChanging && !m.dirty ? (
                             <p className="text-[13px] text-foreground/80">
                                 You already have this code.{" "}
-                                <button
-                                    type="button"
-                                    onClick={m.makeAnother}
-                                    className="cursor-pointer rounded-[4px] font-semibold text-brand underline underline-offset-2 transition-colors duration-fast hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 active:text-muted-foreground"
-                                >
+                                <TextLink onClick={m.makeAnother}>
                                     Make another
-                                </button>
+                                </TextLink>
                             </p>
                         ) : null}
                         <div className="flex flex-wrap gap-2">

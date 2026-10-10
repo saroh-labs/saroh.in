@@ -152,7 +152,7 @@ export function AgendaMonth({
                                     on
                                         ? "bg-primary font-bold text-primary-foreground"
                                         : d === today
-                                          ? "bg-brand-subtle font-medium"
+                                          ? "bg-muted font-medium"
                                           : "font-medium hover:bg-muted",
                                 )}
                             >
@@ -162,7 +162,7 @@ export function AgendaMonth({
                                     className={cn(
                                         "mx-auto mt-px block size-1 rounded-full",
                                         busy
-                                            ? "bg-highlight"
+                                            ? "bg-foreground"
                                             : "bg-transparent",
                                     )}
                                 />

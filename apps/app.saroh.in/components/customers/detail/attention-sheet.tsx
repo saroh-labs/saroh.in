@@ -387,7 +387,7 @@ export function AttentionSheet({
                 {asking ? (
                     <Notice tone="warning" role="alert" layout="banner">
                         <div className="flex flex-wrap items-center gap-2">
-                            <span className="flex-[1_1_180px] text-[12.5px] text-brand-subtle-foreground">
+                            <span className="flex-[1_1_180px] text-[12.5px] text-foreground">
                                 You have changes that are not saved.
                             </span>
                             <Button

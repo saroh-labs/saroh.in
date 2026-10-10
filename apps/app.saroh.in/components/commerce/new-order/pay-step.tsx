@@ -172,7 +172,7 @@ export function PayStep({
                     onClick={() => setDiscounting(true)}
                     className={cn(
                         FOCUS,
-                        "mt-1.5 cursor-pointer rounded-md px-0 py-1 text-[12.5px] font-semibold text-brand transition-colors duration-fast hover:text-foreground active:opacity-80",
+                        "mt-1.5 cursor-pointer rounded-md px-0 py-1 text-[12.5px] font-semibold text-foreground underline decoration-border-strong underline-offset-4 transition-colors duration-fast hover:decoration-foreground active:opacity-80",
                     )}
                 >
                     + Add a discount

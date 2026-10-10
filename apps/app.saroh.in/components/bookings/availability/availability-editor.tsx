@@ -297,7 +297,7 @@ export function AvailabilityEditor({
     });
 
     const saveBar = dirty ? (
-        <div className="sticky bottom-[calc(12px+var(--tab-bar-inset,0px))] z-10 mt-3.5 flex flex-wrap items-center gap-2 rounded-[10px] border border-highlight-border bg-muted/70 px-3.5 py-[11px] backdrop-blur-sm dark:bg-muted">
+        <div className="sticky bottom-[calc(12px+var(--tab-bar-inset,0px))] z-10 mt-3.5 flex flex-wrap items-center gap-2 rounded-[10px] border border-border-strong bg-muted/70 px-3.5 py-[11px] backdrop-blur-sm dark:bg-muted">
             <span
                 role="status"
                 className="flex-[1_1_240px] text-[12.5px] text-foreground"

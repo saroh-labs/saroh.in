@@ -20,6 +20,7 @@ import {
     takeMoneyPlace,
     writeSetupHidden,
 } from "@/lib/settings/ready";
+import { TextLink } from "@saroh/ui/text-link";
 
 /**
  * "Get ready to take money" on Home ("Saroh Home" design, F8): the same steps
@@ -100,13 +101,12 @@ export function TakeMoneyChecklist({
     if (place === "hidden") {
         if (slot !== "late") return null;
         return (
-            <button
-                type="button"
+            <TextLink
                 onClick={() => setHidden(businessId, false)}
-                className="justify-self-start text-left text-[12.5px] font-semibold text-brand underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 active:text-muted-foreground coarse:min-h-11"
+                className="justify-self-start text-left text-[12.5px] coarse:min-h-11"
             >
                 Show setup ({count})
-            </button>
+            </TextLink>
         );
     }
     if (place !== slot) return null;
@@ -210,7 +210,7 @@ function AsideRow({ item }: { item: ReadyAside }) {
                     {item.why}
                 </span>
             </span>
-            <span className="mt-px flex-none text-[12.5px] font-semibold text-brand">
+            <span className="mt-px flex-none text-[12.5px] font-semibold text-foreground">
                 {item.cta}
             </span>
         </Link>

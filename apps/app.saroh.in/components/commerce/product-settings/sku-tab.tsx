@@ -244,7 +244,7 @@ export function SkuTab({
             {dirty && canWrite ? (
                 <div
                     ref={saveBar}
-                    className="sticky bottom-[var(--tab-bar-inset)] z-10 mt-3.5 flex flex-wrap items-center gap-2 rounded-[10px] border border-highlight bg-muted px-3.5 py-2.5"
+                    className="sticky bottom-[var(--tab-bar-inset)] z-10 mt-3.5 flex flex-wrap items-center gap-2 rounded-[10px] border border-border-strong bg-muted px-3.5 py-2.5"
                 >
                     <span
                         role="status"

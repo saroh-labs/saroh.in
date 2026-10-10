@@ -292,7 +292,7 @@ export function EditorRail({
                                                             section.key,
                                                         )) ? (
                                                         <span
-                                                            className="size-1 shrink-0 rounded-full bg-highlight"
+                                                            className="size-1 shrink-0 rounded-full bg-foreground"
                                                             title={[
                                                                 ...(flagsBySection
                                                                     .get(index)

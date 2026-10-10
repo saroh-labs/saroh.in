@@ -20,9 +20,9 @@ const CARD =
     "min-w-0 rounded-[12px] border border-border bg-card px-[18px] py-4";
 const H2 = "m-0 font-display text-[16px] font-semibold tracking-[-0.01em]";
 const LINK =
-    "rounded-[4px] font-semibold text-brand transition-colors duration-fast hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 active:text-foreground/70 coarse:inline-flex coarse:min-h-11 coarse:items-center";
+    "rounded-[4px] font-semibold text-foreground underline decoration-border-strong underline-offset-4 transition-colors duration-fast hover:decoration-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 active:text-foreground/70 coarse:inline-flex coarse:min-h-11 coarse:items-center";
 const NAME_LINK =
-    "rounded-[4px] font-semibold text-foreground transition-colors duration-fast hover:text-brand focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 active:text-brand/80";
+    "rounded-[4px] font-semibold text-foreground transition-colors duration-fast hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 active:text-foreground";
 
 /**
  * Pack Detail's Sales (E17, after the design): sales and takings over six
@@ -95,7 +95,7 @@ export function SalesTab({
                                 className="h-2 overflow-hidden rounded-full bg-muted"
                             >
                                 <div
-                                    className="h-full rounded-full bg-highlight"
+                                    className="h-full rounded-full bg-foreground"
                                     style={{ width: `${m.pct}%` }}
                                 />
                             </div>

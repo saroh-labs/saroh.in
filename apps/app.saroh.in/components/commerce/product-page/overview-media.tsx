@@ -46,7 +46,7 @@ export function OverviewPhotos({
                 <Link
                     href={photosHref}
                     scroll={false}
-                    className={`${FOCUS} rounded-sm px-0.5 text-[12px] text-brand hover:text-foreground coarse:min-h-11`}
+                    className={`${FOCUS} rounded-sm px-0.5 text-[12px] text-foreground underline decoration-border-strong underline-offset-4 hover:decoration-foreground coarse:min-h-11`}
                 >
                     {media.length ? `See all ${media.length}` : "Add"}
                 </Link>

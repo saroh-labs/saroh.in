@@ -21,7 +21,7 @@ export function CustomerView({
                 <div className="font-display text-[18px] font-semibold">
                     Buy a pack and use 1 now
                 </div>
-                <div className="mt-3 flex items-center gap-3 rounded-[12px] border border-highlight-border bg-brand-subtle px-3.5 py-3 shadow-[inset_3px_0_0_hsl(var(--highlight))]">
+                <div className="mt-3 flex items-center gap-3 rounded-[12px] border border-border-strong bg-muted px-3.5 py-3 shadow-[inset_3px_0_0_hsl(var(--foreground))]">
                     <span className="min-w-0 flex-1">
                         <span className="block text-[14px] font-semibold">
                             {name}

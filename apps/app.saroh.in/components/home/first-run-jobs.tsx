@@ -7,6 +7,7 @@ import { TurnOnSheet } from "@/components/modules/turn-on/turn-on-sheet";
 import type { FirstRunJob } from "@/lib/home/first-run";
 import { sidebarName } from "@/lib/home/first-run";
 import type { ModuleView } from "@/lib/modules/schema";
+import { TextLink } from "@saroh/ui/text-link";
 
 /**
  * Home for a business with nothing turned on (Saroh Workspace, "the choice
@@ -107,7 +108,7 @@ export function FirstRunJobs({
                                 Adds {job.gives}
                             </span>
                             {needsNote ? (
-                                <span className="text-pretty text-[11.5px] leading-[1.45] text-brand-subtle-foreground">
+                                <span className="text-pretty text-[11.5px] leading-[1.45] text-foreground">
                                     {needsNote}
                                 </span>
                             ) : null}
@@ -118,12 +119,9 @@ export function FirstRunJobs({
 
             <p className="mt-4 text-[12.5px] text-muted-foreground">
                 Other modules build on these.{" "}
-                <Link
-                    href="/onboarding/modules"
-                    className="font-medium text-brand underline-offset-4 hover:underline"
-                >
+                <TextLink href="/onboarding/modules">
                     See everything, or pick several at once
-                </Link>
+                </TextLink>
             </p>
             <TurnOnSheet
                 picked={picked}

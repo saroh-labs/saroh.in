@@ -276,7 +276,7 @@ function RoleRow({
             className={cn(
                 "flex w-full items-center gap-[11px] border-t border-border px-[15px] py-2.5 text-left transition-colors duration-fast focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring",
                 on
-                    ? "bg-brand-subtle shadow-[inset_2px_0_0_hsl(var(--highlight))]"
+                    ? "bg-muted shadow-[inset_2px_0_0_hsl(var(--foreground))]"
                     : "hover:bg-foreground/[0.035]",
             )}
         >

@@ -191,7 +191,7 @@ export function PagesPanel({
                                 {page.title}
                             </span>
                             {marks.unseen ? (
-                                <span className="shrink-0 text-[0.6875rem] font-medium text-highlight">
+                                <span className="shrink-0 text-[0.6875rem] font-medium text-foreground">
                                     Can&apos;t be seen
                                 </span>
                             ) : marks.notInMenu ? (
@@ -329,7 +329,7 @@ function Disclosure({
             <span className="shrink-0 text-muted-foreground">{icon}</span>
             <span className="min-w-0 flex-1 truncate">{label}</span>
             {hint ? (
-                <span className="shrink-0 text-[0.6875rem] font-medium text-highlight">
+                <span className="shrink-0 text-[0.6875rem] font-medium text-foreground">
                     {hint}
                 </span>
             ) : null}

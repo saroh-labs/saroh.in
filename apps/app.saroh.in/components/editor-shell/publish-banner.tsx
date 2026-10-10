@@ -3,7 +3,6 @@
 import { Button } from "@saroh/ui/button";
 import { cn } from "@saroh/ui/lib/utils";
 import { PageHeader } from "@saroh/ui/page-header";
-import Link from "next/link";
 import { useRef } from "react";
 
 import { StatusBadge } from "@/components/shared/status-badge";
@@ -13,6 +12,7 @@ import type {
     StatusLine,
 } from "@/lib/editor-shell/state";
 import { useBottomBarInset } from "@/lib/hooks/use-bottom-bar-inset";
+import { TextLink } from "@saroh/ui/text-link";
 
 export interface BannerHandlers {
     onPublish: () => void;
@@ -69,12 +69,12 @@ export function PublishBanner({
                     }
                     meta={
                         view ? (
-                            <Link
+                            <TextLink
                                 href={view.href}
-                                className="text-[13px] font-semibold text-brand hover:text-foreground coarse:inline-flex coarse:min-h-11 coarse:items-center"
+                                className="text-[13px] coarse:inline-flex coarse:min-h-11 coarse:items-center"
                             >
                                 {view.label}
-                            </Link>
+                            </TextLink>
                         ) : undefined
                     }
                     actions={
@@ -134,7 +134,7 @@ export function PublishBanner({
                 </p>
             ) : null}
             {changesText ? (
-                <p className="mx-4 mb-0 mt-3 text-pretty rounded-[10px] bg-brand-subtle px-3.5 py-2.5 text-[13px] leading-[1.5] text-brand-subtle-foreground sm:mx-[26px]">
+                <p className="mx-4 mb-0 mt-3 text-pretty rounded-[10px] bg-muted px-3.5 py-2.5 text-[13px] leading-[1.5] text-foreground sm:mx-[26px]">
                     {changesText}
                 </p>
             ) : null}

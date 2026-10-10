@@ -28,6 +28,7 @@ import { couldntLoad, nothingChanged } from "@saroh/ui/lib/state-copy";
 
 import { chipClass } from "@/components/shared/chip";
 import { StatusBadge } from "@/components/shared/status-badge";
+import { TextLink } from "@saroh/ui/text-link";
 import { PILL_TONE, TEXT_TONE } from "./tones";
 
 /**
@@ -256,7 +257,7 @@ export function LogList({
                                                         e.productId,
                                                         "variants",
                                                     )}
-                                                    className="font-semibold text-foreground hover:text-brand focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring active:text-muted-foreground max-[759px]:relative max-[759px]:order-2 max-[759px]:min-w-0 max-[759px]:flex-1 max-[759px]:[overflow-wrap:anywhere] max-[759px]:before:absolute max-[759px]:before:-inset-y-3 max-[759px]:before:inset-x-0 max-[759px]:before:content-[''] min-[760px]:truncate"
+                                                    className="font-semibold text-foreground hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring active:text-muted-foreground max-[759px]:relative max-[759px]:order-2 max-[759px]:min-w-0 max-[759px]:flex-1 max-[759px]:[overflow-wrap:anywhere] max-[759px]:before:absolute max-[759px]:before:-inset-y-3 max-[759px]:before:inset-x-0 max-[759px]:before:content-[''] min-[760px]:truncate"
                                                 >
                                                     {e.variantTitle
                                                         ? `${e.productName} ${e.variantTitle}`
@@ -301,12 +302,12 @@ export function LogList({
                                                 )}
                                             >
                                                 {e.order ? (
-                                                    <Link
+                                                    <TextLink
                                                         href={`/commerce/orders/${encodeURIComponent(e.order.id)}`}
-                                                        className="text-brand transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring active:text-muted-foreground max-[759px]:relative max-[759px]:before:absolute max-[759px]:before:-inset-y-3 max-[759px]:before:inset-x-0 max-[759px]:before:content-['']"
+                                                        className="max-[759px]:relative max-[759px]:before:absolute max-[759px]:before:-inset-y-3 max-[759px]:before:inset-x-0 max-[759px]:before:content-['']"
                                                     >
                                                         {who}
-                                                    </Link>
+                                                    </TextLink>
                                                 ) : who ? (
                                                     <span className="text-foreground/80">
                                                         {who}

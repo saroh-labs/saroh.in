@@ -99,7 +99,7 @@ export function LevelsTable({
                                         row.productId,
                                         "variants",
                                     )}
-                                    className="sticky left-0 z-10 -ml-4 grid min-w-0 gap-px bg-card pl-4 text-foreground hover:text-brand focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring active:text-muted-foreground max-[759px]:static max-[759px]:ml-0 max-[759px]:flex max-[759px]:min-h-11 max-[759px]:flex-wrap max-[759px]:content-center max-[759px]:items-baseline max-[759px]:gap-x-2 max-[759px]:pl-0"
+                                    className="sticky left-0 z-10 -ml-4 grid min-w-0 gap-px bg-card pl-4 text-foreground hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring active:text-muted-foreground max-[759px]:static max-[759px]:ml-0 max-[759px]:flex max-[759px]:min-h-11 max-[759px]:flex-wrap max-[759px]:content-center max-[759px]:items-baseline max-[759px]:gap-x-2 max-[759px]:pl-0"
                                 >
                                     <span className="text-[13.5px] font-semibold [overflow-wrap:anywhere] min-[760px]:truncate">
                                         {row.productName}

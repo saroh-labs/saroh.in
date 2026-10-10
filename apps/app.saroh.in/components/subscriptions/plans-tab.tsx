@@ -211,7 +211,7 @@ function PlanCard({
             <div className="flex items-baseline gap-2">
                 <Link
                     href={`/billing/plans/${encodeURIComponent(card.id)}`}
-                    className="min-w-0 flex-1 text-[15px] font-semibold text-foreground hover:text-brand focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                    className="min-w-0 flex-1 text-[15px] font-semibold text-foreground hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
                 >
                     {card.name}
                 </Link>
@@ -240,7 +240,7 @@ function PlanCard({
                 {card.subscribers}
             </p>
             {card.olderPrices.map((t) => (
-                <p key={t} className="mt-0.5 text-[12px] text-brand">
+                <p key={t} className="mt-0.5 text-[12px] text-foreground">
                     {t}
                 </p>
             ))}

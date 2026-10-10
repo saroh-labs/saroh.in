@@ -81,7 +81,7 @@ export function SectionCard({
                 dirty
                     ? problem
                         ? "border-destructive"
-                        : "border-highlight"
+                        : "border-border-strong"
                     : "border-border",
                 className,
             )}

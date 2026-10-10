@@ -59,12 +59,12 @@ export function WeekColumns({
                             col.outside
                                 ? "bg-neutral-50 dark:bg-muted"
                                 : col.selected
-                                  ? "bg-brand-subtle"
+                                  ? "bg-muted"
                                   : col.off?.striped
                                     ? STRIPED
                                     : "bg-card",
                             col.isToday &&
-                                "shadow-[inset_0_2px_0_hsl(var(--highlight))]",
+                                "shadow-[inset_0_2px_0_hsl(var(--foreground))]",
                         )}
                     >
                         <button
@@ -90,7 +90,7 @@ export function WeekColumns({
                                         col.outside
                                             ? "text-neutral-400 dark:text-muted-foreground"
                                             : col.isToday
-                                              ? "text-brand"
+                                              ? "text-foreground"
                                               : col.past
                                                 ? "text-muted-foreground"
                                                 : "text-foreground",
@@ -155,7 +155,7 @@ export function WeekColumns({
                                                     "min-w-0 truncate font-bold",
                                                     card.flag.tone === "bad"
                                                         ? "text-destructive-subtle-foreground"
-                                                        : "text-brand",
+                                                        : "text-foreground",
                                                 )}
                                             >
                                                 {card.flag.label}
@@ -177,7 +177,7 @@ export function WeekColumns({
                                     type="button"
                                     onClick={() => onPick(col.date)}
                                     aria-haspopup="dialog"
-                                    className="cursor-pointer rounded-[7px] px-0.5 py-1 text-left text-[11.5px] font-semibold text-brand transition-colors duration-fast hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring active:opacity-80"
+                                    className="cursor-pointer rounded-[7px] px-0.5 py-1 text-left text-[11.5px] font-semibold text-foreground underline decoration-border-strong underline-offset-4 transition-colors duration-fast hover:decoration-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring active:opacity-80"
                                 >
                                     {col.more} more — open the day
                                 </button>

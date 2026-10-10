@@ -44,7 +44,7 @@ export function VisitsStorefrontNote() {
             </span>{" "}
             <Link
                 href={STOREFRONTS_HREF}
-                className="rounded-sm font-medium text-foreground underline underline-offset-2 hover:text-brand focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                className="rounded-sm font-medium text-foreground underline underline-offset-2 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
             >
                 Add a location
             </Link>

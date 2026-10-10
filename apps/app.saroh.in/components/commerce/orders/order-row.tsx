@@ -110,7 +110,7 @@ function Avatar({ row }: { row: OrderRow }) {
             className={cn(
                 "flex size-[30px] flex-none items-center justify-center rounded-full bg-muted text-[11px] font-semibold text-neutral-700 dark:text-foreground",
                 returning &&
-                    "ring-[1.5px] ring-highlight ring-offset-[1.5px] ring-offset-card",
+                    "ring-[1.5px] ring-foreground ring-offset-[1.5px] ring-offset-card",
             )}
         >
             {rowInitials(row)}
@@ -222,7 +222,7 @@ export function OrderGridRow({
                 select ? ORDER_GRID_SELECT : ORDER_GRID,
                 "relative border-b border-border py-[11px] transition-colors duration-fast last:rounded-b-[11px] last:border-b-0 hover:bg-foreground/[0.035] active:bg-foreground/[0.06]",
                 (open === true || select?.checked === true) &&
-                    "bg-brand-subtle hover:bg-brand-subtle",
+                    "bg-muted hover:bg-muted",
             )}
         >
             {select ? (
@@ -341,8 +341,7 @@ export function OrderCardFrame({
         <li
             className={cn(
                 "relative flex min-w-0 items-start gap-3 rounded-[11px] border border-border bg-card p-3 transition-colors duration-fast hover:bg-foreground/[0.035] active:bg-foreground/[0.06]",
-                highlighted &&
-                    "border-highlight-border bg-brand-subtle hover:bg-brand-subtle",
+                highlighted && "border-border-strong bg-muted hover:bg-muted",
             )}
         >
             {lead}

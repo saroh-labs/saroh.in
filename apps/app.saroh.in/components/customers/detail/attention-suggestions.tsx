@@ -137,10 +137,10 @@ export function AttentionSuggestions({
     return (
         <section
             aria-label={suggestionsTitle(shown)}
-            className="mb-3.5 grid gap-3 rounded-xl border border-highlight bg-brand-subtle px-4 py-3.5"
+            className="mb-3.5 grid gap-3 rounded-xl border border-border-strong bg-muted px-4 py-3.5"
         >
             <div className="flex flex-wrap items-baseline gap-2">
-                <span className="text-[13.5px] font-semibold text-brand-subtle-foreground">
+                <span className="text-[13.5px] font-semibold text-foreground">
                     {suggestionsTitle(shown)}
                 </span>
                 <span className="text-pretty text-[12px] text-muted-foreground">

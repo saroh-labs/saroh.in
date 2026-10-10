@@ -193,13 +193,13 @@ function Body({
                     {nextLine}
                 </p>
                 {older ? (
-                    <p className="mt-1.5 text-[12px] text-brand">
+                    <p className="mt-1.5 text-[12px] text-foreground">
                         Keeps {money(sub.price, sub.currency)} — the plan is{" "}
                         {money(older.listPrice, sub.currency)} for new sign-ups
                     </p>
                 ) : null}
                 {sub.pendingPlan && tab !== "cancelled" ? (
-                    <p className="mt-1.5 text-[12px] font-semibold text-brand">
+                    <p className="mt-1.5 text-[12px] font-semibold text-foreground">
                         Changes to {sub.pendingPlan.name} on{" "}
                         {dayText(sub.pendingPlan.from, tz, now)}
                     </p>

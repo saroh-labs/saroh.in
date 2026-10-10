@@ -23,6 +23,7 @@ import {
     untrackedLine,
 } from "@/lib/products/tracking";
 
+import { TextLink } from "@saroh/ui/text-link";
 import { useEditor, useSection } from "./editor-state";
 import { FieldHelp } from "./fields";
 import { SectionCard } from "./section-card";
@@ -293,13 +294,12 @@ export function StockSection({
                     onChange={(patch) => setDraft({ ...draft, ...patch })}
                 />
                 {hasVariants && canWrite ? (
-                    <button
-                        type="button"
+                    <TextLink
                         onClick={() => setOpened(true)}
-                        className="mt-2 text-[12px] font-semibold text-brand hover:text-foreground coarse:min-h-11"
+                        className="mt-2 text-[12px] coarse:min-h-11"
                     >
                         Count each variant instead
-                    </button>
+                    </TextLink>
                 ) : null}
                 {lowNow ? (
                     <LowNote>

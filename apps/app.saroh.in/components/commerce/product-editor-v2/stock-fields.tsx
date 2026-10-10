@@ -147,7 +147,7 @@ export function VariantStockTable({
                             {low.includes(l) ? (
                                 <span
                                     aria-hidden
-                                    className="size-[7px] shrink-0 rounded-full bg-highlight"
+                                    className="size-[7px] shrink-0 rounded-full bg-foreground"
                                 />
                             ) : null}
                             <span className="truncate text-[12.5px] font-medium">

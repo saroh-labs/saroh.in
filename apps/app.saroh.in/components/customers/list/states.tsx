@@ -8,6 +8,7 @@ import type { ReactNode } from "react";
 import { whoCanChange } from "@/components/shared/who-can-change";
 import { NUMBER_LOCALE } from "@/lib/format/locale";
 import { newStorefrontHref } from "@/lib/stores/links";
+import { TextLink } from "@saroh/ui/text-link";
 
 /**
  * The Customers list's header: the page header every screen draws, with how
@@ -94,13 +95,7 @@ export function ListNote() {
         <p className="mt-2.5 text-pretty text-[12px] text-muted-foreground">
             Customers are people who&apos;ve paid, signed in on your website or
             been added here. Everyone else is in{" "}
-            <Link
-                href="/contacts"
-                className="font-medium text-brand transition-colors hover:text-foreground active:text-muted-foreground"
-            >
-                Contacts
-            </Link>
-            .
+            <TextLink href="/contacts">Contacts</TextLink>.
         </p>
     );
 }

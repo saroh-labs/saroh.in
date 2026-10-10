@@ -360,8 +360,8 @@ export function SubscriptionDetail({
                 ) : null}
 
                 {pending && canWrite ? (
-                    <div className="flex flex-wrap items-center gap-2.5 rounded-[10px] border border-highlight bg-brand-subtle px-[13px] py-2.5">
-                        <span className="flex-[1_1_240px] text-[13px] font-semibold text-brand-subtle-foreground">
+                    <div className="flex flex-wrap items-center gap-2.5 rounded-[10px] border border-border-strong bg-muted px-[13px] py-2.5">
+                        <span className="flex-[1_1_240px] text-[13px] font-semibold text-foreground">
                             Changes to {pending.name} (
                             {money(pending.price, pending.currency)}) from{" "}
                             {dayText(pending.from, tz, now)}. No part-payment.
@@ -370,7 +370,7 @@ export function SubscriptionDetail({
                             variant="outline"
                             disabled={busy}
                             onClick={keepCurrentPlan}
-                            className="h-[30px] rounded-[8px] border-highlight px-[11px] text-[12.5px] font-semibold coarse:h-11"
+                            className="h-[30px] rounded-[8px] border-border-strong px-[11px] text-[12.5px] font-semibold coarse:h-11"
                         >
                             Keep current plan
                         </Button>

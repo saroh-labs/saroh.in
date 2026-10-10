@@ -27,6 +27,7 @@ import { customerHref } from "@/lib/customers/links";
 import type { UnlinkedCustomer, UnlinkedPage } from "@/lib/customers/list";
 import { rowName, unlinkedText } from "@/lib/customers/list";
 import { couldntLoad } from "@saroh/ui/lib/state-copy";
+import { TextLink } from "@saroh/ui/text-link";
 
 /**
  * "12 paying customers aren't linked to a contact yet · Review" (C4).
@@ -304,12 +305,9 @@ function UnlinkedItem({
                     <div className="flex flex-wrap items-center gap-2">
                         <p className="min-w-0 flex-[1_1_180px] text-muted-foreground">
                             Their email belongs to{" "}
-                            <Link
-                                href={personHref(holder.contactId)}
-                                className="font-medium text-brand transition-colors hover:text-foreground active:text-muted-foreground"
-                            >
+                            <TextLink href={personHref(holder.contactId)}>
                                 {holderName}
-                            </Link>
+                            </TextLink>
                             .
                         </p>
                         {canLink ? (

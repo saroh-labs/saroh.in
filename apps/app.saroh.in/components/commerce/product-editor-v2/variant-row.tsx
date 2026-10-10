@@ -11,6 +11,7 @@ import type { VariantRow } from "@/lib/products/variant-rows";
 import { isLegacy, legacyNote } from "@/lib/products/variant-rows";
 
 import { chipClass } from "@/components/shared/chip";
+import { TextLink } from "@saroh/ui/text-link";
 import { boxClass, FieldHelp, MoneyBox } from "./fields";
 
 export const VARIANT_GRID =
@@ -134,20 +135,17 @@ export function VariantRowView({
                 </button>
             </div>
             <div className="mt-[5px] flex flex-wrap items-center gap-2">
-                <button
-                    type="button"
+                <TextLink
                     aria-expanded={open}
                     onClick={() => onOpen(!open)}
-                    className="text-[12px] font-semibold text-brand hover:text-foreground coarse:min-h-11"
+                    className="text-[12px] coarse:min-h-11"
                 >
                     {open ? "Less" : "More"}
-                </button>
+                </TextLink>
                 <span
                     className={cn(
                         "min-w-0 text-pretty text-[11.5px]",
-                        nowhere
-                            ? "text-brand-subtle-foreground"
-                            : "text-muted-foreground",
+                        nowhere ? "text-foreground" : "text-muted-foreground",
                     )}
                 >
                     {summary}
@@ -315,7 +313,7 @@ function SellItAt({
             {chosen.length === 0 ? (
                 <p
                     role="status"
-                    className="mt-[7px] text-[11.5px] text-brand-subtle-foreground"
+                    className="mt-[7px] text-[11.5px] text-foreground"
                 >
                     Not sold anywhere — customers will not see this {opt}.
                 </p>

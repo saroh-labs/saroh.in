@@ -85,7 +85,7 @@ function DailyVisits({ daily }: { daily: DailyPoint[] }) {
             max > 0 ? Math.max(2, Math.round((d.views / max) * 100)) : 2,
         tone:
             busiest?.date === d.date && d.views > 0
-                ? "bg-brand-700 dark:bg-brand-400"
+                ? "bg-foreground "
                 : "bg-neutral-700 dark:bg-neutral-300",
         readout: dayReadout(d),
         ...(i % wide === 0

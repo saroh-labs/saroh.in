@@ -253,7 +253,7 @@ export function DayPanel({
                                                 </Badge>
                                             ) : null}
                                             {action ? (
-                                                <span className="shrink-0 whitespace-nowrap text-[12px] font-semibold text-brand underline underline-offset-2">
+                                                <span className="shrink-0 whitespace-nowrap text-[12px] font-semibold text-foreground underline decoration-border-strong underline-offset-4">
                                                     {action}
                                                 </span>
                                             ) : null}
@@ -274,7 +274,7 @@ export function DayPanel({
                         {more > 0 ? (
                             <Link
                                 href={LAYER_HOME[layer.key]}
-                                className="mt-1 block text-[12px] font-medium text-brand transition-colors hover:text-foreground active:text-muted-foreground"
+                                className="mt-1 block text-[12px] font-medium text-foreground underline decoration-border-strong underline-offset-4 transition-colors hover:decoration-foreground active:text-muted-foreground"
                             >
                                 {more} more — open {layer.label}
                             </Link>

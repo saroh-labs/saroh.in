@@ -270,7 +270,7 @@ export function VisitsStepper({
                                         "size-2.5 shrink-0 rounded-full",
                                         done && "bg-foreground",
                                         current &&
-                                            "bg-highlight ring-[3px] ring-brand-subtle",
+                                            "bg-foreground ring-[3px] ring-foreground",
                                         !done &&
                                             !current &&
                                             "border-[1.5px] border-border-strong",

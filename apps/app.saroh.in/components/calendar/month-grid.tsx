@@ -205,7 +205,7 @@ export function MonthGrid({
                                     outside
                                         ? "cursor-default bg-neutral-50 dark:bg-muted"
                                         : on
-                                          ? "bg-brand-subtle ring-2 ring-inset ring-highlight"
+                                          ? "bg-muted ring-2 ring-inset ring-foreground"
                                           : "bg-card hover:bg-muted active:bg-muted/70",
                                     // Closed, or the person picked is off:
                                     // stripes over the day's own fill, so
@@ -223,7 +223,7 @@ export function MonthGrid({
                                             outside
                                                 ? "font-medium text-neutral-400 dark:text-muted-foreground"
                                                 : isToday
-                                                  ? "font-bold text-brand"
+                                                  ? "font-bold text-foreground"
                                                   : past
                                                     ? "font-medium text-muted-foreground"
                                                     : "font-medium text-foreground",

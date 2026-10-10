@@ -405,7 +405,7 @@ function PreviewBar({
             <button
                 type="button"
                 onClick={onBack}
-                className="flex shrink-0 items-center gap-2 rounded text-[0.78125rem] font-semibold text-highlight focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                className="flex shrink-0 items-center gap-2 rounded text-[0.78125rem] font-semibold text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
             >
                 Back to editing
                 <kbd className="rounded border border-brand-surface-foreground/30 px-[5px] py-px font-mono text-[0.6875rem] font-normal text-brand-surface-foreground/75">

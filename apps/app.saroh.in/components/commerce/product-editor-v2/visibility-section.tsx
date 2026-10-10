@@ -32,7 +32,7 @@ const STATUSES: { value: ProductStatus; label: string; note: string }[] = [
 const DOT: Record<ProductStatus, string> = {
     PUBLISHED: "bg-success",
     DRAFT: "bg-muted-foreground/60",
-    ARCHIVED: "bg-brand",
+    ARCHIVED: "bg-foreground",
 };
 
 const label = (s: ProductStatus) =>

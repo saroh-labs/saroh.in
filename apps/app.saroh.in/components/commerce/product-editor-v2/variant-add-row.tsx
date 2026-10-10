@@ -1,12 +1,12 @@
 "use client";
 
 import { cn } from "@saroh/ui/lib/utils";
-import Link from "next/link";
 
 import { OptionSelect } from "@/components/shared/option-select";
 import { productSettingsHref } from "@/lib/products/links";
 
 import { chipClass } from "@/components/shared/chip";
+import { TextLink } from "@saroh/ui/text-link";
 import { boxClass, MoneyBox } from "./fields";
 
 /**
@@ -168,12 +168,12 @@ export function OptionChoice({
                     );
                 })}
             </div>
-            <Link
+            <TextLink
                 href={productSettingsHref("options")}
-                className="text-[12px] text-brand transition-colors hover:text-foreground active:text-muted-foreground"
+                className="text-[12px]"
             >
                 Manage options
-            </Link>
+            </TextLink>
         </div>
     );
 }

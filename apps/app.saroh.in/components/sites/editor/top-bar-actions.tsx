@@ -326,7 +326,7 @@ function SecondaryActions({
                     <MessageSquare aria-hidden className="size-[15px]" />
                     Feedback
                     {p.openNotes > 0 ? (
-                        <span className="tabular-nums text-highlight">
+                        <span className="tabular-nums text-foreground">
                             {p.openNotes}
                         </span>
                     ) : null}

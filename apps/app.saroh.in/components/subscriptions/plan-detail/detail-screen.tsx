@@ -219,7 +219,7 @@ export function PlanDetail({
                 />
             </div>
             {head.banner ? (
-                <p className="mx-4 mt-3 rounded-[10px] bg-brand-subtle px-3.5 py-2.5 text-[13px] leading-[1.5] text-brand-subtle-foreground sm:mx-[26px]">
+                <p className="mx-4 mt-3 rounded-[10px] bg-muted px-3.5 py-2.5 text-[13px] leading-[1.5] text-foreground sm:mx-[26px]">
                     {head.banner}
                 </p>
             ) : null}

@@ -146,7 +146,7 @@ function Row({
                             ? ` · ${spentText(row.spent)}`
                             : null}
                         {sub?.open ? (
-                            <span className="text-brand-subtle-foreground">
+                            <span className="text-foreground">
                                 {` · ${sub.text}`}
                             </span>
                         ) : null}
@@ -171,7 +171,7 @@ function Row({
                                 className={cn(
                                     "truncate text-[12px]",
                                     sub.open
-                                        ? "text-brand-subtle-foreground"
+                                        ? "text-foreground"
                                         : "text-muted-foreground",
                                 )}
                             >

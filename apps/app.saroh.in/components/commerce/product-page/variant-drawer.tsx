@@ -22,6 +22,7 @@ import {
     ORDER_STATUS_LABEL,
 } from "@/lib/products/overview-rules";
 import { untrackedShort } from "@/lib/products/tracking";
+import { TextLink } from "@saroh/ui/text-link";
 
 export const WORD_BADGE = {
     IN_STOCK: "success",
@@ -193,15 +194,15 @@ export function VariantDrawer({
                                                         key={o.id}
                                                         className="flex items-center gap-2.5 border-b border-foreground/10 py-2 last:border-0"
                                                     >
-                                                        <Link
+                                                        <TextLink
                                                             href={orderHref(
                                                                 storeId,
                                                                 o.id,
                                                             )}
-                                                            className="font-mono text-[12px] text-brand transition-colors hover:text-foreground active:text-muted-foreground"
+                                                            className="font-mono text-[12px]"
                                                         >
                                                             {o.orderNumber}
-                                                        </Link>
+                                                        </TextLink>
                                                         <span className="min-w-0 flex-1 truncate">
                                                             {o.customer} · ×{" "}
                                                             {o.lines
@@ -266,7 +267,7 @@ export function VariantDrawer({
                                                         <span
                                                             role="img"
                                                             aria-label={`${r.rating} out of 5`}
-                                                            className="tracking-[1px] text-highlight"
+                                                            className="tracking-[1px] text-foreground"
                                                         >
                                                             {"★".repeat(
                                                                 r.rating,

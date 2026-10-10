@@ -58,7 +58,7 @@ export function PackDetailHeader({
                     lead={
                         <div
                             aria-hidden
-                            className="flex size-[52px] flex-col items-center justify-center rounded-[12px] bg-brand-subtle text-brand-subtle-foreground"
+                            className="flex size-[52px] flex-col items-center justify-center rounded-[12px] bg-muted text-foreground"
                         >
                             <span className="font-display text-[20px] font-bold leading-none">
                                 {head.thumbN}

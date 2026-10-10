@@ -14,6 +14,7 @@ import type { TodayRow } from "@/lib/home/today";
 import { clockNow, todayView } from "@/lib/home/today";
 import { recordBookingOutcome } from "@/lib/services/actions";
 import { EmptyState } from "@saroh/ui/data-state";
+import { TextLink } from "@saroh/ui/text-link";
 
 type Outcome = "ATTENDED" | "NO_SHOW";
 type Marked = Pick<HomeTodayItem, "outcome" | "outcomeTime">;
@@ -91,12 +92,12 @@ export function Today({ today, now }: { today: HomeToday; now: string }) {
                 <span className="text-[12.5px] text-muted-foreground">
                     {view.count}
                 </span>
-                <Link
+                <TextLink
                     href={today.bookings ? "/bookings" : "/commerce/orders"}
-                    className="ml-auto rounded text-[12.5px] font-semibold text-brand underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                    className="ml-auto text-[12.5px]"
                 >
                     {today.bookings ? "Open the calendar" : "All orders"}
-                </Link>
+                </TextLink>
             </div>
 
             <ul className="overflow-hidden rounded-xl border border-border bg-card">
@@ -143,7 +144,7 @@ function TodayLine({
             <span
                 className={cn(
                     "font-display text-[15px] font-semibold tabular-nums",
-                    first ? "text-brand" : "text-foreground",
+                    first ? "text-foreground" : "text-foreground",
                 )}
             >
                 {row.time}

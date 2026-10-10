@@ -28,7 +28,7 @@ export function OrderTimeline({ steps }: { steps: TimelineStep[] }) {
                             aria-hidden
                             className={cn(
                                 "mt-[5px] size-[9px] shrink-0 rounded-full",
-                                i === 0 ? "bg-highlight" : "bg-border-strong",
+                                i === 0 ? "bg-foreground" : "bg-border-strong",
                             )}
                         />
                         <div className="min-w-0">

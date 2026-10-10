@@ -115,7 +115,7 @@ export function ClassSeats({
                                 {b.contact ? (
                                     <Link
                                         href={personHref(b.contact.id)}
-                                        className="text-[13px] font-semibold text-foreground hover:text-brand"
+                                        className="text-[13px] font-semibold text-foreground hover:underline"
                                     >
                                         {whoFor(b)}
                                     </Link>

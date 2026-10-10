@@ -67,7 +67,7 @@ export function OrderHeading({
                             className={cn(
                                 "rounded-full border px-2 py-0.5 text-[12px] font-bold tabular-nums",
                                 age.late
-                                    ? "border-highlight-border bg-brand-subtle text-brand-subtle-foreground"
+                                    ? "border-border-strong bg-muted text-foreground"
                                     : "border-transparent bg-muted text-neutral-700 dark:text-muted-foreground",
                             )}
                         >

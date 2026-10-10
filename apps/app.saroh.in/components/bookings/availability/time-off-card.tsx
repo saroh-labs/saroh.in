@@ -151,9 +151,7 @@ export function OffRow({
                     <div
                         className={cn(
                             "text-[12px]",
-                            warn
-                                ? "text-brand-subtle-foreground"
-                                : "text-muted-foreground",
+                            warn ? "text-foreground" : "text-muted-foreground",
                         )}
                     >
                         {why}

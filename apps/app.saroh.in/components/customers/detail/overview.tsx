@@ -22,6 +22,7 @@ import {
 } from "@/lib/customer-workspace/view";
 import { dayText } from "@/lib/subscriptions/view";
 
+import { TextLink } from "@saroh/ui/text-link";
 import { Bar, CARD, Empty, LABEL } from "./parts";
 
 /**
@@ -112,12 +113,12 @@ export function Overview({
                                         key={f.productId}
                                         className="flex gap-2.5 border-b border-foreground/10 py-[7px] text-[13.5px]"
                                     >
-                                        <Link
+                                        <TextLink
                                             href={`/commerce/products/${f.productId}`}
-                                            className="min-w-0 flex-1 text-brand transition-colors hover:text-foreground active:text-muted-foreground"
+                                            className="min-w-0 flex-1"
                                         >
                                             {f.name}
-                                        </Link>
+                                        </TextLink>
                                         <span className="text-muted-foreground">
                                             {f.note}
                                         </span>
@@ -236,13 +237,9 @@ function ClassesLeft({
                 <span className={cn(LABEL, "flex-1")}>Classes left</span>
                 {/* The sell dialog with them chosen (C7), not a trip away. */}
                 {onSell ? (
-                    <button
-                        type="button"
-                        onClick={onSell}
-                        className="rounded-[4px] text-[12.5px] font-semibold text-brand transition-colors duration-fast hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 active:opacity-70"
-                    >
+                    <TextLink onClick={onSell} className="text-[12.5px]">
                         Sell a pack
-                    </button>
+                    </TextLink>
                 ) : null}
             </div>
             {cl ? (
@@ -258,7 +255,7 @@ function ClassesLeft({
                     {m ? (
                         <Link
                             href={`/billing/subscriptions/${m.subscriptionId}`}
-                            className="mt-2.5 block border-t border-foreground/10 pb-2 pt-2.5 text-foreground transition-colors duration-fast hover:text-brand focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring active:text-brand/80"
+                            className="mt-2.5 block border-t border-foreground/10 pb-2 pt-2.5 text-foreground transition-colors duration-fast hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring active:text-foreground"
                         >
                             <div className="flex items-baseline gap-2.5">
                                 <span className="flex-1 text-[13.5px] font-semibold">
@@ -297,7 +294,7 @@ function ClassesLeft({
                         <Link
                             key={p.name + p.sub}
                             href={p.href}
-                            className="block border-t border-foreground/10 pb-2 pt-2.5 text-foreground transition-colors duration-fast hover:text-brand focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring active:text-brand/80"
+                            className="block border-t border-foreground/10 pb-2 pt-2.5 text-foreground transition-colors duration-fast hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring active:text-foreground"
                         >
                             <div className="flex items-baseline gap-2.5">
                                 <span className="flex-1 text-[13.5px] font-semibold">
@@ -312,7 +309,7 @@ function ClassesLeft({
                                 className={cn(
                                     "mt-[5px] text-[12px]",
                                     p.warn
-                                        ? "text-brand"
+                                        ? "text-foreground"
                                         : "text-muted-foreground",
                                 )}
                             >

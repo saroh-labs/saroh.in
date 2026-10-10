@@ -237,7 +237,7 @@ export function OrderQuickView({
  * keyboard focus.
  */
 const CUSTOMER_LINK =
-    "cursor-pointer rounded-sm text-brand transition-colors duration-fast hover:text-foreground active:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring";
+    "cursor-pointer rounded-sm text-foreground underline decoration-border-strong underline-offset-4 transition-colors duration-fast hover:decoration-foreground active:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring";
 
 export function QuickViewBody({ order }: { order: OrderRead }) {
     const money = order.money;

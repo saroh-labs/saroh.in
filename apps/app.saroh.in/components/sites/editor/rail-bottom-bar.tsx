@@ -99,6 +99,6 @@ const tabClass = (on: boolean) =>
         "flex min-h-[52px] min-w-0 flex-1 basis-0 flex-col items-center justify-center gap-[3px] px-0.5 py-1.5 text-[11px] leading-tight transition-colors duration-fast",
         "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring",
         on
-            ? "font-semibold text-foreground shadow-[inset_0_2px_0_hsl(var(--highlight))]"
+            ? "font-semibold text-foreground shadow-[inset_0_2px_0_hsl(var(--foreground))]"
             : "font-medium text-muted-foreground",
     );

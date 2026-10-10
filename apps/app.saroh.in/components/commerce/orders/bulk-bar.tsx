@@ -286,10 +286,10 @@ function HeldCard({
     return (
         <div
             role="status"
-            className="pointer-events-auto rounded-[11px] border border-highlight-border bg-brand-subtle px-[15px] py-[11px] shadow-lg"
+            className="pointer-events-auto rounded-[11px] border border-border-strong bg-muted px-[15px] py-[11px] shadow-lg"
         >
             <div className="flex flex-wrap items-center gap-2.5">
-                <span className="flex-[1_1_220px] text-[13px] font-semibold tabular-nums text-brand-subtle-foreground">
+                <span className="flex-[1_1_220px] text-[13px] font-semibold tabular-nums text-foreground">
                     {holdTitle(held.count, secondsLeft(left))}
                 </span>
                 <button
@@ -297,7 +297,7 @@ function HeldCard({
                     onClick={onUndo}
                     className={cn(
                         HOLD_BUTTON,
-                        "border border-highlight-border bg-card hover:bg-muted active:bg-muted/80",
+                        "border border-border-strong bg-card hover:bg-muted active:bg-muted/80",
                     )}
                 >
                     Undo all
@@ -307,7 +307,7 @@ function HeldCard({
                     onClick={onNow}
                     className={cn(
                         HOLD_BUTTON,
-                        "text-brand-subtle-foreground hover:bg-highlight-border/30 active:bg-highlight-border/45",
+                        "text-foreground hover:bg-primary-hover active:bg-foreground",
                     )}
                 >
                     Send now
@@ -321,7 +321,7 @@ function HeldCard({
                 className="mt-2 h-[3px] rounded-full bg-foreground/5"
             >
                 <div
-                    className="h-[3px] rounded-full bg-highlight transition-[width] duration-200 ease-linear"
+                    className="h-[3px] rounded-full bg-foreground transition-[width] duration-200 ease-linear"
                     style={{ width: `${(left / HOLD_UNDO_MS) * 100}%` }}
                 />
             </div>

@@ -39,7 +39,7 @@ export function ReadyChecklist({ list }: { list: Checklist }) {
             className={cn(
                 "grid gap-3 rounded-xl border px-4 py-3",
                 counted
-                    ? "border-highlight-border bg-brand-subtle"
+                    ? "border-border-strong bg-muted"
                     : "border-border bg-card",
             )}
         >
@@ -79,7 +79,7 @@ function Steps({ list }: { list: Checklist }) {
                     className="ml-auto h-1.5 max-w-[200px] flex-[1_1_120px] self-center overflow-hidden rounded-full bg-muted"
                 >
                     <div
-                        className="h-full rounded-full bg-highlight"
+                        className="h-full rounded-full bg-foreground"
                         style={{ width: `${pct}%` }}
                     />
                 </div>
@@ -94,7 +94,9 @@ function Steps({ list }: { list: Checklist }) {
                             aria-hidden
                             className={cn(
                                 "size-[7px] shrink-0 rounded-full",
-                                item.broken ? "bg-destructive" : "bg-highlight",
+                                item.broken
+                                    ? "bg-destructive"
+                                    : "bg-foreground",
                             )}
                         />
                         <span className="grid min-w-0 flex-[1_1_220px] gap-px">
@@ -117,7 +119,7 @@ function Steps({ list }: { list: Checklist }) {
             {list.outside.length > 0 ? (
                 <ul
                     aria-label="Not counted: comes with another plan"
-                    className="grid gap-2 border-t border-highlight-border pt-2"
+                    className="grid gap-2 border-t border-border-strong pt-2"
                 >
                     {list.outside.map((item) => (
                         <li
@@ -173,7 +175,7 @@ function MakeItYours({
             aria-label="Make it yours"
             className={cn(
                 "grid gap-2",
-                ruled && "border-t border-highlight-border pt-3",
+                ruled && "border-t border-border-strong pt-3",
             )}
         >
             <h3 className="font-display text-[14px] font-semibold tracking-[-0.01em]">

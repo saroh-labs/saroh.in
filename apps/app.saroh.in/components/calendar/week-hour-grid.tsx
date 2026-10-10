@@ -66,10 +66,10 @@ export function WeekHourGrid({
                                 col.outside
                                     ? "cursor-default bg-neutral-50 dark:bg-muted"
                                     : col.selected
-                                      ? "cursor-pointer bg-brand-subtle hover:brightness-[0.98] active:brightness-95"
+                                      ? "cursor-pointer bg-muted hover:brightness-[0.98] active:brightness-95"
                                       : "cursor-pointer bg-transparent hover:bg-muted/60 active:bg-muted",
                                 col.isToday &&
-                                    "shadow-[inset_0_2px_0_hsl(var(--highlight))]",
+                                    "shadow-[inset_0_2px_0_hsl(var(--foreground))]",
                             )}
                         >
                             <span className="flex items-baseline gap-1.5">
@@ -80,7 +80,7 @@ export function WeekHourGrid({
                                         col.outside
                                             ? "text-neutral-400 dark:text-muted-foreground"
                                             : col.isToday
-                                              ? "text-brand"
+                                              ? "text-foreground"
                                               : col.past
                                                 ? "text-muted-foreground"
                                                 : "text-foreground",
@@ -157,7 +157,7 @@ export function WeekHourGrid({
                                     type="button"
                                     onClick={() => onPick(col.date)}
                                     aria-haspopup="dialog"
-                                    className="cursor-pointer rounded-[4px] px-0.5 text-left text-[11px] font-semibold text-brand transition-colors duration-fast hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring active:opacity-80"
+                                    className="cursor-pointer rounded-[4px] px-0.5 text-left text-[11px] font-semibold text-foreground underline decoration-border-strong underline-offset-4 transition-colors duration-fast hover:decoration-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring active:opacity-80"
                                 >
                                     {allDayMore} more — open the day
                                 </button>

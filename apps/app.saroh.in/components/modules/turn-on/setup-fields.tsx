@@ -136,7 +136,7 @@ export function SellFields({
                     </span>
                 ) : null}
                 {shopNote ? (
-                    <p className="text-pretty rounded-[9px] bg-brand-subtle px-3 py-2 text-[12px] leading-normal text-brand-subtle-foreground">
+                    <p className="text-pretty rounded-[9px] bg-muted px-3 py-2 text-[12px] leading-normal text-foreground">
                         {shopNote}
                     </p>
                 ) : null}

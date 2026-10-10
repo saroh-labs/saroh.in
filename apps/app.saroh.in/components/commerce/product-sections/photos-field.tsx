@@ -185,7 +185,7 @@ export function PhotosField({
             )}
 
             {allFull ? (
-                <p className="text-[12.5px] text-brand-subtle-foreground">
+                <p className="text-[12.5px] text-foreground">
                     Full: {LIMITS.photos} photos and {LIMITS.videos} videos is
                     the most. Take one off to add another.
                 </p>

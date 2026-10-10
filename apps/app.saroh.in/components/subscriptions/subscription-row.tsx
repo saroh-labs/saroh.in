@@ -39,7 +39,7 @@ export function SubscriptionRow({
             className={cn(
                 "flex w-full flex-wrap items-center gap-3 rounded-[11px] border border-border px-3.5 py-3 text-left hover:border-border-strong focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 active:bg-accent-active",
                 open
-                    ? "bg-brand-subtle shadow-[inset_3px_0_0_hsl(var(--highlight))]"
+                    ? "bg-muted shadow-[inset_3px_0_0_hsl(var(--foreground))]"
                     : "bg-card",
             )}
         >
@@ -61,7 +61,7 @@ export function SubscriptionRow({
                     {older ? (
                         <>
                             {" · "}
-                            <span className="text-brand">older price</span>
+                            <span className="text-foreground">older price</span>
                         </>
                     ) : null}
                 </span>

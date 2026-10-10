@@ -115,7 +115,7 @@ export function Bar({
                     tone === "ok"
                         ? "bg-success-subtle-foreground"
                         : tone === "accent"
-                          ? "bg-highlight"
+                          ? "bg-foreground"
                           : "bg-neutral-400",
                 )}
                 style={{ width: `${Math.max(0, Math.min(100, pct))}%` }}

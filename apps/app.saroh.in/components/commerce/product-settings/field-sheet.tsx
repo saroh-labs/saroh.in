@@ -298,10 +298,7 @@ export function FieldSheet({
                     </div>
                 )}
                 {categoryIds.length === 0 && categories.length > 0 ? (
-                    <p
-                        role="status"
-                        className="text-[11.5px] text-brand-subtle-foreground"
-                    >
+                    <p role="status" className="text-[11.5px] text-foreground">
                         In no category, so no product will ask for it.
                     </p>
                 ) : null}

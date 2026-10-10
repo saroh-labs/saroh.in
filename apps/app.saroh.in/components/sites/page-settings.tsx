@@ -141,7 +141,7 @@ export function PageSettings({
                     ) : (
                         <>
                             {unseen ? (
-                                <p className="text-xs leading-relaxed text-highlight">
+                                <p className="text-xs leading-relaxed text-foreground">
                                     {unseen}
                                 </p>
                             ) : null}

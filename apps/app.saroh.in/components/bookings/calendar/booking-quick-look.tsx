@@ -478,7 +478,7 @@ function OrderText({
     return (
         <Link
             href={orderHref(treatment)}
-            className="rounded-sm font-medium underline underline-offset-2 hover:text-brand focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            className="rounded-sm font-medium underline underline-offset-2 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
         >
             {orderLabel(treatment)}
         </Link>

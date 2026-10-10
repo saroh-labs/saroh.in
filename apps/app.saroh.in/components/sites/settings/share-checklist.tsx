@@ -70,7 +70,7 @@ export function ShareChecklist({
                     className="h-1.5 overflow-hidden rounded-full bg-muted"
                 >
                     <div
-                        className="h-full rounded-full bg-highlight transition-[width] duration-slow"
+                        className="h-full rounded-full bg-foreground transition-[width] duration-slow"
                         style={{ width: `${of ? (done / of) * 100 : 0}%` }}
                     />
                 </div>

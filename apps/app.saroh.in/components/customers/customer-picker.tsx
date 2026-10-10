@@ -286,7 +286,7 @@ export function CustomerPicker({
                             setWalkIn(false);
                             setAdding(draftFromTyped(query));
                         }}
-                        className="h-8 rounded-full border border-dashed border-border-strong bg-transparent px-[11px] text-[12.5px] font-semibold text-brand transition-colors duration-fast hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 active:bg-accent-active coarse:h-11"
+                        className="h-8 rounded-full border border-dashed border-border-strong bg-transparent px-[11px] text-[12.5px] font-semibold text-foreground underline decoration-border-strong underline-offset-4 transition-colors duration-fast hover:decoration-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 active:bg-accent-active coarse:h-11"
                     >
                         {addLabel(query)}
                     </button>

@@ -3,7 +3,6 @@
 import type { ProductPageData, StockWord } from "@saroh/site-blocks";
 import { ProductPage, SiteThemeScope } from "@saroh/site-blocks";
 import { cn } from "@saroh/ui/lib/utils";
-import Link from "next/link";
 import { useState } from "react";
 
 import { formatMoneyMajor } from "@/lib/format/money";
@@ -17,6 +16,7 @@ import {
     onTheShop,
 } from "@/lib/products/overview-rules";
 import { untrackedShort } from "@/lib/products/tracking";
+import { TextLink } from "@saroh/ui/text-link";
 
 /**
  * The Customer view: the product as its shop page shows it, drawn by the
@@ -184,7 +184,7 @@ export function CustomerView({
                                 <div className="flex gap-2.5">
                                     <span
                                         aria-hidden
-                                        className="grid size-5 shrink-0 place-items-center rounded-full bg-highlight text-[11px] font-bold text-highlight-foreground"
+                                        className="grid size-5 shrink-0 place-items-center rounded-full bg-foreground text-[11px] font-bold text-background"
                                     >
                                         {note.n}
                                     </span>
@@ -197,16 +197,16 @@ export function CustomerView({
                                                 {note.title}
                                             </p>
                                             {canWrite || note.n === 6 ? (
-                                                <Link
+                                                <TextLink
                                                     href={note.action.href}
-                                                    className="text-[12px] text-brand hover:text-foreground coarse:min-h-11"
+                                                    className="text-[12px] coarse:min-h-11"
                                                 >
                                                     {note.action.label}
                                                     <span className="sr-only">
                                                         {" "}
                                                         {note.title}
                                                     </span>
-                                                </Link>
+                                                </TextLink>
                                             ) : null}
                                         </div>
                                         <p className="mt-[3px] text-pretty text-[12px] leading-[1.5] text-foreground/75">

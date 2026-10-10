@@ -20,7 +20,7 @@ import type { DownloadEnv, QrFile, QrFormat } from "./qr-download";
 import { artOf, BROWSER, downloadQr, qrFile } from "./qr-download";
 
 const linkClass =
-    "rounded-[4px] font-semibold text-brand underline underline-offset-2 transition-colors duration-fast hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 active:text-muted-foreground";
+    "rounded-[4px] font-semibold text-foreground underline decoration-border-strong underline-offset-4 transition-colors duration-fast hover:decoration-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 active:text-muted-foreground";
 
 const NOTE = "text-[13px] leading-normal text-foreground/80";
 

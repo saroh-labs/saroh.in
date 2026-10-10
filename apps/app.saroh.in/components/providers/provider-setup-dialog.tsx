@@ -314,13 +314,13 @@ function PaymentsForm({
                 />
             </div>
             {razorpay && missingKey ? (
-                <p className="rounded-[10px] bg-highlight-subtle px-3.5 py-3 text-[12.5px] leading-[1.45] text-highlight-subtle-foreground">
+                <p className="rounded-[10px] bg-muted px-3.5 py-3 text-[12.5px] leading-[1.45] text-foreground">
                     Razorpay needs its key id to open your checkout window, and
                     this connection was saved without one. Enter the key id and
                     secret again to take payments online.
                 </p>
             ) : missingSecret ? (
-                <p className="rounded-[10px] bg-highlight-subtle px-3.5 py-3 text-[12.5px] leading-[1.45] text-highlight-subtle-foreground">
+                <p className="rounded-[10px] bg-muted px-3.5 py-3 text-[12.5px] leading-[1.45] text-foreground">
                     This connection was saved without its webhook signing
                     secret, so {labelOfPayment(provider)}&apos;s payment updates
                     are refused and payments can&apos;t be confirmed. Enter the

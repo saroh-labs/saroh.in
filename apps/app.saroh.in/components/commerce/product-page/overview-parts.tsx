@@ -81,7 +81,7 @@ export function LinkedCard({
                     aria-label={`Open ${title.toLowerCase()}`}
                     className={cn(
                         FOCUS,
-                        "rounded-sm text-[12px] text-brand hover:text-foreground coarse:min-h-11",
+                        "rounded-sm text-[12px] text-foreground underline decoration-border-strong underline-offset-4 hover:decoration-foreground coarse:min-h-11",
                     )}
                 >
                     Open
@@ -115,7 +115,7 @@ export function LinkedCardLink({
                 <span className="flex-1 text-[11.5px] text-muted-foreground">
                     {title}
                 </span>
-                <span className="text-[12px] text-brand">Open</span>
+                <span className="text-[12px] text-foreground">Open</span>
             </span>
             {children}
         </Link>

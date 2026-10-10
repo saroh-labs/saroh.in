@@ -19,12 +19,12 @@ import { Segmented } from "@saroh/ui/segmented";
 
 const BAR = {
     ok: "bg-success",
-    soon: "bg-highlight",
+    soon: "bg-foreground",
     ended: "bg-muted-foreground",
 } as const;
 
 const WHEN = {
-    soon: "text-brand",
+    soon: "text-foreground",
     lost: "text-destructive",
     plain: "text-foreground/80",
 } as const;
@@ -186,7 +186,7 @@ function HolderItem({
                     <Link
                         href={row.href}
                         aria-label={`Open ${row.name}`}
-                        className="min-w-0 flex-1 rounded-[4px] text-[14px] font-semibold text-foreground transition-colors duration-fast hover:text-brand focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 active:text-brand/80"
+                        className="min-w-0 flex-1 rounded-[4px] text-[14px] font-semibold text-foreground transition-colors duration-fast hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 active:text-foreground"
                     >
                         {row.name}
                     </Link>

@@ -64,7 +64,7 @@ export function LocationReadinessCard({
         <section
             aria-labelledby="location-ready-heading"
             data-testid="location-readiness"
-            className="grid gap-2.5 rounded-xl border border-highlight-border bg-brand-subtle px-4 py-3"
+            className="grid gap-2.5 rounded-xl border border-border-strong bg-muted px-4 py-3"
         >
             <div className="flex flex-wrap items-baseline gap-x-2.5 gap-y-1">
                 <h2
@@ -91,7 +91,7 @@ export function LocationReadinessCard({
                     className="ml-auto h-1.5 max-w-[200px] flex-[1_1_120px] self-center overflow-hidden rounded-full bg-muted"
                 >
                     <div
-                        className="h-full rounded-full bg-highlight"
+                        className="h-full rounded-full bg-foreground"
                         style={{ width: `${pct}%` }}
                     />
                 </div>
@@ -140,7 +140,7 @@ function Item({
         <li className="flex min-h-8 flex-wrap items-center gap-x-2.5 gap-y-1.5 text-[13px]">
             <span
                 aria-hidden
-                className="size-[7px] shrink-0 rounded-full bg-highlight"
+                className="size-[7px] shrink-0 rounded-full bg-foreground"
             />
             <span className="min-w-0 flex-[1_1_200px] font-medium">
                 <span className="sr-only">To do: </span>

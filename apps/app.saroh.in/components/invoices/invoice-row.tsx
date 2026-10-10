@@ -49,7 +49,7 @@ export function InvoiceRow({
             className={cn(
                 "grid w-full grid-cols-[minmax(0,1fr)_auto] items-center gap-x-3.5 gap-y-2 rounded-[11px] border border-border px-3.5 py-3 text-left transition-colors duration-fast hover:border-border-strong focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 active:border-border-strong active:bg-accent md:grid-cols-[minmax(120px,1fr)_minmax(0,2fr)_minmax(0,1.6fr)_96px]",
                 selected
-                    ? "bg-brand-subtle shadow-[inset_3px_0_0_hsl(var(--highlight))]"
+                    ? "bg-muted shadow-[inset_3px_0_0_hsl(var(--foreground))]"
                     : "bg-card",
                 nested && "md:ml-6 md:w-[calc(100%-1.5rem)]",
             )}

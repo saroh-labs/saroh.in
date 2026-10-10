@@ -14,6 +14,7 @@ import type { OverviewOrder } from "@/lib/products/overview-rules";
 import { ORDER_STATUS_LABEL } from "@/lib/products/overview-rules";
 
 import { chipClass } from "@/components/shared/chip";
+import { TextLink } from "@saroh/ui/text-link";
 import {
     PanelFailed,
     PanelForbidden,
@@ -98,12 +99,9 @@ export function ProductOrdersTab({
                         ? heldBy(data.recent, product.name)
                         : `The latest ${rows.length} of ${Math.max(data.recent.length, data.thisMonthCount)} orders this month.`}
                 </p>
-                <Link
-                    href="/commerce/orders"
-                    className="text-[12.5px] text-brand transition-colors hover:text-foreground active:text-muted-foreground"
-                >
+                <TextLink href="/commerce/orders" className="text-[12.5px]">
                     All orders for it in Orders →
-                </Link>
+                </TextLink>
             </div>
 
             {rows.length === 0 ? (
@@ -148,24 +146,23 @@ export function ProductOrdersTab({
                                         )}
                                     >
                                         <td>
-                                            <Link
+                                            <TextLink
                                                 href={orderHref(storeId, o.id)}
-                                                className="font-mono text-[12px] text-brand transition-colors hover:text-foreground active:text-muted-foreground"
+                                                className="font-mono text-[12px]"
                                             >
                                                 {o.orderNumber}
-                                            </Link>
+                                            </TextLink>
                                         </td>
                                         <td className="truncate">
                                             {o.customerId ? (
-                                                <Link
+                                                <TextLink
                                                     href={customerHref(
                                                         storeId,
                                                         o.customerId,
                                                     )}
-                                                    className="text-brand transition-colors hover:text-foreground active:text-muted-foreground"
                                                 >
                                                     {o.customer}
-                                                </Link>
+                                                </TextLink>
                                             ) : (
                                                 // A walk-in (B13): no record to open.
                                                 o.customer
