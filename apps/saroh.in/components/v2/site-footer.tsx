@@ -58,7 +58,7 @@ const SOCIAL_MARKS: Readonly<Record<string, readonly string[]>> = {
  * live) and Saroh (Pricing once the launch switch is open, Questions,
  * Contact, Sign in once it is open too). The two sit side by side from
  * 1024px and stack below it; the columns wrap at 130px. Under them, who
- * makes Saroh and the legal pages that are published (R6): Privacy from its
+ * makes Saroh with the copyright line (the year the site was built) and the legal pages that are published (R6): Privacy from its
  * date, and "Cookie choices" where the cookie notice can appear. No Terms
  * until they're published. Before them, always, "Bought from a business on
  * Saroh?" to /customers (DEC-121).
@@ -195,7 +195,10 @@ export function SiteFooter({
                 </div>
             </div>
             <div className="mt-14 flex flex-wrap items-center justify-between gap-x-6 gap-y-2 border-t border-border pt-6 text-[13.5px]">
-                <span>{MADE_BY}</span>
+                <span>
+                    {MADE_BY}. © {new Date().getFullYear()}. All rights
+                    reserved.
+                </span>
                 <div className="flex flex-wrap items-center gap-x-5 gap-y-2">
                     {/* For a business's customers (DEC-121): always here,
                         since a paid merchant site links to Saroh nowhere. */}

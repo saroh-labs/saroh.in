@@ -40,7 +40,11 @@ describe("SiteFooter", () => {
 
     it("says who makes Saroh, and has no Resources column, Privacy or Terms before they're live", () => {
         render(<SiteFooter />);
-        expect(screen.getByText(MADE_BY)).toBeTruthy();
+        expect(
+            screen.getByText(
+                `${MADE_BY}. © ${new Date().getFullYear()}. All rights reserved.`,
+            ),
+        ).toBeTruthy();
         expect(screen.queryByText("Resources")).toBeNull();
         expect(screen.queryByRole("link", { name: "Privacy" })).toBeNull();
         expect(screen.queryByRole("link", { name: /Terms/ })).toBeNull();
