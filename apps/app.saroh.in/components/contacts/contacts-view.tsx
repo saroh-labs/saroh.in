@@ -16,6 +16,7 @@ import type { ContactListItem } from "@/lib/contacts/service";
 import { contactSourceLabel } from "@/lib/contacts/source";
 import { contactName, openLeadsLabel, shownEmail } from "@/lib/crm/format";
 import { formatMoney, formatMoneyMajor } from "@/lib/format/money";
+import { Users } from "lucide-react";
 
 /**
  * Contacts as a customer record, not an address book.
@@ -291,10 +292,16 @@ export function ContactsView({
             rowHref={(c) => personHref(c.id)}
             modes={["table", "grid", "list"]}
             defaultMode="table"
+            noun={{ one: "contact", other: "contacts" }}
+            showTotal={false}
             filters={FILTERS}
             initialFilterId={initialView}
             searchableColumnIds={["name", "email", "company", "source"]}
-            empty="Contacts appear here as enquiries come in, or when you create a lead by hand."
+            emptyState={{
+                icon: <Users />,
+                title: "No contacts yet",
+                note: "They show here as enquiries come in, or when you add a lead.",
+            }}
             renderCard={(c) => (
                 <Link href={personHref(c.id)} className="block">
                     {/* `wk-surface`, not a brand-tinted hover edge: the card is a

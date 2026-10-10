@@ -128,6 +128,12 @@ export default async function LeadDetailPage({
     return (
         <PageContainer>
             <PageHeader
+                breadcrumb={[
+                    <Link key="leads" href="/leads">
+                        Leads
+                    </Link>,
+                    lead.title,
+                ]}
                 title={lead.title}
                 description={
                     lead.contact ? (

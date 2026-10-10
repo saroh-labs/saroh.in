@@ -5,6 +5,7 @@ import { cn } from "@saroh/ui/lib/utils";
 import Link from "next/link";
 
 import { QuickLook, QuickLookCard } from "@/components/shared/quick-look";
+import { EmptyState } from "@saroh/ui/data-state";
 
 import type {
     Optional,
@@ -252,9 +253,11 @@ function Body({
                             </Link>
                         ))
                     ) : (
-                        <p className="border-t border-border/70 py-2 text-[12.5px] text-muted-foreground">
-                            Nothing charged yet.
-                        </p>
+                        <EmptyState
+                            size="inline"
+                            className="border-t border-border/70 py-2"
+                            title="No charges yet."
+                        />
                     )
                 ) : (
                     <p

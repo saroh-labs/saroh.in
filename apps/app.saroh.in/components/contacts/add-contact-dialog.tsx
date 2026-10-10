@@ -13,7 +13,6 @@ import {
 import { Input } from "@saroh/ui/input";
 import { Label } from "@saroh/ui/label";
 import { showError, showSuccess } from "@saroh/ui/toast";
-import { Plus } from "lucide-react";
 import { useRouter } from "next/navigation";
 import type { ReactNode } from "react";
 import { useId, useState } from "react";
@@ -110,12 +109,7 @@ export function AddContactDialog({
             }}
         >
             <DialogTrigger asChild>
-                {trigger ?? (
-                    <Button>
-                        <Plus className="mr-1.5 size-4" />
-                        Add contact
-                    </Button>
-                )}
+                {trigger ?? <Button>New contact</Button>}
             </DialogTrigger>
             <DialogContent className="max-w-[440px]">
                 <form onSubmit={(e) => void submit(e)} className="space-y-4">

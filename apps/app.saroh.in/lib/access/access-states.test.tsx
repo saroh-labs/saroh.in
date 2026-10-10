@@ -170,7 +170,7 @@ describe("ModuleGate", () => {
         const html = await gate("COMMERCE");
         expect(html).toContain("Sell is turned off");
         expect(html).toContain(
-            "Sell is not switched on for this business. Nothing it holds has been deleted. Turning it on brings this section back.",
+            "Nothing is deleted. Turn it on to bring it back.",
         );
         expect(html).toContain("Turn on in Modules");
         expect(html).toContain('href="/settings/modules"');

@@ -16,19 +16,19 @@ import { SectionError } from "@/components/shared/section-error";
  */
 export default function Error({
     error,
-    reset,
+    retry,
 }: {
     error: Error & { digest?: string };
-    reset: () => void;
+    retry: () => void;
 }) {
     return (
         <SectionError
             error={error}
-            reset={reset}
-            title="Couldn't open the editor"
-            description="Your published site is unaffected — this is the editor failing to load."
+            retry={retry}
+            things="the editor"
+            reassurance="Your published site is unaffected."
             backHref="/sites"
-            backLabel="Back to Website"
+            place="Website"
         />
     );
 }

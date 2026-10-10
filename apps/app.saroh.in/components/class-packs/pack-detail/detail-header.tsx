@@ -2,12 +2,16 @@
 
 import { Button } from "@saroh/ui/button";
 import { cn } from "@saroh/ui/lib/utils";
+import { PageHeader } from "@saroh/ui/page-header";
 import Link from "next/link";
+import { packCrumbs } from "../pack-editor/pack-crumbs";
 
 import { Pill } from "@/components/subscriptions/pill";
 import type { DetailHeader } from "@/lib/class-packs/pack-detail";
 
-import { GUTTER } from "./detail-crumbs";
+/** The page's gutter: the page container's own, 26px and 16px on a phone. */
+export const GUTTER = "px-4 sm:px-[26px]";
+
 export type Lens = "team" | "customer";
 
 const LENSES: { key: Lens; label: string }[] = [
@@ -16,8 +20,10 @@ const LENSES: { key: Lens; label: string }[] = [
 ];
 
 /**
- * Pack Detail's header (E16, after the design): the thumb, name and pills,
- * its terms, the Team/Customer lens, Sell at the desk and Edit pack; then,
+ * Pack Detail's header (E16): the page header every screen draws, with
+ * where the pack sits, its thumb, name and pills, its terms, whether the
+ * booking page shows it, the Team/Customer lens, Sell at the desk and Edit
+ * pack; then,
  * for a pack not on sale, the band saying why — with Sell again on an
  * archived one.
  */
@@ -44,101 +50,101 @@ export function PackDetailHeader({
 }) {
     return (
         <>
-            <div
-                className={cn(
-                    "flex flex-wrap items-center gap-3.5 border-b border-border pb-4 pt-5",
-                    GUTTER,
-                )}
-            >
-                <div
-                    aria-hidden
-                    className="flex size-[52px] flex-none flex-col items-center justify-center rounded-[12px] bg-brand-subtle text-brand-subtle-foreground"
-                >
-                    <span className="font-display text-[20px] font-bold leading-none">
-                        {head.thumbN}
-                    </span>
-                    <span className="mt-0.5 text-[11px] font-semibold">
-                        {head.thumbUnit}
-                    </span>
-                </div>
-                <div className="min-w-0 flex-[1_1_260px]">
-                    <div className="flex flex-wrap items-center gap-[9px]">
-                        <h1 className="m-0 font-display text-[24px] font-semibold tracking-[-0.025em]">
-                            {name}
-                        </h1>
-                        <Pill tone={head.status.tone}>{head.status.label}</Pill>
-                        <Pill tone="off">{head.kindLabel}</Pill>
-                        {head.firstOnly ? (
-                            <Pill tone="accent">First pack only</Pill>
-                        ) : null}
-                        {head.pending ? (
-                            <Pill tone="accent">Changes not published</Pill>
-                        ) : null}
-                    </div>
-                    <p className="m-0 mt-1 text-pretty text-[13px] text-muted-foreground">
-                        {head.meta}
-                    </p>
-                </div>
-                <div
-                    role="group"
-                    aria-label="View as"
-                    className="flex rounded-[10px] bg-muted p-[3px]"
-                >
-                    {LENSES.map((l) => {
-                        const on = lens === l.key;
-                        return (
-                            <button
-                                key={l.key}
-                                type="button"
-                                aria-pressed={on}
-                                onClick={() => onLens(l.key)}
-                                className={cn(
-                                    "cursor-pointer rounded-[8px] px-3.5 py-1.5 text-[13px] font-semibold transition-colors duration-fast focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring coarse:min-h-11",
-                                    on
-                                        ? "bg-card text-foreground shadow-xs"
-                                        : "text-muted-foreground hover:text-foreground active:bg-accent-active",
-                                )}
+            <div className={cn("border-b border-border pb-4 pt-5", GUTTER)}>
+                <PageHeader
+                    className="mb-0"
+                    breadcrumb={packCrumbs(name)}
+                    lead={
+                        <div
+                            aria-hidden
+                            className="flex size-[52px] flex-col items-center justify-center rounded-[12px] bg-brand-subtle text-brand-subtle-foreground"
+                        >
+                            <span className="font-display text-[20px] font-bold leading-none">
+                                {head.thumbN}
+                            </span>
+                            <span className="mt-0.5 text-[11px] font-semibold">
+                                {head.thumbUnit}
+                            </span>
+                        </div>
+                    }
+                    title={name}
+                    badge={
+                        <>
+                            <Pill tone={head.status.tone}>
+                                {head.status.label}
+                            </Pill>
+                            <Pill tone="off">{head.kindLabel}</Pill>
+                            {head.firstOnly ? (
+                                <Pill tone="accent">First pack only</Pill>
+                            ) : null}
+                            {head.pending ? (
+                                <Pill tone="accent">Changes not published</Pill>
+                            ) : null}
+                        </>
+                    }
+                    description={head.meta}
+                    meta={
+                        <>
+                            {head.bookingPage ? (
+                                <span className="text-[12.5px] font-medium">
+                                    {head.bookingPage}
+                                </span>
+                            ) : null}
+                            <div
+                                role="group"
+                                aria-label="View as"
+                                className="flex rounded-[10px] bg-muted p-[3px]"
                             >
-                                {l.label}
-                            </button>
-                        );
-                    })}
-                </div>
-                {canSell ? (
-                    <Button
-                        variant="outline"
-                        disabled={!head.onSale}
-                        aria-describedby={
-                            head.note ? "pack-detail-note" : undefined
-                        }
-                        onClick={onSell}
-                    >
-                        Sell at the desk
-                    </Button>
-                ) : null}
-                {canWrite && head.editHref ? (
-                    <Button asChild>
-                        <Link href={head.editHref}>
-                            <svg
-                                aria-hidden
-                                width="14"
-                                height="14"
-                                viewBox="0 0 24 24"
-                                fill="none"
-                                className="size-3.5"
-                            >
-                                <path
-                                    d="M4 20 H8 L19 9 L15 5 L4 16 Z M13 7 L17 11"
-                                    stroke="currentColor"
-                                    strokeWidth="1.9"
-                                    strokeLinecap="round"
-                                    strokeLinejoin="round"
-                                />
-                            </svg>
-                            Edit pack
-                        </Link>
-                    </Button>
-                ) : null}
+                                {LENSES.map((l) => {
+                                    const on = lens === l.key;
+                                    return (
+                                        <button
+                                            key={l.key}
+                                            type="button"
+                                            aria-pressed={on}
+                                            onClick={() => onLens(l.key)}
+                                            className={cn(
+                                                "cursor-pointer rounded-[8px] px-3.5 py-1.5 text-[13px] font-semibold transition-colors duration-fast focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring coarse:min-h-11",
+                                                on
+                                                    ? "bg-card text-foreground shadow-xs"
+                                                    : "text-muted-foreground hover:text-foreground active:bg-accent-active",
+                                            )}
+                                        >
+                                            {l.label}
+                                        </button>
+                                    );
+                                })}
+                            </div>
+                        </>
+                    }
+                    actions={
+                        canSell || (canWrite && head.editHref) ? (
+                            <>
+                                {canSell ? (
+                                    <Button
+                                        variant="outline"
+                                        disabled={!head.onSale}
+                                        aria-describedby={
+                                            head.note
+                                                ? "pack-detail-note"
+                                                : undefined
+                                        }
+                                        onClick={onSell}
+                                    >
+                                        Sell at the desk
+                                    </Button>
+                                ) : null}
+                                {canWrite && head.editHref ? (
+                                    <Button asChild>
+                                        <Link href={head.editHref}>
+                                            Edit pack
+                                        </Link>
+                                    </Button>
+                                ) : null}
+                            </>
+                        ) : undefined
+                    }
+                />
             </div>
             {head.note ? (
                 <div

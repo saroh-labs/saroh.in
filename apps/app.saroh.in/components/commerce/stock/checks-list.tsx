@@ -1,7 +1,7 @@
 "use client";
 
 import { Button } from "@saroh/ui/button";
-import { FailedState } from "@saroh/ui/data-state";
+import { EmptyState, FailedState } from "@saroh/ui/data-state";
 import { showError, showSuccess } from "@saroh/ui/toast";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -15,6 +15,7 @@ import {
     undoStock,
 } from "@/lib/stock/screen-actions";
 import type { StockCheck, StockChecks } from "@/lib/stock/service";
+import { couldntLoad, nothingChanged } from "@saroh/ui/lib/state-copy";
 
 import { pillClass } from "./tones";
 
@@ -63,17 +64,12 @@ export function ChecksList({
             <div>
                 {intro}
                 <FailedState
-                    title="Stock checks couldn't be loaded"
-                    description="Saroh couldn't compare the log with orders just now. This doesn't mean everything adds up."
-                    action={
-                        <Button
-                            type="button"
-                            variant="outline"
-                            onClick={() => router.refresh()}
-                        >
-                            Try again
-                        </Button>
-                    }
+                    size="panel"
+                    title={couldntLoad("stock checks")}
+                    description={nothingChanged(
+                        "This doesn't mean everything adds up.",
+                    )}
+                    onRetry={() => router.refresh()}
                 />
             </div>
         );
@@ -167,10 +163,11 @@ export function ChecksList({
                     );
                 })}
                 {loaded.list.length === 0 ? (
-                    <div className="rounded-xl border border-dashed border-border-strong px-4 py-7 text-center text-[13px] text-muted-foreground">
-                        Everything adds up. Every sale in the log matches an
-                        order, and the last counts match the log.
-                    </div>
+                    <EmptyState
+                        size="panel"
+                        title="Everything adds up"
+                        description="Every sale in the log matches an order, and the last counts match the log."
+                    />
                 ) : null}
             </div>
             {loaded.next ? (

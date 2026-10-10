@@ -1,4 +1,6 @@
-import { InvoiceCrumbs } from "@/components/invoices/invoice-crumbs";
+import { PageHeader } from "@saroh/ui/page-header";
+import Link from "next/link";
+
 import { InvoiceForm } from "@/components/invoices/invoice-form";
 import { PageContainer } from "@/components/shared/page-container";
 import { requireCan } from "@/lib/access/require-can";
@@ -57,14 +59,18 @@ export default async function NewInvoicePage({
     return (
         <PageContainer width="full">
             <div>
-                <InvoiceCrumbs current="New" />
-                <h1 className="mb-1 font-display text-[28px] font-semibold tracking-[-0.02em]">
-                    New invoice
-                </h1>
-                <p className="mb-4 text-[12.5px] text-muted-foreground">
-                    For trade and one-off work. Orders and subscriptions make
-                    their own.
-                </p>
+                <PageHeader
+                    className="mb-4"
+                    breadcrumb={[
+                        "Payments",
+                        <Link key="list" href="/billing/invoices">
+                            Invoices
+                        </Link>,
+                        "New invoice",
+                    ]}
+                    title="New invoice"
+                    description="For trade and one-off work. Orders and subscriptions make their own."
+                />
                 <InvoiceForm
                     contacts={contacts}
                     // The currency the business last invoiced in.

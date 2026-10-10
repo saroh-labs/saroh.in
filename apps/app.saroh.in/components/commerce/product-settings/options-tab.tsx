@@ -63,6 +63,7 @@ export function OptionsTab({ catalogue }: { catalogue: CatalogueView }) {
 
             {options.length === 0 ? (
                 <EmptyState
+                    size="panel"
                     title="No options yet"
                     description="Add one when a product comes in more than one kind, such as Size with 250g and 500g."
                     action={newOption}

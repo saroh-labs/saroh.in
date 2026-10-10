@@ -1,5 +1,10 @@
 import { renderToStaticMarkup } from "react-dom/server";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
+
+// `FailedRead` reads the page again through the router.
+vi.mock("next/navigation", () => ({
+    useRouter: () => ({ refresh: vi.fn() }),
+}));
 
 import type { ClassWaitlistRow } from "@/lib/services/class-waitlist-words";
 
@@ -68,16 +73,16 @@ describe("ClassWaitlist", () => {
         const html = renderToStaticMarkup(
             <ClassWaitlist timezone="Asia/Kolkata" rows={[]} />,
         );
-        expect(text(html)).toContain("Nobody waiting.");
+        expect(text(html)).toContain("No one is waiting.");
     });
 
     it("says a failed read failed, never that nobody is waiting", () => {
         const html = renderToStaticMarkup(
             <ClassWaitlist timezone="Asia/Kolkata" rows={null} />,
         );
-        expect(text(html)).toContain(
-            "We couldn't load the waitlist. Refresh the page to try again.",
-        );
-        expect(text(html)).not.toContain("Nobody waiting.");
+        expect(html).toContain('role="alert"');
+        expect(text(html)).toContain("Couldn't load the waitlist.");
+        expect(text(html)).toContain("Try again");
+        expect(text(html)).not.toContain("No one is waiting.");
     });
 });

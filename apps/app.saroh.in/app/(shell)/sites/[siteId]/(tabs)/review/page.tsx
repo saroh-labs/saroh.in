@@ -50,8 +50,8 @@ export default async function SiteReviewPage({
         return (
             <EmptyState
                 icon={<FileText />}
-                title="Nothing to read yet"
-                description="This site has no pages yet. They appear here as soon as someone adds one."
+                title="No pages yet"
+                description="They show here as soon as someone adds one."
             />
         );
     }

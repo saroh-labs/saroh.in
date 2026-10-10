@@ -3,6 +3,7 @@ import { FailedState } from "@saroh/ui/data-state";
 import { cn } from "@saroh/ui/lib/utils";
 
 import type { HistoryRow } from "@/lib/subscriptions/plan-detail";
+import { couldntLoad } from "@saroh/ui/lib/state-copy";
 
 /**
  * Plan Detail's History (D4): every recorded change, newest first, who made
@@ -27,13 +28,9 @@ export function PlanHistory({
     if (!rows) {
         return (
             <FailedState
-                title="History could not be loaded"
-                description="This tab couldn't read the plan's changes. Nothing has changed — the plan is as it was."
-                action={
-                    <Button variant="outline" onClick={onRetry}>
-                        Try again
-                    </Button>
-                }
+                size="panel"
+                title={couldntLoad("this plan's history")}
+                onRetry={onRetry}
             />
         );
     }

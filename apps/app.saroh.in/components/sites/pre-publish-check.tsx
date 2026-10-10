@@ -17,6 +17,7 @@ import type {
     SitePage,
 } from "@/lib/sites/service";
 import { OVERRIDE_RECORD } from "@/lib/sites/test-releases";
+import { EmptyState } from "@saroh/ui/data-state";
 
 /**
  * The pre-publish check (spec §2, "Publish").
@@ -254,9 +255,11 @@ export function PrePublishCheck({
                     )}
 
                     {total === 0 ? (
-                        <p className="rounded-md border border-dashed p-8 text-center text-sm text-muted-foreground">
-                            Everything checks out. Publish when you are ready.
-                        </p>
+                        <EmptyState
+                            size="panel"
+                            title="Everything checks out"
+                            description="Publish when you are ready."
+                        />
                     ) : (
                         <div className="space-y-8">
                             {siteWide.length > 0 ? (

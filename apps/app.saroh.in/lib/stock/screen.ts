@@ -177,22 +177,6 @@ export function untrackedLine(n: number): string {
         : `${n} products aren't tracked and always sell:`;
 }
 
-/** What an empty table says, by what narrowed it. */
-export function noRowsWords(view: {
-    needs: boolean;
-    q: string;
-    /** Nothing narrows the view: the business counts nothing yet. */
-    all?: boolean;
-}): string {
-    if (view.needs && !view.q) {
-        return "Nothing needs you. Every size has more than its warning level.";
-    }
-    if (view.q) return `No products match "${view.q}".`;
-    return view.all
-        ? "No product counts stock yet. Turn on Track stock in a product's editor to count it here."
-        : "No products match.";
-}
-
 // ---- Counting ----
 
 /** The count box of one shelf. */

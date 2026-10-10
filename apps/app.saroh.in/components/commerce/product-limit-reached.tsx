@@ -1,6 +1,5 @@
 import { Button } from "@saroh/ui/button";
-import { CapabilityOffState } from "@saroh/ui/data-state";
-import { Lock } from "lucide-react";
+import { LimitReachedState } from "@saroh/ui/data-state";
 import Link from "next/link";
 
 import type { PlanMeter } from "@/lib/billing/meter";
@@ -12,23 +11,16 @@ import type { PlanMeter } from "@/lib/billing/meter";
  */
 export function ProductLimitReached({ meter }: { meter: PlanMeter }) {
     return (
-        <CapabilityOffState
-            icon={<Lock />}
+        <LimitReachedState
             title={`You're at ${meter.label}`}
-            description={`${meter.reason ?? ""} Archive or delete one to make room, or move to a plan with more.`}
-            action={
-                <div className="flex flex-wrap gap-2">
-                    <Button asChild>
-                        <Link href={meter.href}>
-                            {meter.upgradeTo
-                                ? `Upgrade to ${meter.upgradeTo}`
-                                : "See plans"}
-                        </Link>
-                    </Button>
-                    <Button asChild variant="outline">
-                        <Link href="/commerce/products">Back to products</Link>
-                    </Button>
-                </div>
+            description="Archive or delete one to make room, or move to a plan with more."
+            plan={meter.upgradeTo}
+            href={meter.href}
+            canChangePlan
+            secondary={
+                <Button asChild variant="outline" className="wk-press">
+                    <Link href="/commerce/products">Back to Products</Link>
+                </Button>
             }
         />
     );

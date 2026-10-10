@@ -2,7 +2,7 @@
 
 import { Button } from "@saroh/ui/button";
 import { EmptyState } from "@saroh/ui/data-state";
-import { PageHeader } from "@saroh/ui/page-header";
+import { countLabel, PageHeader } from "@saroh/ui/page-header";
 import { dismissToasts, showError, showUndo } from "@saroh/ui/toast";
 import { Ticket } from "lucide-react";
 import Link from "next/link";
@@ -24,6 +24,7 @@ import { SellPackDialog } from "./sell-pack-dialog";
 
 /** An Undo toast lasts ten seconds (round-2 default 136). */
 const UNDO_MS = 10_000;
+
 /** Archived, with who keeps what: the toast Undo sits beside. */
 function archiveToast(pack: PackListItem, archived: boolean): string {
     if (!archived) return `${pack.name} is on sale again.`;
@@ -122,51 +123,52 @@ export function PacksScreen({
                     <Link
                         key="bookings"
                         href="/bookings"
-                        className="rounded-sm hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                        className="focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
                     >
                         Bookings
                     </Link>,
-                    "Packs",
+                    "Class packs",
                 ]}
                 title="Class packs"
+                count={countLabel(packs.length, {
+                    one: "pack",
+                    other: "packs",
+                })}
                 description={
                     <span className="block max-w-[720px] text-pretty text-[13px] leading-[1.5] text-foreground/80">
                         {rules}
                     </span>
                 }
+                // A summary, not a button: before the actions.
+                meta={summary}
                 actions={
-                    <span className="text-[12.5px] text-muted-foreground">
-                        {summary}
-                    </span>
+                    canWrite ? (
+                        <>
+                            <Button asChild variant="outline">
+                                <Link href="/class-packs/new?kind=one-to-one">
+                                    New one-to-one pack
+                                </Link>
+                            </Button>
+                            <Button asChild>
+                                <Link href="/class-packs/new">New pack</Link>
+                            </Button>
+                        </>
+                    ) : undefined
                 }
                 className="mb-0"
             />
             <ClassPacksTabs current="packs" />
 
-            <div className="flex flex-wrap items-center gap-2.5">
-                <p className="flex-[1_1_280px] text-pretty text-[13px] text-foreground/80">
-                    Changing a pack only changes what&apos;s sold next. Packs
-                    people already have keep their classes, price and dates.
-                </p>
-                {canWrite ? (
-                    <>
-                        <Button asChild>
-                            <Link href="/class-packs/new">New pack</Link>
-                        </Button>
-                        <Button asChild variant="outline">
-                            <Link href="/class-packs/new?kind=one-to-one">
-                                New one-to-one pack
-                            </Link>
-                        </Button>
-                    </>
-                ) : null}
-            </div>
+            <p className="text-pretty text-[13px] text-foreground/80">
+                Changing a pack only changes what&apos;s sold next. Packs people
+                already have keep their classes, price and dates.
+            </p>
 
             {ordered.length === 0 ? (
                 <EmptyState
                     icon={<Ticket />}
-                    title="No packs yet"
-                    description="A pack is a number of classes for one price, used within a set time. Customers see it when they book a class."
+                    title="No class packs yet"
+                    description="A pack is a number of classes for one price, used within a set time."
                     action={
                         canWrite ? (
                             <Button asChild>

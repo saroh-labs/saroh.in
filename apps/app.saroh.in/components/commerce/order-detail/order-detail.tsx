@@ -45,7 +45,7 @@ import { HoldCard } from "./hold-card";
 import { AllergyBanner, OrderItems } from "./items";
 import { KitchenPaymentCard } from "./kitchen-payment-card";
 import { MoneyCard } from "./money-card";
-import { OrderCrumbs, OrderHeading } from "./order-header";
+import { OrderHeading } from "./order-header";
 import { useOrderPanel } from "./order-sheet";
 import { OrderSheets } from "./order-sheets";
 import type { PillTone } from "./parts";
@@ -363,8 +363,7 @@ export function OrderDetail({
 
     return (
         <main className="w-full">
-            <OrderCrumbs number={number} />
-            <div className="flex flex-col gap-4 px-4 pb-[26px] pt-5 sm:px-6">
+            <div className="flex flex-col gap-4 px-4 pb-[26px] pt-5 sm:px-[26px]">
                 {heading}
                 {unpaid ? (
                     <PaymentBanner

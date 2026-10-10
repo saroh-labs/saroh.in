@@ -68,7 +68,7 @@ export function ModuleList({
     // Turning one on asks for its minimum first, in the one sheet (DEC-068).
     const [turningOn, setTurningOn] = useState<string[] | null>(null);
     return (
-        <div className="max-w-[760px]">
+        <div>
             <TurnOnSheet
                 picked={turningOn}
                 modules={all}

@@ -1,4 +1,4 @@
-import { PageHeader } from "@saroh/ui/page-header";
+import { countLabel, PageHeader } from "@saroh/ui/page-header";
 import Link from "next/link";
 
 import { BookingsView } from "@/components/bookings/bookings-view";
@@ -82,24 +82,25 @@ export default async function BookingsPage({
             : null;
 
     return (
-        <PageContainer width="wide">
+        <PageContainer width="full">
             <PageHeader
                 breadcrumb={[
-                    <Link
-                        key="b"
-                        href="/bookings"
-                        className="hover:text-foreground"
-                    >
+                    <Link key="b" href="/bookings">
                         Bookings
                     </Link>,
                     "All bookings",
                 ]}
                 title="All bookings"
+                count={countLabel(every.length, {
+                    one: "booking",
+                    other: "bookings",
+                })}
                 description="Bookings across your services, in the timezone each was booked in."
+                meta={<BookingsViewSwitch current="list" />}
                 actions={
                     <>
-                        <BookingsViewSwitch current="list" />
                         <NewBookingDialog
+                            plainTrigger
                             services={services
                                 .filter((s) => s.status === "ACTIVE")
                                 .map((s) => ({

@@ -11,6 +11,7 @@ import type {
     SetupFacts,
 } from "@/lib/organizations/settings-service";
 import type { ConnectedCommsProvider } from "@/lib/providers/service";
+import { planLabel } from "@saroh/ui/lib/state-copy";
 
 import { BUSINESS_TAB_PARAM } from "./search";
 
@@ -247,7 +248,7 @@ function onlinePaymentsAside(
         comesWith: upgrade
             ? `Comes with ${upgrade.name}`
             : "Comes with a paid plan",
-        cta: "See plans",
+        cta: planLabel(),
         href: upgradeHref(upgrade?.planId),
     };
 }

@@ -5,19 +5,18 @@ import { SectionError } from "@/components/shared/section-error";
 /** A read that failed is not an empty list: nobody's enrolment changed. */
 export default function Error({
     error,
-    reset,
+    retry,
 }: {
     error: Error & { digest?: string };
-    reset: () => void;
+    retry: () => void;
 }) {
     return (
         <SectionError
             error={error}
-            reset={reset}
-            title="Courses could not be loaded"
-            description="This screen could not read them. Nothing has been changed — everyone enrolled is still booked on their sessions."
-            backHref="/"
-            backLabel="Back to Home"
+            retry={retry}
+            heading="Courses"
+            things="courses"
+            reassurance="Everyone enrolled is still booked on their sessions."
         />
     );
 }

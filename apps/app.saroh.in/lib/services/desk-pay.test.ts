@@ -41,7 +41,7 @@ describe("taking payment at the desk (P2)", () => {
             /take the rest here/,
         );
         expect(off({ cents: 50_000, byLink: true }, false)).toMatch(
-            /Connect a payment provider/,
+            /No payment provider connected/,
         );
         expect(
             deskChoices({ take: { cents: 1, byLink: true }, canLink: true })

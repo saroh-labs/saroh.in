@@ -18,6 +18,7 @@ describe("ComposerNotice", () => {
                     title: "Sending from your own email comes with Plus.",
                     cta: "See Plus",
                     href: "/settings/billing?plan=plus#change-plan",
+                    plan: "Plus",
                 }}
             />,
         );

@@ -32,6 +32,7 @@ import {
 import { mayNavigate } from "@/lib/nav/leave-request";
 import type { SearchHit, SearchKind } from "@/lib/search/service";
 import { searchSettings, settingsPageLabel } from "@/lib/settings/search";
+import { noMatchLine } from "@saroh/ui/lib/state-copy";
 
 import type { NavRole } from "./nav-items";
 import {
@@ -328,7 +329,7 @@ export function CommandMenu({
                         ? "Type at least two characters to search."
                         : busy
                           ? "Searching…"
-                          : `Nothing matches “${query.trim()}”.`}
+                          : noMatchLine("pages or actions", query)}
                 </CommandEmpty>
 
                 {byKind.map(({ kind, rows }) => {

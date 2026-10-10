@@ -1,5 +1,6 @@
 import type { BillingAccessView } from "@/lib/billing/access";
 import { accessRow, upgradeHref } from "@/lib/billing/access";
+import { planLabel } from "@saroh/ui/lib/state-copy";
 
 /**
  * Where the plan leaves roles of your own off (UX-030): the catalogue's
@@ -27,7 +28,7 @@ export function rolesLock(view: BillingAccessView | null): RolesLock | null {
     if (!up) {
         return {
             line: `Roles of your own aren't in your ${view.plan?.name ?? "current"} plan.`,
-            cta: "See plans",
+            cta: planLabel(),
             href: upgradeHref(),
         };
     }

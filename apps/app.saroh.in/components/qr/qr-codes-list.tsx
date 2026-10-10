@@ -72,8 +72,8 @@ export function QrCodesList({
                 title="No QR codes yet"
                 description={
                     canChange
-                        ? "Choose what a code opens and where it goes, then make it. It is listed here with its scans."
-                        : "An owner or admin makes them. They are listed here once there are some."
+                        ? "Choose what a code opens and where it goes, and it is listed here with its scans."
+                        : "They are listed here with their scans once there are some."
                 }
             />
         );

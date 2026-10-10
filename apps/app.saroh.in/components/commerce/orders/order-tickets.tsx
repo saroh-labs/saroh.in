@@ -1,6 +1,7 @@
 "use client";
 
 import { Button } from "@saroh/ui/button";
+import { PageHeader } from "@saroh/ui/page-header";
 import { ChevronLeft, Printer } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useRef } from "react";
@@ -56,40 +57,42 @@ export function OrderTickets({
     }, [orders.length]);
 
     return (
-        <main className="ticket-print w-full px-4 pb-[26px] pt-5 sm:px-6">
-            <div className="mb-5 flex flex-wrap items-center gap-2.5 print:hidden">
-                <div className="min-w-0 flex-1">
-                    <h1 className="font-display text-[22px] font-semibold tracking-[-0.02em]">
-                        {summary.title}
-                    </h1>
-                    <p className="text-[12.5px] text-muted-foreground">
-                        Oldest first, one to a page.
-                        {summary.notes.length > 0
-                            ? ` ${summary.notes.join(" ")}`
-                            : ""}
-                    </p>
-                </div>
-                <Button
-                    asChild
-                    variant="outline"
-                    className="cursor-pointer gap-1.5 active:scale-[0.98]"
-                >
-                    <Link href="/commerce/orders">
-                        <ChevronLeft aria-hidden className="size-4" />
+        <main className="ticket-print w-full px-4 pb-[26px] pt-5 sm:px-[26px]">
+            <PageHeader
+                className="mb-5 print:hidden"
+                breadcrumb={[
+                    "Sell",
+                    <Link key="orders" href="/commerce/orders">
                         Orders
-                    </Link>
-                </Button>
-                {orders.length > 0 ? (
-                    <Button
-                        type="button"
-                        onClick={() => window.print()}
-                        className="cursor-pointer gap-1.5 active:scale-[0.98]"
-                    >
-                        <Printer aria-hidden className="size-4" />
-                        Print
-                    </Button>
-                ) : null}
-            </div>
+                    </Link>,
+                    "Tickets",
+                ]}
+                title={summary.title}
+                description={`Oldest first, one to a page.${
+                    summary.notes.length > 0
+                        ? ` ${summary.notes.join(" ")}`
+                        : ""
+                }`}
+                actions={
+                    <>
+                        <Button asChild variant="outline">
+                            <Link href="/commerce/orders">
+                                <ChevronLeft aria-hidden className="size-4" />
+                                Orders
+                            </Link>
+                        </Button>
+                        {orders.length > 0 ? (
+                            <Button
+                                type="button"
+                                onClick={() => window.print()}
+                            >
+                                <Printer aria-hidden className="size-4" />
+                                Print
+                            </Button>
+                        ) : null}
+                    </>
+                }
+            />
             {orders.length === 0 ? (
                 <p
                     role="status"

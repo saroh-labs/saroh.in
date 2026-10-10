@@ -13,6 +13,7 @@ import { ListCard, ListRow } from "@/components/shared/list-card";
 import { ViewerDate } from "@/components/shared/viewer-date";
 import { completeTask } from "@/lib/leads/actions";
 import type { OpenTask } from "@/lib/leads/service";
+import { couldntLoad } from "@saroh/ui/lib/state-copy";
 
 /**
  * Every follow-up still to do, soonest first, with the lead it belongs to and
@@ -38,13 +39,8 @@ export function FollowUpsList({
     if (tasks === null) {
         return (
             <FailedState
-                title="Follow-ups could not be loaded"
-                description="Nothing has changed and nothing is lost — this list could not be read just now."
-                action={
-                    <Button variant="outline" onClick={() => router.refresh()}>
-                        Try again
-                    </Button>
-                }
+                title={couldntLoad("follow-ups")}
+                onRetry={() => router.refresh()}
             />
         );
     }
@@ -52,8 +48,8 @@ export function FollowUpsList({
         return (
             <EmptyState
                 icon={<CalendarCheck />}
-                title="Nothing to follow up"
-                description="A follow-up set on a lead lands here with its date, so it waits in one place instead of inside a lead nobody opens."
+                title="No follow-ups yet"
+                description="A follow-up set on a lead shows here with its date."
             />
         );
     }

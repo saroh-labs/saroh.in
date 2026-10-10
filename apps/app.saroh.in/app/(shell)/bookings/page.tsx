@@ -1,11 +1,10 @@
-import { Button } from "@saroh/ui/button";
 import { FailedState } from "@saroh/ui/data-state";
-import Link from "next/link";
+import { PageHeader } from "@saroh/ui/page-header";
 
 import { PlanLimitNotice } from "@/components/billing/plan-limit-notice";
 import { BookingsViewSwitch } from "@/components/bookings/bookings-view-switch";
 import { CalendarScreen } from "@/components/bookings/calendar/calendar-screen";
-import { BARE, BookingsTopBar } from "@/components/bookings/calendar/parts";
+
 import { NewBookingDialog } from "@/components/bookings/new-booking-dialog";
 import { PageContainer } from "@/components/shared/page-container";
 import { takesOnlinePayment } from "@/lib/billing/access";
@@ -40,6 +39,7 @@ import { requireSession } from "@/lib/session";
 import type { StaffList } from "@/lib/staff/service";
 import { getBookingRules, listStaff } from "@/lib/staff/service";
 import { withClosures } from "@/lib/staff/time-off";
+import { couldntLoad } from "@saroh/ui/lib/state-copy";
 
 /**
  * Bookings › Calendar (U15). The day by person by default, the week, or the
@@ -135,21 +135,16 @@ export default async function BookingsPage({
 
     if (!calendar) {
         return (
-            <PageContainer width="full" className={BARE}>
-                <BookingsTopBar page="Calendar">
-                    <BookingsViewSwitch current="calendar" />
-                </BookingsTopBar>
-                <div className="px-[22px] pb-6 pt-[18px]">
+            <PageContainer width="full">
+                <PageHeader
+                    breadcrumb={["Bookings", "Calendar"]}
+                    title="Calendar"
+                    meta={<BookingsViewSwitch current="calendar" />}
+                />
+                <div>
                     <FailedState
-                        title="Couldn't load the calendar"
-                        description="Nothing has been changed. Try again in a moment."
-                        action={
-                            <Button asChild variant="outline">
-                                <Link href={calendarHref(layout, date)}>
-                                    Try again
-                                </Link>
-                            </Button>
-                        }
+                        title={couldntLoad("the calendar")}
+                        retryHref={calendarHref(layout, date)}
                     />
                 </div>
             </PageContainer>
@@ -168,7 +163,7 @@ export default async function BookingsPage({
             ? await readCustomerPick(forContact)
             : null;
     return (
-        <PageContainer width="full" className={BARE}>
+        <PageContainer width="full">
             <CalendarScreen
                 layout={layout}
                 date={date}
@@ -201,7 +196,6 @@ export default async function BookingsPage({
                             // Keyed: it renders among the screen's own children.
                             key="new-booking"
                             plainTrigger
-                            triggerClassName="h-[38px] rounded-[9px] px-4 text-[13px]"
                             services={active.map((s) => ({
                                 id: s.id,
                                 name: s.name,

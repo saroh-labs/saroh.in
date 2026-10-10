@@ -2,6 +2,7 @@
 
 import { Button } from "@saroh/ui/button";
 import { cn } from "@saroh/ui/lib/utils";
+import { countLabel, PageHeader } from "@saroh/ui/page-header";
 import { showError, showUndo } from "@saroh/ui/toast";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -26,6 +27,8 @@ import {
 } from "@/lib/services/service-cards";
 import type { ServiceUsage } from "@/lib/services/usage";
 import type { BookingPaymentView, StaffView } from "@/lib/staff/types";
+import { EmptyState } from "@saroh/ui/data-state";
+import { CalendarClock } from "lucide-react";
 /**
  * Bookings › Services (U16, E2, the design's `?view=services`): what people
  * can book, as cards — kind, price, length and the gap after, where, places,
@@ -92,25 +95,28 @@ export function ServicesScreen({
 
     return (
         <>
-            <div className="mb-1 flex flex-wrap items-center gap-3">
-                <h1 className="m-0 font-display text-[28px] font-semibold leading-tight tracking-[-0.03em]">
-                    Services
-                </h1>
-                <span className="ml-auto text-[12.5px] text-muted-foreground">
-                    {servicesSummary(services, hasPage)}
-                </span>
-                {canEdit ? (
-                    <Button asChild>
-                        <Link href="/services/new">New service</Link>
-                    </Button>
-                ) : null}
-            </div>
-            <p className="mb-3.5 max-w-[70ch] text-[12.5px] text-muted-foreground">
-                What people can book, and who takes it. One-to-one services fill
-                a person&apos;s free time; classes run at set times with a
-                number of places. Changing a price only affects bookings made
-                after.
-            </p>
+            <PageHeader
+                className="mb-5"
+                breadcrumb={["Bookings", "Services"]}
+                title="Services"
+                count={countLabel(services.length, {
+                    one: "service",
+                    other: "services",
+                })}
+                description="What people can book, and who takes it. One-to-one services fill a person's free time. Classes run at set times with a number of places. Changing a price only affects bookings made after."
+                meta={
+                    services.length > 0
+                        ? servicesSummary(services, hasPage)
+                        : undefined
+                }
+                actions={
+                    canEdit ? (
+                        <Button asChild>
+                            <Link href="/services/new">New service</Link>
+                        </Button>
+                    ) : undefined
+                }
+            />
             {alsoSell ? (
                 <AlsoSell features={alsoSell} modules={modules} />
             ) : null}
@@ -120,13 +126,22 @@ export function ServicesScreen({
                 </ReadOnlyNote>
             )}
             {services.length === 0 ? (
-                <div className="rounded-[12px] border border-dashed border-border px-5 py-8 text-center">
-                    <p className="text-[14px] font-semibold">No services yet</p>
-                    <p className="mx-auto mt-1 max-w-[52ch] text-[12.5px] text-muted-foreground">
-                        Add what people can book — a one-to-one session or a
-                        class — and it shows on your booking page.
-                    </p>
-                </div>
+                <EmptyState
+                    icon={<CalendarClock />}
+                    title="No services yet"
+                    description={
+                        canEdit
+                            ? "Add what customers can book: a one-to-one or a class."
+                            : "What customers can book shows here: a one-to-one or a class."
+                    }
+                    action={
+                        canEdit ? (
+                            <Button asChild>
+                                <Link href="/services/new">New service</Link>
+                            </Button>
+                        ) : undefined
+                    }
+                />
             ) : (
                 <ul className="grid grid-cols-[repeat(auto-fill,minmax(290px,1fr))] gap-3">
                     {services.map((s) => {

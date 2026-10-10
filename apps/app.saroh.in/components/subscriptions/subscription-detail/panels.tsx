@@ -9,6 +9,7 @@ import { useState } from "react";
 import { personHref } from "@/lib/contacts/person-href";
 import type { ChargeRow, CollectionRow } from "@/lib/subscriptions/view";
 import { chargeHref } from "@/lib/subscriptions/view";
+import { EmptyState } from "@saroh/ui/data-state";
 
 import { Pill } from "../pill";
 
@@ -122,9 +123,11 @@ export function ChargesCard({
                         : "The charges couldn't be loaded. Everything else on this page is up to date."}
                 </p>
             ) : rows.length === 0 ? (
-                <p className="border-t border-border/70 px-4 py-2.5 text-[12.5px] text-muted-foreground">
-                    Nothing charged yet.
-                </p>
+                <EmptyState
+                    size="inline"
+                    className="border-t border-border/70 px-4 py-2.5"
+                    title="No charges yet."
+                />
             ) : (
                 rows.map((c) => (
                     <div

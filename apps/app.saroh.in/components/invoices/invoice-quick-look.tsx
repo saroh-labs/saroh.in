@@ -1,6 +1,7 @@
 "use client";
 
 import { Button } from "@saroh/ui/button";
+import { Skeleton } from "@saroh/ui/skeleton";
 import { showError, showSuccess } from "@saroh/ui/toast";
 import { Copy } from "lucide-react";
 import Link from "next/link";
@@ -350,10 +351,14 @@ export function InvoiceQuickLook({
                         </div>
                     ))
                 ) : (
-                    <div className="grid gap-2 px-4 py-3" role="status">
+                    <div
+                        className="grid gap-2 px-4 py-3"
+                        role="status"
+                        aria-busy="true"
+                    >
                         <span className="sr-only">Loading the lines</span>
-                        <div className="h-4 w-3/4 rounded-[6px] bg-muted" />
-                        <div className="h-4 w-1/2 rounded-[6px] bg-muted" />
+                        <Skeleton aria-hidden className="h-4 w-3/4" />
+                        <Skeleton aria-hidden className="h-4 w-1/2" />
                     </div>
                 )}
                 <TaxRows

@@ -1,7 +1,12 @@
 "use client";
 
 import { Button } from "@saroh/ui/button";
-import { FailedState, LoadingState, PartialNotice } from "@saroh/ui/data-state";
+import {
+    EmptyState,
+    FailedState,
+    LoadingState,
+    PartialNotice,
+} from "@saroh/ui/data-state";
 import {
     Sheet,
     SheetContent,
@@ -21,6 +26,7 @@ import { loadUnlinkedCustomers } from "@/lib/customers/actions";
 import { customerHref } from "@/lib/customers/links";
 import type { UnlinkedCustomer, UnlinkedPage } from "@/lib/customers/list";
 import { rowName, unlinkedText } from "@/lib/customers/list";
+import { couldntLoad } from "@saroh/ui/lib/state-copy";
 
 /**
  * "12 paying customers aren't linked to a contact yet · Review" (C4).
@@ -157,22 +163,15 @@ function UnlinkedSheet({
                     />
                 ) : read.state === "failed" ? (
                     <FailedState
-                        title="Couldn't load them"
-                        description="Something went wrong on our side. Nothing has been changed."
-                        action={
-                            <Button
-                                type="button"
-                                variant="outline"
-                                onClick={() => goTo(page)}
-                            >
-                                Try again
-                            </Button>
-                        }
+                        size="panel"
+                        title={couldntLoad("these customers")}
+                        onRetry={() => goTo(page)}
                     />
                 ) : read.data.rows.length === 0 ? (
-                    <p className="rounded-xl border border-dashed border-border-strong px-5 py-[30px] text-center text-[13px] text-muted-foreground">
-                        Every paying customer is linked.
-                    </p>
+                    <EmptyState
+                        size="inline"
+                        title="Every paying customer is linked."
+                    />
                 ) : (
                     <ul className="flex flex-col gap-2">
                         {read.data.rows.map((c) => (

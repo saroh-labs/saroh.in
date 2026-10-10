@@ -11,6 +11,7 @@ import { orderRef } from "@/lib/products/overview-words";
 import { signed } from "@/lib/stock/levels";
 import { changeTone, weekLine } from "@/lib/stock/product-stock";
 import type { StockCheck, StockLogEntry } from "@/lib/stock/service";
+import { EmptyState } from "@saroh/ui/data-state";
 
 const noop = () => undefined;
 const subscribe = () => noop;
@@ -113,9 +114,11 @@ export function RecentChanges({
                     still right — they come from the shelves.
                 </p>
             ) : log.length === 0 ? (
-                <p className="px-[18px] pb-4 text-[12.5px] text-muted-foreground">
-                    No stock changes yet.
-                </p>
+                <EmptyState
+                    size="inline"
+                    className="px-[18px] pb-4"
+                    title="No stock changes yet."
+                />
             ) : (
                 <>
                     {week ? (

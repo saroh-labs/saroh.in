@@ -312,6 +312,7 @@ export function CatalogueScreen({
                 canWrite={canWrite}
                 meter={meter}
                 bannerShown={limitBannerShown}
+                count={data.total > 0 ? countLabel : undefined}
             />
             <NeedsYou
                 needs={data.needs}
@@ -343,6 +344,7 @@ export function CatalogueScreen({
                     modes={["table", "list"]}
                     hideModeToggle
                     noun={{ one: "product", other: "products" }}
+                    showTotal={false}
                     toolbarExtra={
                         <CatalogueToolbar
                             query={query}
@@ -351,7 +353,6 @@ export function CatalogueScreen({
                             choices={choices}
                         />
                     }
-                    countLabel={() => countLabel}
                     onRowClick={(r) => setOpenId(r.id)}
                     selectable={canWrite}
                     bulkActions={[

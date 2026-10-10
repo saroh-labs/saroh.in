@@ -88,7 +88,7 @@ export function IdentityLinkDialog({
 
                 {suggestions.length === 0 ? (
                     <p className="text-sm text-muted-foreground">
-                        No matching commerce customers found.
+                        No customers match.
                     </p>
                 ) : (
                     <ul className="divide-y rounded-xl border">

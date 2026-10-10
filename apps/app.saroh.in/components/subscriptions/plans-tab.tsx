@@ -13,6 +13,7 @@ import { LimitNoticeBlock } from "@/components/billing/limit-notice";
 import { reportFailure } from "@/components/billing/plan-refusal";
 import type { OnlinePaymentsLock } from "@/lib/billing/access";
 import { HOLD_UNDO_MS } from "@/lib/hold-undo";
+import { couldntLoad, nothingChanged } from "@saroh/ui/lib/state-copy";
 
 import { setPlanArchived } from "@/lib/subscriptions/actions";
 import type { PlanCardView } from "@/lib/subscriptions/plan-cards";
@@ -102,13 +103,11 @@ export function PlansTab({
     if (!plans) {
         return (
             <FailedState
-                title="Plans could not be loaded"
-                description="This tab couldn't read them. Nothing has changed — every plan is still on sale, and subscriptions still renew."
-                action={
-                    <Button variant="outline" onClick={() => router.refresh()}>
-                        Try again
-                    </Button>
-                }
+                title={couldntLoad("plans")}
+                description={nothingChanged(
+                    "Every plan is still on sale, and subscriptions still renew.",
+                )}
+                onRetry={() => router.refresh()}
             />
         );
     }
@@ -154,11 +153,11 @@ export function PlansTab({
                 <EmptyState
                     icon={<Repeat />}
                     title="No plans yet"
-                    description="A plan is what you sell on repeat — a monthly membership, a weekly loaf. Make one, then put people on it."
+                    description="A plan is what you sell on repeat, like a monthly membership or a weekly loaf."
                     action={
                         canWrite && !locked ? (
                             <Button asChild>
-                                <Link href={NEW_PLAN_HREF}>Make a plan</Link>
+                                <Link href={NEW_PLAN_HREF}>New plan</Link>
                             </Button>
                         ) : undefined
                     }

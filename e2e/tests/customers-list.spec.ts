@@ -110,9 +110,7 @@ test.describe("customers list", () => {
         await expect(
             page.getByText("No customers match “zzzz-nobody-zzzz”"),
         ).toBeVisible();
-        await page
-            .getByRole("button", { name: "Clear search and filters" })
-            .click();
+        await page.getByRole("button", { name: "Clear search" }).click();
         await expect(page).toHaveURL(/\/commerce\/customers$/);
     });
 

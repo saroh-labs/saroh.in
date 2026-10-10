@@ -12,6 +12,7 @@ import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 
 import { useBusinessZone } from "@/components/shared/business-zone";
+import { FailedRead } from "@/components/shared/failed-read";
 import { restorePublication } from "@/lib/sites/actions";
 import { exactDate } from "@/lib/sites/format-date";
 import type { RestoreGate, VersionBadgeTone } from "@/lib/sites/release-review";
@@ -107,7 +108,7 @@ export function SiteVersions({
                 {upcoming}
                 <EmptyState
                     icon={<History />}
-                    title="Never published"
+                    title="No versions yet"
                     description="Once you publish this site, every version is kept here and you can put an earlier one back."
                 />
             </div>
@@ -336,9 +337,10 @@ function ScheduledList({
     if (scheduled === null) return null;
     if (scheduled.state === "failed") {
         return (
-            <p className="rounded-lg border bg-muted px-4 py-3 text-sm text-muted-foreground">
-                Couldn&apos;t check for scheduled go-lives. Reload to try again.
-            </p>
+            <FailedRead
+                things="scheduled go-lives"
+                className="rounded-lg border bg-muted px-4 py-3"
+            />
         );
     }
     const upcoming = scheduled.releases.filter(

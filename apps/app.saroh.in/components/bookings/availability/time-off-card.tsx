@@ -10,6 +10,7 @@ import type { LocalDate } from "@/lib/services/diary";
 import type { OffLine } from "@/lib/staff/time-off";
 import { dayCount, offLineLabel, offLines } from "@/lib/staff/time-off";
 import type { Closure, StaffView } from "@/lib/staff/types";
+import { EmptyState } from "@saroh/ui/data-state";
 
 import { ADD_TIME_OFF_ID, AddTimeOffSheet } from "./add-time-off-sheet";
 
@@ -112,9 +113,7 @@ export function TimeOffCard({
                 ))}
             </ul>
             {!saved.length && !pending.length ? (
-                <p className="text-[12.5px] text-muted-foreground">
-                    None booked.
-                </p>
+                <EmptyState size="inline" title="No time off booked." />
             ) : null}
             {canEdit ? (
                 <AddTimeOffSheet

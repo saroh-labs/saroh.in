@@ -1,5 +1,10 @@
 import { Button } from "@saroh/ui/button";
-import { EmptyState, PartialNotice } from "@saroh/ui/data-state";
+import {
+    EmptyState,
+    PartialNotice,
+    PermissionDeniedState,
+    PlanLockedState,
+} from "@saroh/ui/data-state";
 import { Home } from "lucide-react";
 import Link from "next/link";
 
@@ -196,10 +201,10 @@ function FirstRun({
     // nothing would be false.
     if (onButNotOpen(modules)) {
         return (
-            <EmptyState
-                icon={<Home aria-hidden />}
+            <PermissionDeniedState
                 title="Nothing here is open to you yet"
-                description={`${businessName} runs on Saroh, but your role doesn't reach any of it yet. ${WHO_CAN_CHANGE}`}
+                description={`${businessName} runs on Saroh, but your role doesn't include any of it yet.`}
+                note={WHO_CAN_CHANGE}
             />
         );
     }
@@ -211,21 +216,11 @@ function FirstRun({
     // that has it; anyone else, who changes it.
     if (heldByPlan(modules)) {
         return (
-            <EmptyState
-                icon={<Home aria-hidden />}
+            <PlanLockedState
+                name="What's turned on"
                 title="What's turned on isn't in your plan"
-                description={
-                    manages
-                        ? `${businessName} has picked what Saroh does for it, but its plan doesn't include it yet. Nothing is lost; it's all here when the plan does.`
-                        : `${businessName} has picked what Saroh does for it, but its plan doesn't include it yet. The owner can change the plan in Settings › Plan and billing.`
-                }
-                action={
-                    manages ? (
-                        <Button asChild variant="brand">
-                            <Link href={upgradeHref()}>See plans</Link>
-                        </Button>
-                    ) : undefined
-                }
+                href={upgradeHref()}
+                canChangePlan={manages}
             />
         );
     }

@@ -2,6 +2,7 @@
 
 import { Button } from "@saroh/ui/button";
 import { cn } from "@saroh/ui/lib/utils";
+import { PageHeader } from "@saroh/ui/page-header";
 import {
     dismissToasts,
     showError,
@@ -30,7 +31,7 @@ import { EntrySheet } from "./entry-sheet";
 import { LevelsPanel } from "./levels-panel";
 import { LogList } from "./log-list";
 import { MoveDialog } from "./move-dialog";
-import { StockHeader } from "./stock-header";
+
 import { useCountMode } from "./use-count-mode";
 
 type Tab = "levels" | "log" | "checks";
@@ -212,8 +213,11 @@ export function StockScreen({
 
     return (
         <div className="flex flex-col gap-5">
-            <StockHeader
-                subline={stockSubline(business, storefronts)}
+            <PageHeader
+                className="mb-0"
+                breadcrumb={["Sell", "Stock"]}
+                title="Stock"
+                description={stockSubline(business, storefronts) || undefined}
                 actions={
                     canWrite ? (
                         <>

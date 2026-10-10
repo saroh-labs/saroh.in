@@ -115,13 +115,14 @@ function render(initial: EditorRecord<Plan> | null) {
         initial,
         emptyValues: EMPTY,
         canEdit: true,
-        crumbs: (
-            <nav>
-                {/* A plain link: the guard catches any <a>, Next's or not. */}
-                {/* eslint-disable-next-line @next/next/no-html-link-for-pages */}
-                <a href="/billing/subscriptions?tab=plans">Plans</a>
-            </nav>
-        ),
+        breadcrumb: [
+            // A plain link: the guard catches any <a>, Next's or not.
+            // eslint-disable-next-line @next/next/no-html-link-for-pages
+            <a key="plans" href="/billing/subscriptions?tab=plans">
+                Plans
+            </a>,
+            "Monthly",
+        ],
         titleOf: (v, r) => v.name.trim() || (r ? "Untitled plan" : "New plan"),
         problemsOf: (v) => [
             ...(v.name.trim()

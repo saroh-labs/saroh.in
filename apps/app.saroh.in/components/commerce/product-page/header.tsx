@@ -1,7 +1,8 @@
 import { Badge } from "@saroh/ui/badge";
 import { Button } from "@saroh/ui/button";
 import { cn } from "@saroh/ui/lib/utils";
-import { ArrowUpRight, Camera, ChevronLeft, Pencil } from "lucide-react";
+import { PageHeader } from "@saroh/ui/page-header";
+import { ArrowUpRight, Camera } from "lucide-react";
 import Link from "next/link";
 
 import { QrButton } from "@/components/qr/qr-button";
@@ -22,11 +23,10 @@ const FOCUS =
     "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background";
 
 /**
- * The bar above the product (#522): back to Products and the product's
- * name; on the right, why the shop's page can't open yet, the Team /
- * Customer switch and "View on the shop".
+ * Before the header's button (#522): why the shop's page can't open yet,
+ * the Team / Customer switch, its QR and "View on the shop".
  */
-export function ProductCrumbs({
+function ShopControls({
     overview,
     storeId,
     view,
@@ -48,129 +48,105 @@ export function ProductCrumbs({
           ? "Archived — its page does not open for customers."
           : "Publish it first — a draft has no public page.";
     return (
-        <div className="flex flex-wrap items-center gap-2 border-b border-border px-3.5 py-[9px]">
-            <Link
-                href="/commerce/products"
-                className={cn(
-                    FOCUS,
-                    "flex items-center gap-[7px] rounded-lg px-[9px] py-1.5 text-[12.5px] text-neutral-700 hover:bg-muted hover:text-foreground coarse:min-h-11 dark:text-muted-foreground",
-                )}
-            >
-                <ChevronLeft
-                    aria-hidden
-                    className="size-[15px]"
-                    strokeWidth={2}
-                />
-                Products
-            </Link>
-            <span aria-hidden className="text-[15px] text-muted-foreground">
-                /
-            </span>
-            <span
-                aria-current="page"
-                className="min-w-0 truncate text-[13.5px] font-semibold"
-            >
-                {product.name}
-            </span>
-            <div className="ml-auto flex flex-wrap items-center justify-end gap-2">
-                {note ? (
-                    <span
-                        id="shop-link-why"
-                        role="status"
-                        className="max-w-[300px] text-pretty text-[12px] text-muted-foreground max-sm:hidden"
-                    >
-                        {note}
-                    </span>
-                ) : null}
-                <div
-                    role="group"
-                    aria-label="View as"
-                    className="flex rounded-lg bg-muted p-0.5"
+        <>
+            {note ? (
+                <span
+                    id="shop-link-why"
+                    role="status"
+                    className="max-w-[300px] text-pretty text-[12px] text-muted-foreground max-sm:hidden"
                 >
-                    {(["team", "customer"] as const).map((v) => (
-                        <Link
-                            key={v}
-                            href={`${productHref(storeId, product.id)}${v === "customer" ? "&view=customer" : ""}`}
-                            scroll={false}
-                            aria-current={view === v ? "page" : undefined}
-                            className={cn(
-                                FOCUS,
-                                "flex items-center rounded-md px-2.5 py-1 text-[12px] font-semibold coarse:min-h-11",
-                                view === v
-                                    ? "bg-card text-foreground shadow-sm"
-                                    : "text-muted-foreground hover:text-foreground",
-                            )}
-                        >
-                            {v === "team" ? "Team" : "Customer"} view
-                        </Link>
-                    ))}
-                </div>
-                {shopUrl ? (
-                    // Its page is live, so a code for it has somewhere to go.
-                    <QrButton
-                        compact="always"
-                        variant="ghost"
-                        className="size-7 rounded-[7px]"
-                        link={{
-                            mode: "saved",
-                            kind: "PRODUCT",
-                            ref: product.id,
-                            url: shopUrl,
-                            what: product.name,
-                            from: "Product page",
-                        }}
-                    />
-                ) : null}
-                {shopUrl ? (
-                    // Live on the shop (UX-082): open it as customers see it.
-                    <Button
-                        size="xs"
-                        asChild
-                        variant="ghost"
-                        className="gap-1.5 font-medium"
+                    {note}
+                </span>
+            ) : null}
+            <div
+                role="group"
+                aria-label="View as"
+                className="flex rounded-lg bg-muted p-0.5"
+            >
+                {(["team", "customer"] as const).map((v) => (
+                    <Link
+                        key={v}
+                        href={`${productHref(storeId, product.id)}${v === "customer" ? "&view=customer" : ""}`}
+                        scroll={false}
+                        aria-current={view === v ? "page" : undefined}
+                        className={cn(
+                            FOCUS,
+                            "flex items-center rounded-md px-2.5 py-1 text-[12px] font-semibold coarse:min-h-11",
+                            view === v
+                                ? "bg-card text-foreground shadow-sm"
+                                : "text-muted-foreground hover:text-foreground",
+                        )}
                     >
-                        <a
-                            href={shopUrl}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            aria-label="View on the shop — opens in a new tab"
-                        >
-                            View on the shop
-                            <ArrowUpRight
-                                aria-hidden
-                                className="size-3"
-                                strokeWidth={2}
-                            />
-                        </a>
-                    </Button>
-                ) : (
-                    <Button
-                        size="xs"
-                        type="button"
-                        variant="ghost"
-                        disabled
-                        aria-describedby="shop-link-why"
-                        className="gap-1.5 font-medium"
+                        {v === "team" ? "Team" : "Customer"} view
+                    </Link>
+                ))}
+            </div>
+            {shopUrl ? (
+                // Its page is live, so a code for it has somewhere to go.
+                <QrButton
+                    compact="always"
+                    variant="ghost"
+                    className="size-7 rounded-[7px]"
+                    link={{
+                        mode: "saved",
+                        kind: "PRODUCT",
+                        ref: product.id,
+                        url: shopUrl,
+                        what: product.name,
+                        from: "Product page",
+                    }}
+                />
+            ) : null}
+            {shopUrl ? (
+                // Live on the shop (UX-082): open it as customers see it.
+                <Button
+                    size="xs"
+                    asChild
+                    variant="ghost"
+                    className="gap-1.5 font-medium"
+                >
+                    <a
+                        href={shopUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        aria-label="View on the shop — opens in a new tab"
                     >
-                        {live
-                            ? "View on the shop"
-                            : product.status === "ARCHIVED"
-                              ? "Not on the shop"
-                              : "Not on the shop yet"}
+                        View on the shop
                         <ArrowUpRight
                             aria-hidden
                             className="size-3"
                             strokeWidth={2}
                         />
-                    </Button>
-                )}
-            </div>
-        </div>
+                    </a>
+                </Button>
+            ) : (
+                <Button
+                    size="xs"
+                    type="button"
+                    variant="ghost"
+                    disabled
+                    aria-describedby="shop-link-why"
+                    className="gap-1.5 font-medium"
+                >
+                    {live
+                        ? "View on the shop"
+                        : product.status === "ARCHIVED"
+                          ? "Not on the shop"
+                          : "Not on the shop yet"}
+                    <ArrowUpRight
+                        aria-hidden
+                        className="size-3"
+                        strokeWidth={2}
+                    />
+                </Button>
+            )}
+        </>
     );
 }
 
 /**
- * Who this product is at a glance (#522): its cover — which opens Photos —
+ * The product's page header: "Sell › Products › ‹name›", then who this
+ * product is at a glance (#522): its cover — which opens Photos —
  * its name and saved status, then one line: what it sells for, its
  * category, where it sells and when it last changed. "Edit product" opens
  * the whole editor; each panel below has its own Edit.
@@ -180,10 +156,15 @@ export function ProductHeader({
     storeId,
     photosHref,
     paused = false,
+    view,
+    shopUrl = null,
 }: {
     overview: ProductOverview;
     storeId: string;
     photosHref: string;
+    view: "team" | "customer";
+    /** Its page on the live online shop (`shopProductUrl`); null when none. */
+    shopUrl?: string | null;
     /**
      * Past the plan's products limit (#800): hidden from the site and
      * read-only. The note under the header says why.
@@ -207,79 +188,99 @@ export function ProductHeader({
     ].join(" · ");
 
     return (
-        <div className="flex flex-wrap items-center gap-3.5 border-b border-border px-4 pb-4 pt-5 sm:px-[22px]">
-            {cover ? (
-                <Link
-                    href={photosHref}
-                    scroll={false}
-                    aria-label="Cover photo — open Photos"
-                    className={cn(
-                        FOCUS,
-                        "size-14 shrink-0 overflow-hidden rounded-xl bg-muted",
-                    )}
-                >
-                    {/* eslint-disable-next-line @next/next/no-img-element -- a tenant's own photos, outside next/image's allowlist */}
-                    <img
-                        src={cover.url}
-                        alt=""
-                        className="size-full object-cover"
-                    />
-                </Link>
-            ) : (
-                <Link
-                    href={photosHref}
-                    scroll={false}
-                    aria-label="Add a photo"
-                    className={cn(
-                        FOCUS,
-                        "flex size-14 shrink-0 flex-col items-center justify-center gap-0.5 rounded-xl border border-dashed border-border-strong bg-muted/60 text-[10.5px] font-semibold text-muted-foreground hover:bg-muted",
-                    )}
-                >
-                    <Camera
-                        aria-hidden
-                        className="size-[18px]"
-                        strokeWidth={1.8}
-                    />
-                    Add
-                </Link>
-            )}
-            <div className="min-w-0 flex-[1_1_260px]">
-                <div className="flex flex-wrap items-center gap-[9px]">
-                    <h1 className="min-w-0 break-words font-display text-[24px] font-semibold leading-[1.15] tracking-[-0.025em]">
-                        {product.name}
-                    </h1>
-                    <Badge
-                        variant={status.variant}
-                        className="rounded-full px-2 py-0.5 text-[11px] font-semibold uppercase tracking-[0.04em]"
-                    >
-                        {status.label}
-                    </Badge>
-                    {paused ? (
+        <div className="border-b border-border px-4 pb-4 pt-5 sm:px-[22px]">
+            <PageHeader
+                className="mb-0"
+                breadcrumb={[
+                    "Sell",
+                    <Link key="list" href="/commerce/products">
+                        Products
+                    </Link>,
+                    product.name,
+                ]}
+                title={product.name}
+                badge={
+                    <>
                         <Badge
-                            variant="warning"
+                            variant={status.variant}
                             className="rounded-full px-2 py-0.5 text-[11px] font-semibold uppercase tracking-[0.04em]"
                         >
-                            Paused
+                            {status.label}
                         </Badge>
-                    ) : null}
-                </div>
-                <p className="mt-1 text-pretty text-[13px] tabular-nums text-muted-foreground">
-                    {meta} · Changed{" "}
-                    <ViewerDate iso={overview.lastChanged} variant="dayMonth" />
-                </p>
-            </div>
-            {overview.canWrite ? (
-                <Button asChild className="gap-[7px]">
-                    <Link href={productEditHref(storeId, product.id)}>
-                        <Pencil
-                            aria-hidden
-                            className="size-3.5"
-                            strokeWidth={1.9}
+                        {paused ? (
+                            <Badge
+                                variant="warning"
+                                className="rounded-full px-2 py-0.5 text-[11px] font-semibold uppercase tracking-[0.04em]"
+                            >
+                                Paused
+                            </Badge>
+                        ) : null}
+                    </>
+                }
+                description={
+                    <p className="text-pretty text-[13px] tabular-nums text-muted-foreground">
+                        {meta} · Changed{" "}
+                        <ViewerDate
+                            iso={overview.lastChanged}
+                            variant="dayMonth"
                         />
-                        Edit product
-                    </Link>
-                </Button>
-            ) : null}
+                    </p>
+                }
+                meta={
+                    <ShopControls
+                        overview={overview}
+                        storeId={storeId}
+                        view={view}
+                        shopUrl={shopUrl}
+                    />
+                }
+                actions={
+                    overview.canWrite ? (
+                        <Button asChild>
+                            <Link href={productEditHref(storeId, product.id)}>
+                                Edit product
+                            </Link>
+                        </Button>
+                    ) : undefined
+                }
+                lead={
+                    cover ? (
+                        <Link
+                            href={photosHref}
+                            scroll={false}
+                            aria-label="Cover photo — open Photos"
+                            className={cn(
+                                FOCUS,
+                                "size-14 shrink-0 overflow-hidden rounded-xl bg-muted",
+                            )}
+                        >
+                            {/* eslint-disable-next-line @next/next/no-img-element -- a tenant's own photos, outside next/image's allowlist */}
+                            <img
+                                src={cover.url}
+                                alt=""
+                                className="size-full object-cover"
+                            />
+                        </Link>
+                    ) : (
+                        <Link
+                            href={photosHref}
+                            scroll={false}
+                            aria-label="Add a photo"
+                            className={cn(
+                                FOCUS,
+                                "flex size-14 shrink-0 flex-col items-center justify-center gap-0.5 rounded-xl border border-dashed border-border-strong bg-muted/60 text-[10.5px] font-semibold text-muted-foreground hover:bg-muted",
+                            )}
+                        >
+                            <Camera
+                                aria-hidden
+                                className="size-[18px]"
+                                strokeWidth={1.8}
+                            />
+                            Add
+                        </Link>
+                    )
+                }
+            />
         </div>
     );
 }

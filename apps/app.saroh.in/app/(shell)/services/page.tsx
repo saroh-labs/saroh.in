@@ -1,12 +1,10 @@
-import { Button } from "@saroh/ui/button";
 import {
     FailedState,
     PartialNotice,
     PermissionDeniedState,
 } from "@saroh/ui/data-state";
-import Link from "next/link";
+import { PageHeader } from "@saroh/ui/page-header";
 
-import { BARE, BookingsTopBar } from "@/components/bookings/calendar/parts";
 import { ServicesScreen } from "@/components/services/services-screen";
 import { PageContainer } from "@/components/shared/page-container";
 import { whoCanChange } from "@/components/shared/who-can-change";
@@ -24,6 +22,7 @@ import { readServices } from "@/lib/services/service";
 import { readServiceUsage } from "@/lib/services/usage-read";
 import { requireSession } from "@/lib/session";
 import { readBookingPayment } from "@/lib/staff/service";
+import { couldntLoad } from "@saroh/ui/lib/state-copy";
 
 /**
  * Bookings › Services (U16, E2): what people can book, as the design's
@@ -59,9 +58,12 @@ export default async function ServicesPage() {
 
     if (!read.ok) {
         return (
-            <PageContainer width="full" className={BARE}>
-                <BookingsTopBar page="Services" />
-                <div className="px-[22px] pb-6 pt-[18px]">
+            <PageContainer width="full">
+                <PageHeader
+                    breadcrumb={["Bookings", "Services"]}
+                    title="Services"
+                />
+                <div>
                     {read.forbidden ? (
                         // A denial is not a failure: nothing broke and
                         // trying again does the same thing. The denied
@@ -69,13 +71,8 @@ export default async function ServicesPage() {
                         <PermissionDeniedState {...await servicesDenied()} />
                     ) : (
                         <FailedState
-                            title="Couldn't load your services"
-                            description="Nothing has been changed. Try again in a moment."
-                            action={
-                                <Button asChild variant="outline">
-                                    <Link href="/services">Try again</Link>
-                                </Button>
-                            }
+                            title={couldntLoad("services")}
+                            retryHref="/services"
                         />
                     )}
                 </div>
@@ -92,9 +89,8 @@ export default async function ServicesPage() {
     );
 
     return (
-        <PageContainer width="full" className={BARE}>
-            <BookingsTopBar page="Services" />
-            <div className="px-[22px] pb-6 pt-[18px] max-[759px]:px-4">
+        <PageContainer width="full">
+            <div>
                 {staffList && usage ? null : (
                     <PartialNotice className="mb-3">
                         {!staffList && !usage

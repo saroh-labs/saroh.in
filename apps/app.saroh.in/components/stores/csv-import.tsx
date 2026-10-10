@@ -4,6 +4,7 @@ import { Badge } from "@saroh/ui/badge";
 import { Button } from "@saroh/ui/button";
 import { Card, CardContent } from "@saroh/ui/card";
 import { Label } from "@saroh/ui/label";
+import { planLabel } from "@saroh/ui/lib/state-copy";
 import {
     Select,
     SelectContent,
@@ -552,9 +553,7 @@ export function CsvImport({
                                     </p>
                                     <Button asChild variant="outline" size="sm">
                                         <Link href={meter.href}>
-                                            {meter.upgradeTo
-                                                ? `Upgrade to ${meter.upgradeTo}`
-                                                : "See plans"}
+                                            {planLabel(meter.upgradeTo)}
                                         </Link>
                                     </Button>
                                 </div>

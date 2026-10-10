@@ -65,6 +65,16 @@ const config = {
             },
         },
         extend: {
+            /*
+             * `desk:` — 760px, where the workspace's rail appears and its
+             * phone layouts end. `max-desk:` is its exact complement, so a
+             * rule for "below the desk" never overlaps one for "from it"
+             * (the hand-written `max-[760px]:` did, by one pixel). New code
+             * uses these, not an arbitrary 759 or 760.
+             */
+            screens: {
+                desk: "760px",
+            },
             colors: {
                 border: {
                     DEFAULT: "hsl(var(--border))",

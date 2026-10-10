@@ -7,6 +7,7 @@ import {
 } from "@/lib/billing/access";
 import type { EmailSetup } from "@/lib/communications/email-setup";
 import { SEE_PLANS_HREF } from "@/lib/communications/email-setup";
+import { planLabel } from "@saroh/ui/lib/state-copy";
 
 /**
  * What a provider row offers in place of Connect when the plan won't let
@@ -64,7 +65,7 @@ function lockFor(
             : up
               ? `Comes with ${up.name}`
               : "Comes with a paid plan",
-        cta: up ? `See ${up.name}` : "See plans",
+        cta: planLabel(up?.name),
         href: upgradeHref(up?.planId),
         upgrade: up?.name ?? null,
         full,
@@ -84,7 +85,7 @@ export function messagingLockOf(
     if (access) return lockFor(access, "integrations");
     return {
         comesWith: "Comes with a paid plan",
-        cta: "See plans",
+        cta: planLabel(),
         href: SEE_PLANS_HREF,
         upgrade: null,
         full: false,

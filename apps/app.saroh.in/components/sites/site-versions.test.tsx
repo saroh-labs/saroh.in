@@ -160,7 +160,7 @@ describe("version history (T12)", () => {
         expect(html).toContain('href="/sites/site_1/releases/rel_3"');
 
         expect(text(render({ scheduled: { state: "failed" } }))).toContain(
-            "Couldn't check for scheduled go-lives.",
+            "Couldn't load scheduled go-lives.",
         );
     });
 });

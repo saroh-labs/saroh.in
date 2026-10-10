@@ -7,9 +7,11 @@ import { useRouter } from "next/navigation";
 import { Fragment, useEffect, useRef, useState, useTransition } from "react";
 
 import { productHref } from "@/lib/products/links";
-import { noRowsWords, untrackedLine } from "@/lib/stock/screen";
+import { untrackedLine } from "@/lib/stock/screen";
 import { loadLevelsPage } from "@/lib/stock/screen-actions";
 import type { StockLevels } from "@/lib/stock/service";
+import { EmptyState } from "@saroh/ui/data-state";
+import { Boxes } from "lucide-react";
 
 import { LevelsTable } from "./levels-table";
 import { chipClass } from "./tones";
@@ -166,11 +168,45 @@ export function LevelsPanel({
                 counting={counting}
                 values={values}
                 onValue={onValue}
-                empty={noRowsWords({
-                    needs: show === "needs",
-                    q,
-                    all: show === "all" && !q,
-                })}
+                empty={
+                    show === "needs" && !q ? (
+                        <EmptyState
+                            size="panel"
+                            title="Nothing needs you"
+                            description="Every size has more than its warning level."
+                        />
+                    ) : q ? (
+                        <EmptyState
+                            kind="no-results"
+                            size="panel"
+                            things="products"
+                            query={q}
+                            onClear={() => setSearch("")}
+                        />
+                    ) : show === "all" ? (
+                        <EmptyState
+                            size="panel"
+                            icon={<Boxes />}
+                            title="No stock counted yet"
+                            description="Turn on “Track stock” on a product and it shows here."
+                            action={
+                                <Button asChild variant="outline">
+                                    <Link href="/commerce/products">
+                                        Go to Products
+                                    </Link>
+                                </Button>
+                            }
+                        />
+                    ) : (
+                        <EmptyState
+                            kind="no-results"
+                            size="panel"
+                            things="products"
+                            cause="view"
+                            clearHref={href({ show: undefined })}
+                        />
+                    )
+                }
             />
 
             {loaded.next ? (

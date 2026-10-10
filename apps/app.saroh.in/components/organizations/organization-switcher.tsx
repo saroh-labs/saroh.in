@@ -1,5 +1,6 @@
 "use client";
 
+import { Button } from "@saroh/ui/button";
 import { Input } from "@saroh/ui/input";
 import { cn } from "@saroh/ui/lib/utils";
 import { Popover, PopoverContent, PopoverTrigger } from "@saroh/ui/popover";
@@ -15,6 +16,7 @@ import type {
     Organization,
     OrganizationRole,
 } from "@/lib/organizations/service";
+import { noMatchLine } from "@saroh/ui/lib/state-copy";
 
 const ROLE_LABEL: Record<OrganizationRole, string> = {
     OWNER: "Owner",
@@ -151,11 +153,13 @@ export function OrganizationSwitcher({
             }}
         >
             <PopoverTrigger asChild>
-                <button
+                <Button
+                    variant="ghost"
+                    size="sm"
                     type="button"
                     disabled={pending}
                     aria-label={`Change business — currently ${active.name}`}
-                    className="flex min-w-0 items-center gap-[9px] rounded-lg px-[9px] py-1.5 text-left transition-colors duration-fast hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background active:bg-accent-active disabled:opacity-60 coarse:min-h-11"
+                    className="min-w-0 gap-[9px] text-left"
                 >
                     <BusinessTile name={active.name} active size={30} />
                     <span className="flex min-w-0 items-baseline gap-2">
@@ -170,7 +174,7 @@ export function OrganizationSwitcher({
                         aria-hidden
                         className="size-[13px] shrink-0 text-muted-foreground"
                     />
-                </button>
+                </Button>
             </PopoverTrigger>
             <PopoverContent
                 align="start"
@@ -201,7 +205,7 @@ export function OrganizationSwitcher({
                 ) : null}
                 {matches.length === 0 ? (
                     <p className="px-[9px] py-3.5 text-[12.5px] text-muted-foreground">
-                        No business matches that.
+                        {noMatchLine("businesses", query)}
                     </p>
                 ) : null}
                 <div className="mt-1.5 border-t border-muted pt-1.5">

@@ -10,6 +10,7 @@ import type { QrStyle } from "@/lib/qr/types";
 import { QR_LABEL_MAX } from "@/lib/qr/types";
 import { QR_LABELS } from "@/lib/qr/words";
 
+import { FailedRead } from "@/components/shared/failed-read";
 import { ChoiceGroup, Eyebrow, pillClass } from "./choice-group";
 import { QrAddLogo } from "./qr-add-logo";
 import type { QrStyleLock } from "./qr-style-lock";
@@ -133,10 +134,10 @@ export function QrLookControls({
                     </p>
                 ) : null}
                 {style === "BRANDED" && logo.has && !logo.read ? (
-                    <p className="text-[13px] text-foreground/80">
-                        Your logo couldn&apos;t be read just now, so your
-                        initials stand in. Reload to try again.
-                    </p>
+                    <FailedRead
+                        things="your logo"
+                        reassurance="Your initials stand in for now."
+                    />
                 ) : null}
             </div>
 

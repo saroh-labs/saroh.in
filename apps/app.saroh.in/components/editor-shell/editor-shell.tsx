@@ -52,8 +52,8 @@ export interface EditorShellProps<V extends Record<string, unknown>> {
     canEdit: boolean;
     /** The read-only note's first sentence, when `canEdit` is false. */
     readOnlyText?: string;
-    /** The crumbs bar over the header (`PaymentsCrumbs` for a plan). */
-    crumbs?: ReactNode;
+    /** Where the record sits: "Payments › Plans › Monthly", links and all. */
+    breadcrumb?: ReactNode[];
     /** The header's title: the name typed so far, or "New plan". */
     titleOf: (values: V, record: EditorRecord<V> | null) => string;
     /**
@@ -111,7 +111,7 @@ export function EditorShell<V extends Record<string, unknown>>(
         emptyValues,
         canEdit,
         readOnlyText,
-        crumbs,
+        breadcrumb,
         titleOf,
         problemsOf,
         blockerOf,
@@ -286,8 +286,8 @@ export function EditorShell<V extends Record<string, unknown>>(
 
     return (
         <main className="w-full pb-8">
-            {crumbs}
             <PublishBanner
+                breadcrumb={breadcrumb}
                 title={title}
                 pill={pill}
                 line={line}
@@ -314,7 +314,7 @@ export function EditorShell<V extends Record<string, unknown>>(
                 disabled={!canEdit || busy}
                 // Leaving a field saves what it holds now, not in 800 ms.
                 onBlur={() => void editor.flush()}
-                className="m-0 flex min-w-0 flex-wrap items-start gap-4 border-0 px-6 pb-7 pt-4 max-[759px]:px-4"
+                className="m-0 flex min-w-0 flex-wrap items-start gap-4 border-0 px-4 pb-7 pt-4 sm:px-[26px]"
             >
                 <legend className="sr-only">{title}</legend>
                 <div className="grid min-w-0 flex-[1_1_420px] gap-3.5">

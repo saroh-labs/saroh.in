@@ -4,6 +4,7 @@ import { Button } from "@saroh/ui/button";
 import { EmptyState } from "@saroh/ui/data-state";
 import { Input } from "@saroh/ui/input";
 import { cn } from "@saroh/ui/lib/utils";
+import { countLabel, PageHeader } from "@saroh/ui/page-header";
 import { Repeat, Search } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
@@ -28,7 +29,6 @@ import {
     TAB_LABEL,
 } from "@/lib/subscriptions/view";
 
-import { PaymentsCrumbs } from "./payments-crumbs";
 import { PlansTab } from "./plans-tab";
 import { SubscribeDialog } from "./subscribe-dialog";
 import { SubscriptionQuickLook } from "./subscription-quick-look";
@@ -153,22 +153,32 @@ export function SubscriptionsScreen({
 
     return (
         <>
-            <PaymentsCrumbs here="Subscriptions" />
-            <div className="px-6 pt-5">
-                <div className="mb-1.5 flex flex-wrap items-center gap-3">
-                    <h1 className="font-display text-[30px] font-semibold leading-[1.1] tracking-[-0.03em]">
-                        Subscriptions
-                    </h1>
-                    <span className="ml-auto text-[12.5px] text-muted-foreground">
-                        {running.length} active
-                        {monthly ? ` · about ${monthly} a month` : ""}
-                    </span>
-                    {canSubscribe ? (
-                        <Button onClick={() => setSubscribing(true)}>
-                            Subscribe someone
-                        </Button>
-                    ) : null}
-                </div>
+            <div>
+                <PageHeader
+                    className="mb-1.5"
+                    breadcrumb={["Payments", "Subscriptions"]}
+                    title="Subscriptions"
+                    count={countLabel(subscriptions.length, {
+                        one: "subscription",
+                        other: "subscriptions",
+                    })}
+                    // A summary, not a count of the list: before the button.
+                    meta={
+                        subscriptions.length > 0 ? (
+                            <span>
+                                {running.length} active
+                                {monthly ? ` · about ${monthly} a month` : ""}
+                            </span>
+                        ) : undefined
+                    }
+                    actions={
+                        canSubscribe ? (
+                            <Button onClick={() => setSubscribing(true)}>
+                                Subscribe someone
+                            </Button>
+                        ) : undefined
+                    }
+                />
                 {/* The Plans tab says its own lock, in its own words. */}
                 {newLocked && !(onPlans && plansLocked) ? (
                     <LimitNoticeBlock
@@ -273,7 +283,7 @@ export function SubscriptionsScreen({
                 id="subscriptions-panel"
                 role="tabpanel"
                 aria-labelledby={`tab-${tab}`}
-                className="px-6 pb-[26px] pt-4"
+                className="pt-4"
             >
                 {tab === "plans" ? (
                     <PlansTab
@@ -313,7 +323,7 @@ export function SubscriptionsScreen({
                             <EmptyState
                                 icon={<Repeat />}
                                 title="No one is subscribed yet"
-                                description="Put someone on a plan and their first invoice is issued at once; each renewal after that invoices itself."
+                                description="Put a customer on a plan and their first invoice goes out straight away."
                                 action={
                                     canSubscribe ? (
                                         <Button
@@ -325,11 +335,23 @@ export function SubscriptionsScreen({
                                 }
                             />
                         ) : rows.length === 0 ? (
-                            <div className="rounded-xl border border-dashed border-border-strong px-5 py-10 text-center text-[13px] text-muted-foreground">
-                                {needle
-                                    ? `No ${TAB_LABEL[tab].toLowerCase()} subscriptions match “${query.trim()}”.`
-                                    : `No ${TAB_LABEL[tab].toLowerCase()} subscriptions.`}
-                            </div>
+                            needle ? (
+                                <EmptyState
+                                    kind="no-results"
+                                    things={`${TAB_LABEL[tab].toLowerCase()} subscriptions`}
+                                    cause="search"
+                                    query={query}
+                                    onClear={() => setQuery("")}
+                                />
+                            ) : (
+                                <EmptyState
+                                    kind="no-results"
+                                    things="subscriptions"
+                                    cause="view"
+                                    icon={<Repeat />}
+                                    title={`No ${TAB_LABEL[tab].toLowerCase()} subscriptions`}
+                                />
+                            )
                         ) : (
                             <ul className="flex flex-col gap-2">
                                 {rows.map((s) => (

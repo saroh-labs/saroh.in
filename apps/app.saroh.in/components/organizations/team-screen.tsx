@@ -17,6 +17,7 @@ import {
 } from "@saroh/ui/avatar";
 import { Badge } from "@saroh/ui/badge";
 import { Button } from "@saroh/ui/button";
+import { EmptyState } from "@saroh/ui/data-state";
 import {
     Dialog,
     DialogContent,
@@ -42,7 +43,7 @@ import {
     SheetTitle,
 } from "@saroh/ui/sheet";
 import { showError, showInfo, showSuccess } from "@saroh/ui/toast";
-import { Check, Info, Mail, Plus, Users } from "lucide-react";
+import { Check, Info, Mail, Users } from "lucide-react";
 import { useRouter } from "next/navigation";
 import type { ReactNode } from "react";
 import { useState } from "react";
@@ -364,13 +365,11 @@ export function TeamScreen({
                     actions={
                         // On People, where the person invited will appear.
                         canManage && tab === "people" ? (
-                            <Button onClick={openInvite}>
-                                <Plus className="mr-1.5 size-4" />
-                                {invite.label}
-                            </Button>
+                            <Button onClick={openInvite}>{invite.label}</Button>
                         ) : undefined
                     }
                     readOnlyNote={readOnlyNote}
+                    className="mb-0"
                 />
                 <div className="flex items-end gap-3 border-b border-border">
                     <div
@@ -444,25 +443,16 @@ export function TeamScreen({
                     rolesLock={rolesLock}
                 />
             ) : members.length <= 1 && invitations.length === 0 ? (
-                <div className="flex flex-col items-center gap-[9px] rounded-xl border border-dashed border-border-strong px-6 py-12 text-center">
-                    <Users
-                        aria-hidden
-                        className="size-8 stroke-[1.7] text-muted-foreground"
-                    />
-                    <p className="font-display text-[19px] font-semibold tracking-[-0.025em]">
-                        No one else yet
-                    </p>
-                    <p className="max-w-[46ch] text-[13.5px] leading-[1.55] text-muted-foreground">
-                        You are the only person in {organizationName} so far. An
-                        invitation adds someone to this business only — it gives
-                        them nothing in any other.
-                    </p>
-                    {canManage ? (
-                        <Button className="mt-1" onClick={openInvite}>
-                            {invite.label}
-                        </Button>
-                    ) : null}
-                </div>
+                <EmptyState
+                    icon={<Users />}
+                    title="No one else yet"
+                    description={`You are the only person in ${organizationName} so far.`}
+                    action={
+                        canManage ? (
+                            <Button onClick={openInvite}>{invite.label}</Button>
+                        ) : undefined
+                    }
+                />
             ) : (
                 <PeopleTab
                     organizationName={organizationName}

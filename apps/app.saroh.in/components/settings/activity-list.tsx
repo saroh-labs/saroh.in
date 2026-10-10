@@ -41,7 +41,7 @@ export function ActivityList({
         <>
             <section
                 aria-label="Activity"
-                className="max-w-[760px] overflow-hidden rounded-xl border border-border bg-card"
+                className="overflow-hidden rounded-xl border border-border bg-card"
             >
                 <ol>
                     {entries.map(({ line }) => (

@@ -76,6 +76,7 @@ describe("composerGate", () => {
             title: "Sending from your own email comes with Plus.",
             cta: "See Plus",
             href: "/settings/billing?plan=plus#change-plan",
+            plan: "Plus",
         });
     });
 
@@ -83,8 +84,8 @@ describe("composerGate", () => {
         const gate = composerGate({ ...base, providers: [], access: GROW });
         expect(gate).toEqual({
             kind: "connect",
-            title: "Connect your email to write from here.",
-            cta: "Connect email",
+            title: "No email provider is connected, so no email is sent.",
+            cta: "Connect in Providers",
             href: "/settings/providers",
         });
     });
@@ -134,8 +135,8 @@ describe("composerGate", () => {
         });
         expect(gate).toMatchObject({
             kind: "connect",
-            title: "Connect WhatsApp to write from here.",
-            cta: "Connect WhatsApp",
+            title: "WhatsApp isn't connected, so nothing is sent from here.",
+            cta: "Connect in Providers",
         });
     });
 

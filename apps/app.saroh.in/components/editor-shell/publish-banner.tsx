@@ -2,6 +2,7 @@
 
 import { Button } from "@saroh/ui/button";
 import { cn } from "@saroh/ui/lib/utils";
+import { PageHeader } from "@saroh/ui/page-header";
 import Link from "next/link";
 import { useRef } from "react";
 
@@ -12,6 +13,7 @@ import type {
     StatusLine,
 } from "@/lib/editor-shell/state";
 import { useBottomBarInset } from "@/lib/hooks/use-bottom-bar-inset";
+
 export interface BannerHandlers {
     onPublish: () => void;
     onDiscard: () => void;
@@ -21,8 +23,8 @@ export interface BannerHandlers {
 }
 
 /**
- * The editor's sticky header, after the Plan Editor and Pack Editor designs:
- * the title with its state pill, the status line under it (Saving…, Draft ·
+ * The editor's sticky header: the page header every screen draws (where the
+ * record sits, its title with its state pill), the status line under it (Saving…, Draft ·
  * saved, Not saved, "Priya changed this plan"), then View, Delete draft,
  * Discard changes and Publish. Why Publish is off sits under it, right-
  * aligned, and "When you publish: …" under that.
@@ -31,6 +33,7 @@ export interface BannerHandlers {
  * (`PhoneActionBar`), where a thumb reaches them.
  */
 export function PublishBanner({
+    breadcrumb,
     title,
     pill,
     line,
@@ -41,6 +44,7 @@ export function PublishBanner({
     view,
     changesText,
 }: {
+    breadcrumb?: React.ReactNode[];
     title: string;
     pill: { label: string; tone: ShellTone };
     line: StatusLine;
@@ -55,74 +59,78 @@ export function PublishBanner({
 }) {
     return (
         <>
-            <div className="sticky top-[61px] z-10 flex flex-wrap items-center gap-3 border-b border-border bg-card px-6 py-3 dark:bg-background max-[759px]:px-4">
-                <div className="min-w-0 flex-[1_1_260px]">
-                    <div className="flex flex-wrap items-center gap-2.5">
-                        <h1 className="m-0 min-w-0 break-words font-display text-[22px] font-semibold tracking-[-0.02em]">
-                            {title}
-                        </h1>
-                        <Pill tone={pill.tone}>{pill.label}</Pill>
-                    </div>
-                    <div className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-1">
-                        <div
-                            role="status"
-                            className={cn(
-                                "text-pretty text-[12.5px]",
-                                line.tone === "danger"
-                                    ? "text-destructive"
-                                    : "text-muted-foreground",
-                            )}
-                        >
-                            {line.text}
+            <div className="sticky top-[61px] z-10 border-b border-border bg-card px-4 py-3 dark:bg-background sm:px-[26px]">
+                <PageHeader
+                    className="mb-0"
+                    breadcrumb={breadcrumb}
+                    title={title}
+                    badge={<Pill tone={pill.tone}>{pill.label}</Pill>}
+                    meta={
+                        view ? (
+                            <Link
+                                href={view.href}
+                                className="text-[13px] font-semibold text-brand hover:text-foreground coarse:inline-flex coarse:min-h-11 coarse:items-center"
+                            >
+                                {view.label}
+                            </Link>
+                        ) : undefined
+                    }
+                    actions={
+                        canEdit ? (
+                            <div className="flex flex-wrap items-center gap-2 max-[759px]:hidden">
+                                <ActionButtons
+                                    actions={actions}
+                                    handlers={handlers}
+                                    busy={busy}
+                                />
+                            </div>
+                        ) : undefined
+                    }
+                    description={
+                        <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+                            <div
+                                role="status"
+                                className={cn(
+                                    "text-pretty text-[12.5px]",
+                                    line.tone === "danger"
+                                        ? "text-destructive"
+                                        : "text-muted-foreground",
+                                )}
+                            >
+                                {line.text}
+                            </div>
+                            {canEdit && line.action === "retry" ? (
+                                <Button
+                                    type="button"
+                                    variant="outline"
+                                    size="xs"
+                                    onClick={handlers.onRetry}
+                                >
+                                    Try again
+                                </Button>
+                            ) : null}
+                            {line.action === "reload" ? (
+                                <Button
+                                    type="button"
+                                    variant="outline"
+                                    size="xs"
+                                    disabled={busy}
+                                    onClick={handlers.onReload}
+                                >
+                                    Reload
+                                </Button>
+                            ) : null}
                         </div>
-                        {canEdit && line.action === "retry" ? (
-                            <Button
-                                type="button"
-                                variant="outline"
-                                size="xs"
-                                onClick={handlers.onRetry}
-                            >
-                                Try again
-                            </Button>
-                        ) : null}
-                        {line.action === "reload" ? (
-                            <Button
-                                type="button"
-                                variant="outline"
-                                size="xs"
-                                disabled={busy}
-                                onClick={handlers.onReload}
-                            >
-                                Reload
-                            </Button>
-                        ) : null}
-                    </div>
-                </div>
-                {view ? (
-                    <Link
-                        href={view.href}
-                        className="text-[13px] font-semibold text-brand hover:text-foreground coarse:inline-flex coarse:min-h-11 coarse:items-center"
-                    >
-                        {view.label}
-                    </Link>
-                ) : null}
-                {canEdit ? (
-                    <div className="flex flex-wrap items-center gap-2 max-[759px]:hidden">
-                        <ActionButtons
-                            actions={actions}
-                            handlers={handlers}
-                            busy={busy}
-                        />
-                    </div>
-                ) : null}
+                    }
+                />
             </div>
             {canEdit && actions.publishWhy ? (
-                <p className="m-0 px-6 pt-2 text-right text-[12.5px] text-muted-foreground max-[759px]:px-4 max-[759px]:text-left">
+                <p className="m-0 px-4 pt-2 text-[12.5px] text-muted-foreground sm:px-[26px] sm:text-right">
                     {actions.publishWhy}
                 </p>
             ) : null}
             {changesText ? (
-                <p className="mx-6 mb-0 mt-3 text-pretty rounded-[10px] bg-brand-subtle px-3.5 py-2.5 text-[13px] leading-[1.5] text-brand-subtle-foreground max-[759px]:mx-4">
+                <p className="mx-4 mb-0 mt-3 text-pretty rounded-[10px] bg-brand-subtle px-3.5 py-2.5 text-[13px] leading-[1.5] text-brand-subtle-foreground sm:mx-[26px]">
                     {changesText}
                 </p>
             ) : null}

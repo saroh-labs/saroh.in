@@ -93,13 +93,16 @@ const columns: DataColumn<Row>[] = [
     },
 ];
 
-function view(viewId: string) {
+function view(viewId: string, more: { showTotal?: boolean } = {}) {
     return (
         <DataView
             viewId={viewId}
             rows={rows}
             columns={columns}
             rowKey={(r) => r.id}
+            noun={{ one: "customer", other: "customers" }}
+            searchableColumnIds={["name"]}
+            {...more}
         />
     );
 }
@@ -162,8 +165,30 @@ describe("DataView — on the client", () => {
 
         expect(screen.getByRole("table")).toBeInTheDocument();
         expect(
-            screen.getByRole("region", { name: "Rows" }),
+            screen.getByRole("region", { name: "Customers" }),
         ).toBeInTheDocument();
         expect(screen.getByText("Paid in cash")).toBeInTheDocument();
+    });
+});
+
+/**
+ * The count is said in the thing's own word, and once: a screen whose page
+ * header carries it tells the list to keep quiet until it is narrowed.
+ */
+describe("DataView — how many", () => {
+    beforeEach(() => window.localStorage.clear());
+    afterEach(() => vi.unstubAllGlobals());
+
+    it("says the total in the thing's own word", () => {
+        setWidth(true);
+        render(view("count-own-word"));
+        expect(screen.getByText("1 customer")).toBeInTheDocument();
+        expect(screen.queryByText(/\brows?\b/)).toBeNull();
+    });
+
+    it("leaves the total to the page header when told to", () => {
+        setWidth(true);
+        render(view("count-in-header", { showTotal: false }));
+        expect(screen.queryByText("1 customer")).toBeNull();
     });
 });

@@ -1,9 +1,8 @@
 /**
  * What each settings tab says when it couldn't be read ("Saroh Settings"
- * design, F12): what couldn't be read, that nothing changed, and — where
- * it matters — that nothing will be saved over what can't be seen. Business,
- * Team, Modules and Providers are the design's words; the other tabs follow
- * them.
+ * design, F12). The title and the first sentence are the app's one
+ * ("Couldn't load {things}", "Nothing has been changed."); a tab adds only
+ * the reassurance that is true of it, where it has one.
  */
 export type SettingsSection =
     | "organization"
@@ -18,51 +17,52 @@ export type SettingsSection =
 
 export const SECTION_FAILURE: Record<
     SettingsSection,
-    { heading: string; title: string; body: string }
+    { heading: string; things: string; reassurance?: string }
 > = {
     organization: {
         heading: "Business",
-        title: "Business details could not be loaded",
-        body: "Nothing has changed — this screen could not read them. Editing is unavailable until it can, so nothing is saved over details we cannot see.",
+        things: "your business details",
+        reassurance:
+            "Editing is off until they load, so nothing is saved over details you can't see.",
     },
     people: {
         heading: "Team",
-        title: "The team could not be loaded",
-        body: "Something went wrong on our side. Nobody has been removed and no role has changed — this screen could not read who is in this business. Editing is unavailable until it can.",
+        things: "the team",
+        reassurance: "Nobody has been removed and no role has changed.",
     },
     modules: {
         heading: "Modules",
-        title: "Modules could not be loaded",
-        body: "Nothing has been turned on or off — this screen could not read what this business runs on. Try again in a moment.",
+        things: "modules",
+        reassurance: "Nothing has been turned on or off.",
     },
     providers: {
         heading: "Providers",
-        title: "Providers could not be loaded",
-        body: "Every connection is as it was — this screen could not read them. Sites, email and payments keep working.",
+        things: "providers",
+        reassurance: "Your website, email and payments keep working.",
     },
     share: {
         heading: "Share",
-        title: "Your QR codes could not be loaded",
-        body: "Every code is as it was and the printed ones keep working — this screen could not read them. Try again in a moment.",
+        things: "your QR codes",
+        reassurance: "The printed ones keep working.",
     },
     activity: {
         heading: "Activity",
-        title: "Activity could not be loaded",
-        body: "Nothing has changed — this screen could not read who changed what. Every change is still recorded.",
+        things: "activity",
+        reassurance: "Every change is still recorded.",
     },
     billing: {
         heading: "Plan and billing",
-        title: "Plan and billing could not be loaded",
-        body: "Your plan is as it was and nothing has been charged — this screen could not read it. Try again in a moment.",
+        things: "Plan and billing",
+        reassurance: "Your plan is as it was and nothing has been charged.",
     },
     profile: {
         heading: "Your profile",
-        title: "Your profile could not be loaded",
-        body: "Nothing has changed — this screen could not read your details or alerts. Try again in a moment.",
+        things: "your profile",
     },
     data: {
         heading: "Your data",
-        title: "Your downloads could not be loaded",
-        body: "Nothing has changed — this screen could not read them. A download already being prepared carries on, and its link is still emailed to you.",
+        things: "your downloads",
+        reassurance:
+            "A download already being prepared carries on, and its link is still emailed to you.",
     },
 };
