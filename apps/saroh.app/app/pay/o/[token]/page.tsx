@@ -1,10 +1,12 @@
 import type { Metadata } from "next";
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
+import { cache } from "react";
 
 import { SiteTheme } from "@saroh/site-blocks";
 
 import { OrderPay } from "@/components/order-pay";
+import { publicApiUrl } from "@/lib/api-url";
 import { getPayOrder } from "@/lib/order-pay";
 import { payRedirect, TENANT_HOST_HEADER } from "@/lib/pay-host";
 import { SITE_FACES } from "@/lib/site-fonts";
@@ -18,11 +20,24 @@ import { SITE_FACES } from "@/lib/site-fonts";
  * The link is a credential: the page is noindex and sends no referrer, so
  * the token never leaves in a Referer header.
  */
-export const metadata: Metadata = {
-    title: "Pay for your order",
-    robots: { index: false, follow: false },
-    referrer: "no-referrer",
-};
+// One read for the tab's title and the page.
+const readOrder = cache(getPayOrder);
+
+/** "Pay Rye & Co." in the tab; the plain title when the link doesn't open. */
+export async function generateMetadata({
+    params,
+}: {
+    params: Promise<{ token: string }>;
+}): Promise<Metadata> {
+    const result = await readOrder((await params).token);
+    return {
+        title: result.ok
+            ? `Pay ${result.order.businessName}`
+            : "Pay for your order",
+        robots: { index: false, follow: false },
+        referrer: "no-referrer",
+    };
+}
 
 const GONE: Record<
     "missing" | "busy" | "unavailable",
@@ -30,7 +45,7 @@ const GONE: Record<
 > = {
     missing: {
         title: "This link no longer works",
-        body: "If you've paid, here or in person, you're done — the business has it, and this link isn't needed any more. Otherwise the order may have been cancelled, or they sent you a newer link. Ask them for the latest one.",
+        body: "If you've paid, here or in person, you're done. The business has it, and this link isn't needed any more. Otherwise the order may have been cancelled, or they sent you a newer link. Ask them for the latest one.",
     },
     busy: {
         title: "Too many tries at once",
@@ -48,7 +63,7 @@ export default async function OrderPayPage({
     params: Promise<{ token: string }>;
 }) {
     const { token } = await params;
-    const result = await getPayOrder(token);
+    const result = await readOrder(token);
 
     if (!result.ok) {
         const copy = GONE[result.reason];
@@ -75,7 +90,7 @@ export default async function OrderPayPage({
             {order.theme ? (
                 <SiteTheme variables={order.theme} faces={SITE_FACES} />
             ) : null}
-            <OrderPay token={token} order={order} />
+            <OrderPay token={token} order={order} apiUrl={publicApiUrl()} />
         </main>
     );
 }

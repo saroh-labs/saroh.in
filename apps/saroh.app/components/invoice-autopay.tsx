@@ -40,7 +40,8 @@ export function InvoiceAutopay({
     total,
     payable,
     onJustPay,
-    justPayBusy,
+    justPayBusy = false,
+    justPayLabel,
     apiUrl,
 }: {
     token: string;
@@ -51,9 +52,13 @@ export function InvoiceAutopay({
     total: string;
     /** The invoice can still be paid; false: it is paid already. */
     payable: boolean;
-    /** The page's own Pay, for "Just pay this invoice". */
-    onJustPay: () => void;
-    justPayBusy: boolean;
+    /**
+     * The page's own Pay, for "Just pay this invoice", and what its button
+     * reads now. Absent where nothing is owed (`payable` false).
+     */
+    onJustPay?: () => void;
+    justPayBusy?: boolean;
+    justPayLabel?: string;
     /**
      * The public API the window's return is posted to (P1), so the payment
      * is settled without waiting for the webhook.
@@ -97,7 +102,7 @@ export function InvoiceAutopay({
         keys.current.autopay = newKey();
         if (outcome === "paid") {
             setSaid(
-                "Autopay is being confirmed. Use “Check again” in a moment.",
+                "Autopay is being confirmed. Reload this page in a moment to see it.",
             );
         } else if (outcome === "closed") {
             setSaid("The window closed before autopay was set up.");
@@ -235,7 +240,7 @@ export function InvoiceAutopay({
                         "w-full disabled:cursor-not-allowed disabled:opacity-60",
                     )}
                 >
-                    {justPayBusy ? "Starting payment…" : `Pay ${total}`}
+                    {justPayLabel ?? `Pay ${total}`}
                 </button>
             )}
         </div>

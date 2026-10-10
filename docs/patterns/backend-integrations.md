@@ -168,7 +168,13 @@ a note saying so.
   on its payment session. Razorpay's is set to UPI and
   card only; Cashfree's shows what the account has on. What the
   window says is a hint ("Paying…"); the API confirms the booking.
-  The invoice pay page still shows the handoff, not the window.
+  The pay link pages (`/pay/<token>` for an invoice, `/pay/o/<token>` for
+  an order) open the same window through the same helper
+  (`PayLinkPay`, `site-blocks/src/pay-link/`): Pay starts the intent on the
+  site's server, the window opens on it, and after "paid" the page re-reads
+  itself until the server says so. A new page that takes money opens
+  `openProviderCheckout`; never a second provider integration, and never
+  the handoff drawn on the page.
 - **Current** (P1, #710) — **A payment is confirmed by asking the
   provider, with the webhook as backup.** Every merchant-site window posts
   its return (`CheckoutRequest.apiUrl`) to `POST /public/payments/return`:
