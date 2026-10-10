@@ -244,7 +244,7 @@ export function VariantsSection({
     function remove(r: VariantRow) {
         const kept = rows;
         setRows(rows.filter((x) => x.key !== r.key));
-        showUndo(`${titleOf(r) || "Variant"} removed from the list`, () =>
+        showUndo(`${titleOf(r) || "Variant"} removed from the list.`, () =>
             setRows(kept),
         );
     }

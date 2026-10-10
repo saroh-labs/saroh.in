@@ -207,7 +207,7 @@ export function DiscountForm({
             else showError(res.error);
             return;
         }
-        showSuccess(discount ? "Code saved" : `${res.data.code} is ready`);
+        showSuccess(discount ? "Code saved." : `${res.data.code} is ready.`);
         router.push("/commerce/discounts");
         router.refresh();
     }
@@ -225,7 +225,7 @@ export function DiscountForm({
                 showError(res.error);
                 return;
             }
-            showSuccess(`${discount.code} has ended — its figures are kept`);
+            showSuccess(`${discount.code} has ended. Its figures are kept.`);
             router.push("/commerce/discounts");
             router.refresh();
         });

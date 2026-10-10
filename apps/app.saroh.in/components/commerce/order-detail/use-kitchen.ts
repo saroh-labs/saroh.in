@@ -361,7 +361,7 @@ export function useKitchen({
                     );
                 } else {
                     showSuccess(
-                        `Saved. ${money(due)} more is due.`,
+                        `Order saved. ${money(due)} more is due.`,
                         d.online === false ? record : undefined,
                     );
                 }
@@ -372,18 +372,18 @@ export function useKitchen({
                 );
             } else if (fromTill > 0 && online > 0) {
                 showSuccess(
-                    `Saved. ${money(online)} goes back to ${refundTo}, and ${money(fromTill)} from the till.`,
+                    `Order saved. ${money(online)} goes back to ${refundTo}, and ${money(fromTill)} from the till.`,
                 );
             } else if (fromTill > 0) {
                 showSuccess(
-                    `Saved. Give ${money(fromTill)} back from the till.`,
+                    `Order saved. Give ${money(fromTill)} back from the till.`,
                 );
             } else if (online > 0) {
                 showSuccess(
-                    `Saved. ${money(online)} goes back to ${refundTo}.`,
+                    `Order saved. ${money(online)} goes back to ${refundTo}.`,
                 );
             } else {
-                showSuccess("Saved.");
+                showSuccess("Order saved.");
             }
             refresh();
         });

@@ -68,7 +68,7 @@ export async function getRoleCatalogue(): Promise<RoleCatalogue | null> {
 }
 
 export async function createRole(input: RoleInput): Promise<CrmResult<Role>> {
-    return mutate<Role>("/roles", "POST", input, "Could not create that role.");
+    return mutate<Role>("/roles", "POST", input, "Couldn't create that role.");
 }
 
 export async function updateRole(
@@ -79,7 +79,7 @@ export async function updateRole(
         `/roles/${encodeURIComponent(key)}`,
         "PATCH",
         input,
-        "Could not save that role.",
+        "Couldn't save that role.",
     );
     return res.ok
         ? {
@@ -92,6 +92,6 @@ export async function updateRole(
 export async function deleteRole(key: string): Promise<CrmResult<object>> {
     return destroy(
         `/roles/${encodeURIComponent(key)}`,
-        "Could not remove that role.",
+        "Couldn't remove that role.",
     );
 }

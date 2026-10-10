@@ -86,7 +86,7 @@ export function BlockFeedback({
             showError(res.error);
             return;
         }
-        showSuccess(settled ? "Marked settled." : "Reopened.");
+        showSuccess(settled ? "Note marked settled." : "Note reopened.");
         await onChanged();
     }
 

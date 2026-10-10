@@ -264,7 +264,7 @@ export function CatalogueScreen({
             else showError("It couldn't be duplicated.", res.error);
             return;
         }
-        showSuccess(`${res.data.name} is a draft — stock starts at 0.`);
+        showSuccess(`${res.data.name} is a draft. Stock starts at 0.`);
         router.push(productEditHref(res.data.storeId, res.data.id));
     }
 

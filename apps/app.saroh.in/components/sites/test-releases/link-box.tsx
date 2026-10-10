@@ -1,7 +1,7 @@
 "use client";
 
 import { Button } from "@saroh/ui/button";
-import { copyText } from "@saroh/ui/copy-button";
+import { copyFailedMessage, copyText } from "@saroh/ui/copy-button";
 import { showError, showSuccess } from "@saroh/ui/toast";
 import { Copy, ExternalLink } from "lucide-react";
 
@@ -34,9 +34,7 @@ export function LinkBox({ url, label }: { url: string; label: string }) {
                         void copyLink(url).then((ok) =>
                             ok
                                 ? showSuccess("Link copied.")
-                                : showError(
-                                      "Couldn't copy. Select the link and copy it yourself.",
-                                  ),
+                                : showError(copyFailedMessage()),
                         )
                     }
                 >

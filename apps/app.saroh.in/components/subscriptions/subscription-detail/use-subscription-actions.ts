@@ -57,7 +57,7 @@ export function useSubscriptionActions(
         }));
         setBusy(false);
         if (!res.ok) {
-            showError(res.error ?? "That didn't go through.");
+            showError(res.error ?? "That didn't go through. Try again.");
             router.refresh();
             return false;
         }

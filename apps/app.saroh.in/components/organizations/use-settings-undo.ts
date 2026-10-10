@@ -77,7 +77,7 @@ export function useSettingsUndo(): { offer: OfferUndo; settle: () => void } {
                     if (toastId !== null) dismissToast(toastId);
                     if (state.status === "failed") {
                         showError(
-                            refusal ?? "Couldn't undo that",
+                            refusal ?? "Couldn't undo that.",
                             "What you saved is still saved.",
                         );
                     }

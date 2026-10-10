@@ -103,7 +103,7 @@ export function PlaceNameSheet({
                 }
                 save(
                     { name: trimmed },
-                    "Name saved",
+                    "Name saved.",
                     undefined,
                     undefined,
                     onClose,
@@ -263,7 +263,7 @@ export function PlaceAddressSheet({
                 setRefusal(null);
                 save(
                     patch,
-                    "Location address saved",
+                    "Location address saved.",
                     undefined,
                     setRefusal,
                     onClose,
@@ -316,7 +316,7 @@ export function PlaceHoursSheet({
                 }
                 save(
                     { openingHours: week },
-                    "Opening hours saved",
+                    "Opening hours saved.",
                     undefined,
                     undefined,
                     onClose,

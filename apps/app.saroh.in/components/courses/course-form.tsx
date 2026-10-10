@@ -157,10 +157,10 @@ export function CourseForm({
         }
         showSuccess(
             course
-                ? "Course saved"
+                ? "Course saved."
                 : open
-                  ? `${values.name} is open for enrolment`
-                  : `${values.name} saved as a draft`,
+                  ? `${values.name} is open for enrolment.`
+                  : `${values.name} saved as a draft.`,
         );
         if (!leaving) router.push(`/courses/${res.data.id}`);
         return true;

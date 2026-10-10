@@ -163,7 +163,7 @@ export function StockSheet({
                 plan,
             );
             if (stopped !== null) {
-                showError("Nothing was saved", stopped);
+                showError("Nothing was saved.", stopped);
                 return;
             }
             router.refresh();

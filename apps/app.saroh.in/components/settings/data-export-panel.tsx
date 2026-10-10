@@ -43,12 +43,11 @@ export function DataExportPanel({
             const result = await runAction(() => startDataExport());
             if (!result) return;
             if (!result.ok) {
-                showError("Your data couldn't be prepared", result.error);
+                showError("Your data couldn't be prepared.", result.error);
                 return;
             }
             if (result.data.already) showInfo(DATA_EXPORT_ALREADY);
-            else
-                showSuccess("Your data is being prepared", DATA_EXPORT_STARTED);
+            else showSuccess("Export started.", DATA_EXPORT_STARTED);
             router.refresh();
         });
 
@@ -57,7 +56,7 @@ export function DataExportPanel({
         try {
             const result = await getDataExportLink(id);
             if (!result.ok) {
-                showError("The download couldn't start", result.error);
+                showError("The download couldn't start.", result.error);
                 router.refresh();
                 return;
             }

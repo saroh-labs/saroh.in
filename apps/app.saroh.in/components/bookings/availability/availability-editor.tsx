@@ -260,13 +260,13 @@ export function AvailabilityEditor({
         });
         if (outside.length) {
             showWarning(
-                `${count(outside.length, "booking is", "bookings are")} now outside the hours`,
+                `${count(outside.length, "booking is", "bookings are")} now outside the hours.`,
                 "They stay booked. Move them from the calendar if you need to.",
             );
         }
         if (covered.size) {
             showWarning(
-                `${count(covered.size, "booking falls", "bookings fall")} in the time off`,
+                `${count(covered.size, "booking falls", "bookings fall")} in the time off.`,
                 "They stay booked. Move or cancel them from the calendar.",
             );
         }

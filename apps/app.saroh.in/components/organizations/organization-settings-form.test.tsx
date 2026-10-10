@@ -300,7 +300,7 @@ describe("What is this? (DEC-070, K5)", () => {
             string,
             () => void,
         ];
-        expect(message).toBe("What this is saved");
+        expect(message).toBe("What this is saved.");
         // The rows read the new words at once.
         expect(card("Identity")?.textContent).toContain("Just me");
         expect(card("Identity")?.textContent).toContain("Your name or brand");

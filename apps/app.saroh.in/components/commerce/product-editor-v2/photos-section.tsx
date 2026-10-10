@@ -112,7 +112,7 @@ export function PhotosSection({ product }: { product: ProductDetail | null }) {
                     productId,
                     photosInput(draft),
                 );
-                if (!res.ok) showError(`Photos weren't added: ${res.error}`);
+                if (!res.ok) showError("The photos weren't added.", res.error);
                 return res.ok;
             },
         },

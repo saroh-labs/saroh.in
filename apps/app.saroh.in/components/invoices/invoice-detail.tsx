@@ -43,7 +43,7 @@ import { canSend, paysOnline, wasSent } from "@/lib/invoices/send";
 import type { InvoiceSend, InvoiceSent } from "@/lib/invoices/service";
 import type { PillVariant } from "@/lib/invoices/status";
 import type { OnlineBlocker } from "@/lib/staff/types";
-import { copyText } from "@saroh/ui/copy-button";
+import { copyFailedMessage, copyText } from "@saroh/ui/copy-button";
 import { Notice } from "@saroh/ui/notice";
 
 type Dialog =
@@ -240,7 +240,7 @@ export function InvoiceDetail({
                 ? showSuccess(
                       urlKind === "view" ? "Link copied." : "Pay link copied.",
                   )
-                : showError("Couldn't copy. Select the link and copy it."),
+                : showError(copyFailedMessage()),
         );
     }
 

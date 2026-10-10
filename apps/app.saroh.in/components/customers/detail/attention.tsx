@@ -84,7 +84,7 @@ export function useAttention({
                 if (state.status === "failed") {
                     back();
                     showError(
-                        refused ?? "Could not take that off Needs attention.",
+                        refused ?? "Couldn't take that off Needs attention.",
                         `${tagText(entry)} is still on their list.`,
                     );
                 }

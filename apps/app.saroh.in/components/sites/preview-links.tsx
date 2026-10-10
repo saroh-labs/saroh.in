@@ -15,7 +15,7 @@ import {
     revokePreviewLink,
 } from "@/lib/sites/actions";
 import type { PreviewLinkDays, SitePreviewLinkView } from "@/lib/sites/service";
-import { copyText } from "@saroh/ui/copy-button";
+import { copyFailedMessage, copyText } from "@saroh/ui/copy-button";
 import { Segmented } from "@saroh/ui/segmented";
 
 /**
@@ -139,7 +139,7 @@ export function PreviewLinks({ siteId }: { siteId: string }) {
                                                           "Link copied.",
                                                       )
                                                     : showError(
-                                                          "Could not copy. Select the link and copy it yourself.",
+                                                          copyFailedMessage(),
                                                       ),
                                             )
                                         }

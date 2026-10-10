@@ -53,7 +53,7 @@ export function BookingPackControl({
             return;
         }
         showSuccess(
-            `Paid with ${res.data.purchase.pack.name} — ${res.data.purchase.left} left`,
+            `Paid with ${res.data.purchase.pack.name}. ${res.data.purchase.left} left.`,
         );
         router.refresh();
     }
@@ -66,8 +66,8 @@ export function BookingPackControl({
         if (!res.ok) return showError(res.error);
         showSuccess(
             res.data.returned
-                ? "The pack is off this booking, and its class is back"
-                : "This booking was not paid with a pack",
+                ? "The pack is off this booking, and its class is back."
+                : "This booking was not paid with a pack.",
         );
         router.refresh();
     }

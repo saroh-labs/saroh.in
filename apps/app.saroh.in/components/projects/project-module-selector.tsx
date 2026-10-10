@@ -65,8 +65,8 @@ function ProjectModuleRow({
             if (result.ok) {
                 showSuccess(
                     next
-                        ? `${module.label} added to this project`
-                        : `${module.label} removed from this project`,
+                        ? `${module.label} added to this project.`
+                        : `${module.label} removed from this project.`,
                 );
             } else {
                 showError(refusalSentence(result));

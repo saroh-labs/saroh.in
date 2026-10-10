@@ -42,7 +42,7 @@ export function MoveStageControl({
             showError(res.error);
             return;
         }
-        showSuccess("Lead moved");
+        showSuccess("Lead moved.");
         router.refresh();
     }
 

@@ -16,7 +16,7 @@ export function ChangePaymentMethod() {
         <TextLink
             onClick={() =>
                 showInfo(
-                    "Changing how you pay Saroh isn't switched on yet",
+                    "Changing how you pay Saroh isn't switched on yet.",
                     "Until it is, nothing about how you pay changes.",
                 )
             }

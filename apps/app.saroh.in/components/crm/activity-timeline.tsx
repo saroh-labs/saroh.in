@@ -72,7 +72,7 @@ function CompleteTaskButton({
             showError(res.error);
             return;
         }
-        showSuccess("Task completed");
+        showSuccess("Task completed.");
         router.refresh();
     }
 

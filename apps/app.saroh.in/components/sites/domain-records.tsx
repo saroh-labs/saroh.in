@@ -13,7 +13,7 @@ import { useState } from "react";
 import type { DomainView } from "@/lib/domains/domain-view";
 import { DOMAIN_WORDS } from "@/lib/domains/domain-view";
 import type { SiteDomain } from "@/lib/domains/service";
-import { copyText } from "@saroh/ui/copy-button";
+import { copyFailedMessage, copyText } from "@saroh/ui/copy-button";
 
 /**
  * The DNS records a domain asks for (#200, #861), each part something to
@@ -41,9 +41,7 @@ function CopyField({ label, value }: { label: string; value: string }) {
                     void copyText(value).then((ok) =>
                         ok
                             ? showSuccess(`${label} copied.`)
-                            : showError(
-                                  "Could not copy. Select the text and copy it yourself.",
-                              ),
+                            : showError(copyFailedMessage("text")),
                     )
                 }
             >

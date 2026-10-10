@@ -238,7 +238,7 @@ function UnlinkedItem({
                 showSuccess(`Linked to ${holderName}.`);
                 onLinked(holderName);
             } else {
-                showError("Couldn't link them", res.error);
+                showError("Couldn't link them.", res.error);
             }
         });
     }

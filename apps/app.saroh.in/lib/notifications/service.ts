@@ -102,7 +102,7 @@ export async function markNotificationRead(
         error?: string;
     } | null;
     if (res.ok) return { ok: true, data: { id } };
-    return { ok: false, error: readError(data, "Could not mark as read") };
+    return { ok: false, error: readError(data, "Couldn't mark as read.") };
 }
 
 /**
@@ -131,7 +131,7 @@ export async function markAllNotificationsRead(): Promise<
             },
         };
     }
-    return { ok: false, error: readError(data, "Could not mark all as read") };
+    return { ok: false, error: readError(data, "Couldn't mark all as read.") };
 }
 
 /** Undo that press: what it marked read, and only that, is unread again. */

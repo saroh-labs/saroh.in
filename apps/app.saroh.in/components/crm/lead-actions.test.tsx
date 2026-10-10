@@ -339,7 +339,7 @@ describe("Send message", () => {
         await submit();
 
         expect(showWarning).toHaveBeenCalledWith(
-            "Message suppressed: consent is revoked",
+            "Message not sent. Their consent is revoked.",
         );
         expect(showSuccess).not.toHaveBeenCalled();
         expect(dialog()).toBe(null);

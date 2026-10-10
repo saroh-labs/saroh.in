@@ -229,7 +229,7 @@ export function CsvImport({
             setResult(res.data);
             setPhase("done");
             showSuccess(
-                `Imported ${res.data.created + res.data.updated} ${descriptor.entity}`,
+                `Imported ${res.data.created + res.data.updated} ${descriptor.entity}.`,
             );
             router.refresh();
         });

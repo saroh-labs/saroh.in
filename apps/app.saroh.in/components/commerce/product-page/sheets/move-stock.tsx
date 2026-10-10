@@ -84,7 +84,7 @@ export function MoveStock({
                 idempotencyKey: crypto.randomUUID(),
             });
             if (!res.ok) {
-                showError("Nothing moved", res.error);
+                showError("Nothing was moved.", res.error);
                 return;
             }
             showSuccess(movedWords(n, nameOf(to)));

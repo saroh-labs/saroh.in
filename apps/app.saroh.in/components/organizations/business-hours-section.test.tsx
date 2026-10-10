@@ -130,7 +130,7 @@ describe("Hours' row and sheet", () => {
         expect(summary()).toBe(
             "Mon–Sat 9:00 am to 6:00 pm · Sun 10:00 am to 4:00 pm",
         );
-        expect(showUndo.mock.calls[0]?.[0]).toBe("Hours saved");
+        expect(showUndo.mock.calls[0]?.[0]).toBe("Hours saved.");
     });
 
     it("a location that refuses is named, and the sheet stays open with what was typed", async () => {
@@ -144,7 +144,8 @@ describe("Hours' row and sheet", () => {
         await type(input("sun"), "10:00-16:00");
         await press(item("Save"));
         expect(showError).toHaveBeenCalledWith(
-            "Hill Road: A day has to close after it opens.",
+            "Hours weren't saved for Hill Road.",
+            "A day has to close after it opens.",
         );
         expect(sheetName()).toBe("Opening hours");
         expect(input("sun")?.value).toBe("10:00-16:00");

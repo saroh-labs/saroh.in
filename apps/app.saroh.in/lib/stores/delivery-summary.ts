@@ -280,14 +280,14 @@ export function waySaved(type: Way, input: StorefrontInput): string {
     const label = FULFILMENT_LABEL[type];
     const keys = Object.keys(input);
     if (keys.length === 1 && input.fulfilmentTypes) {
-        return `${label} turned ${input.fulfilmentTypes.includes(type) ? "on" : "off"}`;
+        return `${label} turned ${input.fulfilmentTypes.includes(type) ? "on" : "off"}.`;
     }
     const late = input.lateAfterMinutes?.[type];
     if (keys.length === 1 && late !== undefined) {
         const noun = ORDERS_NOUN[type];
-        return `${noun.charAt(0).toUpperCase()}${noun.slice(1)} now count as late after ${lateAfterWords(late)}`;
+        return `${noun.charAt(0).toUpperCase()}${noun.slice(1)} now count as late after ${lateAfterWords(late)}.`;
     }
-    return `${label} saved`;
+    return `${label} saved.`;
 }
 
 /**

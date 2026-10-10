@@ -575,7 +575,7 @@ describe("a save", () => {
         await press(button("Save", dialog()));
 
         expect(dialog()).toBe(null);
-        expect(toast.showSuccess).toHaveBeenCalledWith("Saved.");
+        expect(toast.showSuccess).toHaveBeenCalledWith("Order saved.");
         expect(refresh).toHaveBeenCalledTimes(1);
         expect(document.activeElement).toBe(edit);
     });

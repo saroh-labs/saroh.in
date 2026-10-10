@@ -38,7 +38,7 @@ export function LeadStatusControl({
             showError(res.error);
             return;
         }
-        showSuccess("Lead updated");
+        showSuccess("Lead saved.");
         router.refresh();
     }
 

@@ -72,7 +72,7 @@ async function record(
 ): Promise<EditorResult<PackEditorRecord>> {
     const r = await res;
     if (!r.ok) return r;
-    if (!r.data) return { ok: false, error: "Could not read that pack back." };
+    if (!r.data) return { ok: false, error: "Couldn't read that pack back." };
     return { ok: true, data: tidyRecord(r.data) };
 }
 
@@ -83,7 +83,7 @@ export function loadPackDraft(id: string) {
             `${pack(id)}/draft`,
             "GET",
             undefined,
-            "Could not load that pack.",
+            "Couldn't load that pack.",
         ),
     );
 }
@@ -95,7 +95,7 @@ export function createPackDraft(values: Partial<PackValues>) {
             `${packs}/drafts`,
             "POST",
             values,
-            "Could not save that pack.",
+            "Couldn't save that pack.",
         ),
     );
 }
@@ -111,7 +111,7 @@ export function savePackDraft(
             `${pack(id)}/draft`,
             "PATCH",
             { ...values, revision },
-            "Could not save that pack.",
+            "Couldn't save that pack.",
         ),
     );
 }
@@ -123,7 +123,7 @@ export function publishPack(id: string, revision: number) {
             `${pack(id)}/publish`,
             "POST",
             { revision },
-            "Could not publish that pack.",
+            "Couldn't publish that pack.",
         ),
     );
 }
@@ -135,7 +135,7 @@ export function discardPackChanges(id: string, revision: number) {
             `${pack(id)}/discard`,
             "POST",
             { revision },
-            "Could not discard those changes.",
+            "Couldn't discard those changes.",
         ),
     );
 }
@@ -146,7 +146,7 @@ export function deletePackDraft(id: string, revision: number) {
         `${pack(id)}?revision=${encodeURIComponent(String(revision))}`,
         "DELETE",
         undefined,
-        "Could not delete that draft.",
+        "Couldn't delete that draft.",
     );
 }
 

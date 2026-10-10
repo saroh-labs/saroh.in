@@ -146,5 +146,5 @@ export function savedWords(sheet: BusinessSheet, page: Page): string {
     const { title } = sheetWords(sheet, page);
     return PRINTED.includes(sheet)
         ? `${title} saved. Invoices from now on use it.`
-        : `${title} saved`;
+        : `${title} saved.`;
 }
