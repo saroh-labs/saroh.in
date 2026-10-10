@@ -21,6 +21,7 @@
 | Is this person Saroh staff?          | The API                         | `PlatformAdminGuard`, `PlatformPermissionGuard`                                                                |
 | May this operator do this?           | The permission vocabulary       | `admin-permissions.ts` (code); grants in `PlatformAdminRoleAssignment` (data)                                  |
 | Is this business open for activity?  | Its lifecycle                   | `assertOrganizationOpen` (`organization-lifecycle.gate.ts`), in `OrganizationGuard` and public writes          |
+| What does its state close?           | The lifecycle table             | `organization-lifecycle.policy.ts` (#921): activity, billing, public site, members' door                       |
 
 The frontends, `admin.saroh.in` included, decide none of these. They render
 what the API allows.
@@ -276,9 +277,15 @@ what the API allows.
   plan entitlement, an invitation sent to someone else.
 - **Current** — **Gate on the server first** (§21, §29). A hidden nav item is a
   usability aid. `ModuleEnforcementGuard` covers 19 controllers across all eight
-  modules and stays dark until `MODULE_ENFORCEMENT` is set;
+  modules and stays dark until `MODULE_ENFORCEMENT` is set (`shadow` logs
+  what it would refuse, refusing nothing);
   `module-annotations.spec.ts` pins what is gated and what must never be
   (refunds, consent withdrawal, public checkout, published sites, webhooks).
+  History reads in a gated domain (orders, store customers, bookings, plans and
+  subscriptions, class packs, courses) are left off and their writes gated per
+  handler, so a module switched off keeps its records readable; cancelling an
+  order, booking, subscription or enrolment already made is wind-down and
+  stays open too (#117, DEC-057, `history-reads.gate.spec.ts`).
 - **Current** (DEC-070) — **What is being set up never decides access.**
   `Organization.kind` (BUSINESS, SOLO, WORK) picks words and defaults only.
   It is served on the `org:read` summary and the organization list, changed
@@ -420,7 +427,8 @@ orgId)` (`organizations/organization-kind.ts`).
   a Platform Owner whose ownership does not expire.
 - **Current** — **Cross-tenant reads live only behind the admin guards** (plan
   D2). The admin services (`admin-organizations`, `admin-people`,
-  `admin-machinery`, `admin-waitlist`, `admin-metrics`, and the pricing
+  `admin-machinery`, `admin-waitlist`, `admin-metrics`, `admin-usage`
+  (storage per business, #798), and the pricing
   catalogue's `ImpactService`) read across every
   business with no organization context, so the `org_isolation` policies take
   their permissive branch. Each says **CROSS-TENANT READ** in its doc comment,
@@ -440,6 +448,21 @@ orgId)` (`organizations/organization-kind.ts`).
   `OrganizationGuard` refuses writes and the public enquiry, booking and
   payment paths refuse outright; reads still pass and the site stays up, so its
   people can see what happened and take their data.
+- **Current** (#921, DEC-021 amended) — **What each lifecycle state does is
+  one table**, `organization-lifecycle.policy.ts`: activity, billing, the
+  public site and the members' door, per state. Read it through its
+  accessors (`activityOpen`, `billingMayCharge`, `publicSiteOnline`,
+  `membersMayOpen`, `SITE_ONLINE_ORGANIZATION`, `BILLING_ORGANIZATION`),
+  never a list of state names of your own. **A deleted business
+  (`DELETED_RETAINED`) is closed to its members** — owners too, 403
+  `ORGANIZATION_DELETED` from `assertMembersMayOpen`, asked wherever a
+  membership becomes access (the organization context, the storefront
+  authorizer) and left out of the person's list of businesses — and **its
+  site is offline**: every public site read filters on
+  `SITE_ONLINE_ORGANIZATION` or sits behind `PublicSiteOnlineGuard` (every
+  `public/sites` controller). A new state, a new `public/sites` controller or
+  a new membership door fails `organization-lifecycle.policy.spec.ts` until it
+  is decided.
 - **Adopted** (2026-09-26, ADR-011) — **A business's customers are not
   users.** A customer account on a merchant site is a per-business
   `CustomerAccount` linked to a Contact, never a Better Auth `User`. Its

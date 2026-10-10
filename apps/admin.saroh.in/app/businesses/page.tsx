@@ -75,8 +75,8 @@ export default async function BusinessesPage({
                         defaultValue={query.q}
                         placeholder={
                             canSearchEmail
-                                ? "Name, slug, id or a member's email"
-                                : "Name, slug or id"
+                                ? "Name, web address, id or a member's email"
+                                : "Name, web address or id"
                         }
                     />
                     <FilterSelect

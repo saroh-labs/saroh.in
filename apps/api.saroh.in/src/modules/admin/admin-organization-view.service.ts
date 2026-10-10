@@ -19,6 +19,8 @@ import type { SiteTrackersRow } from "./admin-site-trackers.service";
 import { siteTrackerStates } from "./admin-site-trackers.service";
 import type { UsageNote } from "./catalogue-usage";
 import { catalogueUsage, usageNote } from "./catalogue-usage";
+import type { DeletionRefundRow, DeletionTrailRow } from "./deletion-trail";
+import { deletionRefunds, deletionTrail } from "./deletion-trail";
 import type { EffectivePlan } from "./effective-plan";
 import { effectivePlan } from "./effective-plan";
 
@@ -236,6 +238,17 @@ export interface OrganizationSupportView {
      * "What they see" (owner, 9 Oct). Never a key or credential.
      */
     presence: Panel<OrganizationPresence>;
+    /**
+     * Its way out (#921): every deletion step on the admin ledger, newest
+     * first, with who took it in words. Empty for a business never closed.
+     */
+    deletionTrail: Panel<(DeletionTrailRow & { actor: string | null })[]>;
+    /**
+     * The refunds a closing business still owes its customers, live: the
+     * sweep won't delete it while there are any. Empty unless
+     * `PENDING_DELETION`; a customer's name only to a PII reader.
+     */
+    deletionRefunds: Panel<DeletionRefundRow[]>;
 }
 
 /**
@@ -256,6 +269,11 @@ export interface OrganizationSupportView {
  * line, message or site body — the business's own customers are not what a
  * support conversation is about. People's email addresses are personal data
  * and come back only to a caller holding `organization:pii:read`.
+ *
+ * One exception, for a business on its way out (#921, owner 9 Oct): while
+ * it is `PENDING_DELETION`, the refunds it still owes its customers —
+ * amount, order or invoice number, provider reference, and the customer's
+ * name only to a PII reader — because its deletion waits on them.
  *
  * The two ledgers stay separate (plan D5): `activity` is what the business
  * did, `operatorActions` is what an operator did to it.
@@ -284,6 +302,8 @@ export class AdminOrganizationViewService {
             notes,
             sites,
             presence,
+            trail,
+            refunds,
         ] = await Promise.all([
             this.panel("people", () =>
                 this.people(organizationId, caller.canReadPii),
@@ -325,6 +345,12 @@ export class AdminOrganizationViewService {
                 }));
             }),
             this.panel("presence", () => organizationPresence(organizationId)),
+            this.panel("deletionTrail", () =>
+                this.named(deletionTrail(organizationId), caller),
+            ),
+            this.panel("deletionRefunds", () =>
+                deletionRefunds(organizationId, facts.lifecycleStatus, caller),
+            ),
         ]);
 
         return {
@@ -337,6 +363,8 @@ export class AdminOrganizationViewService {
             notes,
             sites,
             presence,
+            deletionTrail: trail,
+            deletionRefunds: refunds,
         };
     }
 

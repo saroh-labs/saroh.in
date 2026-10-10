@@ -35,6 +35,10 @@ import { findUsableCoupon } from "../pricing/coupons.service";
 import { clearAddonsInTx } from "./addon-charges";
 import type { Term } from "./billing-term";
 import { isOneTime, ONE_TIME_PAYMENT, termOf } from "./billing-term";
+import {
+    assertBillingMayStart,
+    dropLiveCheckoutsInTx,
+} from "./business-closing";
 import type {
     ChangeKind,
     ChangeQuote,
@@ -708,6 +712,9 @@ export class CheckoutService {
         billTo: CheckoutBillTo = { billToState: null, billToGstin: null },
         coupon: PricingCoupon | null = null,
     ): Promise<ChangePlanResult> {
+        // A closing or deleted business starts nothing that charges (#921);
+        // asked again in the transaction that records the checkout.
+        await assertBillingMayStart(prisma, ctx.organizationId);
         const kind = quote.kind as CheckoutKind;
         // A renewal is a scheduled change to the plan it's on (DEC-093).
         const stored = kind === "RENEW" ? "SCHEDULED" : kind;
@@ -846,6 +853,7 @@ export class CheckoutService {
         let row: BillingCheckout;
         try {
             row = await prisma.$transaction(async (tx) => {
+                await assertBillingMayStart(tx, ctx.organizationId);
                 await this.dropOpenCheckout(tx, ctx.organizationId);
                 return tx.billingCheckout.create({ data });
             });
@@ -901,32 +909,7 @@ export class CheckoutService {
         organizationId: string,
         reason: string,
     ) {
-        const live = await tx.billingCheckout.findMany({
-            where: { organizationId, status: { in: ["OPEN", "SCHEDULED"] } },
-        });
-        for (const c of live) {
-            await tx.billingCheckout.update({
-                where: { id: c.id },
-                data: { status: "CANCELLED", endedReason: reason },
-            });
-            await enqueueProviderCancel(tx, {
-                organizationId,
-                provider: c.provider,
-                providerSubscriptionId: c.providerSubscriptionId,
-                atCycleEnd: false,
-            });
-        }
-        // A scheduled checkout's move goes with it.
-        const scheduled = live.filter((c) => c.status === "SCHEDULED");
-        if (scheduled.length) {
-            await tx.subscription.updateMany({
-                where: {
-                    organizationId,
-                    pendingPlanId: { in: scheduled.map((c) => c.planId) },
-                },
-                data: { pendingPlanId: null, pendingFrom: null },
-            });
-        }
+        await dropLiveCheckoutsInTx(tx, organizationId, reason);
     }
 }
 

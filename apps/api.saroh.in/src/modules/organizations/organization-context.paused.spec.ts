@@ -55,6 +55,7 @@ describe("OrganizationContextService.resolve — a paused team member (#800)", (
 
     it("refuses a paused member with MEMBER_PAUSED and words that say why", async () => {
         membershipFindUnique.mockResolvedValue({
+            organization: { lifecycleStatus: "ACTIVE" },
             id: "mem_late",
             role: "MEMBER",
             extraActions: [],
@@ -78,6 +79,7 @@ describe("OrganizationContextService.resolve — a paused team member (#800)", (
 
     it("lets a member who is kept in", async () => {
         membershipFindUnique.mockResolvedValue({
+            organization: { lifecycleStatus: "ACTIVE" },
             id: "mem_early",
             role: "ADMIN",
             extraActions: [],
@@ -90,6 +92,7 @@ describe("OrganizationContextService.resolve — a paused team member (#800)", (
 
     it("never asks for the owner", async () => {
         membershipFindUnique.mockResolvedValue({
+            organization: { lifecycleStatus: "ACTIVE" },
             id: "mem_owner",
             role: "OWNER",
             extraActions: [],
@@ -103,6 +106,7 @@ describe("OrganizationContextService.resolve — a paused team member (#800)", (
 
     it("refuses nothing when nothing is paused (enforcement off, or the plan unread)", async () => {
         membershipFindUnique.mockResolvedValue({
+            organization: { lifecycleStatus: "ACTIVE" },
             id: "mem_late",
             role: "MEMBER",
             extraActions: [],
@@ -116,6 +120,7 @@ describe("OrganizationContextService.resolve — a paused team member (#800)", (
 
     it("lets them in again once the business moves back up", async () => {
         membershipFindUnique.mockResolvedValue({
+            organization: { lifecycleStatus: "ACTIVE" },
             id: "mem_late",
             role: "MEMBER",
             extraActions: [],

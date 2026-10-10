@@ -3,6 +3,7 @@ import { outsideOrgContext, prisma, runInOrgContext } from "@saroh/database";
 
 import { FeatureFlagService } from "../feature-flags/feature-flags.service";
 import { FlagKey } from "../feature-flags/flags";
+import { publicSiteOnline } from "../organizations/organization-lifecycle.policy";
 import type { PublicModulePageStates } from "./module-pages";
 import { publicModulePageStates } from "./module-pages";
 import type { SiteHostClass } from "./site-host-mode";
@@ -162,6 +163,7 @@ export async function resolveTestRelease(
                         organizationId: true,
                         subdomain: true,
                         deletedAt: true,
+                        organization: { select: { lifecycleStatus: true } },
                     },
                 },
             },
@@ -171,6 +173,8 @@ export async function resolveTestRelease(
     const { testRelease: release, site } = link;
     if (
         site.deletedAt ||
+        // Offline with its business (#921).
+        !publicSiteOnline(site.organization.lifecycleStatus) ||
         release.siteId !== site.id ||
         release.publication.siteId !== site.id ||
         // Never anything but the frozen TEST row (R12).

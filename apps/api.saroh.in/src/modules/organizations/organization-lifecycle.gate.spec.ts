@@ -8,8 +8,10 @@ import { prisma } from "@saroh/database";
 import { OrganizationGuard } from "../../common/guards/organization.guard";
 import type { OrganizationContextService } from "./organization-context.service";
 import {
+    assertMembersMayOpen,
     assertOrganizationOpen,
     isReadOnlyMethod,
+    publicSiteOnlineFor,
 } from "./organization-lifecycle.gate";
 
 const findUnique = prisma.organization.findUnique as jest.Mock;
@@ -83,5 +85,47 @@ describe("OrganizationGuard on a suspended business", () => {
         await expect(
             guard.canActivate(contextFor("POST")),
         ).rejects.toBeInstanceOf(ForbiddenException);
+    });
+});
+
+describe("assertMembersMayOpen (#921)", () => {
+    it.each(["ACTIVE", "SUSPENDED", "PENDING_DELETION"])(
+        "lets a member into a %s business",
+        (status) => {
+            expect(() => assertMembersMayOpen(status)).not.toThrow();
+        },
+    );
+
+    it("refuses everyone a deleted business, owners too, with its code", () => {
+        let thrown: unknown;
+        try {
+            assertMembersMayOpen("DELETED_RETAINED");
+        } catch (error) {
+            thrown = error;
+        }
+        expect(thrown).toBeInstanceOf(ForbiddenException);
+        expect((thrown as ForbiddenException).getResponse()).toMatchObject({
+            error: "ORGANIZATION_DELETED",
+            status: "DELETED_RETAINED",
+        });
+    });
+
+    it("refuses a state it doesn't know", () => {
+        expect(() => assertMembersMayOpen("ARCHIVED")).toThrow(
+            ForbiddenException,
+        );
+    });
+});
+
+describe("publicSiteOnlineFor (#921)", () => {
+    it("is false for a deleted business; a missing one is the caller's 404", async () => {
+        findUnique.mockResolvedValueOnce({ lifecycleStatus: "ACTIVE" });
+        await expect(publicSiteOnlineFor("org_1")).resolves.toBe(true);
+        findUnique.mockResolvedValueOnce({
+            lifecycleStatus: "DELETED_RETAINED",
+        });
+        await expect(publicSiteOnlineFor("org_1")).resolves.toBe(false);
+        findUnique.mockResolvedValueOnce(null);
+        await expect(publicSiteOnlineFor("org_1")).resolves.toBe(true);
     });
 });

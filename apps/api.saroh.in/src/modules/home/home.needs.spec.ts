@@ -479,6 +479,8 @@ describe("HomeService needs", () => {
             },
             // B9's failed refunds: none.
             paymentRefund: { findMany: jest.fn().mockResolvedValue([]) },
+            // PAY-06's captures at the wrong amount: none.
+            paymentAttempt: { findMany: jest.fn().mockResolvedValue([]) },
             storeSettings: {
                 aggregate: jest.fn().mockResolvedValue({
                     _max: { pickupLateAfterMinutes: null },

@@ -170,6 +170,11 @@ describe("RazorpayWebhookProvider", () => {
         const dashboard = refund({ amount: 25000, receipt: null, notes: [] });
         expect(dashboard.refundReference).toBeUndefined();
         expect(dashboard.refundAmountCents).toBe(25000);
+        // The refunded payment, from the refund entity when no payment rides
+        // along: how a dashboard refund finds a mismatch (PAY-06).
+        expect(refund({ payment_id: "pay_9" }).providerPaymentRef).toBe(
+            "pay_9",
+        );
     });
 });
 
@@ -293,13 +298,19 @@ describe("CashfreeWebhookProvider", () => {
                 type: "REFUND_STATUS_WEBHOOK",
                 data: {
                     order: { order_id: "order_cf_1" },
-                    refund: { cf_refund_id: 77, refund_status: "SUCCESS" },
+                    refund: {
+                        cf_refund_id: 77,
+                        cf_payment_id: 9001,
+                        refund_status: "SUCCESS",
+                    },
                 },
             },
             headers: {},
         });
         expect(refunded.outcome).toBe("REFUNDED");
         expect(refunded.providerRefundId).toBe("77");
+        // The refunded payment (PAY-06's dashboard refund of a mismatch).
+        expect(refunded.providerPaymentRef).toBe("9001");
 
         expect(refunded.providerEventId).toBe(
             "REFUND_STATUS_WEBHOOK:77:SUCCESS",

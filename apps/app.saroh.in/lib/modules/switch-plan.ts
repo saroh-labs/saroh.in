@@ -134,7 +134,7 @@ export function offImpact({
  * can never produce a button that says the wrong thing.
  */
 const SETUP_ACTION: Record<string, string> = {
-    CRM_NO_PIPELINE: "Create a pipeline",
+    CRM_NO_PIPELINE: "Add a lead",
     WEBSITE_NO_SITE: "Create a site",
     WEBSITE_NO_PUBLICATION: "Publish your site",
     WEBSITE_SHOP_NOT_CHOSEN: "Choose location",

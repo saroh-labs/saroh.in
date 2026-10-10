@@ -15,6 +15,8 @@ import { overLimit } from "../billing/over-limit.service";
 import { assertMemberNotPaused } from "./member-paused";
 import type { OrganizationKind } from "./organization-kind";
 import { kindRead } from "./organization-kind";
+import { assertMembersMayOpen } from "./organization-lifecycle.gate";
+import { membersMayOpen } from "./organization-lifecycle.policy";
 import { isBuiltInRole, resolveCapabilities } from "./organization-policy";
 
 /** A user's Organization membership as surfaced to the switcher/list UI. */
@@ -36,7 +38,8 @@ export interface UserOrganization {
     /**
      * `ACTIVE`, or the state an operator put it in (`SUSPENDED`,
      * `PENDING_DELETION`), so the person's list of businesses can say why one
-     * is not taking changes.
+     * is not taking changes. A deleted one (`DELETED_RETAINED`) isn't
+     * listed: its people can't open it (#921).
      */
     lifecycleStatus: string;
     /**
@@ -102,10 +105,17 @@ export class OrganizationContextService {
     ): Promise<OrganizationContext> {
         const membership = await prisma.membership.findUnique({
             where: { organizationId_userId: { organizationId, userId } },
-            select: { id: true, role: true, extraActions: true },
+            select: {
+                id: true,
+                role: true,
+                extraActions: true,
+                organization: { select: { lifecycleStatus: true } },
+            },
         });
 
         if (membership) {
+            // A deleted business is closed to its people, owners too (#921).
+            assertMembersMayOpen(membership.organization.lifecycleStatus);
             await this.assertNotPaused(organizationId, membership);
             /*
              * The role's own permissions, when the business has stored any.
@@ -159,7 +169,7 @@ export class OrganizationContextService {
 
     /** Organizations the user belongs to, with the caller's role, by name. */
     async listForUser(userId: string): Promise<UserOrganization[]> {
-        const memberships = await prisma.membership.findMany({
+        const listed = await prisma.membership.findMany({
             where: { userId },
             select: {
                 id: true,
@@ -178,6 +188,11 @@ export class OrganizationContextService {
             },
             orderBy: { organization: { name: "asc" } },
         });
+        // A deleted business is closed to its people (#921): it isn't
+        // offered as one to open.
+        const memberships = listed.filter((m) =>
+            membersMayOpen(m.organization.lifecycleStatus),
+        );
 
         /*
          * The permissions behind each membership, in ONE query rather than one

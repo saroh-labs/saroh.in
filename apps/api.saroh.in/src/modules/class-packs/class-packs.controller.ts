@@ -39,10 +39,16 @@ import {
  * not required to sell a pack. Authorization is in the service, and so is
  * the refusal to sell once the business switched Class packs off, which
  * holds whether or not enforcement is on.
+ *
+ * Class packs is required per handler, not on the class (#117): every route
+ * that makes, changes, sells or extends a pack carries
+ * `@RequireModule("CLASS_PACKS")`. The record of packs already sold — the
+ * packs, one pack and its holders, uses, sales and events, and the
+ * purchases — is history, and stays readable when a business switches Class
+ * packs off (`MODULE_ROLLOUT.md`); the service still asks `pack:read`.
  */
 @Controller("organizations/:organizationId/class-packs")
 @UseGuards(BetterAuthGuard, OrganizationGuard, ModuleEnforcementGuard)
-@RequireModule("CLASS_PACKS")
 export class ClassPacksController {
     constructor(private readonly packs: ClassPacksService) {}
 
@@ -59,6 +65,7 @@ export class ClassPacksController {
      * before `:packId`, like "purchases".
      */
     @Get("selling")
+    @RequireModule("CLASS_PACKS")
     selling(@OrgContext() ctx: OrganizationContext) {
         return this.packs.sellingTerms(ctx);
     }
@@ -82,6 +89,7 @@ export class ClassPacksController {
 
     /** Give a holder's pack more days: at most 30 at a time, with a reason. */
     @Post("purchases/:purchaseId/extend")
+    @RequireModule("CLASS_PACKS")
     @HttpCode(200)
     extend(
         @OrgContext() ctx: OrganizationContext,
@@ -131,6 +139,7 @@ export class ClassPacksController {
     }
 
     @Post()
+    @RequireModule("CLASS_PACKS")
     @HttpCode(201)
     create(@OrgContext() ctx: OrganizationContext, @Body() dto: PackInputDto) {
         return this.packs.createPack(ctx, dto);
@@ -142,6 +151,7 @@ export class ClassPacksController {
 
     /** The editor's first save of a new pack, which makes it a DRAFT. */
     @Post("drafts")
+    @RequireModule("CLASS_PACKS")
     @HttpCode(201)
     createDraft(
         @OrgContext() ctx: OrganizationContext,
@@ -152,6 +162,7 @@ export class ClassPacksController {
 
     /** The pack as the editor reads it, with its draft revision. */
     @Get(":packId/draft")
+    @RequireModule("CLASS_PACKS")
     getDraft(
         @OrgContext() ctx: OrganizationContext,
         @Param("packId") id: string,
@@ -161,6 +172,7 @@ export class ClassPacksController {
 
     /** Autosave: a draft's fields, or a live pack's unpublished changes. */
     @Patch(":packId/draft")
+    @RequireModule("CLASS_PACKS")
     saveDraft(
         @OrgContext() ctx: OrganizationContext,
         @Param("packId") id: string,
@@ -170,6 +182,7 @@ export class ClassPacksController {
     }
 
     @Post(":packId/publish")
+    @RequireModule("CLASS_PACKS")
     @HttpCode(200)
     publish(
         @OrgContext() ctx: OrganizationContext,
@@ -180,6 +193,7 @@ export class ClassPacksController {
     }
 
     @Post(":packId/discard")
+    @RequireModule("CLASS_PACKS")
     @HttpCode(200)
     discard(
         @OrgContext() ctx: OrganizationContext,
@@ -191,6 +205,7 @@ export class ClassPacksController {
 
     /** Delete a draft nobody has bought; a published pack is archived. */
     @Delete(":packId")
+    @RequireModule("CLASS_PACKS")
     @HttpCode(204)
     async remove(
         @OrgContext() ctx: OrganizationContext,
@@ -205,6 +220,7 @@ export class ClassPacksController {
      * Pack Editor (E18). Refuses a draft.
      */
     @Patch(":packId")
+    @RequireModule("CLASS_PACKS")
     update(
         @OrgContext() ctx: OrganizationContext,
         @Param("packId") id: string,
@@ -214,6 +230,7 @@ export class ClassPacksController {
     }
 
     @Post(":packId/archive")
+    @RequireModule("CLASS_PACKS")
     @HttpCode(200)
     archive(
         @OrgContext() ctx: OrganizationContext,
@@ -223,6 +240,7 @@ export class ClassPacksController {
     }
 
     @Post(":packId/restore")
+    @RequireModule("CLASS_PACKS")
     @HttpCode(200)
     restore(
         @OrgContext() ctx: OrganizationContext,
@@ -233,6 +251,7 @@ export class ClassPacksController {
 
     /** Sell the pack to a contact; answers with the purchase and its balance. */
     @Post(":packId/sell")
+    @RequireModule("CLASS_PACKS")
     @HttpCode(201)
     sell(
         @OrgContext() ctx: OrganizationContext,

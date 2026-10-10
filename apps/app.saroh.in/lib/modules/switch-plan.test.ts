@@ -146,7 +146,7 @@ describe("words", () => {
     });
 
     it("gives a setup step a verb only when it knows one", () => {
-        expect(setupActionLabel("CRM_NO_PIPELINE")).toBe("Create a pipeline");
+        expect(setupActionLabel("CRM_NO_PIPELINE")).toBe("Add a lead");
         expect(setupActionLabel("AUTOMATIONS_NO_RULE")).toBeNull();
     });
 

@@ -479,13 +479,19 @@ function billedTo(inv: {
  * — not the invoice's status now, which may have moved on since.
  */
 export type RefundReason =
-    "CANCELLED_BOOKING" | "RELEASED_HOLD" | "VOID" | "PAID" | "UNKNOWN";
+    | "CANCELLED_BOOKING"
+    | "RELEASED_HOLD"
+    | "VOID"
+    | "PAID"
+    | "AMOUNT_MISMATCH"
+    | "UNKNOWN";
 
 const REFUND_REASONS: readonly RefundReason[] = [
     "CANCELLED_BOOKING",
     "RELEASED_HOLD",
     "VOID",
     "PAID",
+    "AMOUNT_MISMATCH",
 ];
 
 /**
@@ -512,6 +518,9 @@ export function refundReasonWords(reason: RefundReason): string {
             return "Paid online after it was voided";
         case "PAID":
             return "Paid online after it was already paid";
+        // PAY-06: the provider took an amount Saroh didn't ask for.
+        case "AMOUNT_MISMATCH":
+            return "Paid online at a different amount than asked";
         case "UNKNOWN":
             return "Paid online when it couldn't take the payment";
     }

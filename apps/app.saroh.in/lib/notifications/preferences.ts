@@ -60,12 +60,13 @@ export const ALERTS = [
         note: "When an invite is accepted",
     },
     // Not in the design: a test release's scheduled go-live (DEC-071, T10),
-    // and a reviewer's verdict or notes (UX-043). The API offers it only to
-    // who can publish, with test releases on.
+    // a reviewer's verdict or notes (UX-043), and your own domain going
+    // down or coming back (#917). The API offers it only to who can
+    // publish, with test releases on or a domain of the business's own.
     {
         key: "site",
         label: "Your website",
-        note: "A reviewer's verdict or notes, and a scheduled go-live",
+        note: "A reviewer's verdict or notes, a scheduled go-live, and your own domain going down",
     },
 ] as const;
 export type AlertKey = (typeof ALERTS)[number]["key"];

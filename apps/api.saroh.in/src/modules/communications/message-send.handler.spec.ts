@@ -20,6 +20,7 @@ jest.mock("@saroh/database", () => {
         message: { findUnique: jest.fn(), update: jest.fn() },
         communicationProvider: { findUnique: jest.fn(), updateMany: jest.fn() },
         job: { create: jest.fn() },
+        customerNotice: { findFirst: jest.fn() },
     };
     return {
         prisma: {
@@ -198,6 +199,7 @@ describe("MessageSendHandler", () => {
                 type: "team.alert",
                 payload: {
                     event: "provider",
+                    change: "down",
                     channel: "EMAIL",
                     providerId: "cp_1",
                     since: expect.any(String),
@@ -213,6 +215,94 @@ describe("MessageSendHandler", () => {
         updateMany.mockResolvedValue({ count: 0 });
         await expect(handler.handle(job())).rejects.toThrow();
         expect(jobCreate).not.toHaveBeenCalled();
+    });
+
+    it("clears a refused connection's flag when a send is accepted after all, and tells the team it works again (#555)", async () => {
+        const flaggedAt = new Date("2026-10-08T09:00:00Z");
+        deliveryFindUnique.mockResolvedValue({ id: "del_1", status: "QUEUED" });
+        messageFindUnique.mockResolvedValue(message);
+        providerFindUnique.mockResolvedValue(
+            sealedProviderRow({ attentionAt: flaggedAt }),
+        );
+        const updateMany = prisma.communicationProvider.updateMany as jest.Mock;
+        const jobCreate = prisma.job.create as jest.Mock;
+        const lastTold = prisma.customerNotice.findFirst as jest.Mock;
+        updateMany.mockResolvedValue({ count: 1 });
+        // The team was told it stopped.
+        lastTold.mockResolvedValue({
+            eventKey: `team:provider:cp_1:down:${flaggedAt.toISOString()}`,
+        });
+
+        const handler = new MessageSendHandler(
+            new FakeCommsProviderFactory(new FakeCommsProvider("EMAIL")),
+        );
+        await handler.handle(job());
+
+        // Only the flag it was read with is cleared.
+        expect(updateMany).toHaveBeenCalledWith({
+            where: {
+                id: "cp_1",
+                organizationId: "org_1",
+                attentionAt: flaggedAt,
+            },
+            data: { attentionReason: null, attentionAt: null },
+        });
+        expect(jobCreate).toHaveBeenCalledWith({
+            data: {
+                organizationId: "org_1",
+                type: "team.alert",
+                payload: {
+                    event: "provider",
+                    change: "back",
+                    channel: "EMAIL",
+                    providerId: "cp_1",
+                    since: expect.any(String),
+                    actorUserId: null,
+                },
+            },
+        });
+    });
+
+    it("says nothing of working again when the team never heard it stopped, or another send cleared it first", async () => {
+        const flaggedAt = new Date("2026-10-08T09:00:00Z");
+        deliveryFindUnique.mockResolvedValue({ id: "del_1", status: "QUEUED" });
+        messageFindUnique.mockResolvedValue(message);
+        providerFindUnique.mockResolvedValue(
+            sealedProviderRow({ attentionAt: flaggedAt }),
+        );
+        const updateMany = prisma.communicationProvider.updateMany as jest.Mock;
+        const jobCreate = prisma.job.create as jest.Mock;
+        const lastTold = prisma.customerNotice.findFirst as jest.Mock;
+        const handler = new MessageSendHandler(
+            new FakeCommsProviderFactory(new FakeCommsProvider("EMAIL")),
+        );
+
+        // Never told: cleared, nothing queued.
+        updateMany.mockResolvedValue({ count: 1 });
+        lastTold.mockResolvedValue(null);
+        await handler.handle(job());
+        expect(updateMany).toHaveBeenCalledTimes(1);
+        expect(jobCreate).not.toHaveBeenCalled();
+
+        // Cleared by another send already: nothing queued.
+        updateMany.mockResolvedValue({ count: 0 });
+        lastTold.mockResolvedValue({ eventKey: "team:provider:cp_1:down:x" });
+        await handler.handle(job());
+        expect(jobCreate).not.toHaveBeenCalled();
+    });
+
+    it("leaves a connection that works alone", async () => {
+        deliveryFindUnique.mockResolvedValue({ id: "del_1", status: "QUEUED" });
+        messageFindUnique.mockResolvedValue(message);
+        providerFindUnique.mockResolvedValue(
+            sealedProviderRow({ attentionAt: null }),
+        );
+        const handler = new MessageSendHandler(
+            new FakeCommsProviderFactory(new FakeCommsProvider("EMAIL")),
+        );
+        await handler.handle(job());
+        expect(prisma.communicationProvider.updateMany).not.toHaveBeenCalled();
+        expect(prisma.$transaction).not.toHaveBeenCalled();
     });
 
     it("flags nothing on a provider failure that isn't about the key", async () => {

@@ -13,6 +13,10 @@ import {
 } from "./analytics-aggregate.handler";
 import { AnalyticsCoreModule } from "./analytics-core.module";
 import {
+    ANALYTICS_RETENTION_TYPE,
+    AnalyticsRetentionHandler,
+} from "./analytics-retention.handler";
+import {
     ANALYTICS_ROLLUP_TYPE,
     AnalyticsRollupHandler,
 } from "./analytics-rollup.handler";
@@ -22,7 +26,7 @@ import {
 } from "./analytics.controller";
 import { TakingsService } from "./takings.service";
 
-/** How often a stopped rollup chain is looked for and restarted. */
+/** How often a stopped rollup or retention chain is looked for and restarted. */
 const CHAIN_CHECK_MS = 6 * 60 * 60 * 1000;
 
 /**
@@ -43,6 +47,9 @@ const CHAIN_CHECK_MS = 6 * 60 * 60 * 1000;
  *    `analytics.rollup` chain that queues those aggregates for every
  *    business and day that received events (DEC-075). Before it, nothing
  *    queued them and a real business's Insights read no rows.
+ *  - The RETENTION: {@link AnalyticsRetentionHandler}, the daily
+ *    `analytics.retention` chain that deletes events past their 400-day
+ *    `expiresAt` and never an aggregate (#799, DEC-012).
  *
  * NOTE: this module is registered in `app.module.ts` by the ticket owner.
  */
@@ -57,6 +64,7 @@ const CHAIN_CHECK_MS = 6 * 60 * 60 * 1000;
     providers: [
         AnalyticsAggregateHandler,
         AnalyticsRollupHandler,
+        AnalyticsRetentionHandler,
         OrganizationGuard,
         TakingsService,
     ],
@@ -71,21 +79,25 @@ export class AnalyticsModule implements OnModuleInit, OnModuleDestroy {
         private readonly registry: JobHandlerRegistry,
         private readonly handler: AnalyticsAggregateHandler,
         private readonly rollup: AnalyticsRollupHandler,
+        private readonly retention: AnalyticsRetentionHandler,
     ) {}
 
     /**
-     * Wire both consumers into the job worker at boot and start the rollup
-     * chain — the renewal job's shape (ADR-007): never under test, where no
+     * Wire the consumers into the job worker at boot and start the rollup
+     * and retention chains — the renewal job's shape (ADR-007): never under test, where no
      * worker runs, and never throwing, so a database not up yet cannot stop
      * the boot.
      */
     async onModuleInit(): Promise<void> {
         this.registry.register(ANALYTICS_AGGREGATE_TYPE, this.handler.handle);
         this.registry.register(ANALYTICS_ROLLUP_TYPE, this.rollup.handle);
+        this.registry.register(ANALYTICS_RETENTION_TYPE, this.retention.handle);
         if (env.NODE_ENV === "test") return;
         await this.rollup.ensureScheduled();
+        await this.retention.ensureScheduled();
         this.chainCheck = setInterval(() => {
             void this.rollup.ensureScheduled();
+            void this.retention.ensureScheduled();
         }, CHAIN_CHECK_MS);
         this.chainCheck.unref();
     }

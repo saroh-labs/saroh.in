@@ -6,6 +6,8 @@ import { OrdersScreen } from "@/components/commerce/orders/orders-screen";
 import { OrdersLocked } from "@/components/commerce/orders/orders-states";
 import { PageContainer } from "@/components/shared/page-container";
 import { createBlock, takesOnlinePayment } from "@/lib/billing/access";
+import { arrivalContactId } from "@/lib/customers/prefill";
+import { readCustomerPick } from "@/lib/customers/prefill-read";
 import { hasPaymentProvider } from "@/lib/invoices/tax";
 import {
     orderPowers,
@@ -22,9 +24,9 @@ import {
     ordersHref,
     readOrdersQuery,
 } from "@/lib/orders/list-query";
+import { sellsProducts } from "@/lib/orders/sells-products";
 import { permitsFor } from "@/lib/organizations/permits";
 import { resolveActiveOrganization } from "@/lib/organizations/service";
-import { listCataloguePage } from "@/lib/products/service";
 import { billingAccessOrNull } from "@/lib/saroh-billing/service";
 import { requireSession } from "@/lib/session";
 import { ORDERS_FIRST_RUN, shareLink } from "@/lib/sites/share-links";
@@ -95,24 +97,35 @@ export default async function OrdersPage({
     // in a business that sells things: one whose catalogue is only
     // appointments books them in Bookings. A read that fails keeps the
     // button.
-    const sellsProducts = powers.create
-        ? listCataloguePage({ limit: 1 })
-              .then((p) => p === null || p.total > 0)
-              .catch(() => true)
-        : Promise.resolve(false);
-    const [page, stores, openByStore, filterOptions, canPayOnline, sells] =
-        await Promise.all([
-            listOrderRows(orderListParams(query)),
-            storesRead,
-            // Counted beside the page, not after it.
-            storesRead.then((all) =>
-                all.length > 1 ? openOrdersByStore(all.map((s) => s.id)) : null,
-            ),
-            // What the filter bar offers (B4); null leaves its menus out.
-            getOrderFilterOptions(query.product ?? undefined),
-            payOnline,
-            sellsProducts,
-        ]);
+    const sells = powers.create ? sellsProducts() : Promise.resolve(false);
+    // Opened from a person's page (#247): New order arrives with them
+    // chosen, read only for someone who may take the order and search.
+    const forContact = arrivalContactId(params);
+    const pick =
+        forContact && powers.create && may("contact:read")
+            ? readCustomerPick(forContact)
+            : Promise.resolve(null);
+    const [
+        page,
+        stores,
+        openByStore,
+        filterOptions,
+        canPayOnline,
+        sellsSomething,
+        initialPick,
+    ] = await Promise.all([
+        listOrderRows(orderListParams(query)),
+        storesRead,
+        // Counted beside the page, not after it.
+        storesRead.then((all) =>
+            all.length > 1 ? openOrdersByStore(all.map((s) => s.id)) : null,
+        ),
+        // What the filter bar offers (B4); null leaves its menus out.
+        getOrderFilterOptions(query.product ?? undefined),
+        payOnline,
+        sells,
+        pick,
+    ]);
     // A page past the end, or a cursor from a list that has since changed
     // (an order the API can't find answers as an empty page): start again at
     // the first page rather than show an empty one.
@@ -151,7 +164,7 @@ export default async function OrdersPage({
                 filterOptions={filterOptions}
                 share={share}
                 newOrder={
-                    sells
+                    sellsSomething
                         ? {
                               // The old New order page and the calendar's
                               // "New order" land here with ?new=1.
@@ -161,6 +174,8 @@ export default async function OrdersPage({
                               // The month's orders used up: said before the
                               // sheet is filled, not after (UX-036).
                               blocked: createBlock(billing, "orders"),
+                              // From a person's page (#247): them, chosen.
+                              initialPick,
                           }
                         : null
                 }

@@ -354,7 +354,8 @@ missing: ["address", "gstin"] }` in merchant words, before anything is
   `assertWithinOrderLeftInTx` under the same order lock and transaction
   that create the refund rows, and refuses more than the order has left
   ("At most ₹X can be refunded."). An edit's difference (`forEdit`) is
-  not checked: it is the order costing less.
+  not checked: it is the order costing less. A cancel works out that
+  amount itself rather than refusing it (#918, below).
 - **One lock order, every flow:** Order → StockLevel rows (sorted by id,
   `lockStockLevels`) → PaymentRefund → payment intent → Invoice → Booking.
   A status change (cancel, fulfil), the kitchen, an edit, a refund request
@@ -416,12 +417,25 @@ missing: ["address", "gstin"] }` in merchant words, before anything is
   back) writes a RETURNED entry then; a refund that fails puts nothing back.
   A line-less refund (the provider's dashboard) releases only when it brings
   the order to fully refunded; an edit's difference never does.
-- **Cancel is a refund in full (round-2 B9, `orders/order-cancel.ts`).**
+- **Cancel refunds what is left (round-2 B9, #918, `orders/order-cancel.ts`).**
   An order paid online is cancelled through the one refund path
   (`PaymentsService.refundOrderForCancel`, everything left by line); its
   refund rows carry the key `order-cancel:<order>:<request>`, and the order
-  is marked CANCELLED only once nothing taken online is left and the
-  provider has answered for every refund (`finishCancelInTx`). Every path
+  is marked CANCELLED only once nothing is left for it to send back and the
+  provider has answered for every refund (`finishCancelInTx`). What it
+  sends back is `onlineRefundableInTx`'s `leftCents`: what the online
+  payments still hold, but never more than `leftToRefundCents` leaves on
+  the order (DEC-116) — after part was refunded by hand, a cancel sends
+  only the rest, as one amount split across the payments newest first
+  (`allocateAcrossPayments`, as another amount is). The lines still ride on
+  it, so stock comes back on confirmation; its credit note, whose lines no
+  longer add up to the money, is spread over the invoice for that amount
+  (`issueCreditNote`), so each refund is credited once. With nothing left
+  it sends nothing and cancels at once. Paid by hand, the counter gives
+  back what is left (`CancelOutcome.byHand`, null when nothing is) and
+  `creditRestOfOrder` credits only what earlier credit notes left. The
+  refund webhook's `fullyRefunded` counts `refundedByHand` too: by hand
+  and the rest online, the order reads REFUNDED once nothing is left. Every path
   that learns of a refund calls it under the order's lock — the cancel
   itself (`recordRefundTaken`), try-again, the `payments.send-refund` job
   the cancel writes for an unanswered part, and the refund webhook — so a

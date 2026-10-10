@@ -15,7 +15,8 @@
   then completes or fails the job. Defaults: `JOB_WORKER_POLL_MS=2000`,
   `JOB_WORKER_BATCH=10`, `JOB_VISIBILITY_MS=300000`.
 - **At-least-once.** Retries back off exponentially (1 s base, 5 min cap) up to
-  `maxAttempts` (5), and the job is then FAILED.
+  `maxAttempts` (5), and the job is then FAILED. Staff may cancel a job that
+  is still `PENDING` (`CANCELLED`, below).
 
 ## Rules
 
@@ -71,6 +72,8 @@ waits while holding one.
 | ----------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------- |
 | `first-pack:<organizationId>:<contactId>` | Selling a "first pack only" pack to one person                                                                                                              | `class-packs/first-pack.ts`                                                                                                                     |
 | `subscription-plan-name:<organizationId>` | Saving a subscription plan's name in one business                                                                                                           | `subscriptions/plans.ts` (`lockPlanNames`)                                                                                                      |
+| `domain-alert:<domainId>`                 | Telling one custom domain's down or back (#917), so a "Check now" and a run that both saw the change tell it once                                           | `notifications/domain-alerts.ts` (`wordDomain`)                                                                                                 |
+| `provider-alert:<providerId>`             | Telling the team one payment or email connection stopped or works again (#555)                                                                              | `notifications/provider-alerts.ts` (`wordProvider`)                                                                                             |
 | `plan-meter:<organizationId>:<limitKey>`  | Writes that add to one plan limit (a product, a booking…); a booking notice Saroh will email takes `…:sarohEmailsPerMonth` before its first write (DEC-086) | `billing/metering.service.ts` (`lockMeter`, U13); `customer-notify.handler.ts` (the one notice site; `booking.notify` writes nothing before it) |
 
 Race tests wait on an advisory lock with `waitUntilAdvisoryBlockedBy`
@@ -101,6 +104,79 @@ with the hourly `analytics.rollup` chain (below).
 reschedule from S4-002 with no handler, so its jobs dead-lettered and
 nobody was told. Round-2 A14 closed it (`bookings/booking-notify.handler.ts`).
 
+## Cancelling a job — **Current** (#907)
+
+- **Staff cancel only a job that hasn't started or is waiting to retry**
+  (`PENDING`), from the console's Jobs screen, as a `jobs.cancel` durable
+  operation: dry run first, a reason, `jobs:retry` (the people who retry
+  jobs cancel them), audited as `operation.jobs.cancel.started`
+  (`admin/job-cancel.ts`). The write is fenced on `PENDING`, so a worker
+  that claims the job first wins and the cancel says so. A cancelled job is
+  `CANCELLED`, terminal like `DONE`; nothing claims it again.
+- **Refused on purpose** (`CANCEL_REFUSED`): the self-rescheduling sweeps
+  (`ensureScheduled` would start the chain again), `subscription.charge`
+  (its steps hand on to each other) and `site.go_live` (the release keeps
+  its schedule; the business cancels it from its Website). A new chain or a
+  job whose state lives elsewhere adds its type there.
+- **A durable operation can be cancelled while it runs**
+  (`POST /admin/operations/:id/cancel`, `admin/admin-operation-cancel.ts`):
+  rows not started are `SKIPPED` ("Cancelled before it ran"), the one
+  running finishes, and the operation is `CANCELLED`. It needs the
+  permission the operation was started under, checked in the service, and
+  is audited as `operation.<kind>.cancelled`.
+
+## Business deletion — **Current** (#907)
+
+- **`organization.deletion`** is a daily self-rescheduling sweep
+  (`admin/organization-deletion.handler.ts`), one PENDING run at a time
+  (`Job_one_pending_organization_deletion`). It takes a business whose
+  `PENDING_DELETION` window has ended (`deletionScheduledAt` passed) to
+  `DELETED_RETAINED`, stamping `deletedRetainedAt` — the lifecycle's own
+  last step (`admin-access.service.ts`) — and queues its clean-up on the
+  same transaction. **Not while its customers are owed a refund** (owner,
+  9 Oct): `payments/refunds-outstanding.ts`, read inside that transaction,
+  finds every refund owed, refused, being sent or unconfirmed by its
+  provider (Home's and Order Detail's own definitions, and queued
+  `payments.send-refund` jobs); with any, the business stays
+  `PENDING_DELETION` past its window, the ledger gets one
+  `organization.deletion.waiting_on_refunds` row a day, the console flags
+  it "Deletion waiting on refunds" (`admin/deletion-trail.ts`) and the
+  workspace banner lists them (`GET /organizations/:id/closing`). Each run
+  asks again. Its rows are never deleted (`Store`, `Order`,
+  `Customer`, `Cart` and `Inventory` hold the business without a cascade;
+  orders, invoices, credit notes, customers and the audit trails are
+  records, ADR-008).
+- **`organization.deletion.cleanup`** (#921, one per business,
+  `admin/organization-deletion-cleanup.handler.ts`) clears what a deleted
+  business leaves behind, each step idempotent and tried whatever the others
+  did: its pending jobs cancelled (but the clean-up itself,
+  `billing.provider.cancel`, `subscription.charge`, which stands aside on
+  its own, and `payments.send-refund` — a customer's money is never called
+  off), Saroh's subscription cancelled at the provider and then recorded
+  CANCELLED (provider first: no answer writes nothing), custom hostnames
+  deleted at Cloudflare and the claims released, media out of storage and
+  their rows deleted, the customers' active autopay mandates read and
+  logged per provider (deletion cancels none there), then the payment and
+  messaging keys deleted (`CommunicationProvider` too) — never while a
+  refund is still owed, which fails the step so it is retried. Every
+  provider call logs one `deletion_provider_call` line
+  (`devops-observability.md`), and each run writes an
+  `organization.deletion.cleanup` ledger row with every step's result: the
+  console's deletion trail. A failing step is
+  logged by name and the run throws, so the queue retries it (24 attempts,
+  about an hour and a half); from its first failure the business is flagged
+  "Deletion clean-up unfinished" (`DELETION_CLEANUP`) in the console's
+  directory, and once FAILED an operator retries it from Jobs. It can't be
+  cancelled (`CANCEL_REFUSED`). The daily sweep queues one for any deleted
+  business without one.
+- **Re-read inside the transaction, fenced on `lifecycleVersion`**: a
+  business reinstated, suspended or given a new window between the list
+  and the write is left alone, and one inside its window is never touched
+  (`organization-deletion.db.spec.ts`). Each deletion writes the admin
+  ledger (`system:organization-deletion`, `organization.deleted`) and the
+  business's own history in that transaction; the log line carries counts
+  and ids only.
+
 ## Insights rollups — **Current** (DEC-075)
 
 - **`analytics.rollup`** is a self-rescheduling chain, hourly
@@ -113,6 +189,17 @@ nobody was told. Round-2 A14 closed it (`bookings/booking-notify.handler.ts`).
   stopped, for an insert that committed late; a run whose sweep failed
   hands its own `since` on. A fresh chain (boot, or `ensureScheduled` every
   six hours finding none) starts 90 days back, the page's longest range.
+- **`analytics.retention`** is the daily self-rescheduling sweep (#799,
+  `analytics/analytics-retention.handler.ts`), one PENDING run at a time
+  (`Job_one_pending_analytics_retention`), restarted by the same six-hour
+  check and boot. It deletes `AnalyticsEvent` rows whose `expiresAt` (intake
+  stamps received + `ANALYTICS_RETENTION_DAYS`, 400) has passed, 1,000 ids a
+  statement in `expiresAt` order, at most 50 batches a run; a run that stops
+  at that cap with more due comes back in a minute, not a day. A row with
+  no stamp is kept. It **never deletes an aggregate**: the daily rollups
+  outlive their events, and `analytics.aggregate` refuses to rebuild a day
+  that starts before the 400-day cutoff (`pastRetention`), since what is
+  left of it would shrink its rollup. It logs counts only.
 
 ## Custom-domain re-check — **Current** (#860)
 
@@ -134,10 +221,20 @@ nobody was told. Round-2 A14 closed it (`bookings/booking-notify.handler.ts`).
   or the test-only domain fakes on: the chain is never started, a stray
   run logs `domains_recheck_off` and ends, and domains move only on
   "Check now".
-- **No notice when a live domain goes down**, only a WARN
-  (`domain_hosting_went_down`): there is no domain alert to send, and the
-  Domains screen shows the problem. A domain alert would be a new
-  `team.alert` event.
+- **A live domain that goes down tells the team, once per incident**
+  (#917, `notifications/domain-alerts.ts`). The check's write that moves a
+  domain out of live (ACTIVE), or back into it, queues `team.alert`
+  `{ event: "domain", change: "down" | "back" }` on its own transaction
+  (`syncHosting`'s `onLiveChange`), whether the run or "Check now" ran it;
+  the one who pressed Check now isn't emailed. Told on the Your website
+  row (`domain.down`, `domain.back`): the bell names the domain and what
+  is wrong, Saroh's email names the site and links to its settings (a
+  domain is what `cleanName` takes out). Claimed as
+  `team:domain:<id>:<down|back>:<at>`; the last claim decides what may be
+  told next, under the `domain-alert` lock, so "down" is told only after
+  no "down" or a "back", and "back" only after a "down": nothing while a
+  problem lasts, nothing when a domain first goes live. The run still
+  logs `domain_hosting_went_down` at WARN.
 - A domain removed while a run checks it: the run deletes the hostname at
   the host when no row holds it any more, so a re-registration it raced
   isn't left serving.
@@ -228,7 +325,8 @@ nobody was told. Round-2 A14 closed it (`bookings/booking-notify.handler.ts`).
   producer calls `enqueueTeamAlert(tx, …)` on its own transaction
   (`notifications/team-alerts.ts`): a new order (the create, and an online
   checkout's payment), an invoice's pay link failing (the webhook), an
-  invitation accepted. `booking.notify` writes its team notice itself (A14)
+  invitation accepted, a live custom domain going down or coming back
+  (the domain's check, #917, above). `booking.notify` writes its team notice itself (A14)
   and queues `team.alert` with that notice's id for the email only.
 - **One notice, filtered per person.** The bell is one org-wide
   `Notification`; `NotificationsService` leaves out, per viewer, the types
@@ -251,6 +349,14 @@ nobody was told. Round-2 A14 closed it (`bookings/booking-notify.handler.ts`).
   (`emailReviewersOf`), email its reviewers, who have no bell (UX-043). A
   provider that refused its keys (UX-012) is emailed too, email providers
   included: Saroh sends it, not the refused key.
+- **A provider that stops and starts again** (#555,
+  `notifications/provider-alerts.ts`) is told once per incident: "down"
+  when a live call's 401/403 flags the connection, "back" when keys entered
+  again or a live call accepted on the flagged connection clear it. Each
+  is claimed as `team:provider:<id>:<down|back>:<at>`, and the last one
+  told decides what may follow ("down" only after none or "back", "back"
+  only after "down"), under the `provider-alert:<id>` lock. A claim made
+  before #555 (`team:provider:<id>:<at>`) reads as "down".
 - **Review alerts** (`team.alert` `{ event: "review" }`,
   `notifications/review-alerts.ts`, UX-043), queued on the review write's
   transaction (`sites/review-alert-queue.ts`): a request or a new test

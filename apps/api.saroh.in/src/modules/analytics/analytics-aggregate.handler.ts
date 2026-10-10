@@ -3,7 +3,7 @@ import type { AnalyticsEvent, Job, Prisma } from "@saroh/database";
 import { prisma } from "@saroh/database";
 
 import { planMeter } from "../billing/metering.service";
-import { SITE_VIEW_TYPE } from "./event-contract";
+import { ANALYTICS_RETENTION_DAYS, SITE_VIEW_TYPE } from "./event-contract";
 
 /** The job `type` this handler is registered under. */
 export const ANALYTICS_AGGREGATE_TYPE = "analytics.aggregate";
@@ -17,6 +17,21 @@ export interface AnalyticsAggregatePayload {
     organizationId: string;
     /** The UTC day to (re)aggregate — an ISO date/datetime; only the day is used. */
     date: string;
+}
+
+const DAY_MS = 24 * 60 * 60 * 1000;
+
+/**
+ * Whether a day may already have lost events to the retention sweep
+ * (`analytics.retention`, #799): an event is deleted
+ * `ANALYTICS_RETENTION_DAYS` after it was received, and it occurred no later
+ * than that, so only a day that starts before the cutoff can be missing
+ * rows. Its rollup is final; rebuilding it from what is left would shrink it.
+ */
+export function pastRetention(dayStart: Date, now: Date): boolean {
+    return (
+        dayStart.getTime() < now.getTime() - ANALYTICS_RETENTION_DAYS * DAY_MS
+    );
 }
 
 /** The sentinel meaning "all sites / org-wide total" (matches the schema). */
@@ -70,7 +85,16 @@ export class AnalyticsAggregateHandler {
             job.payload as unknown as AnalyticsAggregatePayload;
 
         const dayStart = this.startOfUtcDay(new Date(date));
-        const dayEnd = new Date(dayStart.getTime() + 24 * 60 * 60 * 1000);
+        const dayEnd = new Date(dayStart.getTime() + DAY_MS);
+
+        // Never rebuild a day the retention sweep may have thinned: its
+        // aggregate is all that is left of it, and it stays as it was.
+        if (pastRetention(dayStart, new Date())) {
+            this.logger.log(
+                `analytics.aggregate: ${dayStart.toISOString().slice(0, 10)} is past retention; its rollup is kept as it is`,
+            );
+            return;
+        }
 
         // ORG-ISOLATED read: only THIS org's events, only for THIS day.
         const events = await prisma.analyticsEvent.findMany({

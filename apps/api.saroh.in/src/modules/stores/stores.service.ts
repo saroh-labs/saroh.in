@@ -9,6 +9,7 @@ import { FeatureFlagService } from "../feature-flags/feature-flags.service";
 import { FlagKey } from "../feature-flags/flags";
 import { MAX_STOREFRONTS_PER_BUSINESS } from "../organizations/business-limits";
 import { assertMemberNotPaused } from "../organizations/member-paused";
+import { assertMembersMayOpen } from "../organizations/organization-lifecycle.gate";
 import type { OrgAction } from "../organizations/organization-policy";
 import {
     isBuiltInRole,
@@ -322,9 +323,17 @@ export class StoresService {
     ): Promise<boolean> {
         const membership = await prisma.membership.findUnique({
             where: { organizationId_userId: { organizationId, userId } },
-            select: { id: true, role: true, extraActions: true },
+            select: {
+                id: true,
+                role: true,
+                extraActions: true,
+                organization: { select: { lifecycleStatus: true } },
+            },
         });
         if (!membership) return false;
+        // A deleted business is closed to its people (#921), as at the
+        // organization context.
+        assertMembersMayOpen(membership.organization.lifecycleStatus);
         await assertMemberNotPaused(organizationId, membership);
         // Resolved from the business's own role, not from the role's name. A
         // role the business invented maps to MEMBER by name, and MEMBER's floor

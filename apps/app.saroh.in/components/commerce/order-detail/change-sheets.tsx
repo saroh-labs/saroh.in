@@ -1,5 +1,6 @@
 "use client";
 
+import { cancelMoney, cancelWords } from "@/lib/orders/cancel-money";
 import type { OrderRead } from "@/lib/orders/read";
 
 import { CancelPanel } from "./cancel-panel";
@@ -17,7 +18,6 @@ export function ChangeSheets({
     number,
     first,
     refundTo,
-    remaining,
     linkable,
     format,
     changes,
@@ -28,8 +28,6 @@ export function ChangeSheets({
     number: string;
     first: string;
     refundTo: string;
-    /** Paid and not yet refunded, in major units. */
-    remaining: number;
     /** A pay link can be made for more that is owed (B11). */
     linkable: boolean;
     /** Money in major units; null without a money read. */
@@ -72,28 +70,21 @@ export function ChangeSheets({
         );
     }
     if (panel === "cancel") {
-        const amount =
-            paid === "by-hand" ? Number(money?.total ?? 0) : remaining;
+        // What is left on the order, refunds by hand counted (#918).
+        const { amount, already } = cancelMoney(money, paid);
+        const words = cancelWords({ paid, amount, already, refundTo, format });
         return (
             <CancelPanel
                 number={number}
                 first={first}
                 lines={order.items}
-                amount={paid === "unpaid" ? 0 : amount}
-                how={
-                    paid === "by-hand"
-                        ? "Give it back from the till."
-                        : `Back to ${refundTo}, in 3–5 days.`
-                }
+                says={words.says}
+                confirm={words.confirm}
                 canTell={order.next.tell ?? false}
                 format={format}
                 onCancel={onClose}
                 onConfirm={(choice) =>
-                    changes.startCancel(
-                        choice,
-                        paid === "unpaid" ? 0 : amount,
-                        format,
-                    )
+                    changes.startCancel(choice, amount, format)
                 }
             />
         );

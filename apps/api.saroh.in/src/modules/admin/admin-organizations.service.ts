@@ -8,9 +8,16 @@ import type { Prisma } from "@saroh/database";
 import { prisma } from "@saroh/database";
 
 import { CatalogueAccessService } from "../billing/catalogue-access.service";
+import { siteRootDomain } from "../sites/site-host-mode";
 import { OPERATOR_LIFECYCLE_ACTIONS } from "./admin-lifecycle.service";
+import { businessesWaitingOnRefunds } from "./deletion-trail";
 import type { EffectivePlan } from "./effective-plan";
 import { effectivePlan } from "./effective-plan";
+import { UNFINISHED_CLEANUP_JOB } from "./organization-deletion-cleanup.handler";
+import {
+    domainSearchTerms,
+    domainSearchWhere,
+} from "./organization-domain-search";
 
 const DEFAULT_PAGE_SIZE = 25;
 const MAX_PAGE_SIZE = 100;
@@ -28,7 +35,17 @@ export interface OrganizationDirectoryQuery {
 }
 
 /** Why a business is flagged for attention. Words, not codes, on screen. */
-export type AttentionReason = "PAST_DUE" | "FAILED_JOBS" | "FAILED_WEBHOOKS";
+export type AttentionReason =
+    | "PAST_DUE"
+    | "FAILED_JOBS"
+    | "FAILED_WEBHOOKS"
+    /** A deleted business whose clean-up has failed and isn't done (#921). */
+    | "DELETION_CLEANUP"
+    /**
+     * Past its deletion window and still `PENDING_DELETION`: its customers
+     * are owed refunds (#921, owner 9 Oct). The business page lists them.
+     */
+    | "DELETION_WAITING_REFUNDS";
 
 export interface OrganizationDirectoryRow {
     id: string;
@@ -101,7 +118,11 @@ export class AdminOrganizationsService {
         caller: { canReadPii: boolean },
     ): Promise<OrganizationDirectoryPage> {
         const limit = clamp(query.limit);
-        const where = this.where(query, caller);
+        const waiting =
+            query.health === "attention"
+                ? await businessesWaitingOnRefunds(new Date())
+                : new Set<string>();
+        const where = this.where(query, caller, waiting);
 
         const records = await prisma.organization.findMany({
             where,
@@ -165,6 +186,7 @@ export class AdminOrganizationsService {
     private where(
         query: OrganizationDirectoryQuery,
         caller: { canReadPii: boolean },
+        waitingOnRefunds: ReadonlySet<string> = new Set(),
     ): Prisma.OrganizationWhereInput {
         const and: Prisma.OrganizationWhereInput[] = [];
         const q = query.q?.trim();
@@ -191,6 +213,10 @@ export class AdminOrganizationsService {
                         { id: q },
                         { name: { contains: q, mode: "insensitive" } },
                         { slug: { contains: q, mode: "insensitive" } },
+                        // Its custom domain or Saroh address (#907).
+                        ...domainSearchWhere(
+                            domainSearchTerms(q, siteRootDomain()),
+                        ),
                     ],
                 });
             }
@@ -233,6 +259,12 @@ export class AdminOrganizationsService {
                             },
                         },
                     },
+                    // However long ago: a half-cleared business stays flagged.
+                    { jobs: { some: UNFINISHED_CLEANUP_JOB } },
+                    // A deletion held back by refunds owed (#921).
+                    ...(waitingOnRefunds.size > 0
+                        ? [{ id: { in: [...waitingOnRefunds] } }]
+                        : []),
                 ],
             });
         }
@@ -252,8 +284,8 @@ export class AdminOrganizationsService {
         const since = new Date(Date.now() - ATTENTION_WINDOW_MS);
 
         const now = new Date();
-        const [activity, failedJobs, failedWebhooks, plans] = await Promise.all(
-            [
+        const [activity, failedJobs, failedWebhooks, plans, cleanups, waiting] =
+            await Promise.all([
                 prisma.auditEvent.groupBy({
                     by: ["organizationId"],
                     where: {
@@ -285,9 +317,21 @@ export class AdminOrganizationsService {
                 // override can't be read in a grouped query without deciding
                 // again here what wins, which only the resolver may do.
                 Promise.all(ids.map((id) => this.effective(id, now))),
-            ],
-        );
+                // A deleted business's clean-up that has failed (#921).
+                prisma.job.findMany({
+                    where: {
+                        organizationId: { in: ids },
+                        ...UNFINISHED_CLEANUP_JOB,
+                    },
+                    select: { organizationId: true },
+                }),
+                // A deletion held back by refunds owed (#921).
+                businessesWaitingOnRefunds(now, ids),
+            ]);
         const effective = new Map(ids.map((id, i) => [id, plans[i]]));
+        const cleanupUnfinished = new Set(
+            cleanups.map((row) => row.organizationId),
+        );
 
         const lastActive = new Map(
             activity.map((row) => [row.organizationId, row._max.createdAt]),
@@ -307,6 +351,12 @@ export class AdminOrganizationsService {
             if (jobsFailing.has(record.id)) attention.push("FAILED_JOBS");
             if (webhooksFailing.has(record.id)) {
                 attention.push("FAILED_WEBHOOKS");
+            }
+            if (cleanupUnfinished.has(record.id)) {
+                attention.push("DELETION_CLEANUP");
+            }
+            if (waiting.has(record.id)) {
+                attention.push("DELETION_WAITING_REFUNDS");
             }
 
             return {

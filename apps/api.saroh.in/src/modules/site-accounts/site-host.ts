@@ -3,6 +3,7 @@ import type { Prisma } from "@saroh/database";
 import { prisma } from "@saroh/database";
 
 import { businessPublicPhoneOf } from "../organizations/business-phone";
+import { SITE_ONLINE_ORGANIZATION } from "../organizations/organization-lifecycle.policy";
 import { siteHostMode } from "../sites/site-host-mode";
 import { normaliseHost } from "./site-relay";
 
@@ -60,6 +61,8 @@ export async function resolveSiteHost(rawHost: string): Promise<SiteHost> {
             ...where,
             deletedAt: null,
             currentPublicationId: { not: null },
+            // Offline with its business (#921): nobody signs in to it.
+            organization: SITE_ONLINE_ORGANIZATION,
         },
         select: {
             id: true,

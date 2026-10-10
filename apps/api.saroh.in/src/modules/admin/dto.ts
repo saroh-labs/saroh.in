@@ -254,6 +254,27 @@ export class ListOrganizationsDto {
     limit?: number;
 }
 
+/** Storage used per business (#798): sorted by size, one page at a time. */
+export class ListStorageUsageDto {
+    @IsOptional()
+    @IsIn(["most", "least"])
+    order?: "most" | "least";
+
+    @IsOptional()
+    @Type(() => Number)
+    @IsInt()
+    @Min(1)
+    @Max(100_000)
+    page?: number;
+
+    @IsOptional()
+    @Type(() => Number)
+    @IsInt()
+    @Min(1)
+    @Max(100)
+    limit?: number;
+}
+
 /** Grant staff access to someone with a Saroh account. */
 export class GrantStaffDto {
     @Transform(trim)
@@ -332,7 +353,7 @@ export class StartOperationDto extends OperatorReasonDto {
 
 export class ListJobsDto {
     @IsOptional()
-    @IsIn(["PENDING", "PROCESSING", "DONE", "FAILED"])
+    @IsIn(["PENDING", "PROCESSING", "DONE", "FAILED", "CANCELLED"])
     status?: string;
 
     @IsOptional()
