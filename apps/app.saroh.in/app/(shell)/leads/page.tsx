@@ -1,11 +1,10 @@
-import { Button } from "@saroh/ui/button";
 import { PageHeader } from "@saroh/ui/page-header";
-import Link from "next/link";
 
 import { AddLeadDialog } from "@/components/leads/add-lead-dialog";
 import { FollowUpsList } from "@/components/leads/follow-ups-list";
 import { LeadsTabs } from "@/components/leads/leads-tabs";
 import { LeadsView } from "@/components/leads/leads-view";
+import { LeadsViewSwitch } from "@/components/leads/leads-view-switch";
 import { PageContainer } from "@/components/shared/page-container";
 import { contactName } from "@/lib/crm/format";
 import { loadAddLead } from "@/lib/leads/add-lead-data";
@@ -43,12 +42,10 @@ export default async function LeadsPage({
         <PageContainer width="wide">
             <PageHeader
                 title="Leads"
-                description="Opportunities in your pipeline — what they're worth, and how long they've waited."
+                description="Opportunities in your pipeline: what they're worth, and how long they've waited."
                 actions={
                     <>
-                        <Button asChild variant="outline">
-                            <Link href="/pipeline">Pipeline board</Link>
-                        </Button>
+                        <LeadsViewSwitch current="list" />
                         <AddLeadDialog {...addLead} />
                     </>
                 }
