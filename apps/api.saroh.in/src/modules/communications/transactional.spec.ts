@@ -199,7 +199,7 @@ describe("the autopay-cancelled note (D14)", () => {
 
     it("the thread line is plain text, never HTML", () => {
         expect(autopayCancelledSentence(vars)).toBe(
-            "Pulse & Co. turned off autopay for Monthly unlimited. Nothing more is taken automatically — your next renewal comes as an invoice with a link to pay.",
+            "Pulse & Co. turned off autopay for Monthly unlimited. Nothing more is taken automatically. Your next renewal comes as an invoice with a link to pay.",
         );
     });
 });

@@ -206,7 +206,7 @@ export class MembersService {
         await sendStoreInvitationEmail(
             email,
             `${appUrl}/invitations/${token}`,
-            store?.name ?? "a store",
+            store?.name ?? "a location",
         );
 
         return {

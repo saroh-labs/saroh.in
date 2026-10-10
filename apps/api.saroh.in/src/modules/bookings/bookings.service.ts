@@ -1042,7 +1042,7 @@ export class BookingsService {
             !isValidSlotStart(toAvailabilityService(service), rules, startAt)
         ) {
             throw new BadRequestException(
-                "That time is not an open slot for this service",
+                "That time isn't open for this service.",
             );
         }
 
@@ -1365,7 +1365,7 @@ export class BookingsService {
 
     private assertRuleWellFormed(rule: AvailabilityRuleDto): void {
         if (rule.dayOfWeek < 0 || rule.dayOfWeek > 6) {
-            throw new BadRequestException("dayOfWeek must be 0–6");
+            throw new BadRequestException("dayOfWeek must be 0 to 6");
         }
         if (
             rule.startMinute < 0 ||

@@ -78,7 +78,7 @@ export class CreateAttentionDto {
     @Transform(trim)
     @IsString()
     @MaxLength(ATTENTION_LABEL_MAX, {
-        message: `Keep it under ${ATTENTION_LABEL_MAX} characters; add the rest as detail.`,
+        message: `Keep it under ${ATTENTION_LABEL_MAX} characters. Add the rest as detail.`,
     })
     label?: string;
 
@@ -116,7 +116,7 @@ export class ConfirmAttentionDto {
     @Transform(trim)
     @IsString()
     @MaxLength(ATTENTION_LABEL_MAX, {
-        message: `Keep it under ${ATTENTION_LABEL_MAX} characters; add the rest as detail.`,
+        message: `Keep it under ${ATTENTION_LABEL_MAX} characters. Add the rest as detail.`,
     })
     label?: string;
 
@@ -140,7 +140,7 @@ export class UpdateAttentionDto {
     @Transform(trim)
     @IsString()
     @MaxLength(ATTENTION_LABEL_MAX, {
-        message: `Keep it under ${ATTENTION_LABEL_MAX} characters; add the rest as detail.`,
+        message: `Keep it under ${ATTENTION_LABEL_MAX} characters. Add the rest as detail.`,
     })
     label?: string;
 

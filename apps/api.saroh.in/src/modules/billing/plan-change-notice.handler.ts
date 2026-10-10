@@ -2,8 +2,8 @@ import { Injectable, Logger } from "@nestjs/common";
 import type { Job, Prisma } from "@saroh/database";
 import { prisma } from "@saroh/database";
 import type { Catalog } from "@saroh/pricing-catalog";
-import { DateTime } from "luxon";
 
+import { dayWords } from "../../common/words-format";
 import { businessTimezone } from "../bookings/staff-availability";
 import { noticeOf } from "../notifications/notice-target";
 import { CatalogueAccessService } from "./catalogue-access.service";
@@ -65,7 +65,7 @@ export async function enqueuePlanChangeNotice(
 
 /** "31 Dec 2027", in the business's zone. */
 export function planDate(at: Date, zone: string): string {
-    return DateTime.fromJSDate(at, { zone }).toFormat("d LLL yyyy");
+    return dayWords(at, zone, { year: true });
 }
 
 /**

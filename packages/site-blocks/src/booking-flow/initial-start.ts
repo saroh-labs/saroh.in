@@ -11,7 +11,7 @@ import { dateIn, timeIn } from "./model";
  */
 
 /** What the page says when the time linked to has gone meanwhile. */
-export const INITIAL_TIME_GONE = "That time has just gone. Here's what's left.";
+export const INITIAL_TIME_GONE = "That time has gone. Here's what's left.";
 
 const DATE = /^\d{4}-\d{2}-\d{2}$/;
 const TIME = /^([01]\d|2[0-3]):[0-5]\d$/;

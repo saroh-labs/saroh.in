@@ -400,9 +400,7 @@ export async function bookVisit(
         !staffing.perPerson &&
         !isValidSlotStart(toAvailabilityService(service), rules, startAt)
     ) {
-        throw new BadRequestException(
-            "That time is not an open slot for this service",
-        );
+        throw new BadRequestException("That time isn't open for this service.");
     }
     const person = await resolvePerson(
         service,
@@ -482,7 +480,7 @@ export async function bookVisit(
             throw new ConflictException(
                 taken > 0
                     ? `Visit ${n} is already booked.`
-                    : "That slot is fully booked",
+                    : "That time is fully booked.",
             );
         }
         throw err;

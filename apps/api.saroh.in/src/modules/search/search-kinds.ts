@@ -2,6 +2,7 @@ import type { Prisma } from "@saroh/database";
 import { prisma } from "@saroh/database";
 
 import type { OrganizationContext } from "../../common/types/organization-context";
+import { whenWords } from "../../common/words-format";
 import { ownBookingsWhere, ownDiaryOf } from "../bookings/own-diary";
 import { contactEmailForDisplay } from "../contacts/contact-email";
 
@@ -161,14 +162,7 @@ export async function searchServices(
 /** "12 Oct, 9:30 am", in the zone the booking was made in. */
 function bookingWhen(startAt: Date, timeZone: string): string {
     try {
-        return new Intl.DateTimeFormat("en-IN", {
-            day: "numeric",
-            month: "short",
-            hour: "numeric",
-            minute: "2-digit",
-            hour12: true,
-            timeZone,
-        }).format(startAt);
+        return whenWords(startAt, timeZone);
     } catch {
         // A zone this runtime doesn't know: the day alone, in UTC.
         return startAt.toISOString().slice(0, 10);

@@ -196,15 +196,15 @@ export default function PacksSection({
                     </button>
                 }
             >
-                We couldn&apos;t load your packs just now.
+                We couldn&apos;t load your packs right now.
             </PacksNote>
         );
     }
     if (state.kind === "off" || state.packs.length === 0) {
         return (
             <PacksNote title={title}>
-                No packs on sale yet. Publish a class pack and it shows here;
-                until then this section is left off your live site.
+                No packs on sale yet. Publish a class pack and it shows here.
+                Until then this section is left off your live site.
             </PacksNote>
         );
     }

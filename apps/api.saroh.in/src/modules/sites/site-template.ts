@@ -112,9 +112,7 @@ export async function buildTemplateContext(
     if (!org) {
         // The guard proved membership in this org, so it must exist; a miss
         // here is a real integrity fault, not a client error.
-        throw new NotFoundException(
-            `Organization "${organizationId}" not found`,
-        );
+        throw new NotFoundException(`Business "${organizationId}" not found`);
     }
     const profile = org.businessProfile;
     return {

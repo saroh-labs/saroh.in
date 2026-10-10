@@ -286,7 +286,7 @@ export class WebhooksService {
         if (stored.status !== "FAILED") {
             return {
                 status: "skipped",
-                detail: `Already ${stored.status.toLowerCase()}; only a failed delivery is replayed`,
+                detail: `Already ${stored.status.toLowerCase()}. Only a failed delivery is replayed.`,
             };
         }
         if (!stored.organizationId) {

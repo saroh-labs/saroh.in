@@ -118,7 +118,7 @@ export const MODULES: readonly ModuleDescriptor[] = [
         key: "WEBSITE",
         label: "Website",
         description:
-            "Sites, pages, templates, forms, and domains — the Organization's public presence.",
+            "Sites, pages, templates, forms and domains: the business's public presence.",
         rootRoutes: ["/website"],
         /*
          * `site:read`, not `site:update` (#274). This gate answers "may this
@@ -140,7 +140,7 @@ export const MODULES: readonly ModuleDescriptor[] = [
         key: "CRM",
         label: "CRM",
         description:
-            "Contacts, leads, pipelines, and activity — the customer relationship core.",
+            "Contacts, leads, pipelines and activity: the customer relationship core.",
         rootRoutes: ["/crm"],
         // Who may REACH contacts: a Member reads the people on the diary.
         // Leads and the pipeline stay OWNER/ADMIN, refused per route.
@@ -204,8 +204,7 @@ export const MODULES: readonly ModuleDescriptor[] = [
     {
         key: "COMMERCE",
         label: "Commerce",
-        description:
-            "Catalog, inventory, carts, and orders for selling products.",
+        description: "Products, stock, bags and orders for selling.",
         rootRoutes: ["/commerce"],
         requiredAction: ["order:read", "order:stage"],
         dependencies: [],
@@ -231,7 +230,7 @@ export const MODULES: readonly ModuleDescriptor[] = [
         key: "COMMUNICATIONS",
         label: "Communications",
         description:
-            "Messages, delivery, and consent over the Organization's connected providers.",
+            "Messages, delivery and consent over the business's connected providers.",
         rootRoutes: ["/communications"],
         requiredAction: "message:read",
         dependencies: ["CRM"],

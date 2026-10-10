@@ -254,7 +254,7 @@ describe("marking an untracked product Sold out by hand", () => {
         const refused = place(hill, cake);
         await expect(refused).rejects.toThrow(ConflictException);
         await expect(place(hill, cake)).rejects.toThrow(
-            "Made-to-order cake — Sold out",
+            "Made-to-order cake: Sold out",
         );
         const error = await place(hill, cake).catch((e: unknown) => e);
         expect(
@@ -348,7 +348,7 @@ describe("marking an untracked product Sold out by hand", () => {
                 productId: candle,
                 available: 0,
                 storefront: "Online",
-                message: "Hand-poured candle — Sold out",
+                message: "Hand-poured candle: Sold out",
             },
         });
         expect(

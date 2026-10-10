@@ -441,7 +441,7 @@ describe("recorded after money, and flagged (DEC-068)", () => {
         const gap = await businessDetailsGap(prisma, owner.organizationId);
         expect(gap).toMatchObject({
             code: "PAYMENTS_BUSINESS_DETAILS",
-            title: "Add the address your invoices print — they go out without it",
+            title: "Add the address your invoices print. They go out without it",
             href: "/settings/organization?section=address&edit=address",
             severity: "ATTENTION",
         });
@@ -488,7 +488,7 @@ describe("recorded after money, and flagged (DEC-068)", () => {
         expect(
             await businessDetailsGap(prisma, owner.organizationId),
         ).toMatchObject({
-            title: "Add your GSTIN — invoices go out without it",
+            title: "Add your GSTIN. Invoices go out without it",
             href: "/settings/organization?section=tax&edit=taxId",
         });
     });

@@ -135,7 +135,7 @@ function PreviewBar({
         >
             <span>
                 <strong className="font-semibold">Draft preview</strong> of{" "}
-                {siteName} — not live. What you see is the current draft, and it
+                {siteName}, not live. What you see is the current draft, and it
                 changes when the draft does.
             </span>
             <span className="text-neutral-400">

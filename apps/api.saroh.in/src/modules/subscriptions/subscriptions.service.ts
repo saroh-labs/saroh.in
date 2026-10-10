@@ -900,7 +900,7 @@ export class SubscriptionsService {
                 now >= sub.currentPeriodEnd && !sub.cancelAtPeriodEnd;
             if (restarts && !(await paymentsOn(tx, sub.organizationId))) {
                 throw new ConflictException(
-                    "Your plan can't restart online just now. Ask the business to restart it for you.",
+                    "Your plan can't restart online right now. Ask the business to restart it for you.",
                 );
             }
             await this.resumeLocked(tx, sub, this.customerLog(tx, member, id), {
@@ -1522,7 +1522,7 @@ export class SubscriptionsService {
             const failed = await this.retryTarget(organizationId, id, now, tx);
             if (!failed) {
                 throw new ConflictException(
-                    "The latest charge is not overdue, so there is nothing to retry.",
+                    "The latest charge is not overdue, so there is nothing to try again.",
                 );
             }
             if (await chargeUnderWayOn(tx, organizationId, failed)) {
@@ -1715,7 +1715,7 @@ export class SubscriptionsService {
             }
             if (!(await takesPaymentOnline(tx, member.organizationId))) {
                 throw new ConflictException(
-                    "This can't be paid online just now. Ask the business how to pay.",
+                    "This can't be paid online right now. Ask the business how to pay.",
                 );
             }
             const { token } = await this.invoices.payLinkForCustomer(

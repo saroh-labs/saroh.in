@@ -68,7 +68,7 @@ const README = (businessName: string, made: Date) =>
         "Credit notes are in invoices-and-credit-notes.csv, with kind CREDIT_NOTE.",
         "Text that a spreadsheet would read as a formula starts with ' so it stays text.",
         "",
-        "media/ holds the photos and videos you uploaded; media.csv lists every one,",
+        "media/ holds the photos and videos you uploaded. media.csv lists every one,",
         "and says if a file was left out of this download and why.",
         "",
     ].join("\r\n");

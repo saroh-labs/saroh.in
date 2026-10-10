@@ -383,7 +383,7 @@ export class OrganizationMembersService {
         });
         if (existing) {
             throw new ConflictException({
-                message: "That person is already in this workspace.",
+                message: "That person is already in this business.",
                 field: "email",
             });
         }
@@ -477,7 +477,7 @@ export class OrganizationMembersService {
         await sendOrganizationInvitationEmail(
             dto.email,
             `${env.APP_URL ?? "https://app.saroh.localhost"}/join/${token}`,
-            organization?.name ?? "a Saroh workspace",
+            organization?.name ?? "a business on Saroh",
         );
 
         await this.audit.record({
@@ -907,7 +907,7 @@ export class OrganizationMembersService {
         }
         if (userId === ctx.userId) {
             throw new ForbiddenException(
-                "Your role can't change your own permissions — no role can. Ask someone else on the team.",
+                "Your role can't change your own permissions, and no role can. Ask someone else on the team.",
             );
         }
 
@@ -1221,9 +1221,7 @@ export class OrganizationMembersService {
             },
         });
         if (!membership) {
-            throw new NotFoundException(
-                "That person is not in this workspace.",
-            );
+            throw new NotFoundException("That person isn't in this business.");
         }
         return membership;
     }
@@ -1250,7 +1248,7 @@ export class OrganizationMembersService {
                 throw new BadRequestException(LAST_OWNER_CANT_LEAVE);
             }
             throw new BadRequestException(
-                `This is the workspace's only owner. Make someone else an owner first, then ${what} this one.`,
+                `This is the business's only owner. Make someone else an owner first, then ${what} this one.`,
             );
         }
     }

@@ -955,7 +955,7 @@ describe("tell the customer (B9, A13's thread)", () => {
         expect(thread.messages).toEqual([
             {
                 author: "SYSTEM",
-                body: `Your order #${number} is now for local delivery. There's ₹40.00 more to pay for delivery.`,
+                body: `Your order #${number} is now for local delivery. There's ₹40 more to pay for delivery.`,
                 event: "ORDER_FULFILMENT_CHANGED",
             },
             {

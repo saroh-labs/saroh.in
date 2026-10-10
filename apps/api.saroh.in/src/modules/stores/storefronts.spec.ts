@@ -637,7 +637,9 @@ describe("opening hours in Settings › Activity (#509)", () => {
                 day("SAT", "10:00", "14:00"),
                 day("SUN", "00:00", "00:00", true),
             ] as never),
-        ).toBe("Mon–Fri 09:00–18:00, Sat 10:00–14:00, Sun closed");
+        ).toBe(
+            "Mon to Fri 9:00 am to 6:00 pm, Sat 10:00 am to 2:00 pm, Sun closed",
+        );
         expect(openingHoursText(null)).toBeNull();
     });
 
@@ -682,8 +684,8 @@ describe("opening hours in Settings › Activity (#509)", () => {
                 changes: [
                     {
                         field: "openingHours",
-                        before: "Mon–Sun 09:00–18:00",
-                        after: "Mon–Fri 09:00–18:00, Sat 10:00–14:00, Sun closed",
+                        before: "Mon to Sun 9:00 am to 6:00 pm",
+                        after: "Mon to Fri 9:00 am to 6:00 pm, Sat 10:00 am to 2:00 pm, Sun closed",
                     },
                 ],
             },

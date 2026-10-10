@@ -82,7 +82,7 @@ export class DomainsService {
             !(await this.entitlements.can(ctx.organizationId, "customDomain"))
         ) {
             throw new ForbiddenException(
-                "Custom domains require a paid plan; upgrade to add one.",
+                "Custom domains come with a paid plan. Upgrade to add one.",
             );
         }
 
@@ -458,7 +458,7 @@ function tellTeam(actorUserId: string | null): OnLiveChange {
 function hostingUnavailable(): ServiceUnavailableException {
     return new ServiceUnavailableException({
         message:
-            "We couldn't disconnect this domain from our hosting just now, so it hasn't been removed. Try again in a few minutes.",
+            "We couldn't disconnect this domain from our hosting, so it hasn't been removed. Try again in a few minutes.",
         details: { reason: "hosting-unavailable" },
     });
 }

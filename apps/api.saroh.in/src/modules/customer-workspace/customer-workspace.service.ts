@@ -63,7 +63,7 @@ export interface TimelineEvent {
 
 /** How a link reads on the timeline: who or what made it (C2). */
 const LINK_TITLES: Record<CustomerLinkReason, string> = {
-    MANUAL: "Linked to their store record by your team",
+    MANUAL: "Linked to their location record by your team",
     BACKFILL: "Linked when the list was set up",
     PAYMENT: "Linked when they paid",
     SITE_ACCOUNT: "Linked when they signed in on your website",

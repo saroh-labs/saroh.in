@@ -72,7 +72,7 @@ export default async function DashboardPage() {
 
                 <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
                     <StatCard
-                        label="Organizations"
+                        label="Businesses"
                         value={metrics.organizations.total}
                         hint={`${metrics.organizations.createdLast30Days} new in 30 days`}
                     />
@@ -96,7 +96,7 @@ export default async function DashboardPage() {
                 <section className="grid gap-6 lg:grid-cols-2">
                     <Panel
                         title="Module adoption"
-                        description="Organizations with each module enabled."
+                        description="Businesses with each module on."
                         empty="No module has been enabled yet."
                         rows={metrics.moduleAdoption.map((row) => ({
                             key: row.moduleKey,

@@ -147,8 +147,8 @@ describe("hours: grouped days and the address", () => {
     it("joins days in a row with the same hours, and names the range", () => {
         const rows = hoursRows(SAMPLE_VISIT.hours, true) ?? [];
         expect(groupedHoursRows(rows).map((l) => [l.label, l.hours])).toEqual([
-            ["Monday to Friday", "7:30am – 5pm"],
-            ["Saturday", "8am – 12pm"],
+            ["Monday to Friday", "7:30am to 5pm"],
+            ["Saturday", "8am to 12pm"],
             ["Sunday", null],
         ]);
     });

@@ -191,7 +191,7 @@ export function renderAutopaySetupLink(
         `<p>${greeting}</p>`,
         `<p>${business} has sent you a link to turn on autopay for ${plan}. Once it&#39;s on, each renewal is paid from your ${escapeHtml(vars.method)}, up to ${escapeHtml(vars.limit)} a time. You can ask ${business} to cancel it whenever you like.</p>`,
         vars.check
-            ? `<p>To switch it on, your bank needs a ${escapeHtml(vars.check)} check. It&#39;s refunded straight away and is back in your account in 5–7 working days.</p>`
+            ? `<p>To switch it on, your bank needs a ${escapeHtml(vars.check)} check. It&#39;s refunded straight away and is back in your account in 5 to 7 working days.</p>`
             : "",
         `<p>Turn on autopay here:<br><a href="${SECRET_LINK_SLOT}">${SECRET_LINK_SLOT}</a></p>`,
         `<p>The link works until ${escapeHtml(vars.expiresOn)}.</p>`,
@@ -218,7 +218,7 @@ export interface AutopayCancelledVars {
  * autopay (D14). Plain text: a thread message is never rendered as HTML.
  */
 export function autopayCancelledSentence(vars: AutopayCancelledVars): string {
-    return `${vars.business} turned off autopay for ${vars.plan}. Nothing more is taken automatically — your next renewal comes as an invoice with a link to pay.`;
+    return `${vars.business} turned off autopay for ${vars.plan}. Nothing more is taken automatically. Your next renewal comes as an invoice with a link to pay.`;
 }
 
 /**

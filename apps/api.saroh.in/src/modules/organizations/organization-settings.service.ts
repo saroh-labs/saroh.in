@@ -530,7 +530,7 @@ export class OrganizationSettingsService {
 
             const organization = await tx.organization.findUnique(read);
             if (!organization) {
-                throw new NotFoundException("Organization not found");
+                throw new NotFoundException("Business not found");
             }
             return { settings: organization, before };
         });
@@ -746,7 +746,7 @@ export class OrganizationSettingsService {
             },
         });
         if (!organization) {
-            throw new NotFoundException("Organization not found");
+            throw new NotFoundException("Business not found");
         }
         return {
             id: organization.id,

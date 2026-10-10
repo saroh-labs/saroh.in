@@ -1027,7 +1027,7 @@ export class CalendarService {
                     kind: "renewal_failed",
                     date,
                     title: who,
-                    subtitle: `${sub.plan.name} — renewal not paid`,
+                    subtitle: `${sub.plan.name}, renewal not paid`,
                     ...amount,
                     link: { type: "subscription", id: sub.id },
                 });

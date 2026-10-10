@@ -252,7 +252,7 @@ describe("module turn-off impact (F13)", () => {
         );
         expect(bookings).not.toHaveProperty("count");
         expect(bookings?.message).toBe(
-            "Bookings already made stay booked; the booking page stops taking new ones.",
+            "Bookings already made stay booked. The booking page stops taking new ones.",
         );
     });
 

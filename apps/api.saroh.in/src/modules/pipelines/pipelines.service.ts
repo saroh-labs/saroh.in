@@ -143,7 +143,7 @@ export class PipelinesService {
         const leadCount = await prisma.lead.count({ where: { stageId } });
         if (leadCount > 0) {
             throw new ConflictException(
-                `Stage still has ${leadCount} lead(s); move them before deleting`,
+                `This stage still has ${leadCount} lead(s). Move them to another stage first.`,
             );
         }
 

@@ -141,7 +141,7 @@ describe("OrganizationContextService.resolve — a paused team member (#800)", (
         membershipFindUnique.mockResolvedValue(null);
         organizationFindUnique.mockResolvedValue({ id: "org_1" });
         await expect(service.resolve("user_x", "org_1")).rejects.toThrow(
-            "You are not a member of this organization",
+            "You aren't a member of this business.",
         );
         expect(pausedNow).not.toHaveBeenCalled();
     });

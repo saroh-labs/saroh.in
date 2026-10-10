@@ -481,6 +481,6 @@ describe("a pasted address (UX-066)", () => {
         );
         expect(
             JSON.stringify((refused as BadRequestException).getResponse()),
-        ).toContain("Enter just the domain, like www.yourshop.in");
+        ).toContain("Enter the domain only, like www.yourshop.in");
     });
 });

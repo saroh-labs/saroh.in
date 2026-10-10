@@ -326,7 +326,7 @@ export class StockChecksService {
                     key: `promised:${row.id}`,
                     kind: "PROMISED_MISMATCH",
                     title: "Promised doesn't add up",
-                    detail: `Shows ${row.promised} promised at ${row.store.name}; open orders hold ${holds}.`,
+                    detail: `Shows ${row.promised} promised at ${row.store.name}. Open orders hold ${holds}.`,
                     numbers: { promised: row.promised, held: holds },
                     fingerprint: `${row.promised}:${holds}`,
                 });
@@ -367,7 +367,7 @@ export class StockChecksService {
                 key: `count:${e.id}`,
                 kind: "COUNT_MISMATCH" as const,
                 title: COUNT_DIDNT_MATCH,
-                detail: `Counted ${e.counted ?? e.after} at ${e.store.name} against ${shown} shown; the log said ${e.before}.`,
+                detail: `Counted ${e.counted ?? e.after} at ${e.store.name} against ${shown} shown. The log said ${e.before}.`,
                 storeId: e.storeId,
                 storeName: e.store.name,
                 productId: e.productId,

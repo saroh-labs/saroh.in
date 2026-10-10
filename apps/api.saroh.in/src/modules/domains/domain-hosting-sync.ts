@@ -57,7 +57,7 @@ export const HOSTING_WORDS = {
     certificate:
         "The secure certificate for this domain couldn't be issued. Check the CNAME record points to Saroh, then check again.",
     checkFailed:
-        "We couldn't check this domain with our hosting provider just now. We'll keep trying, or you can check again now.",
+        "We couldn't check this domain with our hosting provider. We'll keep trying, or you can check again now.",
 } as const;
 
 const PROBLEM_WORDS: Record<HostedProblem, string> = {

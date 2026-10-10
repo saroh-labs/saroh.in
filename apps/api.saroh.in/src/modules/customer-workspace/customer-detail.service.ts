@@ -117,7 +117,7 @@ export interface DetailUnavailable {
 const LABELS: Record<DetailSource, string> = {
     notes: "Notes",
     attention: "Needs attention",
-    linkedCustomers: "Linked store customers",
+    linkedCustomers: "Linked location records",
     possibleMatches: "Possible matches",
     orders: "Orders",
     bookings: "Bookings",

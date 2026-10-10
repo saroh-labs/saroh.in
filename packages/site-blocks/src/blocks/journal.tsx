@@ -413,14 +413,14 @@ export default function JournalSection({
                     </button>
                 }
             >
-                We couldn&apos;t load your posts just now.
+                We couldn&apos;t load your posts right now.
             </JournalNote>
         );
     }
     if (state.feed.posts.length === 0) {
         return (
             <JournalNote title={title}>
-                No posts yet. Publish a post and it shows here; until then this
+                No posts yet. Publish a post and it shows here. Until then this
                 section is left off your live site.
             </JournalNote>
         );

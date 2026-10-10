@@ -194,13 +194,15 @@ describe("Track", () => {
                 ...DETAIL,
                 collectFrom: {
                     address: "12 Hill Road, Bandra",
-                    hours: "Mon–Sat 10:00–19:00, Sun closed",
+                    hours: "Mon to Sat 10:00 am to 7:00 pm, Sun closed",
                 },
             },
         });
         const sheet = screen.getByRole("dialog", { name: "Order #1019" });
         expect(sheet).toHaveTextContent("Pick-up from 12 Hill Road, Bandra");
-        expect(sheet).toHaveTextContent("Open Mon–Sat 10:00–19:00, Sun closed");
+        expect(sheet).toHaveTextContent(
+            "Open Mon to Sat 10:00 am to 7:00 pm, Sun closed",
+        );
     });
 
     it("a shipment links to the courier's tracking; a receipt opens its paper", () => {
@@ -232,7 +234,7 @@ describe("Track", () => {
                 ...DETAIL,
                 state: "refunded",
                 status: "Refunded",
-                refund: "Money back in 5–7 days",
+                refund: "Money back in 5 to 7 days",
                 steps: [
                     {
                         label: "New",
@@ -243,7 +245,7 @@ describe("Track", () => {
                     {
                         label: "Refunded",
                         state: "done",
-                        line: "Money back in 5–7 days",
+                        line: "Money back in 5 to 7 days",
                         at: null,
                     },
                 ],
@@ -254,7 +256,7 @@ describe("Track", () => {
             within(sheet).getByText("Refunded · Pick-up · 2 × Sourdough"),
         ).toBeInTheDocument();
         expect(
-            within(sheet).getByText("Money back in 5–7 days"),
+            within(sheet).getByText("Money back in 5 to 7 days"),
         ).toBeInTheDocument();
         expect(
             within(sheet).getByText(

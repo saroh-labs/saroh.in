@@ -4032,3 +4032,18 @@ no setup file, so it had no fix.
 no-op under `node`), wired through `setupFiles`.
 **Check**: the suite itself: the order sheets' tests press tooltipped buttons.
 **Category**: tests · `docs/patterns/devops-tooling-and-deploy.md`
+
+## Every page said "Home" for a moment on its way in
+
+**Symptom**: moving between sections of the app, the loader's breadcrumb read
+"Home" before the page's own name appeared.
+**Cause**: the router shows the outermost loading file first on a move between
+top-level sections, before the section's own. `app/(shell)/loading.tsx` was
+written as Home's loader, with "Home" fixed in it, though it stands in for
+every address under the shell.
+**Fix**: the shell's loader is `ShellLoading`, which reads the address against
+the menu (`shellLoadingWords`) and names the section and page being opened,
+with a bar for a title it can't know.
+**Check**: `shell-loading.test.ts` (never "Home" for another address), and
+`page-chrome.test.ts` still holds every loader to the one loading shell.
+**Category**: frontend · `docs/patterns/frontend-app-structure.md`

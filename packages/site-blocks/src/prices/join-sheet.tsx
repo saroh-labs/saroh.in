@@ -32,7 +32,7 @@ import { planEvery, planPeriod } from "./plan-words";
  *
  * **Autopay (D12).** When the business's provider takes autopay
  * (`autopayMethods`), the design's "Pay with" choice comes first: "Pay ₹X
- * and turn on autopay" (the default) or "Just pay for this month", and how
+ * and turn on autopay" (the default) or "Pay for this month only", and how
  * autopay pays — every method the provider offers, by its plain name. UPI
  * and card: one window pays the first period and authorises, and the
  * customer lands on the page on the business's site that says how autopay
@@ -421,7 +421,7 @@ function Join({
                         />
                         <PayOption
                             on={!autopayOn}
-                            label={`Just pay for this ${period}`}
+                            label={`Pay for this ${period} only`}
                             sub={`You pay for each ${period} as it starts.`}
                             onPick={() => setAutopayOn(false)}
                         />

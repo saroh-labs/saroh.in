@@ -152,7 +152,7 @@ describe("ModuleReadinessRegistry", () => {
                 {
                     code: "WEBSITE_SHOP_NOT_CHOSEN",
                     message:
-                        "Choose which location your online shop sells from — until then your shop page isn't live.",
+                        "Choose which location your online shop sells from. Until then your shop page isn't live.",
                     severity: "SETUP",
                     actionHref: "/sites/site_1/settings#sells-from",
                 },
@@ -588,7 +588,7 @@ describe("deactivationImpact (F13)", () => {
                 moduleKey: "APPOINTMENTS",
                 count: 3,
                 message:
-                    "3 upcoming bookings stay booked; the booking page stops taking new ones.",
+                    "3 upcoming bookings stay booked. The booking page stops taking new ones.",
             },
         ]);
     });
@@ -597,7 +597,7 @@ describe("deactivationImpact (F13)", () => {
         const db = impactDb({ bookings: 1 });
         const items = await impact(db, "APPOINTMENTS");
         expect(items[0]?.message).toBe(
-            "1 upcoming booking stays booked; the booking page stops taking new ones.",
+            "1 upcoming booking stays booked. The booking page stops taking new ones.",
         );
         const where = (db as unknown as { booking: { count: jest.Mock } })
             .booking.count.mock.calls[0][0].where;
@@ -616,7 +616,7 @@ describe("deactivationImpact (F13)", () => {
         );
         expect(items[0]?.count).toBeNull();
         expect(items[0]?.message).toBe(
-            "We couldn't count your upcoming bookings. They stay booked; the booking page stops taking new ones.",
+            "We couldn't count your upcoming bookings. They stay booked. The booking page stops taking new ones.",
         );
         // The database's words never reach the merchant.
         expect(items[0]?.message).not.toContain("connection");
@@ -652,7 +652,7 @@ describe("deactivationImpact (F13)", () => {
             code: "APPOINTMENTS_UPCOMING_BOOKINGS",
             moduleKey: "APPOINTMENTS",
             message:
-                "Bookings already made stay booked; the booking page stops taking new ones.",
+                "Bookings already made stay booked. The booking page stops taking new ones.",
         });
         expect(
             (db as unknown as { booking: { count: jest.Mock } }).booking.count,
@@ -860,7 +860,7 @@ describe("deactivationImpact (F13)", () => {
         expect(items.map((i) => [i.code, i.message])).toEqual([
             [
                 "APPOINTMENTS_UPCOMING_BOOKINGS",
-                "2 upcoming bookings stay booked; the booking page stops taking new ones.",
+                "2 upcoming bookings stay booked. The booking page stops taking new ones.",
             ],
             [
                 "APPOINTMENTS_SITE_BOOK_PAGE",
@@ -897,7 +897,7 @@ describe("deactivationImpact (F13)", () => {
     it("Website: a live site stays up as last published", async () => {
         const items = await impact(impactDb({ liveSites: 1 }), "WEBSITE");
         expect(items[0]?.message).toBe(
-            "Your live site stays up as last published; changes wait until it's back on.",
+            "Your live site stays up as last published. Changes wait until it's back on.",
         );
     });
 

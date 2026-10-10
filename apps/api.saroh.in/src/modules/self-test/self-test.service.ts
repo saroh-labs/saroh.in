@@ -86,7 +86,7 @@ export class SelfTestService {
         const allowed = this.rateLimiter.take(user.id);
         if (!allowed) {
             throw new HttpException(
-                "Too many test emails — please try again later",
+                "Too many test emails. Try again later.",
                 429,
             );
         }

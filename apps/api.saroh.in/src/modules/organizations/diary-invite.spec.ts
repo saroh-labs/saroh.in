@@ -51,7 +51,7 @@ describe("who on the diary can be invited", () => {
         );
         expect(() =>
             assertDiaryInvitable({ ...person, membershipId: "m_1" }, null),
-        ).toThrow("Priya already has a login here.");
+        ).toThrow("Priya already signs in here.");
     });
 
     it("refuses a second invite for the same person, naming the first", () => {

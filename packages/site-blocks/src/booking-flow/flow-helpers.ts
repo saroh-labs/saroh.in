@@ -55,10 +55,10 @@ export function nextFreeStart(
     );
 }
 
-/** "That time has just gone. We've chosen the next free one: Sun 20 Sep at 08:00." */
+/** "That time has gone. We've chosen the next free one: Sun 20 Sep at 08:00." */
 export function nextChosenText(start: BookingStart, zone: string): string {
     const day = dateText(dateIn(start.startAt, zone), true);
-    return `That time has just gone. We've chosen the next free one: ${day} at ${timeIn(start.startAt, zone)}.`;
+    return `That time has gone. We've chosen the next free one: ${day} at ${timeIn(start.startAt, zone)}.`;
 }
 
 // ── The header's facts (E6) ─────────────────────────────────────────────
@@ -72,7 +72,7 @@ export function pageTitle(services: BookingService[]): string {
 
 /** What the header says about the business, from G8's public visit read. */
 export interface HeaderFacts {
-    /** "12th Main, Indiranagar · Open Mon–Sat 9am–7pm", or null for neither. */
+    /** "12th Main, Indiranagar · Open Mon to Sat 9am to 7pm", or null for neither. */
     place: string | null;
     /** The public phone, E.164 (for `tel:`), or null when none is set. */
     phone: string | null;

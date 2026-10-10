@@ -396,7 +396,7 @@ describe("inviting", () => {
                 email: "already@example.test",
                 role: "MEMBER",
             }),
-        ).rejects.toThrow(/already in this workspace/);
+        ).rejects.toThrow(/already in this business/);
     });
 
     it("records the role but never the invitee's address", async () => {
@@ -889,7 +889,7 @@ describe("removing someone", () => {
         db.membership.findUnique.mockResolvedValue(null);
 
         await expect(service.remove(ctx(), "stranger")).rejects.toThrow(
-            /not in this workspace/,
+            /isn't in this business/,
         );
     });
 });
