@@ -217,7 +217,6 @@ describe("the QR code a booking came from", () => {
         fireEvent.change(await within(sheet).findByLabelText("Code"), {
             target: { value: "123456" },
         });
-        fireEvent.click(within(sheet).getByRole("button", { name: "Sign in" }));
 
         await waitFor(() => expect(sent).toHaveLength(1));
         expect(sent[0]?.source).toBe("qr-h7c");

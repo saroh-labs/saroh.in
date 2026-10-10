@@ -295,7 +295,6 @@ describe("a full class on the booking page (A12)", () => {
         fireEvent.change(await within(sheet).findByLabelText("Code"), {
             target: { value: "123456" },
         });
-        fireEvent.click(within(sheet).getByRole("button", { name: "Sign in" }));
         await waitFor(() => expect(wl.join).toHaveBeenCalled());
         expect(
             await screen.findByRole("heading", { name: /on the waitlist/ }),

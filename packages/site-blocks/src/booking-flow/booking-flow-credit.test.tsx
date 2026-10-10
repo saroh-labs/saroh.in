@@ -411,7 +411,6 @@ describe("a class credit online (A10)", () => {
         fireEvent.change(await within(sheet).findByLabelText("Code"), {
             target: { value: "123456" },
         });
-        fireEvent.click(within(sheet).getByRole("button", { name: "Sign in" }));
 
         expect(
             await screen.findByText(
@@ -464,7 +463,6 @@ describe("a class credit online (A10)", () => {
         fireEvent.change(await within(sheet).findByLabelText("Code"), {
             target: { value: "123456" },
         });
-        fireEvent.click(within(sheet).getByRole("button", { name: "Sign in" }));
 
         const found =
             "You have a class credit for this, so we've picked it. Book with 1 credit, or choose another way to pay.";
@@ -510,7 +508,6 @@ describe("a class credit online (A10)", () => {
         fireEvent.change(await within(sheet).findByLabelText("Code"), {
             target: { value: "123456" },
         });
-        fireEvent.click(within(sheet).getByRole("button", { name: "Sign in" }));
 
         await screen.findByRole("heading", { name: "You're booked, Asha." });
         expect(bookBodies()[0]).toMatchObject({ pay: "DESK" });

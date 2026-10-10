@@ -108,8 +108,8 @@ test.describe("the account area (A5)", () => {
         await sheet.getByLabel("New email").fill(next);
         await sheet.getByRole("button", { name: "Send code" }).click();
         const code = await readSiteCode(next);
+        // The sixth digit sends the code: no button to press.
         await sheet.getByLabel("Code").fill(code);
-        await sheet.getByRole("button", { name: "Confirm new email" }).click();
         await expect(
             page.getByText(/Use that email to sign in from now on/),
         ).toBeVisible();
