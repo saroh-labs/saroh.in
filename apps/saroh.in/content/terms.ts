@@ -7,7 +7,7 @@
  * the 9 Oct additions, rev 46: "Your customers and your business", suspending
  * at once for illegal use or fraud, "Fair use", and the line in "Liability"
  * on businesses' goods and disputes; and the 10 Oct alignment with India's
- * DPDP Act, rev 55: downloading your data in Settings, the business as Data
+ * DPDP Act, rev 55 (and rev 68: closing an account keeps data 180 days): downloading your data in Settings, the business as Data
  * Fiduciary and Saroh as its Data Processor, and suspending at once for what
  * the law prohibits, with what is kept of a suspended account). Published
  * VERBATIM at /terms: do not reword it here. A change comes from the owner's
@@ -104,7 +104,7 @@ We work to keep Saroh running and your data safe, but we can't promise it will n
 
 ## Closing an account
 
-You can close your account at any time. We may close it if you seriously or repeatedly break these terms, or don't pay. For 30 days after, you can still ask us for a copy of your data, unless the law or safety requires otherwise.
+You can close your account at any time. We may close it if you seriously or repeatedly break these terms, or don't pay. You can download your data yourself before you close your account. After that, access ends at once; we keep the data for 180 days, as the Privacy Policy says, and you can ask us for a copy in that time, unless the law or safety requires otherwise.
 
 ## Liability
 

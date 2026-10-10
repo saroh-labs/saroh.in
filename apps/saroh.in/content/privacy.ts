@@ -2,7 +2,7 @@
  * The Privacy Policy, as the owner agreed it (Claude Doc "Saroh Privacy
  * Policy and Terms", settled 4 Oct 2026, rev 32; email provider rev 42, 6 Oct;
  * merchants' own trackers, owner's wording 8 Oct, rev 44; Vercel removed,
- * 9 Oct, rev 45; aligned with India's DPDP Act, 10 Oct, rev 55: Data
+ * 9 Oct, rev 45; aligned with India's DPDP Act, 10 Oct, rev 55 (and rev 68: a business's duty for a child's data, under Age): Data
  * Fiduciary and Data Processor named, security logs kept 1 year, 180 days
  * after closing, suspended accounts, and "If there's a breach"). Published VERBATIM at
  * /privacy: do not reword it here. A change comes from the owner's text,
@@ -106,7 +106,7 @@ Everything travels encrypted. Each business's data is kept apart from every othe
 
 ## Age
 
-Saroh is for people aged 18 or older. We don't knowingly collect children's data for our own use.
+Saroh is for people aged 18 or older. We don't knowingly collect children's data for our own use. A business that uses Saroh is responsible for any child's data it collects from its own customers, and for a parent's verifiable consent where the DPDP Act needs it.
 
 ## Changes
 
