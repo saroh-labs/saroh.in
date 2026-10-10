@@ -2,14 +2,16 @@ import { cn } from "@saroh/ui/lib/utils";
 
 /**
  * "How it prints" ("Saroh Settings" design): the top of an invoice as the
- * business's details put it, live while a section is being edited, so an edit
- * is judged by what a customer will read rather than by the field it is in.
+ * business's details put it. Beside the rows it shows what is saved; under
+ * a sheet's fields (`inSheet`) it follows the draft, so an edit is judged by
+ * what a customer will read rather than by the field it is in.
  *
  * Paper-coloured on purpose — it stands for a printed page, not a card — so
  * it keeps the design's fixed paper and ink in dark theme as well.
  */
 export function BusinessPrintPreview({
     hidden = false,
+    inSheet = false,
     live,
     logoUrl,
     registered,
@@ -25,7 +27,9 @@ export function BusinessPrintPreview({
 }: {
     /** Another card shows its own preview (How to pay us). */
     hidden?: boolean;
-    /** A section is being edited: say the preview shows the unsaved edit. */
+    /** Under a sheet's fields, where it follows what is being typed. */
+    inSheet?: boolean;
+    /** Drawn from a draft: say the preview shows the unsaved edit. */
     live: boolean;
     /** The logo printed above the legal name, when there is one. */
     logoUrl: string | null;
@@ -45,7 +49,10 @@ export function BusinessPrintPreview({
         <aside
             aria-label="How it prints"
             className={cn(
-                "grid min-w-[260px] flex-[0_1_320px] gap-2 self-start min-[1100px]:sticky min-[1100px]:top-4",
+                "grid gap-2",
+                inSheet
+                    ? "mt-3 border-t border-border pt-4"
+                    : "min-w-[260px] flex-[0_1_320px] self-start min-[1100px]:sticky min-[1100px]:top-4",
                 hidden && "hidden",
             )}
         >

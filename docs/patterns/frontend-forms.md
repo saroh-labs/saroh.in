@@ -54,10 +54,12 @@ in `lib/subscriptions/plan-editor.ts`, and `plan-editor-adapter.ts` turns the
 typed form into the API's values and back.
 
 **Current** — **A settings row is read first and edited in a side sheet**
-(owner, 10 Oct): a location's tabs (`components/stores/`) draw `Row`s from
+(owner, 10 Oct): a location's tabs (`components/stores/`) and every tab of
+Settings › Business (`components/organizations/`) draw `Row`s from
 `components/sites/settings-rows.tsx` — label, a sentence of what is saved,
 Edit — and each Edit opens its own `@saroh/ui/sheet` with one Save.
-`PlaceSheetFrame` in `place-sheets.tsx` is the frame to copy: the fields
+`SettingsSheetFrame` in `components/shared/settings-sheet-frame.tsx` is the
+frame to use (`PlaceSheetFrame` names it by a location's row): the fields
 scroll, Save then Cancel sit at the foot, nothing saves until Save, a
 refusal keeps the sheet open with what was typed, Cancel, Escape and the
 close button drop the draft, it can't be dismissed while saving, each
@@ -104,6 +106,17 @@ the same classes until the two are lifted into one, and its links are
 is done inside its sheet or dialog (the share image is uploaded there, Add
 domain shows its DNS records there); an Edit never sends the merchant to
 another page to finish.
+
+the row's Edit. A link opens one with `?edit=` (`lib/stores/place-rows.ts`,
+`lib/organizations/business-rows.ts`; build a Business link with
+`businessEditHref`). With the draft in a sheet, the page needs no
+leave-with-unsaved-changes guard. **What a row needs is done in its sheet**
+(owner, 10 Oct): an Edit never sends someone to another page, so an upload
+sits in the sheet itself (`components/shared/logo-upload.tsx`, a logo field
+with no page state) and a field another row owns joins the sheet that needs
+it (turning GST on asks for the registered address there). Where a preview
+sits beside the rows it shows what is saved; the sheet draws the same
+preview under its fields, from the draft.
 
 ## Rules
 

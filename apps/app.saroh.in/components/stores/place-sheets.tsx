@@ -1,22 +1,14 @@
 "use client";
 
-import { Button } from "@saroh/ui/button";
 import { Input } from "@saroh/ui/input";
 import { Label } from "@saroh/ui/label";
-import {
-    Sheet,
-    SheetContent,
-    SheetDescription,
-    SheetFooter,
-    SheetHeader,
-    SheetTitle,
-} from "@saroh/ui/sheet";
 import { Textarea } from "@saroh/ui/textarea";
 import { ToggleGroup, ToggleGroupItem } from "@saroh/ui/toggle-group";
 import type { FormEventHandler, ReactNode } from "react";
 import { useState } from "react";
 
 import { SEGMENT, SEGMENTED } from "@/components/shared/segmented";
+import { SettingsSheetFrame } from "@/components/shared/settings-sheet-frame";
 import {
     ADDRESS_FIELD_ID,
     KIND_FIELD_ID,
@@ -43,25 +35,13 @@ const PROBLEM =
     "text-pretty text-[12.5px] font-medium leading-[1.5] text-destructive-subtle-foreground";
 
 /**
- * The frame every Edit sheet in The place shares, as Delivery's and
- * Payments' sheets are drawn: the title and a line under it, the fields
- * (which scroll), and Save then Cancel at the foot.
- *
- * Nothing saves until Save. Cancel, Escape, the close button and a press
- * outside drop what was typed, unasked, and the sheet can't be dismissed
- * while a save is on its way. Closed, the keyboard goes back to the row's
- * Edit, unless another sheet has opened in its place. The row gives each
- * opening its own `key`, so a sheet starts from what is saved every time.
+ * The frame every Edit sheet in The place shares: the settings rows' own
+ * (`components/shared/settings-sheet-frame.tsx`, which says how it saves,
+ * closes and hands the keyboard back), named by the row it edits.
  */
 export function PlaceSheetFrame({
     sheet,
-    title,
-    description,
-    open,
-    pending,
-    onClose,
-    onSubmit,
-    children,
+    ...frame
 }: {
     sheet: PlaceSheet;
     title: string;
@@ -73,65 +53,11 @@ export function PlaceSheetFrame({
     children: ReactNode;
 }) {
     return (
-        <Sheet
-            open={open}
-            onOpenChange={(o) => {
-                if (!o && !pending) onClose();
-            }}
-        >
-            <SheetContent
-                className="flex w-full flex-col sm:max-w-md"
-                onCloseAutoFocus={(e) => {
-                    e.preventDefault();
-                    // Saying yes to "Do customers come here?" opens the
-                    // address next: the keyboard stays in that sheet.
-                    if (
-                        document.querySelector(
-                            '[role="dialog"][data-state="open"]',
-                        )
-                    ) {
-                        return;
-                    }
-                    document.getElementById(placeEditId(sheet))?.focus();
-                }}
-            >
-                <SheetHeader>
-                    <SheetTitle>{title}</SheetTitle>
-                    <SheetDescription>{description}</SheetDescription>
-                </SheetHeader>
-                <form
-                    id={`${PLACE_ROW_ID[sheet]}-panel`}
-                    noValidate
-                    className="mt-5 flex min-h-0 flex-1 flex-col"
-                    onSubmit={onSubmit}
-                >
-                    {/* The fields scroll between the title and the
-                        buttons; the padding keeps a focus ring at the
-                        edge from being cut off. */}
-                    <div className="-mx-1 grid min-h-0 flex-1 content-start gap-2 overflow-y-auto px-1 pb-1">
-                        {children}
-                    </div>
-
-                    <SheetFooter className="mt-4 flex-row flex-wrap items-center gap-2 border-t border-border pt-4 sm:justify-start sm:space-x-0">
-                        <Button
-                            type="submit"
-                            variant="brand"
-                            disabled={pending}
-                        >
-                            {pending ? "Saving…" : "Save"}
-                        </Button>
-                        <Button
-                            type="button"
-                            variant="ghost"
-                            disabled={pending}
-                            onClick={onClose}
-                        >
-                            Cancel
-                        </Button>
-                    </SheetFooter>
-                </form>
-            </SheetContent>
-        </Sheet>
+        <SettingsSheetFrame
+            id={`${PLACE_ROW_ID[sheet]}-panel`}
+            returnFocusTo={placeEditId(sheet)}
+            {...frame}
+        />
     );
 }
 

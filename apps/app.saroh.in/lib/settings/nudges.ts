@@ -5,16 +5,13 @@ import {
 } from "@/lib/communications/email-setup";
 import { rolledOut } from "@/lib/modules/rollout";
 import type { ModuleView } from "@/lib/modules/schema";
-import {
-    BUSINESS_TYPE_ANCHOR,
-    businessTypeOf,
-} from "@/lib/organizations/business-types";
+import { businessEditHref } from "@/lib/organizations/business-rows";
+import { businessTypeOf } from "@/lib/organizations/business-types";
 import type { OrganizationSettings } from "@/lib/organizations/settings-service";
 import type { ConnectedCommsProvider } from "@/lib/providers/service";
 
 import type { ReadyAside, ReadyChecklist, ReadyItem, ReadyStep } from "./ready";
 import {
-    business,
     emailAttention,
     emailHeldByPlan,
     handlesMoney,
@@ -113,8 +110,8 @@ function businessType(
         label: "Choose your business type",
         why: "Sole proprietor, partnership, LLP, private limited or another — so your business details are complete.",
         cta: "Choose type",
-        // Straight to the Type field, not the top of the tab.
-        href: `${business("identity")}#${BUSINESS_TYPE_ANCHOR}`,
+        // Straight to the Type row's sheet, not the top of the tab.
+        href: businessEditHref("type"),
         broken: false,
         left: businessTypeOf(settings.profile?.type) === "",
     };
@@ -128,7 +125,7 @@ function logo(settings: Pick<OrganizationSettings, "logo">): Nudge | null {
         label: "Add your logo",
         why: "It goes on every receipt and invoice.",
         cta: "Add logo",
-        href: business("identity"),
+        href: businessEditHref("logo"),
         broken: false,
         left: settings.logo === null,
     };

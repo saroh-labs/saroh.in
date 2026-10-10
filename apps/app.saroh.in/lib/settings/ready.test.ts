@@ -202,9 +202,13 @@ describe("readyChecklist", () => {
             [
                 "address",
                 "Add your registered address",
-                "/settings/organization?section=address",
+                "/settings/organization?section=address&edit=address",
             ],
-            ["tax", "Add your GSTIN", "/settings/organization?section=tax"],
+            [
+                "tax",
+                "Add your GSTIN",
+                "/settings/organization?section=tax&edit=taxId",
+            ],
             ["catalogue", "Add your first product", "/commerce/products/new"],
             ["site", "Publish your site", "/sites"],
         ]);
@@ -783,7 +787,7 @@ describe("the real business type, for a business that said Registered (prelaunch
             done: false,
             label: "Choose your business type",
             cta: "Choose type",
-            href: "/settings/organization?section=identity#business-type",
+            href: "/settings/organization?section=identity&edit=type",
         });
         expect(step?.why).toMatch(/You said your business is registered/);
         expect(step?.why).toMatch(/private limited, LLP, partnership/);
@@ -980,7 +984,7 @@ describe("How to pay us as a step, per plan (UX-007)", () => {
         const step = r.left.find((i) => i.key === "howToPay");
         expect(step).toMatchObject({
             label: "Tell customers how to pay you",
-            href: "/settings/organization?section=pay",
+            href: "/settings/organization?section=pay&edit=pay",
         });
         expect(r.steps[0]?.key).toBe("howToPay");
     });

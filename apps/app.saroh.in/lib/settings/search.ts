@@ -3,6 +3,7 @@ import {
     SETTINGS_PAGES,
     settingsPagesFor,
 } from "@/components/shared/nav-items";
+import { BUSINESS_TAB_PARAM } from "@/lib/organizations/business-rows";
 import { BUSINESS_TYPE_OPTIONS } from "@/lib/organizations/business-types";
 import { KIND_CHOICES, kindWords } from "@/lib/organizations/kind";
 
@@ -37,7 +38,7 @@ export function settingsPageLabel(
 }
 
 /** The query a settings page reads its own tab from. */
-export const BUSINESS_TAB_PARAM = "section";
+export { BUSINESS_TAB_PARAM };
 export const TEAM_TAB_PARAM = "view";
 
 export interface SettingsEntry {

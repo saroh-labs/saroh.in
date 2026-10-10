@@ -1,398 +1,69 @@
 "use client";
 
-import { zodResolver } from "@hookform/resolvers/zod";
-import {
-    Form,
-    FormControl,
-    FormDescription,
-    FormField,
-    FormItem,
-    FormLabel,
-    FormMessage,
-} from "@saroh/ui/form";
-import { Input } from "@saroh/ui/input";
-import { cn } from "@saroh/ui/lib/utils";
-import { Switch } from "@saroh/ui/switch";
-import { showError, showInfo } from "@saroh/ui/toast";
-import Link from "next/link";
 import { useRouter } from "next/navigation";
-import type { ReactNode } from "react";
-import { useEffect, useRef, useState } from "react";
-import type { FieldErrors, Resolver } from "react-hook-form";
-import { useForm, useWatch } from "react-hook-form";
-import { z } from "zod";
+import { useState } from "react";
 
+import type { DetailTab } from "@/components/organizations/business-detail-rows";
+import {
+    BusinessDetailRows,
+    DETAIL_TABS,
+} from "@/components/organizations/business-detail-rows";
+import { BusinessFieldSheet } from "@/components/organizations/business-field-sheet";
+import { printOf, valuesOf } from "@/components/organizations/business-form";
 import {
     BusinessHoursSection,
+    hasHoursToEdit,
     HOURS_SECTION,
 } from "@/components/organizations/business-hours-section";
-import {
-    BusinessKindField,
-    KIND_ROW_LABEL,
-    kindChoiceLabel,
-} from "@/components/organizations/business-kind-field";
-import { BusinessLogoRow } from "@/components/organizations/business-logo-row";
+import { BusinessLogoSheet } from "@/components/organizations/business-logo-sheet";
 import { BusinessPrintPreview } from "@/components/organizations/business-print-preview";
-import type { BusinessRow } from "@/components/organizations/business-section";
-import { BusinessSection } from "@/components/organizations/business-section";
-import { GstinGuide } from "@/components/organizations/gstin-guide";
-import { InvoiceNumberFields } from "@/components/organizations/invoice-number-fields";
 import {
     PAY_SECTION,
     PayInstructionsSection,
 } from "@/components/organizations/pay-instructions-section";
-import {
-    fieldWidth,
-    RegisteredAddressFields,
-} from "@/components/organizations/registered-address-fields";
-import {
-    ADDRESS_API_KEY,
-    ADDRESS_KEYS,
-    registeredAddressShape,
-} from "@/components/organizations/registered-address-shape";
-import { TimeZoneSelect } from "@/components/organizations/time-zone-select";
-import {
-    LeaveDialog,
-    useLeaveGuard,
-} from "@/components/organizations/use-leave-guard";
+import { useBusinessSheets } from "@/components/organizations/use-business-sheets";
 import {
     cardUndo,
     logoCardUndo,
     useSettingsUndo,
 } from "@/components/organizations/use-settings-undo";
-import { countryName } from "@/components/shared/country-select";
-import { OptionSelect } from "@/components/shared/option-select";
 import { SettingsTabStrip } from "@/components/shared/settings-tab-strip";
 import { useTabParam } from "@/lib/hooks/use-tab-param";
+import type { BusinessTab } from "@/lib/organizations/business-rows";
 import {
-    GST_RATE_OPTIONS,
-    GST_STATES,
-    isHsnSac,
-    PREFIX_SHAPE,
-    rateOption,
-} from "@/lib/invoices/gst";
-import { GSTIN_EXAMPLE, gstinProblem } from "@/lib/invoices/gstin";
-import {
-    defaultNumberFormat,
-    formatFields,
-    formatOf,
-    nextInvoiceNumber,
-    numberFormatProblemOnSave,
-    prefixOf,
-    RESTART_LABEL,
-} from "@/lib/invoices/invoice-number";
-import {
-    PHONE_EXAMPLE,
-    phoneLabel,
-    phoneProblem,
-} from "@/lib/organizations/business-phone";
-import {
-    BUSINESS_TYPE_ANCHOR,
-    BUSINESS_TYPE_OPTIONS,
-    BUSINESS_TYPE_VALUES,
-    businessTypeLabel,
-    businessTypeOf,
-} from "@/lib/organizations/business-types";
-import {
-    kindOf,
-    kindWords,
-    ORGANIZATION_KINDS,
-} from "@/lib/organizations/kind";
-import {
-    addressProblems,
-    stateProblem,
-} from "@/lib/organizations/registered-address";
-import { saveOrganizationSettings } from "@/lib/organizations/settings-actions";
+    BUSINESS_TAB_PARAM,
+    BUSINESS_TABS,
+    businessSheetToOpen,
+} from "@/lib/organizations/business-rows";
+import { savedWords } from "@/lib/organizations/business-sheet-words";
 import type { OrganizationSettings } from "@/lib/organizations/settings-service";
-import { browserZone, zoneLabel } from "@/lib/organizations/time-zones";
-import { BUSINESS_TAB_PARAM } from "@/lib/settings/search";
 import type { StorefrontHoursRead } from "@/lib/stores/storefronts";
 
-/** Allow an empty string (field left blank / cleared) or a valid value. */
-const optionalText = (schema: z.ZodString) =>
-    z.union([z.literal(""), schema]).optional();
-
-const formSchema = z
-    .object({
-        name: z.string().trim().min(1, { message: "Name is required" }),
-        // What is being set up (DEC-070): words and defaults only.
-        kind: z.enum(ORGANIZATION_KINDS),
-        legalName: z.string().optional(),
-        type: z.enum(BUSINESS_TYPE_VALUES).optional(),
-        country: z.string().optional(),
-        taxId: z.string().optional(),
-        contactEmail: optionalText(z.string().email("Enter a valid email")),
-        website: optionalText(z.string().url("Enter a valid URL")),
-        // The public phone (DEC-053): E.164 once saved; the API judges it.
-        phone: z.string().superRefine((v, ctx) => {
-            const problem = phoneProblem(v);
-            if (problem) ctx.addIssue({ code: "custom", message: problem });
-        }),
-        // An IANA zone, or "" for none; the API checks it's a real one.
-        timezone: z.string(),
-        // GST (ADR-008). The API checks the GSTIN's state and check
-        // character; here only its shape.
-        gstRegistered: z.boolean(),
-        gstState: z.string(),
-        invoicePrefix: z
-            .string()
-            .trim()
-            .refine(
-                (v) => v === "" || PREFIX_SHAPE.test(v.toUpperCase()),
-                "One to three letters or digits, like RC.",
-            ),
-        deliveryRate: z.string(),
-        deliverySac: z
-            .string()
-            .trim()
-            .refine(
-                (v) => v === "" || isHsnSac(v),
-                "A SAC code is 4 to 8 digits.",
-            ),
-        // How invoice numbers are built (`invoice-number.ts`): the parts
-        // list as one value, "PREFIX,FY,!YEAR,!MONTH", and the rest.
-        numberParts: z.string(),
-        numberSeparator: z.string(),
-        numberDigits: z.string(),
-        numberRestart: z.string(),
-        // The registered address (CGST rule 46); its state is gstState.
-        ...registeredAddressShape,
-    })
-    .superRefine((v, ctx) => {
-        // Which part of the GSTIN is short or wrong, not just "15 characters".
-        const gstin = v.gstRegistered ? gstinProblem(v.taxId ?? "") : null;
-        if (gstin) {
-            ctx.addIssue({ code: "custom", path: ["taxId"], message: gstin });
-        }
-        for (const { path, message } of addressProblems(v)) {
-            ctx.addIssue({ code: "custom", path: [path], message });
-        }
-        // The number format's rules are not here: they apply only when the
-        // save changes it, the prefix or the registration, which the schema
-        // cannot see (`numberFormatProblemOnSave`, in the component).
-    });
-
-type FormValues = z.infer<typeof formSchema>;
-
-const PROFILE_KEYS = [
-    "legalName",
-    "type",
-    "country",
-    "taxId",
-    "contactEmail",
-    "website",
-    "timezone",
-    "phone",
-] as const;
-
-/** Where the API names a refused field, the form field it belongs on. */
-const FIELD_OF: Record<string, keyof FormValues> = {
-    taxId: "taxId",
-    gstState: "gstState",
-    invoicePrefix: "invoicePrefix",
-    deliveryRate: "deliveryRate",
-    deliverySac: "deliverySac",
-    invoiceNumberParts: "numberParts",
-    invoiceNumberRestart: "numberRestart",
-    invoiceNumberDigits: "numberDigits",
-    addressLine1: "addressLine1",
-    addressLine2: "addressLine2",
-    city: "city",
-    postalCode: "postalCode",
-    name: "name",
-    kind: "kind",
-    timezone: "timezone",
-    phone: "phone",
-};
-
-/** Delivery always carries a rate: no "Not set" row. */
-const DELIVERY_RATES = GST_RATE_OPTIONS.filter((o) => o.value !== "");
-
-/** The format a business numbers by: its own, else its standing's default. */
-function numberFormatOf(settings: OrganizationSettings) {
-    const saved = settings.tax?.invoiceNumber;
-    return saved
-        ? {
-              parts: saved.parts,
-              separator: saved.separator,
-              digits: saved.digits,
-              restart: saved.restart,
-          }
-        : defaultNumberFormat(settings.tax?.registered ?? false);
-}
-
-function valuesOf(settings: OrganizationSettings): FormValues {
-    return {
-        name: settings.name,
-        kind: kindOf(settings.kind),
-        legalName: settings.profile?.legalName ?? "",
-        type: businessTypeOf(settings.profile?.type),
-        country: settings.profile?.country ?? "",
-        taxId: settings.profile?.taxId ?? "",
-        contactEmail: settings.profile?.contactEmail ?? "",
-        website: settings.profile?.website ?? "",
-        phone: phoneLabel(settings.profile?.phone),
-        timezone: settings.profile?.timezone ?? "",
-        gstRegistered: settings.tax?.registered ?? false,
-        gstState: settings.tax?.state ?? "",
-        invoicePrefix: settings.tax?.invoicePrefix ?? "",
-        deliveryRate: settings.tax?.deliveryRate ?? "18",
-        deliverySac: settings.tax?.deliverySac ?? "",
-        ...formatFields(numberFormatOf(settings)),
-        addressLine1: settings.registeredAddress?.line1 ?? "",
-        addressLine2: settings.registeredAddress?.line2 ?? "",
-        city: settings.registeredAddress?.city ?? "",
-        postalCode: settings.registeredAddress?.postalCode ?? "",
-    };
-}
-
-/**
- * The four cards this form saves ("Saroh Settings" design), in the order a
- * customer's invoice reads: who the business is, how to reach it, how it is
- * taxed and numbered, where it is registered. Hours sit between the last
- * two as a tab, but save to the storefronts (`business-hours-section.tsx`).
- */
-const SECTIONS = {
-    identity: {
-        title: "Identity",
-        lead: "How the business is named and registered",
-        fields: ["kind", "name", "legalName", "type", "timezone"],
-    },
-    contact: {
-        title: "Contact",
-        lead: "How customers reach you",
-        fields: ["contactEmail", "phone", "website"],
-    },
-    tax: {
-        title: "Tax and invoices",
-        lead: "What every invoice carries",
-        fields: [
-            "gstRegistered",
-            "taxId",
-            "invoicePrefix",
-            "numberParts",
-            "numberSeparator",
-            "numberDigits",
-            "numberRestart",
-            "deliveryRate",
-            "deliverySac",
-        ],
-    },
-    address: {
-        title: "Registered address",
-        lead: "Printed under your legal name",
-        fields: [
-            "addressLine1",
-            "addressLine2",
-            "city",
-            "postalCode",
-            "gstState",
-            "country",
-        ],
-    },
-} as const satisfies Record<
-    string,
-    { title: string; lead: string; fields: readonly (keyof FormValues)[] }
->;
-type SectionKey = keyof typeof SECTIONS;
-const SECTION_KEYS = Object.keys(SECTIONS) as SectionKey[];
-
-/**
- * The tabs, in the design's order; How to pay us (R32) follows what every
- * invoice carries. Hours and How to pay us keep their own forms.
- */
-type OwnFormKey = "hours" | "pay";
-type TabKey = SectionKey | OwnFormKey;
-const TAB_KEYS: TabKey[] = [
-    "identity",
-    "contact",
-    "tax",
-    "pay",
-    "hours",
-    "address",
-];
-const OWN_FORM: Record<OwnFormKey, { title: string; panel: string }> = {
+/** Hours and How to pay us keep their own panels, rows and sheets. */
+type OwnPanelKey = "hours" | "pay";
+const OWN_PANEL: Record<OwnPanelKey, { title: string; panel: string }> = {
     hours: { title: HOURS_SECTION.title, panel: "business-hours-panel" },
     pay: { title: PAY_SECTION.title, panel: "business-pay-panel" },
 };
-const isOwnForm = (key: TabKey | null): key is OwnFormKey =>
-    key === "hours" || key === "pay";
-const titleOf = (key: TabKey) =>
-    isOwnForm(key) ? OWN_FORM[key].title : SECTIONS[key].title;
-
-const sectionOf = (field: string): SectionKey =>
-    SECTION_KEYS.find((key) =>
-        (SECTIONS[key].fields as readonly string[]).includes(field),
-    ) ?? "identity";
+const isDetailTab = (key: BusinessTab): key is DetailTab =>
+    key !== "hours" && key !== "pay";
+const titleOf = (key: BusinessTab) =>
+    isDetailTab(key) ? DETAIL_TABS[key].title : OWN_PANEL[key].title;
 
 /**
- * India's financial year, which invoices are numbered by (`numbering.ts`).
- * GST law fixes it at April to March for every business, so it is said
- * here rather than offered.
- */
-const FINANCIAL_YEAR_ROW: BusinessRow = {
-    label: "Financial year",
-    value: "April – March",
-    tag: "Set by GST law",
-};
-
-const NUMBER_FIELDS = [
-    "numberParts",
-    "numberSeparator",
-    "numberDigits",
-    "numberRestart",
-] as const;
-
-const stateName = (code: string) =>
-    GST_STATES.find((s) => s.value === code)?.label ?? "";
-
-/**
- * The state a GST invoice names: the GSTIN's (the API takes no other for a
- * registered business), else the one stored.
- */
-function gstStateOf(v: Pick<FormValues, "gstState" | "taxId">): {
-    name: string;
-    fromGstin: boolean;
-} {
-    const fromId = stateName((v.taxId ?? "").trim().slice(0, 2).toUpperCase());
-    if (fromId) return { name: fromId, fromGstin: true };
-    return { name: stateName(v.gstState), fromGstin: false };
-}
-
-/** A business's state as printed: none for an address outside India. */
-function indianState(v: Pick<FormValues, "gstState" | "country">): string {
-    return ["", "IN"].includes(v.country ?? "") ? stateName(v.gstState) : "";
-}
-
-function addressText(v: FormValues): string {
-    // As the API prints it: no first line, no address.
-    if (!v.addressLine1.trim()) return "";
-    return [
-        v.addressLine1,
-        v.addressLine2,
-        [v.city, v.postalCode].filter((x) => x.trim()).join(" "),
-        v.gstRegistered ? gstStateOf(v).name : indianState(v),
-    ]
-        .map((x) => x.trim())
-        .filter((x) => x !== "")
-        .join("\n");
-}
-
-/**
- * Workspace → Business, as the "Saroh Settings" design draws it: four tabs,
- * each one card that reads first and is edited on its own, beside a preview
+ * Workspace → Business, read first (owner, 10 Oct): six tabs, in the order
+ * a customer's invoice reads (who the business is, how to reach it, how it
+ * is taxed and numbered, how to pay it, when it is open, where it is
+ * registered), each a card of rows saying what is saved, beside a preview
  * of how an invoice prints.
  *
- * One section is edited at a time: Edit opens its fields, Save sends only
- * what changed in it, Cancel puts it back. Starting another section with an
- * edit unsaved is refused and the open one brought forward — nothing is lost
- * by a stray click. A rule that spans two sections (a GST-registered business
- * needs a registered address) is said in words when the field it names is
- * not on screen.
- *
- * Type and country are pickers, not text: the API accepts only the six
- * business types (`business-types.ts`) and a two-letter country code. Empty strings are SENT rather
- * than dropped: a cleared field means "remove this value".
+ * Nothing is edited on the page. A row's Edit opens that row's side sheet
+ * with one Save (`business-field-sheet.tsx`, and the logo's, the hours' and
+ * How to pay us's own); Cancel, Escape and a press outside drop the draft,
+ * so there is no unsaved edit for the page to guard on the way out. A save
+ * offers Undo (F12), and the rows and the preview read what it answered at
+ * once. A link elsewhere opens a sheet with `?edit=` on its tab
+ * (`lib/organizations/business-rows.ts`).
  */
 export function OrganizationSettingsForm({
     settings: initial,
@@ -403,910 +74,146 @@ export function OrganizationSettingsForm({
 }: {
     settings: OrganizationSettings;
     canEdit: boolean;
-    /** The storefronts' opening hours, for the Hours tab. */
+    /** The locations' opening hours, for the Hours tab. */
     hours: StorefrontHoursRead;
-    /** May change the storefronts, which is where hours are kept. */
+    /** May change the locations, which is where hours are kept. */
     canEditHours: boolean;
     /**
      * The web address card (DEC-069, L4), drawn under Identity. It saves on
-     * its own, so it sits beside this form's `<form>`, never inside it.
+     * its own, in its own dialog.
      */
     webAddress?: React.ReactNode;
 }) {
     const router = useRouter();
-    // What the API last said, so the cards read the saved values at once
-    // rather than waiting for the page to be fetched again.
+    // What the API last said, so the rows read a save at once rather than
+    // waiting for the page to be fetched again.
     const [settings, setSettings] = useState(initial);
-    const savedZone = settings.profile?.timezone ?? "";
-    // Said Registered at setup and no type chosen since: the take-money
-    // checklist holds going live on it, so the field says why.
-    const typeAsked =
-        settings.profile?.registered === true &&
-        businessTypeOf(settings.profile.type) === "";
     // In the address, so Search settings can open the tab a setting is on.
-    const [tab, setTab] = useTabParam(BUSINESS_TAB_PARAM, TAB_KEYS, "identity");
-    const [editing, setEditing] = useState<TabKey | null>(null);
-    // The Hours card keeps its own form; whether it has changes, from it.
-    const [hoursDirty, setHoursDirty] = useState(false);
-    // How to pay us (R32) keeps its own form too.
-    const [payDirty, setPayDirty] = useState(false);
-    // An Indian address isn't whole without its state (UX-018): asked only
-    // while the address card is being edited, so a saved address without
-    // one never holds up another card's save. In the resolver, so the form's
-    // own checks keep it (a manual error would be cleared by the next one).
-    const editingRef = useRef(editing);
-    useEffect(() => {
-        editingRef.current = editing;
-    }, [editing]);
-    const resolver: Resolver<FormValues> = async (values, context, options) => {
-        const result = await zodResolver(formSchema)(values, context, options);
-        const noState =
-            editingRef.current === "address" ? stateProblem(values) : null;
-        if (!noState) return result;
-        return {
-            values: {},
-            errors: {
-                ...result.errors,
-                gstState: { type: "custom", message: noState },
-            },
-        };
-    };
-    const form = useForm<FormValues>({
-        resolver,
-        defaultValues: valuesOf(initial),
-        mode: "onChange",
-    });
-    const { isSubmitting, dirtyFields, isDirty, errors } = form.formState;
-    // The form holds the saved values while nothing is being edited, so the
-    // preview reads it either way.
-    const v = useWatch({ control: form.control }) as FormValues;
-    const registered = v.gstRegistered;
-    // The form re-checks only the field that changed, and a rule that spans
-    // fields (a GSTIN or address a registration needs) can leave a refusal
-    // standing, and Save off, after everything is filled in. While any
-    // refusal shows, each change (and its first showing) re-checks the lot.
-    const showing = Object.keys(errors).length > 0;
-    const watched = JSON.stringify(v);
-    useEffect(() => {
-        if (showing) void form.trigger();
-        // eslint-disable-next-line react-hooks/exhaustive-deps -- re-run per change of the values (or a refusal appearing), not per render
-    }, [watched, showing]);
-    // Whether the open card has changes, whichever form holds it.
-    const editDirty =
-        editing === "hours"
-            ? hoursDirty
-            : editing === "pay"
-              ? payDirty
-              : isDirty;
-    // An open edit with changes holds the way off this page.
-    const { leaveTo, stay } = useLeaveGuard(editing !== null && editDirty);
+    const [tab, setTab] = useTabParam(
+        BUSINESS_TAB_PARAM,
+        BUSINESS_TABS,
+        "identity",
+    );
     // Undo on a save (F12); what it saved back shows at once.
     const undo = useSettingsUndo();
     const applySaved = (next: OrganizationSettings) => {
         setSettings(next);
-        form.reset(valuesOf(next));
+        // The header switcher renders the name: refresh so a rename shows.
         router.refresh();
     };
-    // The number-format rules span four fields (and the prefix and GST
-    // switch), but the form re-checks only the field that changed, so the
-    // rule is worked out here from what is on screen: a part ticked in shows
-    // the 16-character problem and turns Save off at once. Only once the
-    // format, prefix or registration is changed, as the API re-checks it: a
-    // format saved under older rules does not hold up a GSTIN save (DEC-028).
-    const numberProblem =
-        editing === "tax" ? numberFormatProblemOnSave(v, dirtyFields) : null;
-    // Turning GST on needs a registered address, which lives on another
-    // tab. When the saved one is short, its fields join the Tax card, so
-    // one Save covers both rather than neither card being able to.
-    const addressInTax =
-        editing === "tax" &&
-        v.gstRegistered &&
-        addressProblems({ ...valuesOf(settings), gstRegistered: true }).length >
-            0;
-    /** Whether a field is on the card being edited. */
-    const onCard = (field: string) =>
-        sectionOf(field) === editing ||
-        (addressInTax && (ADDRESS_KEYS as readonly string[]).includes(field));
-
-    const startEditing = (key: TabKey) => {
-        if (editing && editing !== key && editDirty) {
-            showInfo(`Finish or cancel your edit in ${titleOf(editing)} first`);
-            setTab(editing);
-            return;
-        }
-        // A new edit closes the last save's Undo, which would reset it.
-        undo.settle();
-        form.reset(valuesOf(settings));
-        // No zone saved: the browser's is offered, as a change to save.
-        const fromBrowser = key === "identity" && !savedZone && browserZone();
-        if (fromBrowser) {
-            form.setValue("timezone", fromBrowser, { shouldDirty: true });
-        }
-        setEditing(key);
-        setTab(key);
-    };
-    const cancel = () => {
-        form.reset(valuesOf(settings));
-        setEditing(null);
-    };
-
-    /** A refusal on a field of another section is said, since it is hidden. */
-    function onInvalid(problems: FieldErrors<FormValues>) {
-        const first = Object.entries(problems).find(
-            ([field]) => !onCard(field),
-        );
-        if (first) {
-            showError(
-                `${SECTIONS[sectionOf(first[0])].title}: ${first[1].message ?? "needs attention"}`,
-            );
-        }
-    }
-
-    async function onSubmit(values: FormValues) {
-        // Hours save through their own card's form.
-        if (!editing || isOwnForm(editing)) return;
-        // The number format's rules, said on its field before the API would.
-        const numberRefusal = numberFormatProblemOnSave(values, dirtyFields);
-        if (numberRefusal) {
-            form.setError(numberRefusal.field, {
-                message: numberRefusal.message,
-            });
-            return;
-        }
-        const profile = Object.fromEntries(
-            PROFILE_KEYS.filter((key) => dirtyFields[key]).map((key) => [
-                key,
-                values[key]?.trim() ?? "",
-            ]),
-        );
-        const tax = {
-            ...(dirtyFields.gstRegistered
-                ? { registered: values.gstRegistered }
-                : {}),
-            ...(dirtyFields.gstState ? { state: values.gstState } : {}),
-            ...(dirtyFields.invoicePrefix
-                ? { invoicePrefix: values.invoicePrefix.trim().toUpperCase() }
-                : {}),
-            ...(dirtyFields.deliveryRate
-                ? { deliveryRate: values.deliveryRate }
-                : {}),
-            ...(dirtyFields.deliverySac
-                ? { deliverySac: values.deliverySac.trim() }
-                : {}),
-            // The format goes whole, and only when it was touched: one never
-            // chosen keeps following the registration (the API's default).
-            ...(NUMBER_FIELDS.some((key) => dirtyFields[key])
-                ? { invoiceNumber: formatOf(values) }
-                : {}),
-        };
-        const registeredAddress = Object.fromEntries(
-            ADDRESS_KEYS.filter((key) => dirtyFields[key]).map((key) => [
-                ADDRESS_API_KEY[key],
-                values[key].trim(),
-            ]),
-        );
-        // Turning registration on checks the GSTIN, so send it with it.
-        if (values.gstRegistered && dirtyFields.gstRegistered) {
-            profile.taxId = values.taxId?.trim().toUpperCase() ?? "";
-        }
-        // A registered business's state and country are its GSTIN's; a
-        // state picked before is replaced, so the API doesn't refuse the pair.
-        if (
-            values.gstRegistered &&
-            (dirtyFields.gstRegistered || dirtyFields.taxId)
-        ) {
-            tax.state = (values.taxId ?? "").trim().slice(0, 2).toUpperCase();
-            if (values.country !== "IN") profile.country = "IN";
-        }
-        // Another country's address has no Indian state.
-        if (dirtyFields.country && !["", "IN"].includes(values.country ?? "")) {
-            tax.state = "";
-        }
-
-        const sent = {
-            ...(dirtyFields.name ? { name: values.name.trim() } : {}),
-            ...(dirtyFields.kind ? { kind: values.kind } : {}),
-            ...(Object.keys(profile).length > 0 ? { profile } : {}),
-            ...(Object.keys(tax).length > 0 ? { tax } : {}),
-            ...(Object.keys(registeredAddress).length > 0
-                ? { registeredAddress }
-                : {}),
-        };
-        const result = await saveOrganizationSettings(sent);
-
-        if (!result.ok) {
-            const field = result.field ? FIELD_OF[result.field] : undefined;
-            if (field && onCard(field)) {
-                form.setError(field, { message: result.error });
-            } else showError(result.error);
-            return;
-        }
-
-        const title = SECTIONS[editing].title;
-        // What is being set up prints on nothing: only its words change.
-        const printed = Object.keys(sent).some((key) => key !== "kind");
-        undo.offer(
-            editing === "contact" || !printed
-                ? `${title} saved`
-                : `${title} saved — invoices from now on use it`,
-            cardUndo(settings, result.data, sent, applySaved),
-        );
-        setSettings(result.data);
-        form.reset(valuesOf(result.data));
-        setEditing(null);
-        // The header switcher renders the name — refresh so a rename shows.
-        router.refresh();
-    }
-
     const saved = valuesOf(settings);
-    const tradingSince = settings.tradingSince
-        ? new Date(settings.tradingSince).getUTCFullYear().toString()
-        : "";
-    // The next invoice's number in a set of values: the count carries on
-    // from where the saved prefix's series stand.
-    const number = (x: FormValues) =>
-        nextInvoiceNumber(formatOf(x), {
-            prefix: prefixOf(x.invoicePrefix),
-            last: settings.tax?.invoiceNumber?.counters,
-            samePrefix:
-                prefixOf(x.invoicePrefix) === prefixOf(saved.invoicePrefix),
-            // Dated in the zone on screen, so a zone being tried shows.
-            timezone: x.timezone || null,
-        });
-    const savedState = gstStateOf(saved);
-    const restartsRow: BusinessRow = {
-        label: "Restarts",
-        value: RESTART_LABEL[formatOf(saved).restart],
-    };
-
-    /**
-     * A business that never chose a format numbers by its standing's
-     * default, so turning registration on or off in the form moves the
-     * untouched format with it — as the API will.
-     */
-    const followRegistration = (on: boolean) => {
-        if (settings.tax?.invoiceNumber?.custom) return;
-        if (NUMBER_FIELDS.some((key) => dirtyFields[key])) return;
-        const fields = formatFields(defaultNumberFormat(on));
-        for (const key of NUMBER_FIELDS) {
-            form.setValue(key, fields[key], { shouldDirty: false });
-        }
-        // Checked together once all four are in: one at a time, the first
-        // would be judged against the other three's old values.
-        void form.trigger(NUMBER_FIELDS);
-    };
-
-    // The words of what is saved (DEC-070): an Undo puts them back too.
-    const words = kindWords(saved.kind);
-    const nameLabel =
-        saved.kind === "BUSINESS" ? "Business name" : words.nameLabel;
-    const leadOf = (key: SectionKey) =>
-        key === "identity" && saved.kind !== "BUSINESS"
-            ? "How you're named and registered"
-            : key === "contact"
-              ? `How ${words.people} reach you`
-              : SECTIONS[key].lead;
-
-    const rows: Record<SectionKey, BusinessRow[]> = {
-        identity: [
-            { label: KIND_ROW_LABEL, value: kindChoiceLabel(saved.kind) },
-            { label: nameLabel, value: saved.name },
-            {
-                label: "Legal name",
-                value: saved.legalName ?? "",
-                empty: "Same as the business name",
-            },
-            {
-                label: "Type",
-                value: businessTypeLabel(saved.type) ?? "",
-                ...(typeAsked
-                    ? { empty: "Not chosen yet — you said it's registered" }
-                    : {}),
-            },
-            {
-                label: "Time zone",
-                value: saved.timezone ? zoneLabel(saved.timezone) : "",
-                empty: "Not set — invoice numbers use India time",
-            },
-            {
-                label: "Trading since",
-                value: tradingSince,
-                empty: "No orders yet",
-                mono: true,
-                tag: "From your first order",
-            },
-            // No address row: the Web address card under this one shows it
-            // whole and changes it (DEC-069, L4), so a second "can't be
-            // changed" line would contradict it.
-        ],
-        contact: [
-            { label: "Contact email", value: saved.contactEmail ?? "" },
-            {
-                label: "Phone on your website",
-                value: saved.phone,
-                empty: "None — your website shows no Call button",
-                mono: true,
-            },
-            {
-                label: "Website",
-                value: saved.website ?? "",
-                empty: "None outside Saroh",
-            },
-        ],
-        tax: saved.gstRegistered
-            ? [
-                  { label: "GST", value: "Registered" },
-                  { label: "GSTIN", value: saved.taxId ?? "", mono: true },
-                  {
-                      label: "State",
-                      value: savedState.name
-                          ? `${savedState.name}${savedState.fromGstin ? " · from the GSTIN" : ""}`
-                          : "",
-                  },
-                  FINANCIAL_YEAR_ROW,
-                  {
-                      label: "Invoice numbers",
-                      value: number(saved),
-                      mono: true,
-                  },
-                  restartsRow,
-                  {
-                      label: "GST on delivery",
-                      value: `${rateOption(saved.deliveryRate) || "18"}%`,
-                  },
-                  {
-                      label: "Delivery SAC",
-                      value: saved.deliverySac,
-                      mono: true,
-                  },
-              ]
-            : [
-                  { label: "GST", value: "Not registered" },
-                  {
-                      label: "Tax ID",
-                      value: saved.taxId ?? "",
-                      empty: "None",
-                      mono: true,
-                  },
-                  FINANCIAL_YEAR_ROW,
-                  {
-                      label: "Invoice numbers",
-                      value: number(saved),
-                      mono: true,
-                  },
-                  restartsRow,
-              ],
-        address: [
-            {
-                label: "Registered address",
-                value: addressText(saved),
-                empty: "No registered address yet",
-            },
-            {
-                label: "Country",
-                value: saved.country ? countryName(saved.country) : "",
-            },
-        ],
-    };
-    const notes: Partial<Record<SectionKey, ReactNode>> = {
-        // The invoices themselves, from here too: a site for my work has
-        // no Invoices row in the rail until Payments is on (UX-074).
-        tax: (
-            <>
-                The invoices you send, and their numbers, are in{" "}
-                <Link
-                    href="/billing/invoices"
-                    className="font-medium text-foreground underline underline-offset-4 hover:decoration-2"
-                >
-                    Invoices
-                </Link>
-                .
-            </>
-        ),
-        identity:
-            "Invoices are issued in the legal name, if you've set one. Your links keep working if you rename the business.",
-        address:
-            "Printed under your legal name on every invoice and receipt. Invoices already issued keep the address they went out with.",
-    };
-
-    // Why Save is off, in the footer's words.
-    const sectionErrors =
-        (editing ? Object.keys(errors).filter(onCard).length : 0) +
-        // The live number-format problem, until Save puts it on a field.
-        (numberProblem && !NUMBER_FIELDS.some((key) => errors[key]) ? 1 : 0);
-    const saveWhy = !isDirty
-        ? "No changes yet"
-        : sectionErrors === 1
-          ? "1 thing to fix"
-          : sectionErrors > 1
-            ? `${sectionErrors} things to fix`
-            : "";
-
-    const liveState = registered
-        ? gstStateOf(v)
-        : { name: indianState(v), fromGstin: false };
-    /** One field's wrapper, at the width the design gives it. */
-    const at = fieldWidth;
-
-    // States are India's (GST's list); another country's address has none.
-    const inIndia = registered || ["", "IN"].includes(v.country ?? "");
-    const addressFields = (
-        <RegisteredAddressFields
-            control={form.control}
-            registered={registered}
-            gstinState={(v.taxId ?? "").trim().slice(0, 2).toUpperCase()}
-            inIndia={inIndia}
-            withCountry
-            at={at}
-        />
+    const mayEditHours = canEdit && canEditHours && hasHoursToEdit(hours);
+    // A new edit closes the last save's Undo, which would write under it.
+    const sheets = useBusinessSheets(
+        (which) =>
+            businessSheetToOpen(which, {
+                canEdit,
+                canEditHours: mayEditHours,
+                registered: saved.gstRegistered,
+            }),
+        undo.settle,
     );
-
-    const fieldsOf: Record<SectionKey, React.ReactNode> = {
-        identity: (
-            <>
-                <BusinessKindField control={form.control} name="kind" at={at} />
-                <FormField
-                    control={form.control}
-                    name="name"
-                    render={({ field }) => (
-                        <FormItem {...at("100%")}>
-                            <FormLabel>{nameLabel}</FormLabel>
-                            <FormControl>
-                                <Input {...field} maxLength={120} />
-                            </FormControl>
-                            <FormDescription>
-                                Shown to {words.people} on receipts and in the
-                                switcher above.
-                            </FormDescription>
-                            <FormMessage />
-                        </FormItem>
-                    )}
-                />
-                <FormField
-                    control={form.control}
-                    name="legalName"
-                    render={({ field }) => (
-                        <FormItem {...at("100%")}>
-                            <FormLabel>Legal name</FormLabel>
-                            <FormControl>
-                                <Input
-                                    {...field}
-                                    placeholder="Same as the business name"
-                                />
-                            </FormControl>
-                            <FormDescription>
-                                The registered name, if it differs from the one
-                                above.
-                            </FormDescription>
-                            <FormMessage />
-                        </FormItem>
-                    )}
-                />
-                <FormField
-                    control={form.control}
-                    name="type"
-                    render={({ field }) => (
-                        // The go-live checklist's "Choose your business
-                        // type" lands here (`#business-type`).
-                        // Half the card, as the design draws it: the time
-                        // zone below takes its own row, so a growing Type
-                        // would stretch a seven-word choice across it.
-                        <FormItem
-                            {...at("220px", false)}
-                            id={BUSINESS_TYPE_ANCHOR}
-                            className={cn(
-                                at("220px", false).className,
-                                "scroll-mt-24",
-                            )}
-                        >
-                            <FormLabel>Type</FormLabel>
-                            <FormControl>
-                                <OptionSelect
-                                    value={field.value ?? ""}
-                                    onValueChange={field.onChange}
-                                    options={BUSINESS_TYPE_OPTIONS}
-                                    className="w-full"
-                                />
-                            </FormControl>
-                            <FormDescription>
-                                {typeAsked
-                                    ? "You said at setup that the business is registered. Choose which kind before you take money."
-                                    : "An individual trades in their own name; a company is registered as one."}
-                            </FormDescription>
-                            <FormMessage />
-                        </FormItem>
-                    )}
-                />
-                <FormField
-                    control={form.control}
-                    name="timezone"
-                    render={({ field }) => (
-                        <FormItem {...at("100%")}>
-                            <FormLabel>Time zone</FormLabel>
-                            <FormControl>
-                                <TimeZoneSelect
-                                    value={field.value}
-                                    onValueChange={field.onChange}
-                                />
-                            </FormControl>
-                            <FormDescription>
-                                Invoice numbers, bookings and the calendar use
-                                this time.
-                                {!savedZone &&
-                                field.value &&
-                                field.value === browserZone()
-                                    ? " From your browser — change it if the business runs elsewhere."
-                                    : ""}
-                            </FormDescription>
-                            <FormMessage />
-                        </FormItem>
-                    )}
-                />
-            </>
-        ),
-        contact: (
-            <>
-                <FormField
-                    control={form.control}
-                    name="contactEmail"
-                    render={({ field }) => (
-                        <FormItem {...at("100%")}>
-                            <FormLabel>Contact email</FormLabel>
-                            <FormControl>
-                                <Input {...field} type="email" />
-                            </FormControl>
-                            <FormDescription>
-                                Where customers can reach the business. Your
-                                website shows it at the foot of every page.
-                            </FormDescription>
-                            <FormMessage />
-                        </FormItem>
-                    )}
-                />
-                <FormField
-                    control={form.control}
-                    name="phone"
-                    render={({ field }) => (
-                        <FormItem {...at("100%")}>
-                            <FormLabel>Phone on your website</FormLabel>
-                            <FormControl>
-                                <Input
-                                    {...field}
-                                    type="tel"
-                                    inputMode="tel"
-                                    autoComplete="tel"
-                                    placeholder={PHONE_EXAMPLE}
-                                />
-                            </FormControl>
-                            <FormDescription>
-                                Your site shows it with a Call button, and
-                                offers it when a sign-in code can&apos;t be
-                                sent. Start with + and the country code. Leave
-                                it empty to show none.
-                            </FormDescription>
-                            <FormMessage />
-                        </FormItem>
-                    )}
-                />
-                <FormField
-                    control={form.control}
-                    name="website"
-                    render={({ field }) => (
-                        <FormItem {...at("100%")}>
-                            <FormLabel>Website</FormLabel>
-                            <FormControl>
-                                <Input
-                                    {...field}
-                                    type="url"
-                                    placeholder="https://example.in"
-                                />
-                            </FormControl>
-                            <FormDescription>
-                                A site the business has outside Saroh, if any.
-                            </FormDescription>
-                            <FormMessage />
-                        </FormItem>
-                    )}
-                />
-            </>
-        ),
-        tax: (
-            <>
-                <FormField
-                    control={form.control}
-                    name="gstRegistered"
-                    render={({ field }) => (
-                        <FormItem {...at("100%")}>
-                            <div className="flex items-center gap-3">
-                                <FormControl>
-                                    <Switch
-                                        checked={field.value}
-                                        onCheckedChange={(on) => {
-                                            field.onChange(on);
-                                            followRegistration(on);
-                                        }}
-                                        aria-label="GST-registered"
-                                    />
-                                </FormControl>
-                                <FormLabel className="!mt-0">
-                                    GST-registered
-                                </FormLabel>
-                            </div>
-                            <FormDescription>
-                                {field.value
-                                    ? "Orders and invoices become tax invoices with your GSTIN, split into CGST + SGST or IGST. Prices include GST."
-                                    : "Orders and invoices are receipts, with no GST on them."}
-                            </FormDescription>
-                            <FormMessage />
-                        </FormItem>
-                    )}
-                />
-                <FormField
-                    control={form.control}
-                    name="taxId"
-                    render={({ field }) => (
-                        <FormItem {...at("100%")}>
-                            <FormLabel>
-                                {registered ? "GSTIN" : "Tax ID (optional)"}
-                            </FormLabel>
-                            <FormControl>
-                                <Input
-                                    {...field}
-                                    onChange={(e) =>
-                                        field.onChange(
-                                            e.target.value.toUpperCase(),
-                                        )
-                                    }
-                                    placeholder={
-                                        registered ? GSTIN_EXAMPLE : undefined
-                                    }
-                                    maxLength={registered ? 20 : undefined}
-                                    autoComplete="off"
-                                    spellCheck={false}
-                                    className="font-mono tracking-[0.04em]"
-                                />
-                            </FormControl>
-                            {registered ? (
-                                <GstinGuide value={field.value ?? ""} />
-                            ) : null}
-                            <FormDescription>
-                                {registered
-                                    ? "15 characters: your state's code, your PAN, the entity number, Z, and a check character. The state code sets your state."
-                                    : "Any VAT or tax registration number."}
-                            </FormDescription>
-                            <FormMessage />
-                        </FormItem>
-                    )}
-                />
-                <FormField
-                    control={form.control}
-                    name="invoicePrefix"
-                    render={({ field }) => (
-                        <FormItem {...at("140px", false)}>
-                            <FormLabel>Invoice prefix</FormLabel>
-                            <FormControl>
-                                <Input
-                                    {...field}
-                                    maxLength={3}
-                                    placeholder="RC"
-                                    className="font-mono uppercase"
-                                />
-                            </FormControl>
-                            <FormMessage />
-                        </FormItem>
-                    )}
-                />
-                <InvoiceNumberFields
-                    format={formatOf(v)}
-                    prefix={prefixOf(v.invoicePrefix)}
-                    registered={registered}
-                    next={number(v)}
-                    problem={numberProblem?.message ?? null}
-                    timezone={v.timezone || null}
-                    at={at}
-                />
-                {registered ? (
-                    <>
-                        <FormField
-                            control={form.control}
-                            name="deliveryRate"
-                            render={({ field }) => (
-                                <FormItem {...at("160px", false)}>
-                                    <FormLabel>GST on delivery</FormLabel>
-                                    <FormControl>
-                                        <OptionSelect
-                                            value={
-                                                rateOption(field.value) || "18"
-                                            }
-                                            onValueChange={field.onChange}
-                                            options={DELIVERY_RATES}
-                                            className="w-full"
-                                        />
-                                    </FormControl>
-                                    <FormMessage />
-                                </FormItem>
-                            )}
-                        />
-                        <FormField
-                            control={form.control}
-                            name="deliverySac"
-                            render={({ field }) => (
-                                <FormItem {...at("160px", false)}>
-                                    <FormLabel>Delivery SAC</FormLabel>
-                                    <FormControl>
-                                        <Input
-                                            {...field}
-                                            inputMode="numeric"
-                                            maxLength={8}
-                                            placeholder="996813"
-                                            className="font-mono"
-                                        />
-                                    </FormControl>
-                                    <FormMessage />
-                                </FormItem>
-                            )}
-                        />
-                    </>
-                ) : null}
-                {addressInTax ? (
-                    <>
-                        <p className="mt-2 basis-full border-t border-border pt-3 text-[13px] font-medium">
-                            Registered address
-                            <span className="ml-2 font-normal text-muted-foreground">
-                                A tax invoice prints it
-                            </span>
-                        </p>
-                        {addressFields}
-                    </>
-                ) : null}
-                <p className="basis-full text-[11.5px] leading-normal text-muted-foreground">
-                    {registered
-                        ? "Delivery is its own line on an invoice, printed with its SAC. "
-                        : ""}
-                    Invoices already numbered keep their numbers; a new format
-                    starts with the next one, and the count carries on. The
-                    financial year runs April – March, as GST law sets it.
-                </p>
-            </>
-        ),
-        address: addressFields,
-    };
+    const editing = canEdit ? sheets.editing : null;
+    const words = { kind: settings.kind, registered: saved.gstRegistered };
 
     return (
-        <Form {...form}>
+        <>
             <SettingsTabStrip
                 label="Business details"
                 idPrefix="business-tab"
                 current={tab}
                 onChange={setTab}
                 className="-mt-1.5 mb-[18px]"
-                tabs={TAB_KEYS.map((key) => ({
+                tabs={BUSINESS_TABS.map((key) => ({
                     key,
                     label: titleOf(key),
-                    controls: isOwnForm(key)
-                        ? OWN_FORM[key].panel
-                        : "business-panel",
-                    extra:
-                        editing === key && key !== tab ? (
-                            <span
-                                aria-label="Editing"
-                                className="size-1.5 rounded-full bg-highlight"
-                            />
-                        ) : null,
+                    controls: isDetailTab(key)
+                        ? "business-panel"
+                        : OWN_PANEL[key].panel,
                 }))}
             />
 
             <div className="flex flex-wrap items-start gap-5">
-                {isOwnForm(tab) ? null : (
-                    <div className="grid min-w-0 flex-[1_1_460px] gap-4">
-                        <form
-                            id="business-panel"
-                            role="tabpanel"
-                            aria-labelledby={`business-tab-${tab}`}
-                            onSubmit={form.handleSubmit(onSubmit, onInvalid)}
-                            className="grid min-w-0 gap-4"
-                        >
-                            <BusinessSection
-                                title={SECTIONS[tab].title}
-                                lead={leadOf(tab)}
-                                rows={rows[tab]}
-                                note={notes[tab]}
-                                editing={editing === tab}
-                                canEdit={canEdit}
-                                onEdit={() => startEditing(tab)}
-                                onCancel={cancel}
-                                saveOff={!isDirty || sectionErrors > 0}
-                                saving={isSubmitting}
-                                saveWhy={saveWhy}
-                                top={
-                                    tab === "identity" ? (
-                                        <BusinessLogoRow
-                                            logoUrl={settings.logo?.url ?? null}
-                                            name={settings.name}
-                                            canEdit={canEdit}
-                                            onSaved={(next, said) => {
-                                                undo.offer(
-                                                    said,
-                                                    logoCardUndo(
-                                                        settings,
-                                                        next,
-                                                        setSettings,
-                                                    ),
-                                                );
-                                                setSettings(next);
-                                            }}
-                                        />
-                                    ) : undefined
-                                }
-                            >
-                                {fieldsOf[tab]}
-                            </BusinessSection>
-                        </form>
+                {isDetailTab(tab) ? (
+                    <div
+                        id="business-panel"
+                        role="tabpanel"
+                        aria-labelledby={`business-tab-${tab}`}
+                        className="grid min-w-0 flex-[1_1_460px] gap-4"
+                    >
+                        <BusinessDetailRows
+                            tab={tab}
+                            settings={settings}
+                            canEdit={canEdit}
+                            sheets={sheets}
+                        />
                         {tab === "identity" ? webAddress : null}
                     </div>
-                )}
-                {/* Mounted on every tab, so an unsaved week survives a look
-                    elsewhere, as the other cards' fields do. */}
+                ) : null}
+                {/* Mounted on every tab, so the weeks a save answered are
+                    still what the tab reads when it is looked at again. */}
                 <BusinessHoursSection
                     hours={hours}
                     hidden={tab !== "hours"}
-                    editing={editing === "hours"}
-                    canEdit={canEdit && canEditHours}
-                    onEdit={() => startEditing("hours")}
-                    onDone={() => setEditing(null)}
-                    onDirty={setHoursDirty}
+                    canEdit={mayEditHours}
+                    sheets={sheets}
                     offerUndo={undo.offer}
                 />
-                {/* Its own form and its own preview: what customers see. */}
+                {/* Its own preview: what customers see. */}
                 <PayInstructionsSection
                     saved={settings.payInstructions}
                     businessName={settings.name}
                     hidden={tab !== "pay"}
-                    editing={editing === "pay"}
                     canEdit={canEdit}
-                    onEdit={() => startEditing("pay")}
-                    onDone={() => setEditing(null)}
-                    onDirty={setPayDirty}
+                    sheets={sheets}
                     onSaved={setSettings}
                     offerUndo={undo.offer}
                 />
 
+                {/* What is saved, as an invoice prints it. A sheet shows
+                    its own draft the same way, under its fields. */}
                 <BusinessPrintPreview
                     hidden={tab === "pay"}
-                    live={editing !== null && !isOwnForm(editing) && isDirty}
-                    logoUrl={settings.logo?.url ?? null}
-                    registered={registered}
-                    number={number(v)}
-                    legalName={
-                        v.legalName?.trim() ? v.legalName.trim() : v.name
-                    }
-                    tradingAs={
-                        v.legalName?.trim() && v.legalName.trim() !== v.name
-                            ? v.name
-                            : null
-                    }
-                    address={addressText(v)}
-                    gstin={v.taxId ?? ""}
-                    stateName={liveState.name}
-                    contact={[v.contactEmail, v.website]
-                        .filter((x) => x?.trim())
-                        .join(" · ")}
-                    deliverySac={v.deliverySac}
-                    deliveryRate={rateOption(v.deliveryRate) || "18"}
+                    live={false}
+                    {...printOf(saved, settings)}
                 />
             </div>
-            <LeaveDialog
-                to={leaveTo}
-                section={editing ? titleOf(editing) : words.settingsTab}
-                onKeep={() => {
-                    stay();
-                    if (editing) setTab(editing);
-                }}
-                onDiscard={() => {
-                    stay();
-                    cancel();
-                }}
-            />
-        </Form>
+
+            {/* The open sheet, a fresh draft each time it opens. */}
+            {editing?.which === "logo" ? (
+                <BusinessLogoSheet
+                    key={editing.opened}
+                    settings={settings}
+                    open={editing.open}
+                    returnTo={editing.returnTo}
+                    onClose={sheets.close}
+                    onSaved={(next, said) => {
+                        undo.offer(
+                            said,
+                            logoCardUndo(settings, next, setSettings),
+                        );
+                        setSettings(next);
+                    }}
+                />
+            ) : editing &&
+              editing.which !== "hours" &&
+              editing.which !== "pay" ? (
+                <BusinessFieldSheet
+                    key={editing.opened}
+                    sheet={editing.which}
+                    settings={settings}
+                    open={editing.open}
+                    returnTo={editing.returnTo}
+                    onClose={sheets.close}
+                    onSaved={(next, sent) => {
+                        undo.offer(
+                            savedWords(editing.which, words),
+                            cardUndo(settings, next, sent, applySaved),
+                        );
+                        applySaved(next);
+                    }}
+                />
+            ) : null}
+        </>
     );
 }

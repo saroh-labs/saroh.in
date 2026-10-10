@@ -125,7 +125,7 @@ describe("settingsNudges (DEC-056)", () => {
             key: "businessType",
             left: true,
             // Straight to the Type field on Business › Identity.
-            href: "/settings/organization?section=identity#business-type",
+            href: "/settings/organization?section=identity&edit=type",
         });
         // A type this app doesn't know reads as Not set; `company` is Pvt Ltd.
         expect(
