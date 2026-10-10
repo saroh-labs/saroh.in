@@ -7,6 +7,7 @@ import { useId, useState } from "react";
 import { showPlanRefusal } from "@/components/billing/plan-refusal";
 import { createBookingPayLink } from "@/lib/services/actions";
 import { ShareLink } from "@saroh/ui/copy-button";
+import { Field } from "@saroh/ui/field";
 
 /**
  * The pay link a booking got, or why it couldn't. `plan`: the business's
@@ -62,17 +63,14 @@ export function PayLinkPanel({
             <p className="text-[13px] font-semibold">{booked}</p>
             {link.ok ? (
                 <>
-                    <div>
-                        <label htmlFor={id} className="label mb-1.5 block">
-                            Pay link
-                        </label>
+                    <Field label="Pay link">
                         <Input
                             id={id}
                             readOnly
                             value={link.url}
                             onFocus={(e) => e.currentTarget.select()}
                         />
-                    </div>
+                    </Field>
                     <p className="text-[12.5px] leading-[1.5] text-muted-foreground">
                         Send it to them however you talk. The booking shows
                         unpaid until they pay. Cancelling it stops the link; a

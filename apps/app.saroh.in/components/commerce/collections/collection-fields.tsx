@@ -1,6 +1,6 @@
 "use client";
 
-import { FieldError } from "@saroh/ui/field";
+import { Field } from "@saroh/ui/field";
 import { Input } from "@saroh/ui/input";
 import { Textarea } from "@saroh/ui/textarea";
 
@@ -21,8 +21,6 @@ import { TextLink } from "@saroh/ui/text-link";
  * the sheet's check or the API's — under it.
  */
 
-const LABEL = "block";
-
 export function NameField({
     value,
     onChange,
@@ -35,10 +33,7 @@ export function NameField({
     error?: string;
 }) {
     return (
-        <div className="space-y-1.5">
-            <label htmlFor="collection-name" className={LABEL}>
-                Name
-            </label>
+        <Field label="Name" error={error}>
             <Input
                 id="collection-name"
                 value={value}
@@ -46,11 +41,8 @@ export function NameField({
                 maxLength={COLLECTION_NAME_MAX + 20}
                 placeholder="Weekend bakes"
                 disabled={disabled}
-                aria-invalid={!!error}
-                aria-describedby={error ? "collection-name-error" : undefined}
             />
-            <FieldError id="collection-name-error">{error}</FieldError>
-        </div>
+        </Field>
     );
 }
 
@@ -66,13 +58,7 @@ export function DescriptionField({
     error?: string;
 }) {
     return (
-        <div className="space-y-1.5">
-            <label htmlFor="collection-description" className={LABEL}>
-                Description{" "}
-                <span className="font-normal text-muted-foreground">
-                    (optional)
-                </span>
-            </label>
+        <Field label="Description" optional error={error}>
             <Textarea
                 id="collection-description"
                 value={value}
@@ -80,11 +66,9 @@ export function DescriptionField({
                 rows={2}
                 disabled={disabled}
                 placeholder="What's in it, in a line."
-                aria-invalid={!!error}
                 className="leading-[1.55]"
             />
-            <FieldError>{error}</FieldError>
-        </div>
+        </Field>
     );
 }
 
@@ -106,33 +90,34 @@ export function CategoryField({
     error?: string;
 }) {
     return (
-        <div className="space-y-1.5">
-            <label htmlFor="collection-category" className={LABEL}>
-                Category
-            </label>
-            {categories.length === 0 ? (
-                <p className="text-[12.5px] text-muted-foreground">
-                    There are no categories yet.{" "}
-                    <TextLink href={productSettingsHref("categories")}>
-                        Manage categories
-                    </TextLink>
+        <Field label="Category" htmlFor="collection-category" error={error}>
+            <>
+                {categories.length === 0 ? (
+                    <p className="text-[12.5px] text-muted-foreground">
+                        There are no categories yet.{" "}
+                        <TextLink href={productSettingsHref("categories")}>
+                            Manage categories
+                        </TextLink>
+                    </p>
+                ) : (
+                    <OptionSelect
+                        id="collection-category"
+                        value={value}
+                        onValueChange={onChange}
+                        options={categoryChoices(categories)}
+                        placeholder="Pick a category"
+                        disabled={disabled}
+                        aria-invalid={!!error}
+                        aria-describedby={
+                            error ? "collection-category-note" : undefined
+                        }
+                    />
+                )}
+                <p className="text-[11.5px] leading-[1.5] text-muted-foreground">
+                    {ruleNote(categories, value)}
                 </p>
-            ) : (
-                <OptionSelect
-                    id="collection-category"
-                    value={value}
-                    onValueChange={onChange}
-                    options={categoryChoices(categories)}
-                    placeholder="Pick a category"
-                    disabled={disabled}
-                    aria-invalid={!!error}
-                />
-            )}
-            <p className="text-[11.5px] leading-[1.5] text-muted-foreground">
-                {ruleNote(categories, value)}
-            </p>
-            <FieldError>{error}</FieldError>
-        </div>
+            </>
+        </Field>
     );
 }
 

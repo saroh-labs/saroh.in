@@ -1,10 +1,8 @@
 "use client";
 
-import { Checkbox } from "@saroh/ui/checkbox";
 import { Field } from "@saroh/ui/field";
 import { Input } from "@saroh/ui/input";
 import { cn } from "@saroh/ui/lib/utils";
-import { RadioGroup, RadioGroupItem } from "@saroh/ui/radio-group";
 import { useId } from "react";
 
 import type { TurnOnDraft } from "@/lib/modules/turn-on";
@@ -16,6 +14,8 @@ import type {
 } from "@/lib/modules/turn-on-schema";
 import { usesLine } from "@/lib/sites/template-picker";
 
+import { CheckRow } from "@/components/shared/check-row";
+import { RadioCards } from "@/components/shared/choice-group";
 import { TextLink } from "@saroh/ui/text-link";
 
 export type Update = (change: (draft: TurnOnDraft) => TurnOnDraft) => void;
@@ -108,15 +108,13 @@ export function SellFields({
                     How orders leave
                 </legend>
                 {HOW_ORDERS_LEAVE.map((o) => (
-                    <label
+                    <CheckRow
                         key={o.value}
-                        className="flex cursor-pointer items-start gap-2.5 rounded-[9px] border border-border px-3 py-2.5 transition-colors duration-fast hover:bg-muted/60 active:bg-accent-active has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-ring coarse:min-h-11"
+                        checked={c.fulfilment.includes(o.value)}
+                        onChange={(on) => flip(o.value, on)}
+                        boxClassName="mt-0.5"
+                        className="items-start gap-2.5 rounded-[9px] border border-border px-3 py-2.5 transition-colors duration-fast hover:bg-muted/60 active:bg-accent-active has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-ring"
                     >
-                        <Checkbox
-                            checked={c.fulfilment.includes(o.value)}
-                            onCheckedChange={(v) => flip(o.value, v === true)}
-                            className="mt-0.5"
-                        />
                         <span className="min-w-0">
                             <span className="block text-[13px] font-medium">
                                 {o.label}
@@ -125,7 +123,7 @@ export function SellFields({
                                 {o.note}
                             </span>
                         </span>
-                    </label>
+                    </CheckRow>
                 ))}
                 {howError ? (
                     <span
@@ -316,33 +314,16 @@ function TemplateChoice({
             <span id={`${id}-label`} className="text-[13px] font-medium">
                 Starts from
             </span>
-            <RadioGroup
-                aria-labelledby={`${id}-label`}
+            <RadioCards
+                labelledBy={`${id}-label`}
                 value={value}
-                onValueChange={onChange}
-                className="grid min-w-0 gap-2"
-            >
-                {choices.map((c) => {
-                    const uses = usesLine(c);
-                    return (
-                        <label
-                            key={c.id}
-                            htmlFor={`${id}-${c.id}`}
-                            className="flex min-w-0 cursor-pointer items-center gap-2.5 rounded-[9px] border border-border px-3 py-2 text-[13px] transition-colors duration-fast hover:bg-muted/60 active:bg-accent-active coarse:min-h-11"
-                        >
-                            <RadioGroupItem id={`${id}-${c.id}`} value={c.id} />
-                            <span className="min-w-0 font-medium">
-                                {c.name}
-                            </span>
-                            {uses ? (
-                                <span className="ml-auto min-w-0 truncate text-[12px] text-muted-foreground">
-                                    {uses}
-                                </span>
-                            ) : null}
-                        </label>
-                    );
-                })}
-            </RadioGroup>
+                onChange={onChange}
+                options={choices.map((c) => ({
+                    value: c.id,
+                    label: c.name,
+                    aside: usesLine(c),
+                }))}
+            />
             <p className="text-[12.5px] leading-normal text-muted-foreground">
                 Change its pages any time.
             </p>
@@ -364,7 +345,6 @@ export function ConnectChoice({
     draft: TurnOnDraft;
     update: Update;
 }) {
-    const id = useId();
     const now = draft.connect[moduleKey] ?? true;
     const set = (value: boolean) =>
         update((d) => ({
@@ -373,25 +353,14 @@ export function ConnectChoice({
         }));
     const what = moduleKey === "PAYMENTS" ? "Razorpay or Cashfree" : "email";
     return (
-        <RadioGroup
-            aria-label="Connect a provider"
+        <RadioCards
+            label="Connect a provider"
             value={now ? "now" : "later"}
-            onValueChange={(v) => set(v === "now")}
-            className="grid min-w-0 gap-2"
-        >
-            {[
+            onChange={(v) => set(v === "now")}
+            options={[
                 { value: "now", label: `Connect ${what} now` },
                 { value: "later", label: "Later" },
-            ].map((o) => (
-                <label
-                    key={o.value}
-                    htmlFor={`${id}-${o.value}`}
-                    className="flex cursor-pointer items-center gap-2.5 rounded-[9px] border border-border px-3 py-2 text-[13px] transition-colors duration-fast hover:bg-muted/60 active:bg-accent-active coarse:min-h-11"
-                >
-                    <RadioGroupItem id={`${id}-${o.value}`} value={o.value} />
-                    {o.label}
-                </label>
-            ))}
-        </RadioGroup>
+            ]}
+        />
     );
 }

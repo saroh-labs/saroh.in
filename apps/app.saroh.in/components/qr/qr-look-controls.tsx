@@ -17,6 +17,7 @@ import {
     pillClass,
 } from "@/components/shared/choice-group";
 import { FailedRead } from "@/components/shared/failed-read";
+import { Field } from "@saroh/ui/field";
 import { Notice } from "@saroh/ui/notice";
 import { QrAddLogo } from "./qr-add-logo";
 import type { QrStyleLock } from "./qr-style-lock";
@@ -201,19 +202,17 @@ export function QrLookControls({
                     itemClassName={(on) => pillClass(on)}
                 />
                 {custom ? (
-                    <label className="flex flex-col gap-1.5 text-[13px] font-semibold">
-                        Your label
+                    <Field
+                        label="Your label"
+                        hint="Leave it empty for no label."
+                    >
                         <Input
                             value={label}
                             maxLength={QR_LABEL_MAX}
                             onChange={(e) => onLabel(e.target.value)}
                             placeholder="Scan for today's menu"
-                            className="font-normal"
                         />
-                        <span className="font-normal text-muted-foreground">
-                            Leave it empty for no label.
-                        </span>
-                    </label>
+                    </Field>
                 ) : null}
             </div>
         </>

@@ -8,6 +8,7 @@ import { ChoiceGroup } from "@/components/shared/choice-group";
 import { useSiteFaces } from "@/components/sites/site-faces";
 import type { SiteStyle, SiteStyleOptions } from "@/lib/sites/style";
 import { activeColourway, contrastOk, inColourway } from "@/lib/sites/style";
+import { Label } from "@saroh/ui/label";
 
 /**
  * The Style panel (#189) — colour and spacing for a whole site.
@@ -132,7 +133,7 @@ export function StylePanel({
                         <ChoiceGroup
                             label="Typeface"
                             className="space-y-1"
-                            value={activePair ?? null}
+                            value={activePair}
                             onChange={setFontPair}
                             choices={fontPairs.map((pair) => ({
                                 value: pair.key,
@@ -218,9 +219,9 @@ export function StylePanel({
                                 value={
                                     paletteOn
                                         ? null
-                                        : ((row.key === "text"
-                                              ? effectiveTextKey
-                                              : style.colours[row.key]) ?? null)
+                                        : row.key === "text"
+                                          ? effectiveTextKey
+                                          : style.colours[row.key]
                                 }
                                 onChange={(key) => setColour(row.key, key)}
                                 choices={row.swatches.map((swatch) => {
@@ -276,12 +277,12 @@ export function StylePanel({
                         return (
                             <div key={scalar.key} className="space-y-1">
                                 <div className="flex items-baseline justify-between">
-                                    <label
+                                    <Label
                                         htmlFor={`style-${scalar.key}`}
-                                        className="text-xs"
+                                        className="text-xs font-normal leading-normal"
                                     >
                                         {scalar.label}
-                                    </label>
+                                    </Label>
                                     <span className="text-xs tabular-nums text-muted-foreground">
                                         {scalar.unit === "×"
                                             ? `${value.toFixed(2)}×`

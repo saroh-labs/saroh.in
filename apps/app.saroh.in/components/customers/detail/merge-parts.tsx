@@ -1,6 +1,6 @@
 "use client";
 
-import { Checkbox } from "@saroh/ui/checkbox";
+import { CheckRow } from "@/components/shared/check-row";
 import { cn } from "@saroh/ui/lib/utils";
 import { Globe } from "lucide-react";
 import { useId } from "react";
@@ -62,32 +62,26 @@ export function AccountBox({
                 </p>
             ))}
             {canLeaveBehind ? (
-                <label
-                    htmlFor={`${id}-leave`}
-                    className="flex cursor-pointer items-center gap-2 coarse:min-h-11"
+                <CheckRow
+                    id={`${id}-leave`}
+                    checked={!carry}
+                    disabled={disabled}
+                    onChange={(leave) => onCarry(!leave)}
+                    className="text-[12.5px]"
                 >
-                    <Checkbox
-                        id={`${id}-leave`}
-                        checked={!carry}
-                        disabled={disabled}
-                        onCheckedChange={(v) => onCarry(v !== true)}
-                    />
                     Don&apos;t carry the sign-in over
-                </label>
+                </CheckRow>
             ) : null}
             {needsConfirm ? (
-                <label
-                    htmlFor={`${id}-confirm`}
-                    className="flex cursor-pointer items-center gap-2 font-semibold coarse:min-h-11"
+                <CheckRow
+                    id={`${id}-confirm`}
+                    checked={confirmed}
+                    disabled={disabled}
+                    onChange={onConfirm}
+                    className="text-[12.5px] font-semibold"
                 >
-                    <Checkbox
-                        id={`${id}-confirm`}
-                        checked={confirmed}
-                        disabled={disabled}
-                        onCheckedChange={(v) => onConfirm(v === true)}
-                    />
                     I&apos;ve checked this email is theirs
-                </label>
+                </CheckRow>
             ) : null}
         </div>
     );

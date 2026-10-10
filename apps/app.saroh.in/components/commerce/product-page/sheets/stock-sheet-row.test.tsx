@@ -38,7 +38,7 @@ const row = (counts: boolean) =>
             canWrite
             hasVariants
             productPrice="450"
-            symbol="₹"
+            currency="INR"
             onSize={() => undefined}
             onPrice={() => undefined}
             onShelf={() => undefined}
@@ -54,7 +54,7 @@ describe("SheetSizeRow on a phone", () => {
             ["Warn at", "800g warn when on hand reaches"],
         ]) {
             const label = new RegExp(
-                `<label for="([^"]+)"[^>]*>${text}</label>`,
+                `<label[^>]* for="([^"]+)"[^>]*>${text}</label>`,
             ).exec(out);
             expect(label, text).not.toBeNull();
             expect(label?.[0]).toContain("sm:hidden");
@@ -84,7 +84,7 @@ describe("SheetSizeRow on a phone", () => {
 
     it("an untracked size has just its labelled price", () => {
         const out = row(false);
-        expect(out).toMatch(/<label for="[^"]+"[^>]*>Price<\/label>/);
+        expect(out).toMatch(/<label[^>]* for="[^"]+"[^>]*>Price<\/label>/);
         expect(out).not.toContain("On hand");
         expect(out).toContain("grid-cols-[minmax(0,1fr)_44px]");
     });

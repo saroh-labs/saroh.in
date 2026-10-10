@@ -1,3 +1,4 @@
+import { Label } from "@saroh/ui/label";
 import { cn } from "@saroh/ui/lib/utils";
 import type { ReactNode } from "react";
 
@@ -34,9 +35,9 @@ export function FieldLabel({
     className?: string;
 }) {
     const label = htmlFor ? (
-        <label htmlFor={htmlFor} className="flex-1 text-[12.5px] font-medium">
+        <Label htmlFor={htmlFor} className="flex-1 leading-normal">
             {children}
-        </label>
+        </Label>
     ) : (
         <span className="flex-1 text-[12.5px] font-medium">{children}</span>
     );
@@ -88,32 +89,5 @@ export function Count({ value, max }: { value: number; max: number }) {
         >
             {value} / {max}
         </span>
-    );
-}
-
-/** The currency's sign ("₹") inside the left of a money box. */
-export function MoneyBox({
-    symbol,
-    children,
-    small = false,
-}: {
-    symbol: string;
-    children: ReactNode;
-    small?: boolean;
-}) {
-    return (
-        <div className="relative min-w-0">
-            <span
-                aria-hidden
-                className={cn(
-                    "pointer-events-none absolute left-2.5 top-0 flex items-center text-muted-foreground",
-                    small ? "h-8 text-[12.5px]" : "h-9 text-[13px]",
-                    "coarse:h-11",
-                )}
-            >
-                {symbol}
-            </span>
-            {children}
-        </div>
     );
 }

@@ -56,6 +56,7 @@ const html = (lines: OrderReadLine[]) => {
                 shipping={0}
                 how="Back to Razorpay, in 3–5 days."
                 format={(n) => `₹${n}`}
+                currency="INR"
                 onCancel={noop}
                 onRefund={noop}
             />,
@@ -82,7 +83,7 @@ describe("RefundPanel", () => {
             expect(out).toContain(`>${reason}</option>`);
         }
         expect(out).toContain("Or another amount");
-        expect(out).toContain('aria-label="Refund another amount, in rupees"');
+        expect(out).toContain('aria-label="Refund another amount"');
         expect(out).toContain("Back to Razorpay, in 3–5 days.");
     });
 

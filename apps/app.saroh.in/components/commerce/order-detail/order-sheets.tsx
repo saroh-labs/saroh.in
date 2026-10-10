@@ -37,6 +37,7 @@ export function OrderSheets({
     addable,
     linkable,
     format,
+    currency,
     kitchen,
     changes,
     onPrint,
@@ -60,6 +61,8 @@ export function OrderSheets({
     linkable: boolean;
     /** Money in major units; null without a money read. */
     format: ((n: number) => string) | null;
+    /** The order's currency, for the sheets' money boxes. */
+    currency: string;
     kitchen: ReturnType<typeof useKitchen>;
     changes: ReturnType<typeof useOrderChanges>;
     onPrint: () => void;
@@ -136,6 +139,7 @@ export function OrderSheets({
                             : `Back to ${refundTo}, in 3–5 days.`
                     }
                     format={format}
+                    currency={currency}
                     onCancel={onClose}
                     onRefund={kitchen.startRefund}
                 />
@@ -149,6 +153,7 @@ export function OrderSheets({
                     options={options}
                     first={first}
                     shipping={Number(money?.shipping ?? 0)}
+                    currency={currency}
                     address={order.deliveryAddress}
                     paid={paid}
                     refundTo={refundTo}

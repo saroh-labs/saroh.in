@@ -19,6 +19,7 @@ import {
     timingTimeline,
     timingTitle,
 } from "@/lib/subscriptions/autopay-timing";
+import { Field } from "@saroh/ui/field";
 
 const BUSINESS = "BUSINESS";
 
@@ -89,28 +90,30 @@ export function PlanAutopayTiming({
             >
                 When autopay charges
             </h2>
-            <label htmlFor={`${id}-select`} className="sr-only">
-                When autopay charges for this plan
-            </label>
-            <OptionSelect
-                id={`${id}-select`}
-                className="mt-1.5"
-                value={value ?? BUSINESS}
-                disabled={pending}
-                readOnly={!canWrite}
-                onValueChange={change}
-                aria-describedby={`${id}-line ${id}-when`}
-                options={[
-                    {
-                        value: BUSINESS,
-                        label: `Use the business setting (${timingTitle(settings.chargeTiming)})`,
-                    },
-                    ...timingOptions(settings).map((o) => ({
-                        value: o.value,
-                        label: o.title,
-                    })),
-                ]}
-            />
+            <Field
+                label="When autopay charges for this plan"
+                labelHidden
+                className="mt-1.5 space-y-0"
+            >
+                <OptionSelect
+                    id={`${id}-select`}
+                    value={value ?? BUSINESS}
+                    disabled={pending}
+                    readOnly={!canWrite}
+                    onValueChange={change}
+                    aria-describedby={`${id}-line ${id}-when`}
+                    options={[
+                        {
+                            value: BUSINESS,
+                            label: `Use the business setting (${timingTitle(settings.chargeTiming)})`,
+                        },
+                        ...timingOptions(settings).map((o) => ({
+                            value: o.value,
+                            label: o.title,
+                        })),
+                    ]}
+                />
+            </Field>
             <p
                 id={`${id}-line`}
                 className="mt-2 text-pretty text-[12px] leading-[1.45] text-muted-foreground"

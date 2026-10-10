@@ -1,7 +1,6 @@
 "use client";
 
 import { FormSheet } from "@/components/shared/form-sheet";
-import { Checkbox } from "@saroh/ui/checkbox";
 import { Input } from "@saroh/ui/input";
 import { Label } from "@saroh/ui/label";
 import { cn } from "@saroh/ui/lib/utils";
@@ -10,6 +9,7 @@ import { showSuccess } from "@saroh/ui/toast";
 import { useRouter } from "next/navigation";
 import { useId, useState } from "react";
 
+import { CheckRow } from "@/components/shared/check-row";
 import { ChoiceGroup } from "@/components/shared/choice-group";
 import { UNREACHED } from "@/lib/api/unreached";
 import {
@@ -289,25 +289,21 @@ export function AttentionSheet({
             </div>
 
             {canSensitive ? (
-                <label className="flex cursor-pointer items-start gap-2 text-[12.5px] leading-[1.45] text-foreground/75 coarse:min-h-11">
-                    <Checkbox
-                        checked={draft.sensitive}
-                        disabled={saving}
-                        onCheckedChange={(v) =>
-                            change({
-                                ...draft,
-                                sensitive: v === true,
-                                sensitiveSet: true,
-                            })
-                        }
-                        className="mt-px"
-                    />
+                <CheckRow
+                    checked={draft.sensitive}
+                    disabled={saving}
+                    onChange={(sensitive) =>
+                        change({ ...draft, sensitive, sensitiveSet: true })
+                    }
+                    className="items-start text-[12.5px] leading-[1.45] text-foreground/75"
+                    boxClassName="mt-px"
+                >
                     <span>
                         Sensitive. Only people who can see sensitive notes can
                         read it. Everyone else sees that there is a note they
                         can&apos;t read.
                     </span>
-                </label>
+                </CheckRow>
             ) : (
                 <p className="text-[12.5px] leading-[1.45] text-muted-foreground">
                     {NO_SENSITIVE_NOTE}

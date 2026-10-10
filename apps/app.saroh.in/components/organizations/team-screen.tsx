@@ -88,6 +88,7 @@ import {
 } from "@/lib/organizations/storefront-team";
 import { TEAM_TAB_PARAM } from "@/lib/settings/search";
 
+import { CheckRow } from "@/components/shared/check-row";
 import { ChoiceGroup } from "@/components/shared/choice-group";
 import { runAction } from "@/lib/api/run-action";
 import { TabStrip } from "@saroh/ui/tabs";
@@ -1380,37 +1381,60 @@ function InviteSheet({
                                     {seatReason ?? viewOnlyReason}
                                 </p>
                             ) : null}
-                            <div
-                                role="radiogroup"
-                                aria-labelledby="invite-role-label"
+                            <ChoiceGroup
+                                labelledBy="invite-role-label"
                                 className="grid gap-1.5"
-                            >
-                                {offered.map((offer) => {
+                                value={field.value}
+                                onChange={field.onChange}
+                                disabled={sending}
+                                choices={offered.map((offer) => {
                                     const r = offer.key;
-                                    return (
-                                        <RoleChoice
-                                            key={r}
-                                            name={field.name}
-                                            value={r}
-                                            label={book.labelOf(r)}
-                                            blurb={book.blurbOf(r)}
-                                            checked={r === field.value}
-                                            // The API refuses to
-                                            // invite anyone at a role
-                                            // that can do more than
-                                            // the inviter.
-                                            beyond={!book.withinReach(r)}
-                                            // Full seats take no one
-                                            // who needs one; full
-                                            // view-only places take
-                                            // no one view-only.
-                                            noRoom={noRoom(offer)}
-                                            disabled={sending}
-                                            onPick={() => field.onChange(r)}
-                                        />
-                                    );
+                                    // The API refuses to invite anyone
+                                    // at a role that can do more than
+                                    // the inviter.
+                                    const beyond = !book.withinReach(r);
+                                    // Full seats take no one who needs
+                                    // one; full view-only places take no
+                                    // one view-only.
+                                    const full = noRoom(offer);
+                                    const off = beyond || full !== null;
+                                    const checked = r === field.value;
+                                    return {
+                                        value: r,
+                                        disabled: off,
+                                        tip: beyond
+                                            ? "Can do more than you can"
+                                            : (full ?? undefined),
+                                        label: (
+                                            <>
+                                                <span className="flex items-center justify-between gap-2 text-[13.5px] font-semibold">
+                                                    {book.labelOf(r)}
+                                                    {/* Which one is picked, beyond the border (UX-029). */}
+                                                    {checked && !off ? (
+                                                        <Check
+                                                            aria-hidden
+                                                            className="size-4 shrink-0"
+                                                        />
+                                                    ) : null}
+                                                </span>
+                                                <span className="mt-0.5 block text-[12px] text-muted-foreground">
+                                                    {book.blurbOf(r)}
+                                                </span>
+                                            </>
+                                        ),
+                                    };
                                 })}
-                            </div>
+                                itemClassName={(on, choice) =>
+                                    cn(
+                                        "block w-full rounded-[9px] border px-3 py-[9px] text-left coarse:min-h-11",
+                                        choice.disabled
+                                            ? "border-border opacity-50"
+                                            : on
+                                              ? "border-foreground bg-foreground/[0.03] shadow-[inset_0_0_0_1px_hsl(var(--foreground))]"
+                                              : "border-border bg-card hover:border-border-strong",
+                                    )
+                                }
+                            />
                         </FormItem>
                     )}
                 />
@@ -1435,32 +1459,27 @@ function InviteSheet({
                                             site.id,
                                         );
                                         return (
-                                            <label
+                                            <CheckRow
                                                 key={site.id}
-                                                className="flex items-center gap-2 text-[13px]"
-                                            >
-                                                <input
-                                                    type="checkbox"
-                                                    checked={on}
-                                                    onChange={() =>
-                                                        field.onChange(
-                                                            on
-                                                                ? field.value.filter(
-                                                                      (s) =>
-                                                                          s !==
-                                                                          site.id,
-                                                                  )
-                                                                : [
-                                                                      ...field.value,
+                                                checked={on}
+                                                disabled={sending}
+                                                onChange={() =>
+                                                    field.onChange(
+                                                        on
+                                                            ? field.value.filter(
+                                                                  (s) =>
+                                                                      s !==
                                                                       site.id,
-                                                                  ],
-                                                        )
-                                                    }
-                                                    disabled={sending}
-                                                    className="size-4 rounded-[4px] border-border-strong"
-                                                />
+                                                              )
+                                                            : [
+                                                                  ...field.value,
+                                                                  site.id,
+                                                              ],
+                                                    )
+                                                }
+                                            >
                                                 {site.name}
-                                            </label>
+                                            </CheckRow>
                                         );
                                     })
                                 )}
@@ -1474,64 +1493,5 @@ function InviteSheet({
                 ) : null}
             </FormSheet>
         </Form>
-    );
-}
-
-/** One role in the invite's list: its name, and what it is for. */
-function RoleChoice({
-    name,
-    value,
-    label,
-    blurb,
-    checked,
-    beyond,
-    noRoom = null,
-    disabled,
-    onPick,
-}: {
-    name: string;
-    value: string;
-    label: string;
-    blurb: string;
-    checked: boolean;
-    beyond: boolean;
-    /** The plan has no room for this role (UX-028, DEC-105), and why. */
-    noRoom?: string | null;
-    disabled: boolean;
-    onPick: () => void;
-}) {
-    const off = beyond || noRoom !== null;
-    return (
-        <label
-            title={beyond ? "Can do more than you can" : (noRoom ?? undefined)}
-            className={cn(
-                "block rounded-[9px] border px-3 py-[9px] transition-colors duration-fast has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-ring has-[:focus-visible]:ring-offset-2",
-                off
-                    ? "cursor-not-allowed border-border opacity-50"
-                    : checked
-                      ? "cursor-pointer border-foreground bg-foreground/[0.03] shadow-[inset_0_0_0_1px_hsl(var(--foreground))]"
-                      : "cursor-pointer border-border bg-card hover:border-border-strong",
-            )}
-        >
-            <input
-                type="radio"
-                name={name}
-                value={value}
-                checked={checked}
-                disabled={off || disabled}
-                onChange={onPick}
-                className="sr-only"
-            />
-            <span className="flex items-center justify-between gap-2 text-[13.5px] font-semibold">
-                {label}
-                {/* Which one is picked, beyond the border (UX-029). */}
-                {checked && !off ? (
-                    <Check aria-hidden className="size-4 shrink-0" />
-                ) : null}
-            </span>
-            <span className="mt-0.5 block text-[12px] text-muted-foreground">
-                {blurb}
-            </span>
-        </label>
     );
 }

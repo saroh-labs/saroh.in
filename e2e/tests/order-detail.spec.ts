@@ -309,7 +309,7 @@ test.describe("order detail", () => {
         const panel = page.getByRole("dialog", {
             name: "What are you refunding?",
         });
-        await panel.getByLabel("Refund another amount, in rupees").fill("1");
+        await panel.getByLabel("Refund another amount").fill("1");
         const go = panel.getByRole("button", { name: /^Refund / });
         await expect(go).toBeDisabled();
         await expect(

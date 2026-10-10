@@ -11,6 +11,7 @@ import type { DayDraft, TurnOnDraft } from "@/lib/modules/turn-on";
 import { hoursErrorsByWeekday, WEEK } from "@/lib/modules/turn-on";
 import type { FieldErrors } from "@/lib/modules/turn-on-errors";
 
+import { Label } from "@saroh/ui/label";
 import type { Update } from "./setup-fields";
 
 /**
@@ -62,7 +63,7 @@ export function BookingsFields({
                                 key={weekday}
                                 className="flex min-w-0 flex-wrap items-center gap-x-2.5 gap-y-1.5 px-3 py-2"
                             >
-                                <label className="flex w-[74px] shrink-0 cursor-pointer items-center gap-2 text-[13px] font-medium coarse:min-h-11">
+                                <Label className="flex w-[74px] shrink-0 cursor-pointer items-center gap-2 text-[13px] font-medium leading-normal coarse:min-h-11">
                                     <Checkbox
                                         checked={day.on}
                                         aria-label={`Open on ${long}`}
@@ -71,7 +72,7 @@ export function BookingsFields({
                                         }
                                     />
                                     {short}
-                                </label>
+                                </Label>
                                 {day.on ? (
                                     <span className="flex min-w-0 items-center gap-1.5">
                                         <TimeSelect

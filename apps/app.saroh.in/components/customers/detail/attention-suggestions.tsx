@@ -1,7 +1,6 @@
 "use client";
 
 import { Button } from "@saroh/ui/button";
-import { Checkbox } from "@saroh/ui/checkbox";
 import { Input } from "@saroh/ui/input";
 import { Label } from "@saroh/ui/label";
 import { cn } from "@saroh/ui/lib/utils";
@@ -15,6 +14,7 @@ import {
 import { useRouter } from "next/navigation";
 import { useEffect, useId, useRef, useState } from "react";
 
+import { CheckRow } from "@/components/shared/check-row";
 import { ChoiceGroup } from "@/components/shared/choice-group";
 import { UNREACHED } from "@/lib/api/unreached";
 import {
@@ -337,20 +337,16 @@ function SuggestionCard({
                 </span>
             ) : null}
             {canSensitive ? (
-                <label className="flex cursor-pointer items-center gap-2 text-[12.5px] text-foreground/75 coarse:min-h-11">
-                    <Checkbox
-                        checked={draft.sensitive}
-                        disabled={saving}
-                        onCheckedChange={(v) =>
-                            change({
-                                ...draft,
-                                sensitive: v === true,
-                                sensitiveSet: true,
-                            })
-                        }
-                    />
+                <CheckRow
+                    checked={draft.sensitive}
+                    disabled={saving}
+                    onChange={(sensitive) =>
+                        change({ ...draft, sensitive, sensitiveSet: true })
+                    }
+                    className="text-[12.5px] text-foreground/75"
+                >
                     {sensitiveTickText(sensitiveRoles)}
-                </label>
+                </CheckRow>
             ) : (
                 <p className="text-[12.5px] text-muted-foreground">
                     {NO_SENSITIVE_NOTE}

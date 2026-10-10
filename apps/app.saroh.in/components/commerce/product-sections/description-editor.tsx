@@ -35,6 +35,7 @@ import {
 } from "@/lib/products/editor-labels";
 import { LIMITS, stripHtml } from "@/lib/products/editor-sections";
 import { editorKey } from "@/lib/tiptap/editor-key";
+import { Label } from "@saroh/ui/label";
 
 /**
  * A product's description (editor v2, "Description"). Six tools up front —
@@ -499,9 +500,7 @@ function LinkTool({
                         setOpen(false);
                     }}
                 >
-                    <label htmlFor="desc-link" className="text-xs font-medium">
-                        Link to
-                    </label>
+                    <Label htmlFor="desc-link">Link to</Label>
                     <Input
                         id="desc-link"
                         value={href}

@@ -283,7 +283,7 @@ export function MergeDialog({
                                 key={row.key}
                                 label={row.label}
                                 className="contents"
-                                value={loaded.picks[row.key] ?? null}
+                                value={loaded.picks[row.key]}
                                 onChange={(c) => pick(row, c)}
                                 disabled={merging}
                                 choices={COLUMNS.map((c) => {

@@ -2,7 +2,6 @@
 
 import { Button } from "@saroh/ui/button";
 import { Input } from "@saroh/ui/input";
-import { Label } from "@saroh/ui/label";
 import { cn } from "@saroh/ui/lib/utils";
 import { Textarea } from "@saroh/ui/textarea";
 import { showError, showSuccess } from "@saroh/ui/toast";
@@ -13,7 +12,9 @@ import { useId, useState } from "react";
 import { FormSheet } from "@/components/shared/form-sheet";
 import { runAction } from "@/lib/api/run-action";
 import { createLead } from "@/lib/leads/actions";
+import { Field } from "@saroh/ui/field";
 import { OptionSelect } from "@saroh/ui/option-select";
+import { Segmented } from "@saroh/ui/segmented";
 
 export interface LeadContactOption {
     id: string;
@@ -177,43 +178,25 @@ export function AddLeadDialog({
                     Who are they?
                 </legend>
                 {contacts.length > 0 ? (
-                    <div
-                        role="radiogroup"
-                        aria-label="Who are they?"
-                        className="grid grid-cols-2 gap-[5px]"
-                    >
-                        {(
-                            [
-                                ["known", "Someone you know"],
-                                ["new", "Someone new"],
-                            ] as const
-                        ).map(([key, text]) => (
-                            <label
-                                key={key}
-                                className={cn(
-                                    "flex cursor-pointer items-center justify-center rounded-[9px] border px-3 py-2 text-[13px] transition-colors duration-fast has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-ring",
-                                    who === key
-                                        ? "border-border-strong bg-foreground/[0.03] font-semibold"
-                                        : "border-muted font-medium hover:border-border-strong",
-                                )}
-                            >
-                                <input
-                                    type="radio"
-                                    name="lead-who"
-                                    className="sr-only"
-                                    checked={who === key}
-                                    onChange={() => setWho(key)}
-                                />
-                                {text}
-                            </label>
-                        ))}
-                    </div>
+                    <Segmented
+                        label="Who are they?"
+                        block
+                        size="md"
+                        value={who}
+                        onValueChange={setWho}
+                        options={[
+                            { value: "known", label: "Someone you know" },
+                            { value: "new", label: "Someone new" },
+                        ]}
+                    />
                 ) : null}
                 {who === "known" ? (
-                    <div className="grid gap-1.5">
-                        <Label htmlFor={ids.contact} className="sr-only">
-                            Contact
-                        </Label>
+                    <Field
+                        label="Contact"
+                        labelHidden
+                        error={errors.contact}
+                        className="space-y-0"
+                    >
                         <OptionSelect
                             id={ids.contact}
                             value={contactId}
@@ -226,12 +209,10 @@ export function AddLeadDialog({
                                         : `${c.name} · ${c.email}`,
                             }))}
                         />
-                        <Note error={errors.contact} />
-                    </div>
+                    </Field>
                 ) : (
                     <div className="grid gap-3">
-                        <div className="grid gap-1.5">
-                            <Label htmlFor={ids.name}>Name</Label>
+                        <Field label="Name">
                             <Input
                                 id={ids.name}
                                 value={name}
@@ -239,10 +220,9 @@ export function AddLeadDialog({
                                 autoComplete="off"
                                 onChange={(e) => setName(e.target.value)}
                             />
-                        </div>
+                        </Field>
                         <div className="grid grid-cols-[3fr_2fr] gap-3">
-                            <div className="grid gap-1.5">
-                                <Label htmlFor={ids.email}>Email</Label>
+                            <Field label="Email">
                                 <Input
                                     id={ids.email}
                                     type="email"
@@ -251,21 +231,15 @@ export function AddLeadDialog({
                                     aria-invalid={Boolean(errors.email)}
                                     onChange={(e) => setEmail(e.target.value)}
                                 />
-                            </div>
-                            <div className="grid gap-1.5">
-                                <Label htmlFor={ids.phone}>
-                                    Phone{" "}
-                                    <span className="font-normal text-muted-foreground">
-                                        optional
-                                    </span>
-                                </Label>
+                            </Field>
+                            <Field label="Phone" optional>
                                 <Input
                                     id={ids.phone}
                                     type="tel"
                                     value={phone}
                                     onChange={(e) => setPhone(e.target.value)}
                                 />
-                            </div>
+                            </Field>
                         </div>
                         <Note
                             error={errors.email}
@@ -275,44 +249,34 @@ export function AddLeadDialog({
                 )}
             </fieldset>
 
-            <div className="grid gap-1.5">
-                <Label htmlFor={ids.title}>What did they want?</Label>
+            <Field
+                label="What did they want?"
+                error={errors.title}
+                hint="The thing you will have forgotten in a fortnight. It is the lead's name in every list."
+            >
                 <Textarea
                     id={ids.title}
                     rows={2}
                     value={title}
                     maxLength={160}
                     placeholder="Asked about weekend classes"
-                    aria-invalid={Boolean(errors.title)}
                     onChange={(e) => setTitle(e.target.value)}
                 />
-                <Note
-                    error={errors.title}
-                    note="The thing you will have forgotten in a fortnight. It is the lead's name in every list."
-                />
-            </div>
+            </Field>
 
-            <div className="grid grid-cols-2 gap-3">
-                <div className="grid gap-1.5">
-                    <Label htmlFor={ids.worth}>
-                        Worth{" "}
-                        <span className="font-normal text-muted-foreground">
-                            optional
-                        </span>
-                    </Label>
+            <div className="grid grid-cols-2 items-start gap-3">
+                <Field label="Worth" optional error={errors.worth}>
                     <Input
                         id={ids.worth}
                         inputMode="decimal"
                         value={worth}
                         placeholder="45000"
                         className="tabular-nums"
-                        aria-invalid={Boolean(errors.worth)}
                         onChange={(e) => setWorth(e.target.value)}
                     />
-                </div>
+                </Field>
                 {stages.length > 1 ? (
-                    <div className="grid gap-1.5">
-                        <Label htmlFor={ids.stage}>Stage</Label>
+                    <Field label="Stage">
                         <OptionSelect
                             id={ids.stage}
                             value={stage}
@@ -322,10 +286,9 @@ export function AddLeadDialog({
                                 label: s.name,
                             }))}
                         />
-                    </div>
+                    </Field>
                 ) : null}
             </div>
-            <Note error={errors.worth} />
         </FormSheet>
     );
 }

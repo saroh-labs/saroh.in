@@ -15,3 +15,26 @@ if (typeof Element !== "undefined") {
         return matches.call(this, selector);
     };
 }
+
+/*
+ * jsdom has no ResizeObserver, and the shared `Checkbox` and `Switch`
+ * (Radix) measure themselves with one. Nothing is laid out here, so an
+ * observer that never reports is the truth. A test that needs sizes brings
+ * its own.
+ */
+if (
+    typeof globalThis !== "undefined" &&
+    typeof globalThis.ResizeObserver === "undefined"
+) {
+    globalThis.ResizeObserver = class {
+        observe() {
+            return undefined;
+        }
+        unobserve() {
+            return undefined;
+        }
+        disconnect() {
+            return undefined;
+        }
+    };
+}

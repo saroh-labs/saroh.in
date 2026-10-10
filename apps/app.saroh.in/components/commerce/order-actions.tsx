@@ -53,6 +53,7 @@ export function OrderActions({
     canRefund = true,
     refundLeft,
     format,
+    currency,
 }: {
     storeId: string;
     orderId: string;
@@ -79,6 +80,8 @@ export function OrderActions({
      */
     refundLeft?: number;
     format?: (amount: number) => string;
+    /** The order's currency, for the amount box. */
+    currency?: string;
 }) {
     const router = useRouter();
     const setPending = onPendingChange;
@@ -189,6 +192,7 @@ export function OrderActions({
                     refund={recordingPaid.to === "REFUNDED"}
                     left={refundLeft}
                     format={format}
+                    currency={currency}
                     onRecord={async (how, amount) => {
                         const res = await commit(recordingPaid, how, amount);
                         if (!res.ok) showError(res.error);

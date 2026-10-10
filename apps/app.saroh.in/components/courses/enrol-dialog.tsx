@@ -2,7 +2,6 @@
 
 import { formatMoneyMajor } from "@/lib/format/money";
 import { count } from "@/lib/format/plural";
-import { Input } from "@saroh/ui/input";
 import { Label } from "@saroh/ui/label";
 import { showError, showSuccess } from "@saroh/ui/toast";
 import { useRouter } from "next/navigation";
@@ -15,6 +14,8 @@ import { runAction } from "@/lib/api/run-action";
 import { enrol } from "@/lib/courses/actions";
 import { booksLine, seatsLeftLine } from "@/lib/courses/seats";
 import type { Course } from "@/lib/courses/service";
+import { Field } from "@saroh/ui/field";
+import { MoneyInput } from "@saroh/ui/money-input";
 import { OptionSelect } from "@saroh/ui/option-select";
 
 /** What the dialog reads of a course: a list row or a course page's detail. */
@@ -159,18 +160,15 @@ export function EnrolDialog({
                             onValueChange={setContactId}
                         />
                     </div>
-                    <div className="grid gap-1.5">
-                        <Label htmlFor={ids.price}>
-                            What they pay ({course.currency})
-                        </Label>
-                        <Input
+                    <Field label="What they pay">
+                        <MoneyInput
                             id={ids.price}
+                            currency={course.currency}
                             value={price}
-                            onChange={(e) => setPrice(e.target.value)}
-                            inputMode="decimal"
+                            onValueChange={setPrice}
                             aria-invalid={!priceOk}
                         />
-                    </div>
+                    </Field>
                     <p className="rounded-[10px] bg-muted/60 px-3.5 py-3 text-[12.5px] leading-[1.55] text-muted-foreground">
                         {booksLine(course)}
                         {invoicesOnEnrol

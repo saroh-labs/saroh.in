@@ -9,6 +9,7 @@ import { useId, useState, useTransition } from "react";
 import { runAction } from "@/lib/api/run-action";
 import { parseOptionValues } from "@/lib/products/option-values";
 import { addOption, addOptionValue } from "@/lib/products/settings-actions";
+import { Label } from "@saroh/ui/label";
 
 /**
  * Add an option's values without leaving the product (UX-062): "Add size:
@@ -72,9 +73,7 @@ export function OptionValuesInline({
 
     return (
         <div className="mb-3 flex flex-wrap items-center gap-2 rounded-[10px] border border-dashed border-border-strong p-3">
-            <label htmlFor={id} className="text-[12px] font-medium">
-                Add {opt} values
-            </label>
+            <Label htmlFor={id}>Add {opt} values</Label>
             <Input
                 dense
                 id={id}

@@ -13,7 +13,14 @@ import { runAction } from "@/lib/api/run-action";
 import { updatePage } from "@/lib/sites/actions";
 import { fixedAddress } from "@/lib/sites/page-menu";
 import type { SitePage, UpdatePageInput } from "@/lib/sites/service";
+import { Label } from "@saroh/ui/label";
 import { Notice } from "@saroh/ui/notice";
+
+/**
+ * The editor's field caption (the eyebrow) on the shared `Label`, which
+ * would otherwise set its own size and weight over it.
+ */
+const CAPTION = `${FIELD_LABEL} text-[11px] font-semibold leading-[1.45]`;
 
 /**
  * The open page's own settings, in the editor's page menu (G16): its title,
@@ -109,9 +116,9 @@ export function PageSettings({
                 }}
             >
                 <div className="grid gap-1.5">
-                    <label htmlFor={`${id}-title`} className={FIELD_LABEL}>
+                    <Label htmlFor={`${id}-title`} className={CAPTION}>
                         Title
-                    </label>
+                    </Label>
                     <Input
                         dense
                         id={`${id}-title`}
@@ -133,9 +140,9 @@ export function PageSettings({
                     {fixed !== null ? (
                         <span className={FIELD_LABEL}>Page path</span>
                     ) : (
-                        <label htmlFor={`${id}-path`} className={FIELD_LABEL}>
+                        <Label htmlFor={`${id}-path`} className={CAPTION}>
                             Page path
-                        </label>
+                        </Label>
                     )}
                     {fixed !== null ? (
                         <p className="text-xs leading-relaxed text-foreground">

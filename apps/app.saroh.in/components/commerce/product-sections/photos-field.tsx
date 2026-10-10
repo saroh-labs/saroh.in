@@ -23,6 +23,7 @@ import {
     mediaFileProblem,
 } from "@/lib/products/editor-sections";
 import { EmptyState } from "@saroh/ui/data-state";
+import { Label } from "@saroh/ui/label";
 import { Tip } from "@saroh/ui/tooltip";
 
 /**
@@ -432,9 +433,7 @@ export function AddressPanel({
     const problem = photoAddressProblem(url);
     return (
         <div className="flex flex-col gap-2 rounded-[10px] bg-muted p-3">
-            <label htmlFor={`${id}-url`} className="text-[12.5px] font-medium">
-                Photo address
-            </label>
+            <Label htmlFor={`${id}-url`}>Photo address</Label>
             <Input
                 id={`${id}-url`}
                 value={url}
@@ -447,9 +446,7 @@ export function AddressPanel({
                 aria-invalid={problem ? true : undefined}
                 aria-describedby={`${id}-url-hint`}
             />
-            <label htmlFor={`${id}-alt`} className="text-[12.5px] font-medium">
-                What it shows
-            </label>
+            <Label htmlFor={`${id}-alt`}>What it shows</Label>
             <Input
                 id={`${id}-alt`}
                 value={alt}

@@ -11,6 +11,7 @@ import type { ModuleStates } from "@/lib/sites/template-picker";
 import { moduleNote, shapeWord, usesLine } from "@/lib/sites/template-picker";
 import type { TemplateThumbnailImage } from "@/lib/sites/template-thumbnails";
 import { templateThumbnail } from "@/lib/sites/template-thumbnails";
+import { Label } from "@saroh/ui/label";
 import { Segmented } from "@saroh/ui/segmented";
 
 /**
@@ -145,10 +146,10 @@ function TemplateCard({
         .filter(Boolean)
         .join(" ");
     return (
-        <label
+        <Label
             htmlFor={`${id}-radio`}
             className={cn(
-                "flex min-w-0 cursor-pointer flex-col overflow-hidden rounded-lg border bg-card text-left transition-colors duration-fast",
+                "flex min-w-0 cursor-pointer flex-col overflow-hidden rounded-lg border bg-card text-left text-sm font-normal leading-normal transition-colors duration-fast",
                 "has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-ring has-[:focus-visible]:ring-offset-2",
                 selected
                     ? "border-foreground ring-1 ring-foreground"
@@ -209,7 +210,7 @@ function TemplateCard({
                     </span>
                 ) : null}
             </span>
-        </label>
+        </Label>
     );
 }
 

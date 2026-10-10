@@ -23,6 +23,7 @@ import {
 import { OptionSelect } from "@saroh/ui/option-select";
 
 import { SectionList } from "@/components/shared/section-list";
+import { Label } from "@saroh/ui/label";
 import { ShareChecklist } from "./share-checklist";
 
 /**
@@ -179,12 +180,12 @@ export function SettingsSections({
                 <div className="flex min-w-0 flex-col gap-6">
                     {/* Below 1024px: the same choice, as a select. */}
                     <div className="flex items-center gap-3 lg:hidden">
-                        <label
+                        <Label
                             htmlFor={selectId}
-                            className="shrink-0 text-sm font-medium text-muted-foreground"
+                            className="shrink-0 text-sm font-medium leading-normal text-muted-foreground"
                         >
                             Section
-                        </label>
+                        </Label>
                         <OptionSelect
                             id={selectId}
                             value={open}

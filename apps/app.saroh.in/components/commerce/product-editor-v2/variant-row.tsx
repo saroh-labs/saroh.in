@@ -14,9 +14,10 @@ import { OptionSelect } from "@saroh/ui/option-select";
 
 import { Chip } from "@/components/shared/chip";
 import { ChoiceGroup } from "@/components/shared/choice-group";
+import { MoneyInput } from "@saroh/ui/money-input";
 import { TextLink } from "@saroh/ui/text-link";
 import { Tip } from "@saroh/ui/tooltip";
-import { FieldHelp, MoneyBox } from "./fields";
+import { FieldHelp } from "./fields";
 
 export const VARIANT_GRID =
     "grid grid-cols-[minmax(0,2fr)_minmax(0,1.4fr)_minmax(0,1fr)_30px] gap-1.5";
@@ -35,7 +36,7 @@ export function VariantRowView({
     takenIds,
     skuDupe,
     error,
-    symbol,
+    currency,
     productPrice,
     photos,
     stores,
@@ -54,7 +55,8 @@ export function VariantRowView({
     takenIds: string[];
     skuDupe: boolean;
     error: string;
-    symbol: string;
+    /** The business's currency, for the price box. */
+    currency: string;
     productPrice: string;
     photos: ProductImage[];
     /** The business's storefronts when there is more than one; else []. */
@@ -104,21 +106,16 @@ export function VariantRowView({
                     aria-label={`Variant ${i + 1} SKU`}
                     className="font-mono"
                 />
-                <MoneyBox symbol={symbol} small>
-                    <Input
-                        dense
-                        aria-invalid={
-                            r.price.trim() !== "" && !isMoney(r.price)
-                        }
-                        value={r.price}
-                        onChange={(e) => onChange({ price: e.target.value })}
-                        inputMode="decimal"
-                        disabled={locked}
-                        placeholder={productPrice}
-                        aria-label={`Variant ${i + 1} price, blank uses the product's`}
-                        className="pl-[22px]"
-                    />
-                </MoneyBox>
+                <MoneyInput
+                    dense
+                    currency={currency}
+                    aria-invalid={r.price.trim() !== "" && !isMoney(r.price)}
+                    value={r.price}
+                    onValueChange={(price) => onChange({ price })}
+                    disabled={locked}
+                    placeholder={productPrice}
+                    aria-label={`Variant ${i + 1} price, blank uses the product's`}
+                />
                 <Tip label={`Remove ${title || "this variant"}`}>
                     <IconButton
                         label={`Remove ${title || "this variant"}`}

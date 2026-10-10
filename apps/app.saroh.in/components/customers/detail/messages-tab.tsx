@@ -26,6 +26,7 @@ import {
 } from "@/lib/customer-workspace/thread";
 
 import { UNREACHED } from "@/lib/api/unreached";
+import { Field } from "@saroh/ui/field";
 import { Empty } from "./parts";
 
 /**
@@ -141,24 +142,30 @@ export function MessagesTab({
             )}
             {thread.canReply ? (
                 <div className="mt-3.5 rounded-xl border border-border bg-card px-3.5 py-3">
-                    <label htmlFor={`${id}-reply`} className="sr-only">
-                        Reply to {firstName}
-                    </label>
-                    <Textarea
-                        id={`${id}-reply`}
-                        rows={2}
-                        value={draft}
-                        onChange={(e) => setDraft(e.target.value)}
-                        onKeyDown={(e) => {
-                            if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
-                                e.preventDefault();
-                                void reply();
-                            }
-                        }}
-                        aria-describedby={`${id}-note`}
-                        placeholder={`Reply to ${firstName}…`}
-                        className="w-full resize-y"
-                    />
+                    <Field
+                        label={`Reply to ${firstName}`}
+                        labelHidden
+                        className="space-y-0"
+                    >
+                        <Textarea
+                            id={`${id}-reply`}
+                            rows={2}
+                            value={draft}
+                            onChange={(e) => setDraft(e.target.value)}
+                            onKeyDown={(e) => {
+                                if (
+                                    e.key === "Enter" &&
+                                    (e.metaKey || e.ctrlKey)
+                                ) {
+                                    e.preventDefault();
+                                    void reply();
+                                }
+                            }}
+                            aria-describedby={`${id}-note`}
+                            placeholder={`Reply to ${firstName}…`}
+                            className="w-full resize-y"
+                        />
+                    </Field>
                     <div className="mt-2 flex items-center gap-2">
                         <span
                             id={`${id}-note`}
