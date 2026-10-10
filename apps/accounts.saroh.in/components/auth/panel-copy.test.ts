@@ -84,41 +84,53 @@ describe("the sign-up panel", () => {
             "The business already exists",
         );
     });
+
+    it("asks nobody to think up a password", () => {
+        expect(copy.SIGNUP_PANEL.body).toContain("no password to think up");
+        for (const line of copy.SIGNUP_JOIN_PANEL.points ?? []) {
+            expect(line).not.toMatch(/characters/);
+        }
+    });
 });
 
-describe("verifyBlurb: the line under Check your email", () => {
-    it("says what comes next for a new account", () => {
-        expect(copy.verifyBlurb(null)).toBe(
-            "Type the code we emailed you. Next, you name your business.",
+describe("codeNext: what the code step says comes after the code", () => {
+    it("says a new account names its business next", () => {
+        expect(copy.codeNext(null, "sign-up")).toBe(
+            "Next, you name your business.",
         );
-        expect(copy.verifyBlurb(`${APP}/onboarding?plan=grow`)).toBe(
-            "Type the code we emailed you. Next, you name your business.",
+        expect(copy.codeNext(`${APP}/onboarding?plan=grow`, "sign-up")).toBe(
+            "Next, you name your business.",
         );
     });
 
     it("says an invitee joins, not sets up", () => {
-        expect(copy.verifyBlurb(`${APP}/join/abc123`)).toBe(
-            "Type the code we emailed you. Next, you join the business that invited you.",
+        expect(copy.codeNext(`${APP}/join/abc123`, "sign-up")).toBe(
+            "Next, you join the business that invited you.",
+        );
+        expect(copy.codeNext(`${APP}/join/abc123`, "sign-in")).toBe(
+            "Next, you join the business that invited you.",
         );
     });
 
-    it("promises nothing about setup to someone on their way elsewhere", () => {
-        expect(copy.verifyBlurb(`${APP}/bookings`)).toBe(
-            "Type the code we emailed you. Next, you carry on where you were going.",
+    it("promises nothing about setup to someone signing in", () => {
+        expect(copy.codeNext(null, "sign-in")).toBeUndefined();
+        expect(copy.codeNext(`${APP}/bookings`, "sign-in")).toBe(
+            "Next, you carry on where you were going.",
         );
     });
 });
 
-describe("verifiedLine: the line under You're verified", () => {
+describe("doneLine: the line under You're signed in", () => {
     it("says business, never workspace", () => {
-        expect(copy.verifiedLine(null)).toBe(
+        expect(copy.doneLine(null, "sign-up")).toBe(
             "Taking you to set up your business…",
         );
-        expect(copy.verifiedLine(`${APP}/join/abc123`)).toBe(
+        expect(copy.doneLine(`${APP}/join/abc123`, "sign-up")).toBe(
             "Taking you to the business that invited you…",
         );
-        expect(copy.verifiedLine(`${APP}/bookings`)).toBe(
+        expect(copy.doneLine(`${APP}/bookings`, "sign-in")).toBe(
             "Taking you to Saroh…",
         );
+        expect(copy.doneLine(null, "sign-in")).toBe("Taking you to Saroh…");
     });
 });

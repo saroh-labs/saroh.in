@@ -34,13 +34,19 @@ export function AddContactDialog({
     onAdded,
     trigger,
     description = "Someone you met who has not enquired or bought yet. Saroh will not mail them for you.",
+    openOnArrival = false,
 }: {
     onAdded?: (contact: AddedContact) => void;
     trigger?: ReactElement;
     description?: string;
+    /**
+     * Open on arrival (`/contacts?new=1`): where setup lands someone who
+     * chose to keep track of people first.
+     */
+    openOnArrival?: boolean;
 } = {}) {
     const router = useRouter();
-    const [open, setOpen] = useState(false);
+    const [open, setOpen] = useState(openOnArrival);
     const [fields, setFields] = useState({
         name: "",
         email: "",
@@ -102,6 +108,7 @@ export function AddContactDialog({
             label: "Open contact",
             onClick: () => router.push(personHref(id)),
         });
+        if (openOnArrival) router.replace("/contacts");
         router.refresh();
     }
 
@@ -118,6 +125,9 @@ export function AddContactDialog({
             onOpen={() => setOpen(true)}
             onClose={() => {
                 setOpen(false);
+                // Opened by `?new=1`: once closed, the list's own address,
+                // so a reload doesn't open it again.
+                if (openOnArrival) router.replace("/contacts");
                 setFields(blank);
                 setError(null);
             }}

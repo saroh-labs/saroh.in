@@ -37,7 +37,9 @@ for (const role of Object.keys(people) as Role[]) {
             // To accounts' own page, not on to the workspace (where a
             // sign-in lands by default): the session is saved before the
             // workspace can add a cookie of its own.
-            await page.goto(`${urls.ACCOUNTS_URL}/login?redirect=/account`);
+            await page.goto(
+                `${urls.ACCOUNTS_URL}/login?with=password&redirect=/account`,
+            );
             await page.getByLabel("Email").fill(who.email);
             await page
                 .getByLabel("Password", { exact: true })

@@ -86,13 +86,17 @@ describe("withDevAccess — the dev environment's key", () => {
 
     it("sends anyone else to one page when it is told to (accounts before early access)", async () => {
         vi.stubEnv("DEV_REDIRECT_ORIGIN", "https://www.saroh.in");
-        vi.stubEnv("DEV_REDIRECT_PATH", "/");
+        // Production accounts sends them to the waitlist page, which says
+        // when Saroh opens (`apps/accounts.saroh.in/wrangler.jsonc`).
+        vi.stubEnv("DEV_REDIRECT_PATH", "/waitlist");
         const res = await gate(
             request("https://accounts.saroh.in/login?returnTo=x"),
         );
         expect(next).not.toHaveBeenCalled();
         expect(res.status).toBe(307);
-        expect(res.headers.get("location")).toBe("https://www.saroh.in/");
+        expect(res.headers.get("location")).toBe(
+            "https://www.saroh.in/waitlist",
+        );
     });
 
     it("a wrong key is treated as none, and is not carried to production", async () => {

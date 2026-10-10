@@ -1,7 +1,9 @@
-// @covers accounts:/login app:/ app:/choose app:/open app:/bookings api:organizations api:saved-views api:bookings
+// @covers accounts:/login accounts:/account pkg:auth app:/ app:/choose app:/open app:/bookings api:organizations api:saved-views api:bookings
 import { expect, test } from "@playwright/test";
 
+import { people } from "../fixtures/sessions";
 import { demoUser, NORTHWIND_ORG, urls } from "../playwright.config";
+import { lastCode, readSiteCode } from "./site-codes";
 
 /** Home's title is its greeting (F6): "Good morning, Priya", "Welcome, …". */
 const HOME_GREETING = /^(Good (morning|afternoon|evening)|Welcome|Hello)\b/;
@@ -18,7 +20,8 @@ const HOME_GREETING = /^(Good (morning|afternoon|evening)|Welcome|Hello)\b/;
  */
 
 async function signIn(page: import("@playwright/test").Page) {
-    await page.goto(`${urls.ACCOUNTS_URL}/login`);
+    // A code is the main way in. The seeded people have passwords.
+    await page.goto(`${urls.ACCOUNTS_URL}/login?with=password`);
     await page.getByLabel("Email").fill(demoUser.email);
     await page.getByLabel("Password", { exact: true }).fill(demoUser.password);
     await page.getByRole("button", { name: "Sign in" }).click();
@@ -68,6 +71,10 @@ test.describe("cross-origin session", () => {
         await page.goto(`${urls.APP_URL}/bookings`);
         await expect(page).toHaveURL(/\/login/);
 
+        // The page opens on "Email me a code". The password is one press away.
+        await page
+            .getByRole("button", { name: "Use a password instead" })
+            .click();
         await page.getByLabel("Email").fill(demoUser.email);
         await page
             .getByLabel("Password", { exact: true })
@@ -90,6 +97,53 @@ test.describe("cross-origin session", () => {
         await expect(
             page.getByRole("button", { name: "Your account" }),
         ).toBeVisible();
+    });
+
+    /**
+     * A code is the main way in (owner, 10 Oct 2026), and an account with a
+     * password takes one too: the same step a merchant's customers meet on
+     * their site. The code comes from the API's fake outbox.
+     */
+    test("an emailed code signs an existing account in, with no password", async ({
+        page,
+    }, testInfo) => {
+        // A new code replaces the one before it, and desk and phone run
+        // side by side: each asks for its own person's.
+        const codeUser = testInfo.project.name.startsWith("phone")
+            ? people.member
+            : people.founder;
+        await page.goto(`${urls.ACCOUNTS_URL}/login?redirect=/account`);
+        await expect(
+            page.getByRole("heading", { name: "Sign in", level: 1 }),
+        ).toBeVisible();
+        await expect(page.getByLabel("Password")).toHaveCount(0);
+        await page.getByLabel("Email").fill(codeUser.email);
+        // Left from an earlier run, a code would be read as this one.
+        const before = lastCode(codeUser.email);
+        await page.getByRole("button", { name: "Email me a code" }).click();
+
+        await expect(
+            page.getByRole("heading", { name: "Check your email", level: 1 }),
+        ).toBeVisible();
+        await expect(
+            page.getByText(
+                `We sent a 6-digit code to ${codeUser.email}. It lasts 10 minutes.`,
+            ),
+        ).toBeVisible();
+        await expect(
+            page.getByRole("button", { name: /^Resend code in \d+s$/ }),
+        ).toBeDisabled();
+        await expect(
+            page.getByRole("button", { name: "Change email" }),
+        ).toBeVisible();
+        const field = page.getByLabel("Code");
+        await expect(field).toHaveAttribute("autocomplete", "one-time-code");
+
+        // The sixth digit sends it: nothing is pressed.
+        await field.fill(await readSiteCode(codeUser.email, before));
+        await page.waitForURL((url) => url.pathname === "/account", {
+            timeout: 30_000,
+        });
     });
 
     test("signing out drops the session everywhere, not just where it was dropped", async ({

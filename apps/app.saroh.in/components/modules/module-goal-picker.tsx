@@ -9,6 +9,7 @@ import { useMemo, useState } from "react";
 
 import { TurnOnSheet } from "@/components/modules/turn-on/turn-on-sheet";
 import { StatusBadge } from "@/components/shared/status-badge";
+import { goalFor } from "@/lib/modules/goals";
 import { rolledOutKeys } from "@/lib/modules/rollout";
 import type { ModuleView } from "@/lib/modules/schema";
 import { kindWords, preselect } from "@/lib/organizations/kind";
@@ -54,34 +55,27 @@ interface Goal {
  */
 function goalsFor(kind: unknown): Goal[] {
     const { people } = kindWords(kind);
+    // The four a business starts with are worded once, for setup, Home and
+    // this list (`lib/modules/goals.ts`). The rest are this list's own.
+    const started = (moduleKey: string): Goal => {
+        const goal = goalFor(moduleKey, kind);
+        return {
+            moduleKey,
+            title: goal?.verb ?? moduleKey,
+            description: goal?.note ?? "",
+        };
+    };
     const goals: Goal[] = [
-        {
-            moduleKey: "COMMERCE",
-            title: "Sell products",
-            description: "Run a catalog, take orders, and manage inventory.",
-        },
-        {
-            moduleKey: "APPOINTMENTS",
-            title: "Take bookings",
-            description: `Offer services and let ${people} book time with you.`,
-        },
+        started("COMMERCE"),
+        started("APPOINTMENTS"),
         {
             moduleKey: "COURSES",
             title: "Run courses",
             description:
                 "Sell a set of dated sessions with limited seats, like a six-week class.",
         },
-        {
-            moduleKey: "WEBSITE",
-            title: "Show up online",
-            description:
-                "Publish a website with pages, forms, and your own domain.",
-        },
-        {
-            moduleKey: "CRM",
-            title: `Manage ${people} & leads`,
-            description: "Capture enquiries and track them through a pipeline.",
-        },
+        started("WEBSITE"),
+        started("CRM"),
         {
             moduleKey: "PAYMENTS",
             title: "Take payments",
@@ -246,6 +240,7 @@ export function ModuleGoalPicker({
         <div className="space-y-8">
             <TurnOnSheet
                 picked={turningOn}
+                firstRun
                 modules={modules}
                 onOpenChange={(open) => {
                     if (!open) setTurningOn(null);
@@ -367,8 +362,8 @@ export function ModuleGoalPicker({
                     aria-live="polite"
                 >
                     {resolved.size === 0
-                        ? "Nothing selected — you can add capabilities later."
-                        : `${count(resolved.size, "capability", "capabilities")} will be turned on.`}
+                        ? "Nothing selected. You can add modules later."
+                        : `${count(resolved.size, "module")} will be turned on.`}
                 </p>
                 <div className="flex items-center gap-2">
                     <Button

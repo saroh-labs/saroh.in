@@ -23,7 +23,8 @@ function outboxPath(email: string): string {
     );
 }
 
-function lastCode(email: string): string | null {
+/** The code waiting for an address now, if any: pass it to `readSiteCode` as `previous` to wait for a newer one. */
+export function lastCode(email: string): string | null {
     try {
         const code = readFileSync(outboxPath(email), "utf8").trim();
         return /^\d{6}$/.test(code) ? code : null;

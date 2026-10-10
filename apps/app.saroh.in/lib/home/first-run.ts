@@ -1,8 +1,8 @@
+import { goalFor, goalHref, INVOICE_GOAL } from "@/lib/modules/goals";
 import { moduleName } from "@/lib/modules/names";
 import { rolledOut, rolledOutKeys } from "@/lib/modules/rollout";
 import type { ModuleView } from "@/lib/modules/schema";
-import type { OrganizationKind } from "@/lib/organizations/kind";
-import { firstRunOrder, INVOICE_JOB, kindOf } from "@/lib/organizations/kind";
+import { firstRunOrder, INVOICE_JOB } from "@/lib/organizations/kind";
 import { permits } from "@/lib/organizations/permits";
 
 /**
@@ -30,72 +30,14 @@ export interface FirstRunJob {
     href?: string;
 }
 
-/**
+/*
  * Four jobs, not the eight modules. They are the ones a business starts with;
  * the rest only mean something once one of these is running, and stay one link
  * away in the full list. Their order is the kind's (`firstRunOrder`), and the
- * kind may reword one (`WORDS_BY_KIND`); a job is never left out for a kind.
+ * kind may reword one; a job is never left out for a kind. Their words and
+ * where each one lands are `lib/modules/goals.ts`, which setup and the module
+ * picker read too, so the same choice is never worded twice.
  */
-const JOBS: Omit<FirstRunJob, "pulls">[] = [
-    {
-        key: "COMMERCE",
-        verb: "Sell things",
-        note: "Take money for products, in person or online.",
-        gives: "orders, products, customers and discounts",
-    },
-    {
-        key: "APPOINTMENTS",
-        verb: "Take bookings",
-        note: "A diary people can book time in.",
-        gives: "a schedule and your services",
-    },
-    {
-        key: "WEBSITE",
-        verb: "Put up a website",
-        note: "Pages, a journal and an address.",
-        gives: "pages and posts",
-    },
-    {
-        key: "CRM",
-        verb: "Keep track of people",
-        note: "Everyone you deal with, in one list.",
-        gives: "contacts, leads and a pipeline",
-    },
-];
-
-/**
- * A job's words for a kind, where the business's words would be wrong
- * (plan KTD-5): a freelancer keeps track of clients, and a site for someone's
- * work hears from its readers. Only the words change, never what it turns on.
- */
-const WORDS_BY_KIND: Partial<
-    Record<OrganizationKind, Record<string, Partial<FirstRunJob>>>
-> = {
-    SOLO: {
-        CRM: {
-            verb: "Keep track of clients",
-            note: "Everyone you work for, in one list.",
-        },
-    },
-    WORK: {
-        CRM: {
-            verb: "Hear from readers",
-            note: "Everyone who gets in touch, in one list.",
-        },
-    },
-};
-
-/**
- * "Invoice a client" (plan KTD-6): a job with no module behind it. Invoices
- * need no module (DEC-070 Decision 5), so it opens a new invoice rather than
- * the Turn on sheet, and adds nothing to the sidebar.
- */
-const INVOICE: Omit<FirstRunJob, "pulls"> = {
-    key: INVOICE_JOB,
-    verb: "Invoice a client",
-    note: "Bill for your work, send it, and mark it paid when they pay.",
-    href: "/billing/invoices/new",
-};
 
 /**
  * What "Invoice a client" needs to know about the person and the business.
@@ -160,15 +102,20 @@ export function firstRunJobs(
     // Only what Saroh has rolled out here (DEC-057): the API lists every
     // module, a dark one with ROLLOUT_DISABLED.
     const shown = rolledOutKeys(modules);
-    const words = WORDS_BY_KIND[kindOf(kind)] ?? {};
     return firstRunOrder(kind).flatMap((key): FirstRunJob[] => {
         if (key === INVOICE_JOB) {
             if (!invoicing?.mayWrite || invoicing.hasInvoice === true) {
                 return [];
             }
-            return [{ ...INVOICE, pulls: [] }];
+            return [
+                {
+                    ...INVOICE_GOAL,
+                    pulls: [],
+                    href: goalHref(INVOICE_JOB),
+                },
+            ];
         }
-        const job = JOBS.find((j) => j.key === key);
+        const job = goalFor(key, kind);
         if (!job || !shown.has(key)) return [];
         const view = byKey.get(key);
         if (!view || view.lifecycle === "ENABLED") return [];
@@ -177,7 +124,6 @@ export function firstRunJobs(
         return [
             {
                 ...job,
-                ...words[key],
                 pulls: order.filter((k) => k !== key),
             },
         ];

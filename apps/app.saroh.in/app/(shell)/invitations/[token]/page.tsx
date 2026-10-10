@@ -6,14 +6,15 @@ import {
     LOCATION_WRONG_EMAIL,
 } from "@/lib/invitations/outcome";
 import { acceptInvitation } from "@/lib/members/service";
+import { joinDoor, locationArrival } from "@/lib/organizations/joined";
 import { requireSession } from "@/lib/session";
-import { storefrontHref } from "@/lib/stores/links";
 
 /**
  * Accept a location's invitation. Requires a session (requireSession bounces
  * a signed-out visitor to accounts sign-in, which brings them back here).
  * The api enforces that the session email matches the invited email. On
- * success we redirect into the location, otherwise the page says which kind
+ * success they arrive in the location's business, on its orders, and are told
+ * where they are. Otherwise the page says which kind
  * of failure it was and the way on (`lib/invitations/outcome.ts`).
  */
 export const metadata = { title: "Join a location" };
@@ -28,7 +29,18 @@ export default async function AcceptInvitationPage({
 
     const result = await acceptInvitation(token);
     if (result.ok) {
-        redirect(storefrontHref(result.data.storeId));
+        // Orders for that location, which their menu lists (the location's
+        // own settings, where this used to land, it never shows).
+        const to = locationArrival(result.data.storeId);
+        // Through the workspace's door: it opens the location's business,
+        // which this never did, so someone with a business of their own
+        // landed in that one. It also leaves the line that says which
+        // business they joined and as what.
+        redirect(
+            result.data.organizationId
+                ? joinDoor(result.data.organizationId, to)
+                : to,
+        );
     }
 
     return (

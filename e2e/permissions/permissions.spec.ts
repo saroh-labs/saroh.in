@@ -154,7 +154,7 @@ test("a staff member lands on their storefront's work, and the header says so (F
         0,
     );
     await expect(
-        page.getByRole("heading", { name: "Get ready to take money" }),
+        page.getByRole("heading", { name: "Finish setup" }),
     ).toHaveCount(0);
     await expect(page.getByText(/order:stage|payment:read/)).toHaveCount(0);
 });

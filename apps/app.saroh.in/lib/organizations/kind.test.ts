@@ -81,10 +81,12 @@ describe("kind defaults (KTD-6)", () => {
         expect(firstRunOrder("WORK")[0]).toBe("WEBSITE");
     });
 
-    it("asks whether it is registered except for a site for my work", () => {
-        expect(kindDefaults("BUSINESS").asksRegistered).toBe(true);
-        expect(kindDefaults("SOLO").asksRegistered).toBe(true);
-        expect(kindDefaults("WORK").asksRegistered).toBe(false);
+    it("no kind is asked at setup whether it is a registered company", () => {
+        // The Finish setup step "Choose your business type" asks, once
+        // something invoices or takes money (UX audit, 10 Oct).
+        for (const kind of ["BUSINESS", "SOLO", "WORK"]) {
+            expect(kindDefaults(kind)).not.toHaveProperty("asksRegistered");
+        }
     });
 
     it("picks each kind's starter template", () => {

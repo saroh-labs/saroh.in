@@ -360,16 +360,13 @@ describe("Sell", () => {
         if (!delivery) throw new Error("No Delivery box");
         act(() => delivery.click());
         expect(text()).toContain(
-            "Your online shop goes on your website at northwind.saroh.app/shop — we'll set up the website for you.",
+            "Your online shop goes on your website at northwind.saroh.app/shop. We'll set up the website for you.",
         );
-        expect(byLabel("Web address").value).toBe("northwind");
-        // With the web address cleared, the note still names /shop, and
-        // never reads "your address.saroh.app" (DEC-069, L12).
-        typeInto(byLabel("Web address"), "");
+        // The web address was chosen at setup: said, never asked again.
+        expect(() => byLabel("Web address")).toThrow();
         expect(text()).toContain(
-            "Your online shop goes on your website at /shop on your web address — we'll set up the website for you.",
+            "Web addressnorthwind.saroh.appYou chose it when you set up.",
         );
-        typeInto(byLabel("Web address"), "northwind");
         await press(button(/^Turn on$/));
         expect(enableModuleAction.mock.calls.map((c) => c[0])).toEqual([
             "COMMERCE",
@@ -411,19 +408,29 @@ describe("Website", () => {
         });
     });
 
-    it("shows the address with its .saroh.app, and a taken one from the API beside it", async () => {
+    it("says the web address chosen at setup, and asks for it only when the API refuses it", async () => {
         enableModuleAction.mockResolvedValueOnce({
             ok: false,
             error: "Validation failed",
             fields: { address: "northwind is taken. Try another." },
         });
         await open(["WEBSITE"]);
-        expect(text()).toContain(".saroh.app");
-        expect(text()).toContain("Customers find you at northwind.saroh.app");
+        // A line to read, not a field (UX audit, 10 Oct).
+        expect(text()).toContain("northwind.saroh.app");
+        expect(text()).toContain(
+            "You chose it when you set up. It can be changed in Settings › Business.",
+        );
+        expect(() => byLabel("Web address")).toThrow();
+        expect(byLabel("Site name").value).toBe("Northwind");
+
         await press(button(/^Turn on$/));
+        // Refused: now it is a field, so it can be fixed, and it stays one.
         const field = byLabel("Web address");
+        expect(field.value).toBe("northwind");
         expect(field.getAttribute("aria-invalid")).toBe("true");
         expect(text()).toContain("northwind is taken. Try another.");
+        typeInto(field, "northwind-supply");
+        expect(byLabel("Web address").value).toBe("northwind-supply");
         // On the field, not a toast; the sheet stays open.
         expect(showError).not.toHaveBeenCalled();
         expect(push).not.toHaveBeenCalled();

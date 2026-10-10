@@ -2,6 +2,7 @@ import { plural } from "@/lib/format/plural";
 import { cleanAddressInput } from "@/lib/organizations/address";
 
 import { blockerSentence } from "./blocker-copy";
+import { goalHref, isGoalKey } from "./goals";
 import { moduleName } from "./names";
 import { isHiddenByRollout } from "./rollout";
 import type { ModuleView } from "./schema";
@@ -413,14 +414,26 @@ const FIRST_SCREEN: Readonly<Record<string, string>> = {
  * Where to go once it is on: Settings › Providers when "Connect now" was
  * chosen, else the first picked module's own screen. Null for a module
  * with none (Communications works in the background): stay where you are.
+ *
+ * On a first run (Home's "What will you do first?" and the module picker)
+ * the first pick that is one of the starting goals lands on the thing
+ * itself, as setup does: a new product, a new service, the site, a new
+ * contact (`goalHref`). One destination per goal, wherever it was picked.
  */
 export function landingHref(
     picked: readonly string[],
     plan: TurnOnPlan,
     draft: TurnOnDraft,
+    firstRun?: { siteId?: string },
 ): string | null {
     if (plan.order.some((k) => CONNECT_KEYS.has(k) && draft.connect[k])) {
         return PROVIDERS_HREF;
+    }
+    if (firstRun) {
+        // Bookings keeps its own first screen here: this sheet has just
+        // made the first service, so "a new service" is not what is next.
+        const goal = picked.find((k) => isGoalKey(k) && k !== "APPOINTMENTS");
+        if (goal) return goalHref(goal, firstRun);
     }
     for (const k of picked) {
         const href = FIRST_SCREEN[k];

@@ -3,7 +3,7 @@ import { redirect } from "next/navigation";
 import { InvitationProblemView } from "@/components/organizations/invitation-problem";
 import { inviteLandingFor } from "@/lib/accounts";
 import { invitationProblem } from "@/lib/invitations/outcome";
-import { setActiveOrganization } from "@/lib/organizations/actions";
+import { joinDoor } from "@/lib/organizations/joined";
 import { acceptInvitation, invitedEmail } from "@/lib/organizations/members";
 import { requireSession } from "@/lib/session";
 
@@ -18,7 +18,8 @@ import { requireSession } from "@/lib/session";
  * invitation's page on accounts (business, inviter, role, their address),
  * whose two doors carry this URL back through sign-up or sign-in (UX-029).
  *
- * On success the invited business becomes the active one. Without that, a
+ * On success the invited business becomes the open one, through the
+ * workspace's door (`/open/:id`), and a line says so on arrival. Without that, a
  * person who already had a business of their own would accept an invitation
  * and land back in their old one, with the site they were invited to nowhere
  * in sight.
@@ -64,8 +65,15 @@ export default async function JoinPage({
         );
     }
 
-    await setActiveOrganization(result.data.organizationId);
-    // Straight to the site they were asked to look at, when they were asked
-    // about one. A reviewer's whole job is on that page.
-    redirect(result.data.siteId ? `/sites/${result.data.siteId}` : "/");
+    // Through the workspace's door, which opens the business they joined (a
+    // page can't write the open business while it draws) and leaves the
+    // line that says which business it is and as what. Then straight to the
+    // site they were asked to look at, when they were asked about one: a
+    // reviewer's whole job is on that page.
+    redirect(
+        joinDoor(
+            result.data.organizationId,
+            result.data.siteId ? `/sites/${result.data.siteId}` : "/",
+        ),
+    );
 }
