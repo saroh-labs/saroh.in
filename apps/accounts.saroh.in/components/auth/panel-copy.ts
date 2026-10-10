@@ -193,6 +193,18 @@ export const DONE_PANEL: PanelCopy = {
     ],
 };
 
+/** `/account`: the person's own details, in the frame every page wears. */
+export const ACCOUNT_PANEL: PanelCopy = {
+    eyebrow: "Your account",
+    heading: "How you sign in, in one place.",
+    body: "Your name, your email and your password are yours, not any one business's. Next, change what you need and go back to Saroh.",
+    points: [
+        "A code to your email always signs you in",
+        "A password is optional, and you can set or change it here",
+        "Signing out here signs you out of every Saroh app",
+    ],
+};
+
 export const INVITE_PANEL: PanelCopy = {
     eyebrow: "Invitation",
     heading: "You are joining, not starting.",

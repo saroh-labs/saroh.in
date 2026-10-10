@@ -277,6 +277,22 @@
   already sits beside the rows). The other Settings sections share that
   measure through `SettingsPanel` (`rows`), or take the panel (`full`) for
   a table.
+- **Current** (10 Oct 2026) — **One setup checklist: `SetupChecklist`**
+  (`components/shared/setup-checklist.tsx`, rules in
+  `lib/setup-checklist.ts`). Home's and Settings › Business's "Finish
+  setup", a location's and the website's "Before you share your site" are
+  all it, each passing its own rows. A title, "2 of 4 done" (`doneOf`), the
+  shared `ProgressBar`, done rows ticked first then what is left, and ONE
+  button a row that opens its task in place (a `?edit=` link, or a press).
+  When the last step is done the bar fills, the heading says the true thing
+  (`doneTitle`, a sentence), and the card stays for that visit and is one
+  quiet line on the next (`foldKey`; `fold="once"` lets the line go after,
+  on Home). "Hide for now" with Undo is the screen's to keep (`hide`); it
+  is kept per browser, since there is no per-person preference store on the
+  server. The checklist on Home and Settings is named **Finish setup**
+  wherever it is referred to (`FINISH_SETUP`, `checklistWords` in
+  `lib/settings/ready.ts`), with a line saying what its steps are for.
+  Never draw a fifth checklist by hand.
 - **Current** — **`desk:` is 760px**, where the rail appears and the phone
   layouts end, and `max-desk:` is its exact complement. New code uses them.
   The older `min-[760px]:` and `max-[759px]:` mean the same and are not yet
