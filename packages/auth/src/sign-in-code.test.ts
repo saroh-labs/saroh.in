@@ -241,17 +241,32 @@ describe("sign up and sign in with an emailed code", () => {
     });
 
     it("a new code replaces the one before it", async () => {
-        const s = stack();
-        await s.ask("asha@example.com");
-        const first = s.lastCode();
-        await s.ask("asha@example.com");
-        const second = s.lastCode();
-        if (first !== second) {
+        // The library takes the newest code for an address, by when it was
+        // made. Two asks are never closer than the Resend wait, so the
+        // clock moves on between them here too.
+        vi.useFakeTimers({ toFake: ["Date"] });
+        try {
+            const s = stack();
+            await s.ask("asha@example.com");
+            const first = s.lastCode();
+            vi.setSystemTime(Date.now() + CODE_RESEND_SECONDS * 1000);
+            await s.ask("asha@example.com");
+            const second = s.lastCode();
+            if (first !== second) {
+                expect((await s.signIn("asha@example.com", first)).status).toBe(
+                    400,
+                );
+            }
+            expect((await s.signIn("asha@example.com", second)).status).toBe(
+                200,
+            );
+            // And using the new one spends the old one with it.
             expect((await s.signIn("asha@example.com", first)).status).toBe(
                 400,
             );
+        } finally {
+            vi.useRealTimers();
         }
-        expect((await s.signIn("asha@example.com", second)).status).toBe(200);
     });
 
     it(`spends the code after ${CODE_ALLOWED_ATTEMPTS} wrong tries, so even the right one is refused`, async () => {
