@@ -8,7 +8,7 @@ import { SOCIAL_LABELS } from "@saroh/block-contract";
  * text it sits in: the site's own footer or page colours (`--site-*`),
  * never a network's brand colour and never Saroh's. No icon font, no image
  * and no script is fetched from anyone, so nothing here tells a network
- * that a page was opened. Google Maps is a plain map pin.
+ * that a page was opened.
  *
  * The outlines follow Tabler Icons (MIT), on a 24 × 24 grid.
  */
@@ -39,10 +39,6 @@ const PATHS: Readonly<Record<SocialNetwork, readonly string[]>> = {
         "M8 8v.01",
         "M12 16v-5",
         "M16 16v-3a2 2 0 0 0 -4 0",
-    ],
-    googleMaps: [
-        "M9 11a3 3 0 1 0 6 0a3 3 0 0 0 -6 0",
-        "M17.657 16.657l-4.243 4.243a2 2 0 0 1 -2.827 0l-4.244 -4.243a8 8 0 1 1 11.314 0z",
     ],
     pinterest: [
         "M8 20l4 -9",

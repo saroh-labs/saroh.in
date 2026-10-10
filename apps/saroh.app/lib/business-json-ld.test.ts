@@ -16,6 +16,7 @@ const place = (name: string, address: string) => ({
     name,
     address,
     hours: null,
+    mapUrl: null as string | null,
 });
 
 const input = (contact: Partial<PublicContact>) => ({
@@ -36,7 +37,12 @@ describe("businessJsonLd (DEC-125)", () => {
                 input({
                     phone: "+919845012345",
                     email: "hello@rye.example.com",
-                    places: [place("Indiranagar", "12th Main\nBengaluru")],
+                    places: [
+                        {
+                            ...place("Indiranagar", "12th Main\nBengaluru"),
+                            mapUrl: "https://maps.app.goo.gl/AbC123xyZ",
+                        },
+                    ],
                     social: [
                         {
                             network: "instagram",
@@ -45,10 +51,6 @@ describe("businessJsonLd (DEC-125)", () => {
                         {
                             network: "whatsapp",
                             url: "https://wa.me/919845012345",
-                        },
-                        {
-                            network: "googleMaps",
-                            url: "https://maps.app.goo.gl/AbC123xyZ",
                         },
                         { network: "x", url: "https://x.com/rye" },
                     ],
@@ -66,7 +68,7 @@ describe("businessJsonLd (DEC-125)", () => {
                 streetAddress: "12th Main, Bengaluru",
             },
             hasMap: "https://maps.app.goo.gl/AbC123xyZ",
-            // A way to message and a map are not profiles.
+            // A way to message is not a profile.
             sameAs: ["https://www.instagram.com/rye", "https://x.com/rye"],
         });
     });
@@ -97,7 +99,10 @@ describe("businessJsonLd (DEC-125)", () => {
             input({
                 phone: "+919845012345",
                 places: [
-                    place("Indiranagar", "12th Main"),
+                    {
+                        ...place("Indiranagar", "12th Main"),
+                        mapUrl: "https://g.page/rye-indiranagar",
+                    },
                     place("Koramangala", "80 Feet Road"),
                 ],
             }),
@@ -112,6 +117,7 @@ describe("businessJsonLd (DEC-125)", () => {
                         "@type": "PostalAddress",
                         streetAddress: "12th Main",
                     },
+                    hasMap: "https://g.page/rye-indiranagar",
                 },
                 {
                     "@type": "Place",
@@ -124,6 +130,14 @@ describe("businessJsonLd (DEC-125)", () => {
             ],
         });
         expect(data).not.toHaveProperty("address");
+    });
+
+    it("has no hasMap for a place with no map link", () => {
+        const data = businessJsonLd(
+            input({ places: [place("Indiranagar", "12th Main")] }),
+        );
+        expect(data).toMatchObject({ "@type": "LocalBusiness" });
+        expect(data).not.toHaveProperty("hasMap");
     });
 
     it("never names Saroh", () => {

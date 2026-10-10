@@ -1,5 +1,9 @@
 import type { SocialNetwork } from "@saroh/block-contract";
-import { normaliseSocialLink, SOCIAL_NETWORKS } from "@saroh/block-contract";
+import {
+    mapLinkOrNull,
+    normaliseSocialLink,
+    SOCIAL_NETWORKS,
+} from "@saroh/block-contract";
 
 import type { OpeningHoursDay } from "./opening-hours";
 import { isOpeningWeek } from "./opening-hours";
@@ -32,6 +36,11 @@ export interface PublicContactPlace {
     /** Lines joined by "\n". */
     address: string;
     hours: OpeningHoursDay[] | null;
+    /**
+     * The address's own place on Google Maps, which "Get directions" opens;
+     * null: a search for the address.
+     */
+    mapUrl: string | null;
 }
 
 export interface PublicSocialLink {
@@ -47,16 +56,30 @@ export const NO_CONTACT: PublicContact = {
     social: [],
 };
 
-function isPlace(value: unknown): value is PublicContactPlace {
-    if (typeof value !== "object" || value === null) return false;
+/**
+ * A place, or null when it isn't one. Its map link is kept only while it
+ * is Google's own canonical address (checked here as well as by the API);
+ * anything else reads as no link, and directions search for the address.
+ */
+function placeOf(value: unknown): PublicContactPlace | null {
+    if (typeof value !== "object" || value === null) return null;
     const v = value as Record<string, unknown>;
-    return (
-        (v.source === "location" || v.source === "registered") &&
-        (v.name === null || typeof v.name === "string") &&
-        typeof v.address === "string" &&
-        v.address.trim() !== "" &&
-        (v.hours === null || isOpeningWeek(v.hours))
-    );
+    if (
+        !(v.source === "location" || v.source === "registered") ||
+        !(v.name === null || typeof v.name === "string") ||
+        typeof v.address !== "string" ||
+        v.address.trim() === "" ||
+        !(v.hours === null || isOpeningWeek(v.hours))
+    ) {
+        return null;
+    }
+    return {
+        source: v.source,
+        name: v.name,
+        address: v.address,
+        hours: v.hours,
+        mapUrl: mapLinkOrNull(v.mapUrl),
+    };
 }
 
 /**
@@ -91,7 +114,10 @@ export function publicContactOf(body: unknown): PublicContact | null {
     return {
         phone: v.phone?.trim() ? v.phone.trim() : null,
         email: v.email?.trim() ? v.email.trim() : null,
-        places: (v.places as unknown[]).filter(isPlace),
+        places: (v.places as unknown[]).flatMap((place) => {
+            const read = placeOf(place);
+            return read ? [read] : [];
+        }),
         social: (v.social as unknown[]).filter(isSocialLink),
     };
 }

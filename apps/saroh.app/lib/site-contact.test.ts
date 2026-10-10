@@ -42,6 +42,7 @@ describe("getSiteContact (DEC-125)", () => {
                         name: "Indiranagar",
                         address: "12th Main",
                         hours: null,
+                        mapUrl: "https://maps.app.goo.gl/AbC123xyZ",
                     },
                 ],
                 social: [
@@ -64,6 +65,7 @@ describe("getSiteContact (DEC-125)", () => {
                     name: "Indiranagar",
                     address: "12th Main",
                     hours: null,
+                    mapUrl: "https://maps.app.goo.gl/AbC123xyZ",
                 },
             ],
             social: [

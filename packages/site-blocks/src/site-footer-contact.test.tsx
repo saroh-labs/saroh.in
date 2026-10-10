@@ -159,18 +159,55 @@ describe("the footer's contact group (DEC-125)", () => {
         ]);
     });
 
-    it("opens the merchant's own Google Maps link for directions to one place", () => {
+    it("opens a place's own Google Maps link for directions when it has one", () => {
         const map = "https://maps.app.goo.gl/AbC123xyZ";
         footer({
             ...ALL,
-            social: [{ network: "googleMaps", url: map }],
+            places: [
+                { name: "Indiranagar", address: "12th Main", mapUrl: map },
+                { name: "Koramangala", address: "80 Feet Road", mapUrl: null },
+            ],
+        });
+        expect(
+            screen
+                .getAllByRole("link", { name: "Get directions" })
+                .map((a) => a.getAttribute("href")),
+        ).toEqual([map, addressDirectionsHref("80 Feet Road")]);
+    });
+
+    it("searches for the address when the map link isn't Google's own", () => {
+        footer({
+            ...ALL,
+            places: [
+                {
+                    name: "Indiranagar",
+                    address: "12th Main",
+                    mapUrl: "https://evil.example/maps",
+                },
+            ],
         });
         expect(
             screen.getByRole("link", { name: "Get directions" }),
-        ).toHaveAttribute("href", map);
+        ).toHaveAttribute("href", addressDirectionsHref("12th Main"));
+    });
+
+    it("has no Google Maps icon among the social links", () => {
+        footer({
+            ...ALL,
+            social: [
+                ...(ALL.social ?? []),
+                {
+                    network: "googleMaps" as never,
+                    url: "https://maps.app.goo.gl/AbC123xyZ",
+                },
+            ],
+        });
+        expect(screen.queryByRole("link", { name: "Google Maps" })).toBeNull();
         expect(
-            screen.getByRole("link", { name: "Google Maps" }),
-        ).toHaveAttribute("href", map);
+            within(
+                screen.getByRole("list", { name: "Find us on" }),
+            ).getAllByRole("link"),
+        ).toHaveLength(3);
     });
 
     it("never draws a link that isn't a network's own address", () => {
@@ -273,6 +310,7 @@ describe("publicContactOf", () => {
                 name: "Indiranagar",
                 address: "12th Main",
                 hours: null,
+                mapUrl: "https://g.page/rye-bakery",
             },
         ],
         social: [
@@ -300,6 +338,18 @@ describe("publicContactOf", () => {
         });
         expect(contact?.places).toHaveLength(1);
         expect(contact?.social).toEqual(body.social);
+    });
+
+    it("keeps a place and drops its map link when the link isn't Google's own", () => {
+        const [first] = body.places;
+        const contact = publicContactOf({
+            ...body,
+            places: [
+                { ...first, mapUrl: "https://evil.example/maps" },
+                { ...first, name: "No link", mapUrl: undefined },
+            ],
+        });
+        expect(contact?.places.map((p) => p.mapUrl)).toEqual([null, null]);
     });
 
     it("is null for anything that isn't the shape", () => {

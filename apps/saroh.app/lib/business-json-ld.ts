@@ -14,8 +14,9 @@ import { jsonLdScript } from "./product-json-ld";
  *   address; with several, an `Organization` listing each as a `location`;
  *   with none, an `Organization`.
  * - `sameAs` is the business's profiles on other networks. A WhatsApp link
- *   is a way to message, not a profile, and the Google Maps link is the
- *   place's map (`hasMap`), so neither is in it.
+ *   is a way to message, not a profile, so it is not in it.
+ * - A place's Google Maps link, when the merchant gave it one, is that
+ *   place's `hasMap`.
  * - Only what is set is written. With nothing set there is no script.
  */
 
@@ -51,9 +52,8 @@ export function businessJsonLd({
     if (!hasContact(contact)) return null;
     const { phone, email, places, social } = contact;
     const sameAs = social
-        .filter((s) => s.network !== "whatsapp" && s.network !== "googleMaps")
+        .filter((s) => s.network !== "whatsapp")
         .map((s) => s.url);
-    const map = social.find((s) => s.network === "googleMaps")?.url;
     const one = places.length === 1 ? places[0] : undefined;
     return {
         "@context": SCHEMA,
@@ -63,13 +63,14 @@ export function businessJsonLd({
         ...(phone ? { telephone: phone } : {}),
         ...(email ? { email } : {}),
         ...(one ? { address: postalAddress(one.address) } : {}),
-        ...(one && map ? { hasMap: map } : {}),
+        ...(one?.mapUrl ? { hasMap: one.mapUrl } : {}),
         ...(places.length > 1
             ? {
                   location: places.map((place) => ({
                       "@type": "Place",
                       ...(place.name ? { name: place.name } : {}),
                       address: postalAddress(place.address),
+                      ...(place.mapUrl ? { hasMap: place.mapUrl } : {}),
                   })),
               }
             : {}),

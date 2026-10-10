@@ -1,4 +1,5 @@
 import type { SocialNetwork } from "@saroh/block-contract";
+import { mapLinkOrNull } from "@saroh/block-contract";
 
 import type { OpeningHoursDay } from "./lib/opening-hours";
 import { weekSummary } from "./lib/opening-hours";
@@ -32,6 +33,11 @@ export interface SiteContactPlace {
     /** Lines joined by "\n". */
     address: string;
     hours?: readonly OpeningHoursDay[] | null;
+    /**
+     * The place on Google Maps, which "Get directions" opens. Without one
+     * directions are a search for the address.
+     */
+    mapUrl?: string | null;
 }
 
 /** A link in the footer, in the footer's own colours. */
@@ -88,9 +94,8 @@ export function shownContact(contact: SiteContact | null | undefined) {
  * - The phone is a `tel:` link in E.164, written the way it is read.
  * - The email is a `mailto:` link.
  * - One place is its address, "Get directions" and the week it opens;
- *   several are each named. Directions open the merchant's own Google Maps
- *   link when there is one place and they set one, else a search for the
- *   address.
+ *   several are each named. Directions open the place's own Google Maps
+ *   link when the merchant gave it one, else a search for the address.
  * - Social links are icons in the footer's own colour.
  */
 export function FooterContact({
@@ -101,7 +106,6 @@ export function FooterContact({
     align: "centre" | "left";
 }) {
     const { phone, email, places, address, social } = shownContact(contact);
-    const ownMap = social.find((link) => link.network === "googleMaps")?.url;
     const justify = align === "centre" ? "justify-center" : "justify-start";
     if (
         !phone &&
@@ -157,11 +161,10 @@ export function FooterContact({
                                 </address>
                                 <a
                                     href={
-                                        places.length === 1 && ownMap
-                                            ? ownMap
-                                            : addressDirectionsHref(
-                                                  place.address,
-                                              )
+                                        // Re-checked: only Google's own
+                                        // map pages are ever a link.
+                                        mapLinkOrNull(place.mapUrl) ??
+                                        addressDirectionsHref(place.address)
                                     }
                                     target="_blank"
                                     rel="noopener noreferrer"
