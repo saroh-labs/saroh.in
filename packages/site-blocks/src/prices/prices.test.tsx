@@ -302,7 +302,7 @@ describe("Join on the Plans block", () => {
         await press(screen.getByRole("button", { name: "Send code" }));
 
         expect(await screen.findByRole("alert")).toHaveTextContent(
-            "We couldn't send your code — try again in a few minutes",
+            "We couldn't send your code. Try again in a few minutes",
         );
         expect(
             screen.getByRole("link", {

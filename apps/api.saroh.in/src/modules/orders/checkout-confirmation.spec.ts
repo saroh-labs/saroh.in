@@ -77,7 +77,7 @@ describe("confirmationView (P4)", () => {
             confirmationView(
                 row({ payOnHandover: true, paymentStatus: "UNPAID" }),
             ).toPay,
-        ).toBe("Pay when you collect");
+        ).toBe("Pay at pick-up");
         expect(
             confirmationView(
                 row({

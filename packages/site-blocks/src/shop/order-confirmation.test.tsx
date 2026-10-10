@@ -39,7 +39,7 @@ describe("OrderConfirmation (P4)", () => {
             <OrderConfirmation
                 lookup={{
                     ok: true,
-                    order: { ...ORDER, toPay: "Pay when you collect" },
+                    order: { ...ORDER, toPay: "Pay at pick-up" },
                 }}
                 businessName="Rye & Co."
             />,
@@ -52,11 +52,11 @@ describe("OrderConfirmation (P4)", () => {
         ).toBeTruthy();
         expect(
             screen.getByText(
-                "You'll pay when you collect your order. Rye & Co. will be in touch when it's ready.",
+                "You'll pay at pick-up. Rye & Co. will be in touch when it's ready.",
             ),
         ).toBeTruthy();
         expect(
-            screen.getByText("To pay when you collect").nextElementSibling
+            screen.getByText("To pay at pick-up").nextElementSibling
                 ?.textContent,
         ).toBe("₹680");
         expect(screen.queryByText("Paid")).toBeNull();
@@ -108,7 +108,7 @@ describe("OrderConfirmation (P4)", () => {
             "₹680",
         );
         expect(
-            screen.getByRole("heading", { name: "Pick up from" }),
+            screen.getByRole("heading", { name: "Pick-up from" }),
         ).toBeTruthy();
         expect(screen.getByText("12 Hill Road, Bandra")).toBeTruthy();
         // No receipt email is sent when a site order is placed.
@@ -264,5 +264,62 @@ describe("OrderConfirmation (P4)", () => {
     it("keeps the customer on the business's own site", () => {
         expect(orderConfirmationHref("ord_1")).toBe("/shop/order/ord_1");
         expect(orderConfirmationHref("a/b")).toBe("/shop/order/a%2Fb");
+    });
+});
+
+describe("the order page says whether a message is coming", () => {
+    it("says the address it emailed when the business's email sends the notice", () => {
+        render(
+            <OrderConfirmation
+                lookup={{
+                    ok: true,
+                    order: {
+                        ...ORDER,
+                        reach: "EMAIL_AND_ACCOUNT",
+                        email: "asha@example.com",
+                    },
+                }}
+                businessName="Rye & Co."
+            />,
+        );
+        expect(
+            screen.getByText("We've emailed asha@example.com."),
+        ).toBeVisible();
+    });
+
+    it("says it is saved in their account otherwise, and claims no email", () => {
+        render(
+            <OrderConfirmation
+                lookup={{
+                    ok: true,
+                    order: {
+                        ...ORDER,
+                        reach: "NONE",
+                        email: "asha@example.com",
+                    },
+                }}
+                businessName="Rye & Co."
+            />,
+        );
+        expect(screen.getByText("It's saved in your account.")).toBeVisible();
+        expect(document.body.textContent).not.toMatch(/emailed/);
+    });
+
+    it("says neither about an order that was refunded", () => {
+        render(
+            <OrderConfirmation
+                lookup={{
+                    ok: true,
+                    order: {
+                        ...ORDER,
+                        refunded: true,
+                        reach: "EMAIL",
+                        email: "asha@example.com",
+                    },
+                }}
+                businessName="Rye & Co."
+            />,
+        );
+        expect(document.body.textContent).not.toMatch(/emailed|saved in/);
     });
 });

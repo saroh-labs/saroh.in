@@ -128,8 +128,8 @@ export default function VisitUsSection({
         return (
             <VisitCard title={title}>
                 <p role="alert" className="mt-1.5 text-sm opacity-85">
-                    We couldn&apos;t load our address and hours right now —
-                    please try again shortly.
+                    We couldn&apos;t load our address and hours right now.
+                    Please try again shortly.
                 </p>
                 <div className="mt-4">
                     <button

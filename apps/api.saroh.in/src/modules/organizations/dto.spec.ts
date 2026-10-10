@@ -185,6 +185,41 @@ describe("what is being set up (DEC-070)", () => {
     });
 });
 
+describe("what they chose to do first (UX audit, 10 Oct)", () => {
+    const pipe = new ValidationPipe(validationPipeOptions);
+    const refusal = async (metatype: new () => object, body: unknown) =>
+        pipe
+            .transform(body, { type: "body", metatype })
+            .then(() => null)
+            .catch((e: BadRequestException) => e.getResponse());
+
+    it.each(["COMMERCE", "APPOINTMENTS", "WEBSITE", "CRM", "INVOICE"])(
+        "takes %s",
+        async (goal) => {
+            expect(
+                await refusal(OnboardOrganizationDto, { name: "Asha", goal }),
+            ).toBeNull();
+        },
+    );
+
+    it("takes none, for someone who will decide later", async () => {
+        expect(
+            await refusal(OnboardOrganizationDto, { name: "Asha" }),
+        ).toBeNull();
+    });
+
+    it("refuses one Saroh does not offer", async () => {
+        const response = await refusal(OnboardOrganizationDto, {
+            name: "Asha",
+            goal: "PAYMENTS",
+        });
+        expect(response).toMatchObject({ statusCode: 400 });
+        expect(JSON.stringify(response)).toContain(
+            "goal is not one Saroh offers",
+        );
+    });
+});
+
 describe('setup\'s "Is it registered?" (prelaunch)', () => {
     const errors = async (body: unknown) =>
         (await validate(plainToInstance(OnboardingProfileDto, body))).map(

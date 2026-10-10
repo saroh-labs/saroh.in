@@ -94,6 +94,12 @@ export interface CreateOrganizationInput {
      * served there. Absent, the API derives it from the name.
      */
     address?: string;
+    /**
+     * What they chose to do first on the setup screen (a goal's key from
+     * `lib/modules/goals.ts`). Only words follow from it: the welcome email
+     * leads with its next step. Absent: they will decide later.
+     */
+    goal?: string;
 }
 
 /** Discriminated result so the UI can surface field errors inline. */

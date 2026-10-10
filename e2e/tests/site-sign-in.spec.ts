@@ -5,7 +5,7 @@ import type { Page } from "@playwright/test";
 import { expect, test } from "@playwright/test";
 
 import { demoUser, urls } from "../playwright.config";
-import { asNewVisitor, signInOnSheet } from "./site-codes";
+import { asNewVisitor, nameThenBook, signInOnSheet } from "./site-codes";
 
 /**
  * A customer's session on a merchant's site (ADR-011; round-2 plan A, A3),
@@ -164,7 +164,6 @@ test.describe("site sign-in: in the browser", () => {
         const email = `signin-${testInfo.project.name}-${Date.now()}@example.in`;
 
         await chooseTime(page);
-        await page.getByLabel("Name").fill("Asha Rao");
         const desk = page.getByRole("radio", { name: /Pay at the desk/ });
         if (await desk.count()) await desk.click();
         await page
@@ -177,6 +176,8 @@ test.describe("site sign-in: in the browser", () => {
             ),
         ).toBeVisible();
         await signInOnSheet(page, email);
+        // A new account: its name is asked once signed in.
+        await nameThenBook(page, "Asha Rao");
         await expect(
             page.getByRole("heading", { name: "You're booked, Asha." }),
         ).toBeVisible({ timeout: 15_000 });

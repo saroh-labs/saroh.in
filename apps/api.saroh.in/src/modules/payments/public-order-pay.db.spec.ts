@@ -343,6 +343,9 @@ describe("paying from an order's pay link (real database)", () => {
             payUrl: `https://saroh.app/pay/o/${token}`,
             // How to pay us (R32): the business set none.
             payInstructions: null,
+            // Its public phone and contact email, under Pay: it set none.
+            // (The business's own, never the customer's.)
+            businessContact: null,
         });
         // No email, phone, surname or ids reach the page.
         const text = JSON.stringify(view);

@@ -242,7 +242,7 @@ describe("the account's allow-list", () => {
                 {
                     label: "Ready",
                     state: "now",
-                    line: "Now · At the counter — show #1019",
+                    line: "Now · At the counter. Show #1019",
                     at: null,
                 },
                 {
@@ -272,7 +272,7 @@ describe("the account's allow-list", () => {
                 hours: null,
             });
             expect(view.steps[2].line).toBe(
-                "Now · Collect from 12 Hill Road — show #1019",
+                "Now · Pick-up from 12 Hill Road. Show #1019",
             );
             expect(leaks(view)).toEqual([]);
             // A "No counter" place has no door: no address is given.
@@ -284,7 +284,7 @@ describe("the account's allow-list", () => {
             } as never);
             expect(online.collectFrom).toBeNull();
             expect(online.steps[2].line).toBe(
-                "Now · At the counter — show #1019",
+                "Now · At the counter. Show #1019",
             );
         });
 

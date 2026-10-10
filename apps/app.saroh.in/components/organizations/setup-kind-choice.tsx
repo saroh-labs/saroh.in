@@ -9,8 +9,9 @@ import type { OrganizationKind } from "@/lib/organizations/kind";
 import { KIND_CHOICES } from "@/lib/organizations/kind";
 
 /**
- * "What are you setting up?" (DEC-070): three large radio cards, with
- * DEC-070's examples under each, and nothing chosen until the person picks.
+ * "What are you setting up?" (DEC-070): three small radio cards, with
+ * DEC-070's examples under each. Setup opens with "A business" chosen
+ * (owner, 10 Oct 2026): the answer is a default to change, not a gate.
  *
  * A real radio group for the keyboard: one tab stop, the arrow keys move
  * and choose, as a native one would. The label and any error are the
@@ -54,7 +55,7 @@ export function SetupKindChoice({
             aria-describedby={describedBy}
             aria-invalid={invalid ? true : undefined}
             aria-required
-            className="grid gap-2"
+            className="grid gap-2 sm:grid-cols-3"
         >
             {KIND_CHOICES.map((choice, at) => {
                 const on = choice.kind === value;
@@ -73,7 +74,7 @@ export function SetupKindChoice({
                         onClick={() => onChange(choice.kind)}
                         onKeyDown={(e) => onKeyDown(e, at)}
                         className={cn(
-                            "flex min-h-[56px] cursor-pointer items-center gap-3 rounded-lg border px-4 py-3 text-left transition-colors duration-fast focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+                            "flex min-h-11 cursor-pointer items-center gap-2 rounded-lg border px-3 py-2 text-left transition-colors duration-fast focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
                             on
                                 ? "border-foreground bg-muted"
                                 : cn(
@@ -85,17 +86,17 @@ export function SetupKindChoice({
                         )}
                     >
                         <span className="min-w-0 flex-1">
-                            <span className="block text-[14px] font-semibold">
+                            <span className="block text-[13px] font-semibold">
                                 {choice.label}
                             </span>
-                            <span className="mt-0.5 block text-[12px] leading-snug text-muted-foreground">
+                            <span className="mt-0.5 block text-[11.5px] leading-snug text-muted-foreground">
                                 {choice.examples}
                             </span>
                         </span>
                         <span
                             aria-hidden
                             className={cn(
-                                "flex size-5 shrink-0 items-center justify-center rounded-full border",
+                                "flex size-4 shrink-0 items-center justify-center rounded-full border",
                                 on
                                     ? "border-foreground bg-foreground text-background"
                                     : "border-input",

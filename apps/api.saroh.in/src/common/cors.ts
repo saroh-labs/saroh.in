@@ -23,5 +23,17 @@ export function corsOptionsFor(
     if (bare.startsWith("/public/") && !bare.startsWith(`/${WEBHOOK_ROUTE}/`)) {
         return { origin: true, credentials: false };
     }
-    return { origin: trustedOrigins, credentials: true };
+    return {
+        origin: trustedOrigins,
+        credentials: true,
+        exposedHeaders: EXPOSED_HEADERS,
+    };
 }
+
+/**
+ * What a first-party page may read off a response besides its body. The
+ * auth server's limiter answers "too many" with the wait in `X-Retry-After`,
+ * and the sign-in page counts it down ("Resend code in 24s"). A browser
+ * hides any header not named here from a page on another origin.
+ */
+export const EXPOSED_HEADERS = ["X-Retry-After"];

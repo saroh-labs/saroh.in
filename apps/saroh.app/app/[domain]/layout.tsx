@@ -24,7 +24,12 @@ import { getSignedInCustomer } from "@/lib/customer-session";
 import { headerAction } from "@/lib/header-action";
 import { liveMenu } from "@/lib/in-page-menu";
 import { dontCachePage, pageCacheRules } from "@/lib/page-cache/site-rules";
-import { getMovedTo, getSiteForHost, shareImages } from "@/lib/publication";
+import {
+    getMovedTo,
+    getSiteForHost,
+    shareImages,
+    siteOriginFor,
+} from "@/lib/publication";
 import { movedLocation, REQUEST_PATH_HEADER } from "@/lib/request-path";
 import { getCheckoutOptions } from "@/lib/shop-checkout";
 import { getSignInOptions } from "@/lib/sign-in";
@@ -50,7 +55,12 @@ import {
     requestSignInCode,
     verifySignInCode,
 } from "./account/actions";
-import { checkoutStanding, quoteBag, startCheckout } from "./shop/actions";
+import {
+    checkoutStanding,
+    quoteBag,
+    savedDeliveryAddress,
+    startCheckout,
+} from "./shop/actions";
 
 /**
  * Tenant site layout (S2-006).
@@ -134,7 +144,9 @@ export async function generateMetadata({
                 description,
                 images,
             },
-            metadataBase: new URL(`https://${domain}`),
+            // Share cards name the site's primary address (its own domain
+            // when it has one), whichever host this request came on.
+            metadataBase: new URL(siteOriginFor(resolved, domain)),
             ...(verification ? { verification } : {}),
         },
     );
@@ -279,6 +291,7 @@ export default async function SiteLayout({
                     quote: quoteBag,
                     start: startCheckout,
                     standing: checkoutStanding,
+                    savedAddress: savedDeliveryAddress,
                 }}
                 apiUrl={publicApiUrl()}
                 account={{

@@ -1,4 +1,4 @@
-// @covers accounts:/login app:/onboarding api:organizations
+// @covers accounts:/login app:/onboarding app:/ api:organizations api:capabilities
 import AxeBuilder from "@axe-core/playwright";
 import type { Page, TestInfo } from "@playwright/test";
 import { expect, test } from "@playwright/test";
@@ -8,13 +8,18 @@ import { useSession } from "../fixtures/sessions";
 import { urls } from "../playwright.config";
 
 /**
- * "What are you setting up?" (DEC-070, K2).
+ * Setup is one screen (UX audit, 10 Oct): "What are you setting up?"
+ * (DEC-070, K2) is a small choice with "A business" chosen, every field is
+ * there from the start, and "What will you do first?" is on the same
+ * screen. The answer sets the words the form speaks in and is stored as the
+ * business's kind.
  *
- * Setup asks it first, with nothing chosen; the answer sets the words the
- * rest of the form speaks in, and is stored as the business's kind. As Asha
- * (`founder`), who is seeded with no business: each test sets up one of its
- * own, with a stamped name, and reads its kind back from the API. Nothing
- * of the demo owner's is touched, so it runs beside everything else.
+ * As Asha (`founder`): each test sets up a business of its own, with a
+ * stamped name, and reads its kind back from the API. Nothing of the demo
+ * owner's is touched, so it runs beside everything else. Each picks "Decide
+ * later", so it lands on Home whatever the stack has rolled out; what each
+ * goal turns on and where it lands is the unit tests'
+ * (`apps/app.saroh.in/lib/modules/first-goal.test.ts`).
  */
 
 interface OrgRow {
@@ -32,12 +37,13 @@ async function openSetup(page: Page) {
     ).toBeVisible();
 }
 
-/** Name it, wait for its address to be free, and set it up. */
-async function setUp(page: Page, name: string, button: string) {
-    await page.getByLabel("Your name or brand").fill(name);
+/** Name it, wait for its web address to be free, and set it up. */
+async function setUp(page: Page, label: string, name: string, button: string) {
+    await page.getByLabel(label).fill(name);
     await expect(
         page.getByText("Available. Your website will live here."),
     ).toBeVisible();
+    await page.getByRole("radio", { name: /Decide later/ }).click();
     await page.getByRole("button", { name: button }).click();
     await page.waitForURL((url) => !url.pathname.startsWith("/onboarding"));
 }
@@ -64,10 +70,10 @@ function aName(prefix: string, testInfo: TestInfo) {
     return `${prefix} ${stamp(testInfo)}`;
 }
 
-test.describe("What are you setting up? (DEC-070)", () => {
-    test("nothing is chosen, and setup will not go on without an answer", async ({
+test.describe("setup is one screen (DEC-070, UX audit 10 Oct)", () => {
+    test("A business is chosen, the whole form is open, and the goal is asked here", async ({
         page,
-    }) => {
+    }, testInfo) => {
         await openSetup(page);
         const choices = page
             .getByRole("radiogroup", { name: "What are you setting up?" })
@@ -77,67 +83,52 @@ test.describe("What are you setting up? (DEC-070)", () => {
             /Just me/,
             /A site for my work/,
         ]);
-        for (const choice of await choices.all()) {
-            await expect(choice).toHaveAttribute("aria-checked", "false");
-        }
-        // The rest of the form waits for the answer.
-        await expect(page.getByLabel("What is it called?")).toBeHidden();
+        await expect(choices.nth(0)).toHaveAttribute("aria-checked", "true");
 
-        await page.getByRole("button", { name: "Set it up" }).click();
+        // Nothing waits for an answer.
+        await expect(page.getByLabel("What is it called?")).toBeVisible();
+        await expect(page.getByLabel("Web address")).toBeVisible();
+        await expect(page.getByText("Its address on Saroh")).toHaveCount(0);
         await expect(
-            page.getByText("Choose what you're setting up"),
-        ).toBeVisible();
+            page.getByText("Is it registered as a company?"),
+        ).toHaveCount(0);
+        await expect(
+            page
+                .getByRole("radiogroup", { name: "Where does it trade?" })
+                .getByRole("radio", { name: /India/ }),
+        ).toHaveAttribute("aria-checked", "true");
+
+        // Asha has businesses already, so this is "Set up another" and
+        // carries no step count (a new account's does:
+        // `signup-from-marketing.spec.ts`). Nothing calls it the last step.
+        await expect(page.getByText(/last step/i)).toHaveCount(0);
+
+        // The goals, in Home's words, with Sell chosen for a business.
+        const goals = page
+            .getByRole("radiogroup", { name: "What will you do first?" })
+            .getByRole("radio");
+        await expect(goals).toHaveText([
+            /^Sell things/,
+            /^Take bookings/,
+            /^Put up a website/,
+            /^Keep track of people/,
+            /^Decide later/,
+        ]);
+        await expect(goals.nth(0)).toHaveAttribute("aria-checked", "true");
+
+        // An empty name is refused on its field, and nothing is made.
+        await page.getByRole("button", { name: "Create the business" }).click();
+        await expect(page.getByText("It needs a name")).toBeVisible();
         await expect(page).toHaveURL(/\/onboarding/);
 
-        // axe on the cards, answered and not.
-        const axe = async () =>
-            (
-                await new AxeBuilder({ page })
-                    .include('[role="radiogroup"]')
-                    .withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"])
-                    .analyze()
-            ).violations.map((v) => `${v.id}: ${v.help}`);
-        expect(await axe()).toEqual([]);
-        await page.getByRole("radio", { name: /Just me/ }).click();
-        expect(await axe()).toEqual([]);
-    });
-
-    test("Just me is asked for a name or brand, and is stored as SOLO", async ({
-        page,
-    }, testInfo) => {
-        await openSetup(page);
-        await page.getByRole("radio", { name: /Just me/ }).click();
-
-        await expect(page.getByLabel("Your name or brand")).toBeVisible();
-        await expect(page.getByLabel("Your name or brand")).toHaveAttribute(
-            "placeholder",
-            "Asha Rao",
-        );
-        await expect(
-            page.getByText("Is it registered as a company?"),
-        ).toBeVisible();
-
-        const name = aName("Asha Rao", testInfo);
-        await setUp(page, name, "Set it up");
-        expect(await kindOf(page, name)).toEqual({
-            listed: "SOLO",
-            summary: "SOLO",
-        });
-    });
-
-    test("A site for my work is not asked about a company, and is stored as WORK", async ({
-        page,
-    }, testInfo) => {
-        await openSetup(page);
-        await page.getByRole("radio", { name: /A site for my work/ }).click();
-
-        await expect(page.getByLabel("Your name or brand")).toHaveAttribute(
-            "placeholder",
-            "Asha Rao Studio",
-        );
-        await expect(
-            page.getByText("Is it registered as a company?"),
-        ).toBeHidden();
+        // axe on the choices.
+        const violations = (
+            await new AxeBuilder({ page })
+                .include('[role="radiogroup"]')
+                .withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"])
+                .analyze()
+        ).violations.map((v) => `${v.id}: ${v.help}`);
+        expect(violations).toEqual([]);
 
         // The page never scrolls sideways, at the width it was set to (on a
         // phone `innerWidth` grows with the overflow, so it can't be used).
@@ -148,8 +139,59 @@ test.describe("What are you setting up? (DEC-070)", () => {
             )
             .toBeLessThanOrEqual(width);
 
+        const name = aName("Rye Bakery", testInfo);
+        await setUp(page, "What is it called?", name, "Create the business");
+        expect(await kindOf(page, name)).toEqual({
+            listed: "BUSINESS",
+            summary: "BUSINESS",
+        });
+    });
+
+    test("Just me is asked for a name or brand, and is stored as SOLO", async ({
+        page,
+    }, testInfo) => {
+        await openSetup(page);
+        await page.getByRole("radio", { name: /Just me/ }).click();
+
+        await expect(page.getByLabel("Your name or brand")).toHaveAttribute(
+            "placeholder",
+            "Asha Rao",
+        );
+        // Its own order of goals, bookings first.
+        await expect(
+            page
+                .getByRole("radiogroup", { name: "What will you do first?" })
+                .getByRole("radio")
+                .first(),
+        ).toHaveText(/^Take bookings/);
+
+        const name = aName("Asha Rao", testInfo);
+        await setUp(page, "Your name or brand", name, "Set it up");
+        expect(await kindOf(page, name)).toEqual({
+            listed: "SOLO",
+            summary: "SOLO",
+        });
+    });
+
+    test("A site for my work starts with the website, and is stored as WORK", async ({
+        page,
+    }, testInfo) => {
+        await openSetup(page);
+        await page.getByRole("radio", { name: /A site for my work/ }).click();
+
+        await expect(page.getByLabel("Your name or brand")).toHaveAttribute(
+            "placeholder",
+            "Asha Rao Studio",
+        );
+        await expect(
+            page
+                .getByRole("radiogroup", { name: "What will you do first?" })
+                .getByRole("radio")
+                .first(),
+        ).toHaveText(/^Put up a website/);
+
         const name = aName("Asha Rao Studio", testInfo);
-        await setUp(page, name, "Set it up");
+        await setUp(page, "Your name or brand", name, "Set it up");
         expect(await kindOf(page, name)).toEqual({
             listed: "WORK",
             summary: "WORK",

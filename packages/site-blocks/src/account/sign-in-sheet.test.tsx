@@ -138,7 +138,7 @@ describe("SignInSheet: the email step", () => {
         await askForCode();
         const alert = screen.getByRole("alert");
         expect(alert).toHaveTextContent(
-            "We couldn't send your code — try again in a few minutes",
+            "We couldn't send your code. Try again in a few minutes",
         );
         const call = screen.getByRole("link", {
             name: "Or call Kavi Dental on +91 80 4000 1234",
@@ -152,7 +152,7 @@ describe("SignInSheet: the email step", () => {
         setup({ code: { ok: false, reason: "unavailable" } });
         await askForCode();
         expect(screen.getByRole("alert")).toHaveTextContent(
-            /^We couldn't send your code — try again in a few minutes$/,
+            /^We couldn't send your code. Try again in a few minutes$/,
         );
         expect(screen.queryByRole("link")).toBeNull();
     });

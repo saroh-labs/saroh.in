@@ -5,7 +5,7 @@ import type {
     PricesActions,
     SignInOptions,
 } from "@saroh/site-blocks";
-import { modulePageTopOf, PageSections } from "@saroh/site-blocks";
+import { modulePageTopOf, PageSections, reachOf } from "@saroh/site-blocks";
 
 import {
     requestSignInCode,
@@ -25,6 +25,7 @@ import { getSignedInCustomer } from "@/lib/customer-session";
 import type { PublicationPage, PublicationSnapshot } from "@/lib/publication";
 import { getJournalFeed } from "@/lib/publication";
 import { getSignInOptions } from "@/lib/sign-in";
+import { getSiteContact } from "@/lib/site-contact";
 import { getPacksFeed } from "@/lib/site-packs";
 import { getPlansFeed } from "@/lib/site-plans";
 import { getProductGridFeeds } from "@/lib/site-product-grids";
@@ -57,9 +58,15 @@ export async function PublishedPage({
             page.kind === "SHOP" || page.path === "/shop",
         ),
     ]);
-    const [prices, thread] = await Promise.all([
+    const [prices, thread, contact] = await Promise.all([
         pricesActions(snapshot.site.name, plans, packs),
         threadActions(snapshot.site.name, page.sections),
+        // How to reach the business, for a booking block with no time to
+        // offer: the layout's own read (shared through `cache`), and only
+        // on a page that draws the block.
+        siteId && page.sections.some((s) => s.type === "booking")
+            ? getSiteContact(siteId)
+            : null,
     ]);
 
     return (
@@ -76,6 +83,7 @@ export async function PublishedPage({
             prices={prices}
             thread={thread}
             productGrids={productGrids}
+            reach={reachOf(contact)}
         />
     );
 }

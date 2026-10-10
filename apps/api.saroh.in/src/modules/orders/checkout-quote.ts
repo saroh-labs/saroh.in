@@ -40,6 +40,12 @@ export interface QuoteListing {
         categoryId?: string | null;
         stockTracked: boolean;
         fulfilmentTypes: readonly string[];
+        /**
+         * The product's own returns rule, where its page shows one (the
+         * same words, `public-catalogue.service.ts`); null or absent for
+         * none. The bag repeats it above its button.
+         */
+        returns?: string | null;
         cover: { url: string; alt: string } | null;
         variants: readonly {
             id: string;
@@ -83,6 +89,8 @@ export interface QuotedLine {
     available: number | null;
     /** The product's own ways (B12), for `allowedTypes`. */
     fulfilmentTypes: readonly string[];
+    /** The returns rule its page shows; null for none, or a line gone. */
+    returns: string | null;
 }
 
 /** The most lines, and of each, a bag may hold. */
@@ -149,6 +157,7 @@ export function quoteLines(
             state: "gone",
             available: 0,
             fulfilmentTypes: [],
+            returns: null,
         });
         if (!listing || product?.status !== "PUBLISHED") {
             return gone();
@@ -194,6 +203,7 @@ export function quoteLines(
             state,
             available,
             fulfilmentTypes: product.fulfilmentTypes,
+            returns: product.returns?.trim() ? product.returns.trim() : null,
         };
     });
 }
@@ -310,6 +320,8 @@ export interface CheckoutQuote {
         amount: string;
         state: LineState;
         available: number | null;
+        /** The returns rule the product's page shows; null for none. */
+        returns: string | null;
     }[];
     ways: CheckoutWay[];
     /** The way asked for, when it is one of `ways`; else null. */
@@ -408,6 +420,7 @@ export function buildQuote(input: {
             ),
             state: l.state,
             available: l.available,
+            returns: l.returns,
         })),
         ways: ways.map((type) => {
             const fee = deliveryCents(type, input.fees, items);

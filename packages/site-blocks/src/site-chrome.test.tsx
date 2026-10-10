@@ -47,7 +47,7 @@ describe("the site header (G17)", () => {
             <SiteHeader name="Pulse Fitness" navigation={NAV} action={BOOK} />,
         );
         const home = screen.getByRole("link", {
-            name: "Pulse Fitness — home",
+            name: "Pulse Fitness, home",
         });
         expect(home).toHaveAttribute("href", "/");
         expect(home.querySelector("span")).toHaveClass("font-site-heading");
@@ -114,7 +114,7 @@ describe("the site header (G17)", () => {
     it("draws no main button and no menu button for a site with neither", () => {
         render(<SiteHeader name="Kavi Dental" navigation={[]} />);
         expect(
-            screen.getByRole("link", { name: "Kavi Dental — home" }),
+            screen.getByRole("link", { name: "Kavi Dental, home" }),
         ).toBeInTheDocument();
         expect(screen.queryByRole("button")).toBeNull();
         expect(screen.queryByRole("navigation")).toBeNull();
@@ -161,7 +161,7 @@ describe("the site header (G17)", () => {
             />,
         );
         expect(
-            screen.getByRole("link", { name: "Pulse Fitness — home" }),
+            screen.getByRole("link", { name: "Pulse Fitness, home" }),
         ).toHaveAttribute("href", "/preview/tok");
         expect(screen.getByRole("link", { name: "Classes" })).toHaveAttribute(
             "href",
@@ -690,7 +690,7 @@ describe("the header's controls look pressable (G19)", () => {
         const classes = screen.getByRole("link", { name: "Classes" });
         expect(classes.className).toContain("hover:bg-site-border/40");
 
-        const name = screen.getByRole("link", { name: "Pulse — home" });
+        const name = screen.getByRole("link", { name: "Pulse, home" });
         expect(name.className).toContain("cursor-pointer");
         expect(name.className).toMatch(/\bhover:/);
         expect(name.className).toMatch(/\bactive:/);

@@ -288,14 +288,33 @@ what the API allows.
   by Google. `/apps` is for Saroh staff: the page asks the API
   (`GET /admin/me`, `isStaff`), sends everyone else on to the app, and
   nothing links to it.
-- **Current** — **A sign-up for an address that has an account says the
-  same as a new one** (`requireEmailVerification`), so the screen can't be
-  used to learn who is registered. No code is sent, so the owner of the
-  address is emailed "You already have a Saroh account" with Sign in and
-  Reset password (`onExistingUserSignUp` → `existingUserSignUpHook` in
-  `packages/auth/src/server.ts`, `sendExistingAccountEmail` in the API), and
-  the verify page offers "No code? You may already have an account. Sign in."
-  to everyone. A failed send never changes the sign-up's answer.
+- **Current** (DEC-126, 10 Oct 2026) — **A merchant signs up and signs in
+  with an emailed code; a password is optional.** `/signup` takes the email,
+  then the code; `/login` leads with "Email me a code" and keeps "Use a
+  password instead" (`/login?with=password` opens on it). Both are Better
+  Auth's `emailOTP` endpoints, never a session of our own making:
+  `emailOtp.sendVerificationOtp({ type: "sign-in" })`, then
+  `signIn.emailOtp`. Asking for a code answers the same, and sends the same
+  email, whether or not the address has an account, so no screen says who is
+  registered; the code makes the account when there was none. One code step
+  for every page (`apps/accounts.saroh.in/components/auth/code-step.tsx`),
+  its rules and words pure in `lib/sign-in-code.ts`, in the words of the
+  customer site's sheet. The limits are constants in
+  `@saroh/auth/constants` that the server's plugin and the screen both read
+  (code lifetime, 5 wrong tries, 3 a minute, the Resend wait), and
+  `packages/auth/src/sign-in-code.test.ts` runs the real library on
+  `authOptions()` with a database in memory: change the auth options or
+  upgrade the library and it says what broke. A first password is set on
+  the account page with a code to the account's address
+  (`lib/password.ts`), never on the session alone. The name is asked in
+  setup; an invitee's sign-up asks for it.
+- **Current** — **The old password sign-up endpoint still answers the same
+  for an address that has an account** (`requireEmailVerification`): no
+  page calls it now, but it is the library's and stays on, so the owner of
+  the address is still emailed "You already have a Saroh account"
+  (`onExistingUserSignUp` → `existingUserSignUpHook` in
+  `packages/auth/src/server.ts`, `sendExistingAccountEmail` in the API). A
+  failed send never changes the answer.
 - **Current** — **Derive the organization; never accept it.** `:organizationId`
   or `x-organization-id` is a hint the guard re-validates against real
   membership. Public routes derive the organization from the resource (a Site),

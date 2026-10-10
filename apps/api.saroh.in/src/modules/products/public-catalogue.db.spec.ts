@@ -263,6 +263,8 @@ describe("public catalogue (G11)", () => {
             // The card's "2 sizes" (DEC-073 #12).
             optionName: "Size",
             blurb: "Slow rye. Baked at dawn.",
+            // Filed under no category: none for the shop's chips.
+            categoryName: null,
             soldOut: false,
             listingId: expect.any(String),
             bagVariantId: expect.any(String),
@@ -280,6 +282,39 @@ describe("public catalogue (G11)", () => {
         expect(
             shop.products.find((p) => p.slug === "focaccia")?.bagVariantId,
         ).toBeNull();
+    });
+
+    it("names the category a product is filed under, for the shop's chips", async () => {
+        const before = await catalogue.list(ryeSite, "visitor");
+        const listed = before.products.find((p) => p.slug === "focaccia");
+        expect(listed?.categoryName).toBeNull();
+        const product = await prisma.product.findFirstOrThrow({
+            where: { slug: "focaccia" },
+            select: { id: true, organizationId: true, categoryId: true },
+        });
+        const category = await prisma.category.create({
+            data: {
+                organizationId: product.organizationId,
+                name: " Flatbreads ",
+                slug: `flatbreads-${Date.now()}`,
+            },
+        });
+        await prisma.product.update({
+            where: { id: product.id },
+            data: { categoryId: category.id },
+        });
+        try {
+            const shop = await catalogue.list(ryeSite, "visitor");
+            expect(
+                shop.products.find((p) => p.slug === "focaccia")?.categoryName,
+            ).toBe("Flatbreads");
+        } finally {
+            await prisma.product.update({
+                where: { id: product.id },
+                data: { categoryId: product.categoryId },
+            });
+            await prisma.category.delete({ where: { id: category.id } });
+        }
     });
 
     it("serves a product page with only the variants sold here, and their stock words", async () => {

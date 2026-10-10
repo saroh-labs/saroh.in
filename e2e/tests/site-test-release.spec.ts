@@ -259,7 +259,6 @@ test.describe("flows stop short on a test release (T6)", () => {
         });
         await expect(times.first()).toBeVisible({ timeout: 15_000 });
         await times.first().click();
-        await page.getByLabel("Name").fill(`Tester ${mark}`);
         const bookWrites = watchWrites(page);
         await page
             .getByRole("button", { name: "Continue to sign in" })

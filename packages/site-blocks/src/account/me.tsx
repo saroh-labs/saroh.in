@@ -277,7 +277,7 @@ export function Me({
                 onSignedIn={(customer) => {
                     setAccount((a) => ({ ...a, email: customer.email }));
                     setSaid(
-                        "Done. Use that email to sign in from now on — other devices are signed out.",
+                        "Done. Use that email to sign in from now on. Other devices are signed out.",
                     );
                     router.refresh();
                 }}

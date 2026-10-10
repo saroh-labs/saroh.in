@@ -121,8 +121,6 @@ export interface KindDefaults {
     firstRunOrder: readonly string[];
     /** The module `/onboarding/modules` pre-selects, if any. */
     preselect: string | null;
-    /** Whether setup asks "Is it registered as a company?". */
-    asksRegistered: boolean;
     /** The site template a new site starts from (K15). */
     starterTemplate: string;
     /** The setup name field's example. */
@@ -133,7 +131,6 @@ const DEFAULTS: Record<OrganizationKind, KindDefaults> = {
     BUSINESS: {
         firstRunOrder: ["COMMERCE", "APPOINTMENTS", "WEBSITE", "CRM"],
         preselect: "COMMERCE",
-        asksRegistered: true,
         starterTemplate: "starter",
         namePlaceholder: "Rye & Co. Bakery",
     },
@@ -146,15 +143,12 @@ const DEFAULTS: Record<OrganizationKind, KindDefaults> = {
             "COMMERCE",
         ],
         preselect: null,
-        asksRegistered: true,
         starterTemplate: "personal",
         namePlaceholder: "Asha Rao",
     },
     WORK: {
         firstRunOrder: ["WEBSITE", "CRM", "APPOINTMENTS", "COMMERCE"],
         preselect: "WEBSITE",
-        // Asked in Settings, and in place before a first invoice (DEC-068 M3).
-        asksRegistered: false,
         starterTemplate: "portfolio",
         namePlaceholder: "Asha Rao Studio",
     },

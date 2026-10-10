@@ -30,7 +30,7 @@ import { TakeMoneyChecklist } from "./take-money-checklist";
 import { ThisWeek } from "./this-week";
 import { Today } from "./today";
 
-/** "Get ready to take money", for someone who may change the business. */
+/** "Finish setup", for someone who may change the business. */
 export interface HomeSetup {
     list: ReadyChecklist;
     businessId: string;
@@ -124,7 +124,7 @@ export function HomeDashboard({
                     its content's min-content width and pushed the whole page
                     into a horizontal scroll at 320px (#178, §18). */}
                 <div className="grid min-w-0 flex-[1_1_520px] content-start gap-5">
-                    {/* "Get ready to take money" leads while fewer than half
+                    {/* "Finish setup" leads while fewer than half
                         its steps are done, and moves to the foot of the
                         column once more are; each slot draws only when it's
                         the checklist's place (F8). */}

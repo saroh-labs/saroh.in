@@ -28,6 +28,11 @@ export interface QuoteLine {
     amount: string;
     state: QuoteLineState;
     available: number | null;
+    /**
+     * The returns rule the product's page shows, repeated above the bag's
+     * button; null for none. Absent from an older API.
+     */
+    returns?: string | null;
 }
 
 /** A way the order can leave, with what it adds. */
@@ -40,7 +45,7 @@ export interface QuoteWay {
 
 /**
  * How an order is paid: online in the provider's window, or at the
- * handover — "Pay when you collect", "Pay on delivery".
+ * handover — "Pay at pick-up", "Pay on delivery".
  */
 export type ShopPayment = "ONLINE" | "ON_HANDOVER";
 
@@ -198,11 +203,17 @@ export interface ShopCheckoutApi {
     }): Promise<ShopResult<CheckoutQuote>>;
     start(body: StartCheckout): Promise<ShopResult<CheckoutStarted>>;
     standing(orderId: string): Promise<ShopResult<CheckoutStanding>>;
+    /**
+     * Where the signed-in customer's last delivery went, or null when they
+     * have had none: the bag reads it out instead of asking again. Absent:
+     * the bag always asks.
+     */
+    savedAddress?: () => Promise<ShopResult<DeliveryAddress | null>>;
 }
 
 /** The sentence when the server can't be reached at all. */
 export const SHOP_OFFLINE =
-    "We couldn't reach the shop — check your connection and try again.";
+    "We couldn't reach the shop. Check your connection and try again.";
 
 /** A key for one checkout: letters, digits, - and _ only. */
 export function checkoutKey(): string {

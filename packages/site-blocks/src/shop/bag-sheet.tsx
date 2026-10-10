@@ -17,10 +17,29 @@ import type {
     StartCheckout,
 } from "./api";
 import { checkoutKey, SHOP_OFFLINE } from "./api";
+import {
+    addressBlank,
+    AddressFields,
+    addressLeft,
+    EMPTY_ADDRESS,
+    needsAddress,
+    SavedAddress,
+    trimmed,
+} from "./bag-address";
+import type { RemovedLine } from "./bag-lines";
+import {
+    BagLines,
+    lineKey,
+    lineNote,
+    RemovedNotice,
+    returnsLines,
+} from "./bag-lines";
 import type { BagItem } from "./bag-store";
-import { MAX_ITEM_QUANTITY, setQuantity } from "./bag-store";
+import { addToBag, setQuantity } from "./bag-store";
 import { cleanCode, CodeField, codeSettled } from "./code-field";
 import { sheetButton, SheetFrame } from "./sheet-frame";
+
+export { lineNote };
 
 /**
  * "Your bag" (round-2 G13), as the Customer Site design's cart sheet draws
@@ -42,55 +61,25 @@ import { sheetButton, SheetFrame } from "./sheet-frame";
  * takes (DEC-059).
  */
 
+/**
+ * A note as the checkout's print carries it: a number that changes when
+ * the note does, from which the note can't be read back.
+ */
+export function notePrint(note: string): number {
+    let hash = 5381;
+    for (let i = 0; i < note.length; i += 1) {
+        hash = (Math.imul(hash, 33) ^ note.charCodeAt(i)) >>> 0;
+    }
+    return hash;
+}
+
+/** The most an order's note may run to: the API's own limit. */
+export const MAX_ORDER_NOTE = 500;
+
 type Load =
     | { kind: "loading" }
     | { kind: "ready"; quote: CheckoutQuote }
     | { kind: "error"; message: string };
-
-const needsAddress = (way: ShopWay | null) =>
-    way === "LOCAL_DELIVERY" || way === "SHIPPING";
-
-const EMPTY_ADDRESS: DeliveryAddress = {
-    name: "",
-    phone: "",
-    line1: "",
-    line2: "",
-    city: "",
-    state: "",
-    postalCode: "",
-};
-
-function addressReady(a: DeliveryAddress): boolean {
-    return (
-        a.line1.trim() !== "" &&
-        a.city.trim() !== "" &&
-        a.state.trim() !== "" &&
-        a.postalCode.trim() !== ""
-    );
-}
-
-function trimmed(a: DeliveryAddress): DeliveryAddress {
-    const out: DeliveryAddress = {
-        line1: a.line1.trim(),
-        city: a.city.trim(),
-        state: a.state.trim(),
-        postalCode: a.postalCode.trim(),
-    };
-    if (a.name?.trim()) out.name = a.name.trim();
-    if (a.phone?.trim()) out.phone = a.phone.trim();
-    if (a.line2?.trim()) out.line2 = a.line2.trim();
-    return out;
-}
-
-/** What a line says under its name when it can't be sold as asked. */
-export function lineNote(line: QuoteLine): string | null {
-    if (line.state === "gone") return "No longer sold here. Take it out.";
-    if (line.state === "sold-out") return "Sold out";
-    if (line.state === "short") {
-        return `Only ${line.available ?? 0} left`;
-    }
-    return null;
-}
 
 /**
  * The small line under the bag's delivery row for the location's "Free
@@ -117,10 +106,6 @@ export function freeDeliveryNote(
         ? `Free delivery on orders of ${formatAmount(free.over, quote.currency)} or more.`
         : null;
 }
-
-/** A bag line's key: its listing and variant. */
-const lineKey = (l: Pick<QuoteLine, "listingId" | "variantId">) =>
-    `${l.listingId}:${l.variantId ?? ""}`;
 
 /**
  * The lines asking for more than is left, and how many each can have
@@ -169,6 +154,8 @@ export function holdReason(input: {
     quote: CheckoutQuote | null;
     way: ShopWay | null;
     addressOk: boolean;
+    /** What the address still lacks, when it is the phone and not a line. */
+    addressNote?: string | null;
     payable: boolean;
 }): string | null {
     const { quote, way } = input;
@@ -186,23 +173,13 @@ export function holdReason(input: {
     if (!way || quote.fulfilment !== way) {
         return "Choose how your order reaches you.";
     }
-    if (!input.addressOk) return "Add the address to deliver to.";
+    if (!input.addressOk) {
+        return input.addressNote ?? "Add the address to deliver to.";
+    }
     if (!input.payable)
         return "This can't be paid for this way. Choose another.";
     return null;
 }
-
-// 16px: under it, iOS Safari zooms the page when a field takes focus.
-const field = cn(
-    "border-site-border text-site-fg mt-1 block h-11 w-full rounded-[calc(var(--site-radius)+8px)] border px-3 text-base",
-    inputFill,
-    focusRing,
-);
-
-const stepper = cn(
-    "border-site-border bg-site-bg text-site-fg size-[30px] cursor-pointer rounded-lg border text-base leading-none hover:opacity-80 active:scale-95 disabled:cursor-not-allowed disabled:opacity-40",
-    focusRing,
-);
 
 /**
  * What the customer chose in the bag, kept by the header's bag (`ShopBag`)
@@ -216,6 +193,20 @@ export interface BagDraft {
     /** How they'll pay; null until picked (the first offered then). */
     pay: ShopPayment | null;
     address: DeliveryAddress;
+    /**
+     * Where `address` came from, for a signed-in customer: `shown` while it
+     * is their last delivery's, read out rather than typed; `typing` once
+     * they have none, or chose another ("Use a different address"), which
+     * is never filled in again; null until the bag has asked.
+     */
+    saved: "shown" | "typing" | null;
+    /**
+     * "Note for ‹business›": a gift message, "no sesame", "ring the bell".
+     * Optional, and sent with the order for the business to read. Kept
+     * while the page is open and never written to the visit's storage
+     * (`bag-draft-store.ts`): it may say something about someone's health.
+     */
+    note: string;
     /**
      * The discount code applied in the bag (DEC-104), as typed and tidied;
      * null for none. The quote judges it every time it prices the bag.
@@ -235,12 +226,15 @@ export const EMPTY_DRAFT: BagDraft = {
     way: null,
     pay: null,
     address: EMPTY_ADDRESS,
+    saved: null,
+    note: "",
     code: null,
     checkout: null,
 };
 
 export function BagSheet({
     site,
+    businessName,
     items,
     api,
     signedIn,
@@ -252,6 +246,8 @@ export function BagSheet({
     onClose,
 }: {
     site: string;
+    /** Who the note is for: "Note for Rye & Co.". */
+    businessName: string;
     items: readonly BagItem[];
     api: ShopCheckoutApi;
     signedIn: boolean;
@@ -286,6 +282,17 @@ export function BagSheet({
     // (UX-058): "+" stops there, and the bag says why.
     const [caps, setCaps] = useState<Readonly<Record<string, number>>>({});
     const [notice, setNotice] = useState<string | null>(null);
+    // The line just taken out, for "Undo".
+    const [removed, setRemoved] = useState<RemovedLine | null>(null);
+    const undoRemove = () => {
+        if (!removed) return;
+        addToBag(site, {
+            listingId: removed.listingId,
+            variantId: removed.variantId,
+            quantity: removed.quantity,
+        });
+        setRemoved(null);
+    };
 
     // Asking for more than is left: set the bag to what is, and say so.
     function capOverStock(lines: readonly QuoteLine[]) {
@@ -344,12 +351,53 @@ export function BagSheet({
         // eslint-disable-next-line react-hooks/exhaustive-deps -- the bag's contents, by value
     }, [bagPrint, way, api, round, problem, draft.code]);
 
+    // A signed-in customer's last delivery, asked for once a delivery is
+    // chosen: read out instead of typed again. Never over something typed.
+    const askSaved =
+        signedIn &&
+        needsAddress(way) &&
+        draft.saved === null &&
+        addressBlank(address)
+            ? api.savedAddress
+            : undefined;
+    const asksSaved = askSaved !== undefined;
+    useEffect(() => {
+        if (!askSaved) return;
+        let live = true;
+        void askSaved()
+            .catch(() => null)
+            .then((result) => {
+                if (!live) return;
+                const found = result?.ok ? result.data : null;
+                onDraft((d) => {
+                    if (d.saved !== null) return d;
+                    if (!found || !addressBlank(d.address)) {
+                        return { ...d, saved: "typing" };
+                    }
+                    const last = { ...EMPTY_ADDRESS, ...found };
+                    // One the checkout would now send back (an older
+                    // order with no phone) is filled in to be finished.
+                    return {
+                        ...d,
+                        address: last,
+                        saved: addressLeft(last) === null ? "shown" : "typing",
+                    };
+                });
+            });
+        return () => {
+            live = false;
+        };
+    }, [askSaved, onDraft]);
+
     if (items.length === 0) {
         return (
             <SheetFrame title="Your bag" onClose={onClose}>
                 <p className="text-site-body mt-3 text-sm">
                     Your bag is empty. Add something from the shop.
                 </p>
+                {removed ? (
+                    <RemovedNotice removed={removed} onUndo={undoRemove} />
+                ) : null}
                 <button type="button" disabled className={sheetButton(true)}>
                     Your bag is empty
                 </button>
@@ -365,7 +413,8 @@ export function BagSheet({
     const applied =
         settled && discount?.applied === true ? discount.code : null;
     const chosen = quote?.ways.find((w) => w.type === way) ?? null;
-    const addressOk = !needsAddress(way) || addressReady(address);
+    const addressNote = needsAddress(way) ? addressLeft(address) : null;
+    const addressOk = addressNote === null;
     const pays = paysOf(quote);
     const pay = payChosen(pays, draft.pay);
     const payNote = payWords(pay);
@@ -381,8 +430,16 @@ export function BagSheet({
     const freeNote = quote ? freeDeliveryNote(quote, way) : null;
     const held = busy
         ? null
-        : holdReason({ quote, way, addressOk, payable: pay !== null });
+        : holdReason({
+              quote,
+              way,
+              addressOk,
+              addressNote,
+              payable: pay !== null,
+          });
     const pickup = way === "PICKUP" ? (quote?.pickup ?? null) : null;
+    // The returns rule of what is in the bag, said again before paying.
+    const returns = quote ? returnsLines(quote.lines) : [];
 
     function place() {
         if (!canPlace || !way) return;
@@ -391,10 +448,17 @@ export function BagSheet({
             fulfilment: way,
             ...(needsAddress(way) ? { address: trimmed(address) } : {}),
             ...(pay.type === "ON_HANDOVER" ? { payment: pay.type } : {}),
+            ...(draft.note.trim() ? { notes: draft.note.trim() } : {}),
             // Only a code the quote applied: a refused one is never sent.
             ...(applied ? { discountCode: applied } : {}),
         };
-        const print = JSON.stringify(body);
+        // The bag's print is kept for the visit beside its key, so the
+        // note goes in as a number worked out from it, never its words:
+        // another note is another request, and nothing typed is stored.
+        const print = JSON.stringify({
+            ...body,
+            ...(body.notes ? { notes: notePrint(body.notes) } : {}),
+        });
         const checkout =
             draft.checkout?.print === print
                 ? draft.checkout
@@ -441,8 +505,38 @@ export function BagSheet({
         codeError ??
         (settled && discount && !discount.applied ? discount.message : null);
 
+    // Pinned to the sheet's foot: why the button is held, what it all
+    // comes to, and the button. The rest of the bag scrolls above.
+    const footer = (
+        <>
+            {held && !problem ? (
+                <p
+                    id={`${site}-held`}
+                    className="text-site-body mt-2 text-sm leading-normal"
+                >
+                    {held}
+                </p>
+            ) : null}
+            {quote ? (
+                <div className="mt-2 flex gap-2.5 text-base">
+                    <span className="flex-1 font-semibold">Total</span>
+                    <span className="font-semibold tabular-nums">{total}</span>
+                </div>
+            ) : null}
+            <button
+                type="button"
+                onClick={place}
+                disabled={!canPlace}
+                aria-describedby={held && !problem ? `${site}-held` : undefined}
+                className={cn(sheetButton(!canPlace), "mt-2.5")}
+            >
+                {placeLabel({ signedIn, busy, pay: pay?.type ?? null, total })}
+            </button>
+        </>
+    );
+
     return (
-        <SheetFrame title="Your bag" onClose={onClose}>
+        <SheetFrame title="Your bag" onClose={onClose} footer={footer}>
             {load.kind === "error" ? (
                 <div className="mt-3">
                     <p role="alert" className={destructiveAlertClasses}>
@@ -471,80 +565,21 @@ export function BagSheet({
 
             {quote ? (
                 <div className="mt-3">
-                    {quote.lines.map((line) => {
-                        const note = lineNote(line);
-                        const name = line.variantTitle
-                            ? `${line.name} · ${line.variantTitle}`
-                            : line.name;
-                        const change = (q: number) =>
-                            setQuantity(
-                                site,
-                                {
-                                    listingId: line.listingId,
-                                    variantId: line.variantId,
-                                },
-                                q,
-                            );
-                        return (
-                            <div
-                                key={`${line.listingId}:${line.variantId ?? ""}`}
-                                className="border-site-border flex items-center gap-2.5 border-t py-2.5 text-sm"
-                            >
-                                <span className="min-w-0 flex-1">
-                                    <span className="block truncate">
-                                        {name}
-                                    </span>
-                                    {note ? (
-                                        <span className="text-site-fg block text-xs font-semibold">
-                                            {note}
-                                        </span>
-                                    ) : null}
-                                </span>
-                                <span className="flex items-center gap-1">
-                                    <button
-                                        type="button"
-                                        onClick={() =>
-                                            change(line.quantity - 1)
-                                        }
-                                        aria-label={`One fewer ${name}`}
-                                        className={stepper}
-                                    >
-                                        −
-                                    </button>
-                                    {/* Words a screen reader reads: an
-                                        aria-label on a plain span is not
-                                        (UX-082). */}
-                                    <span className="min-w-5 text-center font-semibold tabular-nums">
-                                        <span aria-hidden>{line.quantity}</span>
-                                        <span className="sr-only">
-                                            {`${line.quantity} of ${name}`}
-                                        </span>
-                                    </span>
-                                    <button
-                                        type="button"
-                                        onClick={() =>
-                                            change(line.quantity + 1)
-                                        }
-                                        disabled={
-                                            line.state !== "ok" ||
-                                            line.quantity >=
-                                                MAX_ITEM_QUANTITY ||
-                                            line.quantity >=
-                                                (caps[lineKey(line)] ??
-                                                    Infinity)
-                                        }
-                                        aria-label={`One more ${name}`}
-                                        className={stepper}
-                                    >
-                                        +
-                                    </button>
-                                </span>
-                                <span className="font-semibold tabular-nums">
-                                    {formatAmount(line.amount, quote.currency)}
-                                </span>
-                            </div>
-                        );
-                    })}
+                    <BagLines
+                        site={site}
+                        quote={quote}
+                        caps={caps}
+                        onRemoved={setRemoved}
+                    />
+                    {removed ? (
+                        <RemovedNotice removed={removed} onUndo={undoRemove} />
+                    ) : null}
+                    <div className="border-site-border mt-3 flex gap-2.5 border-t py-2.5 text-sm">
+                        <span className="flex-1">Subtotal</span>
+                        <span className="font-semibold tabular-nums">
+                            {formatAmount(quote.subtotal, quote.currency)}
+                        </span>
+                    </div>
                     <div className="border-site-border flex gap-2.5 border-t py-2.5 text-sm">
                         <span className="flex-1">
                             {chosen?.label ?? "Pick-up or delivery"}
@@ -558,7 +593,7 @@ export function BagSheet({
                         </span>
                     </div>
                     {freeNote ? (
-                        <p className="text-site-muted -mt-1 pb-2 text-[12.5px]">
+                        <p className="text-site-body -mt-1 pb-2 text-sm">
                             {freeNote}
                         </p>
                     ) : null}
@@ -572,7 +607,7 @@ export function BagSheet({
                                 onClick={removeCode}
                                 aria-label={`Remove code ${discount.code}`}
                                 className={cn(
-                                    "text-site-muted cursor-pointer text-[12.5px] underline",
+                                    "text-site-fg coarse:min-h-11 cursor-pointer text-sm underline underline-offset-2",
                                     focusRing,
                                 )}
                             >
@@ -583,13 +618,6 @@ export function BagSheet({
                             </span>
                         </div>
                     ) : null}
-                    <div className="border-site-border flex gap-2.5 border-t py-2.5 text-sm">
-                        <span className="flex-1 font-semibold">Total</span>
-                        <span className="font-semibold tabular-nums">
-                            {total}
-                        </span>
-                    </div>
-
                     <CodeField
                         site={site}
                         open={codeOpen}
@@ -633,7 +661,7 @@ export function BagSheet({
                                             <span className="text-[14.5px] font-semibold">
                                                 {w.label}
                                             </span>
-                                            <span className="text-site-muted text-[12.5px]">
+                                            <span className="text-site-body text-sm">
                                                 {w.fee
                                                     ? formatAmount(
                                                           w.fee,
@@ -687,13 +715,13 @@ export function BagSheet({
                     ) : null}
 
                     {pickup ? (
-                        <p className="text-site-body mt-2.5 text-[13.5px] leading-normal">
-                            <span className="font-semibold">Collect from</span>{" "}
+                        <p className="text-site-body mt-2.5 text-sm leading-normal">
+                            <span className="text-site-fg font-semibold">
+                                Pick-up from
+                            </span>{" "}
                             {pickup.address}
                             {pickup.hours ? (
-                                <span className="text-site-muted block text-[12.5px]">
-                                    {pickup.hours}
-                                </span>
+                                <span className="block">{pickup.hours}</span>
                             ) : null}
                         </p>
                     ) : null}
@@ -703,13 +731,57 @@ export function BagSheet({
                             <legend className="text-site-muted mb-1 text-xs font-bold uppercase tracking-[0.08em]">
                                 Deliver to
                             </legend>
-                            <AddressFields
-                                address={address}
-                                onChange={setField}
-                            />
+                            {asksSaved ? (
+                                <p
+                                    role="status"
+                                    className="text-site-body text-sm"
+                                >
+                                    Looking for your last address…
+                                </p>
+                            ) : draft.saved === "shown" ? (
+                                <SavedAddress
+                                    address={address}
+                                    onDifferent={() =>
+                                        onDraft((d) => ({
+                                            ...d,
+                                            address: EMPTY_ADDRESS,
+                                            saved: "typing",
+                                        }))
+                                    }
+                                />
+                            ) : (
+                                <AddressFields
+                                    site={site}
+                                    address={address}
+                                    onChange={setField}
+                                />
+                            )}
                         </fieldset>
                     ) : null}
                 </div>
+            ) : null}
+
+            {quote ? (
+                <label className="mt-3.5 block text-[13.5px] font-medium">
+                    Note for {businessName}{" "}
+                    <span className="text-site-body font-normal">
+                        (optional)
+                    </span>
+                    <textarea
+                        rows={2}
+                        maxLength={MAX_ORDER_NOTE}
+                        value={draft.note}
+                        onChange={(e) =>
+                            onDraft((d) => ({ ...d, note: e.target.value }))
+                        }
+                        placeholder="A gift message, or anything they should know"
+                        className={cn(
+                            "border-site-border text-site-fg placeholder:text-site-muted mt-1 block w-full resize-y rounded-[calc(var(--site-radius)+8px)] border px-3 py-2.5 text-base",
+                            inputFill,
+                            focusRing,
+                        )}
+                    />
+                </label>
             ) : null}
 
             {problem ? (
@@ -726,28 +798,19 @@ export function BagSheet({
                     {notice}
                 </p>
             ) : null}
-            {held && !problem ? (
-                <p
-                    id={`${site}-held`}
-                    className="text-site-body mt-2.5 text-[13px] leading-normal"
-                >
-                    {held}
-                </p>
-            ) : null}
             {payNote ? (
-                <p className="text-site-muted mt-2.5 text-[12.5px] leading-normal">
+                <p className="text-site-body mt-2.5 text-sm leading-normal">
                     {payNote}
                 </p>
             ) : null}
-            <button
-                type="button"
-                onClick={place}
-                disabled={!canPlace}
-                aria-describedby={held && !problem ? `${site}-held` : undefined}
-                className={sheetButton(!canPlace)}
-            >
-                {placeLabel({ signedIn, busy, pay: pay?.type ?? null, total })}
-            </button>
+            {returns.map((rule) => (
+                <p
+                    key={rule}
+                    className="text-site-body mt-1.5 text-sm leading-normal [overflow-wrap:anywhere]"
+                >
+                    {rule}
+                </p>
+            ))}
         </SheetFrame>
     );
 }
@@ -806,58 +869,7 @@ export function payWords(
     if (pay.type === "ON_HANDOVER") {
         return pay.label === "Pay on delivery"
             ? "You'll pay when your order is delivered. Your order is placed now."
-            : "You'll pay when you collect your order. Your order is placed now.";
+            : "You'll pay at pick-up. Your order is placed now.";
     }
     return "You pay online in a secure window. Your order is placed once the payment goes through.";
-}
-
-function AddressFields({
-    address,
-    onChange,
-}: {
-    address: DeliveryAddress;
-    onChange: (name: keyof DeliveryAddress) => (value: string) => void;
-}) {
-    const input = (
-        name: keyof DeliveryAddress,
-        label: string,
-        auto: string,
-        required = false,
-    ) => (
-        <label className="block text-[13.5px] font-medium">
-            {label}
-            {required ? <span aria-hidden="true"> *</span> : null}
-            <input
-                type={name === "phone" ? "tel" : "text"}
-                // The keyboard each needs: digits for a PIN code (six of
-                // them), the phone pad for a phone.
-                inputMode={
-                    name === "postalCode"
-                        ? "numeric"
-                        : name === "phone"
-                          ? "tel"
-                          : undefined
-                }
-                maxLength={name === "postalCode" ? 6 : undefined}
-                autoComplete={auto}
-                required={required}
-                value={address[name] ?? ""}
-                onChange={(e) => onChange(name)(e.target.value)}
-                className={field}
-            />
-        </label>
-    );
-    return (
-        <div className="grid gap-2.5">
-            {input("name", "Name", "name")}
-            {input("phone", "Phone", "tel")}
-            {input("line1", "Address", "address-line1", true)}
-            {input("line2", "Flat, floor or landmark", "address-line2")}
-            <div className="grid grid-cols-2 gap-2.5">
-                {input("city", "Town or city", "address-level2", true)}
-                {input("postalCode", "PIN code", "postal-code", true)}
-            </div>
-            {input("state", "State", "address-level1", true)}
-        </div>
-    );
 }

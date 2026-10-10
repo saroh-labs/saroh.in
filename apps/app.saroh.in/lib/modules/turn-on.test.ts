@@ -442,6 +442,42 @@ describe("after it is on", () => {
         expect(landingHref(["COMMUNICATIONS"], comms, d)).toBeNull();
     });
 
+    it("a first run lands on the thing itself, the same place setup does", () => {
+        const d = draftFrom([]);
+        const on = (key: string) =>
+            turnOnPlan({ picked: [key], modules: allOff });
+        // From Settings › Modules: the module's first screen, as before.
+        expect(landingHref(["COMMERCE"], on("COMMERCE"), d)).toBe(
+            "/commerce/products",
+        );
+        // From Home's first run or the picker.
+        expect(landingHref(["COMMERCE"], on("COMMERCE"), d, {})).toBe(
+            "/commerce/products/new",
+        );
+        expect(landingHref(["CRM"], on("CRM"), d, {})).toBe("/contacts?new=1");
+        expect(
+            landingHref(["WEBSITE"], on("WEBSITE"), d, { siteId: "site_1" }),
+        ).toBe("/sites/site_1");
+        expect(landingHref(["WEBSITE"], on("WEBSITE"), d, {})).toBe("/sites");
+        // The sheet has just made the first service, so Bookings opens.
+        expect(landingHref(["APPOINTMENTS"], on("APPOINTMENTS"), d, {})).toBe(
+            "/bookings",
+        );
+        // Connecting a provider now still wins.
+        d.connect.PAYMENTS = true;
+        expect(
+            landingHref(
+                ["COMMERCE", "PAYMENTS"],
+                turnOnPlan({
+                    picked: ["COMMERCE", "PAYMENTS"],
+                    modules: allOff,
+                }),
+                d,
+                {},
+            ),
+        ).toBe(PROVIDERS_HREF);
+    });
+
     it("lists the Finish setup items in the app's words, never a code or a gate", () => {
         const items = finishSetupItems([
             view("COMMERCE", {

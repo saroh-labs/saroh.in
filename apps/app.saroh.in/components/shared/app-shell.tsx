@@ -10,6 +10,7 @@ import { AppHeader } from "@/components/shared/app-header";
 import { AppSidebar } from "@/components/shared/app-sidebar";
 import { BusinessZoneProvider } from "@/components/shared/business-zone";
 import { CommandMenu } from "@/components/shared/command-menu";
+import { JoinedNotice } from "@/components/shared/joined-notice";
 import { LiveRefresh } from "@/components/shared/live-refresh";
 import type { NavCounts } from "@/components/shared/nav-items";
 import { NOTIFICATIONS_NAV, navCan } from "@/components/shared/nav-items";
@@ -217,146 +218,156 @@ export async function AppShell({ children }: { children: React.ReactNode }) {
     const roleKey = activeOrg?.roleKey ?? null;
 
     return (
-        // Every plan prompt under the shell asks this once: the way to
-        // another plan for someone who may change it, who can for anyone
-        // else (`PlanWay`).
-        <PlanAccessProvider canChangePlan={mayChangePlan(activeOrg)}>
-            <AppShellFrame>
-                {/*
-                 * Without this, reaching the page content by keyboard means tabbing
-                 * through the wordmark, search, every nav item, the org switcher,
-                 * the theme toggle and the account menu — on every single page.
-                 * Visible only when focused, so it costs sighted users nothing.
-                 */}
-                <a
-                    href="#main-content"
-                    className="sr-only bg-background text-foreground outline-none focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:z-50 focus:rounded-md focus:border focus:px-4 focus:py-2 focus:text-sm focus:font-medium focus:shadow-md focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-                >
-                    Skip to content
-                </a>
-                {/*
-                 * The role, alongside module availability, decides what the chrome
-                 * offers. Two different questions — does this business have the
-                 * capability, and may this person use it — and a merchant meets
-                 * both (#313). It comes off the resolved active organization, so
-                 * switching workspaces changes it with everything else.
-                 */}
-                {/*
-                 * The page reads again by itself, the unread count sits in the
-                 * tab's title, and "signed out" gets its Sign in button (10 Oct
-                 * 2026). Draws nothing.
-                 */}
-                <LiveRefresh
-                    unread={
-                        navCan({ role, actions }, NOTIFICATIONS_NAV.action)
-                            ? unread
-                            : null
-                    }
-                />
-                <CommandMenu
-                    moduleKeys={moduleKeys}
-                    role={role}
-                    roleKey={roleKey}
-                    actions={actions}
-                    kind={activeOrg?.kind}
-                    // What was opened in this business, not in another.
-                    recentsScope={activeOrg?.id ?? ""}
-                    sites={navSites}
-                    stockTracked={stockTracked}
-                    storefronts={storefronts}
-                />
-                {/* The top bar runs the full width; the rail and the working
+        <ShellFrame canChangePlan={mayChangePlan(activeOrg)}>
+            {/*
+             * Without this, reaching the page content by keyboard means tabbing
+             * through the wordmark, search, every nav item, the org switcher,
+             * the theme toggle and the account menu — on every single page.
+             * Visible only when focused, so it costs sighted users nothing.
+             */}
+            <a
+                href="#main-content"
+                className="sr-only bg-background text-foreground outline-none focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:z-50 focus:rounded-md focus:border focus:px-4 focus:py-2 focus:text-sm focus:font-medium focus:shadow-md focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+            >
+                Skip to content
+            </a>
+            {/*
+             * The role, alongside module availability, decides what the chrome
+             * offers. Two different questions — does this business have the
+             * capability, and may this person use it — and a merchant meets
+             * both (#313). It comes off the resolved active organization, so
+             * switching workspaces changes it with everything else.
+             */}
+            {/*
+             * The page reads again by itself, the unread count sits in the
+             * tab's title, and "signed out" gets its Sign in button (10 Oct
+             * 2026). Draws nothing.
+             */}
+            <LiveRefresh
+                unread={
+                    navCan({ role, actions }, NOTIFICATIONS_NAV.action)
+                        ? unread
+                        : null
+                }
+            />
+            <CommandMenu
+                moduleKeys={moduleKeys}
+                role={role}
+                roleKey={roleKey}
+                actions={actions}
+                kind={activeOrg?.kind}
+                // What was opened in this business, not in another.
+                recentsScope={activeOrg?.id ?? ""}
+                sites={navSites}
+                stockTracked={stockTracked}
+                storefronts={storefronts}
+            />
+            {/* The top bar runs the full width; the rail and the working
                 area sit below it. */}
-                <AppHeader
-                    user={session.user}
-                    organizations={organizations}
-                    activeOrg={activeOrg}
-                    moduleKeys={moduleKeys}
-                    unread={
-                        navCan({ role, actions }, NOTIFICATIONS_NAV.action)
-                            ? unread
-                            : null
+            <AppHeader
+                user={session.user}
+                organizations={organizations}
+                activeOrg={activeOrg}
+                moduleKeys={moduleKeys}
+                unread={
+                    navCan({ role, actions }, NOTIFICATIONS_NAV.action)
+                        ? unread
+                        : null
+                }
+            />
+            <div className="flex min-h-0 flex-1">
+                <AppSidebar
+                    collapsed={
+                        (await cookies()).get(RAIL_COOKIE)?.value ===
+                        RAIL_COLLAPSED
                     }
-                />
-                <div className="flex min-h-0 flex-1">
-                    <AppSidebar
-                        collapsed={
-                            (await cookies()).get(RAIL_COOKIE)?.value ===
-                            RAIL_COLLAPSED
-                        }
-                        unread={unread}
-                        moduleKeys={moduleKeys}
-                        role={role}
-                        roleKey={roleKey}
-                        actions={actions}
-                        counts={counts}
-                        locked={lockedHrefs}
-                        stockTracked={stockTracked}
-                        storefronts={storefronts?.used ?? null}
-                        kind={activeOrg?.kind ?? null}
-                    />
-                    {/* The working area is white and the rail sits on Paper: the
-                product spends white surfaces, and the page you work on is
-                the raised one (brand file §5, and the applied screens). In
-                dark it is the ground, as on the marketing site: the tables
-                and cards on it are what rise, a surface step up. */}
-                    <div className="flex min-w-0 flex-1 flex-col bg-card dark:bg-background">
-                        {/*
-                         * `tabIndex={-1}` makes this a valid focus target: following the
-                         * skip link must MOVE focus, not just scroll, or the next Tab
-                         * would land back at the top of the nav.
-                         */}
-                        {/*
-                         * Padded by the tab bar's height below 760px (0 above;
-                         * `--tab-bar-inset` in workspace.css), so the last row
-                         * of a page scrolls clear of the bar instead of ending
-                         * underneath it.
-                         */}
-                        <div
-                            id="main-content"
-                            tabIndex={-1}
-                            className="flex flex-1 flex-col pb-[var(--tab-bar-inset)] outline-none"
-                        >
-                            {/*
-                             * The business's zone (UX-008): every time a page
-                             * writes with `BusinessDate` reads as the business
-                             * keeps it, on the server's first paint too.
-                             */}
-                            <BusinessZoneProvider
-                                zone={businessZone(activeOrg)}
-                            >
-                                {/* Scheduled for deletion (#921). */}
-                                <ClosingBanner view={closing} />
-                                {/* A plan that ends within 30 days (#805). */}
-                                <PlanEndingBanner
-                                    ending={billing?.planEnding}
-                                />
-                                {/* What a lower plan paused, or will (#800). */}
-                                <PausedBanner view={paused} />
-                                {children}
-                            </BusinessZoneProvider>
-                        </div>
-                    </div>
-                </div>
-                {/* A write the plan refused, shown as its notice (U14). */}
-                <PlanRefusalHost />
-                {/* Below 760px, the rail's place is taken by this. */}
-                <TabBar
                     unread={unread}
                     moduleKeys={moduleKeys}
                     role={role}
                     roleKey={roleKey}
                     actions={actions}
                     counts={counts}
+                    locked={lockedHrefs}
                     stockTracked={stockTracked}
                     storefronts={storefronts?.used ?? null}
                     kind={activeOrg?.kind ?? null}
                 />
-            </AppShellFrame>
-        </PlanAccessProvider>
+                {/* The working area is white and the rail sits on Paper: the
+                product spends white surfaces, and the page you work on is
+                the raised one (brand file §5, and the applied screens). In
+                dark it is the ground, as on the marketing site: the tables
+                and cards on it are what rise, a surface step up. */}
+                <div className="flex min-w-0 flex-1 flex-col bg-card dark:bg-background">
+                    {/*
+                     * `tabIndex={-1}` makes this a valid focus target: following the
+                     * skip link must MOVE focus, not just scroll, or the next Tab
+                     * would land back at the top of the nav.
+                     */}
+                    {/*
+                     * Padded by the tab bar's height below 760px (0 above;
+                     * `--tab-bar-inset` in workspace.css), so the last row
+                     * of a page scrolls clear of the bar instead of ending
+                     * underneath it.
+                     */}
+                    <div
+                        id="main-content"
+                        tabIndex={-1}
+                        className="flex flex-1 flex-col pb-[var(--tab-bar-inset)] outline-none"
+                    >
+                        {/*
+                         * The business's zone (UX-008): every time a page
+                         * writes with `BusinessDate` reads as the business
+                         * keeps it, on the server's first paint too.
+                         */}
+                        <BusinessZoneProvider zone={businessZone(activeOrg)}>
+                            {/* Scheduled for deletion (#921). */}
+                            <ClosingBanner view={closing} />
+                            {/* A plan that ends within 30 days (#805). */}
+                            <PlanEndingBanner ending={billing?.planEnding} />
+                            {/* What a lower plan paused, or will (#800). */}
+                            <PausedBanner view={paused} />
+                            {/* Just accepted an invitation: which business
+                                this is and what their role opens, once. */}
+                            <JoinedNotice />
+                            {children}
+                        </BusinessZoneProvider>
+                    </div>
+                </div>
+            </div>
+            {/* A write the plan refused, shown as its notice (U14). */}
+            <PlanRefusalHost />
+            {/* Below 760px, the rail's place is taken by this. */}
+            <TabBar
+                unread={unread}
+                moduleKeys={moduleKeys}
+                role={role}
+                roleKey={roleKey}
+                actions={actions}
+                counts={counts}
+                stockTracked={stockTracked}
+                storefronts={storefronts?.used ?? null}
+                kind={activeOrg?.kind ?? null}
+            />
+        </ShellFrame>
     );
 }
 
-function AppShellFrame({ children }: { children: React.ReactNode }) {
-    return <div className="flex min-h-screen flex-col">{children}</div>;
+/**
+ * The shell's outer box, which also says once whether this person may
+ * change the plan (`billing:manage`): every plan prompt under it offers the
+ * way to another plan to someone who may, and says who can to anyone else
+ * (`PlanWay`).
+ */
+function ShellFrame({
+    canChangePlan,
+    children,
+}: {
+    canChangePlan: boolean;
+    children: React.ReactNode;
+}) {
+    return (
+        <PlanAccessProvider canChangePlan={canChangePlan}>
+            <div className="flex min-h-screen flex-col">{children}</div>
+        </PlanAccessProvider>
+    );
 }

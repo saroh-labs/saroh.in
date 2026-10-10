@@ -3,7 +3,7 @@ import { payInstructionsOf } from "@saroh/site-blocks";
 import { serverApiUrl } from "./api-url";
 import { isIntent } from "./checkout-shape";
 import type { StartResult } from "./invoice-pay";
-import { payOnlineOf, payUrlOf } from "./invoice-pay-shape";
+import { payContactOf, payOnlineOf, payUrlOf } from "./invoice-pay-shape";
 import type { PayOrder } from "./order-pay-shape";
 import { isPayOrder } from "./order-pay-shape";
 
@@ -48,6 +48,11 @@ export async function getPayOrder(token: string): Promise<OrderPayLookup> {
                       payOnline: payOnlineOf(body.payOnline),
                       // How to pay offline (R32), checked field by field.
                       payInstructions: payInstructionsOf(body.payInstructions),
+                      // How to reach the business, checked the same way.
+                      businessContact: payContactOf(
+                          (body as { businessContact?: unknown })
+                              .businessContact,
+                      ),
                   },
               }
             : { ok: false, reason: "unavailable" };

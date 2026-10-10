@@ -16,6 +16,33 @@ export const VERIFICATION_OTP_EXPIRY_SECONDS = 600;
 export const VERIFICATION_OTP_LENGTH = 6;
 
 /**
+ * Wrong tries a code takes before it is spent and a new one has to be asked
+ * for. A six-digit code is guessable by construction, so this lockout, not
+ * the entropy, is the control.
+ */
+export const CODE_ALLOWED_ATTEMPTS = 5;
+
+/**
+ * The limiter on asking for a code and on checking one: this many requests,
+ * then none until `CODE_LIMIT_WINDOW_SECONDS` have passed since the last.
+ * Per address the request came from, per endpoint.
+ */
+export const CODE_LIMIT_MAX = 3;
+export const CODE_LIMIT_WINDOW_SECONDS = 60;
+
+/**
+ * How long the code step waits before "Resend code" can be pressed: the
+ * limiter's window spread over what it allows, so a person who resends as
+ * soon as the button lets them is not refused on the second code. The
+ * screens read it from here, the same file the server's limiter is set from,
+ * so the countdown and the limiter cannot drift. A refusal carries the
+ * server's own wait, which the screen then counts down instead.
+ */
+export const CODE_RESEND_SECONDS = Math.ceil(
+    CODE_LIMIT_WINDOW_SECONDS / (CODE_LIMIT_MAX - 1),
+);
+
+/**
  * The session cookie's name prefix: `AUTH_COOKIE_PREFIX`, else Better Auth's
  * own `better-auth`. Production leaves it unset. The development environment
  * sets its own (`saroh-dev`), because its hosts sit under production's

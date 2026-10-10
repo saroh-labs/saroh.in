@@ -220,7 +220,7 @@ export function ShopBag({
                     started,
                     toPay:
                         request.fulfilment === "PICKUP"
-                            ? "Pay when you collect"
+                            ? "Pay at pick-up"
                             : "Pay on delivery",
                 });
                 return;
@@ -293,6 +293,7 @@ export function ShopBag({
             {step.kind === "bag" ? (
                 <BagSheet
                     site={site}
+                    businessName={businessName}
                     items={items}
                     api={api}
                     signedIn={customer !== null}

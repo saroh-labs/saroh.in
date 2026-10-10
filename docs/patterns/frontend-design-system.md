@@ -277,6 +277,22 @@
   already sits beside the rows). The other Settings sections share that
   measure through `SettingsPanel` (`rows`), or take the panel (`full`) for
   a table.
+- **Current** (10 Oct 2026) — **One setup checklist: `SetupChecklist`**
+  (`components/shared/setup-checklist.tsx`, rules in
+  `lib/setup-checklist.ts`). Home's and Settings › Business's "Finish
+  setup", a location's and the website's "Before you share your site" are
+  all it, each passing its own rows. A title, "2 of 4 done" (`doneOf`), the
+  shared `ProgressBar`, done rows ticked first then what is left, and ONE
+  button a row that opens its task in place (a `?edit=` link, or a press).
+  When the last step is done the bar fills, the heading says the true thing
+  (`doneTitle`, a sentence), and the card stays for that visit and is one
+  quiet line on the next (`foldKey`; `fold="once"` lets the line go after,
+  on Home). "Hide for now" with Undo is the screen's to keep (`hide`); it
+  is kept per browser, since there is no per-person preference store on the
+  server. The checklist on Home and Settings is named **Finish setup**
+  wherever it is referred to (`FINISH_SETUP`, `checklistWords` in
+  `lib/settings/ready.ts`), with a line saying what its steps are for.
+  Never draw a fifth checklist by hand.
 - **Current** — **`desk:` is 760px**, where the rail appears and the phone
   layouts end, and `max-desk:` is its exact complement. New code uses them.
   The older `min-[760px]:` and `max-[759px]:` mean the same and are not yet
@@ -317,6 +333,33 @@
   autofill its field needs (`inputMode`, `autoComplete`, `maxLength` for a
   PIN code). `site-blocks/src/form-controls.test.tsx` renders every one;
   a new control gets a line there.
+- **Current** (10 Oct 2026) — **On a merchant's site, what a phone needs
+  stays under the thumb, and CSS decides the layout.** A sheet's footer is
+  pinned while its body scrolls (`SheetFrame`'s `footer`: the bag's total
+  and button); sheets are sized in `dvh` and hold the page behind them
+  still (`lib/sheet-shell.ts`). Add to bag and the booking page's summary
+  are bars pinned to the foot of the screen under 700px. Both layouts are
+  in the page the server sends, shown by `max-[699px]:` and
+  `min-[700px]:` classes: never a script's reading of the screen's width,
+  which draws the desk layout first on every phone. Tests pick a width
+  with `viewport("phone")` (`src/test-viewport.ts`).
+- **Current** (10 Oct 2026) — **A line that answers a doubt is body colour
+  at 14px** on a merchant's site (`text-site-body text-sm`): how you pay,
+  cancel rules, pick-up hours, returns, tax and delivery. `text-site-muted`
+  is the merchant's own colour and can fall near 3:1 on their ground, so it
+  is for labels and decoration, not for what a customer decides on.
+- **Current** (10 Oct 2026) — **Every picture on a merchant's site loads by
+  one rule**, `siteImage()` (`site-blocks/src/lib/site-image.ts`), spread
+  onto a plain `<img>`: lazy below the fold, decoded off the main thread,
+  the first section's hero fetched first. Give the `<img>` its width and
+  height, or a box with an aspect ratio. No `srcset`: storage keeps one
+  file per photo and nothing resizes on request.
+- **Current** (10 Oct 2026) — **The customer's words**: Pick-up (never
+  collect or pickup), bag (never basket), booking (never appointment, save
+  where a merchant typed it), the payment window (never the provider's
+  name), "Pay at the desk" only for a service attended in person ("Pay
+  later" for one held online). No long dashes or semicolons.
+  `site-blocks/src/customer-words.test.tsx` scans for them.
 - **Adopted** — **Reflow at 320px and 390px** with no hidden operation and no
   page-level horizontal scroll; wide content scrolls inside its own container
   (14, 18, 04 §4). Put `min-w-0` on grid and flex columns holding text.

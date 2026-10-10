@@ -9,6 +9,9 @@ import { APIError } from "better-auth/api";
 import { emailOTP } from "better-auth/plugins";
 
 import {
+    CODE_ALLOWED_ATTEMPTS,
+    CODE_LIMIT_MAX,
+    CODE_LIMIT_WINDOW_SECONDS,
     sessionCookiePrefix,
     VERIFICATION_OTP_EXPIRY_SECONDS,
     VERIFICATION_OTP_LENGTH,
@@ -21,6 +24,10 @@ export { getTrustedOrigins, isTrustedOrigin } from "./origins";
 // browser must import these from `@saroh/auth/constants` instead — see the note
 // in that file.
 export {
+    CODE_ALLOWED_ATTEMPTS,
+    CODE_LIMIT_MAX,
+    CODE_LIMIT_WINDOW_SECONDS,
+    CODE_RESEND_SECONDS,
     VERIFICATION_OTP_EXPIRY_SECONDS,
     VERIFICATION_OTP_LENGTH,
 } from "./constants";
@@ -252,8 +259,34 @@ export function sessionCookieDomain(apiUrl: string | undefined): string | null {
  * session validation.
  *
  * Milestone 1: core only (email/password + verification + reset, GitHub +
- * Google OAuth) plus `emailOTP` for code-based verification. Advanced plugins
- * are layered on per M2 slice.
+ * Google OAuth) plus `emailOTP`. Advanced plugins are layered on per M2
+ * slice.
+ *
+ * **A merchant signs up and signs in with an emailed code** (owner, 10 Oct
+ * 2026); a password is optional and set later from the account page. Both
+ * are `emailOTP`'s own endpoints, nothing of ours:
+ * `POST /email-otp/send-verification-otp` with `type: "sign-in"`, then
+ * `POST /sign-in/email-otp`. What makes that safe to offer is the plugin's,
+ * and `sign-in-code.test.ts` runs the real library to hold it there:
+ *
+ * - asking for a code answers the same whether or not the address has an
+ *   account, and sends the same email, so the screen can't be used to learn
+ *   who is registered;
+ * - a right code for a new address makes the account, already verified, and
+ *   signs it in; for an existing one it only signs in, password untouched;
+ * - a right code for an account whose address was never proven first removes
+ *   the password and sessions it was made with
+ *   (`revokeUnprovenAccountAccess`), so nobody who signed up with someone
+ *   else's address keeps a way in once the owner arrives;
+ * - a code is single use, hashed at rest, good for
+ *   `VERIFICATION_OTP_EXPIRY_SECONDS`, and spent after
+ *   `CODE_ALLOWED_ATTEMPTS` wrong tries;
+ * - both endpoints are rate limited (`CODE_LIMIT_MAX` per
+ *   `CODE_LIMIT_WINDOW_SECONDS`), as the verify step always was.
+ *
+ * `disableSignUp` stays off on purpose: with it on, a code for an unknown
+ * address is never sent, and "Check your email" with nothing arriving is
+ * the dead end the duplicate sign-up email was written to cover.
  *
  * The explicit `BetterAuthOptions` / `BetterAuthInstance` annotations below are
  * required, not stylistic: plugin endpoints are typed with zod schemas, so an
@@ -265,6 +298,14 @@ export function sessionCookieDomain(apiUrl: string | undefined): string | null {
  * plugin-aware types from `createAuthClient` in ./client instead.
  */
 export function createAuth(opts: CreateAuthOptions = {}): BetterAuthInstance {
+    return betterAuth(authOptions(opts));
+}
+
+/**
+ * {@link createAuth}'s options, on their own so a test can run the real
+ * library on them with a database of its own (`sign-in-code.test.ts`).
+ */
+export function authOptions(opts: CreateAuthOptions = {}): BetterAuthOptions {
     const secret = resolveAuthSecret();
     const cookieDomain = sessionCookieDomain(process.env.BETTER_AUTH_URL);
 
@@ -399,7 +440,14 @@ export function createAuth(opts: CreateAuthOptions = {}): BetterAuthInstance {
                 // Codes are short and guessable by construction, so the lockout
                 // — not the entropy — is the control. 5 tries, then the code is
                 // burned and the user must request a new one.
-                allowedAttempts: 5,
+                allowedAttempts: CODE_ALLOWED_ATTEMPTS,
+                // The plugin's own default, written down because the code
+                // step's "Resend code in 30s" is worked out from it
+                // (`CODE_RESEND_SECONDS`).
+                rateLimit: {
+                    window: CODE_LIMIT_WINDOW_SECONDS,
+                    max: CODE_LIMIT_MAX,
+                },
                 // Never store a usable code at rest: a DB leak must not hand an
                 // attacker a working second factor for every pending signup.
                 storeOTP: "hashed",
@@ -410,7 +458,7 @@ export function createAuth(opts: CreateAuthOptions = {}): BetterAuthInstance {
         ],
     };
 
-    return betterAuth(options);
+    return options;
 }
 
 export type Auth = ReturnType<typeof createAuth>;

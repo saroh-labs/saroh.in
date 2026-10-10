@@ -4,7 +4,12 @@ import { expect, test } from "@playwright/test";
 
 import { useSession } from "../fixtures/sessions";
 import { ignoreHTTPSErrors, urls } from "../playwright.config";
-import { asNewVisitor, expectNoZoomOnFocus, signInOnSheet } from "./site-codes";
+import {
+    asNewVisitor,
+    expectNoZoomOnFocus,
+    nameThenBook,
+    signInOnSheet,
+} from "./site-codes";
 
 /**
  * The customer's booking page on a merchant's site, end to end (U19):
@@ -91,7 +96,10 @@ async function pickTime(
     return { label, serviceId };
 }
 
-/** Who they are: a name — the email is confirmed with a code (A9). */
+/**
+ * Who they are: nothing typed before signing in. The email is confirmed
+ * with a code (A9), and a new account's name is asked after it.
+ */
 async function details(page: Page) {
     await expect(
         page.getByText(/You'll confirm your email with a code/),
@@ -102,20 +110,25 @@ async function details(page: Page) {
     await expect(page.getByLabel(/Phone/)).toHaveAccessibleName(
         "Phone (optional)",
     );
-    // A phone doesn't zoom into either, and offers the right keyboard.
-    await expectNoZoomOnFocus(page.getByLabel("Name"));
+    // Signed out, no name is asked for: an account that has one already
+    // would have typed it for nothing.
+    await expect(page.getByLabel("Name")).toHaveCount(0);
+    // A phone doesn't zoom into the field, and offers the right keyboard.
     await expectNoZoomOnFocus(page.getByLabel(/Phone/));
     await expect(page.getByLabel(/Phone/)).toHaveAttribute("inputmode", "tel");
-    await page.getByLabel("Name").fill("Asha Rao");
 }
 
-/** The last step: sign in with a code, and the booking is made. */
+/**
+ * The last step: sign in with a code. These are new accounts, so the page
+ * then asks their name, and the next press makes the booking.
+ */
 async function continueAndSignIn(page: Page, email: string) {
     await page
         .getByRole("button", { name: "Continue to sign in" })
         .first()
         .click();
     await signInOnSheet(page, email);
+    await nameThenBook(page, "Asha Rao");
 }
 
 /** The pay token a hold's payment is started with (E11). */
@@ -259,11 +272,20 @@ test.describe("the booking page", () => {
         await expect(
             page.getByText(/at the front desk when you arrive/),
         ).toBeVisible();
+        // What happens next: an email when the business's own provider
+        // sends one, else where the booking is kept. One or the other.
         await expect(
             page.getByText(
-                /We've saved this to your details with Northwind Supply\./,
+                /^(We've emailed \S+@\S+\.|It's saved in your account\.)$/,
             ),
         ).toBeVisible();
+        // Google Calendar, beside the calendar file.
+        await expect(
+            page.getByRole("link", { name: "Add to Google Calendar" }),
+        ).toHaveAttribute(
+            "href",
+            /^https:\/\/calendar\.google\.com\/calendar\/render\?action=TEMPLATE/,
+        );
         await expect(
             page.getByRole("button", { name: "Add to calendar" }),
         ).toBeVisible();
@@ -542,6 +564,7 @@ test.describe("the booking page", () => {
                     .filter({ visible: true })
                     .click();
                 await signInOnSheet(page, email);
+                await nameThenBook(page, "Asha Rao");
                 payToken = payTokenOf(await intent);
                 expect(bookBodies.map((b) => b.pay)).toEqual(["DEPOSIT"]);
 

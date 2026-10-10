@@ -5,6 +5,7 @@ import { generateMetadata } from "./page";
 interface Lookup {
     ok: boolean;
     reason?: string;
+    data?: { products: { name: string }[] };
 }
 
 const site = vi.hoisted(() => {
@@ -21,6 +22,7 @@ vi.mock("@/lib/publication", () => ({
     postsPrefix: vi.fn(() => "blog"),
 }));
 vi.mock("@/lib/module-pages", () => ({
+    findModulePage: vi.fn(() => null),
     isFreePage: vi.fn(() => false),
     moduleLabel: vi.fn(() => "Shop"),
     moduleRoute: vi.fn(() => ({ draw: "builtin" })),
@@ -37,7 +39,7 @@ vi.mock("@/lib/page-cache/site-rules", () => ({
     listsProducts: vi.fn(),
 }));
 vi.mock("@/components/published-page", () => ({ PublishedPage: () => null }));
-vi.mock("@saroh/site-blocks", () => ({}));
+vi.mock("@saroh/site-blocks", () => ({ modulePageTopOf: () => null }));
 vi.mock("../[slug]/page", () => ({
     default: () => null,
     generateMetadata: vi.fn(),
@@ -52,12 +54,32 @@ describe("the shop's tab title", () => {
             modules: [],
             snapshot: { site: { name: "Northwind Supply" }, pages: [] },
         };
-        site.lookup = { ok: true };
+        site.lookup = { ok: true, data: { products: [] } };
     });
 
     it("names the shop when it has something to sell", async () => {
         const metadata = await generateMetadata({ params });
         expect(metadata?.title).toBe("Shop · Northwind Supply");
+    });
+
+    it("describes the shop by what it sells, and names its one address on the site's own domain", async () => {
+        site.resolved = {
+            siteId: "site_1",
+            modules: [],
+            primaryHost: "www.northwind.example",
+            snapshot: { site: { name: "Northwind Supply" }, pages: [] },
+        };
+        site.lookup = {
+            ok: true,
+            data: { products: [{ name: "Crates" }, { name: "Pallets" }] },
+        };
+        const metadata = await generateMetadata({ params });
+        expect(metadata?.description).toBe(
+            "Shop Crates and Pallets from Northwind Supply online.",
+        );
+        expect(metadata?.alternates?.canonical).toBe(
+            "https://www.northwind.example/shop",
+        );
     });
 
     it("says the page isn't found when the shop 404s", async () => {

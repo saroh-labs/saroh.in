@@ -183,11 +183,11 @@ export function sellRefusal(
 
 /** The customer's words when two payments raced for the last unit (DEC-032). */
 export const SOLD_OUT_WHILE_PAYING =
-    "Sorry, it sold out while you were paying — your money is on its way back.";
+    "Sorry, it sold out while you were paying. Your money is on its way back.";
 
 /** The customer's words when their payment reached an order already closed. */
 export const ORDER_CLOSED_WHILE_PAYING =
-    "Sorry, this order was closed before your payment reached us — your money is on its way back.";
+    "Sorry, this order was closed before your payment reached us. Your money is on its way back.";
 
 /**
  * The same two, while the refund is not yet with the provider (G13): the

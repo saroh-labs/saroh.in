@@ -3,6 +3,8 @@ import { prisma, runInOrgContext } from "@saroh/database";
 
 import { fromMinor, toMinor, toMoneyString } from "../../common/money";
 import type { CustomerContext } from "../site-accounts/customer-context.decorator";
+import type { NoticeReach } from "../site-accounts/notice-reach";
+import { contactReach } from "../site-accounts/notice-reach";
 import { openingHoursText } from "../stores/opening-hours-text";
 import type { OpeningHoursDay } from "../stores/storefronts.dto";
 import { onHandoverLabel } from "./checkout-readiness";
@@ -80,6 +82,16 @@ export interface CheckoutConfirmation {
      * paid online.
      */
     toPay: string | null;
+    /**
+     * How the customer hears about this order (A14's reach, for the
+     * "order placed" notice): by email when the business's own provider
+     * sends one, in their account, or not at all. The page says which,
+     * and never claims an email that doesn't go. Absent from the pure
+     * view; the service adds it.
+     */
+    reach?: NoticeReach;
+    /** The address an email goes to: the account's own. */
+    email?: string;
 }
 
 /** What the read selects, and all {@link confirmationView} needs. */
@@ -258,6 +270,39 @@ export class CheckoutConfirmationService {
             }),
         );
         if (!row) throw new NotFoundException("Nothing to show here");
-        return confirmationView(row);
+        return { ...confirmationView(row), ...(await this.told(customer)) };
+    }
+
+    /**
+     * How this customer hears about a placed order, and at which address.
+     * Never a reason to lose the page: a read that fails says nothing
+     * about an email, and the page then promises none.
+     */
+    private async told(
+        customer: CustomerContext,
+    ): Promise<{ reach?: NoticeReach; email?: string }> {
+        try {
+            return await runInOrgContext(customer.organizationId, async () => {
+                const [reach, account] = await Promise.all([
+                    contactReach(
+                        prisma,
+                        customer.organizationId,
+                        customer.contactId,
+                        undefined,
+                        "ORDER_PLACED",
+                    ),
+                    prisma.customerAccount.findFirst({
+                        where: {
+                            id: customer.accountId,
+                            organizationId: customer.organizationId,
+                        },
+                        select: { email: true },
+                    }),
+                ]);
+                return account ? { reach, email: account.email } : { reach };
+            });
+        } catch {
+            return {};
+        }
     }
 }

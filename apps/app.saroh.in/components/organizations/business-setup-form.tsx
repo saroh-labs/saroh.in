@@ -15,7 +15,8 @@ import {
 } from "@saroh/ui/form";
 import { Input } from "@saroh/ui/input";
 import { cn } from "@saroh/ui/lib/utils";
-import { showError } from "@saroh/ui/toast";
+import { showError, showInfo } from "@saroh/ui/toast";
+import { Tip } from "@saroh/ui/tooltip";
 import { Check } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -23,8 +24,11 @@ import { useEffect, useRef, useState } from "react";
 import { useForm, useWatch } from "react-hook-form";
 import { z } from "zod";
 
+import { Chip } from "@/components/shared/chip";
 import { CountrySelect } from "@/components/shared/country-select";
 import { accountsLoginUrl } from "@/lib/accounts";
+import { startWithGoalAction } from "@/lib/modules/first-goal-actions";
+import { GOAL_LATER } from "@/lib/modules/goals";
 import { checkAddress, createOrganization } from "@/lib/organizations/actions";
 import {
     addressFromName,
@@ -36,14 +40,14 @@ import {
     ORGANIZATION_KINDS,
 } from "@/lib/organizations/kind";
 import type { AddressAvailability } from "@/lib/organizations/service";
+import { defaultGoal, setupGoals } from "@/lib/organizations/setup-plan";
 import { browserZone } from "@/lib/organizations/time-zones";
 import {
     startCheckoutAfterOnboarding,
     takeLaunchOfferAfterOnboarding,
 } from "@/lib/saroh-billing/checkout-actions";
 
-import { chipClass } from "@/components/shared/chip";
-import { Tip } from "@saroh/ui/tooltip";
+import { SetupGoalChoice } from "./setup-goal-choice";
 import { SetupKindChoice } from "./setup-kind-choice";
 
 /**
@@ -59,59 +63,51 @@ const COMMON_COUNTRIES = [
     { code: "US", name: "United States" },
 ] as const;
 
-/**
- * Setup asks only whether the business is registered; Settings › Business
- * offers the six types (F10). Registered saves no type: "registered" is this
- * form's own value, sent as `registered: true`, so a Pvt Ltd, LLP or
- * partnership isn't guessed at. The take-money checklist then asks for the
- * real one before they go live (`ready.ts`).
- */
-const TYPES = [
-    {
-        value: "individual",
-        label: "Not registered",
-        note: "Sole trader, freelancer, side project",
-    },
-    {
-        value: "registered",
-        label: "Registered",
-        note: "Pvt Ltd, LLP, partnership",
-    },
-] as const;
+function schemaFor(needsName: boolean) {
+    return z.object({
+        // "A business" to start with (owner, 10 Oct): the form is open from
+        // the first moment, and the answer is one press to change.
+        kind: z.enum(ORGANIZATION_KINDS),
+        // Asked only of an account that has no name yet: one made with an
+        // emailed code, which asks for nothing but the address.
+        yourName: needsName
+            ? z.string().trim().min(1, { message: "Enter your name" }).max(120)
+            : z.string().optional(),
+        name: z.string().trim().min(1, { message: "It needs a name" }),
+        address: z.string().min(3, {
+            message: "A web address needs at least 3 characters",
+        }),
+        country: z.string().length(2),
+        // A goal's key, or "LATER".
+        goal: z.string().min(1),
+    });
+}
 
-const formSchema = z.object({
-    // Nothing is chosen for them (DEC-070): the answer is theirs to give.
-    kind: z.enum(ORGANIZATION_KINDS, {
-        errorMap: () => ({ message: "Choose what you're setting up" }),
-    }),
-    name: z.string().trim().min(1, { message: "It needs a name" }),
-    address: z
-        .string()
-        .min(3, { message: "An address needs at least 3 characters" }),
-    type: z.enum(["individual", "registered"]).optional(),
-    country: z.string().length(2),
-});
-
-type FormValues = z.infer<typeof formSchema>;
+type FormValues = z.infer<ReturnType<typeof schemaFor>>;
 
 /**
- * Setup's one step: say what is being set up (DEC-070), name it, reserve its
- * address, and say the things invoices and payment providers need to know.
- * Then Saroh opens.
+ * Setup, on one screen (UX audit, 10 Oct): your name if the account has
+ * none, what it is called, its web address, where it is, and what you will
+ * do first. "Create" then turns that first thing on with its defaults and
+ * opens it: a new product, a new service, the site ready to publish, a new
+ * contact. No second sheet of questions, and no empty list to land on.
  *
- * "What are you setting up?" comes first, with nothing chosen. The rest of
- * the form appears once it is answered, on the same screen, and speaks in
- * that answer's words (`kindWords`). The answer changes words and defaults
- * only: every kind gets the same Saroh.
+ * "What are you setting up?" (DEC-070) stays as a small choice at the top,
+ * with "A business" chosen. It is not a gate: every field is on screen from
+ * the start, and the answer changes words and defaults only.
  *
- * The address follows the name until the merchant edits it, and is checked as
- * they go — it is the one thing here that is hard to change later, because it
- * is where the business's website will live (`<address>.saroh.app`). The
- * rest of the business profile (legal name, tax ID, contact email, website)
- * is not asked here; Business settings has every one of those fields.
+ * The web address follows the name until the merchant edits it, and is
+ * checked as they go. It is the one thing here that is hard to change later,
+ * because it is where the business's website lives (`<address>.saroh.app`),
+ * so it is asked once, here, and never again when Website is turned on.
+ *
+ * Whether it is a registered company is not asked here any more. The Finish
+ * setup step "Choose your business type" asks, once something invoices or
+ * takes money. The rest of the business profile is in Settings › Business.
  */
 export function BusinessSetupForm({
     email,
+    needsName = false,
     backTo,
     checkout,
     invite,
@@ -119,6 +115,8 @@ export function BusinessSetupForm({
 }: {
     /** Who is signed in — named beside the way out, so it is clear whose. */
     email: string;
+    /** The account has no name yet, so setup asks for it. */
+    needsName?: boolean;
     /** Where Back goes: the workspace, when they already have a business. */
     backTo?: string;
     /**
@@ -136,35 +134,36 @@ export function BusinessSetupForm({
 }) {
     const router = useRouter();
     const form = useForm<FormValues>({
-        resolver: zodResolver(formSchema),
+        resolver: zodResolver(schemaFor(needsName)),
         defaultValues: {
-            kind: undefined,
+            kind: "BUSINESS",
+            yourName: "",
             name: defaultName ?? "",
             address: "",
-            type: undefined,
             country: "IN",
+            goal: defaultGoal("BUSINESS"),
         },
     });
     const { isSubmitting } = form.formState;
-    // Set up, and on the way to Home: the push takes a moment, and the
-    // button stays "Setting up…" until the page goes (UX-076).
+    // Set up, and on the way in: the push takes a moment, and the button
+    // stays "Setting up…" until the page goes (UX-076).
     const [leaving, setLeaving] = useState(false);
     const busy = isSubmitting || leaving;
 
-    /** Whether the merchant has typed an address of their own. */
+    /** Whether the merchant has typed a web address of their own. */
     const [edited, setEdited] = useState(false);
+    /** Whether they have picked a goal, so a change of kind leaves it be. */
+    const goalPicked = useRef(false);
     const name = useWatch({ control: form.control, name: "name" });
     const address = useWatch({ control: form.control, name: "address" });
     const country = useWatch({ control: form.control, name: "country" });
-    // Unanswered until they pick: the schema's type says what a valid
-    // submit holds, not what the form holds before one.
-    const kind = useWatch({ control: form.control, name: "kind" }) as
-        FormValues["kind"] | undefined;
+    const kind = useWatch({ control: form.control, name: "kind" });
     const words = kindWords(kind);
     const defaults = kindDefaults(kind);
+    const goals = setupGoals(kind);
     const [otherCountry, setOtherCountry] = useState(false);
 
-    // The address follows the name until it is edited.
+    // The web address follows the name until it is edited.
     useEffect(() => {
         if (!edited) {
             form.setValue("address", addressFromName(name), {
@@ -217,22 +216,31 @@ export function BusinessSetupForm({
         !availability.available;
 
     async function onSubmit(values: FormValues) {
-        // A site for my work is not asked (KTD-6), so it sends no type even
-        // if one was picked under another answer first.
-        const asked = kindDefaults(values.kind).asksRegistered;
+        const businessName = values.name.trim();
+        // The account's own name first: the business's team, its invoices
+        // and its welcome email all say who made it.
+        if (needsName) {
+            const saved = await authClient
+                .updateUser({ name: (values.yourName ?? "").trim() })
+                .then(
+                    (res) => !res.error,
+                    () => false,
+                );
+            if (!saved) {
+                form.setError("yourName", {
+                    message: "Couldn't save your name. Try again.",
+                });
+                return;
+            }
+        }
         const zone = browserZone();
         const res = await createOrganization({
-            name: values.name.trim(),
+            name: businessName,
             kind: values.kind,
             address: values.address,
+            // What they chose to do first: the welcome email leads with it.
+            ...(values.goal === GOAL_LATER ? {} : { goal: values.goal }),
             profile: {
-                // Registered leaves the type unset and says so (see TYPES).
-                ...(asked && values.type === "individual"
-                    ? { type: "individual", registered: false }
-                    : {}),
-                ...(asked && values.type === "registered"
-                    ? { registered: true }
-                    : {}),
                 country: values.country,
                 // The browser's zone (UX-008): the business's for a country
                 // that keeps several; one that keeps one zone uses that.
@@ -247,13 +255,22 @@ export function BusinessSetupForm({
             }
             return;
         }
+        // The business exists. Turn its first goal on with the defaults
+        // and learn where to land. A goal that can't be turned on lands on
+        // Home with the reason: the business is set up either way.
+        const start = await startWithGoalAction(values.goal, values.kind).catch(
+            () => ({
+                href: "/",
+                said: `${businessName} is set up. Pick what to do first from Home.`,
+            }),
+        );
         if (invite) {
             // Where the waitlist entry is marked joined and the offer
             // starts; the API checks the invite against this account.
             const taken = await takeLaunchOfferAfterOnboarding(invite);
             if (!taken.ok) {
                 showError(
-                    `${values.name.trim()} is set up, but the launch offer isn't applied yet.`,
+                    `${businessName} is set up, but the launch offer isn't applied yet.`,
                     taken.error,
                 );
             }
@@ -271,13 +288,14 @@ export function BusinessSetupForm({
             }
             if (started.kind === "failed") {
                 showError(
-                    `${values.name.trim()} is set up, but ${checkout.name} isn't started yet.`,
+                    `${businessName} is set up, but ${checkout.name} isn't started yet.`,
                     started.error,
                 );
             }
         }
+        if (start.said) showInfo(start.said);
         setLeaving(true);
-        router.push("/");
+        router.push(start.href);
         router.refresh();
     }
 
@@ -286,19 +304,14 @@ export function BusinessSetupForm({
             <form
                 onKeyDown={submitOnModEnter}
                 onSubmit={form.handleSubmit(onSubmit)}
-                className={cn(
-                    "grid gap-5",
-                    // Until the first question is answered, only it, the
-                    // button and the way out show. Hidden rather than
-                    // unmounted: what was typed survives a change of answer.
-                    !kind && "[&>*:not([data-setup-kept])]:hidden",
-                )}
+                className="grid gap-5"
+                noValidate
             >
                 <FormField
                     control={form.control}
                     name="kind"
-                    render={({ field, fieldState }) => (
-                        <FormItem data-setup-kept>
+                    render={({ field }) => (
+                        <FormItem>
                             <FormLabel id="kind-label">
                                 What are you setting up?
                             </FormLabel>
@@ -306,29 +319,44 @@ export function BusinessSetupForm({
                                 value={field.value}
                                 onChange={(next) => {
                                     field.onChange(next);
-                                    // What an unanswered submit said about
-                                    // fields that were not on screen yet is
-                                    // not news once they appear.
-                                    form.clearErrors();
+                                    // The goal follows the kind until one
+                                    // is picked by hand.
+                                    if (!goalPicked.current) {
+                                        form.setValue(
+                                            "goal",
+                                            defaultGoal(next),
+                                        );
+                                    }
                                 }}
                                 labelledBy="kind-label"
-                                describedBy={
-                                    fieldState.error ? "kind-error" : undefined
-                                }
-                                invalid={Boolean(fieldState.error)}
                             />
-                            {fieldState.error ? (
-                                <p
-                                    id="kind-error"
-                                    role="alert"
-                                    className="text-[0.8rem] font-medium text-destructive"
-                                >
-                                    {fieldState.error.message}
-                                </p>
-                            ) : null}
                         </FormItem>
                     )}
                 />
+
+                {needsName ? (
+                    <FormField
+                        control={form.control}
+                        name="yourName"
+                        render={({ field }) => (
+                            <FormItem>
+                                <FormLabel>Your name</FormLabel>
+                                <FormControl>
+                                    <Input
+                                        autoComplete="name"
+                                        className="coarse:text-base"
+                                        {...field}
+                                        value={field.value ?? ""}
+                                    />
+                                </FormControl>
+                                <FormDescription>
+                                    What your team sees when you invite them.
+                                </FormDescription>
+                                <FormMessage />
+                            </FormItem>
+                        )}
+                    />
+                ) : null}
 
                 <FormField
                     control={form.control}
@@ -340,6 +368,7 @@ export function BusinessSetupForm({
                                 <Input
                                     placeholder={defaults.namePlaceholder}
                                     autoComplete="organization"
+                                    className="coarse:text-base"
                                     {...field}
                                 />
                             </FormControl>
@@ -357,13 +386,13 @@ export function BusinessSetupForm({
                     name="address"
                     render={({ field }) => (
                         <FormItem>
-                            <FormLabel>Its address on Saroh</FormLabel>
+                            <FormLabel>Web address</FormLabel>
                             {/* FormControl on the Input itself, so the label,
                                 the description and any error are wired to the
                                 field a screen reader lands on, not its frame. */}
                             <div
                                 className={cn(
-                                    "flex h-[38px] items-center rounded-md border border-input bg-field pr-3 font-mono text-sm focus-within:ring-2 focus-within:ring-ring",
+                                    "flex h-[38px] items-center rounded-md border border-input bg-field pr-3 font-mono text-sm focus-within:ring-2 focus-within:ring-ring coarse:h-11",
                                     taken && "border-destructive",
                                 )}
                             >
@@ -384,7 +413,7 @@ export function BusinessSetupForm({
                                         // the input itself is borderless so
                                         // the address and `.saroh.app` read
                                         // as one value.
-                                        className="h-full min-w-0 flex-1 rounded-none border-0 bg-transparent pr-0 text-right font-mono shadow-none focus-visible:ring-0"
+                                        className="h-full min-w-0 flex-1 rounded-none border-0 bg-transparent pr-0 text-right font-mono shadow-none focus-visible:ring-0 coarse:h-full coarse:text-base"
                                     />
                                 </FormControl>
                                 <span className="text-muted-foreground">
@@ -425,61 +454,6 @@ export function BusinessSetupForm({
                     )}
                 />
 
-                {defaults.asksRegistered ? (
-                    <FormField
-                        control={form.control}
-                        name="type"
-                        render={({ field }) => (
-                            <FormItem>
-                                <FormLabel id="type-label">
-                                    Is it registered as a company?
-                                </FormLabel>
-                                <div
-                                    role="radiogroup"
-                                    aria-labelledby="type-label"
-                                    className="grid grid-cols-2 gap-2"
-                                >
-                                    {TYPES.map((type) => {
-                                        const on = field.value === type.value;
-                                        return (
-                                            <button
-                                                key={type.value}
-                                                type="button"
-                                                role="radio"
-                                                aria-checked={on}
-                                                onClick={() =>
-                                                    field.onChange(
-                                                        on
-                                                            ? undefined
-                                                            : type.value,
-                                                    )
-                                                }
-                                                className={cn(
-                                                    "rounded-lg border px-3.5 py-3 text-left transition-colors duration-fast focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
-                                                    on
-                                                        ? "border-foreground bg-muted"
-                                                        : "border-input hover:bg-muted active:bg-accent-active",
-                                                )}
-                                            >
-                                                <span className="block text-[13px] font-semibold">
-                                                    {type.label}
-                                                </span>
-                                                <span className="mt-0.5 block text-[12px] leading-snug text-muted-foreground">
-                                                    {type.note}
-                                                </span>
-                                            </button>
-                                        );
-                                    })}
-                                </div>
-                                <FormDescription>
-                                    It decides what your invoices say and what a
-                                    payment provider will ask you for.
-                                </FormDescription>
-                            </FormItem>
-                        )}
-                    />
-                ) : null}
-
                 <FormItem>
                     <FormLabel id="country-label">
                         {kind === "BUSINESS"
@@ -491,36 +465,27 @@ export function BusinessSetupForm({
                         aria-labelledby="country-label"
                         className="flex flex-wrap gap-1.5"
                     >
-                        {COMMON_COUNTRIES.map((c) => {
-                            const on = !otherCountry && country === c.code;
-                            return (
-                                <button
-                                    key={c.code}
-                                    type="button"
-                                    role="radio"
-                                    aria-checked={on}
-                                    onClick={() => {
-                                        setOtherCountry(false);
-                                        form.setValue("country", c.code);
-                                    }}
-                                    className={chipClass(on)}
-                                >
-                                    <span className="font-mono text-[11px] opacity-70">
-                                        {c.code}
-                                    </span>
-                                    {c.name}
-                                </button>
-                            );
-                        })}
-                        <button
-                            type="button"
-                            role="radio"
-                            aria-checked={otherCountry}
+                        {COMMON_COUNTRIES.map((c) => (
+                            <Chip
+                                key={c.code}
+                                on={!otherCountry && country === c.code}
+                                onClick={() => {
+                                    setOtherCountry(false);
+                                    form.setValue("country", c.code);
+                                }}
+                            >
+                                <span className="font-mono text-[11px] opacity-70">
+                                    {c.code}
+                                </span>
+                                {c.name}
+                            </Chip>
+                        ))}
+                        <Chip
+                            on={otherCountry}
                             onClick={() => setOtherCountry(true)}
-                            className={chipClass(otherCountry)}
                         >
                             Another country
-                        </button>
+                        </Chip>
                     </div>
                     {otherCountry ? (
                         <CountrySelect
@@ -539,7 +504,34 @@ export function BusinessSetupForm({
                     </FormDescription>
                 </FormItem>
 
-                <div data-setup-kept className="flex gap-2 pt-1">
+                <FormField
+                    control={form.control}
+                    name="goal"
+                    render={({ field }) => (
+                        <FormItem>
+                            <FormLabel id="goal-label">
+                                What will you do first?
+                            </FormLabel>
+                            <SetupGoalChoice
+                                goals={goals}
+                                value={field.value}
+                                onChange={(next) => {
+                                    goalPicked.current = true;
+                                    field.onChange(next);
+                                }}
+                                labelledBy="goal-label"
+                                describedBy="goal-note"
+                            />
+                            <FormDescription id="goal-note">
+                                It is set up with sensible defaults and opens
+                                ready to fill in. You can add the others
+                                whenever.
+                            </FormDescription>
+                        </FormItem>
+                    )}
+                />
+
+                <div className="flex gap-2 pt-1">
                     {backTo ? (
                         <Button asChild variant="outline">
                             <Link href={backTo}>Back</Link>
@@ -566,10 +558,7 @@ export function BusinessSetupForm({
                     </Tip>
                 </div>
 
-                <p
-                    data-setup-kept
-                    className="text-[12px] text-muted-foreground"
-                >
+                <p className="text-[12px] text-muted-foreground">
                     Signed in as{" "}
                     <span className="text-foreground">{email}</span> ·{" "}
                     <Button

@@ -23,7 +23,8 @@ function outboxPath(email: string): string {
     );
 }
 
-function lastCode(email: string): string | null {
+/** The code waiting for an address now, if any: pass it to `readSiteCode` as `previous` to wait for a newer one. */
+export function lastCode(email: string): string | null {
     try {
         const code = readFileSync(outboxPath(email), "utf8").trim();
         return /^\d{6}$/.test(code) ? code : null;
@@ -107,4 +108,23 @@ export async function signInOnSheet(page: Page, email: string): Promise<void> {
     await expectNoZoomOnFocus(field);
     await field.fill(code);
     await expect(sheet).toBeHidden({ timeout: 15_000 });
+}
+
+/**
+ * After signing in at the booking page's last step with a new account: it
+ * has no name yet, so the page asks for one now (and only now; a signed-out
+ * visitor is never asked), keeps everything chosen, and books on the next
+ * press. Gives the name and presses the page's own button, whatever it
+ * reads ("Book", "Pay ₹500 and book", "Pay and book" on a phone's bar).
+ */
+export async function nameThenBook(page: Page, name: string): Promise<void> {
+    const field = page.getByLabel("Name");
+    await expect(field).toBeVisible({ timeout: 15_000 });
+    await expectNoZoomOnFocus(field);
+    await field.fill(name);
+    await page
+        .getByRole("button", { name: /^(Book|Pay )/ })
+        .filter({ visible: true })
+        .first()
+        .click();
 }

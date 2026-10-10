@@ -58,12 +58,18 @@ export function TurnOnSheet({
     picked,
     modules,
     onOpenChange,
+    firstRun,
 }: {
     /** The modules to turn on; null when the sheet is closed. */
     picked: readonly string[] | null;
     /** Every module, as the API lists them: for what each one needs. */
     modules: readonly ModuleView[];
     onOpenChange: (open: boolean) => void;
+    /**
+     * Opened from a first run (Home's "What will you do first?" or the
+     * module picker): it lands on the thing itself, as setup does.
+     */
+    firstRun?: boolean;
 }) {
     const [session, setSession] = useState(0);
     // Said by the body, which knows what the plan lets the business connect.
@@ -95,6 +101,7 @@ export function TurnOnSheet({
                     modules={modules}
                     onClose={close}
                     onSays={setSays}
+                    firstRun={firstRun}
                 />
             ) : null}
         </FormSheet>
@@ -106,14 +113,16 @@ function TurnOnBody({
     modules,
     onClose,
     onSays,
+    firstRun,
 }: {
     picked: readonly string[];
     modules: readonly ModuleView[];
     onClose: () => void;
+    firstRun?: boolean;
     /** The line under the title, once what can be connected is known. */
     onSays: (line: string | null) => void;
 }) {
-    const t = useTurnOn({ picked, modules, onClose });
+    const t = useTurnOn({ picked, modules, onClose, firstRun });
     const { draft, plan } = t;
     const single = picked.length === 1 ? picked[0] : undefined;
     const fielded = plan.order.filter(hasSetup);
@@ -147,7 +156,7 @@ function TurnOnBody({
     const shopNote = !draft
         ? null
         : plan.websiteForShop
-          ? `Your online shop goes on your website at ${draft.WEBSITE.address ? `${draft.WEBSITE.address}.saroh.app/shop` : "/shop on your web address"} — we'll set up the website for you.`
+          ? `Your online shop goes on your website at ${draft.WEBSITE.address ? `${draft.WEBSITE.address}.saroh.app/shop` : "/shop on your web address"}. We'll set up the website for you.`
           : null;
 
     // A module whose provider the plan won't connect is described as the
@@ -227,6 +236,7 @@ function TurnOnBody({
                                             suggestion={t.suggestion}
                                             template={t.websiteTemplate}
                                             choices={t.websiteChoices}
+                                            addressFixed={t.websiteAddressFixed}
                                         />
                                     </Section>
                                 );

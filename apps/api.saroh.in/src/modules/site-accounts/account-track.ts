@@ -99,8 +99,8 @@ function stepLine(
         case "READY":
             if (type !== "PICKUP") return "Packed, waiting to leave";
             return order.collectFrom
-                ? `Collect from ${order.collectFrom} — show #${order.number}`
-                : `At the counter — show #${order.number}`;
+                ? `Pick-up from ${order.collectFrom}. Show #${order.number}`
+                : `At the counter. Show #${order.number}`;
         case "COLLECTED":
             return "Picked up";
         case "OUT_FOR_DELIVERY":
