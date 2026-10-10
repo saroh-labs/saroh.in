@@ -58,6 +58,11 @@ a note saying so.
   behind the signed relay, and no consent is taken from an unverified
   address (`link-preview/report-email.ts`, DEV_LEARNINGS "a public tool
   that emails stranger-supplied text is a relay").
+  saroh.in's free tools share one email budget, `waitlist/tool-email-cap.ts`
+  (3 a UTC day to an address, 300 a day in all): a new tool's gate claims
+  from it rather than counting its own. The QR code maker's email
+  (`tools/qr-maker-email.ts`) takes no input at all, because the API never
+  receives what the visitor typed.
 - **Current** — **A stranger's host name is resolved off the thread pool.**
   Never `dns.lookup` (getaddrinfo on libuv's four threads) for an address a
   visitor typed: use `dns.promises.Resolver` with a short timeout and one

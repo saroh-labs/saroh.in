@@ -273,6 +273,9 @@ const NEVER: Record<string, string> = {
     // account or business exists. Behind the signed visitor relay instead.
     "link-preview/link-preview.controller.ts":
         "saroh.in's public link preview tool, not a tenant surface",
+    // QR codes plan U9: the free QR code maker's email gate, the same way.
+    "tools/qr-maker.controller.ts":
+        "saroh.in's public QR code maker's email gate, not a tenant surface",
 };
 
 /** Controllers with a test of their own below, not a row above. */

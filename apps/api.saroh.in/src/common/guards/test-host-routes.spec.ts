@@ -71,6 +71,9 @@ const REFUSED = [
     // saroh.in's server calls either, never a merchant's test release.
     "POST public/tools/link-preview",
     "POST public/tools/link-preview/report",
+    // saroh.in's QR code maker: its email gate stores an address and
+    // sends an email; only saroh.in's server calls it.
+    "POST public/tools/qr-code-maker/unlock",
     // Plans, packs and autopay.
     "POST public/site-accounts/me/plans/:ref/join",
     "POST public/site-accounts/me/plan/:ref/cancel",

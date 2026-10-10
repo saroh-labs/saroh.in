@@ -392,6 +392,9 @@ module.exports = {
         // Link preview tool (resources plan U2): the SSRF guard, the head
         // parser, the report and the gate, with fake DNS and transports.
         "<rootDir>/src/modules/link-preview/**/*.spec.ts",
+        // QR code maker (QR codes plan U9): its email gate, with a mocked
+        // Prisma and mailer.
+        "<rootDir>/src/modules/tools/**/*.spec.ts",
         // Which social sign-in buttons the accounts pages show: only
         // providers with both keys set. Pure; no DB.
         "<rootDir>/src/modules/sign-in-options/**/*.spec.ts",
