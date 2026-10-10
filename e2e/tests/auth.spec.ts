@@ -21,7 +21,7 @@ async function signIn(page: import("@playwright/test").Page) {
     await page.goto(`${urls.ACCOUNTS_URL}/login`);
     await page.getByLabel("Email").fill(demoUser.email);
     await page.getByLabel("Password", { exact: true }).fill(demoUser.password);
-    await page.getByRole("button", { name: "Log in" }).click();
+    await page.getByRole("button", { name: "Sign in" }).click();
     await page.waitForURL((url) => !url.pathname.startsWith("/login"), {
         timeout: 30_000,
     });
@@ -72,7 +72,7 @@ test.describe("cross-origin session", () => {
         await page
             .getByLabel("Password", { exact: true })
             .fill(demoUser.password);
-        await page.getByRole("button", { name: "Log in" }).click();
+        await page.getByRole("button", { name: "Sign in" }).click();
 
         await page.waitForURL(/\/bookings/, { timeout: 30_000 });
 
@@ -103,7 +103,7 @@ test.describe("cross-origin session", () => {
         ).toBeVisible();
 
         await page.getByRole("button", { name: "Your account" }).click();
-        await page.getByRole("menuitem", { name: /sign out|log out/i }).click();
+        await page.getByRole("menuitem", { name: "Sign out" }).click();
 
         await page.waitForURL(/\/login/, { timeout: 30_000 });
 

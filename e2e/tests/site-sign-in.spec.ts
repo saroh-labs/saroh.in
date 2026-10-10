@@ -89,7 +89,7 @@ test.describe("site sign-in: the API side", () => {
         await page
             .getByLabel("Password", { exact: true })
             .fill(demoUser.password);
-        await page.getByRole("button", { name: "Log in" }).click();
+        await page.getByRole("button", { name: "Sign in" }).click();
         await page.waitForURL((url) => !url.pathname.startsWith("/login"), {
             timeout: 30_000,
         });
@@ -121,7 +121,7 @@ test.describe("site sign-in: in the browser", () => {
         await page
             .getByLabel("Password", { exact: true })
             .fill(demoUser.password);
-        await page.getByRole("button", { name: "Log in" }).click();
+        await page.getByRole("button", { name: "Sign in" }).click();
         await page.waitForURL((url) => !url.pathname.startsWith("/login"), {
             timeout: 30_000,
         });

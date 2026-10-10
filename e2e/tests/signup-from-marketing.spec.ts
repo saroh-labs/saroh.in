@@ -1,10 +1,10 @@
-// @covers accounts:/signup accounts:/verify-email accounts:/apps app:/onboarding app:/ api:organizations api:billing
+// @covers accounts:/signup accounts:/verify-email accounts:/login app:/onboarding app:/ app:/choose api:organizations api:billing pkg:auth
 import type { Page, TestInfo } from "@playwright/test";
 import { expect, test } from "@playwright/test";
 
 import { stamp } from "../fixtures/own-data";
 import { useSession } from "../fixtures/sessions";
-import { urls } from "../playwright.config";
+import { demoUser, urls } from "../playwright.config";
 import { readSiteCode } from "./site-codes";
 
 /**
@@ -129,7 +129,50 @@ test.describe("sign-up from the marketing site (U27)", () => {
     }) => {
         await useSession(page, "founder");
         await page.goto(`${urls.ACCOUNTS_URL}/signup?plan=free&src=nav`);
-        await expect(page).toHaveURL(`${urls.ACCOUNTS_URL}/apps`);
+        // Saroh itself, whose front door picks Home or which business. It
+        // was accounts' `/apps`, a list of Saroh's own hosts.
+        await page.waitForURL((url) => url.origin === urls.APP_URL, {
+            timeout: 20_000,
+        });
+        expect(new URL(page.url()).pathname).not.toBe("/apps");
+        expect(new URL(page.url()).pathname).not.toMatch(/^\/login/);
+    });
+
+    /**
+     * An address that already has an account gets the same "Check your
+     * email" as a new one (the page must not say who is registered), and no
+     * code is coming. The way out is on the page for everyone: Sign in, with
+     * the address filled in. The email that tells the owner is the unit
+     * tests' (`apps/api.saroh.in/src/common/email-existing-account.spec.ts`).
+     */
+    test("signing up with an address that has an account: the same page, and a way to sign in", async ({
+        page,
+    }) => {
+        await page.goto(`${urls.ACCOUNTS_URL}/signup`);
+        await page.getByLabel("Your name").fill("Someone Else");
+        await page.getByLabel("Email").fill(demoUser.email);
+        await page.getByLabel("Password").fill(PASSWORD);
+        await page.getByRole("button", { name: "Send the code" }).click();
+        await page.waitForURL(/\/verify-email\?/);
+        await expect(
+            page.getByRole("heading", { name: "Check your email", level: 1 }),
+        ).toBeVisible();
+        await expect(
+            page.getByText("No code? You may already have an account."),
+        ).toBeVisible();
+
+        await page.getByRole("link", { name: "Sign in", exact: true }).click();
+        await page.waitForURL(/\/login\?/);
+        await expect(
+            page.getByRole("heading", { name: "Sign in", level: 1 }),
+        ).toBeVisible();
+        await expect(page.getByLabel("Email")).toHaveValue(demoUser.email);
+        // Privacy, Terms and Help are one tap away on every one of these.
+        await expect(
+            page
+                .getByRole("navigation", { name: "Legal and help" })
+                .getByRole("link", { name: "Help" }),
+        ).toBeVisible();
     });
 
     test("signed in with a business, a plan link to onboarding goes to the workspace", async ({
