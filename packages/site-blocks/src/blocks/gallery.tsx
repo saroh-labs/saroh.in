@@ -1,5 +1,6 @@
 import type { RenderedGallery } from "@saroh/block-contract";
 import { resolveVariant } from "@saroh/block-contract";
+import { siteImage } from "../lib/site-image";
 import { cn } from "../lib/utils";
 
 /**
@@ -48,6 +49,9 @@ export default function GallerySection({
                                 <img
                                     src={img.src}
                                     alt={img.alt ?? ""}
+                                    width={img.width}
+                                    height={img.height}
+                                    {...siteImage()}
                                     className="h-64 w-auto rounded-[var(--site-radius)] object-cover"
                                 />
                                 <Caption text={img.caption} over={over} />
@@ -57,6 +61,9 @@ export default function GallerySection({
                                 key={i}
                                 src={img.src}
                                 alt={img.alt ?? ""}
+                                width={img.width}
+                                height={img.height}
+                                {...siteImage()}
                                 className="h-64 w-auto flex-none snap-start rounded-[var(--site-radius)] object-cover"
                             />
                         ),
@@ -81,6 +88,12 @@ export default function GallerySection({
                             key={i}
                             src={img.src}
                             alt={img.alt ?? ""}
+                            // Its own size, where the snapshot has it: a
+                            // masonry photo keeps its shape, so the page
+                            // holds its room before it arrives.
+                            width={img.width}
+                            height={img.height}
+                            {...siteImage()}
                             className={cn(
                                 "w-full rounded-[var(--site-radius)] object-cover",
                                 layout === "masonry"

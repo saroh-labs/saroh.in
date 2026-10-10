@@ -14,10 +14,16 @@ import {
 import { getCatalogueProduct } from "@/lib/catalogue";
 import { dontCachePage, showsProduct } from "@/lib/page-cache/site-rules";
 import { productJsonLdScript } from "@/lib/product-json-ld";
-import { getSiteForHost, postsPrefix, shareImages } from "@/lib/publication";
+import {
+    getSiteForHost,
+    postsPrefix,
+    shareImages,
+    siteOriginFor,
+} from "@/lib/publication";
 import { getCheckoutOptions } from "@/lib/shop-checkout";
 import { enquiryPagePath } from "@/lib/shop-checkout-shape";
 import { getSignInOptions } from "@/lib/sign-in";
+import { canonical, productDescription } from "@/lib/site-meta";
 import { shareable } from "@/lib/test-metadata";
 
 import PostPage, {
@@ -64,9 +70,9 @@ export async function generateMetadata({
     const title = product.seoTitle?.trim()
         ? product.seoTitle
         : `${product.name} · ${name}`;
-    const description = product.seoDescription?.trim()
-        ? product.seoDescription
-        : undefined;
+    // The one its merchant wrote, else its blurb: the start of what the
+    // page says about it.
+    const description = productDescription(product);
     const cover = product.images.find((i) => i.kind !== "video");
     const images = cover ? [cover.url] : shareImages(resolved.snapshot.site);
     const url = `/shop/${product.slug}`;
@@ -80,7 +86,7 @@ export async function generateMetadata({
             description,
             images,
         },
-        metadataBase: new URL(`https://${domain}`),
+        ...canonical(resolved, domain, url),
     });
 }
 
@@ -148,7 +154,7 @@ export default async function ShopProductPage({
                 dangerouslySetInnerHTML={{
                     __html: productJsonLdScript({
                         product,
-                        origin: `https://${domain}`,
+                        origin: siteOriginFor(resolved, domain),
                         business,
                     }),
                 }}

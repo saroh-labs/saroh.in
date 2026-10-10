@@ -95,8 +95,14 @@ export default function SectionRenderer({
     fixtures,
     modulePage = false,
     reach,
+    first = false,
 }: {
     section: Section;
+    /**
+     * The page's first section: a hero here is what the page opens on, and
+     * its photo is fetched first (`lib/site-image.ts`).
+     */
+    first?: boolean;
     /**
      * How to reach the business (the public contact read): the booking
      * block offers a call and a message when it has no time to offer.
@@ -177,6 +183,7 @@ export default function SectionRenderer({
                     visit={fixtures?.visit}
                     today={fixtures?.today}
                     now={now}
+                    priority={first}
                 />
             );
         case "richText":
@@ -474,6 +481,7 @@ export function PageSections({
                         fixtures={fixtures}
                         modulePage={modulePage}
                         reach={reach}
+                        first={i === 0}
                     />
                 );
                 return (

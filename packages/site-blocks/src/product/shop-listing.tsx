@@ -3,6 +3,7 @@
 import { useState } from "react";
 
 import { focusRing } from "../booking-flow/styles";
+import { siteImage } from "../lib/site-image";
 import { cn } from "../lib/utils";
 import { allInBagWords, roomInBag } from "../shop/add-to-bag";
 import { addToBag, openBag, useBag } from "../shop/bag-store";
@@ -134,7 +135,7 @@ export default function ShopListing({
                 </p>
             ) : null}
             <ul className="mt-4 grid grid-cols-[repeat(auto-fill,minmax(260px,1fr))] gap-3">
-                {products.map((p) => {
+                {products.map((p, index) => {
                     const amount = formatAmount(p.price, p.currency, locale);
                     const canAdd = Boolean(bagSite && p.listingId);
                     const href = `${basePath}/${encodeURIComponent(p.slug)}`;
@@ -159,6 +160,12 @@ export default function ShopListing({
                                         <img
                                             src={p.image.url}
                                             alt={p.image.alt}
+                                            // The first row is on the
+                                            // first screen; the rest wait
+                                            // until the visitor nears them.
+                                            {...siteImage(
+                                                index < 4 ? "above" : "below",
+                                            )}
                                             className="h-full w-full object-cover"
                                         />
                                     ) : (

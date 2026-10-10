@@ -2,6 +2,7 @@
 
 import { focusRing, quietFill } from "../booking-flow/styles";
 import { formatAmount } from "../lib/money";
+import { siteImage } from "../lib/site-image";
 import { cn } from "../lib/utils";
 import type { CheckoutQuote, QuoteLine } from "./api";
 import { MAX_ITEM_QUANTITY, setQuantity } from "./bag-store";
@@ -78,8 +79,7 @@ export function BagLines({
                                 alt=""
                                 width={56}
                                 height={56}
-                                loading="lazy"
-                                decoding="async"
+                                {...siteImage()}
                                 className="border-site-border size-14 shrink-0 rounded-[calc(var(--site-radius)+4px)] border object-cover"
                             />
                         ) : (

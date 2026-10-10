@@ -1,6 +1,7 @@
 import type { RenderedProjects } from "@saroh/block-contract";
 import { isSafeHref } from "@saroh/block-contract";
 
+import { siteImage } from "../lib/site-image";
 import { cn } from "../lib/utils";
 
 /**
@@ -157,7 +158,7 @@ function Tile({
                 <img
                     src={src}
                     alt={item.image?.alt ?? ""}
-                    loading="lazy"
+                    {...siteImage()}
                     className="absolute inset-0 h-full w-full object-cover"
                 />
             ) : null}

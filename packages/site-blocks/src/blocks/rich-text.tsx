@@ -1,5 +1,6 @@
 import type { RenderedRichText } from "@saroh/block-contract";
 import { resolveVariant } from "@saroh/block-contract";
+import { siteImage } from "../lib/site-image";
 
 /**
  * `richText` v1 — authored rich content.
@@ -143,7 +144,7 @@ export default function RichTextSection({
                 alt={image.alt ?? ""}
                 width={image.width}
                 height={image.height}
-                loading="lazy"
+                {...siteImage()}
                 className="bg-site-surface mb-8 aspect-video h-auto w-full rounded-[var(--site-radius)] object-cover"
             />
         );
@@ -187,7 +188,7 @@ export default function RichTextSection({
                     alt={image.alt ?? ""}
                     width={image.width}
                     height={image.height}
-                    loading="lazy"
+                    {...siteImage()}
                     className={
                         photoLeft
                             ? "h-auto w-full rounded-[var(--site-radius)] object-cover"

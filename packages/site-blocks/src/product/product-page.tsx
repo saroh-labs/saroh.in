@@ -4,6 +4,7 @@ import type { ReactNode } from "react";
 import { createContext, useContext, useState } from "react";
 
 import { formatAmount } from "../lib/money";
+import { siteImage } from "../lib/site-image";
 import { cn } from "../lib/utils";
 
 /**
@@ -209,6 +210,7 @@ function ProductVideo({
                     <img
                         src={video.posterUrl}
                         alt={label}
+                        {...siteImage("above")}
                         className="aspect-[4/5] w-full object-cover"
                     />
                 ) : (
@@ -352,6 +354,7 @@ export default function ProductPage({
                                 alt={shown.alt}
                                 width={shown.width ?? undefined}
                                 height={shown.height ?? undefined}
+                                {...siteImage("above")}
                                 className="aspect-[4/5] w-full object-cover"
                             />
                         ) : (
@@ -398,6 +401,7 @@ export default function ProductPage({
                                                         : img.url
                                                 }
                                                 alt=""
+                                                {...siteImage()}
                                                 className="aspect-square w-full object-cover"
                                             />
                                         )}

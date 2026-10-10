@@ -157,6 +157,8 @@ export { formatAmount } from "./lib/money";
 export { phoneText } from "./lib/phone";
 export { shopFactsLine } from "./lib/shop-facts";
 export type { ShopFactsInput } from "./lib/shop-facts";
+export { siteImage } from "./lib/site-image";
+export type { ImagePlace, SiteImageProps } from "./lib/site-image";
 export { emailed, reachOrNull, toldText } from "./lib/told";
 export type { NoticeReach } from "./lib/told";
 export { NO_REACH, ReachLinks, hasReach, reachOf } from "./reach-links";

@@ -14,6 +14,7 @@ import {
     productCardsOf,
     productGridQuery,
 } from "../lib/product-grid-read";
+import { siteImage } from "../lib/site-image";
 import { cn, trimTrailingSlashes } from "../lib/utils";
 import { optionSummary } from "../product/option-summary";
 import { formatAmount } from "../product/product-page";
@@ -482,7 +483,7 @@ function ListRowBody({
                 <img
                     src={p.image.url}
                     alt={p.image.alt}
-                    loading="lazy"
+                    {...siteImage()}
                     className={listPhoto}
                 />
             ) : null}
@@ -508,7 +509,7 @@ function CardBody({
                 <img
                     src={p.image.url}
                     alt={p.image.alt}
-                    loading="lazy"
+                    {...siteImage()}
                     className="mb-1.5 h-[130px] w-full object-cover"
                 />
             ) : (
@@ -627,7 +628,7 @@ function BareGrid({
                                     <img
                                         src={p.image.url}
                                         alt={p.image.alt}
-                                        loading="lazy"
+                                        {...siteImage()}
                                         className="h-full w-full object-cover"
                                     />
                                 ) : null}

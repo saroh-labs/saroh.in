@@ -9,6 +9,7 @@ import { DEFAULT_API_URL } from "../api-url";
 import { dateText } from "../booking-flow/model";
 import type { OpeningHoursDay } from "../lib/opening-hours";
 import { isOpeningWeek, openState, openStateText } from "../lib/opening-hours";
+import { siteImage } from "../lib/site-image";
 import { cn } from "../lib/utils";
 import { useQrSource, withQrSource } from "../qr-source";
 import { CtaButton } from "./cta";
@@ -343,6 +344,7 @@ function SplitHero({
                         alt={content.image.alt ?? ""}
                         width={content.image.width}
                         height={content.image.height}
+                        {...siteImage()}
                         className="absolute inset-0 size-full rounded-[calc(var(--site-radius)*1.6)] object-cover"
                     />
                 </div>

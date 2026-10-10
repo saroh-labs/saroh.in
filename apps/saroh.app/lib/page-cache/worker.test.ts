@@ -128,6 +128,32 @@ describe("the merchant sites' page cache (#863)", () => {
         expect(second.headers.get("x-saroh-page-tags")).toBeNull();
     });
 
+    it("answers an ad click, a shared link and a QR scan from the page kept for the plain address", async () => {
+        const h = harness();
+        const seen: string[] = [];
+        h.render = (request) => {
+            seen.push(new URL(request.url).search);
+            tagPage("site:site_1");
+            return page();
+        };
+        // The first visitor scanned a code: the page is drawn without its tag.
+        const first = await h.fetch(
+            "https://rye.saroh.app/shop/sourdough?src=qr-h7c",
+        );
+        expect(first.headers.get(CACHE_STATUS_HEADER)).toBe("miss");
+        expect(seen).toEqual([""]);
+        for (const url of [
+            "https://rye.saroh.app/shop/sourdough",
+            "https://rye.saroh.app/shop/sourdough?utm_source=instagram&fbclid=abc",
+            "https://rye.saroh.app/shop/sourdough?gclid=x&igshid=y",
+        ]) {
+            expect((await h.fetch(url)).headers.get(CACHE_STATUS_HEADER)).toBe(
+                "hit",
+            );
+        }
+        expect(h.renders).toBe(1);
+    });
+
     it("never answers one host with another's page", async () => {
         const h = harness();
         await h.fetch("https://rye.saroh.app/about");
