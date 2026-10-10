@@ -232,13 +232,18 @@ test.describe("the booking page", () => {
         const email = `desk-${testInfo.project.name}-${Date.now()}@example.in`;
         await pickTime(page, 0);
 
-        // Days say what they are: Full, Closed, or how many are free.
+        // Days say what they are: how many are free, Full, Closed, or No
+        // times (open, but nobody takes this service then: the first day is
+        // today, and on a weekend that is what Northwind's says).
         await expect(
             page
                 .getByRole("radiogroup", { name: "Day" })
                 .getByRole("radio")
                 .first(),
-        ).toHaveAttribute("aria-label", /: (\d+ times? free|full|closed)$/);
+        ).toHaveAttribute(
+            "aria-label",
+            /: (\d+ times? free|full|closed|no times)$/,
+        );
 
         await details(page);
         await page.getByRole("radio", { name: /Pay at the desk/ }).click();

@@ -3787,3 +3787,17 @@ still ask the table; every `@Controller("public/sites")` must carry
 ask `assertMembersMayOpen`. A new state, site controller or member door fails
 it until it is decided.
 **Category**: lifecycle · `apps/api.saroh.in/src/modules/organizations/organization-lifecycle.policy.ts`
+
+## A browser spec that only passed on weekdays
+
+**Symptom**: `public-booking.spec.ts` › "pay at the desk…" failed on desk and
+phone, first try and retry, in a Saturday gate; it had passed every weekday.
+**Cause**: it asserted the first day button's `aria-label` ends in
+"N times free", "full" or "closed". The first button is today, and on a day
+Northwind is open but nobody takes the service the label is "no times"
+(`dayAria`, UX-054), which the pattern left out.
+**Fix**: the pattern accepts all four endings `dayAria` can give.
+**Check**: none added. A spec that reads "today" must accept every state today
+can be in; read the function that writes the words, not one day's screen
+(`saroh-browser-tests` skill: date-dependent assertions).
+**Category**: browser tests · `e2e/tests/public-booking.spec.ts`
