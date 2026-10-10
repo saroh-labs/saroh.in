@@ -210,7 +210,10 @@ async function signInAsAsha() {
     fireEvent.change(await screen.findByLabelText("Code"), {
         target: { value: "123456" },
     });
-    await press(screen.getByRole("button", { name: "Sign in" }));
+    // The sixth digit sends the code; let the check settle.
+    await act(async () => {
+        await Promise.resolve();
+    });
 }
 
 describe("Join on the Plans block", () => {

@@ -70,13 +70,63 @@ describe("ShopListing (G11)", () => {
     describe("Add to bag on the card (the design's shop, G13)", () => {
         beforeEach(() => window.localStorage.clear());
 
+        // One option on offer: nothing to choose, so the card adds it.
         const offered: ShopListingCard = {
             ...sourdough,
+            variantTitles: ["Large"],
             listingId: "listing-sourdough",
             bagVariantId: "variant-large",
         };
+        // Two sizes on offer: the card can't know which is wanted.
+        const sized: ShopListingCard = {
+            ...sourdough,
+            listingId: "listing-sourdough",
+            bagVariantId: "variant-small",
+        };
 
-        it("adds the first option on offer, then says Add another and offers the bag", () => {
+        it("sends a product with several options to its page to choose, adding nothing", () => {
+            render(<ShopListing products={[sized]} bagSite="site-1" />);
+            const choose = screen.getByRole("link", {
+                name: "Choose size for Sourdough",
+            });
+            expect(choose).toHaveTextContent("Choose size");
+            expect(choose).toHaveAttribute("href", "/shop/sourdough");
+            // A link, not a button: nothing is added from the card.
+            expect(screen.queryByRole("button")).toBeNull();
+            expect(readBag("site-1")).toEqual([]);
+        });
+
+        it("says Choose options where the options have no name", () => {
+            render(
+                <ShopListing
+                    products={[{ ...sized, optionName: null }]}
+                    bagSite="site-1"
+                />,
+            );
+            expect(
+                screen.getByRole("link", {
+                    name: "Choose options for Sourdough",
+                }),
+            ).toHaveTextContent("Choose options");
+        });
+
+        it("keeps Add to bag for a product with no options at all", () => {
+            render(
+                <ShopListing
+                    products={[
+                        { ...offered, variantTitles: [], bagVariantId: null },
+                    ]}
+                    bagSite="site-1"
+                />,
+            );
+            expect(
+                screen.getByRole("button", {
+                    name: "Add Sourdough to your bag",
+                }),
+            ).toHaveTextContent("Add to bag");
+        });
+
+        it("adds the one option on offer, then says Add another and offers the bag", () => {
             render(<ShopListing products={[offered]} bagSite="site-1" />);
             fireEvent.click(
                 screen.getByRole("button", {
@@ -110,9 +160,7 @@ describe("ShopListing (G11)", () => {
         it("is off and says Sold out when nothing can be sold", () => {
             render(
                 <ShopListing
-                    products={[
-                        { ...offered, soldOut: true, bagVariantId: null },
-                    ]}
+                    products={[{ ...sized, soldOut: true, bagVariantId: null }]}
                     bagSite="site-1"
                 />,
             );

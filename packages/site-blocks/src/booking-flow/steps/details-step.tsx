@@ -112,6 +112,7 @@ export function DetailsStep({
                     id={`${ids}-phone`}
                     label="Phone (optional)"
                     type="tel"
+                    inputMode="tel"
                     autoComplete="tel"
                     placeholder={`So ${business} can call you about it`}
                     value={phone}

@@ -1,5 +1,6 @@
 import {
     act,
+    cleanup,
     fireEvent,
     render,
     screen,
@@ -15,6 +16,7 @@ import type {
     VerifyResult,
 } from "./api";
 import { callLine, codeDigits, retryText } from "./api";
+import { CODE_STEP_MS, parseSignInDraft } from "./sign-in-draft";
 import { resendDelayMs, resendWait, SignInSheet } from "./sign-in-sheet";
 
 vi.mock("./challenge", () => ({
@@ -46,7 +48,7 @@ function setup(
         options?: Partial<SignInOptions>;
         code?: CodeRequestResult;
         verify?: VerifyResult;
-        purpose?: "book" | "sign-in";
+        purpose?: "book" | "sign-in" | "change-email";
     } = {},
 ) {
     const requestCode = vi
@@ -94,7 +96,7 @@ describe("SignInSheet: the email step", () => {
     it("asks for an email, says it creates an account, and sends the code", async () => {
         const { requestCode } = setup();
         expect(
-            screen.getByRole("dialog", { name: "Sign in — Kavi Dental" }),
+            screen.getByRole("dialog", { name: "Sign in to Kavi Dental" }),
         ).toBeInTheDocument();
         expect(
             screen.getByText("No password. We'll send you a one-time code."),
@@ -238,16 +240,26 @@ describe("SignInSheet: the code step", () => {
     const codeField = () => screen.getByLabelText("Code");
     const signIn = () => screen.getByRole("button", { name: "Sign in" });
 
-    it("signs in with six digits, then hands over the customer and closes", async () => {
+    /** Type a code, and let the check its sixth digit starts settle. */
+    async function typeCode(value: string) {
+        await act(async () => {
+            fireEvent.change(codeField(), { target: { value } });
+            await Promise.resolve();
+        });
+    }
+
+    it("checks the code when its sixth digit is typed, then hands over the customer and closes", async () => {
         const { verifyCode, onSignedIn, onClose } = await toCode();
         expect(codeField()).toHaveAttribute("inputmode", "numeric");
         expect(codeField()).toHaveAttribute("autocomplete", "one-time-code");
+        expect(codeField()).toHaveAttribute("maxlength", "6");
         expect(signIn()).toBeDisabled();
-        fireEvent.change(codeField(), { target: { value: "12 34-5" } });
+        await typeCode("12 34-5");
         expect(signIn()).toBeDisabled();
-        fireEvent.change(codeField(), { target: { value: "123456789" } });
-        expect(codeField()).toHaveValue("123456");
-        await press(signIn());
+        expect(verifyCode).not.toHaveBeenCalled();
+        // Pasted with more than it needs: the first six digits, sent at once.
+        await typeCode("123456789");
+        expect(verifyCode).toHaveBeenCalledTimes(1);
         expect(verifyCode).toHaveBeenCalledWith("farah@example.in", "123456");
         expect(onSignedIn).toHaveBeenCalledWith({
             email: "farah@example.in",
@@ -256,10 +268,35 @@ describe("SignInSheet: the code step", () => {
         expect(onClose).toHaveBeenCalled();
     });
 
+    it("keeps the button for a refused code, and never checks one code twice at once", async () => {
+        let answer: (result: VerifyResult) => void = () => undefined;
+        const t = await toCode();
+        t.verifyCode.mockImplementation(
+            () => new Promise<VerifyResult>((resolve) => (answer = resolve)),
+        );
+        await typeCode("000000");
+        // The check is under way: a press of the button starts no second.
+        expect(
+            screen.getByRole("button", { name: "Checking…" }),
+        ).toBeDisabled();
+        // Enter in the field, as a keyboard's Go sends it.
+        const form = codeField().closest("form");
+        expect(form).not.toBeNull();
+        if (form) fireEvent.submit(form);
+        expect(t.verifyCode).toHaveBeenCalledTimes(1);
+        await act(async () => {
+            answer({ ok: false, reason: "invalid" });
+            await Promise.resolve();
+        });
+        // Refused: the same six digits can be sent again with the button.
+        expect(signIn()).toBeEnabled();
+        await press(signIn());
+        expect(t.verifyCode).toHaveBeenCalledTimes(2);
+    });
+
     async function tryCode(verify: VerifyResult) {
         const t = await toCode(verify);
-        fireEvent.change(codeField(), { target: { value: "000000" } });
-        await press(signIn());
+        await typeCode("000000");
         return t;
     }
 
@@ -326,8 +363,7 @@ describe("SignInSheet: the code step", () => {
     it("says so when the site's server can't be reached", async () => {
         const t = await toCode();
         t.verifyCode.mockRejectedValue(new Error("offline"));
-        fireEvent.change(codeField(), { target: { value: "123456" } });
-        await press(signIn());
+        await typeCode("123456");
         expect(screen.getByRole("alert")).toHaveTextContent(
             "We couldn't reach the business. Try again in a moment.",
         );
@@ -445,5 +481,168 @@ describe("the sheet's words", () => {
     it("keeps six digits of whatever was pasted", () => {
         expect(codeDigits("Your code: 123 456")).toBe("123456");
         expect(codeDigits("1234567")).toBe("123456");
+    });
+});
+
+// ── Kept for the visit ────────────────────────────────────────────────────
+
+describe("SignInSheet: through a reload (the code is read in another app)", () => {
+    const codeField = () => screen.getByLabelText("Code");
+
+    it("opens on Enter the code with the email still there, and keeps no code", async () => {
+        setup({ purpose: "book" });
+        await askForCode();
+        fireEvent.change(codeField(), { target: { value: "12345" } });
+        const kept = window.sessionStorage.getItem("saroh.sign-in") ?? "";
+        expect(JSON.parse(kept)).toMatchObject({
+            email: "farah@example.in",
+            step: "code",
+        });
+        expect(kept).not.toContain("12345");
+        expect(document.cookie).toBe("");
+        expect(window.localStorage.length).toBe(0);
+
+        // The page loads again: a new sheet, the same tab.
+        cleanup();
+        const { requestCode, verifyCode, onSignedIn } = setup({
+            purpose: "book",
+        });
+        expect(
+            screen.getByRole("dialog", { name: "Enter the code" }),
+        ).toBeInTheDocument();
+        expect(
+            screen.getByText("We sent a 6-digit code to farah@example.in."),
+        ).toBeInTheDocument();
+        expect(codeField()).toHaveValue("");
+        // No second code is sent for it.
+        expect(requestCode).not.toHaveBeenCalled();
+        await act(async () => {
+            fireEvent.change(codeField(), { target: { value: "123456" } });
+            await Promise.resolve();
+        });
+        expect(verifyCode).toHaveBeenCalledWith("farah@example.in", "123456");
+        expect(onSignedIn).toHaveBeenCalled();
+    });
+
+    it("asks for a new code, email still filled in, once the old one has likely run out", () => {
+        window.sessionStorage.setItem(
+            "saroh.sign-in",
+            JSON.stringify({
+                email: "farah@example.in",
+                step: "code",
+                sentAt: Date.now() - CODE_STEP_MS - 1_000,
+            }),
+        );
+        setup();
+        expect(emailField()).toHaveValue("farah@example.in");
+        expect(sendButton()).toBeEnabled();
+        // Opening it again doesn't make the old code new.
+        cleanup();
+        setup();
+        expect(emailField()).toHaveValue("farah@example.in");
+    });
+
+    it("keeps an email typed before the code was asked for", () => {
+        setup();
+        fireEvent.change(emailField(), {
+            target: { value: "farah@example.in" },
+        });
+        cleanup();
+        setup();
+        expect(emailField()).toHaveValue("farah@example.in");
+    });
+
+    it("forgets it once signed in", async () => {
+        setup();
+        await askForCode();
+        expect(window.sessionStorage.getItem("saroh.sign-in")).not.toBe(null);
+        await act(async () => {
+            fireEvent.change(codeField(), { target: { value: "123456" } });
+            await Promise.resolve();
+        });
+        expect(window.sessionStorage.getItem("saroh.sign-in")).toBe(null);
+        cleanup();
+        setup();
+        expect(emailField()).toHaveValue("");
+    });
+
+    it("goes back to the email step when Change email is pressed, and keeps that", async () => {
+        setup();
+        await askForCode();
+        fireEvent.click(screen.getByRole("button", { name: "Change email" }));
+        cleanup();
+        setup();
+        expect(emailField()).toHaveValue("farah@example.in");
+    });
+
+    it("keeps nothing of a change of sign-in email", async () => {
+        setup({ purpose: "change-email" });
+        fireEvent.change(screen.getByLabelText("New email"), {
+            target: { value: "new@example.in" },
+        });
+        await press(sendButton());
+        expect(window.sessionStorage.length).toBe(0);
+    });
+});
+
+describe("parseSignInDraft", () => {
+    const at = 1_800_000_000_000;
+    const kept = (over: object = {}) =>
+        JSON.stringify({
+            email: "farah@example.in",
+            step: "code",
+            sentAt: at,
+            ...over,
+        });
+
+    it("reads nothing kept, and anything strange, as nothing", () => {
+        const none = { email: "", step: "email", sentAt: null };
+        expect(parseSignInDraft(null, at)).toEqual(none);
+        expect(parseSignInDraft("not json", at)).toEqual(none);
+        expect(parseSignInDraft("[]", at)).toEqual(none);
+        expect(parseSignInDraft(kept({ email: 7 }), at)).toEqual(none);
+        expect(parseSignInDraft(kept({ email: "a".repeat(300) }), at)).toEqual(
+            none,
+        );
+    });
+
+    it("restores the code step while the code is likely still good", () => {
+        expect(parseSignInDraft(kept(), at + 60_000)).toEqual({
+            email: "farah@example.in",
+            step: "code",
+            sentAt: at,
+        });
+    });
+
+    it("comes back as the email step, email kept, once the code has likely run out", () => {
+        const stale = {
+            email: "farah@example.in",
+            step: "email",
+            sentAt: null,
+        };
+        expect(parseSignInDraft(kept(), at + CODE_STEP_MS + 1)).toEqual(stale);
+        // A clock that went backwards, or no time at all, is not trusted.
+        expect(parseSignInDraft(kept(), at - 1)).toEqual(stale);
+        expect(parseSignInDraft(kept({ sentAt: "soon" }), at)).toEqual(stale);
+    });
+
+    it("never hands back a code, whatever was stored beside it", () => {
+        expect(parseSignInDraft(kept({ code: "123456" }), at)).toEqual({
+            email: "farah@example.in",
+            step: "code",
+            sentAt: at,
+        });
+    });
+});
+
+describe("SignInSheet: on a phone", () => {
+    it("sets both fields at 16px or more, so iOS doesn't zoom on focus", async () => {
+        setup();
+        expect(emailField()).toHaveAttribute("autocomplete", "email");
+        expect(emailField().className).toMatch(/text-\[17px\]/);
+        await askForCode();
+        expect(screen.getByLabelText("Code").className).toMatch(
+            /text-\[17px\]/,
+        );
     });
 });

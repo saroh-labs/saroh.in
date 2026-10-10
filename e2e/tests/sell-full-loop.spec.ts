@@ -158,7 +158,10 @@ test.describe("selling, end to end (#122)", () => {
                 await expect(pickUp).toBeVisible({ timeout: 15_000 });
                 await pickUp.click();
                 await expect(pickUp).toHaveAttribute("aria-checked", "true");
-                const go = bag.getByRole("button", { name: /^Continue · / });
+                // Signed out, the button says what pressing it does.
+                const go = bag.getByRole("button", {
+                    name: /^Sign in and (pay|place order) · /,
+                });
                 await expect(go).toBeEnabled({ timeout: 15_000 });
                 // Offered beside paying online only when both are open;
                 // alone, it is the way and no choice is drawn.
@@ -171,6 +174,8 @@ test.describe("selling, end to end (#122)", () => {
                         "aria-checked",
                         "true",
                     );
+                    // Paid at the handover: the code is the last step.
+                    await expect(go).toHaveText(/^Sign in and place order · /);
                 }
                 // Nothing here may open a provider's window.
                 await site.route("https://checkout.razorpay.com/**", (r) =>

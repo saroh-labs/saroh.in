@@ -6,6 +6,7 @@ import {
     holdReason,
     overStock,
     payWords,
+    placeLabel,
     stockNotice,
 } from "./bag-sheet";
 import { cleanCode, codeSettled } from "./code-field";
@@ -68,7 +69,7 @@ describe("overStock and stockNotice", () => {
         const over = overStock([line({ state: "short", available: 1 })]);
         expect(over.map((o) => o.left)).toEqual([1]);
         expect(stockNotice(over)).toBe(
-            "Only 1 left — we've set your bag to 1.",
+            "Only 1 left, so we've set your bag to 1.",
         );
     });
 
@@ -91,7 +92,7 @@ describe("overStock and stockNotice", () => {
             }),
         ]);
         expect(stockNotice(over)).toBe(
-            "Fewer are left than you asked for — we've set Linen kurta (M) to 1, Tote to 2.",
+            "Fewer are left than you asked for, so we've set Linen kurta (M) to 1, Tote to 2.",
         );
     });
 });
@@ -223,5 +224,60 @@ describe("freeDeliveryNote", () => {
         expect(
             freeDeliveryNote(quote({ ways: ways("60.00", null) }), null),
         ).toBeNull();
+    });
+});
+
+/**
+ * The bag's button says what pressing it does. Signed out, the email code
+ * is the last step: an order paid at the handover is placed straight after
+ * it, so the button never reads a bare "Continue".
+ */
+describe("placeLabel", () => {
+    const base = { busy: false, total: "₹560" };
+
+    it("says Place order to someone signed in, however it is paid", () => {
+        expect(placeLabel({ ...base, signedIn: true, pay: "ONLINE" })).toBe(
+            "Place order · ₹560",
+        );
+        expect(
+            placeLabel({ ...base, signedIn: true, pay: "ON_HANDOVER" }),
+        ).toBe("Place order · ₹560");
+    });
+
+    it("signed out, says the order is placed when nothing is paid online", () => {
+        expect(
+            placeLabel({ ...base, signedIn: false, pay: "ON_HANDOVER" }),
+        ).toBe("Sign in and place order · ₹560");
+    });
+
+    it("signed out, says it leads to paying when it is paid online", () => {
+        expect(placeLabel({ ...base, signedIn: false, pay: "ONLINE" })).toBe(
+            "Sign in and pay · ₹560",
+        );
+    });
+
+    it("promises neither before the quote says how it is paid, and drops the dot without a total", () => {
+        expect(
+            placeLabel({ busy: false, total: "", signedIn: false, pay: null }),
+        ).toBe("Sign in to order");
+        expect(
+            placeLabel({ busy: false, total: "", signedIn: true, pay: null }),
+        ).toBe("Place order");
+    });
+
+    it("says it is starting while a checkout starts", () => {
+        expect(
+            placeLabel({ ...base, busy: true, signedIn: false, pay: "ONLINE" }),
+        ).toBe("Starting…");
+    });
+
+    it("never says Continue", () => {
+        for (const signedIn of [true, false]) {
+            for (const pay of ["ONLINE", "ON_HANDOVER", null] as const) {
+                expect(placeLabel({ ...base, signedIn, pay })).not.toMatch(
+                    /continue/i,
+                );
+            }
+        }
     });
 });

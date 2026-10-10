@@ -186,7 +186,7 @@ export function AccountMessages({
                             if (problem) setProblem(null);
                         }}
                         className={cn(
-                            "border-site-border text-site-fg placeholder:text-site-muted h-11 min-w-0 flex-1 rounded-[calc(var(--site-radius)+6px)] border px-3 text-[15px] disabled:cursor-not-allowed disabled:opacity-60",
+                            "border-site-border text-site-fg placeholder:text-site-muted h-11 min-w-0 flex-1 rounded-[calc(var(--site-radius)+6px)] border px-3 text-base disabled:cursor-not-allowed disabled:opacity-60",
                             inputFill,
                             focusRing,
                         )}

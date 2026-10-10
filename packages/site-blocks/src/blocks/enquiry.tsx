@@ -111,6 +111,20 @@ export function enquiryErrorMessage(
 }
 
 /** Map an enquiry field type to the native input type / control. */
+/**
+ * What the browser may fill a field with: an email or a phone by its type,
+ * a name by what the form calls it. Anything else is left to the browser.
+ */
+export function autoCompleteFor(field: {
+    type: RenderedEnquiry["fields"][number]["type"];
+    name: string;
+}): string | undefined {
+    if (field.type === "email") return "email";
+    if (field.type === "tel") return "tel";
+    if (field.type === "textarea") return undefined;
+    return /^(full[\s_-]?)?name$/i.test(field.name.trim()) ? "name" : undefined;
+}
+
 function inputTypeFor(type: RenderedEnquiry["fields"][number]["type"]): string {
     switch (type) {
         case "email":
@@ -307,8 +321,10 @@ function EnquiryForm({
                                 [field.name]: e.target.value,
                             })),
                     };
+                    // `text-base`: under 16px, iOS Safari zooms the page
+                    // when a field takes focus.
                     const controlClasses =
-                        "w-full max-w-full rounded-[var(--site-radius)] border border-site-border bg-site-surface px-3 py-2 text-site-fg outline-none focus:border-site-border focus:ring-2 focus:ring-site-border ";
+                        "w-full max-w-full rounded-[var(--site-radius)] border border-site-border bg-site-surface px-3 py-2 text-base text-site-fg outline-none focus:border-site-border focus:ring-2 focus:ring-site-border ";
                     return (
                         <div key={i} className="grid gap-1.5">
                             <label
@@ -336,6 +352,7 @@ function EnquiryForm({
                                 <input
                                     {...shared}
                                     type={inputTypeFor(field.type)}
+                                    autoComplete={autoCompleteFor(field)}
                                     className={controlClasses}
                                 />
                             )}
@@ -516,7 +533,7 @@ function ThreadForm({
                                 setState({ kind: "idle" });
                             }
                         }}
-                        className="border-site-border bg-site-surface text-site-fg focus:border-site-border focus:ring-site-border w-full max-w-full rounded-[var(--site-radius)] border px-3 py-2 outline-none focus:ring-2"
+                        className="border-site-border bg-site-surface text-site-fg focus:border-site-border focus:ring-site-border w-full max-w-full rounded-[var(--site-radius)] border px-3 py-2 text-base outline-none focus:ring-2"
                     />
                 </div>
 

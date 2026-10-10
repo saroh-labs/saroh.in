@@ -64,6 +64,24 @@ add or change there may be served to the next visitor without rendering.
 - **Outside the Worker** (`next dev`, a test) none of it runs: pages render
   per request, as before.
 
+## Merchant sites: what a customer typed, kept for the visit — **Current**
+
+Signing in is the last step of buying, and the email code is read in another
+app; a phone (the browsers inside WhatsApp and Instagram above all) often
+loads the page again on the way back. So what the customer typed before
+that step is kept in `sessionStorage` and restored on mount: the bag's way,
+address, discount code and checkout key (`site-blocks/src/shop/bag-draft-store.ts`),
+and the sign-in sheet's email and step (`account/sign-in-draft.ts`).
+
+- **`sessionStorage` only**: no cookie, never `localStorage` for anything
+  typed. Every read is narrowed field by field and every call is wrapped;
+  a storage that refuses leaves the page's own state.
+- **Only what was typed**, never a sign-in code, a QR source or a price.
+- **Cleared on success**: the order placed, the customer signed in.
+- **Never drawn on the server's render**: read it into state that draws
+  nothing until a sheet opens, or in an effect.
+- The booking flow's chosen service, time and details are not kept yet.
+
 ## If you think you need React Query
 
 You probably need a Server Component read plus `router.refresh()`. Genuine

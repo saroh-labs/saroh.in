@@ -1531,7 +1531,6 @@ describe("sign-in at the last step (A9)", () => {
         fireEvent.change(await within(sheet).findByLabelText("Code"), {
             target: { value: "123456" },
         });
-        fireEvent.click(within(sheet).getByRole("button", { name: "Sign in" }));
     }
 
     const cannotSend = () => ({

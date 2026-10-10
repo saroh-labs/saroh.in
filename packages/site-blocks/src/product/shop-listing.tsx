@@ -6,18 +6,19 @@ import { focusRing } from "../booking-flow/styles";
 import { cn } from "../lib/utils";
 import { allInBagWords, roomInBag } from "../shop/add-to-bag";
 import { addToBag, openBag, useBag } from "../shop/bag-store";
-import { optionSummary } from "./option-summary";
+import { chooseLabel, optionSummary } from "./option-summary";
 import { formatAmount, percentOff } from "./product-page";
 
 /**
  * The shop on a merchant's site (round-2 G11): `/shop`, a grid of every
  * product its sells-from storefront sells. Each card opens the product's
  * page. Where the site takes online orders (G13, `bagSite`), each card also
- * carries the design's button beside its price: "Add to bag" adds the
- * first option on offer that can be sold now (another is chosen on the
- * product page) and then reads "Add another"; "Sold out" when nothing can
- * be sold. It sits outside the card's link, so the rest of the card still
- * opens the product.
+ * carries the design's button beside its price. A product with one option
+ * or none: "Add to bag" adds it and then reads "Add another". A product
+ * with several: "Choose size" (the option's own name, `chooseLabel`) opens
+ * its page, where one is picked; the card never adds a size nobody chose.
+ * "Sold out" when nothing can be sold. The button sits outside the card's
+ * link, so the rest of the card still opens the product.
  *
  * Follows the Customer Site design's list page: the page title and a lead,
  * then cards of a photo, an eyebrow (the sizes it comes in), the name, two
@@ -46,7 +47,11 @@ export interface ShopListingCard {
     soldOut: boolean;
     /** The listing at the site's storefront: what the bag holds (G13). */
     listingId?: string;
-    /** The option the card's Add to bag adds; null for none. */
+    /**
+     * The option the card's Add to bag adds; null for none. Read only for
+     * a product with one option on offer: with several, the card sends the
+     * customer to the product page to choose.
+     */
     bagVariantId?: string | null;
     /**
      * How many of that option can go in the bag, where the product page
@@ -132,6 +137,11 @@ export default function ShopListing({
                 {products.map((p) => {
                     const amount = formatAmount(p.price, p.currency, locale);
                     const canAdd = Boolean(bagSite && p.listingId);
+                    const href = `${basePath}/${encodeURIComponent(p.slug)}`;
+                    // Several options: chosen on the product's page.
+                    const choose = p.soldOut
+                        ? null
+                        : chooseLabel(p.variantTitles, p.optionName);
                     // Everything left is in the bag already (UX-058).
                     const allIn =
                         canAdd &&
@@ -141,7 +151,7 @@ export default function ShopListing({
                     return (
                         <li key={p.slug} className="relative min-w-0">
                             <a
-                                href={`${basePath}/${encodeURIComponent(p.slug)}`}
+                                href={href}
                                 className="border-site-border bg-site-surface text-site-fg focus-visible:outline-site-accent grid h-full min-w-0 grid-rows-[auto_1fr] overflow-hidden rounded-[14px] border focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2"
                             >
                                 <span className="bg-site-bg relative block h-[140px]">
@@ -187,7 +197,10 @@ export default function ShopListing({
                                             "mt-auto flex flex-wrap items-baseline gap-x-2 pt-1.5 text-base font-bold tabular-nums",
                                             // Room for the button beside it.
                                             canAdd &&
-                                                "min-h-[38px] content-center items-center pr-32",
+                                                "min-h-[38px] content-center items-center",
+                                            // "Choose options" is wider.
+                                            canAdd &&
+                                                (choose ? "pr-36" : "pr-32"),
                                             p.soldOut && "text-site-muted",
                                         )}
                                     >
@@ -211,7 +224,18 @@ export default function ShopListing({
                                     </span>
                                 </span>
                             </a>
-                            {canAdd ? (
+                            {canAdd && choose ? (
+                                <a
+                                    href={href}
+                                    aria-label={`${choose} for ${p.name}`}
+                                    className={cn(
+                                        cardButton,
+                                        "absolute bottom-4 right-4",
+                                    )}
+                                >
+                                    {choose}
+                                </a>
+                            ) : canAdd ? (
                                 <button
                                     type="button"
                                     onClick={() => add(p)}

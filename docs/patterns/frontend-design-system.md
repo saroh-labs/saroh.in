@@ -177,6 +177,12 @@
   32→44px) and keeps its desk height under a mouse; `coarse:` is a pointer
   media query, not a width. 13 §7 and 14 §5's "40px default" finding predates
   it. Inputs were not re-checked.
+- **Current** — **A form control on a merchant's site is 16px or more**
+  (`text-base` at least). iOS Safari zooms the page when a smaller field
+  takes focus, and leaves it zoomed. Each also carries the keyboard and
+  autofill its field needs (`inputMode`, `autoComplete`, `maxLength` for a
+  PIN code). `site-blocks/src/form-controls.test.tsx` renders every one;
+  a new control gets a line there.
 - **Adopted** — **Reflow at 320px and 390px** with no hidden operation and no
   page-level horizontal scroll; wide content scrolls inside its own container
   (14, 18, 04 §4). Put `min-w-0` on grid and flex columns holding text.

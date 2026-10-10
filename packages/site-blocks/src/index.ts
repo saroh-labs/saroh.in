@@ -419,7 +419,23 @@ export {
     autopayWith,
 } from "./autopay/words";
 export { openProviderCheckout } from "./booking-flow/checkout";
+export type { OpenCheckout } from "./booking-flow/checkout";
 export { PayOption } from "./booking-flow/steps/pay-option";
+// Paying from a pay link (an invoice's, an order's): the Pay button, the
+// provider's window and where the payment stands.
+export {
+    PayLinkHelp,
+    PayLinkPay,
+    PayLinkStatus,
+    payLinkButtonLabel,
+    usePayLink,
+} from "./pay-link/pay-link-pay";
+export type {
+    PayLinkContact,
+    PayLinkOptions,
+    PayLinkStart,
+    PayLinkState,
+} from "./pay-link/pay-link-pay";
 
 export { destructiveAlertClasses } from "./alert";
 export { DEFAULT_API_URL } from "./api-url";

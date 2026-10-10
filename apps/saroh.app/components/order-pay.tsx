@@ -1,19 +1,17 @@
 "use client";
 
+import type { OpenCheckout } from "@saroh/site-blocks";
 import {
-    ctaClasses,
-    destructiveAlertClasses,
     hasPayInstructions,
     PayInstructionsCard,
+    PayLinkPay,
     payWaysText,
 } from "@saroh/site-blocks";
 import { cn } from "@saroh/ui/lib/utils";
 import { useRouter } from "next/navigation";
-import { useState, useTransition } from "react";
+import { useCallback } from "react";
 
 import { startPayment } from "@/app/pay/o/[token]/actions";
-import { ProviderHandoff } from "@/components/provider-handoff";
-import type { CheckoutIntent } from "@/lib/checkout-shape";
 import { payMoney } from "@/lib/invoice-pay-shape";
 import type { PayOrder } from "@/lib/order-pay";
 import { orderPayOffer } from "@/lib/order-pay-shape";
@@ -23,10 +21,11 @@ import { orderPayOffer } from "@/lib/order-pay-shape";
  *
  * Only what the API's allow-list sends is on the page: the business, the
  * order's number, its lines and total, what is due, and the customer's
- * first name. The Pay button starts an intent for what is due and hands
- * over to the provider exactly as checkout does; the page never claims a
- * payment went through — "Check again" re-reads the order, which only the
- * provider's webhook moves to paid.
+ * first name. The Pay button starts an intent for what is due and opens
+ * the business's provider window on it, as the bag and the booking page do
+ * (`PayLinkPay`, over the one shared `openProviderCheckout`). The page never
+ * claims a payment went through: after the window it re-reads the order
+ * until the server says paid, and "Check again" does the same by hand.
  *
  * When the business can't take it online (`payOnline` false, R33 — a link
  * made before its plan changed, say), the page is view-only: the order,
@@ -39,43 +38,40 @@ import { orderPayOffer } from "@/lib/order-pay-shape";
  * an opaque fill with its own foreground: the page ground is the
  * merchant's, so a tint cannot be trusted against it.
  */
-export function OrderPay({ token, order }: { token: string; order: PayOrder }) {
+export function OrderPay({
+    token,
+    order,
+    apiUrl,
+    openCheckout,
+}: {
+    token: string;
+    order: PayOrder;
+    /** Where the provider window's return is posted (P1). */
+    apiUrl?: string;
+    /** The provider window; replaced in tests. */
+    openCheckout?: OpenCheckout;
+}) {
     const router = useRouter();
-    const [intent, setIntent] = useState<CheckoutIntent | null>(null);
-    const [error, setError] = useState<string | null>(null);
-    const [pending, startTransition] = useTransition();
-    // One key per visit, so a double tap can't start two payments.
-    const [idempotencyKey] = useState(() =>
-        typeof crypto !== "undefined" && "randomUUID" in crypto
-            ? crypto.randomUUID()
-            : Math.random().toString(36).slice(2),
+    const start = useCallback(
+        (idempotencyKey: string) => startPayment(token, idempotencyKey),
+        [token],
     );
+    const refresh = useCallback(() => router.refresh(), [router]);
 
     const money = (a: string) => payMoney(a, order.currency);
     const offer = orderPayOffer(order);
     const partPaid =
         order.status === "DUE" && Number(order.due) < Number(order.total);
 
-    function pay() {
-        setError(null);
-        startTransition(async () => {
-            const res = await startPayment(token, idempotencyKey);
-            if (res.ok) {
-                setIntent(res.intent);
-                return;
-            }
-            setError(res.message);
-            if (res.settled) router.refresh();
-        });
-    }
-
     return (
         <section className="mx-auto w-full max-w-xl px-5 py-12 sm:px-8 sm:py-16">
-            <p className="text-sm text-site-muted">{order.businessName}</p>
+            <h1 className="text-2xl font-bold tracking-tight text-site-fg [overflow-wrap:anywhere]">
+                {order.businessName}
+            </h1>
             <div className="mt-1 flex flex-wrap items-center justify-between gap-3">
-                <h1 className="text-2xl font-bold tracking-tight text-site-fg">
+                <h2 className="text-base font-semibold text-site-body">
                     Order #{order.orderNumber}
-                </h1>
+                </h2>
                 <StatusBadge status={order.status} />
             </div>
             {order.firstName ? (
@@ -155,45 +151,23 @@ export function OrderPay({ token, order }: { token: string; order: PayOrder }) {
                     due={money(order.due)}
                 />
             ) : offer === "pay" ? (
-                <div className="mt-6 space-y-4">
-                    {error ? (
-                        <p role="alert" className={destructiveAlertClasses}>
-                            {error}
-                        </p>
-                    ) : null}
-                    {intent ? (
-                        <ProviderHandoff
-                            intent={intent}
-                            after="Once you've paid, use “Check again” to see this order marked paid."
-                        />
-                    ) : (
-                        <button
-                            type="button"
-                            onClick={pay}
-                            disabled={pending}
-                            className={cn(
-                                ctaClasses("primary"),
-                                "w-full disabled:cursor-not-allowed disabled:opacity-60",
-                            )}
-                        >
-                            {pending
-                                ? "Starting payment…"
-                                : `Pay ${money(order.due)}`}
-                        </button>
-                    )}
-                    <button
-                        type="button"
-                        onClick={() => router.refresh()}
-                        className={cn(ctaClasses("secondary"), "w-full")}
-                    >
-                        Check again
-                    </button>
+                <div className="mt-6">
+                    <PayLinkPay
+                        start={start}
+                        refresh={refresh}
+                        amount={money(order.due)}
+                        businessName={order.businessName}
+                        description={`Order #${order.orderNumber}`}
+                        payerName={order.firstName}
+                        apiUrl={apiUrl}
+                        openCheckout={openCheckout}
+                    />
                 </div>
             ) : (
                 <div className="mt-6 rounded-xl border border-site-border bg-site-surface p-5 text-center">
                     <p className="text-site-fg">
                         {order.status === "PAID"
-                            ? "Already paid. Thank you — there's nothing more to do."
+                            ? "Already paid. Thank you, there's nothing more to do."
                             : `This order can't be paid any more. If you think that's a mistake, ask ${order.businessName}.`}
                     </p>
                 </div>

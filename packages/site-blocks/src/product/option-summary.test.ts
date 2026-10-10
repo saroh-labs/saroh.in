@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { optionSummary, plural } from "./option-summary";
+import { chooseLabel, optionSummary, plural } from "./option-summary";
 
 /** A product card's options, summed up (DEC-073 #12): "2 sizes". */
 describe("optionSummary", () => {
@@ -61,5 +61,32 @@ describe("plural", () => {
         expect(plural("tray")).toBe("trays");
         expect(plural("kids sizes")).toBe("kids sizes");
         expect(plural("250")).toBe("250");
+    });
+});
+
+/**
+ * The shop card's button for a product with several options: it names the
+ * choice and never makes it.
+ */
+describe("chooseLabel", () => {
+    it("asks for the choice by the option's own name", () => {
+        expect(chooseLabel(["Small", "Large"], "Size")).toBe("Choose size");
+        expect(chooseLabel(["Red", "Blue"], "Colour")).toBe("Choose colour");
+        expect(chooseLabel(["6", "7"], "UK size")).toBe("Choose UK size");
+    });
+
+    it("says Choose options without a name, or with one too long for the card", () => {
+        expect(chooseLabel(["A", "B"], null)).toBe("Choose options");
+        expect(chooseLabel(["A", "B"], undefined)).toBe("Choose options");
+        expect(chooseLabel(["A", "B"], "  ")).toBe("Choose options");
+        expect(chooseLabel(["A", "B"], "Gift wrap style")).toBe(
+            "Choose options",
+        );
+    });
+
+    it("is null with one option or none: the card adds it itself", () => {
+        expect(chooseLabel([], "Size")).toBeNull();
+        expect(chooseLabel(["500 g"], "Size")).toBeNull();
+        expect(chooseLabel(["500 g", " "], "Size")).toBeNull();
     });
 });
