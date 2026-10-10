@@ -10,54 +10,7 @@ import {
     SelectValue,
 } from "@saroh/ui/select";
 
-import { currencySymbol } from "@/lib/format/money";
 import type { LateUnit } from "@/lib/stores/late-after";
-
-/**
- * The Delivery edit sheet's two fields. A money amount with its
- * currency's sign inside the box: "[ 40  ₹ ]".
- */
-export function MoneyField({
-    id,
-    value,
-    placeholder,
-    currency,
-    readOnly,
-    invalid,
-    describedBy,
-    onChange,
-}: {
-    id: string;
-    value: string;
-    placeholder: string;
-    currency: string;
-    readOnly: boolean;
-    invalid: boolean;
-    describedBy?: string;
-    onChange: (value: string) => void;
-}) {
-    return (
-        <div className="relative">
-            <Input
-                id={id}
-                inputMode="decimal"
-                placeholder={placeholder}
-                value={value}
-                readOnly={readOnly}
-                aria-invalid={invalid || undefined}
-                aria-describedby={describedBy}
-                onChange={(e) => onChange(e.target.value)}
-                className="pr-8 tabular-nums"
-            />
-            <span
-                aria-hidden
-                className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-[13px] text-muted-foreground"
-            >
-                {currencySymbol(currency)}
-            </span>
-        </div>
-    );
-}
 
 /**
  * "[ 24  hours ▾ ]": the amount and its unit as one control with one

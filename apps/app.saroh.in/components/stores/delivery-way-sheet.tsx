@@ -1,6 +1,7 @@
 "use client";
 
 import { Label } from "@saroh/ui/label";
+import { MoneyInput } from "@saroh/ui/money-input";
 import { Switch } from "@saroh/ui/switch";
 import { ToggleGroup, ToggleGroupItem } from "@saroh/ui/toggle-group";
 import { useState } from "react";
@@ -22,7 +23,7 @@ import type { StorefrontFulfilmentType } from "@/lib/stores/fulfilment-types";
 import { FULFILMENT_LABEL } from "@/lib/stores/late-after";
 import type { StorefrontSettings } from "@/lib/stores/storefronts";
 
-import { LateAfterField, MoneyField } from "./delivery-fields";
+import { LateAfterField } from "./delivery-fields";
 import type { Saver } from "./location-save";
 
 const OTHER = "other";
@@ -157,19 +158,21 @@ export function DeliveryWaySheet({
                                 >
                                     {label} fee
                                 </Label>
-                                <MoneyField
+                                <MoneyInput
                                     id={`${id}-fee`}
                                     value={draft.fee}
                                     placeholder="0"
                                     currency={store.currency}
-                                    readOnly={false}
-                                    invalid={Boolean(say("fee"))}
-                                    describedBy={
+
+                                    aria-invalid={
+                                        Boolean(say("fee")) || undefined
+                                    }
+                                    aria-describedby={
                                         say("fee")
                                             ? `${id}-fee-problem`
                                             : undefined
                                     }
-                                    onChange={(fee) => set({ fee })}
+                                    onValueChange={(fee) => set({ fee })}
                                 />
                             </div>
                         ) : null}
@@ -193,15 +196,18 @@ export function DeliveryWaySheet({
                                     Free on orders over
                                 </Label>
                                 <div className="w-32">
-                                    <MoneyField
+                                    <MoneyInput
                                         id={`${id}-over`}
                                         value={draft.threshold}
                                         placeholder="Never"
                                         currency={store.currency}
-                                        readOnly={false}
-                                        invalid={Boolean(problems.threshold)}
-                                        describedBy={`${id}-over-note`}
-                                        onChange={(threshold) =>
+
+                                        aria-invalid={
+                                            Boolean(problems.threshold) ||
+                                            undefined
+                                        }
+                                        aria-describedby={`${id}-over-note`}
+                                        onValueChange={(threshold) =>
                                             set({ threshold })
                                         }
                                     />

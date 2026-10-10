@@ -4,6 +4,7 @@ import { Checkbox } from "@saroh/ui/checkbox";
 import { FieldError } from "@saroh/ui/field";
 import { Input } from "@saroh/ui/input";
 import { cn } from "@saroh/ui/lib/utils";
+import { MoneyInput } from "@saroh/ui/money-input";
 import { Textarea } from "@saroh/ui/textarea";
 import { useId } from "react";
 
@@ -25,7 +26,6 @@ import {
     glance,
     packRules,
 } from "@/lib/class-packs/pack-editor-words";
-import { currencySymbol } from "@/lib/format/money";
 
 import { FIELD, HELP, LABEL, PackChip, PackSection } from "./parts";
 import { ValidityChips } from "./validity-chips";
@@ -193,26 +193,22 @@ export function CreditsAndPrice({
                 </div>
                 <div className="min-w-0">
                     <label htmlFor={ids.price} className={LABEL}>
-                        Price ({currencySymbol(values.currency)})
+                        Price
                     </label>
-                    <Input
-                        id={ids.price}
-                        inputMode="decimal"
-                        autoComplete="off"
-                        value={values.price ?? ""}
-                        aria-invalid={errors.price ? true : undefined}
-                        aria-describedby={
-                            errors.price ? ids.priceErr : undefined
-                        }
-                        onChange={(e) => {
-                            const typed = e.target.value.replace(
-                                /[^0-9.,]/g,
-                                "",
-                            );
-                            set({ price: typed || null });
-                        }}
-                        className={cn(FIELD, "w-[140px] max-w-full")}
-                    />
+                    <div className={cn(FIELD, "w-[140px] max-w-full")}>
+                        <MoneyInput
+                            id={ids.price}
+                            currency={values.currency}
+                            value={values.price ?? ""}
+                            aria-invalid={errors.price ? true : undefined}
+                            aria-describedby={
+                                errors.price ? ids.priceErr : undefined
+                            }
+                            onValueChange={(price) =>
+                                set({ price: price || null })
+                            }
+                        />
+                    </div>
                 </div>
             </div>
             <FieldError id={ids.creditsErr}>{errors.credits}</FieldError>

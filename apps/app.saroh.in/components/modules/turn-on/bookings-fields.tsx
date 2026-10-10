@@ -3,10 +3,10 @@
 import { Checkbox } from "@saroh/ui/checkbox";
 import { Field } from "@saroh/ui/field";
 import { Input } from "@saroh/ui/input";
+import { MoneyInput } from "@saroh/ui/money-input";
 import { TimeSelect } from "@saroh/ui/time-select";
 import { useId } from "react";
 
-import { currencySymbol } from "@/lib/format/money";
 import type { DayDraft, TurnOnDraft } from "@/lib/modules/turn-on";
 import { hoursErrorsByWeekday, WEEK } from "@/lib/modules/turn-on";
 import type { FieldErrors } from "@/lib/modules/turn-on-errors";
@@ -171,13 +171,13 @@ export function BookingsFields({
                 </Field>
                 <Field
                     htmlFor={`${id}-price`}
-                    label={`Price (${currencySymbol("INR")})`}
+                    label="Price"
                     error={errors["service.price"]}
                 >
-                    <Input
+                    <MoneyInput
                         id={`${id}-price`}
+                        currency="INR"
                         value={b.price}
-                        inputMode="decimal"
                         maxLength={10}
                         autoComplete="off"
                         aria-invalid={
@@ -188,7 +188,7 @@ export function BookingsFields({
                                 ? `${id}-price-note`
                                 : undefined
                         }
-                        onChange={(e) => setService({ price: e.target.value })}
+                        onValueChange={(price) => setService({ price })}
                     />
                 </Field>
             </div>

@@ -3,12 +3,12 @@
 import { Checkbox } from "@saroh/ui/checkbox";
 import { Input } from "@saroh/ui/input";
 import { cn } from "@saroh/ui/lib/utils";
+import { MoneyInput } from "@saroh/ui/money-input";
 import { Textarea } from "@saroh/ui/textarea";
 import { useId } from "react";
 
 import { Chip, Eyebrow } from "@/components/bookings/calendar/parts";
 import type { PlanLock } from "@/lib/billing/access";
-import { currencySymbol } from "@/lib/format/money";
 import { onlineBookingProblem } from "@/lib/services/online-booking";
 import type { DepositMode } from "@/lib/services/service";
 import type { ServiceDraft } from "@/lib/services/service-editor";
@@ -193,15 +193,16 @@ export function PriceSection({
     return (
         <Section title="Price">
             <label htmlFor={id} className={LABEL}>
-                Price ({currencySymbol(currency)})
+                Price
             </label>
-            <Input
-                id={id}
-                inputMode="decimal"
-                value={draft.price}
-                onChange={(e) => set({ price: e.target.value })}
-                className={cn(FIELD, "w-[160px] max-w-full")}
-            />
+            <div className={cn(FIELD, "w-[160px] max-w-full")}>
+                <MoneyInput
+                    id={id}
+                    currency={currency}
+                    value={draft.price}
+                    onValueChange={(price) => set({ price })}
+                />
+            </div>
             <DepositField
                 deposit={draft.deposit}
                 price={draft.price}
