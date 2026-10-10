@@ -6,6 +6,7 @@ import {
 import type { MerchantPaymentProvider } from "@saroh/database";
 import { prisma } from "@saroh/database";
 
+import { errorFacts } from "../../common/observability/report-error";
 import {
     isKeysRefused,
     KEYS_REFUSED,
@@ -100,6 +101,33 @@ export async function providerOrderFailed(
         details: {
             reason: refused ? "provider-keys-refused" : "provider-unavailable",
         },
+    });
+}
+
+/**
+ * A connection whose stored keys can't be opened (the seal doesn't match
+ * the server's key, or what it holds isn't a key pair), as the same
+ * handled answer a failed provider gets: the customer reads that online
+ * payment is down, never a bare 500. Logged at ERROR, since stored keys
+ * that won't open are a broken invariant, not a provider having a bad
+ * minute; a few in a day means a business to reconnect, many means the
+ * server's key changed. The connection is not flagged: when the server's
+ * key is at fault, every business would be told to re-enter good keys.
+ * The log names the provider, the business and the error's message, which
+ * describes only the seal's shape, never a key.
+ */
+export function credentialsUnreadable(
+    row: Pick<MerchantPaymentProvider, "organizationId" | "provider">,
+    err: unknown,
+): ServiceUnavailableException {
+    logger.error(
+        `${providerLabel(row.provider)} credentials for business ${row.organizationId} could not be opened: ${
+            errorFacts(err).message
+        }`,
+    );
+    return new ServiceUnavailableException({
+        message: PROVIDER_FAILED_MESSAGE,
+        details: { reason: "provider-unavailable" },
     });
 }
 

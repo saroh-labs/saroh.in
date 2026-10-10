@@ -49,6 +49,63 @@ environment can't shorten the first.
 never a number in a handler; and a thing a deletion removes is first asked
 "a secret, or a record with a period?". `docs/patterns/backend-jobs.md` →
 Retention.
+## Seed — the dev environment's businesses claimed providers they couldn't use
+
+**Symptom**: on the dev environment (9 Oct 2026), Northwind's Settings ›
+Providers showed Cashfree and Resend connected and its site offered to take
+money online, but checkout answered 500 and every customer email (a booking
+confirmation, say) failed five times with "Invalid authentication tag
+length: 6".
+**Cause**: the seed writes provider rows with placeholder sealed keys
+(`seed-not-a-real-credential`, rightly: it never fabricates a usable
+credential) and marked them CONNECTED. Nothing tells a row whose keys can't
+be opened from a real one until the API opens them — at checkout, or in the
+send job, which then retries. The browser specs need those rows connected
+(Pay now offered, a pay link made, Send naming email) and stub the provider
+in the browser, so it never showed locally or on CI.
+**Fix**: `packages/database/src/seed/stand-in-providers.ts`. The CONNECTED
+stand-ins (Northwind's Cashfree and Resend, the showcase's Razorpay and
+Cashfree) are written only on this machine's database, as the fixture
+password is; on any other the seed writes none and removes a placeholder
+row an earlier seed left, never touching one with real keys. The DISABLED
+Razorpay row stays: it is honest anywhere.
+**Check**: `stand-in-providers.test.ts`. Re-seed the dev environment to
+clear its old rows.
+
+## API — a site checkout answered 500 with only its request line in the log
+
+**Symptom**: 9 Oct 2026, on dev: `POST /public/sites/:siteId/checkout`
+answered 500, the shopper read "Something went wrong on our side", and the
+API log showed only the `http_request` line at error level, with no cause.
+**Cause**: the business's stored payment keys didn't open under the
+server's key (seeded placeholder credentials), so `decryptSecret` threw
+inside `createIntentFor`, outside the try that turns a failed provider call
+into the handled 503 (UX-012). The checkout order was already written,
+PENDING and unpaid. On logging: `AllExceptionsFilter` does call
+`reportError`, which writes `unhandled_exception`; a reproduction with a
+real crypto error wrote it, but with `errorName: "object"` and no stack,
+because `reportError` read the error with `instanceof Error`, which is false
+for an error from another realm (Node's crypto binding under Jest's VM).
+Why the dev log stream showed no cause line at all was not confirmed from
+the code.
+**Fix**: keys that won't open are now the same handled 503 as a failed
+provider (`credentialsUnreadable` in `payments/provider-keys.ts`, reason
+`provider-unavailable`), logged at ERROR with the provider and business,
+never the secret; a credential blob that isn't JSON no longer quotes itself
+in a parse error. The PENDING order is left as an abandoned checkout:
+nothing was charged, a retry with the same key pays it, and its close job
+ends it after a day. The site says "The business can't take payment online
+right now…" (`payments-down`) instead of our trouble. `reportError` reads
+errors by shape (`errorFacts`), keeps name, message, code and stack with
+emails, numbers and tokens masked, and the visitor's address headers are
+redacted; `structuredLogger` can no longer throw on a field JSON can't hold.
+**Check**: `all-exceptions.filter.spec.ts` → "an unexpected error";
+`payments.service.spec.ts` → "keys that won't open"; `public-checkout.db.spec.ts`
+→ "says online payment is down when the stored keys won't open".
+**Category**: observability · payments ·
+`apps/api.saroh.in/src/common/observability/report-error.ts`
+
+---
 
 ## Deploy — the merchant sites' production Worker didn't know it was production
 
@@ -3652,6 +3709,65 @@ serialized read only after stripping the timestamps.
 `apps/app.saroh.in/components/sites/site-editor.test.tsx`,
 `apps/api.saroh.in/src/modules/orders/order-kitchen.service.spec.ts`
 
+## Flaky tests — two settings specs on PR #913, already fixed underneath it
+
+**Symptom**: CI on PR #913 (run 37917139224, 9 Oct) failed two phone tests,
+first try and retry, and passed on a re-run. (1) `business-settings.spec.ts`
+→ "the address tab is Registered address": no "Registered address" region,
+Identity still selected, and a "Choose your business type" card on the
+page. (2) `ux-polish-874.spec.ts` → "Settings' tabs say there is more at
+320px": `expect(got.inView).toBe(true)` got false on /settings/activity,
+whose feed was full of other tests' changes.
+**Cause**: neither was another test changing Northwind. The run was cut
+before both fixes reached `development`. (1) is #846's lost click: the tab
+is server-drawn and a press before hydration does nothing; the trace has the
+click 0.5 s after the page loaded. The business-type card is the seed's
+state (not registered, no type), and the six tabs and the region's title
+are constants (`TAB_KEYS`, `SECTIONS` in `organization-settings-form.tsx`),
+so nothing a parallel test saves changes them. Fixed by 1b5224de8 (clicks
+until `aria-selected`). (2) `useEdgeFade` revealed the open tab once, on
+first paint, and web fonts widened the tabs after it; the spec looked once.
+Fixed by 310085602 (reveals again as the strip or tab resizes, and the spec
+polls `inView`). What was left in (2): the fade and the "no sideways scroll"
+checks were still one look each after the poll, the page check compared
+`scrollWidth` with `innerWidth`, which a phone widens to fit an overflow
+(so it passed on the bug), and it read Northwind's Activity and Providers
+tab, which other tests write to. The Business tab strip test pressed the
+last tab without waiting for hydration, so it could pass on Identity.
+**Fix**: Settings' tabs are read on a business the test sets up
+(`makeBusiness`), and one `expect.poll` checks the strip overflows, fades,
+shows the open tab, and that the page neither scrolls nor zooms out past
+the width set. The Business strip test presses until `aria-selected`, then
+polls. No product change: read from the code, nothing on Activity widens the page; its rows are
+clipped by the card's `overflow-hidden`, not spilled.
+**Check**: before calling a CI flake a data race, check the failing run's
+tree against `development` (`git merge-base --is-ancestor <fix> <head>`) and
+read the trace's timings. A one-shot `expect(await page.evaluate(…))` in a
+spec is the pattern the skill bans (#718); five remain in `e2e/tests` and a
+grep in `scripts/prepush.sh` could refuse new ones.
+**Category**: tests · `e2e/tests/ux-polish-874.spec.ts`,
+`.agents/skills/saroh-browser-tests/SKILL.md` → Waiting
+
+## A bakery's footer said "when the studio is open"
+
+**Symptom**: a new business, Rehearsal Bakery, started its site from Store
+and got "Your area and town — and when the studio is open" saved as its
+footer, shown in Website › Settings › Footer and on the site.
+**Cause**: Store (`ceramics`, offered to every shop and creator) was
+designed as a ceramics studio, and its footer line kept the design's
+"studio". The footer is saved to `Site.footer` at creation, so the words
+read as the merchant's own, on any kind of shop.
+**Fix**: the line names no kind of business ("Your area and town · when you
+are open"). The old line moves to `footer.formerLines`, so the pre-publish
+check still flags a site made with it and never changed; saved data is
+untouched. `frame.test.ts` now fails any template whose footer names a kind
+of business its own name does not, and any template for anyone (no
+`kinds`) that names one anywhere. Store's page body (clay, glaze, firing,
+"The studio", "Throwing since") is still ceramics-specific and left for an
+owner decision.
+**Category**: templates · `packages/templates/src/frame.test.ts`,
+`packages/templates/src/manifest.ts` → `TemplateFooter.formerLines`
+
 ## A module switched off would have hidden its own history
 
 **Symptom**: the #117 audit found `@RequireModule("COMMERCE")` on the
@@ -3729,3 +3845,16 @@ controller with a `stores` route and fails one without the guard; the same
 spec names every write route of the order, booking, payment, invoice,
 membership, class pack and course controllers as wind-down or refused.
 **Category**: lifecycle · `apps/api.saroh.in/src/common/guards/store-lifecycle.guard.ts`
+## A browser spec that only passed on weekdays
+
+**Symptom**: `public-booking.spec.ts` › "pay at the desk…" failed on desk and
+phone, first try and retry, in a Saturday gate; it had passed every weekday.
+**Cause**: it asserted the first day button's `aria-label` ends in
+"N times free", "full" or "closed". The first button is today, and on a day
+Northwind is open but nobody takes the service the label is "no times"
+(`dayAria`, UX-054), which the pattern left out.
+**Fix**: the pattern accepts all four endings `dayAria` can give.
+**Check**: none added. A spec that reads "today" must accept every state today
+can be in; read the function that writes the words, not one day's screen
+(`saroh-browser-tests` skill: date-dependent assertions).
+**Category**: browser tests · `e2e/tests/public-booking.spec.ts`

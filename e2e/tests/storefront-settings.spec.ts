@@ -6,8 +6,9 @@ import { useSession } from "../fixtures/sessions";
 import { urls } from "../playwright.config";
 
 /**
- * Locations, "How orders leave" (plan B, B17): the chips, and "Mark
- * pick-up orders late after [N] [hours ▾]" per way the location offers.
+ * A location's Delivery tab (plan B, B17; the 9 Oct second pass): a
+ * sentence per way, and each way's Edit panel with "Mark late after" as
+ * presets or Other… [N] [hours ▾], saved by one Save.
  * (Storefronts in the API and in code; DEC-069 renamed only the words.)
  *
  * Walks it on Northwind Supply, the base seed — Rye & Co. and Pulse Fitness
@@ -46,11 +47,16 @@ test.describe("Locations (DEC-069)", () => {
         await expect(page).toHaveURL(
             new RegExp(`/commerce/locations\\?storefront=${one.id}$`),
         );
+        // Titled with the location's own name; the crumb keeps the word.
         await expect(
-            page.getByRole("heading", {
-                level: 1,
-                name: stores.length > 1 ? "Locations" : "Location",
-            }),
+            page.getByRole("heading", { level: 1, name: one.name }),
+        ).toBeVisible();
+        await expect(
+            page
+                .getByRole("navigation", { name: "Breadcrumb" })
+                .getByText(stores.length > 1 ? "Locations" : "Location", {
+                    exact: true,
+                }),
         ).toBeVisible();
         await expect(page.getByLabel("Location name")).toHaveValue(one.name);
         // The words changed, not only the address.
@@ -63,6 +69,47 @@ test.describe("Locations (DEC-069)", () => {
         await expect(page).toHaveURL(
             new RegExp(`/commerce/locations/${one.id}/details$`),
         );
+    });
+
+    test("the tabs keep the open one in the address, and Back returns to the last", async ({
+        page,
+    }) => {
+        await signIn(page);
+        await page.goto(`/open/${ORG}`);
+        const one = (await locations(page)).at(0);
+        expect(one).toBeDefined();
+        if (!one) return;
+        await page.goto(`/commerce/locations?storefront=${one.id}`);
+
+        const tabs = page.getByRole("tablist", { name: "Location settings" });
+        const placeTab = tabs.getByRole("tab", { name: "The place" });
+        await expect(placeTab).toHaveAttribute("aria-selected", "true");
+        // Pressed until it answers: a press before hydration does nothing.
+        await expect(async () => {
+            await tabs.getByRole("tab", { name: "Payments" }).click();
+            await expect(page).toHaveURL(/[?&]section=payments/, {
+                timeout: 2_000,
+            });
+        }).toPass({ timeout: 20_000 });
+        await expect(
+            page.getByRole("tabpanel").getByText("Online payments"),
+        ).toBeVisible();
+        // The title and the readiness line stay above every tab.
+        await expect(
+            page.getByRole("heading", { level: 1, name: one.name }),
+        ).toBeVisible();
+
+        await page.goBack();
+        await expect(page).not.toHaveURL(/section=/);
+        await expect(placeTab).toHaveAttribute("aria-selected", "true");
+
+        // A link straight to a tab opens it.
+        await page.goto(
+            `/commerce/locations?storefront=${one.id}&section=delivery`,
+        );
+        await expect(
+            tabs.getByRole("tab", { name: "Delivery" }),
+        ).toHaveAttribute("aria-selected", "true");
     });
 
     test("the rail names the row Location, or Locations once there are several", async ({
@@ -138,7 +185,7 @@ test.describe(
     "storefront settings: when orders are late",
     { tag: "@serial" },
     () => {
-        test("a counter sets pick-ups late after 20 minutes; a way it doesn't offer has no row", async ({
+        test("a counter sets pick-ups late after 20 minutes in Pick-up's Edit; a way it doesn't offer says Off", async ({
             page,
         }) => {
             test.setTimeout(120_000);
@@ -158,33 +205,45 @@ test.describe(
                     kind: "SHOP",
                     fulfilmentTypes: ["PICKUP"],
                 });
-                await page.goto(`/commerce/locations?storefront=${first.id}`);
-                const card = page.getByRole("region", {
-                    name: "How orders leave",
-                });
+                // The Delivery tab, opened by its address.
+                await page.goto(
+                    `/commerce/locations?storefront=${first.id}&section=delivery`,
+                );
+                const card = page.getByRole("region", { name: "Delivery" });
+                // Read first: a sentence per way, no open fields.
                 await expect(
-                    card.getByRole("button", { name: "Pick-up" }),
-                ).toHaveAttribute("aria-pressed", "true");
-                await expect(
-                    card.getByRole("button", { name: "Shipping" }),
-                ).toHaveAttribute("aria-pressed", "false");
-                await expect(
-                    card.getByLabel("Mark shipping orders late after"),
-                ).toHaveCount(0);
+                    card.getByTestId("delivery-shipping-summary"),
+                ).toHaveText("Off");
+                await expect(card.getByRole("textbox")).toHaveCount(0);
 
-                // 20 minutes: a fraction of an hour, so in minutes.
-                const field = card.getByLabel("Mark pick-up orders late after");
-                await field.fill("20");
-                await card
-                    .getByRole("combobox", { name: "Unit for pick-up orders" })
+                // Pressed until it opens: a press before hydration does nothing.
+                const panel = card.locator("#delivery-pickup-panel");
+                await expect(async () => {
+                    await card
+                        .getByRole("button", { name: "Edit pick-up" })
+                        .click();
+                    await expect(panel).toBeVisible({ timeout: 2_000 });
+                }).toPass({ timeout: 20_000 });
+
+                // 20 minutes: no preset holds it, so Other…
+                await panel.getByRole("radio", { name: "Other…" }).click();
+                await panel
+                    .getByLabel("Pick-up late after", { exact: true })
+                    .fill("20");
+                await panel
+                    .getByRole("combobox", { name: "Pick-up late after, unit" })
                     .click();
                 await page.getByRole("option", { name: "minutes" }).click();
-                await card.getByRole("button", { name: "Save" }).click();
+                await panel.getByRole("button", { name: "Save" }).click();
                 await expect(
                     page.getByText(
                         "Pick-up orders now count as late after 20 minutes",
                     ),
                 ).toBeVisible();
+                await expect(panel).toHaveCount(0);
+                await expect(
+                    card.getByTestId("delivery-pickup-summary"),
+                ).toContainText("late after 20 min");
                 expect(
                     (await read(page.request, first.id)).lateAfterMinutes
                         .PICKUP,
@@ -192,22 +251,41 @@ test.describe(
 
                 // 3 minutes is refused before it is sent, with the bounds.
                 await card
-                    .getByLabel("Mark pick-up orders late after")
+                    .getByRole("button", { name: "Edit pick-up" })
+                    .click();
+                await expect(
+                    panel.getByRole("radio", { name: "Other…" }),
+                ).toHaveAttribute("data-state", "on");
+                await panel
+                    .getByLabel("Pick-up late after", { exact: true })
                     .fill("3");
                 await expect(
-                    card.getByText("5 minutes at the soonest.", {
+                    panel.getByText("5 minutes at the soonest.", {
                         exact: false,
                     }),
                 ).toBeVisible();
-                await expect(
-                    card.getByRole("button", { name: "Save" }),
-                ).toBeDisabled();
+                await panel.getByRole("button", { name: "Save" }).click();
+                expect(
+                    (await read(page.request, first.id)).lateAfterMinutes
+                        .PICKUP,
+                ).toBe(20);
+                await panel.getByRole("button", { name: "Cancel" }).click();
 
-                // Shipping on: its row appears, on its default.
-                await card.getByRole("button", { name: "Shipping" }).click();
-                await expect(
-                    card.getByLabel("Mark shipping orders late after"),
-                ).toHaveValue(String(before.lateAfterMinutes.SHIPPING / 60));
+                // Shipping, turned on in its panel, starts on its default.
+                await card
+                    .getByRole("button", { name: "Edit shipping" })
+                    .click();
+                const shipping = card.locator("#delivery-shipping-panel");
+                await shipping
+                    .getByRole("switch", { name: "Offer shipping" })
+                    .click();
+                const preset = shipping.getByRole("radio", {
+                    name:
+                        before.lateAfterMinutes.SHIPPING === 2880
+                            ? "2 days"
+                            : "Other…",
+                });
+                await expect(preset).toHaveAttribute("data-state", "on");
             } finally {
                 await write(page.request, first.id, {
                     kind: before.kind,

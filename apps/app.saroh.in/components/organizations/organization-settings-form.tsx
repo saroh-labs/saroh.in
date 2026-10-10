@@ -12,7 +12,6 @@ import {
 } from "@saroh/ui/form";
 import { Input } from "@saroh/ui/input";
 import { cn } from "@saroh/ui/lib/utils";
-import { useEdgeFade } from "@saroh/ui/scroll-x";
 import { Switch } from "@saroh/ui/switch";
 import { showError, showInfo } from "@saroh/ui/toast";
 import Link from "next/link";
@@ -63,6 +62,7 @@ import {
 } from "@/components/organizations/use-settings-undo";
 import { countryName } from "@/components/shared/country-select";
 import { OptionSelect } from "@/components/shared/option-select";
+import { SettingsTabStrip } from "@/components/shared/settings-tab-strip";
 import { useTabParam } from "@/lib/hooks/use-tab-param";
 import {
     GST_RATE_OPTIONS,
@@ -425,13 +425,6 @@ export function OrganizationSettingsForm({
         businessTypeOf(settings.profile.type) === "";
     // In the address, so Search settings can open the tab a setting is on.
     const [tab, setTab] = useTabParam(BUSINESS_TAB_PARAM, TAB_KEYS, "identity");
-    // On a phone the strip runs off the screen: it fades on the side with
-    // more, and the open tab is kept in view (UX-079).
-    const tabStrip = useRef<HTMLDivElement>(null);
-    const tabFade = useEdgeFade(tabStrip, {
-        current: '[aria-selected="true"]',
-        revealKey: tab,
-    });
     const [editing, setEditing] = useState<TabKey | null>(null);
     // The Hours card keeps its own form; whether it has changes, from it.
     const [hoursDirty, setHoursDirty] = useState(false);
@@ -832,25 +825,6 @@ export function OrganizationSettingsForm({
     const liveState = registered
         ? gstStateOf(v)
         : { name: indianState(v), fromGstin: false };
-    const tabIndex = TAB_KEYS.indexOf(tab);
-    const onTabKeys = (e: React.KeyboardEvent) => {
-        const n = TAB_KEYS.length;
-        const next =
-            e.key === "ArrowRight"
-                ? (tabIndex + 1) % n
-                : e.key === "ArrowLeft"
-                  ? (tabIndex - 1 + n) % n
-                  : e.key === "Home"
-                    ? 0
-                    : e.key === "End"
-                      ? n - 1
-                      : null;
-        if (next === null) return;
-        e.preventDefault();
-        setTab(TAB_KEYS[next]);
-        document.getElementById(`business-tab-${TAB_KEYS[next]}`)?.focus();
-    };
-
     /** One field's wrapper, at the width the design gives it. */
     const at = fieldWidth;
 
@@ -1200,51 +1174,27 @@ export function OrganizationSettingsForm({
 
     return (
         <Form {...form}>
-            <div
-                ref={tabStrip}
-                role="tablist"
-                aria-label="Business details"
-                onKeyDown={onTabKeys}
-                style={tabFade}
-                // One line however narrow: the strip scrolls sideways, with
-                // no scrollbar drawn, rather than wrapping under itself; the
-                // fade says there is more (UX-079).
-                className="-mt-1.5 mb-[18px] flex flex-nowrap gap-0.5 overflow-x-auto border-b border-border [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
-            >
-                {TAB_KEYS.map((key) => {
-                    const on = key === tab;
-                    return (
-                        <button
-                            key={key}
-                            id={`business-tab-${key}`}
-                            type="button"
-                            role="tab"
-                            aria-selected={on}
-                            aria-controls={
-                                isOwnForm(key)
-                                    ? OWN_FORM[key].panel
-                                    : "business-panel"
-                            }
-                            tabIndex={on ? 0 : -1}
-                            onClick={() => setTab(key)}
-                            className={cn(
-                                "flex shrink-0 items-center gap-[7px] whitespace-nowrap px-3.5 py-2.5 text-[14px] transition-colors duration-fast focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring coarse:min-h-11",
-                                on
-                                    ? "font-semibold text-foreground shadow-[inset_0_-2px_0_hsl(var(--foreground))]"
-                                    : "font-medium text-muted-foreground hover:text-foreground active:bg-accent-active",
-                            )}
-                        >
-                            {titleOf(key)}
-                            {editing === key && !on ? (
-                                <span
-                                    aria-label="Editing"
-                                    className="size-1.5 rounded-full bg-highlight"
-                                />
-                            ) : null}
-                        </button>
-                    );
-                })}
-            </div>
+            <SettingsTabStrip
+                label="Business details"
+                idPrefix="business-tab"
+                current={tab}
+                onChange={setTab}
+                className="-mt-1.5 mb-[18px]"
+                tabs={TAB_KEYS.map((key) => ({
+                    key,
+                    label: titleOf(key),
+                    controls: isOwnForm(key)
+                        ? OWN_FORM[key].panel
+                        : "business-panel",
+                    extra:
+                        editing === key && key !== tab ? (
+                            <span
+                                aria-label="Editing"
+                                className="size-1.5 rounded-full bg-highlight"
+                            />
+                        ) : null,
+                }))}
+            />
 
             <div className="flex flex-wrap items-start gap-5">
                 {isOwnForm(tab) ? null : (

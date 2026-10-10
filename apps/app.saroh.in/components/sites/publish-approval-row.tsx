@@ -58,7 +58,7 @@ export function PublishApprovalSection({
     return (
         <Section
             title="Publishing"
-            description="Whether a change needs someone else's approval before it goes live. Changes here apply at once; there's nothing to publish."
+            description="Whether a change needs someone else's approval before it goes live."
         >
             <Row
                 label="Needs approval"

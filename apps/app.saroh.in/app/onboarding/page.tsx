@@ -8,6 +8,7 @@ import { BusinessSetupForm } from "@/components/organizations/business-setup-for
 import { ACTIVE_ORG_COOKIE } from "@/lib/api/http";
 import {
     ACTIVE_ORG_NAME_COOKIE,
+    ACTIVE_ORG_USER_COOKIE,
     leftBusinessNotice,
 } from "@/lib/organizations/left-business";
 import {
@@ -76,11 +77,15 @@ export default async function OnboardingPage({
     // Removed from the business they were in: said, not set up as new.
     const jar = await cookies();
     const activeId = jar.get(ACTIVE_ORG_COOKIE)?.value;
-    const maybeLeft = leftBusinessNotice({
-        activeId,
-        activeName: jar.get(ACTIVE_ORG_NAME_COOKIE)?.value,
-        memberOf: organizations.map((o) => o.id),
-    });
+    const maybeLeft = session
+        ? leftBusinessNotice({
+              activeId,
+              activeName: jar.get(ACTIVE_ORG_NAME_COOKIE)?.value,
+              activeUser: jar.get(ACTIVE_ORG_USER_COOKIE)?.value,
+              userId: session.user.id,
+              memberOf: organizations.map((o) => o.id),
+          })
+        : null;
     // Asked of that business itself before saying it: an empty list can be
     // an outage, and "you're no longer in" must only ever be a 403 or 404.
     const left =

@@ -1,10 +1,11 @@
 "use client";
 
 import type { TrackerKind } from "@saroh/block-contract";
-import { TRACKER_KINDS, VERIFICATION_SERVICES } from "@saroh/block-contract";
+import { VERIFICATION_SERVICES } from "@saroh/block-contract";
 import { Button } from "@saroh/ui/button";
 import { Switch } from "@saroh/ui/switch";
 import { showError, showSuccess } from "@saroh/ui/toast";
+import { ChevronDown } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 
@@ -21,6 +22,7 @@ import { PrivacyField } from "@/components/sites/search-tracking/privacy-field";
 import type { TrackerStanding } from "@/components/sites/search-tracking/tracker-row";
 import { TrackerRow } from "@/components/sites/search-tracking/tracker-row";
 import { TrackerSetupDialog } from "@/components/sites/search-tracking/tracker-setup-dialog";
+import { VerificationCodes } from "@/components/sites/search-tracking/verification-codes";
 import { VerificationField } from "@/components/sites/search-tracking/verification-field";
 import { VerifyAddress } from "@/components/sites/search-tracking/verify-address";
 import { saveSearchTracking } from "@/lib/sites/actions";
@@ -38,6 +40,7 @@ import {
     trackerSavedLine,
 } from "@/lib/sites/search-tracking";
 import type { SiteAddress } from "@/lib/sites/share-links";
+import { moreToolsLine, splitTrackers } from "@/lib/sites/tracker-order";
 import type { TrackersLock } from "@/lib/sites/trackers-lock";
 import { trackersLockOfRefusal } from "@/lib/sites/trackers-lock";
 
@@ -157,6 +160,10 @@ function Editable({
           : "open";
     const ownDomain = address !== null && address.host !== address.platformHost;
     const byKind = new Map(view.trackers.map((t) => [t.kind, t]));
+    // Meta and Pinterest verify only a domain of the business's own.
+    const services = VERIFICATION_SERVICES.filter(
+        (s) => ownDomain || !OWN_DOMAIN_SERVICES.includes(s),
+    );
 
     function actionsFor(kind: TrackerKind, tracker: TrackerView | null) {
         const name = TRACKER_WORDS[kind].name;
@@ -217,25 +224,76 @@ function Editable({
                     size="sm"
                     onClick={() => setSetup(kind)}
                 >
-                    Change
+                    Edit
                 </Button>
                 {remove}
             </>
         );
     }
 
+    // The common tools and every connected one first; the rest fold.
+    const trackers = splitTrackers(new Set(byKind.keys()));
+    const row = (kind: TrackerKind) => {
+        const tracker = byKind.get(kind) ?? null;
+        return (
+            <TrackerRow
+                key={kind}
+                kind={kind}
+                tracker={tracker}
+                standing={standing}
+                lock={lock}
+                actions={actionsFor(kind, tracker)}
+            />
+        );
+    };
+
     return (
         <SearchTrackingFrame>
             {view.switchedOff ? <SwitchedOffNotice /> : null}
 
             <Block
-                title="Verify your site"
-                description="Prove the site is yours to Google, Bing and others. Codes are added to every page of your live site."
+                title="Your trackers"
+                description="Your own analytics and ad tools. Visitors are asked first for any that uses cookies."
+            >
+                {lock && !view.switchedOff ? <LockNotice lock={lock} /> : null}
+                {trackers.shown.map(row)}
+                {trackers.folded.length ? (
+                    <details className="group" data-more-tools>
+                        <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-4 py-3 text-sm font-medium transition-colors duration-fast hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring active:bg-accent-active coarse:min-h-11 [&::-webkit-details-marker]:hidden">
+                            <span>
+                                <span className="group-open:hidden">
+                                    {moreToolsLine(trackers.folded.length)}
+                                </span>
+                                <span className="hidden group-open:inline">
+                                    Fewer tools
+                                </span>
+                                <span className="font-normal text-muted-foreground">
+                                    {" "}
+                                    ·{" "}
+                                    {trackers.folded
+                                        .map((k) => TRACKER_WORDS[k].name)
+                                        .join(", ")}
+                                </span>
+                            </span>
+                            <ChevronDown
+                                aria-hidden
+                                className="size-4 shrink-0 text-muted-foreground transition-transform duration-fast group-open:rotate-180"
+                            />
+                        </summary>
+                        <div className="divide-y divide-border border-t border-border">
+                            {trackers.folded.map(row)}
+                        </div>
+                    </details>
+                ) : null}
+                <PrivacyField saved={view.privacyUrl} save={save} />
+            </Block>
+
+            <VerificationCodes
+                services={services}
+                added={services.filter((s) => view.verifications[s]).length}
             >
                 <VerifyAddress address={address} />
-                {VERIFICATION_SERVICES.filter(
-                    (s) => ownDomain || !OWN_DOMAIN_SERVICES.includes(s),
-                ).map((service) => (
+                {services.map((service) => (
                     <VerificationField
                         key={service}
                         service={service}
@@ -250,28 +308,7 @@ function Editable({
                         {OWN_DOMAIN_NOTE}
                     </p>
                 )}
-            </Block>
-
-            <Block
-                title="Your trackers"
-                description="Connect your own analytics and ad tools. Saroh adds each tool's own code and asks visitors first for any that uses cookies."
-            >
-                {lock && !view.switchedOff ? <LockNotice lock={lock} /> : null}
-                {TRACKER_KINDS.map((kind) => {
-                    const tracker = byKind.get(kind) ?? null;
-                    return (
-                        <TrackerRow
-                            key={kind}
-                            kind={kind}
-                            tracker={tracker}
-                            standing={standing}
-                            lock={lock}
-                            actions={actionsFor(kind, tracker)}
-                        />
-                    );
-                })}
-                <PrivacyField saved={view.privacyUrl} save={save} />
-            </Block>
+            </VerificationCodes>
 
             {setup ? (
                 <TrackerSetupDialog

@@ -9,6 +9,7 @@ import { SiteSettingsRead } from "./site-settings-read";
 
 vi.mock("next/navigation", () => ({
     useRouter: () => ({ refresh: vi.fn() }),
+    useSearchParams: () => new URLSearchParams(),
 }));
 vi.mock("@/lib/sites/actions", () => ({
     updateSiteFooter: vi.fn(),
@@ -41,7 +42,7 @@ const site = {
     navigation: null,
     pages: [],
     pendingSectionChanges: 0,
-    pendingSiteChanges: 0,
+    pendingSiteChanges: [],
     postsPrefix: "journal",
     sellsFrom: {
         storefront: { id: "st_1", name: "Online" },
@@ -65,6 +66,8 @@ const address: SiteAddress = {
 /** The text a merchant reads, tags and entities aside. */
 const words = (html: string) =>
     html
+        // A break opportunity is no space (the web address's <wbr>).
+        .replace(/<wbr\/?>/g, "")
         .replace(/<[^>]+>/g, " ")
         .replace(/&#x27;/g, "'")
         .replace(/\s+/g, " ");
@@ -75,15 +78,25 @@ describe("the site's settings name each address (DEC-069, L12)", () => {
     );
     const text = words(html);
 
-    it("calls where customers find the site its web address", () => {
+    it("calls where customers find the site its web address, once", () => {
         expect(text).toContain("Web address rye.saroh.app");
-        expect(text).toContain("On Saroh rye.saroh.app");
-        expect(text).not.toMatch(/Saroh address|Subdomain/);
+        expect(text.match(/rye\.saroh\.app Copy/g)).toHaveLength(1);
+        expect(text).not.toMatch(/Saroh address|Subdomain|Site status/);
+    });
+
+    it("gives the web address the row's width, breaking only at its parts", () => {
+        // The value and its buttons share one cell, so the address keeps
+        // one line where it fits instead of a narrow column of its own.
+        expect(html).toMatch(
+            /data-row-inline[\s\S]*data-web-address[^>]*>rye\.<wbr\/>saroh\.<wbr\/>app</,
+        );
     });
 
     it("calls where the posts live the posts path", () => {
-        expect(text).toContain("Posts path /journal");
-        expect(text).not.toContain("Writing address");
+        expect(text).toContain(
+            "Posts path Next publish /journal · where your posts live",
+        );
+        expect(text).not.toMatch(/Writing address|Writing/);
     });
 
     it("says the online shop sells from a location", () => {
@@ -97,7 +110,10 @@ describe("the site's settings name each address (DEC-069, L12)", () => {
                 <SiteSettingsRead site={site} address={address} />,
             ),
         );
-        expect(read).toContain("Web address On Saroh rye.saroh.app");
+        expect(read).toContain("Web address rye.saroh.app");
+        expect(read).toContain(
+            "Posts path Next publish /journal · where your posts live",
+        );
         expect(read).not.toMatch(/Saroh address/);
     });
 });
@@ -169,19 +185,253 @@ describe("the site's settings show whether publishing needs approval (T13)", () 
     });
 });
 
-describe("each settings section says when it goes live (UX-081)", () => {
+describe("the two save models, made visible (UX-081, the audit)", () => {
     const html = renderToStaticMarkup(
         <SiteSettings site={site} address={address} />,
     );
-    const marks = Array.from(
-        html.matchAll(/data-saves="(now|publish)"/g),
-        (m: RegExpMatchArray) => m[1],
+    const text = words(html);
+
+    it("marks only the draft rows with Next publish", () => {
+        const marks = Array.from(
+            html.matchAll(/data-saves="(now|publish)"/g),
+            (m: RegExpMatchArray) => m[1],
+        );
+        // Title, description, share image, menu, footer and posts path.
+        expect(marks).toEqual(Array(6).fill("publish"));
+        expect(text).not.toContain("Live as soon as it's saved");
+        expect(text).not.toContain("Goes live with your next publish");
+        expect(text).not.toContain("part of your draft");
+    });
+
+    it("says a draft isn't published, with the way to publish", () => {
+        const draft = words(
+            renderToStaticMarkup(
+                <SiteSettings
+                    site={
+                        {
+                            ...site,
+                            can: { manageSettings: true, publish: true },
+                        } as unknown as SiteDetail
+                    }
+                    address={address}
+                />,
+            ),
+        );
+        expect(draft).toContain(
+            "Your site isn't published yet. Nobody can reach it until you publish. Review and publish",
+        );
+    });
+
+    const liveSite = (pendingSiteChanges: string[]) =>
+        ({
+            ...site,
+            can: { manageSettings: true, publish: true },
+            currentPublication: { publishedAt: "2026-10-01T10:00:00Z" },
+            pendingSectionChanges: 0,
+            pendingSiteChanges,
+        }) as unknown as SiteDetail;
+
+    it("counts what waits on a live site", () => {
+        const html = renderToStaticMarkup(
+            <SiteSettings
+                site={liveSite(["style", "footer", "menu"])}
+                address={address}
+            />,
+        );
+        expect(words(html)).toContain(
+            "3 changes wait for your next publish: the style, the footer and the menu. Review and publish",
+        );
+        expect(html).toContain('href="/sites/site_rye"');
+    });
+
+    it("leaves room under the bar so the last rows scroll above it", () => {
+        const html = renderToStaticMarkup(
+            <SiteSettings site={liveSite(["menu"])} address={address} />,
+        );
+        // Measured once mounted; the room comes straight after the bar.
+        expect(html).toMatch(
+            /data-publish-bar[\s\S]*<\/div><div aria-hidden="true" data-publish-bar-room/,
+        );
+    });
+
+    it("draws no bar when the live site matches the draft", () => {
+        const html = renderToStaticMarkup(
+            <SiteSettings site={liveSite([])} address={address} />,
+        );
+        expect(html).not.toContain("data-publish-bar");
+    });
+});
+
+describe('values in use, not "Nothing set yet" (the audit)', () => {
+    const text = words(
+        renderToStaticMarkup(<SiteSettings site={site} address={address} />),
     );
 
-    it("marks the address and domain live at once, the rest with a publish", () => {
-        expect(marks.filter((m) => m === "now")).toHaveLength(2);
-        expect(marks.filter((m) => m === "publish")).toHaveLength(5);
-        expect(words(html)).toContain("Live as soon as it's saved");
-        expect(words(html)).toContain("Goes live with your next publish");
+    it("shows the site's name as the title the live site uses", () => {
+        expect(text).toContain("Title Next publish Rye · your site's name");
+        expect(text).not.toContain("Nothing set yet");
+    });
+
+    it("says what has no stand-in is not written, with the verb to fix it", () => {
+        expect(text).toContain("Description Next publish Not written Write");
+        expect(text).toContain("Share image Next publish None");
+        expect(text).toContain("Footer Next publish Not written Write");
+        expect(text).toContain("Menu Next publish Not built Build");
+    });
+
+    it("names the module pages a menu-less site still lists", () => {
+        const withShop = {
+            ...site,
+            pages: [
+                {
+                    id: "p1",
+                    path: "/",
+                    title: "Home",
+                    isHome: true,
+                    hidden: false,
+                },
+                {
+                    id: "p2",
+                    path: "/shop",
+                    title: "Shop",
+                    isHome: false,
+                    hidden: false,
+                    kind: "SHOP",
+                },
+            ],
+        } as unknown as SiteDetail;
+        expect(
+            words(
+                renderToStaticMarkup(
+                    <SiteSettings site={withShop} address={address} />,
+                ),
+            ),
+        ).toContain("Not built · Shop shows on their own");
+    });
+});
+
+describe("Before you share your site (the audit)", () => {
+    it("starts from what is done, and jumps to each row left", () => {
+        const html = renderToStaticMarkup(
+            <SiteSettings site={site} address={address} />,
+        );
+        const text = words(html);
+        expect(text).toContain("Before you share your site 1 of 3");
+        expect(text).toContain("Done: Search title · using Rye");
+        expect(html).toContain('href="#settings-description"');
+        expect(html).toContain('href="#settings-share-image"');
+    });
+
+    it("is one quiet line for a live site with everything set", () => {
+        const ready = {
+            ...site,
+            currentPublication: { publishedAt: "2026-10-01T10:00:00Z" },
+            seoDescription: "Bread",
+            socialImageUrl: "https://example.com/a.jpg",
+        } as unknown as SiteDetail;
+        const html = renderToStaticMarkup(
+            <SiteSettings site={ready} address={address} />,
+        );
+        expect(html).toContain("data-share-ready");
+        expect(html).not.toContain("data-share-checklist");
+    });
+});
+
+describe("the groups, from a side list (owner, 9 Oct)", () => {
+    const tabsOf = (html: string) =>
+        Array.from(
+            html.matchAll(
+                /role="tab" aria-selected="(true|false)"[^>]*>([^<]+)</g,
+            ),
+            (m: RegExpMatchArray) => [m[2], m[1]],
+        );
+
+    it("lists the groups in order, Address open, one panel shown", () => {
+        const html = renderToStaticMarkup(
+            <SiteSettings
+                site={site}
+                address={address}
+                approval={{ on: false, canChange: true }}
+            />,
+        );
+        expect(html).toContain(
+            'role="tablist" aria-label="Settings sections" aria-orientation="vertical"',
+        );
+        // Below 1024px the same choice is a select, never a second strip.
+        expect(words(html)).toContain("Section");
+        expect(html).toMatch(/<button[^>]*role="combobox"/);
+        expect(tabsOf(html)).toEqual([
+            ["Address", "true"],
+            ["Search and sharing", "false"],
+            ["Menu and footer", "false"],
+            ["Shop", "false"],
+            ["Tracking", "false"],
+            ["Advanced", "false"],
+        ]);
+        const panels = Array.from(
+            html.matchAll(
+                /<div id="settings-panel-([a-z-]+)" role="tabpanel"[^>]*>/g,
+            ),
+            (m: RegExpMatchArray) => [
+                m[1],
+                m[0].includes(" hidden") ? "hidden" : "shown",
+            ],
+        );
+        expect(panels.filter(([, v]) => v === "shown")).toEqual([
+            ["address", "shown"],
+        ]);
+        // Every panel stays mounted, so a half-edited row survives a tab.
+        expect(panels).toHaveLength(6);
+        const ids = Array.from(
+            html.matchAll(/data-settings-group="([a-z-]+)"/g),
+            (m: RegExpMatchArray) => m[1],
+        );
+        expect(ids).toEqual([
+            "address",
+            "search-and-sharing",
+            "menu-and-footer",
+            "shop",
+            "tracking",
+            "advanced",
+        ]);
+    });
+
+    it("leaves Shop and Advanced out when there's nothing in them", () => {
+        const html = renderToStaticMarkup(
+            <SiteSettings
+                site={{ ...site, sellsFrom: null }}
+                address={address}
+            />,
+        );
+        expect(html).not.toContain('data-settings-group="shop"');
+        expect(html).not.toContain('data-settings-group="advanced"');
+        expect(tabsOf(html).map(([name]) => name)).toEqual([
+            "Address",
+            "Search and sharing",
+            "Menu and footer",
+            "Tracking",
+        ]);
+    });
+
+    it("offers Change for the web address only where the owner may", () => {
+        const can = renderToStaticMarkup(
+            <SiteSettings site={site} address={address} canChangeAddress />,
+        );
+        expect(can).toContain('href="/settings/organization#web-address"');
+        const cannot = renderToStaticMarkup(
+            <SiteSettings site={site} address={address} />,
+        );
+        expect(cannot).not.toContain("/settings/organization#web-address");
+    });
+
+    it("groups the read-only view the same way, with no controls", () => {
+        const html = renderToStaticMarkup(
+            <SiteSettingsRead site={site} address={address} />,
+        );
+        expect(html).toContain('data-settings-group="search-and-sharing"');
+        expect(tabsOf(html).map(([name]) => name)).toContain(
+            "Search and sharing",
+        );
+        expect(html).not.toMatch(/<input|<textarea|>Edit<|>Write<|>Build</);
     });
 });

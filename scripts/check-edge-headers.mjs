@@ -23,7 +23,12 @@
 import { execFileSync } from "node:child_process";
 import { readFile } from "node:fs/promises";
 
-const ALLOWED = new Set(["apps/api.saroh.in/src/common/trust-proxy.ts"]);
+// redact.ts names those headers only to strip them from log lines, so a
+// visitor's address never reaches a log; it reads no address from them.
+const ALLOWED = new Set([
+    "apps/api.saroh.in/src/common/trust-proxy.ts",
+    "apps/api.saroh.in/src/common/logging/redact.ts",
+]);
 
 const files = execFileSync(
     "git",

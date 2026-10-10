@@ -8,6 +8,8 @@ describe("leftBusinessNotice (UX-073)", () => {
             leftBusinessNotice({
                 activeId: "org_gone",
                 activeName: "Hill Road Bakes",
+                activeUser: "user_1",
+                userId: "user_1",
                 memberOf: [],
             }),
         ).toBe(
@@ -20,6 +22,8 @@ describe("leftBusinessNotice (UX-073)", () => {
             leftBusinessNotice({
                 activeId: "org_gone",
                 activeName: undefined,
+                activeUser: "user_1",
+                userId: "user_1",
                 memberOf: ["org_other"],
             }),
         ).toMatch(/^You're no longer in that business — /);
@@ -30,6 +34,8 @@ describe("leftBusinessNotice (UX-073)", () => {
             leftBusinessNotice({
                 activeId: "org_1",
                 activeName: "Mine",
+                activeUser: "user_1",
+                userId: "user_1",
                 memberOf: ["org_1"],
             }),
         ).toBeNull();
@@ -37,7 +43,32 @@ describe("leftBusinessNotice (UX-073)", () => {
             leftBusinessNotice({
                 activeId: null,
                 activeName: null,
+                activeUser: null,
+                userId: "user_1",
                 memberOf: [],
+            }),
+        ).toBeNull();
+    });
+
+    it("says nothing to someone else on the same browser (a new sign-up)", () => {
+        const left = {
+            activeId: "org_gone",
+            activeName: "Hill Road Bakes",
+            memberOf: [],
+        };
+        expect(
+            leftBusinessNotice({
+                ...left,
+                activeUser: "user_before",
+                userId: "user_new",
+            }),
+        ).toBeNull();
+        // A cookie from before the user was kept beside it can't say whose.
+        expect(
+            leftBusinessNotice({
+                ...left,
+                activeUser: undefined,
+                userId: "user_new",
             }),
         ).toBeNull();
     });

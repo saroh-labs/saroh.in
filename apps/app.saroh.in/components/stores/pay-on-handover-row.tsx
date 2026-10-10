@@ -41,20 +41,17 @@ export function PayOnHandoverRow({
     setStore: (fn: (s: StorefrontSettings) => StorefrontSettings) => void;
 }) {
     if (store.offerPayOnHandover === undefined) return null;
-    const after =
-        "The order comes in as not paid yet and its items are set aside. Mark it paid on the order when you take the money.";
 
     if (store.onlinePaymentsPlan === false) {
         return (
             <div className="grid gap-1">
                 <p className="text-[13.5px] font-medium">
-                    Pay when you collect, or on delivery
+                    Pay when they collect, or on delivery
                 </p>
                 <Note>
-                    Your plan takes payment in person, so customers ordering on
-                    your website pay when they collect, or when you deliver.
-                    Shipping isn&rsquo;t offered, since a courier can&rsquo;t
-                    take the money for you. {after}
+                    Your plan takes payment in person, so website orders are
+                    paid when collected or delivered, and Shipping isn&rsquo;t
+                    offered. Mark each one paid when you take the money.
                 </Note>
             </div>
         );
@@ -75,7 +72,7 @@ export function PayOnHandoverRow({
         <ToggleRow
             id="storefront-pay-on-handover"
             label="Let customers pay when they collect or on delivery"
-            note={`Your website's checkout offers it beside paying online, for pick-up and local delivery. ${after}`}
+            note="Offered beside paying online, for pick-up and local delivery. Mark the order paid when you take the money."
             checked={store.offerPayOnHandover}
             disabled={!canEdit || pending}
             onChange={flip}

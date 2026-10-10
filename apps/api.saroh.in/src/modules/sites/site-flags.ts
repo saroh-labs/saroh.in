@@ -127,6 +127,11 @@ export interface FlagSiteInput {
      * records, or null when the site has no template, or one with no line.
      */
     templateFooterLine?: string | null;
+    /**
+     * Lines the template started sites with before that line was reworded
+     * (`footer.formerLines`): a footer still equal to one is the template's.
+     */
+    formerTemplateFooterLines?: readonly string[];
 }
 
 // ---------------------------------------------------------------------------
@@ -719,6 +724,7 @@ export function checkSite(site: FlagSiteInput): Flag[] {
     const footerFlag = untouchedTemplateFooter(
         site.footer,
         site.templateFooterLine,
+        site.formerTemplateFooterLines,
     );
     if (footerFlag) flags.push(footerFlag);
 
@@ -827,17 +833,22 @@ export function checkSite(site: FlagSiteInput): Flag[] {
  * rather than guessing from its phrasing. The comparison is on the words:
  * a footer the editor saved back as `<p>…</p>`, or with its spacing
  * changed, is still the template's. Anything else — an edit of one word —
- * is the owner's, and quiet.
+ * is the owner's, and quiet. A line the template has since reworded
+ * (`formerLines`) still counts: a site made with it and never changed is
+ * no more the owner's than one made today.
  */
 export function untouchedTemplateFooter(
     footer: FlagSiteInput["footer"],
     templateLine: string | null | undefined,
+    formerLines: readonly string[] = [],
 ): Flag | null {
-    const line = words(templateLine ?? "");
-    if (line === "" || !footer) return null;
+    const lines = [templateLine ?? "", ...formerLines]
+        .map(words)
+        .filter((l) => l !== "");
+    if (lines.length === 0 || !footer) return null;
     const written =
         footer.format === "html" ? textOf(footer.value) : footer.value;
-    if (words(written) !== line) return null;
+    if (!lines.includes(words(written))) return null;
     return {
         type: "placeholderText",
         message:

@@ -177,6 +177,7 @@ export type {
     CheckoutStarted,
     DeliveryAddress,
     QuoteDiscount,
+    QuoteFreeDelivery,
     QuoteLine,
     QuotePayment,
     QuoteWay,

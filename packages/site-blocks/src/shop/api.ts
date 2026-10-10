@@ -64,6 +64,13 @@ export interface CheckoutQuote {
      * from an API before site codes.
      */
     discount?: QuoteDiscount | null;
+    /**
+     * The location's "Free delivery over": the amount, and how much more the
+     * items (after any code) must come to before delivery is free — null
+     * once they reach it, when the delivery ways' fees read free. Null when
+     * there is no amount, or no way here has a fee; absent from an older API.
+     */
+    freeDelivery?: QuoteFreeDelivery | null;
     total: string;
     ready: boolean;
     /**
@@ -77,6 +84,14 @@ export interface CheckoutQuote {
      * hours. Null when Pick-up isn't offered; absent from an older API.
      */
     pickup?: PickupPlace | null;
+}
+
+/** Free delivery over an amount, as the bag shows it. */
+export interface QuoteFreeDelivery {
+    /** "999.00" */
+    over: string;
+    /** "120.00" more to go, or null once the items reach `over`. */
+    short: string | null;
 }
 
 /** A discount code as the bag shows it. */
@@ -151,12 +166,15 @@ export interface CheckoutStanding {
  * - bag-changed: price it again before paying.
  * - busy: a checkout is open already, or too many tries.
  * - cant-order: the shop isn't taking orders online now.
+ * - payments-down: the business's online payment failed just now; try
+ *   later, or pay them another way.
  */
 export type ShopProblem =
     | "signed-out"
     | "bag-changed"
     | "busy"
     | "cant-order"
+    | "payments-down"
     | "invalid"
     | "error"
     | "test-release";

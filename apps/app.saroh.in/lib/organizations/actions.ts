@@ -6,8 +6,13 @@ import { redirect } from "next/navigation";
 import { env } from "@/env";
 import { ACTIVE_ORG_COOKIE } from "@/lib/api/http";
 
+import { requireSession } from "@/lib/session";
 import { PAUSED_ERROR, PAUSED_HREF } from "./choose";
-import { ACTIVE_ORG_NAME_COOKIE } from "./left-business";
+
+import {
+    ACTIVE_ORG_NAME_COOKIE,
+    ACTIVE_ORG_USER_COOKIE,
+} from "./left-business";
 
 import type {
     AddressAvailability,
@@ -50,6 +55,9 @@ async function writeActiveOrgCookie(
     // they are no longer in (UX-073). Never anything but the name.
     if (name) jar.set(ACTIVE_ORG_NAME_COOKIE, name, options);
     else jar.delete(ACTIVE_ORG_NAME_COOKIE);
+    // And who chose it: the browser may be someone else's next.
+    const session = await requireSession();
+    jar.set(ACTIVE_ORG_USER_COOKIE, session.user.id, options);
 }
 
 /**

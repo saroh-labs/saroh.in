@@ -292,16 +292,22 @@ const RYE_PLANS = "/billing/subscriptions?tab=plans";
  * RENDERER_URL=https://saroh.app for help-own-domain-1, so it reads
  * northwind.saroh.app as in production, not the local renderer's host. */
 const NW_SETTINGS = "/sites/seed_site_0/settings";
-const DOMAIN = 'section:has(h2:text-is("Your own domain"))';
-const SHARE = 'section:has(h2:text-is("Social share image"))';
-const SEARCH = 'section:has(h2:text-is("Search"))';
+/* The settings' tabs (Website › Settings, 9 Oct): the domain is in
+ * Address (the first tab), the share image and the description in Search
+ * and sharing, the codes and trackers in Tracking; a shot opens its tab
+ * with `?section=`. */
+const DOMAIN = "#address";
+const SHARE = "#search-and-sharing";
+const SEARCH = "#search-and-sharing";
+/** The verification codes fold; a shot that shows them opens them first. */
+const OPEN_CODES: Step = { click: "[data-verification-codes] summary" };
 
 /* "Verify your site and add analytics": Search and tracking, at the foot of
  * Northwind's site settings (DEC-108), with the API's RENDERER_URL set to
  * https://saroh.app as for help-own-domain-1. The Google field and the
  * Google Analytics dialog are typed into and never saved. */
 const ST = '[data-section="search-and-tracking"]';
-const ST_VERIFY = `${ST} .wk-surface:has(h3:text-is("Verify your site"))`;
+const ST_VERIFY = `${ST} [data-verification-codes]`;
 const ST_TRACKERS = `${ST} .wk-surface:has(h3:text-is("Your trackers"))`;
 /** Tall enough that the section, near the page's foot, is laid out in view. */
 const ST_DESK: Viewport = { width: 1280, height: 4800 };
@@ -558,7 +564,7 @@ const HELP_SHOTS_B: Shot[] = [
                 fill: '[aria-label="Domain to add"]',
                 value: "www.northwindsupply.in",
             },
-            { click: `${DOMAIN} h2` },
+            { click: `${DOMAIN} h3` },
         ],
         clip: { selector: DOMAIN, pad: 12 },
         mark: `${DOMAIN} button:has-text("Add domain")`,
@@ -605,7 +611,7 @@ const HELP_SHOTS_B: Shot[] = [
         key: "help-share-image-1",
         business: "northwind",
         role: "owner",
-        route: NW_SETTINGS,
+        route: `${NW_SETTINGS}?section=search-and-sharing`,
         viewport: { width: 1280, height: 3000 },
         clip: { selector: SHARE, pad: 12 },
         mark: `${SHARE} button:text-is("Add")`,
@@ -616,11 +622,11 @@ const HELP_SHOTS_B: Shot[] = [
         key: "help-share-image-2",
         business: "northwind",
         role: "owner",
-        route: NW_SETTINGS,
+        route: `${NW_SETTINGS}?section=search-and-sharing`,
         viewport: { width: 1280, height: 3000 },
         steps: [{ click: `${SHARE} button:text-is("Add")` }],
         clip: {
-            selector: `${SHARE} div.grid:has(> div:text-is("Image"))`,
+            selector: `${SHARE} div.grid:has(> div > span:text-is("Share image"))`,
             pad: 12,
         },
         mark: `${SHARE} button:has-text("Choose a photo")`,
@@ -631,10 +637,12 @@ const HELP_SHOTS_B: Shot[] = [
         key: "help-share-image-3",
         business: "northwind",
         role: "owner",
-        route: NW_SETTINGS,
+        route: `${NW_SETTINGS}?section=search-and-sharing`,
         viewport: { width: 1280, height: 3000 },
         steps: [
-            { click: `${SEARCH} button:text-is("Edit") >> nth=1` },
+            {
+                click: `#settings-description button:is(:text-is("Edit"), :text-is("Write"))`,
+            },
             {
                 fill: '[aria-label="Search description"]',
                 value: "Packaging, cleaning and workshop supplies for small manufacturers in Peenya, Bengaluru. Order by phone or online.",
@@ -662,14 +670,11 @@ const HELP_SHOTS_B: Shot[] = [
         key: "help-verify-analytics-1",
         business: "northwind",
         role: "owner",
-        route: NW_SETTINGS,
+        route: `${NW_SETTINGS}?section=tracking`,
         viewport: ST_DESK,
-        clip: {
-            selector: `${ST} > div:first-child`,
-            until: ST_VERIFY,
-            pad: 12,
-        },
-        mark: "#search-tracking-title",
+        steps: [OPEN_CODES],
+        clip: { selector: ST_VERIFY, pad: 12 },
+        mark: "#tracking-title",
         alt: "Search and tracking in the website settings of Northwind Supply (demo store): its live address, its sitemap and the verification fields",
         caption: "Search and tracking at Northwind Supply",
     },
@@ -677,14 +682,14 @@ const HELP_SHOTS_B: Shot[] = [
         key: "help-verify-analytics-2",
         business: "northwind",
         role: "owner",
-        route: NW_SETTINGS,
+        route: `${NW_SETTINGS}?section=tracking`,
         viewport: ST_DESK,
         steps: [
+            OPEN_CODES,
             {
                 fill: '[data-verification="google"] input',
                 value: '<meta name="google-site-verification" content="northwind-demo-search-console-code" />',
             },
-            { click: `${ST_VERIFY} h3` },
         ],
         clip: { selector: '[data-verification="google"]', pad: 12 },
         mark: '[data-verification="google"] button:text-is("Save")',
@@ -695,8 +700,9 @@ const HELP_SHOTS_B: Shot[] = [
         key: "help-verify-analytics-3",
         business: "northwind",
         role: "owner",
-        route: NW_SETTINGS,
+        route: `${NW_SETTINGS}?section=tracking`,
         viewport: ST_DESK,
+        steps: [OPEN_CODES],
         clip: {
             selector: `${ST_VERIFY} div.grid:has([data-live-address])`,
             until: `${ST_VERIFY} div.grid:has([data-sitemap])`,
@@ -710,7 +716,7 @@ const HELP_SHOTS_B: Shot[] = [
         key: "help-verify-analytics-4",
         business: "northwind",
         role: "owner",
-        route: NW_SETTINGS,
+        route: `${NW_SETTINGS}?section=tracking`,
         viewport: ST_DESK,
         clip: { selector: ST_TRACKERS, pad: 12 },
         mark: '[data-tracker="ga4"] button:text-is("Set up")',
@@ -721,7 +727,7 @@ const HELP_SHOTS_B: Shot[] = [
         key: "help-verify-analytics-5",
         business: "northwind",
         role: "owner",
-        route: NW_SETTINGS,
+        route: `${NW_SETTINGS}?section=tracking`,
         viewport: { width: 1280, height: 900 },
         steps: [
             { click: '[data-tracker="ga4"] button:text-is("Set up")' },

@@ -163,6 +163,26 @@ describe("the API's answers", () => {
     it("says each refusal in the page's words", () => {
         expect(problemOf(401, {}).reason).toBe("signed-out");
         expect(problemOf(403, {}).reason).toBe("cant-order");
+        // The business's payments down: said as that, not as our trouble.
+        for (const reason of [
+            "provider-unavailable",
+            "provider-keys-refused",
+        ]) {
+            expect(
+                problemOf(503, {
+                    error: {
+                        message: "Internal words",
+                        details: { reason },
+                    },
+                }),
+            ).toEqual({
+                ok: false,
+                reason: "payments-down",
+                message:
+                    "The business can't take payment online right now. Please try again later, or pay them another way.",
+            });
+        }
+        expect(problemOf(503, {}).reason).toBe("error");
         expect(
             problemOf(409, {
                 error: {
@@ -395,6 +415,23 @@ describe("a discount code in the bag (DEC-104)", () => {
         expect(
             isQuote({ ...priced, discount: { code: "X", applied: "yes" } }),
         ).toBe(false);
+    });
+
+    it("reads a quote's free delivery over an amount, and one from an older API", () => {
+        expect(
+            isQuote({
+                ...priced,
+                freeDelivery: { over: "999.00", short: "120.00" },
+            }),
+        ).toBe(true);
+        expect(
+            isQuote({
+                ...priced,
+                freeDelivery: { over: "999.00", short: null },
+            }),
+        ).toBe(true);
+        expect(isQuote({ ...priced, freeDelivery: null })).toBe(true);
+        expect(isQuote({ ...priced, freeDelivery: { over: 999 } })).toBe(false);
     });
 
     it("says a code that stopped applying in the checkout's words", () => {
