@@ -5,7 +5,7 @@ import { OrganizationSettingsForm } from "@/components/organizations/organizatio
 import { WebAddressSection } from "@/components/organizations/web-address-section";
 import {
     ReadyChecklist,
-    readyHasLeft,
+    readyHasCard,
 } from "@/components/settings/ready-checklist";
 import {
     SettingsPanel,
@@ -69,7 +69,7 @@ export default async function OrganizationSettingsPage() {
             : organization?.role === "OWNER" || organization?.role === "ADMIN";
     const canEdit = may("org:update");
 
-    // Home's "Get ready to take money" steps, and what Settings adds.
+    // Home's "Finish setup" steps, and what Settings adds.
     const ready =
         settings && canEdit
             ? await loadSettingsChecklist(settings, {
@@ -101,8 +101,11 @@ export default async function OrganizationSettingsPage() {
                 // The Settings side list is already beside the rows.
                 beside
                 aside={
-                    ready && readyHasLeft(ready) ? (
-                        <ReadyChecklist list={ready} />
+                    ready && readyHasCard(ready) ? (
+                        <ReadyChecklist
+                            list={ready}
+                            businessId={organization?.id}
+                        />
                     ) : undefined
                 }
             >

@@ -189,7 +189,7 @@ const edit = (name: string) =>
 const says = (row: string) =>
     host.querySelector(`[data-testid="location-${row}-summary"]`)?.textContent;
 const card = () =>
-    host.querySelector<HTMLElement>('[data-testid="location-readiness"]');
+    host.querySelector<HTMLElement>('[data-setup-checklist="location"]');
 
 /** The open sheet, and the name a screen reader gives it. */
 const sheet = () => document.querySelector<HTMLElement>('[role="dialog"]');

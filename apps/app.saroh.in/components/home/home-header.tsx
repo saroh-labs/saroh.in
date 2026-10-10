@@ -20,6 +20,7 @@ export function HomeHeader({
     businessName,
     only = null,
     kind,
+    subject = null,
 }: {
     lastDay: HomeLastDay | null;
     /** The viewer's own name, from their session. */
@@ -29,6 +30,11 @@ export function HomeHeader({
     only?: string | null;
     /** What is being set up (DEC-070); its words for a new business. */
     kind?: unknown;
+    /**
+     * What "Finish setup" is about on this Home, when it shows one: the
+     * line under the greeting follows it, not always "ready to take money".
+     */
+    subject?: "money" | "site" | "setup" | null;
 }) {
     const links = sinceLinks(lastDay);
 
@@ -39,7 +45,9 @@ export function HomeHeader({
             title={greeting(lastDay, name)}
             description={
                 <>
-                    <p>{dateLine(lastDay, businessName, only, kind)}</p>
+                    <p>
+                        {dateLine(lastDay, businessName, only, kind, subject)}
+                    </p>
                     {links.length > 0 ? (
                         <div
                             role="group"

@@ -144,7 +144,7 @@ export function SettingsSections({
     // Sell › Location and Settings › Business use. Once everything is
     // set the checklist is a line, which stays above the rows.
     const count = readinessCount(steps);
-    const allSet = live && count.done === count.of;
+    const allSet = count.done === count.of;
     const checklist = (
         <ShareChecklist
             steps={steps}
