@@ -251,6 +251,7 @@ function StateAction({
     onClick,
     variant = "outline",
     busy = false,
+    reload = false,
 }: {
     size: StateSize;
     label: string;
@@ -258,14 +259,21 @@ function StateAction({
     onClick?: () => void;
     variant?: "default" | "outline";
     busy?: boolean;
+    /**
+     * A full load of `href`, not a client navigation: what Try again needs,
+     * since a full load is what is certain to ask the server again.
+     */
+    reload?: boolean;
 }) {
+    // A plain anchor for a full load, the router's link otherwise.
+    const Anchor = reload ? "a" : Link;
     if (size === "inline") {
         const text =
             "wk-press inline-flex items-center rounded-sm font-medium text-foreground underline underline-offset-[3px] hover:no-underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:text-muted-foreground coarse:min-h-11";
         return href ? (
-            <Link href={href} className={text}>
+            <Anchor href={href} className={text}>
                 {label}
-            </Link>
+            </Anchor>
         ) : (
             <button
                 type="button"
@@ -279,7 +287,7 @@ function StateAction({
     }
     return href ? (
         <Button asChild variant={variant} className="wk-press">
-            <Link href={href}>{label}</Link>
+            <Anchor href={href}>{label}</Anchor>
         </Button>
     ) : (
         <Button
@@ -749,7 +757,10 @@ export interface FailedStateProps extends Omit<
      * refetch, `router.refresh()`. Never a redraw of the same failed read.
      */
     onRetry?: () => void;
-    /** Or the address that reads again, for a server-rendered state. */
+    /**
+     * Or the address that reads again, for a server-rendered state. It is
+     * loaded in full, so the read is certain to be asked again.
+     */
     retryHref?: string;
     /** While the retry is on its way: the button waits. */
     retrying?: boolean;
@@ -790,6 +801,7 @@ export function FailedState({
                 label={TRY_AGAIN}
                 onClick={onRetry}
                 href={retryHref}
+                reload
                 variant={size === "page" ? "default" : "outline"}
                 busy={retrying}
             />
