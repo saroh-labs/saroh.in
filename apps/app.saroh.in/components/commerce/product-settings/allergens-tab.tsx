@@ -1,21 +1,18 @@
 "use client";
 
+import { EmptyState } from "@saroh/ui/data-state";
 import { cn } from "@saroh/ui/lib/utils";
 import { showError, showUndo } from "@saroh/ui/toast";
+import { Plus } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useState, useTransition } from "react";
+import { useTransition } from "react";
 
 import type { AllergenView } from "@/lib/products/settings";
 import { addAllergens, removeAllergen } from "@/lib/products/settings-actions";
 
 import { ReadOnlyNote } from "@/components/shared/read-only-note";
-import {
-    bigBtn,
-    rowBtn,
-    smallBtn,
-    TabIntro,
-    textBox,
-} from "./product-settings";
+import { NameDialog } from "./name-dialog";
+import { bigBtn, rowBtn, smallBtn, TabIntro } from "./product-settings";
 
 const MAX = 30;
 const COMMON = [
@@ -32,7 +29,8 @@ const COMMON = [
 /**
  * What the editor offers under "Contains" and "May contain", named as
  * customers will read it. A store starts with none — a food business adds
- * the usual eight in one step. One a product lists can't be removed.
+ * the usual eight in one step. The list is read first: Add allergen opens a
+ * one-field dialog. One a product lists can't be removed.
  */
 export function AllergensTab({
     allergens,
@@ -43,14 +41,6 @@ export function AllergensTab({
 }) {
     const router = useRouter();
     const [pending, start] = useTransition();
-    const [name, setName] = useState("");
-    const na = name.trim();
-    const err =
-        na && allergens.some((a) => a.name.toLowerCase() === na.toLowerCase())
-            ? `${na} is already on the list.`
-            : na.length > MAX
-              ? `Keep it under ${MAX} characters.`
-              : "";
 
     function run(work: () => Promise<void>) {
         start(async () => {
@@ -59,51 +49,94 @@ export function AllergensTab({
         });
     }
 
-    function add(names: string[], said: string) {
-        run(async () => {
-            const before = new Set(allergens.map((a) => a.id));
-            const res = await addAllergens(names);
-            if (!res.ok) return showError(res.error);
-            setName("");
-            const added = res.data.filter((a) => !before.has(a.id));
-            showUndo(said, () =>
-                run(async () => {
-                    for (const a of added) await removeAllergen(a.id);
-                }),
-            );
-        });
+    /** Resolves true when they were added. */
+    async function add(names: string[], said: string) {
+        const before = new Set(allergens.map((a) => a.id));
+        const res = await addAllergens(names);
+        if (!res.ok) {
+            showError(res.error);
+            return false;
+        }
+        router.refresh();
+        const added = res.data.filter((a) => !before.has(a.id));
+        showUndo(said, () =>
+            run(async () => {
+                for (const a of added) await removeAllergen(a.id);
+            }),
+        );
+        return true;
     }
+
+    const addOne = canWrite ? (
+        <NameDialog
+            trigger={
+                <button type="button" className={bigBtn}>
+                    <Plus aria-hidden className="-ml-0.5 mr-1.5 size-3.5" />
+                    Add allergen
+                </button>
+            }
+            title="Add allergen"
+            note="Customers see it as you name it here."
+            label="Allergen name"
+            placeholder="Celery"
+            submitLabel="Add allergen"
+            busyLabel="Adding…"
+            problem={(name) =>
+                !name
+                    ? "An allergen needs a name."
+                    : allergens.some(
+                            (a) => a.name.toLowerCase() === name.toLowerCase(),
+                        )
+                      ? `${name} is already on the list.`
+                      : name.length > MAX
+                        ? `Keep it under ${MAX} characters.`
+                        : ""
+            }
+            onSubmit={(name) =>
+                add([name], `${name} added. The editor offers it now.`)
+            }
+        />
+    ) : null;
 
     return (
         <section>
-            <TabIntro title="Allergen list">
+            <TabIntro
+                title="Allergen list"
+                // With none yet, the empty state carries the buttons.
+                action={allergens.length > 0 ? addOne : null}
+            >
                 What the editor offers under “Contains” and “May contain”.
                 Customers see each one as you name it here.
             </TabIntro>
             {canWrite ? null : <ReadOnlyNote />}
 
             {allergens.length === 0 ? (
-                <div className="flex flex-wrap items-center gap-3 rounded-[12px] border border-dashed border-border-strong px-4 py-3.5">
-                    <p className="flex-[1_1_260px] text-pretty text-[12.5px] leading-[1.5] text-muted-foreground">
-                        No allergens yet. A shop that sells food usually starts
-                        with the common eight; anyone else can leave this empty.
-                    </p>
-                    {canWrite ? (
-                        <button
-                            type="button"
-                            disabled={pending}
-                            className={smallBtn}
-                            onClick={() =>
-                                add(
-                                    COMMON,
-                                    "The common food allergens are on the list.",
-                                )
-                            }
-                        >
-                            Add the common food allergens
-                        </button>
-                    ) : null}
-                </div>
+                <EmptyState
+                    title="No allergens yet"
+                    description="A shop that sells food usually starts with the common eight; anyone else can leave this empty."
+                    action={
+                        canWrite ? (
+                            <div className="flex flex-wrap items-center justify-center gap-2">
+                                <button
+                                    type="button"
+                                    disabled={pending}
+                                    className={cn(smallBtn, "h-9 px-3.5")}
+                                    onClick={() =>
+                                        start(async () => {
+                                            await add(
+                                                COMMON,
+                                                "The common food allergens are on the list.",
+                                            );
+                                        })
+                                    }
+                                >
+                                    Add the common food allergens
+                                </button>
+                                {addOne}
+                            </div>
+                        ) : null
+                    }
+                />
             ) : (
                 <ul className="rounded-[12px] border border-border bg-card">
                     {allergens.map((a) => {
@@ -175,46 +208,6 @@ export function AllergensTab({
                 </ul>
             )}
 
-            {canWrite ? (
-                <>
-                    <form
-                        className="mt-3.5 flex flex-wrap gap-2"
-                        onSubmit={(e) => {
-                            e.preventDefault();
-                            if (!na || err) return;
-                            add([na], `${na} added. The editor offers it now.`);
-                        }}
-                    >
-                        <input
-                            value={name}
-                            onChange={(e) => setName(e.target.value)}
-                            aria-label="New allergen"
-                            aria-invalid={!!err}
-                            placeholder="Add one, e.g. Celery"
-                            className={cn(
-                                textBox,
-                                "flex-[1_1_220px]",
-                                err ? "border-destructive" : "border-border",
-                            )}
-                        />
-                        <button
-                            type="submit"
-                            disabled={!na || !!err || pending}
-                            className={bigBtn}
-                        >
-                            Add allergen
-                        </button>
-                    </form>
-                    {err ? (
-                        <p
-                            role="alert"
-                            className="mt-1.5 text-[12px] text-destructive"
-                        >
-                            {err}
-                        </p>
-                    ) : null}
-                </>
-            ) : null}
             <p className="mt-2 text-[11.5px] text-muted-foreground">
                 One a product lists cannot be removed — take it off those
                 products first.

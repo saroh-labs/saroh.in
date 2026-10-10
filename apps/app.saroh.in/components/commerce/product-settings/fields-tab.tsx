@@ -1,39 +1,29 @@
 "use client";
 
+import { EmptyState } from "@saroh/ui/data-state";
 import { cn } from "@saroh/ui/lib/utils";
 import { showError, showUndo } from "@saroh/ui/toast";
+import { Plus } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useState, useTransition } from "react";
+import { useTransition } from "react";
 
-import type {
-    CatalogueView,
-    FieldType,
-    FieldView,
-} from "@/lib/products/settings";
-import {
-    addField,
-    removeField,
-    restoreField,
-    updateField,
-} from "@/lib/products/settings-actions";
+import type { CatalogueView, FieldView } from "@/lib/products/settings";
+import { removeField, restoreField } from "@/lib/products/settings-actions";
 
 import { ReadOnlyNote } from "@/components/shared/read-only-note";
-import { bigBtn, chipBtn, rowBtn, TabIntro, textBox } from "./product-settings";
+import { FIELD_TYPES, FieldSheet } from "./field-sheet";
+import { bigBtn, rowBtn, TabIntro } from "./product-settings";
 
-const TYPES: { type: FieldType; label: string }[] = [
-    { type: "TEXT", label: "Text" },
-    { type: "NUMBER", label: "Number" },
-    { type: "DATE", label: "Date" },
-    { type: "YES_NO", label: "Yes / no" },
-];
-const MAX = 40;
 const plural = (n: number) => `${n} ${n === 1 ? "product" : "products"}`;
+const PILL =
+    "rounded-full bg-muted px-2 py-0.5 text-[11px] font-semibold text-foreground/75";
 
 /**
  * Extra things a product records, for the categories picked — "Skin type"
  * for serums, "Fabric care" for dresses. Team only fields stay on the
- * product page; fields on the shop show under the description. A change
- * here takes effect at once; a delete keeps what was typed, with Undo.
+ * product page; fields on the shop show under the description. Each field
+ * is read first; Add field and Edit open the one side sheet, where a change
+ * is saved. A delete keeps what was typed, with Undo.
  */
 export function FieldsTab({
     catalogue,
@@ -45,16 +35,6 @@ export function FieldsTab({
     const router = useRouter();
     const { canWrite, categories } = catalogue;
     const [pending, start] = useTransition();
-    const [name, setName] = useState("");
-    const [type, setType] = useState<FieldType>("TEXT");
-
-    const nl = name.trim();
-    const err =
-        nl && fields.some((f) => f.name.toLowerCase() === nl.toLowerCase())
-            ? `There is already a field called ${nl}.`
-            : nl.length > MAX
-              ? `Keep it under ${MAX} characters.`
-              : "";
 
     function run(work: () => Promise<void>) {
         start(async () => {
@@ -63,9 +43,26 @@ export function FieldsTab({
         });
     }
 
+    const addOne = canWrite ? (
+        <FieldSheet
+            trigger={
+                <button type="button" className={bigBtn}>
+                    <Plus aria-hidden className="-ml-0.5 mr-1.5 size-3.5" />
+                    Add field
+                </button>
+            }
+            fields={fields}
+            categories={categories}
+        />
+    ) : null;
+
     return (
         <section>
-            <TabIntro title="Custom fields">
+            <TabIntro
+                title="Custom fields"
+                // With none yet, the empty state carries the button.
+                action={fields.length > 0 ? addOne : null}
+            >
                 Extra things a product records, for the categories you pick.
                 Team only fields stay on the product page; fields on the shop
                 show under the description.
@@ -73,275 +70,122 @@ export function FieldsTab({
             {canWrite ? null : <ReadOnlyNote />}
 
             {fields.length === 0 ? (
-                <p className="rounded-[12px] border border-dashed border-border-strong px-4 py-3.5 text-[12.5px] leading-[1.5] text-muted-foreground">
-                    No custom fields yet. Add one below — say, “Skin type” for
-                    serums or “Fabric care” for dresses.
-                </p>
+                <EmptyState
+                    title="No custom fields yet"
+                    description="Add one to record something extra, such as Skin type for serums or Fabric care for dresses."
+                    action={addOne}
+                />
             ) : (
-                <div className="flex flex-col gap-3">
+                <ul className="flex flex-col gap-3">
                     {fields.map((f) => {
                         const typeLabel =
-                            TYPES.find((t) => t.type === f.type)?.label ??
+                            FIELD_TYPES.find((t) => t.type === f.type)?.label ??
                             "Text";
                         const cats = categories.filter((c) =>
                             f.categoryIds.includes(c.id),
                         );
                         return (
-                            <div
+                            <li
                                 key={f.id}
                                 className="rounded-[12px] border border-border bg-card px-4 py-3.5"
                             >
                                 <div className="flex flex-wrap items-center gap-2">
-                                    <span className="text-[14px] font-semibold">
+                                    <span className="min-w-0 text-[14px] font-semibold [overflow-wrap:anywhere]">
                                         {f.name}
                                     </span>
-                                    <span className="rounded-full bg-muted px-2 py-0.5 text-[11px] font-semibold text-foreground/75">
-                                        {typeLabel}
+                                    <span className={PILL}>{typeLabel}</span>
+                                    <span className={PILL}>
+                                        {f.onShop ? "On the shop" : "Team only"}
                                     </span>
-                                    <span className="flex-[1_1_160px] text-[12px] text-muted-foreground">
+                                    <span className="flex-[1_1_120px] text-[12px] text-muted-foreground">
                                         {cats.length
-                                            ? `${cats.map((c) => c.name).join(", ")} · ${plural(f.productCount)}`
-                                            : "No category"}
+                                            ? plural(f.productCount)
+                                            : ""}
                                     </span>
-                                    <div
-                                        role="radiogroup"
-                                        aria-label={`${f.name}: who sees it`}
-                                        className="flex gap-0.5 rounded-[8px] bg-muted p-0.5"
-                                    >
-                                        {[
-                                            { on: false, label: "Team only" },
-                                            { on: true, label: "On the shop" },
-                                        ].map((o) => {
-                                            const chosen = f.onShop === o.on;
-                                            return (
-                                                <button
-                                                    key={o.label}
-                                                    type="button"
-                                                    role="radio"
-                                                    aria-checked={chosen}
-                                                    disabled={
-                                                        !canWrite || pending
-                                                    }
-                                                    onClick={() => {
-                                                        if (chosen) return;
-                                                        run(async () => {
-                                                            const res =
-                                                                await updateField(
-                                                                    f.id,
-                                                                    {
-                                                                        onShop: o.on,
-                                                                    },
-                                                                );
-                                                            if (!res.ok)
-                                                                return showError(
-                                                                    res.error,
-                                                                );
-                                                            showUndo(
-                                                                o.on
-                                                                    ? `${f.name} now shows on the shop.`
-                                                                    : `${f.name} is team only now.`,
-                                                                () =>
-                                                                    run(
-                                                                        async () => {
-                                                                            await updateField(
-                                                                                f.id,
-                                                                                {
-                                                                                    onShop: f.onShop,
-                                                                                },
-                                                                            );
-                                                                        },
-                                                                    ),
-                                                            );
-                                                        });
-                                                    }}
-                                                    className={cn(
-                                                        "rounded-[6px] px-2.5 py-[5px] text-[12px] font-semibold disabled:cursor-not-allowed coarse:min-h-11",
-                                                        chosen
-                                                            ? "bg-card text-foreground shadow-[0_1px_3px_rgba(28,28,26,0.12)]"
-                                                            : "text-muted-foreground",
-                                                    )}
-                                                >
-                                                    {o.label}
-                                                </button>
-                                            );
-                                        })}
-                                    </div>
                                     {canWrite ? (
-                                        <button
-                                            type="button"
-                                            disabled={pending}
-                                            className={cn(
-                                                rowBtn,
-                                                "text-destructive",
-                                            )}
-                                            onClick={() =>
-                                                run(async () => {
-                                                    const res =
-                                                        await removeField(f.id);
-                                                    if (!res.ok)
-                                                        return showError(
-                                                            res.error,
-                                                        );
-                                                    showUndo(
-                                                        `${f.name} deleted. Values already typed on products are kept for 30 days.`,
-                                                        () =>
-                                                            run(async () => {
-                                                                const undo =
-                                                                    await restoreField(
-                                                                        f.id,
-                                                                    );
-                                                                if (!undo.ok)
-                                                                    showError(
-                                                                        undo.error,
-                                                                    );
-                                                            }),
-                                                    );
-                                                })
-                                            }
-                                        >
-                                            Delete
-                                        </button>
-                                    ) : null}
-                                </div>
-                                <p className="mb-1.5 mt-3 text-[12px] font-medium">
-                                    Asked for products in
-                                </p>
-                                <div
-                                    role="group"
-                                    aria-label={`Categories that ask for ${f.name}`}
-                                    className="flex flex-wrap gap-1.5"
-                                >
-                                    {categories.map((c) => {
-                                        const on = f.categoryIds.includes(c.id);
-                                        return (
+                                        <div className="flex shrink-0 gap-1.5">
+                                            <FieldSheet
+                                                trigger={
+                                                    <button
+                                                        type="button"
+                                                        className={rowBtn}
+                                                        aria-label={`Edit ${f.name}`}
+                                                    >
+                                                        Edit
+                                                    </button>
+                                                }
+                                                field={f}
+                                                fields={fields}
+                                                categories={categories}
+                                            />
                                             <button
-                                                key={c.id}
                                                 type="button"
-                                                aria-pressed={on}
-                                                disabled={!canWrite || pending}
+                                                disabled={pending}
+                                                aria-label={`Delete ${f.name}`}
+                                                className={cn(
+                                                    rowBtn,
+                                                    "text-destructive",
+                                                )}
                                                 onClick={() =>
                                                     run(async () => {
                                                         const res =
-                                                            await updateField(
+                                                            await removeField(
                                                                 f.id,
-                                                                {
-                                                                    categoryIds:
-                                                                        on
-                                                                            ? f.categoryIds.filter(
-                                                                                  (
-                                                                                      x,
-                                                                                  ) =>
-                                                                                      x !==
-                                                                                      c.id,
-                                                                              )
-                                                                            : [
-                                                                                  ...f.categoryIds,
-                                                                                  c.id,
-                                                                              ],
-                                                                },
                                                             );
                                                         if (!res.ok)
-                                                            showError(
+                                                            return showError(
                                                                 res.error,
                                                             );
+                                                        showUndo(
+                                                            `${f.name} deleted. Values already typed on products are kept for 30 days.`,
+                                                            () =>
+                                                                run(
+                                                                    async () => {
+                                                                        const undo =
+                                                                            await restoreField(
+                                                                                f.id,
+                                                                            );
+                                                                        if (
+                                                                            !undo.ok
+                                                                        )
+                                                                            showError(
+                                                                                undo.error,
+                                                                            );
+                                                                    },
+                                                                ),
+                                                        );
                                                     })
                                                 }
-                                                className={chipBtn(on)}
                                             >
-                                                {c.name}
+                                                Delete
                                             </button>
-                                        );
-                                    })}
+                                        </div>
+                                    ) : null}
                                 </div>
-                                {f.categoryIds.length === 0 ? (
+                                {cats.length ? (
+                                    <p className="mt-2 text-[12.5px] text-foreground/75">
+                                        <span className="font-medium text-foreground">
+                                            Asked for products in
+                                        </span>{" "}
+                                        {cats.map((c) => c.name).join(", ")}
+                                    </p>
+                                ) : (
                                     <p
                                         role="status"
-                                        className="mt-[7px] text-[11.5px] text-brand-subtle-foreground"
+                                        className="mt-2 text-[12px] text-brand-subtle-foreground"
                                     >
-                                        In no category — no product will ask for
-                                        it.
+                                        In no category, so no product asks for
+                                        it
+                                        {canWrite
+                                            ? ". Edit it to pick one."
+                                            : "."}
                                     </p>
-                                ) : null}
-                            </div>
+                                )}
+                            </li>
                         );
                     })}
-                </div>
+                </ul>
             )}
-
-            {canWrite ? (
-                <div className="mt-3.5 rounded-[12px] bg-muted/50 px-3.5 py-[13px]">
-                    <p className="mb-2 text-[12.5px] font-semibold">
-                        Add a field
-                    </p>
-                    <form
-                        className="flex flex-wrap items-center gap-2"
-                        onSubmit={(e) => {
-                            e.preventDefault();
-                            if (!nl || err) return;
-                            run(async () => {
-                                const res = await addField(nl, type);
-                                if (!res.ok) return showError(res.error);
-                                setName("");
-                                showUndo(`${nl} added.`, () =>
-                                    run(async () => {
-                                        const undo = await removeField(
-                                            res.data.id,
-                                        );
-                                        if (!undo.ok) showError(undo.error);
-                                    }),
-                                );
-                            });
-                        }}
-                    >
-                        <input
-                            value={name}
-                            onChange={(e) => setName(e.target.value)}
-                            aria-label="New field name"
-                            aria-invalid={!!err}
-                            placeholder="Field name, e.g. Skin type"
-                            className={cn(
-                                textBox,
-                                "flex-[1_1_220px]",
-                                err ? "border-destructive" : "border-border",
-                            )}
-                        />
-                        <div
-                            role="radiogroup"
-                            aria-label="Field type"
-                            className="flex flex-wrap gap-[5px]"
-                        >
-                            {TYPES.map((t) => (
-                                <button
-                                    key={t.type}
-                                    type="button"
-                                    role="radio"
-                                    aria-checked={type === t.type}
-                                    onClick={() => setType(t.type)}
-                                    className={chipBtn(type === t.type)}
-                                >
-                                    {t.label}
-                                </button>
-                            ))}
-                        </div>
-                        <button
-                            type="submit"
-                            disabled={!nl || !!err || pending}
-                            className={bigBtn}
-                        >
-                            Add field
-                        </button>
-                    </form>
-                    <p
-                        className={cn(
-                            "mt-2 text-[11.5px]",
-                            err ? "text-destructive" : "text-muted-foreground",
-                        )}
-                    >
-                        {err ||
-                            "It starts team only and in no category — pick where it applies once it is added."}
-                    </p>
-                </div>
-            ) : null}
         </section>
     );
 }
