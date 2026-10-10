@@ -14,6 +14,7 @@ import {
     FormMessage,
 } from "@saroh/ui/form";
 import { Input } from "@saroh/ui/input";
+import { MoneyInput } from "@saroh/ui/money-input";
 import { showError, showSuccess } from "@saroh/ui/toast";
 import { ToggleGroup, ToggleGroupItem } from "@saroh/ui/toggle-group";
 import { useRouter } from "next/navigation";
@@ -44,9 +45,6 @@ import type {
     DiscountReach,
 } from "@/lib/discounts/service";
 import { amountProblem, percentProblem } from "@/lib/discounts/value";
-import { OptionSelect } from "@saroh/ui/option-select";
-
-const CURRENCIES = ["INR", "USD", "EUR", "GBP", "AUD", "CAD", "SGD", "AED"];
 
 const formSchema = z
     .object({
@@ -360,39 +358,21 @@ export function DiscountForm({
                                     <FormItem>
                                         <FormLabel>Amount off</FormLabel>
                                         <FormControl>
-                                            <Input
-                                                {...field}
-                                                inputMode="decimal"
-                                                placeholder="10.00"
-                                                className="w-36 tabular-nums"
-                                            />
+                                            <div className="w-36">
+                                                <MoneyInput
+                                                    {...field}
+                                                    currency={form.watch(
+                                                        "currency",
+                                                    )}
+                                                    onValueChange={
+                                                        field.onChange
+                                                    }
+                                                />
+                                            </div>
                                         </FormControl>
                                         <FormDescription>
                                             Never more than what it applies to.
                                         </FormDescription>
-                                        <FormMessage />
-                                    </FormItem>
-                                )}
-                            />
-                            <FormField
-                                control={form.control}
-                                name="currency"
-                                render={({ field }) => (
-                                    <FormItem>
-                                        <FormLabel>Currency</FormLabel>
-                                        <FormControl>
-                                            <OptionSelect
-                                                value={field.value}
-                                                onValueChange={field.onChange}
-                                                options={CURRENCIES.map(
-                                                    (c) => ({
-                                                        value: c,
-                                                        label: c,
-                                                    }),
-                                                )}
-                                                className="w-28 font-mono"
-                                            />
-                                        </FormControl>
                                         <FormMessage />
                                     </FormItem>
                                 )}

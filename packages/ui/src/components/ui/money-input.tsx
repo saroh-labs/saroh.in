@@ -2,6 +2,7 @@
 
 import * as React from "react";
 import { cn } from "../../lib/utils";
+import type { InputProps } from "./input";
 import { Input } from "./input";
 
 /**
@@ -64,7 +65,7 @@ export function cleanMoney(raw: string, decimals: number): string {
 }
 
 export interface MoneyInputProps extends Omit<
-    React.InputHTMLAttributes<HTMLInputElement>,
+    InputProps,
     "value" | "onChange" | "type" | "inputMode"
 > {
     /** The business's currency code ("INR"). Never asked of the merchant. */
@@ -103,6 +104,9 @@ const MoneyInput = React.forwardRef<HTMLInputElement, MoneyInputProps>(
                     {sign}
                 </span>
                 <Input
+                    // First, so nothing a form library spreads in (its own
+                    // onChange, say) replaces what makes this a money box.
+                    {...props}
                     ref={ref}
                     type="text"
                     inputMode={decimals > 0 ? "decimal" : "numeric"}
@@ -117,7 +121,6 @@ const MoneyInput = React.forwardRef<HTMLInputElement, MoneyInputProps>(
                         paddingLeft: `calc(0.75rem + ${sign.length}ch + 0.5rem)`,
                         ...style,
                     }}
-                    {...props}
                 />
             </div>
         );

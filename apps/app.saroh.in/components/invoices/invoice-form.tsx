@@ -5,6 +5,7 @@ import { Button } from "@saroh/ui/button";
 import { Input } from "@saroh/ui/input";
 import { Label } from "@saroh/ui/label";
 import { cn } from "@saroh/ui/lib/utils";
+import { MoneyInput } from "@saroh/ui/money-input";
 import { Textarea } from "@saroh/ui/textarea";
 import { showError, showSuccess } from "@saroh/ui/toast";
 import { X } from "lucide-react";
@@ -634,18 +635,25 @@ export function InvoiceForm({
                                                 >
                                                     Price each
                                                 </Label>
-                                                <Input
-                                                    id={`${ids.lines}-${i}-price`}
-                                                    aria-label={`Line ${i + 1}: price each, ${currency}`}
-                                                    inputMode="decimal"
-                                                    placeholder="₹ each"
-                                                    className="tabular-nums"
-                                                    disabled={isSubmitting}
-                                                    aria-invalid={Boolean(
-                                                        lineErr?.unitPrice,
-                                                    )}
-                                                    {...form.register(
-                                                        `lines.${i}.unitPrice`,
+                                                <Controller
+                                                    control={form.control}
+                                                    name={`lines.${i}.unitPrice`}
+                                                    render={({ field }) => (
+                                                        <MoneyInput
+                                                            {...field}
+                                                            id={`${ids.lines}-${i}-price`}
+                                                            aria-label={`Line ${i + 1}: price each, ${currency}`}
+                                                            currency={currency}
+                                                            onValueChange={
+                                                                field.onChange
+                                                            }
+                                                            disabled={
+                                                                isSubmitting
+                                                            }
+                                                            aria-invalid={Boolean(
+                                                                lineErr?.unitPrice,
+                                                            )}
+                                                        />
                                                     )}
                                                 />
                                             </div>

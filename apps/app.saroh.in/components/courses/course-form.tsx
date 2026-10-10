@@ -14,6 +14,7 @@ import {
 } from "@saroh/ui/form";
 import { Input } from "@saroh/ui/input";
 import { Label } from "@saroh/ui/label";
+import { MoneyInput } from "@saroh/ui/money-input";
 import { Textarea } from "@saroh/ui/textarea";
 import { TimeSelect } from "@saroh/ui/time-select";
 import { showError, showSuccess } from "@saroh/ui/toast";
@@ -34,8 +35,6 @@ import type { CourseDetail } from "@/lib/courses/service";
 import { wallClockToIso, ymd } from "@/lib/courses/sessions";
 import { formatDayLabel, formatTimeRange } from "@/lib/format/datetime";
 import { OptionSelect } from "@saroh/ui/option-select";
-
-const CURRENCIES = ["INR", "USD", "GBP", "EUR", "AED", "SGD", "AUD", "CAD"];
 
 const schema = z.object({
     serviceId: z.string().min(1, "Choose the service it runs on"),
@@ -264,7 +263,7 @@ export function CourseForm({
                         </FormItem>
                     )}
                 />
-                <div className="grid gap-4 sm:grid-cols-[1fr_8rem_8rem]">
+                <div className="grid gap-4 sm:grid-cols-[1fr_8rem]">
                     <FormField
                         control={form.control}
                         name="price"
@@ -272,36 +271,16 @@ export function CourseForm({
                             <FormItem>
                                 <FormLabel>Price</FormLabel>
                                 <FormControl>
-                                    <Input
+                                    <MoneyInput
                                         {...field}
-                                        inputMode="decimal"
-                                        placeholder="240.00"
+                                        currency={form.watch("currency")}
+                                        onValueChange={field.onChange}
                                     />
                                 </FormControl>
                                 <FormDescription>
                                     For the whole course. You can change it for
                                     one person when you enrol them.
                                 </FormDescription>
-                                <FormMessage />
-                            </FormItem>
-                        )}
-                    />
-                    <FormField
-                        control={form.control}
-                        name="currency"
-                        render={({ field }) => (
-                            <FormItem>
-                                <FormLabel>Currency</FormLabel>
-                                <FormControl>
-                                    <OptionSelect
-                                        value={field.value}
-                                        onValueChange={field.onChange}
-                                        options={CURRENCIES.map((c) => ({
-                                            value: c,
-                                            label: c,
-                                        }))}
-                                    />
-                                </FormControl>
                                 <FormMessage />
                             </FormItem>
                         )}
