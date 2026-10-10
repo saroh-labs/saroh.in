@@ -1,6 +1,7 @@
 "use client";
 
 import { FormDialog } from "@/components/shared/form-dialog";
+import { count, plural } from "@/lib/format/plural";
 import { Button } from "@saroh/ui/button";
 import { Input } from "@saroh/ui/input";
 import { showError, showSuccess } from "@saroh/ui/toast";
@@ -171,7 +172,7 @@ export function StagesDialog({
                         <Tip
                             label={
                                 r.leads > 0
-                                    ? `${r.leads} lead${r.leads === 1 ? "" : "s"} still here. Move them first.`
+                                    ? `${count(r.leads, "lead")} still here. Move them first.`
                                     : undefined
                             }
                         >
@@ -182,7 +183,7 @@ export function StagesDialog({
                                 className="size-8"
                                 aria-label={
                                     r.leads > 0
-                                        ? `${r.name} has ${r.leads} lead${r.leads === 1 ? "" : "s"}; move them before removing it`
+                                        ? `${r.name} has ${count(r.leads, "lead")}; move them before removing it`
                                         : `Remove ${r.name || "this stage"}`
                                 }
                                 disabled={r.leads > 0 || rows.length === 1}
@@ -252,7 +253,7 @@ export function StagesDialog({
                             setRemoved([]);
                         }}
                     >
-                        {removed.length === 1 ? "Put it back" : "Put them back"}
+                        {plural(removed.length, "Put it back", "Put them back")}
                     </button>
                 </p>
             ) : null}

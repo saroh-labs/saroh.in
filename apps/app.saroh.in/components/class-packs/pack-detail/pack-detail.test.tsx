@@ -46,7 +46,10 @@ const actions = vi.hoisted(() => ({
 }));
 vi.mock("@/lib/class-packs/actions", () => actions);
 
+import { pinClock } from "@/lib/format/test-clock";
 import { PackDetailScreen } from "./pack-detail";
+
+pinClock();
 
 const DAY = 86_400_000;
 const NOW = new Date("2026-10-01T06:30:00.000Z");
@@ -432,7 +435,7 @@ describe("Pack Detail's Used this week (E17)", () => {
             },
         );
         expect(text()).toContain("Used this week");
-        expect(text()).toContain("Thu 1 Oct 07:00");
+        expect(text()).toContain("Thu 1 Oct, 7:00 am");
         expect(text()).toContain("HIIT");
         expect(text()).toContain("Asha Rao");
         expect(text()).toContain("Booked");

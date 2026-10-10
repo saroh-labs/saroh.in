@@ -39,8 +39,7 @@ export function useOrderChanges({
 }) {
     const router = useRouter();
     const [busy, startTransition] = useTransition();
-    const money = (cents: number) =>
-        formatMoney(Math.abs(cents), currency) ?? String(cents / 100);
+    const money = (cents: number) => formatMoney(Math.abs(cents), currency);
     const told = (yes: boolean) =>
         yes
             ? `${first} has been told in their messages.`

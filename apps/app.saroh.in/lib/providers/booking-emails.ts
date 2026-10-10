@@ -1,4 +1,5 @@
 import { upgradeHref } from "@/lib/billing/access";
+import { formatNumber } from "@/lib/format/money";
 import { businessEditHref } from "@/lib/organizations/business-rows";
 
 import type { SarohEmailState } from "./service";
@@ -52,7 +53,7 @@ export type BookingEmails =
     | { kind: "block"; block: BookingEmailsBlock }
     | { kind: "unread"; text: string };
 
-const n = (v: number) => v.toLocaleString("en-IN");
+const n = formatNumber;
 
 /** The way out, by whether the business can connect its own email. */
 const OWN_SENTENCE = {

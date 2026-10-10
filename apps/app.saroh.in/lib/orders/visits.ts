@@ -1,5 +1,9 @@
-import { formatMoment } from "@/lib/format/datetime";
-
+import {
+    formatDate,
+    formatDateTime,
+    formatRecent,
+} from "@/lib/format/datetime";
+import { count } from "@/lib/format/plural";
 import type { OrderVisit, OrderVisits, VisitState } from "./read";
 
 /*
@@ -28,7 +32,7 @@ export function visitsSummary(
 export function visitsCount(
     v: Pick<OrderVisits, "attended" | "total">,
 ): string {
-    return `${v.attended} of ${v.total} visit${v.total === 1 ? "" : "s"}`;
+    return `${v.attended} of ${count(v.total, "visit")}`;
 }
 
 /** The pill each state wears, and its word. */
@@ -54,7 +58,7 @@ export function visitWhen(
     now: Date,
 ): string {
     return v.startAt
-        ? formatMoment(v.startAt, timeZone, now)
+        ? formatDateTime(v.startAt, timeZone, { relative: true, now })
         : "Not booked yet";
 }
 
@@ -77,16 +81,12 @@ export function visitStepLabel(
     now: Date,
 ): string {
     if (!v.startAt) return `Visit ${v.number}`;
-    const moment = formatMoment(v.startAt, timeZone, now);
-    const day = moment.startsWith("Today") ? moment : moment.split(",")[0];
-    return `Visit ${v.number} · ${day}`;
+    return `Visit ${v.number} · ${formatRecent(v.startAt, timeZone, now)}`;
 }
 
 /** A moment in a sentence: "today, 18:00", "yesterday, 10:00", "19 Sep, 18:00". */
 function inSentence(at: string, timeZone: string, now: Date): string {
-    return formatMoment(at, timeZone, now)
-        .replace(/^Today/, "today")
-        .replace(/^Yesterday/, "yesterday");
+    return formatDateTime(at, timeZone, { relative: "lower", now });
 }
 
 /** What the header's primary button says, or null when there is none. */
@@ -175,8 +175,10 @@ export function quickVisitsText(
     );
     if (!next || v.closed) return count;
     if (!next.startAt) return `${count} · Visit ${next.number} · to book`;
-    const day = formatMoment(next.startAt, timeZone, now);
-    const when = day.startsWith("Today") ? "today" : day.split(",")[0];
+    const when = formatDate(next.startAt, timeZone, {
+        relative: "lower",
+        now,
+    });
     return `${count} · Visit ${next.number} · booked ${when}`;
 }
 

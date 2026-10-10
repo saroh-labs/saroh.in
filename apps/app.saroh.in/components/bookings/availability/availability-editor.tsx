@@ -1,5 +1,7 @@
 "use client";
 
+import { formatClockRange, formatDay } from "@/lib/format/datetime";
+import { count } from "@/lib/format/plural";
 import { Button } from "@saroh/ui/button";
 import { cn } from "@saroh/ui/lib/utils";
 import { PageHeader } from "@saroh/ui/page-header";
@@ -21,7 +23,6 @@ import {
     weeklyHours,
 } from "@/lib/services/availability-rules";
 import type { LocalDate } from "@/lib/services/diary";
-import { clock, dayLabel } from "@/lib/services/diary";
 import {
     addClosure,
     addExtraHours,
@@ -243,13 +244,13 @@ export function AvailabilityEditor({
         });
         if (outside.length) {
             showWarning(
-                `${outside.length} ${outside.length === 1 ? "booking is" : "bookings are"} now outside the hours`,
+                `${count(outside.length, "booking is", "bookings are")} now outside the hours`,
                 "They stay booked. Move them from the calendar if you need to.",
             );
         }
         if (covered.size) {
             showWarning(
-                `${covered.size} ${covered.size === 1 ? "booking falls" : "bookings fall"} in the time off`,
+                `${count(covered.size, "booking falls", "bookings fall")} in the time off`,
                 "They stay booked. Move or cancel them from the calendar.",
             );
         }
@@ -507,15 +508,15 @@ export function AvailabilityEditor({
                                 return (
                                     <OffRow
                                         key={x.id}
-                                        when={`${dayLabel(x.date.slice(0, 10))} · ${clock(x.startMinute)}–${clock(x.endMinute)}`}
+                                        when={`${formatDay(x.date.slice(0, 10), { weekday: "short", year: "never" })} · ${formatClockRange(x.startMinute, x.endMinute)}`}
                                         why={
                                             n
-                                                ? `${n} ${n === 1 ? "booking" : "bookings"} that day — kept if you close these`
+                                                ? `${count(n, "booking")} that day — kept if you close these`
                                                 : null
                                         }
                                         warn={n > 0}
                                         canEdit={canEdit}
-                                        removeLabel={`Remove extra hours ${clock(x.startMinute)} to ${clock(x.endMinute)} on ${dayLabel(x.date.slice(0, 10))}`}
+                                        removeLabel={`Remove extra hours ${formatClockRange(x.startMinute, x.endMinute)} on ${formatDay(x.date.slice(0, 10), { weekday: "short", year: "never" })}`}
                                         onRemove={() =>
                                             edit((y) => {
                                                 y.extraRemoved.push(x.id);

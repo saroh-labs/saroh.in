@@ -1,3 +1,4 @@
+import { zoneParts } from "@/lib/format/datetime";
 /**
  * A session is picked as a day and a time on the wall of the business — the
  * service's zone — not the browser's. This turns that into the instant the
@@ -7,25 +8,14 @@
  */
 
 function offsetMs(at: number, timeZone: string): number {
-    const parts = new Intl.DateTimeFormat("en-US", {
-        timeZone,
-        hourCycle: "h23",
-        year: "numeric",
-        month: "2-digit",
-        day: "2-digit",
-        hour: "2-digit",
-        minute: "2-digit",
-        second: "2-digit",
-    }).formatToParts(new Date(at));
-    const get = (type: string) =>
-        Number(parts.find((p) => p.type === type)?.value ?? 0);
+    const p = zoneParts(at, timeZone);
     const asUtc = Date.UTC(
-        get("year"),
-        get("month") - 1,
-        get("day"),
-        get("hour"),
-        get("minute"),
-        get("second"),
+        p.year,
+        p.month - 1,
+        p.day,
+        p.hour,
+        p.minute,
+        p.second,
     );
     return asUtc - at;
 }

@@ -164,7 +164,7 @@ export function ProductHeader({
 }) {
     const { product, price } = overview;
     const money = (amount: string) =>
-        formatMoneyMajor(amount, product.currency) ?? amount;
+        formatMoneyMajor(amount, product.currency);
     const status = STATUS_BADGE[product.status];
     // The cover is the first photo; a video never stands in for it.
     const cover = product.images.find((i) => i.kind !== "video");

@@ -1,5 +1,6 @@
 "use client";
 
+import { count } from "@/lib/format/plural";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Button } from "@saroh/ui/button";
 import { DatePicker } from "@saroh/ui/date-picker";
@@ -527,7 +528,7 @@ export function DiscountForm({
                                 <FormDescription>
                                     Across every order. Leave empty for no cap.
                                     {discount
-                                        ? ` Used ${discount.used} ${discount.used === 1 ? "time" : "times"} so far.`
+                                        ? ` Used ${count(discount.used, "time")} so far.`
                                         : ""}
                                 </FormDescription>
                                 <FormMessage />

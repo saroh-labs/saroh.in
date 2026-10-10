@@ -1,5 +1,6 @@
 "use client";
 
+import { plural } from "@/lib/format/plural";
 import { Button } from "@saroh/ui/button";
 import { Input } from "@saroh/ui/input";
 import { cn } from "@saroh/ui/lib/utils";
@@ -162,8 +163,8 @@ export function ProductsPicker({
             {hiddenCount > 0 ? (
                 <p className="text-[11.5px] leading-[1.5] text-muted-foreground">
                     It also keeps {hiddenCount} archived{" "}
-                    {hiddenCount === 1 ? "product" : "products"}. They
-                    aren&apos;t shown, and come back here when sold again.
+                    {plural(hiddenCount, "product")}. They aren&apos;t shown,
+                    and come back here when sold again.
                 </p>
             ) : null}
             {error ? (

@@ -50,7 +50,7 @@ export function VariantDrawer({
 }) {
     const { product, stock } = overview;
     const money = (amount: string) =>
-        formatMoneyMajor(amount, product.currency) ?? amount;
+        formatMoneyMajor(amount, product.currency);
     const edit = (section: "variants" | "stock") =>
         productEditHref(storeId, product.id, section);
     const open = product.variants.find((v) => v.id === variantId) ?? null;

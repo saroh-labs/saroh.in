@@ -1,3 +1,4 @@
+import { isTimeZone, zoneParts } from "@/lib/format/datetime";
 /**
  * How a business's invoice numbers are built — the app's mirror of the API's
  * `invoices/numbering.ts` (ADR-008), for the Tax card's editor and preview.
@@ -91,22 +92,11 @@ function localParts(
     now: Date,
     zone: string | null | undefined,
 ): { year: number; month: number } {
-    let parts: Intl.DateTimeFormatPart[];
-    try {
-        parts = new Intl.DateTimeFormat("en-US", {
-            timeZone:
-                zone === null || zone === undefined || zone === ""
-                    ? DEFAULT_TIMEZONE
-                    : zone,
-            year: "numeric",
-            month: "numeric",
-        }).formatToParts(now);
-    } catch {
-        return localParts(now, DEFAULT_TIMEZONE);
-    }
-    const part = (type: string) =>
-        Number(parts.find((p) => p.type === type)?.value);
-    return { year: part("year"), month: part("month") };
+    const { year, month } = zoneParts(
+        now,
+        zone && isTimeZone(zone) ? zone : DEFAULT_TIMEZONE,
+    );
+    return { year, month };
 }
 
 /**

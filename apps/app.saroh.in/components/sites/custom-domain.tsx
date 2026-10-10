@@ -1,5 +1,6 @@
 "use client";
 
+import { formatDateTime } from "@/lib/format/datetime";
 import { Badge } from "@saroh/ui/badge";
 import { Button } from "@saroh/ui/button";
 import { showError, showInfo, showSuccess, showWarning } from "@saroh/ui/toast";
@@ -25,7 +26,6 @@ import {
     domainView,
 } from "@/lib/domains/domain-view";
 import type { SiteDomain } from "@/lib/domains/service";
-import { exactDate } from "@/lib/sites/format-date";
 import { SETTINGS_ROW_ID, settingsEditId } from "@/lib/sites/settings-edit";
 import { TextLink } from "@saroh/ui/text-link";
 
@@ -222,7 +222,7 @@ export function CustomDomain({
                                     variant={view.badge.variant}
                                     title={
                                         domain.verifiedAt
-                                            ? `Verified ${exactDate(domain.verifiedAt, zone)}`
+                                            ? `Verified ${formatDateTime(domain.verifiedAt, zone, { year: "always" })}`
                                             : undefined
                                     }
                                 >
@@ -284,7 +284,11 @@ export function CustomDomain({
                             <p
                                 className="text-xs text-muted-foreground"
                                 title={
-                                    lineAt ? exactDate(lineAt, zone) : undefined
+                                    lineAt
+                                        ? formatDateTime(lineAt, zone, {
+                                              year: "always",
+                                          })
+                                        : undefined
                                 }
                             >
                                 {line}

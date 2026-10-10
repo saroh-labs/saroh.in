@@ -1,5 +1,6 @@
 "use client";
 
+import { formatClock, formatClockRange } from "@/lib/format/datetime";
 import { Button } from "@saroh/ui/button";
 import { cn } from "@saroh/ui/lib/utils";
 import { Popover, PopoverContent, PopoverTrigger } from "@saroh/ui/popover";
@@ -13,7 +14,6 @@ import {
     rangeRefusal,
     WEEK,
 } from "@/lib/services/availability-rules";
-import { clock } from "@/lib/services/diary";
 import { openingNote, whollyOutside } from "@/lib/services/in-person-hours";
 import type { WeeklyRange } from "@/lib/staff/types";
 
@@ -129,12 +129,14 @@ export function WeeklyHours({
                                                 : "px-[11px]",
                                         )}
                                     >
-                                        {clock(r.startMinute)}–
-                                        {clock(r.endMinute)}
+                                        {formatClockRange(
+                                            r.startMinute,
+                                            r.endMinute,
+                                        )}
                                         {canEdit ? (
                                             <button
                                                 type="button"
-                                                aria-label={`Remove ${clock(r.startMinute)} to ${clock(r.endMinute)} on ${name}`}
+                                                aria-label={`Remove ${formatClockRange(r.startMinute, r.endMinute)} on ${name}`}
                                                 onClick={() =>
                                                     onChange(
                                                         hours.filter(
@@ -291,7 +293,7 @@ export function WeeklyHours({
                                     {out
                                         .map(
                                             (b) =>
-                                                `${b.who.split(" ")[0]} ${clock(b.start)}`,
+                                                `${b.who.split(" ")[0]} ${formatClock(b.start)}`,
                                         )
                                         .join(", ")}
                                     . They stay booked; move them if you need

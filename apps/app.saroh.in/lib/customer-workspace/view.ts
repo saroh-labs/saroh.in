@@ -1,8 +1,10 @@
-import { clock } from "@/lib/calendar/layers";
+import { formatDate, formatMonth, formatTime } from "@/lib/format/datetime";
+import { formatMoneyMajor } from "@/lib/format/money";
+import { count as countOf } from "@/lib/format/plural";
 import { goesToAddress } from "@/lib/orders/lifecycle";
 import { methodLabel } from "@/lib/payments/method-words";
 import type { Review } from "@/lib/product-reviews/service";
-import { dayText, money, shortPrice } from "@/lib/subscriptions/view";
+import { shortPrice } from "@/lib/subscriptions/view";
 
 import { addedLine } from "./added";
 import type {
@@ -17,9 +19,6 @@ import type {
 } from "./detail";
 import { packHref } from "./packs";
 import type { CustomerThread } from "./thread";
-import { monthText, whenText } from "./when";
-
-export { monthText, whenText };
 
 /**
  * How Customer Detail says a customer (plan 2026-09-23-003, U18, after
@@ -183,7 +182,7 @@ export function initials(name: string): string {
 /** Money per currency, joined: "₹5,370" or "₹5,370 + $40". */
 export function totals(list: MoneyTotal[]): string {
     return list.length
-        ? list.map((t) => money(t.amount, t.currency)).join(" + ")
+        ? list.map((t) => formatMoneyMajor(t.amount, t.currency)).join(" + ")
         : "—";
 }
 
@@ -240,10 +239,10 @@ export function sinceLine(
         const attended = d.stats.attended;
         return [
             first
-                ? `With ${bizName ?? "you"} since ${dayText(first, tz, now)}`
+                ? `With ${bizName ?? "you"} since ${formatDate(first, tz, { now })}`
                 : "No bookings yet",
             typeof attended === "number"
-                ? `${attended} ${attended === 1 ? "session" : "sessions"} attended`
+                ? `${countOf(attended, "session")} attended`
                 : null,
         ]
             .filter(Boolean)
@@ -258,7 +257,7 @@ export function sinceLine(
     const first = rows.map((o) => o.placedAt).sort()[0];
     const where = Array.from(new Set(rows.map((o) => o.via.storefront.name)));
     return [
-        `Customer since ${monthText(first, tz)}`,
+        `Customer since ${formatMonth(first, tz)}`,
         `buys at ${joinAnd(where)}`,
     ].join(" · ");
 }
@@ -365,8 +364,11 @@ export function orderTiles(d: CustomerDetail, now: Date): Tile[] {
         const sum = same.reduce((n, o) => n + Number(o.total), 0);
         tiles.push({
             label: "Average order",
-            value: money(String(Math.round(sum / same.length)), currency),
-            note: `Across ${same.length} ${same.length === 1 ? "order" : "orders"}`,
+            value: formatMoneyMajor(
+                String(Math.round(sum / same.length)),
+                currency,
+            ),
+            note: `Across ${countOf(same.length, "order")}`,
             opens: null,
         });
     }
@@ -374,8 +376,8 @@ export function orderTiles(d: CustomerDetail, now: Date): Tile[] {
     if (last) {
         tiles.push({
             label: "Last order",
-            value: whenText(last.placedAt, tz, now),
-            note: `${clock(last.placedAt, tz)} at ${last.via.storefront.name}`,
+            value: formatDate(last.placedAt, tz, { now, relative: true }),
+            note: `${formatTime(last.placedAt, tz)} at ${last.via.storefront.name}`,
             opens: "all",
         });
     }
@@ -429,7 +431,7 @@ export function favourites(rows: DetailOrder[]): Favourite[] {
             return {
                 productId,
                 name: f.name,
-                note: `${f.orders} ${f.orders === 1 ? "order" : "orders"}${usual}`,
+                note: `${countOf(f.orders, "order")}${usual}`,
             };
         });
 }
@@ -515,7 +517,7 @@ export function paidText(paid: DetailBooking["paid"]): string | null {
     const how = methodLabel(paid.method) ?? "Online";
     const amount =
         paid.amount && paid.currency
-            ? ` ${money(paid.amount, paid.currency)}`
+            ? ` ${formatMoneyMajor(paid.amount, paid.currency)}`
             : "";
     return `Paid${amount} · ${how}`;
 }
@@ -575,8 +577,8 @@ export function bookingRow(
     const staff = b.staff?.name;
     return {
         id: b.id,
-        day: dayText(b.startAt, b.timezone, now, true),
-        at: clock(b.startAt, b.timezone),
+        day: formatDate(b.startAt, b.timezone, { now, weekday: "short" }),
+        at: formatTime(b.startAt, b.timezone),
         what: b.service.name,
         with: b.isClass
             ? staff
@@ -655,9 +657,9 @@ export function packLines(
                 (Date.parse(p.expiresAt) - now.getTime()) / DAY,
             );
             const soon = !expired && days <= 14;
-            const bought = `bought ${dayText(p.boughtAt, timeZone, now)}${
+            const bought = `bought ${formatDate(p.boughtAt, timeZone, { now })}${
                 p.price && p.currency
-                    ? ` for ${money(p.price, p.currency)}`
+                    ? ` for ${formatMoneyMajor(p.price, p.currency)}`
                     : ""
             }`;
             return {
@@ -667,11 +669,9 @@ export function packLines(
                 pct: Math.round((100 * p.left) / Math.max(1, p.credits)),
                 bar: expired ? "off" : soon ? "accent" : "ok",
                 sub: expired
-                    ? `Ran out ${dayText(p.expiresAt, timeZone, now)} with ${p.left} unused`
-                    : `Use by ${dayText(p.expiresAt, timeZone, now)}${
-                          soon
-                              ? ` — ${days} ${days === 1 ? "day" : "days"} left`
-                              : ""
+                    ? `Ran out ${formatDate(p.expiresAt, timeZone, { now })} with ${p.left} unused`
+                    : `Use by ${formatDate(p.expiresAt, timeZone, { now })}${
+                          soon ? ` — ${countOf(days, "day")} left` : ""
                       } · ${bought}`,
                 warn: soon,
             };
@@ -690,7 +690,7 @@ export function allowanceChangeLine(
 ): string | null {
     const next = m.nextPeriod;
     if (!next) return null;
-    const from = dayText(next.from, timeZone, now);
+    const from = formatDate(next.from, timeZone, { now });
     return next.perMonth === null
         ? `Unlimited classes from ${from}`
         : `${next.perMonth} a month from ${from}`;
@@ -727,7 +727,7 @@ export function subRow(
     timeZone: string,
     now: Date,
 ): SubRow {
-    const day = (at: string) => dayText(at, timeZone, now);
+    const day = (at: string) => formatDate(at, timeZone, { now });
     const status =
         s.status === "CANCELLED"
             ? "Cancelled"
@@ -783,13 +783,15 @@ export function invoiceRow(
     return {
         id: v.id,
         number: v.number ?? "Draft",
-        issued: v.issuedAt ? dayText(v.issuedAt, timeZone, now) : "Draft",
+        issued: v.issuedAt
+            ? formatDate(v.issuedAt, timeZone, { now })
+            : "Draft",
         from: credit
             ? `Credit note${v.orderNumber ? ` · order #${v.orderNumber}` : ""}`
             : invoiceFrom(v, kind),
         status: credit ? "Credit note" : (INVOICE_WORD[v.standing] ?? v.status),
         tone: v.standing === "PAID" && !credit ? "ok" : "off",
-        total: money(v.total, v.currency),
+        total: formatMoneyMajor(v.total, v.currency),
     };
 }
 
@@ -836,7 +838,7 @@ function invoiceFrom(v: DetailInvoice, kind: Kind): string {
 export function owedLine(d: CustomerDetail): string | null {
     const owed = d.stats.owed;
     if (!owed || owed.unpaidCount === 0) return null;
-    return `${owed.unpaidCount} ${owed.unpaidCount === 1 ? "invoice" : "invoices"} unpaid · ${totals(owed.totals)}${
+    return `${countOf(owed.unpaidCount, "invoice")} unpaid · ${totals(owed.totals)}${
         owed.overdueCount ? " — some overdue" : ""
     }`;
 }
@@ -850,7 +852,9 @@ export function offersText(
     now: Date,
 ): string {
     if (!consent?.status) return "Nothing recorded yet.";
-    const on = consent.at ? ` · ${dayText(consent.at, timeZone, now)}` : "";
+    const on = consent.at
+        ? ` · ${formatDate(consent.at, timeZone, { now })}`
+        : "";
     return consent.status === "REVOKED"
         ? `Asked to stop${on}`
         : `Said yes to offers by email${on}`;

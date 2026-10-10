@@ -241,7 +241,7 @@ describe("StorefrontsScreen as a location's own page", () => {
             "Customers come here Yes, they visit It has an address and opening hours, and can offer pick-up. Change",
         );
         expect(t).toContain("Address 12 Hill Road, Bandra Edit");
-        expect(t).toContain("Opening hours Mon–Sat · 9:00 AM – 6:00 PM Edit");
+        expect(t).toContain("Opening hours Mon–Sat · 9:00 am to 6:00 pm Edit");
         expect(t).toContain(
             "Description and logo No description yet · no logo yet Edit",
         );

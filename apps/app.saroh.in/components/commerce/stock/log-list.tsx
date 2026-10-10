@@ -1,5 +1,6 @@
 "use client";
 
+import { formatTime } from "@/lib/format/datetime";
 import { Button } from "@saroh/ui/button";
 import { EmptyState, FailedState } from "@saroh/ui/data-state";
 import { cn } from "@saroh/ui/lib/utils";
@@ -14,7 +15,6 @@ import {
     allStorefrontsWords,
     entryNote,
     entryQuantity,
-    entryTime,
     entryTone,
     entryWho,
     groupByDay,
@@ -245,7 +245,7 @@ export function LogList({
                                             )}
                                         >
                                             <span className="text-[12px] tabular-nums text-muted-foreground max-[759px]:order-1 max-[759px]:shrink-0">
-                                                {entryTime(
+                                                {formatTime(
                                                     e.createdAt,
                                                     timezone,
                                                 )}

@@ -1,5 +1,6 @@
 "use client";
 
+import { count } from "@/lib/format/plural";
 import { EmptyState } from "@saroh/ui/data-state";
 import { cn } from "@saroh/ui/lib/utils";
 import { showError, showUndo } from "@saroh/ui/toast";
@@ -144,7 +145,7 @@ export function AllergensTab({
                     {allergens.map((a) => {
                         const used = a.contains + a.mayContain;
                         const title = used
-                            ? `${a.name} is on ${used} ${used === 1 ? "product" : "products"} — take it off them first`
+                            ? `${a.name} is on ${count(used, "product")} — take it off them first`
                             : `Remove ${a.name}`;
                         return (
                             <li

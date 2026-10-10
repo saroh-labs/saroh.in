@@ -1,5 +1,6 @@
 "use client";
 
+import { formatDateTime } from "@/lib/format/datetime";
 import { Badge } from "@saroh/ui/badge";
 import { Button } from "@saroh/ui/button";
 import { Card, CardContent } from "@saroh/ui/card";
@@ -14,7 +15,6 @@ import { useState, useTransition } from "react";
 import { useBusinessZone } from "@/components/shared/business-zone";
 import { FailedRead } from "@/components/shared/failed-read";
 import { restorePublication } from "@/lib/sites/actions";
-import { exactDate } from "@/lib/sites/format-date";
 import type { RestoreGate, VersionBadgeTone } from "@/lib/sites/release-review";
 import {
     releaseTitle,
@@ -156,7 +156,9 @@ export function SiteVersions({
                                 <div className="min-w-0">
                                     <div className="flex flex-wrap items-center gap-2">
                                         <span className="text-sm font-medium">
-                                            {exactDate(when, zone)}
+                                            {formatDateTime(when, zone, {
+                                                year: "always",
+                                            })}
                                         </span>
                                         {/*
                                          * Live is marked, not implied by
@@ -303,7 +305,7 @@ function RestoreConfirm({
             <p className="text-sm text-muted-foreground">
                 This replaces what visitors see now
                 {current
-                    ? ` (published ${exactDate(current.publishedAt, zone)})`
+                    ? ` (published ${formatDateTime(current.publishedAt, zone, { year: "always" })})`
                     : ""}
                 . Nothing is deleted — this version is published again as a new
                 entry, so you can undo it from this same list. Your unpublished

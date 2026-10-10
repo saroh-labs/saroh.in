@@ -7,6 +7,7 @@ import { SettingsPanelHeader } from "@/components/settings/settings-panel";
 import { useBusinessZone } from "@/components/shared/business-zone";
 import type { PausedTeam } from "@/lib/billing/paused";
 import { NONE_PAUSED, pausedWords, teamOverLimit } from "@/lib/billing/paused";
+import { count } from "@/lib/format/plural";
 import { zodResolver } from "@hookform/resolvers/zod";
 import {
     Avatar,
@@ -305,13 +306,13 @@ export function TeamScreen({
             if (isBuiltIn(key)) return ROLE_BLURB[key];
             if (key === CALENDAR_ONLY_ROLE) return CALENDAR_ONLY_BLURB;
             const n = byKey.get(key)?.actions.length ?? 0;
-            return `Made for ${organizationName}. Whoever holds it can do exactly what was ticked for it — ${n === 1 ? "1 permission" : `${n} permissions`}.`;
+            return `Made for ${organizationName}. Whoever holds it can do exactly what was ticked for it — ${count(n, "permission")}.`;
         },
         plainOf: (key) => {
             if (isBuiltIn(key)) return ROLE_PLAIN[key];
             if (key === CALENDAR_ONLY_ROLE) return CALENDAR_ONLY_PLAIN;
             const n = byKey.get(key)?.actions.length ?? 0;
-            return n === 1 ? "1 permission" : `${n} permissions`;
+            return count(n, "permission");
         },
         withinReach: (key) => {
             const role = byKey.get(key);
@@ -612,7 +613,7 @@ function PeopleTab({
                                         <p className="mt-0.5 truncate text-[11.5px] text-muted-foreground">
                                             {m.email}
                                             {m.role === "REVIEWER"
-                                                ? ` · ${m.siteIds.length} site${m.siteIds.length === 1 ? "" : "s"}`
+                                                ? ` · ${count(m.siteIds.length, "site")}`
                                                 : ""}
                                         </p>
                                         {m.storefronts &&
@@ -1103,7 +1104,7 @@ function RemoveMember({
         showSuccess(
             `${name} removed.`,
             links > 0
-                ? `They can no longer open ${organizationName}, and ${links} share link${links === 1 ? "" : "s"} they made stopped working.`
+                ? `They can no longer open ${organizationName}, and ${count(links, "share link")} they made stopped working.`
                 : `They can no longer open ${organizationName}.`,
         );
         router.refresh();

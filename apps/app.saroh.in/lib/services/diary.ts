@@ -1,3 +1,4 @@
+import { localDateKey, zoneParts } from "@/lib/format/datetime";
 import type { StaffView } from "@/lib/staff/types";
 
 import type {
@@ -28,35 +29,12 @@ const DAY_MINUTES = 1440;
 
 // ── Zones ───────────────────────────────────────────────────────────────────
 
-const partsFormat = new Map<string, Intl.DateTimeFormat>();
-
-function formatFor(timeZone: string): Intl.DateTimeFormat {
-    let format = partsFormat.get(timeZone);
-    if (!format) {
-        format = new Intl.DateTimeFormat("en-US", {
-            timeZone,
-            hourCycle: "h23",
-            year: "numeric",
-            month: "2-digit",
-            day: "2-digit",
-            hour: "2-digit",
-            minute: "2-digit",
-        });
-        partsFormat.set(timeZone, format);
-    }
-    return format;
-}
-
 /** The wall clock of an instant in a zone. */
 function wallClock(ms: number, timeZone: string) {
-    const parts = Object.fromEntries(
-        formatFor(timeZone)
-            .formatToParts(new Date(ms))
-            .map((p) => [p.type, p.value]),
-    );
+    const p = zoneParts(ms, timeZone);
     return {
-        date: `${parts.year}-${parts.month}-${parts.day}`,
-        minute: (Number(parts.hour) % 24) * 60 + Number(parts.minute),
+        date: localDateKey(ms, timeZone),
+        minute: p.hour * 60 + p.minute,
     };
 }
 
@@ -148,74 +126,10 @@ export function monthDays(date: LocalDate): {
     return { days, lead: (weekdayOf(first) + 6) % 7 };
 }
 
-/** "06:00" — the diary's clock, 24-hour like the design. */
-export function clock(minute: number): string {
-    const m = ((minute % DAY_MINUTES) + DAY_MINUTES) % DAY_MINUTES;
-    const h = minute >= DAY_MINUTES ? 24 : Math.floor(m / 60);
-    return `${String(h).padStart(2, "0")}:${String(m % 60).padStart(2, "0")}`;
-}
-
 /** "06:00" → 360. */
 export function minuteOf(time: string): number {
     const [h = "0", m = "0"] = time.split(":");
     return Number(h) * 60 + Number(m);
-}
-
-const WEEKDAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
-const WEEKDAY_NAMES = [
-    "Sunday",
-    "Monday",
-    "Tuesday",
-    "Wednesday",
-    "Thursday",
-    "Friday",
-    "Saturday",
-];
-const MONTHS = [
-    "Jan",
-    "Feb",
-    "Mar",
-    "Apr",
-    "May",
-    "Jun",
-    "Jul",
-    "Aug",
-    "Sep",
-    "Oct",
-    "Nov",
-    "Dec",
-];
-
-/**
- * "Fri 18 Sep". Spelled out rather than `Intl`: ICU versions disagree on
- * "Sep" and "Sept", and the server and the browser must render the same.
- */
-export function dayLabel(date: LocalDate): string {
-    return `${WEEKDAYS[weekdayOf(date)]} ${Number(date.slice(8, 10))} ${MONTHS[Number(date.slice(5, 7)) - 1]}`;
-}
-
-/** "Friday". */
-export function weekdayName(date: LocalDate): string {
-    return WEEKDAY_NAMES[weekdayOf(date)] ?? "";
-}
-
-/** "September 2026". */
-export function monthLabel(date: LocalDate): string {
-    const long = [
-        "January",
-        "February",
-        "March",
-        "April",
-        "May",
-        "June",
-        "July",
-        "August",
-        "September",
-        "October",
-        "November",
-        "December",
-    ];
-    return `${long[Number(date.slice(5, 7)) - 1]} ${date.slice(0, 4)}`;
 }
 
 // ── Spans ───────────────────────────────────────────────────────────────────

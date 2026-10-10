@@ -1,5 +1,6 @@
 "use client";
 
+import { formatDate, formatDateTime } from "@/lib/format/datetime";
 import { Button } from "@saroh/ui/button";
 import { Textarea } from "@saroh/ui/textarea";
 import { showError, showSuccess } from "@saroh/ui/toast";
@@ -7,7 +8,6 @@ import { useState } from "react";
 
 import { useBusinessZone } from "@/components/shared/business-zone";
 import { createComment, setCommentResolved } from "@/lib/sites/actions";
-import { exactDate, shortDate } from "@/lib/sites/format-date";
 import type { SiteCommentView } from "@/lib/sites/service";
 import { EmptyState } from "@saroh/ui/data-state";
 import { Tip } from "@saroh/ui/tooltip";
@@ -147,9 +147,11 @@ export function BlockFeedback({
                             </p>
                             <p
                                 className="text-xs text-muted-foreground"
-                                title={exactDate(c.createdAt, zone)}
+                                title={formatDateTime(c.createdAt, zone, {
+                                    year: "always",
+                                })}
                             >
-                                {shortDate(c.createdAt, zone)}
+                                {formatDate(c.createdAt, zone)}
                             </p>
                             <Button
                                 type="button"
@@ -194,9 +196,13 @@ export function BlockFeedback({
                                     <p className="text-xs font-medium">
                                         {c.author.name} ·{" "}
                                         <span
-                                            title={exactDate(c.createdAt, zone)}
+                                            title={formatDateTime(
+                                                c.createdAt,
+                                                zone,
+                                                { year: "always" },
+                                            )}
                                         >
-                                            {shortDate(c.createdAt, zone)}
+                                            {formatDate(c.createdAt, zone)}
                                         </span>
                                     </p>
                                     <p className="whitespace-pre-line text-[0.8125rem] leading-relaxed">

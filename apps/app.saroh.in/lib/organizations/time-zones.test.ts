@@ -1,8 +1,8 @@
+import { isTimeZone } from "@/lib/format/datetime";
 import { describe, expect, it } from "vitest";
 
 import {
     currentZoneName,
-    isKnownZone,
     timeZoneOptions,
     zoneLabel,
     zoneOption,
@@ -36,7 +36,7 @@ describe("zoneLabel", () => {
     });
 
     it("shows a zone it does not know as stored", () => {
-        expect(isKnownZone("Mars/Olympus")).toBe(false);
+        expect(isTimeZone("Mars/Olympus")).toBe(false);
         expect(zoneLabel("Mars/Olympus")).toBe("Mars/Olympus");
     });
 });

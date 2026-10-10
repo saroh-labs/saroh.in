@@ -1,5 +1,6 @@
 "use client";
 
+import { plural } from "@/lib/format/plural";
 import { Button } from "@saroh/ui/button";
 import { showError, showSuccess, showUndo } from "@saroh/ui/toast";
 import { useRouter } from "next/navigation";
@@ -36,7 +37,7 @@ export function ClosingSection({
     const [open, setOpen] = useState(false);
     const [closing, startClosing] = useTransition();
     const orders = store.orderCount;
-    const kept = `${orders} past ${orders === 1 ? "order stays" : "orders stay"}`;
+    const kept = `${orders} past ${plural(orders, "order stays", "orders stay")}`;
     const paused = Boolean(store.pausedAt);
     const stock = heldStock(store);
     const resume = () => {
@@ -70,7 +71,7 @@ export function ClosingSection({
                 {paused
                     ? `${store.name} is paused: customers can't pay for orders here until you resume it. Everything is kept.`
                     : store.unfulfilled > 0
-                      ? `${pausing} ${store.unfulfilled === 1 ? "One order here is" : `${store.unfulfilled} orders here are`} still to go out, so it can't close until ${store.unfulfilled === 1 ? "that one is" : "they are"} fulfilled or cancelled.`
+                      ? `${pausing} ${store.unfulfilled === 1 ? "One order here is" : `${store.unfulfilled} orders here are`} still to go out, so it can't close until ${plural(store.unfulfilled, "that one is", "they are")} fulfilled or cancelled.`
                       : stock
                         ? `${pausing} ${stock} So it can't close yet: move or count out its stock first.`
                         : orders > 0

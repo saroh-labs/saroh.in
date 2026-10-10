@@ -1,5 +1,6 @@
 "use client";
 
+import { count } from "@/lib/format/plural";
 import { Button } from "@saroh/ui/button";
 import {
     DropdownMenu,
@@ -278,7 +279,7 @@ export function TopBarActions({
                         <span
                             aria-hidden
                             data-flag-dot=""
-                            title={`${p.flagCount} ${p.flagCount === 1 ? "thing" : "things"} worth a look`}
+                            title={`${count(p.flagCount, "thing")} worth a look`}
                             className="ml-1.5 inline-block size-1.5 rounded-full bg-background/80"
                         />
                     ) : null}

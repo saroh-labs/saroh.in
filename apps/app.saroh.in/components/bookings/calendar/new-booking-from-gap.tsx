@@ -5,6 +5,11 @@ import {
     FormSheetBody,
     FormSheetFoot,
 } from "@/components/shared/form-sheet";
+import {
+    formatClock,
+    formatClockRange,
+    formatDay,
+} from "@/lib/format/datetime";
 import { showError, showSuccess, showUndo } from "@saroh/ui/toast";
 import { useRouter } from "next/navigation";
 import { useEffect, useId, useState } from "react";
@@ -29,13 +34,7 @@ import {
     payNote,
 } from "@/lib/services/booking-pay";
 import type { LocalDate, Span } from "@/lib/services/diary";
-import {
-    clock,
-    dayBounds,
-    dayLabel,
-    firstStartIn,
-    zonedInstant,
-} from "@/lib/services/diary";
+import { dayBounds, firstStartIn, zonedInstant } from "@/lib/services/diary";
 import type { Service } from "@/lib/services/service";
 import { addExtraHours, removeExtraHours } from "@/lib/staff/actions";
 import type { StaffView } from "@/lib/staff/types";
@@ -84,7 +83,7 @@ export function NewBookingFromGap({
             title="New booking"
             description={
                 target
-                    ? `With ${target.staff.name} on ${dayLabel(target.date)}. Pick the service, then who it is for.`
+                    ? `With ${target.staff.name} on ${formatDay(target.date, { weekday: "short", year: "never" })}. Pick the service, then who it is for.`
                     : ""
             }
             onClose={onClose}
@@ -195,7 +194,7 @@ function Form({
     const payNow: PayChoice = pay === "LINK" && !offerLink ? "DESK" : pay;
     const booker = bookerFor(pick);
     const ready = Boolean(serviceId) && booker !== null;
-    const when = `${staff.name} · ${dayLabel(date)} at ${clock(at)}`;
+    const when = `${staff.name} · ${formatDay(date, { weekday: "short", year: "never" })} at ${formatClock(at)}`;
 
     async function book() {
         setTried(true);
@@ -224,7 +223,7 @@ function Form({
             router.refresh();
             return;
         }
-        const booked = `Booked ${pick ? pickName(pick) : "them"} with ${staff.name} at ${clock(at)}.`;
+        const booked = `Booked ${pick ? pickName(pick) : "them"} with ${staff.name} at ${formatClock(at)}.`;
         if (payNow === "LINK") {
             const link = await makePayLink(res.data.id);
             setSaving(false);
@@ -245,7 +244,7 @@ function Form({
         onClose();
         router.refresh();
         showUndo(
-            `Closed the extra ${clock(extra.startMinute)}–${clock(extra.endMinute)}.`,
+            `Closed the extra ${formatClockRange(extra.startMinute, extra.endMinute)}.`,
             async () => {
                 const back = await addExtraHours(staff.id, {
                     date,
@@ -302,7 +301,7 @@ function Form({
                                     {s.name} · {s.durationMinutes} min
                                     {price ? ` · ${price}` : ""}
                                     {startOf(s) !== null && startOf(s) !== start
-                                        ? ` · from ${clock(startOf(s) ?? start)}`
+                                        ? ` · from ${formatClock(startOf(s) ?? start)}`
                                         : ""}
                                 </Chip>
                             );
@@ -324,8 +323,8 @@ function Form({
                 ) : anyTooLong ? (
                     <p className="-mt-1.5 mb-3 text-[11.5px] text-muted-foreground">
                         Greyed out: it can&apos;t start in this free time. It is
-                        longer than the time before {clock(free[1])}, or outside
-                        the service&apos;s own hours.
+                        longer than the time before {formatClock(free[1])}, or
+                        outside the service&apos;s own hours.
                     </p>
                 ) : null}
 

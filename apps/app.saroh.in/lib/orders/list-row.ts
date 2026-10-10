@@ -1,5 +1,6 @@
-import { formatMoment } from "@/lib/format/datetime";
+import { formatDateTime } from "@/lib/format/datetime";
 import { formatMoneyMajor } from "@/lib/format/money";
+import { count } from "@/lib/format/plural";
 
 import type { OrderRow } from "./business-service";
 
@@ -106,9 +107,10 @@ export function nextVisitWords(
     now: Date,
 ): string {
     if (!next) return "Next visit not booked";
-    const when = formatMoment(next.startAt, next.timezone, now)
-        .replace(/^Today/, "today")
-        .replace(/^Yesterday/, "yesterday");
+    const when = formatDateTime(next.startAt, next.timezone, {
+        relative: "lower",
+        now,
+    });
     return `Next ${when}`;
 }
 
@@ -223,7 +225,7 @@ export function rowSubline(
     row: Pick<OrderRow, "itemCount" | "store" | "fulfilmentLabel">,
     showStore: boolean,
 ): string {
-    const items = row.itemCount === 1 ? "1 item" : `${row.itemCount} items`;
+    const items = count(row.itemCount, "item");
     return [items, showStore ? row.store.name : null, row.fulfilmentLabel]
         .filter(Boolean)
         .join(" · ");

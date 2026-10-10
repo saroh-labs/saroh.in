@@ -1,5 +1,7 @@
 "use client";
 
+import { formatDate } from "@/lib/format/datetime";
+import { count } from "@/lib/format/plural";
 import { PageSections, SiteTheme } from "@saroh/site-blocks";
 import { Button } from "@saroh/ui/button";
 import { cn } from "@saroh/ui/lib/utils";
@@ -11,7 +13,6 @@ import { useBusinessZone } from "@/components/shared/business-zone";
 import { useSiteFaces } from "@/components/sites/site-faces";
 import { env } from "@/env";
 import { createComment } from "@/lib/sites/actions";
-import { shortDate } from "@/lib/sites/format-date";
 import type { ReviewableSection, SiteCommentView } from "@/lib/sites/service";
 import type { SiteStyle, SiteStyleOptions } from "@/lib/sites/style";
 import { resolveStyleVariables } from "@/lib/sites/style";
@@ -250,7 +251,7 @@ function SectionSlot({
                     ) : null}
                     {openNotes > 0 ? (
                         <span className="rounded bg-background/90 px-2 py-1 text-xs shadow-sm">
-                            {openNotes === 1 ? "1 note" : `${openNotes} notes`}
+                            {count(openNotes, "note")}
                         </span>
                     ) : null}
                     <Button
@@ -295,7 +296,7 @@ function SectionSlot({
                                             {note.author.name}
                                         </span>
                                         <span className="text-[11px] text-muted-foreground">
-                                            {shortDate(note.createdAt, zone)}
+                                            {formatDate(note.createdAt, zone)}
                                             {note.resolvedAt === null
                                                 ? ""
                                                 : " · settled"}

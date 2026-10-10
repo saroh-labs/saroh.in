@@ -1,5 +1,6 @@
 "use client";
 
+import { formatTime, formatWeekday } from "@/lib/format/datetime";
 import { Button } from "@saroh/ui/button";
 import { cn } from "@saroh/ui/lib/utils";
 import Link from "next/link";
@@ -12,10 +13,6 @@ import type {
 import { canCheckIn } from "@/lib/services/booking-state";
 import {
     bookingState,
-    clock,
-    dayLabel,
-    localDateOf,
-    localMinuteOf,
     paidText,
     STATE_LABEL,
     whoFor,
@@ -70,7 +67,7 @@ export function ClassSeats({
         const mark = new Date(start - rule * HOUR);
         note =
             ctx.now < mark.getTime()
-                ? `Classes come back if cancelled before ${dayLabel(localDateOf(mark, ctx.timezone)).split(" ")[0]} ${clock(localMinuteOf(mark, ctx.timezone))}`
+                ? `Classes come back if cancelled before ${formatWeekday(mark, ctx.timezone, "short")} ${formatTime(mark, ctx.timezone)}`
                 : `Past the ${rule}-hour mark — cancelling now uses the class`;
     }
     const seats = [...session.bookings].sort(

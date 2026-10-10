@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 
+import { pinClock } from "@/lib/format/test-clock";
 import {
     checkedLine,
     explainStart,
@@ -11,6 +12,8 @@ import {
     rowInvoice,
     standing,
 } from "./renewal";
+
+pinClock();
 
 const NOW = new Date("2026-09-24T10:00:00Z");
 const base = {

@@ -7,7 +7,7 @@ export function ruleOf(
     d: Pick<Discount, "kind" | "percent" | "amount" | "currency">,
 ): string {
     if (d.kind === "PERCENTAGE") return `${d.percent ?? "?"}% off`;
-    return `${formatMoneyMajor(d.amount ?? "0", d.currency ?? "") ?? d.amount} off`;
+    return `${formatMoneyMajor(d.amount ?? "0", d.currency ?? "")} off`;
 }
 
 /** What the code reaches, in a phrase: "everything", "Hill Road", "3 products". */

@@ -1,6 +1,7 @@
 "use client";
 
 import { OptionSelect } from "@/components/shared/option-select";
+import { plural } from "@/lib/format/plural";
 import { cn } from "@saroh/ui/lib/utils";
 import { useId, useState } from "react";
 
@@ -289,7 +290,7 @@ function RefundDraft({
                                   ? ` Ticking every line refunds the ${format(shipping)} delivery too.`
                                   : ""}
                             {putBackUnits > 0 && stock === "back"
-                                ? ` ${putBackUnits} go${putBackUnits === 1 ? "es" : ""} back in stock when the refund is confirmed.`
+                                ? ` ${putBackUnits} ${plural(putBackUnits, "goes", "go")} back in stock when the refund is confirmed.`
                                 : ""}
                         </p>
                     </>

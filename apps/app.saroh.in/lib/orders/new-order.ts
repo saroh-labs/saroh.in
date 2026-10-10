@@ -7,6 +7,7 @@
  */
 
 import type { CustomerPick } from "@/lib/customers/picker";
+import { count } from "@/lib/format/plural";
 import { METHOD_WORD } from "@/lib/payments/method-words";
 import { providerDisconnected } from "@saroh/ui/lib/state-copy";
 
@@ -259,7 +260,7 @@ export function clashText(
 export function itemCount(lines: readonly CartLine[]): string {
     const n = lines.reduce((sum, l) => sum + l.quantity, 0);
     if (n === 0) return "Nothing yet";
-    return `${n} ${n === 1 ? "item" : "items"}`;
+    return count(n, "item");
 }
 
 /** Add one of a thing, or take one away; a line at 0 goes. */

@@ -429,7 +429,7 @@ describe("a shop customer's overview", () => {
             ["Orders", "2", "1 open, new"],
             ["Spent", "₹1,500", "Including delivery"],
             ["Average order", "₹750", "Across 2 orders"],
-            ["Last order", "Today", "12:44 at Rye & Co."],
+            ["Last order", "Today", "12:44 pm at Rye & Co."],
         ]);
     });
 
@@ -562,7 +562,7 @@ describe("a gym customer's bookings and classes", () => {
         expect(bookingRow(booking(), true, NOW)).toEqual(
             expect.objectContaining({
                 day: "Fri 25 Sep",
-                at: "07:00",
+                at: "7:00 am",
                 what: "HIIT class",
                 with: "Class with Vikram",
                 pay: "Membership credit",

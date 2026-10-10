@@ -1,5 +1,6 @@
 "use client";
 
+import { count } from "@/lib/format/plural";
 import { Badge } from "@saroh/ui/badge";
 import {
     DropdownMenu,
@@ -34,7 +35,7 @@ import { STATUS_LABEL, STATUS_VARIANT, TONE_TEXT } from "./tones";
 
 /** The row's price: the variants' range when they differ. */
 export function priceText(row: CatalogueRow): string {
-    const money = (v: string) => formatMoneyMajor(v, row.currency) ?? "—";
+    const money = (v: string) => formatMoneyMajor(v, row.currency);
     return row.priceRange
         ? `${money(row.priceRange.low)} – ${money(row.priceRange.high)}`
         : money(row.price);
@@ -84,7 +85,7 @@ export function catalogueColumns({
                                 rating ? (
                                     <span
                                         key="rating"
-                                        aria-label={`Rated ${rating.average} from ${rating.count} ${rating.count === 1 ? "review" : "reviews"}`}
+                                        aria-label={`Rated ${rating.average} from ${count(rating.count, "review")}`}
                                     >
                                         ★ {ratingLabel(rating)}
                                     </span>

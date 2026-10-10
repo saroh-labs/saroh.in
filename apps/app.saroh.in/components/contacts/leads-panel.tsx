@@ -1,9 +1,10 @@
+import { formatMoney } from "@/lib/format/money";
 import { Badge } from "@saroh/ui/badge";
 import Link from "next/link";
 
 import { AddLeadDialog } from "@/components/leads/add-lead-dialog";
 import type { ContactDetail } from "@/lib/contacts/service";
-import { formatValue, LEAD_STATUS } from "@/lib/crm/format";
+import { LEAD_STATUS } from "@/lib/crm/format";
 import type { LeadStatus } from "@/lib/leads/service";
 
 import { ContactPanelSection } from "./contact-panel";
@@ -46,7 +47,9 @@ export function LeadsPanel({
         >
             <ul>
                 {(leads ?? []).map((lead) => {
-                    const amount = formatValue(lead.value);
+                    const amount = formatMoney(lead.value, null, {
+                        decimals: "always",
+                    });
                     const status =
                         lead.status in LEAD_STATUS
                             ? LEAD_STATUS[lead.status as LeadStatus]

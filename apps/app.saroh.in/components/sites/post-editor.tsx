@@ -1,6 +1,7 @@
 "use client";
 
 import { EditorLoading } from "@/components/sites/editor-loading";
+import { formatDate, formatDateTime } from "@/lib/format/datetime";
 import { Badge } from "@saroh/ui/badge";
 import { Button } from "@saroh/ui/button";
 import { Input } from "@saroh/ui/input";
@@ -30,7 +31,6 @@ import {
     updatePost,
 } from "@/lib/content/actions";
 import type { PostCategory, PostDetail } from "@/lib/content/service";
-import { exactDate, shortDate } from "@/lib/sites/format-date";
 
 /* On demand and browser-only, for the same reasons as everywhere else it is
    used: the editor is heavy, and it is created in the browser. */
@@ -322,9 +322,9 @@ export function PostEditor({
                         : dirty
                           ? "Unsaved changes"
                           : savedAt
-                            ? `Saved ${shortDate(savedAt, zone)}`
+                            ? `Saved ${formatDate(savedAt, zone)}`
                             : liveAt
-                              ? `Live since ${shortDate(liveAt, zone)}`
+                              ? `Live since ${formatDate(liveAt, zone)}`
                               : ""}
                 </span>
 
@@ -519,7 +519,7 @@ export function PostEditor({
                             <div className="border-t pt-4">
                                 <p className="text-xs text-muted-foreground">
                                     {liveAt
-                                        ? `Live copy published ${exactDate(liveAt, zone)}.`
+                                        ? `Live copy published ${formatDateTime(liveAt, zone, { year: "always" })}.`
                                         : "This post has never been published."}
                                 </p>
                                 <Button

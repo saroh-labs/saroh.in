@@ -3,18 +3,19 @@
 import { useSyncExternalStore } from "react";
 
 import {
-    formatDayHeading,
-    formatMoment,
+    formatDate,
+    formatDateTime,
+    formatMonth,
     formatRecent,
-    formatShortDate,
-    formatShortDateTime,
+    formatTime,
+    viewerTimeZone,
 } from "@/lib/format/datetime";
 
 /**
  * A date shown in the VIEWER'S timezone, without breaking hydration.
  *
- * Every `toLocaleDateString` without an explicit `timeZone` silently uses the
- * runtime's own zone. In production the server runs in UTC and the merchant does
+ * A date written without an explicit zone silently uses the runtime's own.
+ * In production the server runs in UTC and the merchant does
  * not, so an instant late in their evening renders as one day on the server and
  * the next in the browser — React fails hydration on the mismatch and throws the
  * whole tree away.
@@ -36,7 +37,6 @@ import {
  */
 const noop = () => undefined;
 const subscribe = () => noop;
-const getTimeZone = () => Intl.DateTimeFormat().resolvedOptions().timeZone;
 const getServerTimeZone = () => "UTC";
 
 export function ViewerDate({
@@ -53,8 +53,10 @@ export function ViewerDate({
      */
     timeZone?: string;
     /**
-     * `heading` says "Today" / "Tomorrow" where it applies; `short` is a date;
-     * `datetime` adds the time, for a timeline where the hour matters.
+     * `short` is a date ("12 Oct", with the year when it is not this one);
+     * `heading` says "Today" / "Tomorrow" where it applies; `datetime` adds
+     * the time ("12 Oct, 9:30 am"), for a timeline where the hour matters.
+     * The words themselves are `lib/format/datetime.ts`'s.
      */
     variant?:
         | "short"
@@ -63,9 +65,9 @@ export function ViewerDate({
         | "dayMonth"
         | "dayMonthLong"
         | "time"
-        // "Today, 09:14" — a step on a timeline (Order Detail).
+        // "Today, 9:14 am": a step on a timeline (Order Detail).
         | "moment"
-        // "Today 09:14", "Yesterday", "22 Sep" — a log line (Settings ›
+        // "Today, 9:14 am", "Yesterday", "22 Sep": a log line (Settings ›
         // Activity).
         | "recent"
         // "August 2026".
@@ -74,44 +76,37 @@ export function ViewerDate({
 }) {
     const viewerZone = useSyncExternalStore(
         subscribe,
-        getTimeZone,
+        viewerTimeZone,
         getServerTimeZone,
     );
     const timeZone = fixedZone ?? viewerZone;
 
     const text =
         variant === "moment"
-            ? formatMoment(iso, timeZone)
+            ? formatDateTime(iso, timeZone, { relative: true })
             : variant === "recent"
               ? formatRecent(iso, timeZone)
               : variant === "monthYear"
-                ? new Intl.DateTimeFormat("en-GB", {
-                      month: "long",
-                      year: "numeric",
-                      timeZone,
-                  }).format(new Date(iso))
+                ? formatMonth(iso, timeZone)
                 : variant === "heading"
-                  ? formatDayHeading(iso, timeZone)
+                  ? formatDate(iso, timeZone, {
+                        weekday: "short",
+                        relative: true,
+                    })
                   : variant === "datetime"
-                    ? formatShortDateTime(iso, timeZone)
+                    ? formatDateTime(iso, timeZone)
                     : variant === "dayMonth"
-                      ? // "18 Sep" — a stat tile's figure, where the year is noise. Three
-                        // letters every month (ICU writes "Sept"), as the design does.
-                        dayMonth(iso, timeZone)
+                      ? // "18 Sep": a stat tile's figure, where the year is noise.
+                        formatDate(iso, timeZone, { year: "never" })
                       : variant === "dayMonthLong"
-                        ? // "2 September" — said in a sentence.
-                          new Intl.DateTimeFormat("en-GB", {
-                              day: "numeric",
+                        ? // "2 September": said in a sentence.
+                          formatDate(iso, timeZone, {
                               month: "long",
-                              timeZone,
-                          }).format(new Date(iso))
+                              year: "never",
+                          })
                         : variant === "time"
-                          ? new Intl.DateTimeFormat("en-GB", {
-                                hour: "2-digit",
-                                minute: "2-digit",
-                                timeZone,
-                            }).format(new Date(iso))
-                          : formatShortDate(iso, timeZone);
+                          ? formatTime(iso, timeZone)
+                          : formatDate(iso, timeZone);
 
     return (
         // `<time dateTime>` carries the exact instant regardless of how the
@@ -121,33 +116,4 @@ export function ViewerDate({
             {text}
         </time>
     );
-}
-
-const MONTHS = [
-    "Jan",
-    "Feb",
-    "Mar",
-    "Apr",
-    "May",
-    "Jun",
-    "Jul",
-    "Aug",
-    "Sep",
-    "Oct",
-    "Nov",
-    "Dec",
-];
-
-function dayMonth(iso: string, timeZone: string): string {
-    const parts = new Intl.DateTimeFormat("en-GB", {
-        day: "numeric",
-        month: "numeric",
-        timeZone,
-    }).formatToParts(new Date(iso));
-    // en-GB pads a numeric day with numeric month ("02"); the design doesn't.
-    const day = String(
-        Number(parts.find((p) => p.type === "day")?.value ?? ""),
-    );
-    const month = Number(parts.find((p) => p.type === "month")?.value ?? "1");
-    return `${day} ${MONTHS[month - 1] ?? ""}`;
 }

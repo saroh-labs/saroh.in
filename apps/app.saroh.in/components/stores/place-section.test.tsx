@@ -258,7 +258,7 @@ describe("The place's rows", () => {
         expect(says("name")).toBe("Hill Road");
         expect(says("kind")).toBe("Yes, they visit");
         expect(says("address")).toBe("12 Hill Road, Bandra");
-        expect(says("hours")).toBe("Mon–Sat · 9:00 AM – 6:00 PM");
+        expect(says("hours")).toBe("Mon–Sat · 9:00 am to 6:00 pm");
         expect(says("details")).toBe("No description yet · no logo yet");
         expect(sheet()).toBeNull();
         expect(host.querySelector("input, textarea, form")).toBeNull();
@@ -596,7 +596,7 @@ describe("the Opening hours sheet", () => {
         });
         expect(showSuccess).toHaveBeenCalledWith("Opening hours saved");
         expect(sheet()).toBeNull();
-        expect(says("hours")).toBe("Mon–Fri · 9:00 AM – 6:00 PM");
+        expect(says("hours")).toBe("Mon–Fri · 9:00 am to 6:00 pm");
     });
 
     it("never saved: Set hours starts from a week, and Save keeps it as it stands", async () => {
@@ -608,7 +608,7 @@ describe("the Opening hours sheet", () => {
         );
         await press(item("Save"));
         expect(update).toHaveBeenCalledWith(hill.id, { openingHours: WEEK });
-        expect(says("hours")).toBe("Mon–Sat · 9:00 AM – 6:00 PM");
+        expect(says("hours")).toBe("Mon–Sat · 9:00 am to 6:00 pm");
     });
 
     it("Cancel saves nothing; Save with nothing changed sends nothing", async () => {
@@ -616,7 +616,7 @@ describe("the Opening hours sheet", () => {
         await press(edit("Edit opening hours"));
         await press(item("Every day"));
         await press(item("Cancel"));
-        expect(says("hours")).toBe("Mon–Sat · 9:00 AM – 6:00 PM");
+        expect(says("hours")).toBe("Mon–Sat · 9:00 am to 6:00 pm");
         expect(document.activeElement).toBe(edit("Edit opening hours"));
         await press(edit("Edit opening hours"));
         expect(item("Mon–Sat")?.getAttribute("data-state")).toBe("on");

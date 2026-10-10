@@ -1,5 +1,4 @@
-import { shortDate } from "@/lib/sites/format-date";
-
+import { formatDate } from "@/lib/format/datetime";
 import type { DomainCheckFailure, SiteDomain } from "./service";
 
 /**
@@ -200,7 +199,7 @@ export function checkLine(
     if (scene === "waiting") return txtCheckLine(domain, zone);
     const checkedAt = domain.hosting?.checkedAt ?? null;
     const problem = domain.hosting?.problem ?? null;
-    const when = checkedAt ? shortDate(checkedAt, zone) : null;
+    const when = checkedAt ? formatDate(checkedAt, zone) : null;
     switch (scene) {
         case "not-pointed":
             if (!when) return "Add the record, then check.";
@@ -224,7 +223,7 @@ function txtCheckLine(
     if (!domain.lastCheckedAt) {
         return "Not checked yet. Add the record, then check.";
     }
-    const when = shortDate(domain.lastCheckedAt, zone);
+    const when = formatDate(domain.lastCheckedAt, zone);
     switch (checkFailure(domain.lastCheckResult)) {
         case "WRONG_VALUE":
             return `Checked ${when}: a record exists, but its value does not match. Copy the value again, exactly, and replace what is there.`;

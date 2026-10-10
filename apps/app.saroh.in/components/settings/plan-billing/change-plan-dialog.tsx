@@ -1,5 +1,6 @@
 "use client";
 
+import { formatDate, viewerTimeZone } from "@/lib/format/datetime";
 import { Button } from "@saroh/ui/button";
 import {
     Dialog,
@@ -19,7 +20,6 @@ import { useEffect, useState, useTransition } from "react";
 
 import { OptionSelect } from "@/components/shared/option-select";
 import { ViewerDate } from "@/components/shared/viewer-date";
-import { formatShortDate } from "@/lib/format/datetime";
 import { GST_STATES } from "@/lib/invoices/gst";
 import {
     changePlanAction,
@@ -165,11 +165,11 @@ export function ChangePlanDialog({
                 return;
             }
             if (res.data.kind === "TO_FREE") {
-                const zone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+                const zone = viewerTimeZone();
                 const on = new Date(res.data.effectiveAt) > new Date();
                 showSuccess(
                     on
-                        ? `You'll move to ${picked.name} on ${formatShortDate(res.data.effectiveAt, zone)}. Everything stays until then.`
+                        ? `You'll move to ${picked.name} on ${formatDate(res.data.effectiveAt, zone)}. Everything stays until then.`
                         : `You're on ${picked.name} from today.`,
                 );
                 onClose();

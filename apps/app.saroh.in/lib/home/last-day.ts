@@ -1,4 +1,6 @@
+import { formatDay } from "@/lib/format/datetime";
 import { formatMoney } from "@/lib/format/money";
+import { count } from "@/lib/format/plural";
 import { kindOf } from "@/lib/organizations/kind";
 
 import type { HomeLastDay, HomeSinceItem } from "./service";
@@ -57,16 +59,11 @@ export function dateLine(
     if (!lastDay) return where;
     if (lastDay.fresh) return firstRunLine(businessName, kind);
     // The date is already the business's; read it as a calendar day.
-    const day = new Intl.DateTimeFormat("en-GB", {
-        timeZone: "UTC",
+    const day = formatDay(lastDay.date, {
         weekday: "long",
-        day: "numeric",
         month: "long",
-    })
-        .format(new Date(`${lastDay.date}T00:00:00Z`))
-        // en-GB writes "Friday 18 September" or, in some ICU builds,
-        // "Friday, 18 September"; the design has no comma.
-        .replace(",", "");
+        year: "never",
+    });
     return `${day} · ${where}`;
 }
 
@@ -82,18 +79,15 @@ function firstRunLine(name: string, kind: unknown): string {
     }
 }
 
-const plural = (n: number, one: string, many: string) =>
-    `${n} ${n === 1 ? one : many}`;
-
 /** What one figure says: "3 new orders", "₹12,400 taken". */
 export function sinceLabel(item: HomeSinceItem): string {
     switch (item.kind) {
         case "ORDERS":
-            return plural(item.count, "new order", "new orders");
+            return count(item.count, "new order", "new orders");
         case "BOOKINGS":
-            return plural(item.count, "new booking", "new bookings");
+            return count(item.count, "new booking", "new bookings");
         case "REVIEWS":
-            return plural(item.count, "review", "reviews");
+            return count(item.count, "review", "reviews");
         case "PAYMENTS":
             return `${formatMoney(item.amountMinor, item.currency) ?? item.count} taken`;
     }

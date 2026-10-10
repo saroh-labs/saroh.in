@@ -1,5 +1,6 @@
 "use client";
 
+import { formatDate, formatDateTime, formatTime } from "@/lib/format/datetime";
 import { Button } from "@saroh/ui/button";
 import { Checkbox } from "@saroh/ui/checkbox";
 import { Label } from "@saroh/ui/label";
@@ -256,7 +257,7 @@ export function NewBookingDialog({
         }
         showSuccess(
             "Visit booked.",
-            `Visit ${v.visitNumber} of ${v.visits} for ${v.who}, ${dayTime(picked, service.timezone)}.`,
+            `Visit ${v.visitNumber} of ${v.visits} for ${v.who}, ${formatDateTime(picked, service.timezone, { weekday: "short" })}.`,
         );
         close();
         router.refresh();
@@ -304,7 +305,7 @@ export function NewBookingDialog({
             const link = await makePayLink(res.data.id);
             setSaving(false);
             setDone({
-                booked: `${whom} booked for ${service.name}, ${dayTime(picked, service.timezone)}.`,
+                booked: `${whom} booked for ${service.name}, ${formatDateTime(picked, service.timezone, { weekday: "short" })}.`,
                 bookingId: res.data.id,
                 link,
             });
@@ -315,8 +316,8 @@ export function NewBookingDialog({
         showSuccess(
             "Booking created.",
             paying
-                ? `${whom} for ${service.name}, ${dayTime(picked, service.timezone)}, paid with ${pack.pack.name}.`
-                : `${whom} for ${service.name}, ${dayTime(picked, service.timezone)}.`,
+                ? `${whom} for ${service.name}, ${formatDateTime(picked, service.timezone, { weekday: "short" })}, paid with ${pack.pack.name}.`
+                : `${whom} for ${service.name}, ${formatDateTime(picked, service.timezone, { weekday: "short" })}.`,
         );
         close();
         setPicked(null);
@@ -466,7 +467,7 @@ export function NewBookingDialog({
                                                                 : "border-border hover:border-border-strong hover:bg-accent",
                                                         )}
                                                     >
-                                                        {clockTime(
+                                                        {formatTime(
                                                             slot.startAt,
                                                             service?.timezone ??
                                                                 "UTC",
@@ -596,39 +597,11 @@ export function NewBookingDialog({
 /** Slots grouped under the day they fall on in the service's own zone. */
 function groupByDay(slots: Slot[], timeZone: string): [string, Slot[]][] {
     const days = new Map<string, Slot[]>();
-    const label = new Intl.DateTimeFormat("en-GB", {
-        timeZone,
-        weekday: "short",
-        day: "numeric",
-        month: "short",
-    });
     for (const slot of slots) {
-        const key = label.format(new Date(slot.startAt));
+        const key = formatDate(slot.startAt, timeZone, { weekday: "short" });
         const list = days.get(key);
         if (list) list.push(slot);
         else days.set(key, [slot]);
     }
     return Array.from(days.entries());
-}
-
-/** "Tue 23 Sept, 10:00", in the service's own zone. */
-function dayTime(iso: string, timeZone: string): string {
-    return new Intl.DateTimeFormat("en-GB", {
-        timeZone,
-        weekday: "short",
-        day: "numeric",
-        month: "short",
-        hour: "2-digit",
-        minute: "2-digit",
-        hourCycle: "h23",
-    }).format(new Date(iso));
-}
-
-function clockTime(iso: string, timeZone: string): string {
-    return new Intl.DateTimeFormat("en-GB", {
-        timeZone,
-        hour: "2-digit",
-        minute: "2-digit",
-        hourCycle: "h23",
-    }).format(new Date(iso));
 }

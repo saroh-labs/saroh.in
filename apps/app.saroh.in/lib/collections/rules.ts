@@ -1,5 +1,5 @@
+import { count } from "@/lib/format/plural";
 import type { ProductPlacement } from "@/lib/products/overview-rules";
-import { plural } from "@/lib/products/overview-rules";
 
 import type {
     CollectionKind,
@@ -26,10 +26,10 @@ export function collectionNote(c: {
     productCount: number;
     category: { name: string } | null;
 }): string {
-    const count = plural(c.productCount, "product");
+    const products = count(c.productCount, "product");
     return c.kind === "AUTOMATIC"
-        ? `${count} · fills itself: everything in ${c.category?.name ?? "its category"}`
-        : `${count} · picked by hand`;
+        ? `${products} · fills itself: everything in ${c.category?.name ?? "its category"}`
+        : `${products} · picked by hand`;
 }
 
 /**
@@ -123,7 +123,7 @@ export function ruleNote(
     if (!name) return "Pick the category it fills itself from.";
     const inside = childCount(categories, categoryId);
     return inside > 0
-        ? `Everything in ${name} and the ${plural(inside, "category", "categories")} inside it. Products join and leave as their category changes.`
+        ? `Everything in ${name} and the ${count(inside, "category", "categories")} inside it. Products join and leave as their category changes.`
         : `Everything in ${name}. Products join and leave as their category changes.`;
 }
 

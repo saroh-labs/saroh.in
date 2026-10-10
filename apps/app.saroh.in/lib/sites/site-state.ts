@@ -1,3 +1,4 @@
+import { count } from "@/lib/format/plural";
 import { pendingChangeCount } from "@/lib/sites/pending";
 import type { SiteSummary } from "@/lib/sites/service";
 
@@ -48,7 +49,7 @@ export function siteState(
     );
     if (pending > 0) {
         return {
-            label: `Live · ${pending} thing${pending === 1 ? "" : "s"} to look at`,
+            label: `Live · ${count(pending, "thing")} to look at`,
             tone: "attention",
         };
     }

@@ -188,8 +188,8 @@ describe("dayCards", () => {
             money: false,
         });
         expect(cards.map((c) => [c.at, c.title])).toEqual([
-            ["08:05", "Order #1020 · Kabir"],
-            ["11:30", "Order #1021 · Meera"],
+            ["8:05 am", "Order #1020 · Kabir"],
+            ["11:30 am", "Order #1021 · Meera"],
             // A pick-up has no time: its layer's name stands in.
             ["Pick-ups", "Collects · Asha Rao"],
         ]);
@@ -201,7 +201,7 @@ describe("dayCards", () => {
         expect(cards[2].href).toBe("/billing/subscriptions/s1");
         // The tooltip keeps the whole line.
         expect(cards[0].full).toBe(
-            "Order #1020 · Kabir · Placed 08:05 · coming up",
+            "Order #1020 · Kabir · Placed 8:05 am · coming up",
         );
     });
 
@@ -231,7 +231,7 @@ describe("dayCards", () => {
             money: false,
         });
         expect(card).toMatchObject({
-            at: "07:00",
+            at: "7:00 am",
             title: "Personal training",
             flag: { label: "No-show", tone: "bad" },
             href: "/bookings/b1",

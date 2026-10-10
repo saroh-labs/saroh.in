@@ -1,5 +1,7 @@
 "use client";
 
+import { formatMoneyMajor } from "@/lib/format/money";
+import { plural } from "@/lib/format/plural";
 import { Button } from "@saroh/ui/button";
 import { EmptyState } from "@saroh/ui/data-state";
 import { cn } from "@saroh/ui/lib/utils";
@@ -22,12 +24,7 @@ import type {
     SubscriptionSettings,
 } from "@/lib/subscriptions/service";
 import type { ListTab, ScreenTab } from "@/lib/subscriptions/view";
-import {
-    listTab,
-    money,
-    monthlyTotal,
-    TAB_LABEL,
-} from "@/lib/subscriptions/view";
+import { listTab, monthlyTotal, TAB_LABEL } from "@/lib/subscriptions/view";
 
 import { Notice } from "@saroh/ui/notice";
 import { TabStrip } from "@saroh/ui/tabs";
@@ -143,7 +140,9 @@ export function SubscriptionsScreen({
     );
     const running = subscriptions.filter((s) => listTab(s) === "active");
     const total = monthlyTotal(subscriptions);
-    const monthly = total ? money(total.amount, total.currency) : null;
+    const monthly = total
+        ? formatMoneyMajor(total.amount, total.currency)
+        : null;
     const plans = planRead ?? [];
     const onPlans = tab === "plans";
     const peek = subscriptions.find((s) => s.id === peekId) ?? null;
@@ -267,7 +266,7 @@ export function SubscriptionsScreen({
                                             ? "renewal isn't"
                                             : "renewals aren't"}{" "}
                                         paid and{" "}
-                                        {failed === 1 ? "needs" : "need"} you.
+                                        {plural(failed, "needs", "need")} you.
                                     </span>
                                     <Button
                                         variant="outline"

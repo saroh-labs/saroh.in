@@ -1,5 +1,6 @@
 "use client";
 
+import { plural } from "@/lib/format/plural";
 import { cn } from "@saroh/ui/lib/utils";
 import type { ToastId } from "@saroh/ui/toast";
 import { dismissToast, showError, showUndo } from "@saroh/ui/toast";
@@ -238,7 +239,7 @@ export function AttentionCard({
                                 className="size-[13px] shrink-0"
                             />
                             {hidden}. Only people who can edit customers can
-                            read {state.hiddenCount === 1 ? "it" : "them"}.
+                            read {plural(state.hiddenCount, "it", "them")}.
                         </p>
                     ) : null}
                     {!canWrite ? (

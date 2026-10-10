@@ -1,5 +1,6 @@
 "use client";
 
+import { formatDate } from "@/lib/format/datetime";
 import { Button } from "@saroh/ui/button";
 import { cn } from "@saroh/ui/lib/utils";
 import Link from "next/link";
@@ -20,7 +21,6 @@ import {
     packLines,
     upcomingOf,
 } from "@/lib/customer-workspace/view";
-import { dayText } from "@/lib/subscriptions/view";
 
 import { TextLink } from "@saroh/ui/text-link";
 import { Tip } from "@saroh/ui/tooltip";
@@ -285,7 +285,7 @@ function ClassesLeft({
                             >
                                 {m.paused
                                     ? "Paused — classes start again when it resumes."
-                                    : `Classes this month · resets ${dayText(m.resetsAt, d.timezone, now)}, unused ones don't carry over`}
+                                    : `Classes this month · resets ${formatDate(m.resetsAt, d.timezone, { now })}, unused ones don't carry over`}
                             </div>
                             {change ? (
                                 <div className="mt-0.5 text-[12px] text-muted-foreground">

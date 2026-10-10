@@ -75,7 +75,7 @@ export function savedFee(store: Store, type: Way): string | null {
 }
 
 const money = (amount: string, currency: string) =>
-    formatMoneyMajor(amount, currency) ?? amount;
+    formatMoneyMajor(amount, currency);
 
 function lateOf(store: Store, type: Way): number {
     return (store.lateAfterMinutes ?? DEFAULT_LATE_AFTER)[type];

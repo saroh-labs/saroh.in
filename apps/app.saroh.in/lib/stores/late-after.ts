@@ -1,3 +1,4 @@
+import { plural } from "@/lib/format/plural";
 import type { StorefrontFulfilmentType } from "./fulfilment-types";
 
 /**
@@ -77,5 +78,5 @@ export function lateAfterMinutes(
 export function lateAfterWords(minutes: number): string {
     const { amount, unit } = lateAfterField(minutes);
     const n = Number(amount);
-    return `${amount} ${n === 1 ? unit.slice(0, -1) : unit}`;
+    return `${amount} ${plural(n, unit.slice(0, -1), unit)}`;
 }

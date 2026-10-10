@@ -79,7 +79,7 @@ export function TakePayment({
     // What is wrong with the cash given is said once the button is pressed.
     const [tried, setTried] = useState(false);
 
-    const format = (cents: number) => formatMoney(cents, currency) ?? "";
+    const format = (cents: number) => formatMoney(cents, currency);
     const amount = format(take.cents);
     const choices = deskChoices({ take, canLink, online });
     const change = deskChange(given, take.cents);

@@ -1,5 +1,10 @@
-import { DISPLAY_LOCALE } from "@/lib/format/locale";
-import { invoiceMoney } from "@/lib/invoices/money";
+import {
+    formatDate,
+    formatRelative,
+    formatWeekday,
+} from "@/lib/format/datetime";
+import { formatMoneyMajor } from "@/lib/format/money";
+import { count } from "@/lib/format/plural";
 
 import type { Interval, Renewals, Subscription } from "./service";
 
@@ -33,19 +38,6 @@ export type Standing = "ACTIVE" | "OVERDUE" | "PAUSED" | "CANCELLED";
 
 const DAY = 86_400_000;
 
-function day(iso: string, timeZone: string): string {
-    return (
-        new Intl.DateTimeFormat(DISPLAY_LOCALE, {
-            timeZone,
-            day: "numeric",
-            month: "short",
-        })
-            .format(new Date(iso))
-            // ICU writes "Sept"; the designs write three letters every month.
-            .replace("Sept", "Sep")
-    );
-}
-
 export function intervalWords(interval: Interval): {
     adj: string;
     per: string;
@@ -74,37 +66,41 @@ export function standing(sub: Pick<Sub, "status" | "overdue">): Standing {
 export function nextLine(sub: Sub, now: Date = new Date()): string {
     const tz = sub.timezone;
     if (sub.status === "CANCELLED") {
-        return sub.cancelledAt ? `Ended ${day(sub.cancelledAt, tz)}` : "Ended";
+        return sub.cancelledAt
+            ? `Ended ${formatDate(sub.cancelledAt, tz, { now })}`
+            : "Ended";
     }
     if (sub.status === "PAUSED") {
         // A pause with an end date resumes on its own that day (D8).
         if (sub.pausedUntil) {
-            const until = day(sub.pausedUntil, tz);
+            const until = formatDate(sub.pausedUntil, tz, { now });
             return Date.parse(sub.pausedUntil) <= now.getTime()
                 ? `Pause ended ${until}`
                 : `Paused until ${until}`;
         }
         return sub.pausedAt
-            ? `Paused since ${day(sub.pausedAt, tz)}`
+            ? `Paused since ${formatDate(sub.pausedAt, tz, { now })}`
             : "Paused";
     }
-    if (sub.startsAt) return `Starts ${day(sub.startsAt, tz)}`;
-    if (sub.endsAt) return `Ends ${day(sub.endsAt, tz)}`;
-    return sub.nextRenewalAt ? `Renews ${day(sub.nextRenewalAt, tz)}` : "—";
+    if (sub.startsAt) return `Starts ${formatDate(sub.startsAt, tz, { now })}`;
+    if (sub.endsAt) return `Ends ${formatDate(sub.endsAt, tz, { now })}`;
+    return sub.nextRenewalAt
+        ? `Renews ${formatDate(sub.nextRenewalAt, tz, { now })}`
+        : "—";
 }
 
 /** The day the current period ends, in its own timezone: "1 Oct". */
 export function periodEndDay(
     sub: Pick<Subscription, "currentPeriodEnd" | "timezone">,
 ): string {
-    return day(sub.currentPeriodEnd, sub.timezone);
+    return formatDate(sub.currentPeriodEnd, sub.timezone);
 }
 
 /** "2 invoices overdue · ₹3,000.00", or null when nothing is overdue. */
 export function owedLine(sub: Sub): string | null {
     if (!sub.overdue || sub.overdueCount === 0) return null;
     const n = sub.overdueCount;
-    return `${n} ${n === 1 ? "invoice" : "invoices"} overdue · ${invoiceMoney(sub.unpaidTotal, sub.currency)}`;
+    return `${count(n, "invoice")} overdue · ${formatMoneyMajor(sub.unpaidTotal, sub.currency, { decimals: "always" })}`;
 }
 
 /** Under the latest invoice's number: how late, when paid, or when due. */
@@ -115,12 +111,14 @@ export function latestInvoiceNote(
     const inv = sub.latestInvoice;
     if (!inv) return null;
     if (inv.status === "PAID") {
-        return inv.paidAt ? `Paid ${day(inv.paidAt, sub.timezone)}` : "Paid";
+        return inv.paidAt
+            ? `Paid ${formatDate(inv.paidAt, sub.timezone, { now })}`
+            : "Paid";
     }
     if (!inv.dueAt) return "Not paid yet";
     const late = Math.floor((now.getTime() - Date.parse(inv.dueAt)) / DAY);
-    if (late > 0) return `${late} ${late === 1 ? "day" : "days"} past due`;
-    return `Due ${day(inv.dueAt, sub.timezone)}`;
+    if (late > 0) return `${count(late, "day")} past due`;
+    return `Due ${formatDate(inv.dueAt, sub.timezone, { now })}`;
 }
 
 /**
@@ -144,10 +142,7 @@ export function rowInvoice(
         return {
             id,
             number,
-            note:
-                late > 0
-                    ? `${late} ${late === 1 ? "day" : "days"} past due`
-                    : "Past due",
+            note: late > 0 ? `${count(late, "day")} past due` : "Past due",
         };
     }
     const latest = sub.latestInvoice;
@@ -188,15 +183,6 @@ function boundary(anchor: Ymd, interval: Interval, n: number): Ymd {
     return { y, m, d: Math.min(anchor.d, last) };
 }
 
-const short = (v: Ymd) =>
-    new Intl.DateTimeFormat(DISPLAY_LOCALE, {
-        timeZone: "UTC",
-        day: "numeric",
-        month: "short",
-    })
-        .format(new Date(toUtc(v)))
-        .replace("Sept", "Sep");
-
 function ordinal(n: number): string {
     const tail =
         n % 100 >= 11 && n % 100 <= 13
@@ -223,36 +209,26 @@ export function explainStart(
     }
     const start = boundary(anchor, interval, n);
     const end = fromUtc(toUtc(boundary(anchor, interval, n + 1)) - DAY);
-    const span = `${short(start)} to ${short(end)}`;
+    const span = `${formatDate(toUtc(start), "UTC", { now: toUtc(now) })} to ${formatDate(toUtc(end), "UTC", { now: toUtc(now) })}`;
     const renews =
         interval === "WEEK"
-            ? `every ${new Intl.DateTimeFormat(DISPLAY_LOCALE, { timeZone: "UTC", weekday: "long" }).format(new Date(toUtc(anchor)))}`
+            ? `every ${formatWeekday(toUtc(anchor), "UTC")}`
             : `on the ${ordinal(anchor.d)}`;
 
     if (toUtc(anchor) > toUtc(now)) {
-        return `Nothing is billed until then. The first invoice is issued on ${short(start)}, for ${span}, and it renews ${renews} after that.`;
+        return `Nothing is billed until then. The first invoice is issued on ${formatDate(toUtc(start), "UTC", { now: toUtc(now) })}, for ${span}, and it renews ${renews} after that.`;
     }
     if (n === 0) {
         return `The first invoice is issued now, for ${span}. It renews ${renews} after that.`;
     }
     const kept =
         interval === "WEEK"
-            ? `It keeps ${new Intl.DateTimeFormat(DISPLAY_LOCALE, { timeZone: "UTC", weekday: "long" }).format(new Date(toUtc(anchor)))} as its renewal day.`
+            ? `It keeps ${formatWeekday(toUtc(anchor), "UTC")} as its renewal day.`
             : `It keeps the ${ordinal(anchor.d)} as its renewal day.`;
     return `${kept} Only the period holding today, ${span}, is invoiced now — the ${interval === "WEEK" ? "weeks" : "months"} before are not billed.`;
 }
 
 // — The renewal job ————————————————————————————————————————————
-
-function ago(ms: number): string {
-    const minutes = Math.max(1, Math.round(ms / 60_000));
-    if (minutes < 60)
-        return `${minutes} ${minutes === 1 ? "minute" : "minutes"} ago`;
-    const hours = Math.round(minutes / 60);
-    if (hours < 48) return `${hours} ${hours === 1 ? "hour" : "hours"} ago`;
-    const days = Math.round(hours / 24);
-    return `${days} days ago`;
-}
 
 /**
  * Whether renewals are behind: never checked, or the next check is more than
@@ -274,11 +250,11 @@ export function checkedLine(r: Renewals, now: Date = new Date()): string {
     if (!r.lastCheckedAt) {
         return "Renewals have not been checked yet. Invoices go out when they are.";
     }
-    const last = `Renewals last checked ${ago(now.getTime() - Date.parse(r.lastCheckedAt))}.`;
+    const last = `Renewals last checked ${formatRelative(r.lastCheckedAt, now)}.`;
     const went =
         r.issuedToday === 0
             ? "None went out today"
-            : `${r.issuedToday} ${r.issuedToday === 1 ? "invoice" : "invoices"} went out today`;
+            : `${count(r.issuedToday, "invoice")} went out today`;
     const next = renewalsLate(r, now)
         ? "the next check is late"
         : "the next check is within the hour";

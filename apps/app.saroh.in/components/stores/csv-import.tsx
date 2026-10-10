@@ -1,5 +1,6 @@
 "use client";
 
+import { count } from "@/lib/format/plural";
 import { Badge } from "@saroh/ui/badge";
 import { Button } from "@saroh/ui/button";
 import { Card, CardContent } from "@saroh/ui/card";
@@ -293,8 +294,7 @@ export function CsvImport({
                     {result.failed > 0 ? (
                         <div className="space-y-2">
                             <p className="text-sm font-medium">
-                                {result.failed} row
-                                {result.failed === 1 ? "" : "s"} could not be
+                                {count(result.failed, "row")} could not be
                                 imported. Fix these in your file and import it
                                 again — rows that already succeeded will be
                                 skipped or updated, not duplicated.
@@ -571,7 +571,7 @@ export function CsvImport({
                                 >
                                     {pending
                                         ? "Working…"
-                                        : `Import ${willWrite} row${willWrite === 1 ? "" : "s"}`}
+                                        : `Import ${count(willWrite, "row")}`}
                                 </Button>
                                 <Button
                                     variant="outline"

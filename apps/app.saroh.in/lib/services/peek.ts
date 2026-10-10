@@ -9,6 +9,7 @@
  * than "No phone yet".
  */
 
+import { plural } from "@/lib/format/plural";
 import type { NoticeReach } from "@/lib/messages/notice-reach";
 
 export type AttentionKind = "ALLERGY" | "MEDICAL" | "ACCESS" | "OTHER";
@@ -66,7 +67,7 @@ export function attentionText(attention: PeekAttention | null): string | null {
     );
     const hidden = attention.hiddenSensitiveCount;
     if (hidden > 0) {
-        const notes = hidden === 1 ? "note" : "notes";
+        const notes = plural(hidden, "note");
         shown.push(
             shown.length
                 ? `${hidden} more your role can't see`

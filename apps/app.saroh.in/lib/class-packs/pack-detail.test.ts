@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 
+import { pinClock } from "@/lib/format/test-clock";
 import {
     BUILT_TABS,
     archiveToast,
@@ -23,6 +24,8 @@ import {
     linkedCards,
     overviewTiles,
 } from "./pack-overview";
+
+pinClock();
 
 const ZONE = "Asia/Kolkata";
 const NOW = new Date("2026-10-01T06:30:00.000Z");

@@ -1,10 +1,9 @@
-import { localDateKey } from "@/lib/format/datetime";
-import { DISPLAY_LOCALE } from "@/lib/format/locale";
+import { formatDate, formatMonth, localDateKey } from "@/lib/format/datetime";
+import { formatMoneyMajor } from "@/lib/format/money";
 import { customerHref, invoiceHref } from "@/lib/invoices/links";
 
 import type { MoneyTotal } from "./pack-cards";
-import { money } from "./pack-cards";
-import { day, totals } from "./pack-detail";
+import { totals } from "./pack-detail";
 import type {
     PackActor,
     PackDetail,
@@ -39,12 +38,10 @@ export interface MonthRow {
 }
 
 function monthLabel(year: number, month: number): string {
-    return new Intl.DateTimeFormat(DISPLAY_LOCALE, {
+    return formatMonth(Date.UTC(year, month - 1, 15), "UTC", {
         month: "short",
-        timeZone: "UTC",
-    })
-        .format(new Date(Date.UTC(year, month - 1, 15)))
-        .replace("Sept", "Sep");
+        year: "never",
+    });
 }
 
 function sumByCurrency(sales: readonly PackSale[]): MoneyTotal[] {
@@ -165,14 +162,14 @@ export function priceHistory(
                       s.currency === pack.currency &&
                       Number(s.price) === Number(price),
               ).length;
-    const M = (p: string) => money(p, pack.currency);
+    const M = (p: string) => formatMoneyMajor(p, pack.currency);
     const latest = changes.at(0);
     const nowCount = boughtAt(pack.price);
     const current: PriceEntry = {
         t: `${M(pack.price)} now`,
         sub: [
             latest
-                ? `Since ${day(latest.at, timeZone)}`
+                ? `Since ${formatDate(latest.at, timeZone)}`
                 : partial
                   ? "No change recorded"
                   : "Since it was created",
@@ -186,7 +183,7 @@ export function priceHistory(
         return {
             t: M(c.before),
             sub: [
-                `Until ${day(c.at, timeZone)}`,
+                `Until ${formatDate(c.at, timeZone)}`,
                 n === null ? null : `${n} bought at it — they keep it`,
             ]
                 .filter(Boolean)
@@ -203,7 +200,10 @@ export function priceHistory(
             ? changes
                   .slice()
                   .reverse()
-                  .map((c) => `${M(c.before)} until ${day(c.at, timeZone)}`)
+                  .map(
+                      (c) =>
+                          `${M(c.before)} until ${formatDate(c.at, timeZone)}`,
+                  )
                   .join(" · ")
             : partial
               ? "No change recorded"
@@ -246,10 +246,10 @@ export function saleRow(
     const by = s.soldBy;
     return {
         purchaseId: s.purchaseId,
-        when: day(s.soldAt, opts.timeZone),
+        when: formatDate(s.soldAt, opts.timeZone),
         name: s.contact.name,
         href: customerHref(s.contact.id),
-        amount: money(s.price, s.currency),
+        amount: formatMoneyMajor(s.price, s.currency),
         older:
             Number(s.price) !== Number(pack.price) ||
             s.currency !== pack.currency,

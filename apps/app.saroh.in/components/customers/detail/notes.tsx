@@ -1,5 +1,6 @@
 "use client";
 
+import { formatDate } from "@/lib/format/datetime";
 import { Button } from "@saroh/ui/button";
 import { Label } from "@saroh/ui/label";
 import { cn } from "@saroh/ui/lib/utils";
@@ -19,7 +20,6 @@ import {
     deleteNoteAction,
 } from "@/lib/customer-workspace/actions";
 import type { DetailNote } from "@/lib/customer-workspace/detail";
-import { dayText } from "@/lib/subscriptions/view";
 
 import { Empty } from "./parts";
 
@@ -141,7 +141,7 @@ export function Notes({
                 {shown.map((n) => (
                     <article
                         key={n.id}
-                        aria-label={`Note from ${dayText(n.createdAt, timeZone, now)}`}
+                        aria-label={`Note from ${formatDate(n.createdAt, timeZone, { now })}`}
                         className="rounded-xl border border-border bg-card px-3.5 py-[11px]"
                     >
                         <div className="flex items-baseline gap-2">
@@ -152,7 +152,7 @@ export function Notes({
                                     : (n.author?.split(" ")[0] ?? "Team")}
                             </span>
                             <span className="flex-1 text-[12px] text-muted-foreground">
-                                {dayText(n.createdAt, timeZone, now)}
+                                {formatDate(n.createdAt, timeZone, { now })}
                             </span>
                             {canWrite && n.createdByUserId === userId ? (
                                 <button

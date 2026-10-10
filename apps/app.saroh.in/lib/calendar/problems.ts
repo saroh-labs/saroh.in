@@ -1,3 +1,4 @@
+import { count } from "@/lib/format/plural";
 import type { CalendarDay, CalendarItem, LayerKey } from "./types";
 
 /**
@@ -107,7 +108,7 @@ export function problemChip(
     if (n === 0) return "";
     if (kinds.length > 1) return `${n} need you`;
     const [one, many] = WORDS[kinds[0]];
-    return `${n} ${n === 1 ? one : many}`;
+    return count(n, one, many);
 }
 
 /** What this person may do about a problem (the page reads their actions). */

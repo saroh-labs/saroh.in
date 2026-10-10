@@ -629,7 +629,7 @@ describe("formatRecent", () => {
 
     it("gives today's hour, then yesterday, then the date", () => {
         expect(formatRecent("2026-09-25T03:44:00.000Z", zone, now)).toBe(
-            "Today 09:14",
+            "Today, 9:14 am",
         );
         expect(formatRecent("2026-09-24T10:00:00.000Z", zone, now)).toBe(
             "Yesterday",
@@ -645,7 +645,7 @@ describe("formatRecent", () => {
     it("reads the day in the zone given, not the server's", () => {
         // 20:00 UTC on the 24th is already the 25th in Kolkata.
         expect(formatRecent("2026-09-24T20:00:00.000Z", zone, now)).toBe(
-            "Today 01:30",
+            "Today, 1:30 am",
         );
     });
 });

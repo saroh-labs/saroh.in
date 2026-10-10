@@ -7,7 +7,7 @@ import { showError, showSuccess } from "@saroh/ui/toast";
 import { useRouter } from "next/navigation";
 import { useEffect, useState, useTransition } from "react";
 
-import { formatTimeRange } from "@/lib/format/datetime";
+import { formatDate, formatTime, formatTimeRange } from "@/lib/format/datetime";
 import { listAvailability, rescheduleBooking } from "@/lib/services/actions";
 import { deadlineText } from "@/lib/services/booking-money";
 import type { Slot } from "@/lib/services/service";
@@ -149,7 +149,7 @@ export function RescheduleBooking({
                                             "disabled:pointer-events-none disabled:text-disabled-foreground",
                                         )}
                                     >
-                                        {clockTime(slot.startAt, timezone)}
+                                        {formatTime(slot.startAt, timezone)}
                                     </button>
                                 ))}
                             </div>
@@ -177,26 +177,11 @@ export function RescheduleBooking({
 /** Slots grouped under the day they fall on IN THE BOOKING'S ZONE. */
 function groupByDay(slots: Slot[], timeZone: string): [string, Slot[]][] {
     const days = new Map<string, Slot[]>();
-    const label = new Intl.DateTimeFormat("en-GB", {
-        timeZone,
-        weekday: "short",
-        day: "numeric",
-        month: "short",
-    });
     for (const slot of slots) {
-        const key = label.format(new Date(slot.startAt));
+        const key = formatDate(slot.startAt, timeZone, { weekday: "short" });
         const bucket = days.get(key);
         if (bucket) bucket.push(slot);
         else days.set(key, [slot]);
     }
     return Array.from(days.entries());
-}
-
-function clockTime(iso: string, timeZone: string): string {
-    return new Intl.DateTimeFormat("en-GB", {
-        timeZone,
-        hour: "numeric",
-        minute: "2-digit",
-        hour12: true,
-    }).format(new Date(iso));
 }

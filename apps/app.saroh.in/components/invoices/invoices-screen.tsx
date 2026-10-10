@@ -44,7 +44,7 @@ export interface InvoiceBusinessTax {
 }
 
 const money = (amount: string | number, currency: string) =>
-    formatMoneyMajor(amount, currency) ?? String(amount);
+    formatMoneyMajor(amount, currency);
 
 /** "₹35,400", or "₹35,400 + $120" when a business bills in two currencies. */
 function sums(list: { currency: string; cents: number }[]): string {

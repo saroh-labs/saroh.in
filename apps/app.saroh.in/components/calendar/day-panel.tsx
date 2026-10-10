@@ -1,3 +1,5 @@
+import { formatDay } from "@/lib/format/datetime";
+import { count } from "@/lib/format/plural";
 import { Badge } from "@saroh/ui/badge";
 import { Button } from "@saroh/ui/button";
 import { cn } from "@saroh/ui/lib/utils";
@@ -5,12 +7,7 @@ import { Plus } from "lucide-react";
 import Link from "next/link";
 
 import type { LayerStyle, Off } from "@/lib/calendar/layers";
-import {
-    dayCount,
-    dayTitle,
-    describeItem,
-    itemsTotal,
-} from "@/lib/calendar/layers";
+import { dayCount, describeItem, itemsTotal } from "@/lib/calendar/layers";
 import type { CalendarCash } from "@/lib/calendar/money";
 import {
     dayMoney,
@@ -96,7 +93,7 @@ export function DayPanel({
     return (
         <>
             {heading(
-                dayTitle(day.date, today) +
+                formatDay(day.date, { today, weekday: "short" }) +
                     (day.date === today ? " · today" : ""),
             )}
             {offLine ? (
@@ -106,7 +103,7 @@ export function DayPanel({
             ) : null}
             <p className="mb-2.5 mt-0.5 min-h-[1lh] text-[12.5px] text-muted-foreground">
                 {n > 0
-                    ? `${n} ${n === 1 ? "thing" : "things"}${ahead ? " coming up" : ""}`
+                    ? `${count(n, "thing")}${ahead ? " coming up" : ""}`
                     : ""}
             </p>
             {cash ? (

@@ -1,5 +1,6 @@
 "use client";
 
+import { count } from "@/lib/format/plural";
 import { Button } from "@saroh/ui/button";
 import { Checkbox } from "@saroh/ui/checkbox";
 import { Check } from "lucide-react";
@@ -367,7 +368,7 @@ export function ModuleGoalPicker({
                 >
                     {resolved.size === 0
                         ? "Nothing selected — you can add capabilities later."
-                        : `${resolved.size} ${resolved.size === 1 ? "capability" : "capabilities"} will be turned on.`}
+                        : `${count(resolved.size, "capability", "capabilities")} will be turned on.`}
                 </p>
                 <div className="flex items-center gap-2">
                     <Button

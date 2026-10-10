@@ -1,7 +1,7 @@
+import { formatDate } from "@/lib/format/datetime";
 import { describe, expect, it } from "vitest";
 
-import { shortDate } from "@/lib/sites/format-date";
-
+import { pinClock } from "@/lib/format/test-clock";
 import {
     bookableWithNoLogin,
     invitationMeta,
@@ -13,11 +13,13 @@ import {
     teamCounts,
 } from "./invitations";
 
+pinClock();
+
 const ZONE = "Asia/Kolkata";
 
 // The month as this runtime's ICU spells it ("Sep" or "Sept").
 const sep = (day: number) =>
-    shortDate(`2026-09-${String(day).padStart(2, "0")}T12:00:00Z`, ZONE);
+    formatDate(`2026-09-${String(day).padStart(2, "0")}T12:00:00Z`, ZONE);
 
 const known = {
     memberEmails: ["Priya@Example.in"],

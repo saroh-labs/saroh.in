@@ -1,5 +1,7 @@
 "use client";
 
+import { ViewerDate } from "@/components/shared/viewer-date";
+import { count } from "@/lib/format/plural";
 import { Badge } from "@saroh/ui/badge";
 import { Button } from "@saroh/ui/button";
 import { EmptyState } from "@saroh/ui/empty-state";
@@ -11,32 +13,11 @@ import { useTransition } from "react";
 
 import { ListCard, ListRow } from "@/components/shared/list-card";
 import { personHref } from "@/lib/contacts/person-href";
-import { DISPLAY_LOCALE } from "@/lib/format/locale";
 import {
     markAllNotificationsRead,
     markNotificationRead,
 } from "@/lib/notifications/actions";
 import type { Notification } from "@/lib/notifications/service";
-
-/**
- * Format an ISO timestamp as a short date-time.
- *
- * The locale is pinned, not inherited: this component server-renders and then
- * hydrates, and `undefined` resolves to the runtime's own locale — Node's on the
- * server, the browser's on the client. When the two disagree React fails
- * hydration and discards the tree. See `lib/format/locale.ts`.
- */
-function formatWhen(iso: string): string {
-    const d = new Date(iso);
-    if (Number.isNaN(d.getTime())) return "";
-    return d.toLocaleString(DISPLAY_LOCALE, {
-        month: "short",
-        day: "numeric",
-        hour: "numeric",
-        minute: "2-digit",
-        hour12: true,
-    });
-}
 
 /**
  * Workspace → Notifications, as the workspace design draws it: a list with
@@ -94,7 +75,7 @@ export function NotificationsInbox({
             {unread > 0 ? (
                 <div className="flex items-center justify-between gap-3">
                     <p className="text-[12.5px] text-muted-foreground">
-                        {unread === 1 ? "1 unread" : `${unread} unread`}
+                        {count(unread, "unread", "unread")}
                     </p>
                     <Button
                         variant="outline"
@@ -127,7 +108,10 @@ export function NotificationsInbox({
                             }
                             end={
                                 <span className="text-[12px] tabular-nums text-muted-foreground">
-                                    {formatWhen(n.createdAt)}
+                                    <ViewerDate
+                                        iso={n.createdAt}
+                                        variant="datetime"
+                                    />
                                 </span>
                             }
                         />

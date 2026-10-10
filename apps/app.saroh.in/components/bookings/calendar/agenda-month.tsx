@@ -1,12 +1,12 @@
 "use client";
 
+import { formatClock, formatClockRange } from "@/lib/format/datetime";
 import { cn } from "@saroh/ui/lib/utils";
 
 import type { Block, LocalDate } from "@/lib/services/diary";
 import {
     blockLine,
     blockTitle,
-    clock,
     monthDays,
     STATE_LABEL,
 } from "@/lib/services/diary";
@@ -55,10 +55,10 @@ export function AgendaList({
                     >
                         <div className="w-16 shrink-0 tabular-nums">
                             <div className="text-[14px] font-bold">
-                                {clock(b.start)}
+                                {formatClock(b.start)}
                             </div>
                             <div className="text-[11.5px] text-muted-foreground">
-                                {clock(b.end)}
+                                {formatClock(b.end)}
                             </div>
                         </div>
                         <span
@@ -185,12 +185,12 @@ export function AgendaMonth({
                                     key={f.key}
                                     type="button"
                                     onClick={f.book}
-                                    aria-label={`Book ${f.who} at ${clock(f.from)}`}
+                                    aria-label={`Book ${f.who} at ${formatClock(f.from)}`}
                                     className="flex w-full gap-2 rounded-[7px] px-2 py-[7px] text-left text-[12.5px] hover:bg-success-subtle focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring active:brightness-95"
                                 >
                                     <span className="flex-1">{f.who}</span>
                                     <span className="font-semibold tabular-nums text-success-subtle-foreground">
-                                        {clock(f.from)}–{clock(f.to)}
+                                        {formatClockRange(f.from, f.to)}
                                     </span>
                                 </button>
                             ))

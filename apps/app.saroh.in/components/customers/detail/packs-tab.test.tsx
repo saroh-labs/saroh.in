@@ -6,8 +6,11 @@ import type {
     DetailPack,
 } from "@/lib/customer-workspace/detail";
 
+import { pinClock } from "@/lib/format/test-clock";
 import { Overview } from "./overview";
 import { PacksTab } from "./packs-tab";
+
+pinClock();
 
 vi.mock("next/navigation", () => ({
     useRouter: () => ({ refresh: vi.fn() }),

@@ -1,3 +1,4 @@
+import { count } from "@/lib/format/plural";
 import { Button } from "@saroh/ui/button";
 import { PageHeader } from "@saroh/ui/page-header";
 import Link from "next/link";
@@ -132,7 +133,7 @@ export default async function TestReleasePage({
                 <p data-release-verdict>
                     {releaseVerdictLine(review.latestApproval)}
                     {review.openNotes > 0
-                        ? ` ${review.openNotes === 1 ? "1 note is" : `${review.openNotes} notes are`} open.`
+                        ? ` ${count(review.openNotes, "note is", "notes are")} open.`
                         : ""}
                 </p>
                 {release.note ? (

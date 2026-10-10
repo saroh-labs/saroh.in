@@ -1,5 +1,6 @@
 "use client";
 
+import { count } from "@/lib/format/plural";
 import { Button } from "@saroh/ui/button";
 import { cn } from "@saroh/ui/lib/utils";
 import { Skeleton } from "@saroh/ui/skeleton";
@@ -242,8 +243,7 @@ const CUSTOMER_LINK =
 export function QuickViewBody({ order }: { order: OrderRead }) {
     const money = order.money;
     const currency = money?.currency ?? "INR";
-    const format = (a: string | number) =>
-        formatMoneyMajor(a, currency) ?? String(a);
+    const format = (a: string | number) => formatMoneyMajor(a, currency);
     // Without the money read, whether it is paid — never a figure (UX-010).
     const payment =
         quickPayment(order, format) ?? kitchenPayment(order)?.label ?? null;
@@ -399,7 +399,7 @@ export function QuickViewBody({ order }: { order: OrderRead }) {
                     )}
                     {c ? (
                         <span className="text-muted-foreground">
-                            {` · ${c.orderCount} ${c.orderCount === 1 ? "order" : "orders"}`}
+                            {` · ${count(c.orderCount, "order")}`}
                         </span>
                     ) : null}
                     {reach ? (

@@ -109,8 +109,7 @@ export function VariantsSection({
     const productPrice = isMoney(product.price) ? trimMoney(product.price) : "";
     // Said in a sentence with its separators ("₹1,299", UX-082); the field's
     // placeholder keeps the plain figure it would type.
-    const shown = (m: string) =>
-        formatMoneyMajor(m, product.currency) ?? `${symbol}${m}`;
+    const shown = (m: string) => formatMoneyMajor(m, product.currency);
     const shownPrice = productPrice ? shown(productPrice) : "";
     const cents = (m: string) => Math.round(Number(m) * 100);
     // The API refuses a price over the MRP customers see struck through;

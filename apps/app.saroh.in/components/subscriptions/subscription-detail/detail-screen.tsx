@@ -1,5 +1,7 @@
 "use client";
 
+import { formatDate } from "@/lib/format/datetime";
+import { formatMoneyMajor } from "@/lib/format/money";
 import { Button } from "@saroh/ui/button";
 import { cn } from "@saroh/ui/lib/utils";
 import { PageHeader } from "@saroh/ui/page-header";
@@ -23,14 +25,12 @@ import {
     chargeRow,
     chargingText,
     collectionRows,
-    dayText,
     failWhy,
     gstNote,
     headline,
     initials,
     listTab,
     longPrice,
-    money,
     olderPrice,
     paysBy,
     retryOffer,
@@ -151,9 +151,9 @@ export function SubscriptionDetail({
         window.history.replaceState(null, "", url.pathname + url.search);
     }, []);
 
-    const periodEndText = dayText(sub.currentPeriodEnd, tz, now);
+    const periodEndText = formatDate(sub.currentPeriodEnd, tz, { now });
     const nextText = sub.nextRenewalAt
-        ? dayText(sub.nextRenewalAt, tz, now)
+        ? formatDate(sub.nextRenewalAt, tz, { now })
         : null;
 
     const failedId = sub.failedCharge?.id;
@@ -286,7 +286,7 @@ export function SubscriptionDetail({
                     description={[
                         sub.plan.name,
                         longPrice(sub.price, sub.currency, sub.interval),
-                        `Since ${dayText(sub.startedAt, tz, now)}`,
+                        `Since ${formatDate(sub.startedAt, tz, { now })}`,
                         bizName,
                     ]
                         .filter(Boolean)
@@ -363,8 +363,9 @@ export function SubscriptionDetail({
                     <div className="flex flex-wrap items-center gap-2.5 rounded-[10px] border border-border-strong bg-muted px-[13px] py-2.5">
                         <span className="flex-[1_1_240px] text-[13px] font-semibold text-foreground">
                             Changes to {pending.name} (
-                            {money(pending.price, pending.currency)}) from{" "}
-                            {dayText(pending.from, tz, now)}. No part-payment.
+                            {formatMoneyMajor(pending.price, pending.currency)})
+                            from {formatDate(pending.from, tz, { now })}. No
+                            part-payment.
                         </span>
                         <Button
                             variant="outline"
@@ -423,7 +424,7 @@ export function SubscriptionDetail({
                             )}
                             older={
                                 older
-                                    ? `Keeps ${money(sub.price, sub.currency)} — the plan is ${money(older.listPrice, sub.currency)} for new sign-ups`
+                                    ? `Keeps ${formatMoneyMajor(sub.price, sub.currency)} — the plan is ${formatMoneyMajor(older.listPrice, sub.currency)} for new sign-ups`
                                     : null
                             }
                             // What the customer set up (D12) comes first;

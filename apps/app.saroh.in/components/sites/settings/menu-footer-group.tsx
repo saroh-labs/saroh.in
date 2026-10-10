@@ -1,5 +1,6 @@
 "use client";
 
+import { plural } from "@/lib/format/plural";
 import { useState } from "react";
 
 import { Absent, Group, Row, Section } from "@/components/sites/settings-rows";
@@ -125,7 +126,7 @@ export function MenuFooterGroup({
                             <Absent>Not built</Absent>{" "}
                             <span className="text-muted-foreground">
                                 · {automatic.join(" · ")}{" "}
-                                {automatic.length === 1 ? "shows" : "show"} on
+                                {plural(automatic.length, "shows", "show")} on
                                 their own
                             </span>
                         </span>
