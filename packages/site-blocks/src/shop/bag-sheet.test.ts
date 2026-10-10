@@ -69,7 +69,7 @@ describe("overStock and stockNotice", () => {
         const over = overStock([line({ state: "short", available: 1 })]);
         expect(over.map((o) => o.left)).toEqual([1]);
         expect(stockNotice(over)).toBe(
-            "Only 1 left — we've set your bag to 1.",
+            "Only 1 left, so we've set your bag to 1.",
         );
     });
 
@@ -92,7 +92,7 @@ describe("overStock and stockNotice", () => {
             }),
         ]);
         expect(stockNotice(over)).toBe(
-            "Fewer are left than you asked for — we've set Linen kurta (M) to 1, Tote to 2.",
+            "Fewer are left than you asked for, so we've set Linen kurta (M) to 1, Tote to 2.",
         );
     });
 });

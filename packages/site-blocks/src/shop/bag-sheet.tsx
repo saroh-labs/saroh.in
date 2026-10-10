@@ -84,7 +84,7 @@ function trimmed(a: DeliveryAddress): DeliveryAddress {
 
 /** What a line says under its name when it can't be sold as asked. */
 export function lineNote(line: QuoteLine): string | null {
-    if (line.state === "gone") return "No longer sold here — take it out";
+    if (line.state === "gone") return "No longer sold here. Take it out.";
     if (line.state === "sold-out") return "Sold out";
     if (line.state === "short") {
         return `Only ${line.available ?? 0} left`;
@@ -140,14 +140,14 @@ export function overStock(
     );
 }
 
-/** "Only 1 left — we've set your bag to 1." */
+/** "Only 1 left, so we've set your bag to 1." */
 export function stockNotice(
     capped: readonly { line: QuoteLine; left: number }[],
 ): string | null {
     if (capped.length === 0) return null;
     if (capped.length === 1) {
         const { left } = capped[0];
-        return `Only ${left} left — we've set your bag to ${left}.`;
+        return `Only ${left} left, so we've set your bag to ${left}.`;
     }
     const each = capped
         .map(({ line, left }) => {
@@ -157,7 +157,7 @@ export function stockNotice(
             return `${name} to ${left}`;
         })
         .join(", ");
-    return `Fewer are left than you asked for — we've set ${each}.`;
+    return `Fewer are left than you asked for, so we've set ${each}.`;
 }
 
 /**

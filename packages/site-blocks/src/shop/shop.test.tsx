@@ -542,7 +542,7 @@ describe("the header's bag", () => {
         ).toBeDisabled();
         // The bag is set to what is left, and says so (UX-058).
         expect(
-            await screen.findByText("Only 1 left — we've set your bag to 1."),
+            await screen.findByText("Only 1 left, so we've set your bag to 1."),
         ).toBeInTheDocument();
         expect(readBag(SITE)).toEqual([
             { listingId: "l-bread", variantId: null, quantity: 1 },
