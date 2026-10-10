@@ -14,6 +14,7 @@ import {
 } from "@/lib/orders/new-order";
 import type { NewOrderProduct } from "@/lib/orders/new-order-service";
 
+import { Tip } from "@saroh/ui/tooltip";
 import { FIELD } from "./parts";
 
 /**
@@ -52,9 +53,7 @@ export function LinesStep({
             className="overflow-hidden rounded-xl border border-border bg-card"
         >
             <div className="flex items-baseline px-3.5 pb-2 pt-[13px]">
-                <h3 className="flex-1 text-[11px] font-semibold uppercase tracking-[0.1em] text-muted-foreground">
-                    Items
-                </h3>
+                <h3 className="label flex-1">Items</h3>
                 <span className="text-[12px] text-muted-foreground">
                     {itemCount(lines)}
                 </span>
@@ -101,21 +100,24 @@ export function LinesStep({
                             >
                                 {line.quantity}
                             </span>
-                            <Button
-                                variant="outline"
-                                size="icon-sm"
-                                type="button"
-                                onClick={() => onBump(line.key, 1)}
-                                disabled={room === 0}
-                                title={
+                            <Tip
+                                label={
                                     room === 0
                                         ? `None left at ${storeName}`
                                         : undefined
                                 }
-                                aria-label={`One more ${title}`}
                             >
-                                +
-                            </Button>
+                                <Button
+                                    variant="outline"
+                                    size="icon-sm"
+                                    type="button"
+                                    onClick={() => onBump(line.key, 1)}
+                                    disabled={room === 0}
+                                    aria-label={`One more ${title}`}
+                                >
+                                    +
+                                </Button>
+                            </Tip>
                             <span className="min-w-[70px] text-right font-semibold tabular-nums">
                                 {format(s.priceCents * line.quantity)}
                             </span>
@@ -158,28 +160,31 @@ export function LinesStep({
                                     const room = roomFor(s, inCart(s.key));
                                     const out = room === 0;
                                     return (
-                                        <Chip
-                                            key={s.key}
-                                            role="button"
-                                            aria-checked={undefined}
-                                            on={false}
-                                            disabled={out}
-                                            onClick={() => onBump(s.key, 1)}
-                                            title={
+                                        <Tip
+                                            label={
                                                 out
                                                     ? `None left at ${storeName}`
                                                     : room === null
                                                       ? undefined
                                                       : `${room} left at ${storeName}`
                                             }
-                                            className="h-[30px] cursor-pointer active:scale-[0.97] disabled:cursor-not-allowed coarse:h-11"
                                         >
-                                            {chipWords(
-                                                s.variantTitle,
-                                                format(s.priceCents),
-                                                room,
-                                            )}
-                                        </Chip>
+                                            <Chip
+                                                key={s.key}
+                                                role="button"
+                                                aria-checked={undefined}
+                                                on={false}
+                                                disabled={out}
+                                                onClick={() => onBump(s.key, 1)}
+                                                className="h-[30px] cursor-pointer active:scale-[0.97] disabled:cursor-not-allowed coarse:h-11"
+                                            >
+                                                {chipWords(
+                                                    s.variantTitle,
+                                                    format(s.priceCents),
+                                                    room,
+                                                )}
+                                            </Chip>
+                                        </Tip>
                                     );
                                 })}
                             </div>

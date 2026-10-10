@@ -17,13 +17,13 @@ import {
     OWN_DRIVER,
 } from "@/lib/orders/courier";
 
+import { chipClass } from "@/components/shared/chip";
 import {
     OrderSheet,
     OrderSheetBody,
     OrderSheetFoot,
     useOrderSheetDraft,
 } from "./order-sheet";
-import { FOCUS } from "./parts";
 /**
  * The courier's details (B10, DEC-045): who took it, their tracking number
  * and, if they gave one, the tracking link — every one optional, since the
@@ -139,13 +139,7 @@ function CourierDraft({
                                 role="radio"
                                 aria-checked={on}
                                 onClick={() => pickChip(c)}
-                                className={cn(
-                                    FOCUS,
-                                    "h-[30px] rounded-full border px-[11px] text-[12.5px] coarse:h-11",
-                                    on
-                                        ? "border-foreground bg-primary font-semibold text-primary-foreground"
-                                        : "border-border bg-card font-medium text-neutral-700 hover:border-border-strong hover:bg-accent active:bg-accent-active dark:text-muted-foreground",
-                                )}
+                                className={chipClass(on)}
                             >
                                 {c}
                             </button>

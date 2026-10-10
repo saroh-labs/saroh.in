@@ -85,7 +85,7 @@ export function ServicesPicker({
                         : "No classes are taking bookings yet."}{" "}
                     <Link
                         href="/services/new"
-                        className="rounded-[4px] font-semibold text-brand transition-colors duration-fast hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 active:text-foreground/70"
+                        className="rounded-[4px] font-semibold text-foreground underline decoration-border-strong underline-offset-4 transition-colors duration-fast hover:decoration-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 active:text-foreground/70"
                     >
                         Add a service
                     </Link>{" "}

@@ -65,7 +65,7 @@ test.describe("customers list", () => {
         const someone = api.rows[0];
         const name = someone.name ?? someone.email ?? "";
         await page
-            .getByRole("searchbox", { name: /Search by name/ })
+            .getByRole("searchbox", { name: /Search customers by name/ })
             .fill(name);
         await expect(page).toHaveURL(/[?&]q=/);
         await expect(

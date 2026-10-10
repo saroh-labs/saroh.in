@@ -9,7 +9,6 @@ import { cn } from "@saroh/ui/lib/utils";
 import { Switch } from "@saroh/ui/switch";
 import { showSuccess } from "@saroh/ui/toast";
 import { Info, Lock, Plus } from "lucide-react";
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
 
@@ -17,6 +16,7 @@ import { showPlanRefusal } from "@/components/billing/plan-refusal";
 import type { ConfirmResult } from "@/components/shared/confirm-dialog";
 import { ConfirmDialog } from "@/components/shared/confirm-dialog";
 import { FormSheet } from "@/components/shared/form-sheet";
+import { StatusBadge } from "@/components/shared/status-badge";
 import { CAPABILITY_GROUP_LABEL as GROUP_LABEL } from "@/lib/organizations/capability-groups";
 import {
     createRole,
@@ -29,6 +29,8 @@ import type {
     RoleCatalogue,
 } from "@/lib/organizations/roles";
 import type { RolesLock } from "@/lib/organizations/roles-lock";
+import { Notice } from "@saroh/ui/notice";
+import { TextLink } from "@saroh/ui/text-link";
 
 /** The built-ins a new role may start from. Owner is not offered: see below. */
 const START_FROM = [
@@ -154,12 +156,9 @@ export function RolesTab({
                         />
                         <p>
                             {rolesLock.line}{" "}
-                            <Link
-                                href={rolesLock.href}
-                                className="font-medium text-foreground underline underline-offset-4"
-                            >
+                            <TextLink href={rolesLock.href}>
                                 {rolesLock.cta}
-                            </Link>
+                            </TextLink>
                         </p>
                     </div>
                 ) : canEdit ? (
@@ -237,9 +236,7 @@ function ListSection({
 }) {
     return (
         <div className="border-b border-border last:border-b-0">
-            <p className="px-[15px] py-[11px] text-[11px] font-semibold uppercase tracking-[0.1em] text-muted-foreground">
-                {label}
-            </p>
+            <p className="label px-[15px] py-[11px]">{label}</p>
             {children}
         </div>
     );
@@ -270,7 +267,7 @@ function RoleRow({
             className={cn(
                 "flex w-full items-center gap-[11px] border-t border-border px-[15px] py-2.5 text-left transition-colors duration-fast focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring",
                 on
-                    ? "bg-brand-subtle shadow-[inset_2px_0_0_hsl(var(--highlight))]"
+                    ? "bg-muted shadow-[inset_2px_0_0_hsl(var(--foreground))]"
                     : "hover:bg-foreground/[0.035]",
             )}
         >
@@ -349,13 +346,13 @@ function RoleDetail({
                         {role.label}
                     </h2>
                     {role.system ? null : (
-                        <span className="ml-auto rounded-full bg-muted px-[9px] py-[3px] text-[11px] font-medium text-neutral-600 dark:text-muted-foreground">
+                        <StatusBadge tone="neutral" className="ml-auto">
                             {held === 0
                                 ? "Nobody holds it yet"
                                 : held === 1
                                   ? "1 person holds it"
                                   : `${held} people hold it`}
-                        </span>
+                        </StatusBadge>
                     )}
                 </div>
                 <p className="mt-[9px] text-[12.5px] leading-[1.55] text-neutral-600 dark:text-muted-foreground">
@@ -493,7 +490,7 @@ function Permissions({
                 return (
                     <section key={group} className="pt-3">
                         <div className="flex items-baseline justify-between pb-1.5">
-                            <h3 className="text-[11px] font-semibold uppercase tracking-[0.1em] text-muted-foreground">
+                            <h3 className="label">
                                 {GROUP_LABEL[group] ?? group}
                             </h3>
                             <span className="text-[11px] tabular-nums text-muted-foreground">
@@ -659,14 +656,7 @@ function RoleSheet({
                     onToggle={toggle}
                 />
             </div>
-            {refusal ? (
-                <p
-                    role="alert"
-                    className="rounded-[9px] bg-destructive-subtle px-3 py-2 text-[12.5px] text-destructive-subtle-foreground"
-                >
-                    {refusal}
-                </p>
-            ) : null}
+            {refusal ? <Notice tone="error">{refusal}</Notice> : null}
         </FormSheet>
     );
 }
@@ -823,14 +813,7 @@ function NewRoleSheet({
                     </p>
                 ) : null}
             </fieldset>
-            {error ? (
-                <p
-                    role="alert"
-                    className="rounded-[9px] bg-destructive-subtle px-3 py-2 text-[12.5px] text-destructive-subtle-foreground"
-                >
-                    {error}
-                </p>
-            ) : null}
+            {error ? <Notice tone="error">{error}</Notice> : null}
         </FormSheet>
     );
 }

@@ -479,7 +479,7 @@ test("a Manager who edits roles can give only what they hold (F19)", async ({
 }) => {
     // Holds `member:role:update` and storefronts, but no money.
     await scenario(context, "MANAGER");
-    await page.goto("/settings/people?view=roles");
+    await page.goto("/settings/people?tab=roles");
 
     // Counter is within reach: what the Manager holds can be ticked, and
     // what they don't is locked with the reason beside it.

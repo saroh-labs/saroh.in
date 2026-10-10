@@ -200,7 +200,7 @@ export function detailHeader(pack: PackDetail): DetailHeader {
             ? { label: "Draft", tone: "off" }
             : archived
               ? { label: "Archived", tone: "off" }
-              : { label: "On sale", tone: "ok" },
+              : { label: "Live", tone: "ok" },
         kindLabel: kind === "ONE_TO_ONE" ? "One-to-one" : "Classes",
         firstOnly: Boolean(pack.firstPackOnly),
         pending: onSale && Boolean(pack.hasPendingChanges),

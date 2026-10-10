@@ -108,7 +108,7 @@ describe("searchSettings", () => {
             "Roles and what they open",
             "People — invite or change a role",
         ]);
-        expect(hits[0]?.href).toBe("/settings/people?view=roles");
+        expect(hits[0]?.href).toBe("/settings/people?tab=roles");
     });
 
     it("leaves the page's name out when asked (the ⌘K menu)", () => {

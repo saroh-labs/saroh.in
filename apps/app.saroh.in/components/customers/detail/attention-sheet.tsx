@@ -35,6 +35,7 @@ import {
     picksAllergen,
     toInput,
 } from "@/lib/customer-workspace/attention";
+import { Notice } from "@saroh/ui/notice";
 
 interface Choice {
     id: string;
@@ -333,13 +334,10 @@ export function AttentionSheet({
             )}
 
             {failed && unplaced ? (
-                <p
-                    role="alert"
-                    className="rounded-[9px] bg-destructive-subtle px-3 py-2.5 text-[12.5px] leading-[1.5] text-destructive-subtle-foreground"
-                >
+                <Notice tone="error">
                     {failed.message} Nothing was saved. What you typed is still
                     here.
-                </p>
+                </Notice>
             ) : null}
         </FormSheet>
     );

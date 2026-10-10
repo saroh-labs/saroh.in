@@ -4,8 +4,8 @@ import { Button } from "@saroh/ui/button";
 import { cn } from "@saroh/ui/lib/utils";
 import Link from "next/link";
 
+import { StatusBadge } from "@/components/shared/status-badge";
 import { ViewerDate } from "@/components/shared/viewer-date";
-import { Pill } from "@/components/subscriptions/pill";
 import { personHref } from "@/lib/contacts/person-href";
 import type { CustomerRow, CustomersPage } from "@/lib/customers/list";
 import {
@@ -56,7 +56,7 @@ export function Rows({
                 <div className="sm:min-w-[520px]">
                     <div
                         className={cn(
-                            "hidden gap-3 border-b border-border bg-neutral-50 px-4 py-[9px] text-[11px] font-semibold uppercase tracking-[0.06em] text-muted-foreground dark:bg-muted sm:grid",
+                            "label hidden gap-3 border-b border-border bg-muted px-4 py-[9px] sm:grid",
                             cols,
                         )}
                     >
@@ -120,13 +120,9 @@ function Row({
                         {rowName(row)}
                     </span>
                     {tags.map((t) => (
-                        <Pill
-                            key={t.label}
-                            tone={t.tone}
-                            className="px-[7px] py-px"
-                        >
+                        <StatusBadge key={t.label} tone={t.tone}>
                             {t.label}
-                        </Pill>
+                        </StatusBadge>
                     ))}
                 </span>
                 <span className="truncate text-[12px] text-muted-foreground">
@@ -150,7 +146,7 @@ function Row({
                             ? ` · ${spentText(row.spent)}`
                             : null}
                         {sub?.open ? (
-                            <span className="text-brand-subtle-foreground">
+                            <span className="text-foreground">
                                 {` · ${sub.text}`}
                             </span>
                         ) : null}
@@ -175,7 +171,7 @@ function Row({
                                 className={cn(
                                     "truncate text-[12px]",
                                     sub.open
-                                        ? "text-brand-subtle-foreground"
+                                        ? "text-foreground"
                                         : "text-muted-foreground",
                                 )}
                             >

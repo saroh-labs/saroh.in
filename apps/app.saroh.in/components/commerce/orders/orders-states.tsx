@@ -107,7 +107,7 @@ export function OrdersAttentionPartial({ onRetry }: { onRetry: () => void }) {
                     variant="outline"
                     size="sm"
                     onClick={onRetry}
-                    className="wk-press flex-none border-brand/50 bg-card text-brand-subtle-foreground"
+                    className="wk-press flex-none border-border-strong bg-card text-foreground"
                 >
                     Try again
                 </Button>

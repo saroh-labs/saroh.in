@@ -1,6 +1,5 @@
 "use client";
 
-import { Button } from "@saroh/ui/button";
 import {
     DropdownMenu,
     DropdownMenuContent,
@@ -23,6 +22,7 @@ import {
 } from "@/lib/orders/lifecycle";
 import type { OrderStatus, PaymentStatus } from "@/lib/orders/service";
 
+import { IconButton } from "@saroh/ui/icon-button";
 import { RecordPaidDialog } from "./record-paid-dialog";
 
 type Pending =
@@ -149,14 +149,13 @@ export function OrderActions({
             {cancellable || paymentMoves.length > 0 ? (
                 <DropdownMenu>
                     <DropdownMenuTrigger asChild>
-                        <Button
+                        <IconButton
+                            label={`More actions for ${orderRef}`}
+                            icon={<MoreHorizontal />}
                             variant="outline"
-                            size="icon"
-                            className="bg-card print:hidden"
-                            aria-label={`More actions for ${orderRef}`}
-                        >
-                            <MoreHorizontal className="size-4" />
-                        </Button>
+                            size="md"
+                            className="print:hidden"
+                        />
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end" className="w-52">
                         {paymentMoves.map((to) => (

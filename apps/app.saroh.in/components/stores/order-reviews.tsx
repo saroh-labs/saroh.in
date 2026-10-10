@@ -12,6 +12,7 @@ import {
     reviewEmailNote,
 } from "@/lib/product-reviews/describe";
 import type { InvitationState } from "@/lib/product-reviews/service";
+import { Tip } from "@saroh/ui/tooltip";
 
 /**
  * An order's Reviews section: where its invitation stands, and Invite or
@@ -78,17 +79,18 @@ export function OrderReviews({
                 </p>
             </div>
             {canWrite && state.state !== "completed" && !note ? (
-                <Button
-                    variant="outline"
-                    size="sm"
-                    disabled={state.blocked !== null}
-                    title={state.blocked?.message}
-                    onClick={invite}
-                    busy={pending}
-                    busyLabel="Sending…"
-                >
-                    {verb}
-                </Button>
+                <Tip label={state.blocked?.message}>
+                    <Button
+                        variant="outline"
+                        size="sm"
+                        disabled={state.blocked !== null}
+                        onClick={invite}
+                        busy={pending}
+                        busyLabel="Sending…"
+                    >
+                        {verb}
+                    </Button>
+                </Tip>
             ) : null}
         </section>
     );

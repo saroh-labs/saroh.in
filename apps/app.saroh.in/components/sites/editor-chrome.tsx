@@ -1,6 +1,6 @@
 "use client";
 
-import { cn } from "@saroh/ui/lib/utils";
+import { TabStrip } from "@saroh/ui/tabs";
 import { useRef } from "react";
 
 /**
@@ -31,39 +31,23 @@ export function EditorTabs<T extends string>({
     onSelect: (tab: T) => void;
 }) {
     return (
-        <div
-            role="tablist"
-            aria-label={label}
-            className="flex shrink-0 items-end gap-4 border-b px-4"
-        >
-            {tabs.map((tab) => (
-                <button
-                    key={tab.key}
-                    type="button"
-                    role="tab"
-                    aria-selected={value === tab.key}
-                    onClick={() => onSelect(tab.key)}
-                    className={cn(
-                        "relative -mb-px flex h-10 items-center gap-1.5 border-b-2 text-[0.8125rem] font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring coarse:h-11",
-                        value === tab.key
-                            ? "border-highlight text-foreground"
-                            : "border-transparent text-muted-foreground hover:text-foreground",
-                    )}
-                >
-                    {tab.label}
-                    {/*
-                     * The count rides the tab rather than a separate badge:
-                     * the number only means anything next to the word it
-                     * counts.
-                     */}
-                    {tab.count ? (
-                        <span className="rounded-full bg-secondary px-1.5 text-[0.6875rem] tabular-nums leading-4 text-highlight">
-                            {tab.count}
-                        </span>
-                    ) : null}
-                </button>
-            ))}
-        </div>
+        <TabStrip
+            label={label}
+            value={value}
+            onValueChange={onSelect}
+            className="shrink-0"
+            listClassName="px-2"
+            // The count rides the tab: the number only means anything next
+            // to the word it counts. None at zero.
+            tabs={tabs.map((tab) => ({
+                value: tab.key,
+                label: tab.label,
+                count:
+                    tab.count === undefined || tab.count === 0
+                        ? undefined
+                        : tab.count,
+            }))}
+        />
     );
 }
 
@@ -163,7 +147,7 @@ export function PanelDivider({
              */}
             <span
                 aria-hidden
-                className="pointer-events-none absolute left-1/2 top-1/2 h-10 w-1.5 -translate-x-1/2 -translate-y-1/2 rounded-full border border-border bg-background transition-colors group-hover:border-ring group-hover:bg-ring group-focus-visible:border-ring group-focus-visible:bg-ring"
+                className="pointer-events-none absolute left-1/2 top-1/2 h-10 w-1.5 -translate-x-1/2 -translate-y-1/2 rounded-full border border-border bg-background transition-colors duration-fast group-hover:border-ring group-hover:bg-ring group-focus-visible:border-ring group-focus-visible:bg-ring"
             />
         </div>
     );
@@ -176,6 +160,6 @@ export function PanelDivider({
  */
 export function railRowState(selected: boolean): string {
     return selected
-        ? "bg-secondary font-medium before:absolute before:-left-2 before:inset-y-1.5 before:w-0.5 before:rounded-full before:bg-highlight"
+        ? "bg-secondary font-medium before:absolute before:-left-2 before:inset-y-1.5 before:w-0.5 before:rounded-full before:bg-foreground"
         : "hover:bg-muted active:bg-secondary";
 }

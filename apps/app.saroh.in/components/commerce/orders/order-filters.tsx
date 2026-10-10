@@ -2,7 +2,6 @@
 
 import { Button } from "@saroh/ui/button";
 import { Input } from "@saroh/ui/input";
-import { cn } from "@saroh/ui/lib/utils";
 
 import type { OrderFilterOptions } from "@/lib/orders/business-service";
 import type { OrdersDate, OrdersPayment } from "@/lib/orders/list-filters";
@@ -17,6 +16,7 @@ import type { OrdersQuery } from "@/lib/orders/list-query";
 import type { FulfilmentType } from "@/lib/orders/read";
 import { OptionSelect } from "@saroh/ui/option-select";
 
+import { chipClass } from "@/components/shared/chip";
 import { ProductFilter } from "./product-filter";
 
 const SELECT =
@@ -191,6 +191,7 @@ export function OrderFilters({
                     size="inline"
                     type="button"
                     onClick={() => go({ ...NO_FILTERS })}
+                    className="rounded-sm px-1 text-foreground underline decoration-border-strong underline-offset-4 transition-colors duration-fast hover:decoration-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring active:text-muted-foreground"
                 >
                     Clear filters
                 </Button>
@@ -214,12 +215,7 @@ function Toggle({
             type="button"
             aria-pressed={on}
             onClick={onFlip}
-            className={cn(
-                "h-[34px] shrink-0 cursor-pointer rounded-full border px-3 text-[12.5px] transition-colors duration-fast focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 coarse:h-11",
-                on
-                    ? "border-foreground bg-foreground font-semibold text-background hover:bg-foreground/90 active:bg-foreground/80"
-                    : "border-border bg-card font-medium text-foreground/75 hover:bg-muted active:bg-foreground/[0.08]",
-            )}
+            className={chipClass(on)}
         >
             {label}
         </button>

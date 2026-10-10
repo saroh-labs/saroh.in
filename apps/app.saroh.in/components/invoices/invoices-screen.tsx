@@ -2,7 +2,6 @@
 
 import { Button } from "@saroh/ui/button";
 import { EmptyState } from "@saroh/ui/empty-state";
-import { cn } from "@saroh/ui/lib/utils";
 import { countLabel, PageHeader } from "@saroh/ui/page-header";
 import { ReceiptText } from "lucide-react";
 import Link from "next/link";
@@ -35,6 +34,8 @@ import {
 } from "@/lib/invoices/status";
 import { LIST_LIMIT } from "@/lib/lists/capped";
 import { withoutSince } from "@/lib/views/since";
+import { Notice } from "@saroh/ui/notice";
+import { TabStrip } from "@saroh/ui/tabs";
 
 /** The business's GST standing, for the line under the title. */
 export interface InvoiceBusinessTax {
@@ -117,7 +118,7 @@ export function InvoicesScreen({
 
     // The tab and the chip are part of the address, so a reload or a shared
     // link keeps them.
-    function remember(key: "view" | "source", value: string | null) {
+    function remember(key: "tab" | "source", value: string | null) {
         const q = new URLSearchParams(params.toString());
         if (value === null) q.delete(key);
         else q.set(key, value);
@@ -127,7 +128,7 @@ export function InvoicesScreen({
 
     function pick(next: InvoiceTab) {
         setTab(next);
-        remember("view", next === "all" ? null : next);
+        remember("tab", next === "all" ? null : next);
     }
 
     function pickChip(next: SourceChip) {
@@ -202,44 +203,22 @@ export function InvoicesScreen({
                       : null}
             </p>
 
-            <div
-                role="tablist"
-                aria-label="Invoices"
-                className="flex flex-wrap gap-0.5 border-b border-border"
-            >
-                {INVOICE_TABS.map((t) => {
-                    const on = t.id === tab;
+            <TabStrip
+                label="Invoices"
+                idPrefix="invoices-tab"
+                value={tab}
+                onValueChange={pick}
+                tabs={INVOICE_TABS.map((t) => {
                     const n = mine.filter((i) => inTab(i, t.id)).length;
-                    const alarm = t.id === "overdue" && n > 0;
-                    return (
-                        <button
-                            key={t.id}
-                            type="button"
-                            role="tab"
-                            aria-selected={on}
-                            onClick={() => pick(t.id)}
-                            className={cn(
-                                "inline-flex items-center px-3.5 py-2.5 text-[13px] transition-colors duration-fast coarse:min-h-11",
-                                on
-                                    ? "font-semibold text-foreground shadow-[inset_0_-2px_0_hsl(var(--brand))]"
-                                    : "font-medium text-muted-foreground hover:text-foreground active:bg-accent-active",
-                            )}
-                        >
-                            {t.label}
-                            <span
-                                className={cn(
-                                    "ml-1.5 rounded-full px-1.5 py-px text-[11px] font-semibold",
-                                    alarm
-                                        ? "bg-destructive-subtle text-destructive-subtle-foreground"
-                                        : "bg-muted text-muted-foreground",
-                                )}
-                            >
-                                {n}
-                            </span>
-                        </button>
-                    );
+                    return {
+                        value: t.id,
+                        label: t.label,
+                        count: n,
+                        countTone:
+                            t.id === "overdue" && n > 0 ? "danger" : "neutral",
+                    };
                 })}
-            </div>
+            />
 
             <div className="flex flex-col pb-[26px] pt-4">
                 {scope ? (
@@ -268,24 +247,23 @@ export function InvoicesScreen({
                     </div>
                 ) : null}
                 {overdueCount > 0 && tab !== "overdue" ? (
-                    <div
-                        role="alert"
-                        className="mb-3.5 flex flex-wrap items-center gap-3 rounded-[12px] border border-destructive-subtle-foreground bg-destructive-subtle px-4 py-3"
-                    >
-                        <span className="flex-[1_1_260px] text-[13px] font-semibold text-destructive-subtle-foreground">
-                            {overdueCount} overdue · {sums(overdue)} — worked
-                            out from the due date.
-                        </span>
-                        <Button
-                            size="sm"
-                            type="button"
-                            variant="outline"
-                            onClick={() => pick("overdue")}
-                            className="border-destructive-subtle-foreground"
-                        >
-                            Show them
-                        </Button>
-                    </div>
+                    <Notice tone="error" className="mb-3.5">
+                        <div className="flex flex-wrap items-center gap-3">
+                            <span className="flex-[1_1_260px] text-[13px] font-semibold text-destructive-subtle-foreground">
+                                {overdueCount} overdue · {sums(overdue)} —
+                                worked out from the due date.
+                            </span>
+                            <Button
+                                size="sm"
+                                type="button"
+                                variant="outline"
+                                onClick={() => pick("overdue")}
+                                className="border-destructive-subtle-foreground"
+                            >
+                                Show them
+                            </Button>
+                        </div>
+                    </Notice>
                 ) : null}
 
                 {invoices.length === 0 && !scope ? (

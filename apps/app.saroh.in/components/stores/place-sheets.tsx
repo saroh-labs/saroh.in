@@ -2,12 +2,10 @@
 
 import { Input } from "@saroh/ui/input";
 import { Label } from "@saroh/ui/label";
-import { ToggleGroup, ToggleGroupItem } from "@saroh/ui/toggle-group";
 import type { FormEventHandler, ReactNode } from "react";
 import { useState } from "react";
 
 import { FormSheet } from "@/components/shared/form-sheet";
-import { SEGMENT, SEGMENTED } from "@/components/shared/segmented";
 import {
     addressDraftOf,
     addressPatch,
@@ -28,6 +26,7 @@ import type {
     StorefrontSettings,
 } from "@/lib/stores/storefronts";
 
+import { Segmented } from "@saroh/ui/segmented";
 import { LocationAddressFields } from "./location-address-fields";
 import type { Saver } from "./location-save";
 import { DEFAULT_WEEK, OpeningHoursFields } from "./opening-hours";
@@ -191,33 +190,25 @@ export function PlaceKindSheet({
                 );
             }}
         >
-            <ToggleGroup
-                type="single"
-                value={kind}
-                // Radix clears a single group when the pressed item is
-                // pressed again; a location is always one or the other.
-                onValueChange={(v) => {
-                    if (v !== "SHOP" && v !== "ONLINE") return;
-                    setKind(v);
-                    setError(null);
-                }}
-                disabled={pending}
+            <Segmented
                 id={KIND_FIELD_ID}
-                aria-label="Do customers come here?"
+                label="Do customers come here?"
                 aria-describedby={
                     error
                         ? "location-kind-error location-kind-note"
                         : "location-kind-note"
                 }
-                className={SEGMENTED}
-            >
-                <ToggleGroupItem value="SHOP" className={SEGMENT}>
-                    {KIND_ANSWER.SHOP}
-                </ToggleGroupItem>
-                <ToggleGroupItem value="ONLINE" className={SEGMENT}>
-                    {KIND_ANSWER.ONLINE}
-                </ToggleGroupItem>
-            </ToggleGroup>
+                value={kind}
+                onValueChange={(v) => {
+                    setKind(v);
+                    setError(null);
+                }}
+                disabled={pending}
+                options={[
+                    { value: "SHOP", label: KIND_ANSWER.SHOP },
+                    { value: "ONLINE", label: KIND_ANSWER.ONLINE },
+                ]}
+            />
             {error ? (
                 <p id="location-kind-error" role="alert" className={PROBLEM}>
                     {error}

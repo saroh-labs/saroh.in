@@ -1,6 +1,5 @@
 "use client";
 
-import { Button } from "@saroh/ui/button";
 import { Input } from "@saroh/ui/input";
 import { cn } from "@saroh/ui/lib/utils";
 import { showError, showUndo } from "@saroh/ui/toast";
@@ -27,6 +26,9 @@ import {
 } from "@/lib/products/editor-sections";
 import type { ProductDetail } from "@/lib/products/service";
 
+import { Notice } from "@saroh/ui/notice";
+import { ProgressBar } from "@saroh/ui/progress-bar";
+import { TextLink } from "@saroh/ui/text-link";
 import { useEditor, useSection } from "./editor-state";
 import { FieldHelp } from "./fields";
 import { LibraryPanel } from "./photo-library-panel";
@@ -361,7 +363,7 @@ export function PhotosSection({ product }: { product: ProductDetail | null }) {
                             : "text-foreground/75 hover:bg-muted/50",
                     )}
                 >
-                    <Plus aria-hidden className="size-[18px]" strokeWidth={2} />
+                    <Plus aria-hidden className="size-[18px]" />
                     <span>From your photos</span>
                 </button>
                 <button
@@ -375,11 +377,7 @@ export function PhotosSection({ product }: { product: ProductDetail | null }) {
                             : "text-foreground/75 hover:bg-muted/50",
                     )}
                 >
-                    <Upload
-                        aria-hidden
-                        className="size-[18px]"
-                        strokeWidth={2}
-                    />
+                    <Upload aria-hidden className="size-[18px]" />
                     <span>
                         {busy
                             ? `Uploading ${progress ?? 0}%`
@@ -391,40 +389,28 @@ export function PhotosSection({ product }: { product: ProductDetail | null }) {
                 {limit.text}
             </FieldHelp>
             {busy ? (
-                <div
-                    role="progressbar"
-                    aria-valuemin={0}
-                    aria-valuemax={100}
-                    aria-valuenow={progress ?? 0}
-                    aria-label="Upload progress"
-                    className="mt-2 h-1 w-full overflow-hidden rounded-full bg-muted"
-                >
-                    <div
-                        className="h-full rounded-full bg-foreground"
-                        style={{ width: `${progress ?? 0}%` }}
-                    />
-                </div>
+                <ProgressBar
+                    value={progress ?? 0}
+                    max={100}
+                    size="xs"
+                    label="Upload progress"
+                    className="mt-2"
+                />
             ) : null}
             {error ? (
-                <div
-                    role="alert"
-                    className="mt-[9px] text-pretty rounded-[9px] bg-destructive-subtle px-3 py-2.5 text-[12px] leading-[1.5] text-destructive"
-                >
+                <Notice tone="error" className="mt-[9px]">
                     {error}
-                </div>
+                </Notice>
             ) : null}
             {canWrite && !full ? (
-                <Button
-                    variant="link"
-                    size="inline"
-                    type="button"
+                <TextLink
                     disabled={ro}
                     aria-expanded={byAddress}
                     onClick={() => setByAddress((o) => !o)}
-                    className="mt-1"
+                    className="mt-1 text-[11.5px] disabled:cursor-not-allowed disabled:text-disabled-foreground coarse:min-h-11"
                 >
                     {byAddress ? "Close" : "Or add one by its address"}
-                </Button>
+                </TextLink>
             ) : null}
             {byAddress && !full && !ro ? (
                 <div className="mt-2">

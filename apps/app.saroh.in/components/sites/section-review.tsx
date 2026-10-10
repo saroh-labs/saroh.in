@@ -264,7 +264,7 @@ function SectionSlot({
                          * not using a mouse.
                          */
                         className={cn(
-                            "pointer-events-auto opacity-0 shadow-sm transition-opacity focus-visible:opacity-100 group-hover:opacity-100",
+                            "pointer-events-auto opacity-0 shadow-sm transition-opacity duration-fast focus-visible:opacity-100 group-hover:opacity-100",
                             open && "opacity-100",
                         )}
                         aria-expanded={open}

@@ -10,12 +10,12 @@ import type { ProductStatus } from "@/lib/products/service";
  */
 
 export const STATUS_LABEL: Record<ProductStatus, string> = {
-    PUBLISHED: "Published",
+    PUBLISHED: "Live",
     DRAFT: "Draft",
     ARCHIVED: "Archived",
 };
 
-/** Published is success; a draft and an archived product ask nothing yet. */
+/** Live is success; a draft and an archived product ask nothing yet. */
 export const STATUS_VARIANT: Record<
     ProductStatus,
     NonNullable<BadgeProps["variant"]>

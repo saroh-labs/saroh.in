@@ -2,7 +2,6 @@
 
 import { Switch } from "@saroh/ui/switch";
 import { showError, showSuccess } from "@saroh/ui/toast";
-import Link from "next/link";
 import { useTransition } from "react";
 
 import {
@@ -11,6 +10,7 @@ import {
 } from "@/lib/modules/actions";
 import { refusalSentence } from "@/lib/modules/blocker-copy";
 import type { ModuleView } from "@/lib/modules/schema";
+import { TextLink } from "@saroh/ui/text-link";
 
 /**
  * Per-Project module selection (ADR-003 / #116). OWNER/ADMIN choose which of
@@ -80,12 +80,9 @@ function ProjectModuleRow({
                 {!orgEnabled ? (
                     <p className="text-sm text-muted-foreground">
                         Not enabled for the organization.{" "}
-                        <Link
-                            href="/settings/modules"
-                            className="font-medium underline underline-offset-2"
-                        >
+                        <TextLink href="/settings/modules">
                             Enable it first
-                        </Link>
+                        </TextLink>
                     </p>
                 ) : !module.canManage ? (
                     <p className="text-sm text-muted-foreground">

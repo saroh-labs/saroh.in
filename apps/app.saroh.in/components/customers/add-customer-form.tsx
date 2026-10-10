@@ -23,6 +23,7 @@ import { personHref } from "@/lib/contacts/person-href";
 import { addCustomerAction } from "@/lib/customer-workspace/actions";
 import type { EmailHolder } from "@/lib/customer-workspace/service";
 import { trimmedOr } from "@/lib/forms/values";
+import { TextLink } from "@saroh/ui/text-link";
 
 const formSchema = z.object({
     email: z
@@ -98,14 +99,14 @@ export function AddCustomerForm() {
                             </FormControl>
                             <FormMessage />
                             {holder ? (
-                                <Link
+                                <TextLink
                                     href={personHref(holder.contactId)}
-                                    className="w-fit rounded-[4px] text-[13px] font-semibold text-brand transition-colors duration-fast hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 active:opacity-70"
+                                    className="w-fit text-[13px]"
                                 >
                                     {holder.name
                                         ? `Open ${holder.name}`
                                         : "Open them"}
-                                </Link>
+                                </TextLink>
                             ) : null}
                         </FormItem>
                     )}

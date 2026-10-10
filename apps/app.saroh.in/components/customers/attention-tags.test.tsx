@@ -70,7 +70,11 @@ describe("AttentionTags", () => {
                 ]}
             />,
         );
-        expect(html).toContain('title="Explain each step before starting"');
+        // The tag's own sentence is its description (and a tooltip), not
+        // the browser's hover text, which a thumb never sees.
+        expect(html).toContain(
+            'aria-description="Explain each step before starting"',
+        );
         expect(html).toContain("<svg");
     });
 });

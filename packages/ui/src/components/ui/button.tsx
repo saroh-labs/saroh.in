@@ -63,7 +63,7 @@ const buttonVariants = cva(
                 ghost: "hover:bg-accent hover:text-accent-foreground active:bg-accent-active",
                 // Ink, not Saffron: in the product the accent belongs to the active
                 // state and nothing else, and a link is not a state.
-                link: "text-primary underline-offset-4 hover:underline disabled:bg-transparent disabled:shadow-none",
+                link: "text-primary underline-offset-4 hover:underline active:text-muted-foreground disabled:bg-transparent disabled:shadow-none",
             },
             /*
              * 28 / 32 / 38 / 45 — extra small for a control inside a dense

@@ -19,7 +19,8 @@ import {
 } from "@/lib/orders/visits";
 
 import { FailedRead } from "@/components/shared/failed-read";
-import type { PillTone } from "./parts";
+import { StatusBadge } from "@/components/shared/status-badge";
+import { Notice } from "@saroh/ui/notice";
 import { FOCUS, Panel, PanelTitle } from "./parts";
 
 /*
@@ -34,13 +35,6 @@ import { FOCUS, Panel, PanelTitle } from "./parts";
  * visit is moved or cancelled on its booking, which the row opens. Money on
  * a treatment comes back only through the order's refund.
  */
-
-const PILL: Record<PillTone, string> = {
-    brand: "bg-brand-subtle text-brand-subtle-foreground",
-    success: "bg-success-subtle text-success-subtle-foreground",
-    neutral: "bg-muted text-neutral-700 dark:text-muted-foreground",
-    danger: "bg-destructive-subtle text-destructive-subtle-foreground",
-};
 
 /**
  * What a treatment shows where an order shows its kitchen: the visits'
@@ -106,17 +100,14 @@ export function VisitsCard({
                 ) : null}
             </div>
             {card?.entries.map((e) => (
-                <div
+                <Notice
                     key={e.id}
-                    role="alert"
-                    className={cn(
-                        "rounded-lg bg-destructive-subtle px-2.5 py-2 text-[12.5px] leading-[1.45] text-destructive-subtle-foreground",
-                        e.sensitive && "print:hidden",
-                    )}
+                    tone="error"
+                    className={e.sensitive ? "print:hidden" : undefined}
                 >
                     <strong>{e.text}.</strong>
                     {details.get(e.id) ? ` ${details.get(e.id)}` : null}
-                </div>
+                </Notice>
             ))}
             {card?.hidden ? (
                 <p className="text-[12px] text-muted-foreground print:hidden">
@@ -124,15 +115,12 @@ export function VisitsCard({
                 </p>
             ) : null}
             {attention === null ? (
-                <p
-                    role="status"
-                    className="rounded-lg bg-muted px-2.5 py-2 text-[12.5px] leading-[1.45] text-muted-foreground"
-                >
+                <Notice role="status">
                     <span className="font-semibold text-foreground">
                         Needs attention: not available.
                     </span>{" "}
                     Check with {first} before the visit.
-                </p>
+                </Notice>
             ) : null}
             {visits ? (
                 <ol className="grid gap-2.5" aria-label="Visits">
@@ -206,14 +194,11 @@ function VisitRow({
                 </span>
             </span>
             <span className="flex items-center gap-1">
-                <span
-                    className={cn(
-                        "whitespace-nowrap rounded-full px-[9px] py-0.5 text-[11.5px] font-semibold",
-                        PILL[state.tone],
-                    )}
+                <StatusBadge
+                    tone={state.tone === "brand" ? "active" : state.tone}
                 >
                     {state.label}
-                </span>
+                </StatusBadge>
                 {href ? (
                     <ChevronRight
                         aria-hidden
@@ -235,7 +220,7 @@ function VisitRow({
             className={cn(
                 FOCUS,
                 grid,
-                "-mx-2 cursor-pointer rounded-lg px-2 text-foreground transition-colors duration-100 hover:bg-muted active:bg-muted/70 coarse:min-h-11",
+                "-mx-2 cursor-pointer rounded-lg px-2 text-foreground transition-colors duration-fast hover:bg-muted active:bg-muted/70 coarse:min-h-11",
             )}
         >
             {body}
@@ -285,7 +270,7 @@ export function VisitsStepper({
                                         "size-2.5 shrink-0 rounded-full",
                                         done && "bg-foreground",
                                         current &&
-                                            "bg-highlight ring-[3px] ring-brand-subtle",
+                                            "bg-foreground ring-[3px] ring-foreground",
                                         !done &&
                                             !current &&
                                             "border-[1.5px] border-border-strong",

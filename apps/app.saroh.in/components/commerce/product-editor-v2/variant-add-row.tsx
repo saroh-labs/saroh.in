@@ -3,11 +3,12 @@
 import { Button } from "@saroh/ui/button";
 import { Input } from "@saroh/ui/input";
 import { cn } from "@saroh/ui/lib/utils";
-import Link from "next/link";
 
 import { productSettingsHref } from "@/lib/products/links";
 import { OptionSelect } from "@saroh/ui/option-select";
 
+import { chipClass } from "@/components/shared/chip";
+import { TextLink } from "@saroh/ui/text-link";
 import { MoneyBox } from "./fields";
 
 /**
@@ -160,24 +161,19 @@ export function OptionChoice({
                             onClick={() => {
                                 if (!on) onPick(o);
                             }}
-                            className={cn(
-                                "h-7 rounded-full border px-2.5 text-[12px] disabled:cursor-not-allowed coarse:h-11",
-                                on
-                                    ? "border-foreground bg-foreground font-semibold text-background"
-                                    : "border-border bg-card font-medium text-foreground/75 hover:bg-muted/50",
-                            )}
+                            className={chipClass(on)}
                         >
                             {o.name}
                         </button>
                     );
                 })}
             </div>
-            <Link
+            <TextLink
                 href={productSettingsHref("options")}
-                className="text-[12px] text-brand transition-colors hover:text-foreground active:text-muted-foreground"
+                className="text-[12px]"
             >
                 Manage options
-            </Link>
+            </TextLink>
         </div>
     );
 }

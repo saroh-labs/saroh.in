@@ -67,7 +67,7 @@ export function FieldHelp({
                 tone === "bad"
                     ? "text-destructive"
                     : tone === "warn"
-                      ? "text-brand-subtle-foreground"
+                      ? "text-foreground"
                       : "text-muted-foreground",
                 className,
             )}

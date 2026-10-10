@@ -282,7 +282,7 @@ export function WeeklyHours({
                                 </p>
                             ) : null}
                             {out.length ? (
-                                <p className="basis-full text-[12px] text-brand-subtle-foreground">
+                                <p className="basis-full text-[12px] text-foreground">
                                     {out.length}{" "}
                                     {out.length === 1
                                         ? "booking this week falls"

@@ -219,7 +219,7 @@ export function ProductOverviewTab({
                                 className={cn(
                                     "text-[12px] leading-[1.45]",
                                     reviews.data.toAnswer > 0
-                                        ? "text-brand"
+                                        ? "text-foreground"
                                         : "text-muted-foreground",
                                 )}
                             >

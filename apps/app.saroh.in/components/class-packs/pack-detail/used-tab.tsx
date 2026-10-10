@@ -2,8 +2,8 @@
 
 import { FailedState, PermissionDeniedState } from "@saroh/ui/data-state";
 
+import { StatusBadge } from "@/components/shared/status-badge";
 import { whoCanChange } from "@/components/shared/who-can-change";
-import { Pill } from "@/components/subscriptions/pill";
 import type { UseRow } from "@/lib/class-packs/pack-activity";
 import { couldntLoad, nothingChanged } from "@saroh/ui/lib/state-copy";
 
@@ -99,7 +99,9 @@ export function UsedTab({
                             <span className="min-w-0 flex-[1_1_140px] text-foreground/80">
                                 {u.who}
                             </span>
-                            <Pill tone={u.state.tone}>{u.state.label}</Pill>
+                            <StatusBadge tone={u.state.tone}>
+                                {u.state.label}
+                            </StatusBadge>
                         </li>
                     ))}
                 </ul>

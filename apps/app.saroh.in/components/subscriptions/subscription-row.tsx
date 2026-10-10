@@ -2,6 +2,7 @@
 
 import { cn } from "@saroh/ui/lib/utils";
 
+import { StatusBadge } from "@/components/shared/status-badge";
 import type { Plan, Subscription } from "@/lib/subscriptions/service";
 import {
     initials,
@@ -12,24 +13,6 @@ import {
     TAB_LABEL,
     TAB_TONE,
 } from "@/lib/subscriptions/view";
-
-import { Pill } from "./pill";
-
-/** A tab's count; a failed renewal's count is red while it has any. */
-export function Count({ n, danger = false }: { n: number; danger?: boolean }) {
-    return (
-        <span
-            className={cn(
-                "ml-1.5 rounded-full px-1.5 py-px text-[11px] font-semibold",
-                danger && n > 0
-                    ? "bg-destructive-subtle text-destructive-subtle-foreground"
-                    : "bg-muted text-muted-foreground",
-            )}
-        >
-            {n}
-        </span>
-    );
-}
 
 /** One subscription on the list; it opens the quick look. */
 export function SubscriptionRow({
@@ -56,7 +39,7 @@ export function SubscriptionRow({
             className={cn(
                 "flex w-full flex-wrap items-center gap-3 rounded-[11px] border border-border px-3.5 py-3 text-left hover:border-border-strong focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 active:bg-accent-active",
                 open
-                    ? "bg-brand-subtle shadow-[inset_3px_0_0_hsl(var(--highlight))]"
+                    ? "bg-muted shadow-[inset_3px_0_0_hsl(var(--foreground))]"
                     : "bg-card",
             )}
         >
@@ -78,13 +61,13 @@ export function SubscriptionRow({
                     {older ? (
                         <>
                             {" · "}
-                            <span className="text-brand">older price</span>
+                            <span className="text-foreground">older price</span>
                         </>
                     ) : null}
                 </span>
             </span>
             <span className="min-w-0 flex-[1_1_110px]">
-                <Pill tone={TAB_TONE[tab]}>{TAB_LABEL[tab]}</Pill>
+                <StatusBadge tone={TAB_TONE[tab]}>{TAB_LABEL[tab]}</StatusBadge>
             </span>
             <span
                 className={cn(

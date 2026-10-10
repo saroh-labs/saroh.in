@@ -8,13 +8,13 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 
 import { reportFailure } from "@/components/billing/plan-refusal";
-import { InvoicePill } from "@/components/invoices/invoice-pill";
 import {
     NewLinkConfirm,
     UnseenLinkNote,
 } from "@/components/invoices/unseen-link";
 import { QrButton } from "@/components/qr/qr-button";
 import { QuickLook, QuickLookCard } from "@/components/shared/quick-look";
+import { StatusBadge } from "@/components/shared/status-badge";
 import { ViewerDate } from "@/components/shared/viewer-date";
 import { formatMoneyMajor } from "@/lib/format/money";
 import { readInvoice } from "@/lib/invoices/actions";
@@ -40,6 +40,11 @@ import {
     sourceLine,
     whenLine,
 } from "@/lib/invoices/status";
+import {
+    copyFailedMessage,
+    copyText as writeClipboard,
+} from "@saroh/ui/copy-button";
+import { Notice } from "@saroh/ui/notice";
 
 type Read =
     | { state: "loading" }
@@ -159,16 +164,14 @@ export function InvoiceQuickLook({
         linkSight({ linkOut, held: remembered !== null }) === "unseen";
 
     async function copyText(url: string, made: boolean) {
-        try {
-            await navigator.clipboard.writeText(url);
-            showSuccess(
-                made
-                    ? `Pay link copied. Send it to ${who.name}.`
-                    : "Pay link copied.",
-            );
-        } catch {
-            showError("Couldn't copy it. Select the link below and copy it.");
+        if (!(await writeClipboard(url))) {
+            showError(copyFailedMessage());
+            return;
         }
+        // A toast only when the link was also just made: it says who to
+        // send it to. A plain copy is acknowledged by the button.
+        if (made) showSuccess(`Pay link copied. Send it to ${who.name}.`);
+        else showSuccess("Pay link copied.");
     }
 
     async function copyLink() {
@@ -220,7 +223,7 @@ export function InvoiceQuickLook({
                     )}
                 </>
             }
-            status={<InvoicePill label={pill.label} variant={pill.variant} />}
+            status={<StatusBadge tone={pill.variant}>{pill.label}</StatusBadge>}
             description={`${paperTitle(i)} for ${who.name}, ${money(i.total)}.`}
             footer={
                 <>
@@ -255,17 +258,14 @@ export function InvoiceQuickLook({
             }
         >
             {i.standing === "OVERDUE" && i.dueAt ? (
-                <div
-                    role="alert"
-                    className="rounded-[12px] border border-destructive-subtle-foreground bg-destructive-subtle px-3.5 py-[11px] text-[13px] font-bold text-destructive-subtle-foreground"
-                >
+                <Notice tone="error">
                     {late.before} — due{" "}
                     <ViewerDate
                         iso={i.dueAt}
                         variant="dayMonth"
                         timeZone={timeZone}
                     />
-                </div>
+                </Notice>
             ) : null}
 
             <QuickLookCard label="Billed to">

@@ -352,7 +352,7 @@ describe("a discount code, for someone who reads discounts", () => {
         expect(said).toContain("MARKETDAY");
         expect(said).toContain("15% off");
         expect(said).toContain("12 of 100");
-        expect(said).toContain("Active");
+        expect(said).toContain("Live");
         expect(said).not.toMatch(/<input|<form|discount-form|>Save/);
         // The form's options are never read for a page that has no form.
         expect(loadReachOptions).not.toHaveBeenCalled();

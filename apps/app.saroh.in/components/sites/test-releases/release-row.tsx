@@ -38,6 +38,7 @@ import {
 const BADGE = {
     success: "success",
     draft: "draft",
+    active: "active",
     neutral: "neutral",
     error: "error",
     info: "info",
@@ -122,10 +123,7 @@ export function ReleaseRow({
                         {status.line}
                     </p>
                 </div>
-                <Badge
-                    variant={BADGE[status.tone]}
-                    className="shrink-0 whitespace-nowrap"
-                >
+                <Badge variant={BADGE[status.tone]} className="shrink-0">
                     {status.label}
                 </Badge>
             </div>
@@ -156,7 +154,7 @@ export function ReleaseRow({
                         <li className="flex items-start gap-1.5 text-muted-foreground">
                             <span
                                 aria-hidden
-                                className="mx-[5px] mt-[7px] size-1 shrink-0 rounded-full bg-highlight"
+                                className="mx-[5px] mt-[7px] size-1 shrink-0 rounded-full bg-foreground"
                             />
                             Your draft has changed since
                         </li>

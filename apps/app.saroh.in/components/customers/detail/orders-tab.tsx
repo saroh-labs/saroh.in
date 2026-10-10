@@ -1,7 +1,5 @@
 "use client";
 
-import Link from "next/link";
-
 import { OrderCardFrame } from "@/components/commerce/orders/order-row";
 
 import type { DetailOrder } from "@/lib/customer-workspace/detail";
@@ -15,7 +13,9 @@ import {
 } from "@/lib/customer-workspace/view";
 import { money } from "@/lib/subscriptions/view";
 
-import { Chips, Empty, RowPill } from "./parts";
+import { StatusBadge } from "@/components/shared/status-badge";
+import { TextLink } from "@saroh/ui/text-link";
+import { Chips, Empty } from "./parts";
 
 const COLS =
     "grid grid-cols-[70px_minmax(0,1.6fr)_90px_90px_100px_90px] gap-2.5";
@@ -66,7 +66,7 @@ export function OrdersTab({
             <div className="overflow-x-auto rounded-xl border border-border bg-card px-[18px] pb-1.5 max-[759px]:hidden">
                 <div className="min-w-[560px]">
                     <div
-                        className={`${COLS} border-b border-foreground/10 pb-[7px] pt-2.5 text-[11px] font-semibold uppercase tracking-[0.06em] text-muted-foreground`}
+                        className={`${COLS} label border-b border-border pb-[7px] pt-2.5`}
                     >
                         <span>Order</span>
                         <span>What</span>
@@ -80,12 +80,12 @@ export function OrdersTab({
                             key={o.id}
                             className={`${COLS} items-center border-b border-foreground/10 py-2.5 text-[13px] last:border-b-0`}
                         >
-                            <Link
+                            <TextLink
                                 href={`/commerce/orders/${o.id}`}
-                                className="font-mono text-[12px] text-brand transition-colors hover:text-foreground active:text-muted-foreground"
+                                className="font-mono text-[12px]"
                             >
                                 #{o.number}
-                            </Link>
+                            </TextLink>
                             <span className="text-foreground/75">
                                 {orderWhat(o)}
                             </span>
@@ -101,9 +101,9 @@ export function OrdersTab({
                                 {whenText(o.placedAt, timeZone, now)}
                             </span>
                             <span>
-                                <RowPill tone={isOpen(o) ? "ok" : "off"}>
+                                <StatusBadge tone={isOpen(o) ? "ok" : "off"}>
                                     {orderStatus(o)}
-                                </RowPill>
+                                </StatusBadge>
                             </span>
                         </div>
                     ))}
@@ -145,9 +145,11 @@ export function OrdersTab({
                                     <span className="font-mono">
                                         #{o.number}
                                     </span>
-                                    <RowPill tone={isOpen(o) ? "ok" : "off"}>
+                                    <StatusBadge
+                                        tone={isOpen(o) ? "ok" : "off"}
+                                    >
                                         {orderStatus(o)}
-                                    </RowPill>
+                                    </StatusBadge>
                                 </>
                             }
                             footer={
@@ -169,12 +171,7 @@ export function OrdersTab({
             {count > rows.length ? (
                 <p className="mt-2 text-[12px] text-muted-foreground">
                     The latest {rows.length} of {count} orders.{" "}
-                    <Link
-                        href="/commerce/orders"
-                        className="font-semibold text-brand transition-colors hover:text-foreground active:text-muted-foreground"
-                    >
-                        All orders
-                    </Link>
+                    <TextLink href="/commerce/orders">All orders</TextLink>
                 </p>
             ) : null}
         </>

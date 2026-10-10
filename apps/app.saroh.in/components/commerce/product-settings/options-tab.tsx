@@ -2,7 +2,6 @@
 
 import { Button } from "@saroh/ui/button";
 import { EmptyState } from "@saroh/ui/data-state";
-import { cn } from "@saroh/ui/lib/utils";
 import { showError, showUndo } from "@saroh/ui/toast";
 import { Plus } from "lucide-react";
 import { useRouter } from "next/navigation";
@@ -12,6 +11,7 @@ import type { CatalogueView } from "@/lib/products/settings";
 import { addOption, removeOption } from "@/lib/products/settings-actions";
 
 import { ReadOnlyNote } from "@/components/shared/read-only-note";
+import { Tip } from "@saroh/ui/tooltip";
 import { OptionSheet } from "./option-sheet";
 import { TabIntro } from "./product-settings";
 
@@ -101,59 +101,63 @@ export function OptionsTab({ catalogue }: { catalogue: CatalogueView }) {
                                                 option={o}
                                                 options={options}
                                             />
-                                            <Button
-                                                variant="outline"
-                                                size="xs"
-                                                type="button"
-                                                disabled={used || pending}
-                                                title={
+                                            <Tip
+                                                label={
                                                     used
                                                         ? usedLine
                                                         : `Delete ${o.name}`
                                                 }
-                                                aria-label={`Delete ${o.name}`}
-                                                className={cn(
-                                                    !used &&
-                                                        "text-destructive hover:text-destructive",
-                                                )}
-                                                onClick={() =>
-                                                    run(async () => {
-                                                        const res =
-                                                            await removeOption(
-                                                                o.id,
-                                                            );
-                                                        if (!res.ok)
-                                                            return showError(
-                                                                res.error,
-                                                            );
-                                                        showUndo(
-                                                            `${o.name} deleted.`,
-                                                            () =>
-                                                                run(
-                                                                    async () => {
-                                                                        const undo =
-                                                                            await addOption(
-                                                                                res
-                                                                                    .data
-                                                                                    .name,
-                                                                                res
-                                                                                    .data
-                                                                                    .values,
-                                                                            );
-                                                                        if (
-                                                                            !undo.ok
-                                                                        )
-                                                                            showError(
-                                                                                undo.error,
-                                                                            );
-                                                                    },
-                                                                ),
-                                                        );
-                                                    })
-                                                }
                                             >
-                                                Delete
-                                            </Button>
+                                                <Button
+                                                    variant="outline"
+                                                    size="xs"
+                                                    type="button"
+                                                    disabled={used || pending}
+                                                    aria-label={`Delete ${o.name}`}
+                                                    className={
+                                                        used
+                                                            ? undefined
+                                                            : "text-destructive"
+                                                    }
+                                                    onClick={() =>
+                                                        run(async () => {
+                                                            const res =
+                                                                await removeOption(
+                                                                    o.id,
+                                                                );
+                                                            if (!res.ok)
+                                                                return showError(
+                                                                    res.error,
+                                                                );
+                                                            showUndo(
+                                                                `${o.name} deleted.`,
+                                                                () =>
+                                                                    run(
+                                                                        async () => {
+                                                                            const undo =
+                                                                                await addOption(
+                                                                                    res
+                                                                                        .data
+                                                                                        .name,
+                                                                                    res
+                                                                                        .data
+                                                                                        .values,
+                                                                                );
+                                                                            if (
+                                                                                !undo.ok
+                                                                            )
+                                                                                showError(
+                                                                                    undo.error,
+                                                                                );
+                                                                        },
+                                                                    ),
+                                                            );
+                                                        })
+                                                    }
+                                                >
+                                                    Delete
+                                                </Button>
+                                            </Tip>
                                         </div>
                                     ) : null}
                                 </div>

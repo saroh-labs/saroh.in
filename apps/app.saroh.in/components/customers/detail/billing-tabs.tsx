@@ -14,7 +14,9 @@ import type {
 import type { Kind } from "@/lib/customer-workspace/view";
 import { invoiceRow, isPayable, subRow } from "@/lib/customer-workspace/view";
 
-import { Empty, ROW_LINK, RowPill } from "./parts";
+import { StatusBadge } from "@/components/shared/status-badge";
+import { Notice } from "@saroh/ui/notice";
+import { Empty, ROW_LINK } from "./parts";
 
 /**
  * Subscriptions (a shop) or Membership (a bookings business): each one
@@ -58,7 +60,7 @@ export function SubscriptionsTab({
                                 {r.when}
                             </div>
                         </div>
-                        <RowPill tone={r.tone}>{r.status}</RowPill>
+                        <StatusBadge tone={r.tone}>{r.status}</StatusBadge>
                         <span className="font-semibold tabular-nums">
                             {r.price}
                         </span>
@@ -103,12 +105,9 @@ export function InvoicesTab({
     return (
         <>
             {owed ? (
-                <div
-                    role="status"
-                    className="mb-2.5 rounded-xl border border-highlight bg-brand-subtle px-3.5 py-[11px] text-[13px] font-semibold text-brand-subtle-foreground"
-                >
+                <Notice tone="info" className="mb-2.5">
                     {owed}
-                </div>
+                </Notice>
             ) : null}
             {!rows.length ? <Empty>No invoices yet.</Empty> : null}
             <div className="flex flex-col gap-2">
@@ -128,7 +127,7 @@ export function InvoicesTab({
                             <div className="min-w-0 flex-[2_1_160px] text-[12.5px] text-muted-foreground">
                                 {r.from}
                             </div>
-                            <RowPill tone={r.tone}>{r.status}</RowPill>
+                            <StatusBadge tone={r.tone}>{r.status}</StatusBadge>
                             <span className="min-w-[70px] text-right font-semibold tabular-nums">
                                 {r.total}
                             </span>

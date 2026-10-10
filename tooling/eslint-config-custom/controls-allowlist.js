@@ -32,16 +32,16 @@ export const RAW_ALLOWED = {
     "components/bookings/calendar/agenda-month.tsx": ["button"],
     // button: a chip
     "components/bookings/calendar/booking-quick-look.tsx": ["button"],
-    // button: one of a segmented choice (radio)
-    "components/bookings/calendar/calendar-screen.tsx": ["button"],
-    // button: a cell covered by its button, a control styled by its screen's own helper, a row or card that is one button
+    // button: a cell covered by its button, a row or card that is one button
     "components/bookings/calendar/day-by-person.tsx": ["button"],
-    // button: a control styled by its screen's own helper, a row or card that is one button
+    // button: a row or card that is one button
     "components/bookings/calendar/week-view.tsx": ["button"],
     // button: one of a segmented choice (radio); label: a label that wraps its control
     "components/bookings/new-booking-dialog.tsx": ["button", "label"],
     // label: a label that wraps its control
     "components/bookings/pay-link-panel.tsx": ["label"],
+    // button: a choice in a list
+    "components/bookings/reschedule-booking.tsx": ["button"],
     // label: a label that wraps its control
     "components/bookings/take-payment.tsx": ["label"],
     // button: a pressed-or-not toggle or filter chip
@@ -50,20 +50,14 @@ export const RAW_ALLOWED = {
     "components/calendar/month-grid.tsx": ["button"],
     // button: a row or card that is one button
     "components/calendar/month-strip.tsx": ["button"],
-    // button: one of a segmented choice (radio)
-    "components/calendar/view-switch.tsx": ["button"],
     // button: a choice in a list
     "components/calendar/week-columns.tsx": ["button"],
     // button: a choice in a list
     "components/calendar/week-hour-grid.tsx": ["button"],
     // button: a pressed-or-not toggle or filter chip
     "components/class-packs/pack-detail/detail-header.tsx": ["button"],
-    // button: a tab
-    "components/class-packs/pack-detail/holders-tab.tsx": ["button"],
     // button: a control styled by its screen's own helper
     "components/class-packs/pack-detail/overview.tsx": ["button"],
-    // button: a tab
-    "components/class-packs/pack-detail/pack-detail.tsx": ["button"],
     // label: a label that wraps its control
     "components/class-packs/pack-editor/pack-sections.tsx": ["label"],
     // label: a label that wraps its control
@@ -98,7 +92,7 @@ export const RAW_ALLOWED = {
     "components/commerce/orders/bulk-bar.tsx": ["button"],
     // button: a pressed-or-not toggle or filter chip
     "components/commerce/orders/order-filters.tsx": ["button"],
-    // button: a control styled by its screen's own helper, a row or card that is one button
+    // button: a row or card that is one button
     "components/commerce/orders/order-row.tsx": ["button"],
     // button: a combobox trigger
     "components/commerce/product-editor-v2/category-picker.tsx": ["button"],
@@ -110,7 +104,7 @@ export const RAW_ALLOWED = {
     "components/commerce/product-editor-v2/made-by-section.tsx": ["button"],
     // label: a label that wraps its control
     "components/commerce/product-editor-v2/option-values-inline.tsx": ["label"],
-    // button: a pressed-or-not toggle or filter chip
+    // button: a row or card that is one button
     "components/commerce/product-editor-v2/photo-library-panel.tsx": ["button"],
     // button: a control styled by its screen's own helper; input: a file picker
     "components/commerce/product-editor-v2/photos-section.tsx": [
@@ -137,8 +131,6 @@ export const RAW_ALLOWED = {
     "components/commerce/product-page/stock-tab.tsx": ["button"],
     // button: a row or card that is one button
     "components/commerce/product-page/stock-table.tsx": ["button"],
-    // button: a row or card that is one button
-    "components/commerce/product-page/tab-row.tsx": ["button"],
     // button: a control styled by its screen's own helper
     "components/commerce/product-page/tracking-actions.tsx": ["button"],
     // button: a pressed-or-not toggle or filter chip, a row or pill that is a switch, one of a segmented choice (radio); label: a label that wraps its control
@@ -151,7 +143,7 @@ export const RAW_ALLOWED = {
         "button",
         "label",
     ],
-    // button: a row or pill that is a switch, one of a segmented choice (radio)
+    // button: a row or pill that is a switch
     "components/commerce/product-sections/shop-switch.tsx": ["button"],
     // button: one of a segmented choice (radio)
     "components/commerce/product-settings/category-merge-sheet.tsx": ["button"],
@@ -184,8 +176,6 @@ export const RAW_ALLOWED = {
         "button",
         "label",
     ],
-    // button: a tab
-    "components/customers/detail/header.tsx": ["button"],
     // button: one of a segmented choice (radio); label: a label that wraps its control
     "components/customers/detail/merge-parts.tsx": ["button", "label"],
     // button: a row or card that is one button; label: a label that wraps its control
@@ -206,8 +196,6 @@ export const RAW_ALLOWED = {
     "components/invoices/invoice-form.tsx": ["button"],
     // button: a row or card that is one button
     "components/invoices/invoice-row.tsx": ["button"],
-    // button: a tab
-    "components/invoices/invoices-screen.tsx": ["button"],
     // input: a native radio inside its own label; label: a label that wraps its control
     "components/leads/add-lead-dialog.tsx": ["input", "label"],
     // label: a label that wraps its control
@@ -226,13 +214,13 @@ export const RAW_ALLOWED = {
     "components/organizations/invoice-number-fields.tsx": ["label"],
     // button: a row or pill that is a switch
     "components/organizations/member-extras.tsx": ["button"],
-    // button: a choice in a list
+    // button: a row or card that is one button
     "components/organizations/organization-switcher.tsx": ["button"],
     // button: a pressed-or-not toggle or filter chip, a row or card that is one button; input: a native radio inside its own label; label: a label that wraps its control
     "components/organizations/roles-tab.tsx": ["button", "input", "label"],
     // button: one of a segmented choice (radio)
     "components/organizations/setup-kind-choice.tsx": ["button"],
-    // button: a pressed-or-not toggle or filter chip, one of a segmented choice (radio); input: a native radio inside its own label, a native tick inside its own label; label: a label that wraps its control
+    // button: one of a segmented choice (radio); input: a native radio inside its own label, a native tick inside its own label; label: a label that wraps its control
     "components/organizations/team-screen.tsx": ["button", "input", "label"],
     // input: a native radio inside its own label; label: a label that wraps its control
     "components/providers/provider-setup-sheet.tsx": ["input", "label"],
@@ -254,22 +242,20 @@ export const RAW_ALLOWED = {
     "components/services/service-editor/more-settings.tsx": ["label"],
     // label: a label that wraps its control
     "components/services/service-editor/where-field.tsx": ["label"],
-    // button: a row that opens
+    // button: a row or card that is one button
     "components/settings/activity-list.tsx": ["button"],
-    // button: one of a segmented choice (radio)
-    "components/settings/plan-billing/plan-chooser.tsx": ["button"],
     // button: a control styled by its screen's own helper, an option in a list; input: a field its screen draws itself
     "components/settings/settings-search.tsx": ["button", "input"],
     // button: a row or card that is one button
     "components/shared/app-sidebar.tsx": ["button"],
-    // button: one of a segmented choice (radio)
+    // button: a shared piece that passes its props to the button
     "components/shared/chip.tsx": ["button"],
     // button: a control styled by its screen's own helper
     "components/shared/failed-read.tsx": ["button"],
     // input: a file picker
     "components/shared/logo-upload.tsx": ["input"],
     // button: a tab
-    "components/shared/settings-tab-strip.tsx": ["button"],
+    "components/shared/section-list.tsx": ["button"],
     // button: a control styled by its screen's own helper
     "components/shared/tab-bar.tsx": ["button"],
     // button: a chip
@@ -284,8 +270,6 @@ export const RAW_ALLOWED = {
     "components/sites/block-feedback.tsx": ["label"],
     // button: a pressed-or-not toggle or filter chip
     "components/sites/choice-field.tsx": ["button"],
-    // button: a tab
-    "components/sites/editor-chrome.tsx": ["button"],
     // button: a row or card that is one button
     "components/sites/editor/editor-canvas.tsx": ["button"],
     // button: a choice in a list
@@ -306,8 +290,6 @@ export const RAW_ALLOWED = {
     "components/sites/post-editor.tsx": ["input"],
     // button: a row or card that is one button
     "components/sites/pre-publish-check.tsx": ["button"],
-    // button: one of a segmented choice (radio)
-    "components/sites/preview-links.tsx": ["button"],
     // button: a pressed-or-not toggle or filter chip; input: a field its screen draws itself
     "components/sites/rich-text-editor.tsx": ["button", "input"],
     // label: a label that wraps its control
@@ -324,16 +306,14 @@ export const RAW_ALLOWED = {
     "components/sites/sells-from-row.tsx": ["label"],
     // button: a pressed-or-not toggle or filter chip
     "components/sites/settings/menu-footer-sheets.tsx": ["button"],
-    // button: a tab; label: a label that wraps its control
-    "components/sites/settings/settings-sections.tsx": ["button", "label"],
+    // label: a label that wraps its control
+    "components/sites/settings/settings-sections.tsx": ["label"],
     // button: one of a segmented choice (radio); input: a slider; label: a label that wraps its control
     "components/sites/style-panel.tsx": ["button", "input", "label"],
     // button: a pressed-or-not toggle or filter chip; label: a label that wraps its control
     "components/sites/template-picker.tsx": ["button", "label"],
     // button: one of a segmented choice (radio)
     "components/sites/test-releases/go-live-dialog.tsx": ["button"],
-    // button: one of a segmented choice (radio)
-    "components/sites/test-releases/release-links.tsx": ["button"],
     // label: a label that wraps its control
     "components/sites/verdict-controls.tsx": ["label"],
     // label: a label that wraps its control
@@ -342,14 +322,10 @@ export const RAW_ALLOWED = {
     "components/stores/csv-import.tsx": ["input"],
     // label: a label that wraps its control
     "components/stores/invite-reviews-sheet.tsx": ["label"],
-    // button: a tab
-    "components/stores/location-tabs.tsx": ["button"],
     // label: a label that wraps its control
     "components/stores/reviews-view.tsx": ["label"],
     // label: a label that wraps its control
     "components/subscriptions/members-pause-row.tsx": ["label"],
-    // button: a tab
-    "components/subscriptions/plan-detail/detail-screen.tsx": ["button"],
     // label: a label that wraps its control
     "components/subscriptions/plan-detail/plan-autopay-timing.tsx": ["label"],
     // label: a label that wraps its control
@@ -371,8 +347,6 @@ export const RAW_ALLOWED = {
     ],
     // button: a row or card that is one button
     "components/subscriptions/subscription-row.tsx": ["button"],
-    // button: a tab; label: a label that wraps its control
-    "components/subscriptions/subscriptions-screen.tsx": ["button", "label"],
     // input: a native radio inside its own label; label: a label that wraps its control
     "components/subscriptions/timing-card.tsx": ["input", "label"],
 };

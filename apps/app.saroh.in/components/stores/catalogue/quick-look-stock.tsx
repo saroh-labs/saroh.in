@@ -23,6 +23,7 @@ import {
 } from "@/lib/products/quick-look";
 import { addedWords } from "@/lib/stock/levels";
 
+import { Notice } from "@saroh/ui/notice";
 import { TONE_TEXT } from "./tones";
 
 /**
@@ -76,15 +77,12 @@ export function StockBlock({
                 </p>
             ) : null}
             {stock.total.short > 0 ? (
-                <div
-                    role="alert"
-                    className="rounded-[9px] bg-destructive-subtle px-[11px] py-[9px] text-[12.5px] leading-[1.45] text-destructive-subtle-foreground"
-                >
+                <Notice tone="error">
                     <strong>{shortTitle(stock.total.short)}</strong>{" "}
                     {canStock
                         ? "Add stock below, or tell the customers their order will be late."
                         : "Someone who counts stock can add it, or tell the customers their order will be late."}
-                </div>
+                </Notice>
             ) : null}
             {showShelves(stock) ? (
                 <>

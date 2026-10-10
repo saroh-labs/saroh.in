@@ -3,7 +3,6 @@
 import { FieldError } from "@saroh/ui/field";
 import { Input } from "@saroh/ui/input";
 import { Textarea } from "@saroh/ui/textarea";
-import Link from "next/link";
 
 import type { CategoryNode } from "@/lib/collections/rules";
 import {
@@ -12,7 +11,9 @@ import {
     ruleNote,
 } from "@/lib/collections/rules";
 import { productSettingsHref } from "@/lib/products/links";
+import { Notice } from "@saroh/ui/notice";
 import { OptionSelect } from "@saroh/ui/option-select";
+import { TextLink } from "@saroh/ui/text-link";
 
 /**
  * The collection sheet's fields (#524), at the product page sheets' scale:
@@ -112,12 +113,9 @@ export function CategoryField({
             {categories.length === 0 ? (
                 <p className="text-[12.5px] text-muted-foreground">
                     There are no categories yet.{" "}
-                    <Link
-                        href={productSettingsHref("categories")}
-                        className="text-brand transition-colors hover:text-foreground active:text-muted-foreground"
-                    >
+                    <TextLink href={productSettingsHref("categories")}>
                         Manage categories
-                    </Link>
+                    </TextLink>
                 </p>
             ) : (
                 <OptionSelect
@@ -159,14 +157,7 @@ export function SheetNotices({
                     or admin can.
                 </p>
             ) : null}
-            {loadError ? (
-                <p
-                    role="alert"
-                    className="rounded-[9px] border border-destructive/40 px-3 py-2.5 text-[12.5px] text-destructive"
-                >
-                    {loadError}
-                </p>
-            ) : null}
+            {loadError ? <Notice tone="error">{loadError}</Notice> : null}
             {loading ? (
                 <p
                     role="status"

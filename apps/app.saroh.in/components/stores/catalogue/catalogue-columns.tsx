@@ -1,7 +1,6 @@
 "use client";
 
 import { Badge } from "@saroh/ui/badge";
-import { Button } from "@saroh/ui/button";
 import {
     DropdownMenu,
     DropdownMenuContent,
@@ -29,6 +28,7 @@ import type { ProductRating } from "@/lib/product-reviews/service";
 import type { CatalogueRow } from "@/lib/products/catalogue";
 import { rowFacts, stockWords } from "@/lib/products/catalogue";
 
+import { IconButton } from "@saroh/ui/icon-button";
 import { ProductThumb } from "./product-thumb";
 import { STATUS_LABEL, STATUS_VARIANT, TONE_TEXT } from "./tones";
 
@@ -117,16 +117,13 @@ export function catalogueColumns({
                 r.paused ? (
                     <Badge
                         variant="warning"
-                        className="px-[9px] py-[3px] text-[11px] font-medium"
+                        size="sm"
                         title="Hidden from your site and read-only: past your plan's products limit"
                     >
                         Paused
                     </Badge>
                 ) : (
-                    <Badge
-                        variant={STATUS_VARIANT[r.status]}
-                        className="px-[9px] py-[3px] text-[11px] font-medium"
-                    >
+                    <Badge variant={STATUS_VARIANT[r.status]} size="sm">
                         {STATUS_LABEL[r.status]}
                     </Badge>
                 ),
@@ -193,14 +190,12 @@ export function RowMenu({
     return (
         <DropdownMenu>
             <DropdownMenuTrigger asChild>
-                <Button
+                <IconButton
+                    label={`More actions for ${row.name}`}
+                    icon={<MoreHorizontal />}
                     variant="ghost"
-                    size="icon-xs"
-                    className="text-muted-foreground hover:text-foreground"
-                    aria-label={`More actions for ${row.name}`}
-                >
-                    <MoreHorizontal className="size-4" />
-                </Button>
+                    className="text-muted-foreground"
+                />
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-44">
                 <DropdownMenuItem onSelect={onPreview}>

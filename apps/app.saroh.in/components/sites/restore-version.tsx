@@ -7,6 +7,7 @@ import { useState, useTransition } from "react";
 
 import { restorePublication } from "@/lib/sites/actions";
 import { RESTORE_OVERRIDE_LINE, restoreGate } from "@/lib/sites/release-review";
+import { Notice } from "@saroh/ui/notice";
 
 /**
  * Put the version being previewed back (#283, #194).
@@ -105,12 +106,9 @@ export function RestoreVersion({
                 </p>
             )}
             {override ? (
-                <p
-                    role="note"
-                    className="rounded-lg bg-destructive-subtle px-3.5 py-3 text-[12.5px] leading-normal text-destructive-subtle-foreground"
-                >
+                <Notice tone="error" role="note">
                     {RESTORE_OVERRIDE_LINE}
-                </p>
+                </Notice>
             ) : null}
             <div className="flex gap-2">
                 <Button

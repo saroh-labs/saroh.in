@@ -22,6 +22,8 @@ export default defineConfig({
     test: {
         environment: "node",
         globals: true,
+        // jsdom answers `:modal` slowly enough to time a test out.
+        setupFiles: ["./vitest.setup.ts"],
         // Plus the editor's pure helpers that sit beside the component using
         // them, such as what a save can send (`saveable-sections.ts`).
         include: [

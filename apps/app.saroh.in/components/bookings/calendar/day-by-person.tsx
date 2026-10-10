@@ -247,7 +247,7 @@ export function DayByPerson({
                                         "absolute inset-x-1 z-[2] box-border flex cursor-pointer flex-col items-stretch justify-start overflow-hidden rounded-[7px] px-[7px] py-1 text-left transition-[filter] duration-fast hover:brightness-110 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1 active:brightness-90 coarse:min-h-11",
                                         blockColour(b),
                                         selected === b.key &&
-                                            "ring-2 ring-highlight ring-offset-0",
+                                            "ring-2 ring-foreground ring-offset-0",
                                         b.state === "cancelled" &&
                                             "line-through",
                                     )}
@@ -290,7 +290,7 @@ export function DayByPerson({
                         nowMinute <= to ? (
                             <div
                                 aria-hidden
-                                className="pointer-events-none absolute inset-x-0 z-[3] h-[2px] bg-highlight"
+                                className="pointer-events-none absolute inset-x-0 z-[3] h-[2px] bg-foreground"
                                 style={{ top: at(nowMinute, from) }}
                             />
                         ) : null}

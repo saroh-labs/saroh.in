@@ -8,6 +8,7 @@ import { SettingsSearch } from "@/components/settings/settings-search";
 import type { SettingsActor } from "@/lib/settings/search";
 import { isSettingsScreen } from "@/lib/settings/search";
 
+import { Tip } from "@saroh/ui/tooltip";
 import { openCommandMenu } from "./command-menu";
 
 const BUTTON =
@@ -34,15 +35,16 @@ export function CommandTrigger({ actor }: { actor: SettingsActor }) {
         return <SettingsSearch actor={actor} className={BUTTON} />;
     }
     return (
-        <Button
-            variant="ghost"
-            size="icon-sm"
-            type="button"
-            onClick={openCommandMenu}
-            aria-label="Search Saroh (Command K)"
-            title="Search  ⌘K"
-        >
-            <Search className="size-4" />
-        </Button>
+        <Tip label="Search  ⌘K">
+            <Button
+                variant="ghost"
+                size="icon-sm"
+                type="button"
+                onClick={openCommandMenu}
+                aria-label="Search Saroh (Command K)"
+            >
+                <Search className="size-4" />
+            </Button>
+        </Tip>
     );
 }

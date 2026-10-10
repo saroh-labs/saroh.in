@@ -12,6 +12,9 @@ import type { VariantRow } from "@/lib/products/variant-rows";
 import { isLegacy, legacyNote } from "@/lib/products/variant-rows";
 import { OptionSelect } from "@saroh/ui/option-select";
 
+import { chipClass } from "@/components/shared/chip";
+import { TextLink } from "@saroh/ui/text-link";
+import { Tip } from "@saroh/ui/tooltip";
 import { FieldHelp, MoneyBox } from "./fields";
 
 export const VARIANT_GRID =
@@ -115,39 +118,32 @@ export function VariantRowView({
                         className="pl-[22px]"
                     />
                 </MoneyBox>
-                <Button
-                    variant="ghost"
-                    size="icon-sm"
-                    type="button"
-                    disabled={locked}
-                    onClick={onRemove}
-                    aria-label={`Remove ${title || "this variant"}`}
-                    title={`Remove ${title || "this variant"}`}
-                    className="text-muted-foreground"
-                >
-                    <Trash2
-                        aria-hidden
-                        className="size-[15px]"
-                        strokeWidth={1.9}
-                    />
-                </Button>
+                <Tip label={`Remove ${title || "this variant"}`}>
+                    <Button
+                        variant="ghost"
+                        size="icon-sm"
+                        type="button"
+                        disabled={locked}
+                        onClick={onRemove}
+                        aria-label={`Remove ${title || "this variant"}`}
+                        className="text-muted-foreground"
+                    >
+                        <Trash2 aria-hidden className="size-[15px]" />
+                    </Button>
+                </Tip>
             </div>
             <div className="mt-[5px] flex flex-wrap items-center gap-2">
-                <Button
-                    variant="link"
-                    size="inline"
-                    type="button"
+                <TextLink
                     aria-expanded={open}
                     onClick={() => onOpen(!open)}
+                    className="text-[12px] coarse:min-h-11"
                 >
                     {open ? "Less" : "More"}
-                </Button>
+                </TextLink>
                 <span
                     className={cn(
                         "min-w-0 text-pretty text-[11.5px]",
-                        nowhere
-                            ? "text-brand-subtle-foreground"
-                            : "text-muted-foreground",
+                        nowhere ? "text-foreground" : "text-muted-foreground",
                     )}
                 >
                     {summary}
@@ -305,12 +301,7 @@ function SellItAt({
                                         : [...chosen, s.id],
                                 )
                             }
-                            className={cn(
-                                "h-[30px] rounded-full border px-3 text-[12.5px] disabled:cursor-not-allowed coarse:h-11",
-                                on
-                                    ? "border-foreground bg-foreground font-semibold text-background"
-                                    : "border-border bg-card font-medium text-foreground/75 hover:bg-muted/50",
-                            )}
+                            className={chipClass(on)}
                         >
                             {s.name}
                         </button>
@@ -320,7 +311,7 @@ function SellItAt({
             {chosen.length === 0 ? (
                 <p
                     role="status"
-                    className="mt-[7px] text-[11.5px] text-brand-subtle-foreground"
+                    className="mt-[7px] text-[11.5px] text-foreground"
                 >
                     Not sold anywhere — customers will not see this {opt}.
                 </p>

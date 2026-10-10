@@ -92,7 +92,7 @@ export function SheetSizeRow({
             }
             className={cn("p-0 text-destructive-subtle-foreground", className)}
         >
-            <X aria-hidden className="size-3" strokeWidth={2.2} />
+            <X aria-hidden className="size-3" />
         </Button>
     );
 

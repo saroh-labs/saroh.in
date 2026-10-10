@@ -248,10 +248,7 @@ export function ProductsPicker({
                                                 )}
                                             >
                                                 {on ? (
-                                                    <Check
-                                                        className="size-3"
-                                                        strokeWidth={3}
-                                                    />
+                                                    <Check className="size-3" />
                                                 ) : null}
                                             </span>
                                             <ProductThumb

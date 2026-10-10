@@ -317,9 +317,7 @@ function Sessions({
     return (
         <section className="flex min-w-0 flex-col gap-2.5">
             <div className="flex min-h-8 flex-wrap items-center justify-between gap-2">
-                <h2 className="text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
-                    Sessions
-                </h2>
+                <h2 className="label">Sessions</h2>
                 {canAdd && !empty ? addButton : null}
             </div>
             {empty ? (

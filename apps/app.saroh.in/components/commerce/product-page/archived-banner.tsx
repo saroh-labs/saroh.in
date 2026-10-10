@@ -7,6 +7,7 @@ import { useTransition } from "react";
 
 import { ViewerDate } from "@/components/shared/viewer-date";
 import { patchProduct } from "@/lib/products/actions";
+import { Notice } from "@saroh/ui/notice";
 
 /**
  * Under an archived product's header: when it went, what that means, and
@@ -50,39 +51,38 @@ export function ArchivedBanner({
     }
 
     return (
-        <div
-            role="note"
-            className="flex flex-wrap items-center gap-2.5 border-b border-border bg-muted px-4 py-[11px] sm:px-[22px]"
-        >
-            <p className="flex-[1_1_280px] text-pretty text-[13px] leading-[1.5] text-foreground/75">
-                <strong className="font-semibold text-foreground">
-                    {archivedAt ? (
-                        <>
-                            Archived on{" "}
-                            <ViewerDate
-                                iso={archivedAt}
-                                variant="dayMonthLong"
-                            />
-                            .
-                        </>
-                    ) : (
-                        "Archived."
-                    )}
-                </strong>{" "}
-                It is not sold and its page does not open. Past orders, reviews
-                and stock history are kept below.
-            </p>
-            {canWrite ? (
-                <Button
-                    size="sm"
-                    type="button"
-                    onClick={restore}
-                    busy={pending}
-                    busyLabel="Restoring…"
-                >
-                    Restore as a draft
-                </Button>
-            ) : null}
-        </div>
+        <Notice layout="banner">
+            <div className="flex flex-wrap items-center gap-2.5">
+                <p className="flex-[1_1_280px] text-pretty text-[13px] leading-[1.5] text-foreground/75">
+                    <strong className="font-semibold text-foreground">
+                        {archivedAt ? (
+                            <>
+                                Archived on{" "}
+                                <ViewerDate
+                                    iso={archivedAt}
+                                    variant="dayMonthLong"
+                                />
+                                .
+                            </>
+                        ) : (
+                            "Archived."
+                        )}
+                    </strong>{" "}
+                    It is not sold and its page does not open. Past orders,
+                    reviews and stock history are kept below.
+                </p>
+                {canWrite ? (
+                    <Button
+                        size="sm"
+                        type="button"
+                        onClick={restore}
+                        busy={pending}
+                        busyLabel="Restoring…"
+                    >
+                        Restore as a draft
+                    </Button>
+                ) : null}
+            </div>
+        </Notice>
     );
 }

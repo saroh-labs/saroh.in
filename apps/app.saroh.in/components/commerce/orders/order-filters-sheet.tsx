@@ -10,6 +10,7 @@ import type { OrderFilterOptions } from "@/lib/orders/business-service";
 import { filtersOn, NO_FILTERS } from "@/lib/orders/list-filters";
 import type { OrdersQuery } from "@/lib/orders/list-query";
 
+import { CountBadge } from "@saroh/ui/count-badge";
 import { OrderFilters } from "./order-filters";
 
 /**
@@ -56,12 +57,12 @@ export function OrderFiltersSheet({
                 <SlidersHorizontal aria-hidden className="size-4" />
                 Filters
                 {on > 0 ? (
-                    <span
+                    <CountBadge
+                        count={on}
+                        tone="strong"
                         aria-hidden
-                        className="ml-0.5 grid h-5 min-w-5 place-items-center rounded-full bg-foreground px-1.5 text-[11px] font-bold tabular-nums text-background"
-                    >
-                        {on}
-                    </span>
+                        className="ml-0.5"
+                    />
                 ) : null}
             </Button>
             <QuickLook

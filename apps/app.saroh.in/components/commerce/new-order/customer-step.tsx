@@ -7,6 +7,7 @@ import type { CustomerPick } from "@/lib/customers/picker";
 import { pickName } from "@/lib/customers/picker";
 import { pickMeta } from "@/lib/orders/new-order";
 
+import { Notice } from "@saroh/ui/notice";
 import { StepCard } from "./parts";
 
 /**
@@ -73,12 +74,9 @@ export function CustomerStep({
                 </Button>
             </div>
             {attention ? (
-                <div
-                    role="alert"
-                    className="mt-[9px] rounded-lg bg-destructive-subtle px-2.5 py-2 text-[12.5px] font-semibold leading-[1.45] text-destructive-subtle-foreground"
-                >
+                <Notice tone="error" className="mt-[9px]">
                     {attention}
-                </div>
+                </Notice>
             ) : null}
         </StepCard>
     );

@@ -18,6 +18,7 @@ import type { ProductOverview } from "@/lib/products/overview";
 import { websiteSummary } from "@/lib/products/overview-words";
 import { EmptyState } from "@saroh/ui/data-state";
 
+import { TextLink } from "@saroh/ui/text-link";
 import { CollectionSheet } from "./collection-sheet";
 import { ProductCollectionsSheet } from "./product-collections-sheet";
 /**
@@ -114,7 +115,7 @@ export function ProductCollectionsTab({
                             Add to a collection
                         </Button>
                     ) : null}
-                    <StateLink href="/commerce/products?view=collections">
+                    <StateLink href="/commerce/products?tab=collections">
                         Open Products
                     </StateLink>
                 </TabState>
@@ -141,11 +142,7 @@ export function ProductCollectionsTab({
                             onClick={() => setEditing(true)}
                             aria-label="Edit collections"
                         >
-                            <Pencil
-                                className="size-3"
-                                strokeWidth={2}
-                                aria-hidden
-                            />
+                            <Pencil className="size-3" aria-hidden />
                             Edit
                         </Button>
                     ) : null}
@@ -178,16 +175,13 @@ export function ProductCollectionsTab({
                                         <p className="min-w-0 flex-1 truncate text-[14px] font-semibold">
                                             {c.name}
                                         </p>
-                                        <Button
-                                            variant="link"
-                                            size="inline"
-                                            type="button"
+                                        <TextLink
                                             onClick={() => setOpened(c.id)}
                                             aria-label={`Open ${c.name}`}
-                                            className="shrink-0"
+                                            className="shrink-0 text-[12px] coarse:min-h-11"
                                         >
                                             Open
-                                        </Button>
+                                        </TextLink>
                                     </div>
                                     <p className="mt-1 text-[12px] text-muted-foreground">
                                         {note}

@@ -91,7 +91,7 @@ test.describe("Collections", () => {
 
         try {
             // New collection, picked by hand: two products, in order.
-            await page.goto("/commerce/products?view=collections");
+            await page.goto("/commerce/products?tab=collections");
             await page
                 .getByRole("button", { name: "New collection" })
                 .or(page.getByRole("link", { name: "New collection" }))

@@ -1,6 +1,5 @@
 "use client";
 
-import { Button } from "@saroh/ui/button";
 import { Checkbox } from "@saroh/ui/checkbox";
 import { Field } from "@saroh/ui/field";
 import { Input } from "@saroh/ui/input";
@@ -16,6 +15,8 @@ import type {
     WebsiteTemplateChoice,
 } from "@/lib/modules/turn-on-schema";
 import { usesLine } from "@/lib/sites/template-picker";
+
+import { TextLink } from "@saroh/ui/text-link";
 
 export type Update = (change: (draft: TurnOnDraft) => TurnOnDraft) => void;
 
@@ -135,7 +136,7 @@ export function SellFields({
                     </span>
                 ) : null}
                 {shopNote ? (
-                    <p className="text-pretty rounded-[9px] bg-brand-subtle px-3 py-2 text-[12px] leading-normal text-brand-subtle-foreground">
+                    <p className="text-pretty rounded-[9px] bg-muted px-3 py-2 text-[12px] leading-normal text-foreground">
                         {shopNote}
                     </p>
                 ) : null}
@@ -242,20 +243,17 @@ export function WebsiteFields({
             </Field>
             {suggestion && suggestion !== w.address ? (
                 // The one asked for is taken: the API offers a free one.
-                <Button
-                    variant="link"
-                    size="inline"
-                    type="button"
+                <TextLink
                     onClick={() =>
                         update((d) => ({
                             ...d,
                             WEBSITE: { ...d.WEBSITE, address: suggestion },
                         }))
                     }
-                    className="-mt-2 w-fit text-left"
+                    className="-mt-2 w-fit text-left text-[12px] coarse:min-h-11"
                 >
                     Use {suggestion}.saroh.app
-                </Button>
+                </TextLink>
             ) : null}
             {template && choices.length > 1 ? (
                 <TemplateChoice

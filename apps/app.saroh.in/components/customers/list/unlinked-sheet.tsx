@@ -11,7 +11,6 @@ import {
 import { couldntLoad } from "@saroh/ui/lib/state-copy";
 import { showError, showSuccess } from "@saroh/ui/toast";
 import { Check } from "lucide-react";
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useState, useTransition } from "react";
 
@@ -22,6 +21,7 @@ import { loadUnlinkedCustomers } from "@/lib/customers/actions";
 import { customerHref } from "@/lib/customers/links";
 import type { UnlinkedCustomer, UnlinkedPage } from "@/lib/customers/list";
 import { rowName, unlinkedText } from "@/lib/customers/list";
+import { TextLink } from "@saroh/ui/text-link";
 
 /**
  * "12 paying customers aren't linked to a contact yet · Review" (C4).
@@ -272,12 +272,12 @@ function UnlinkedItem({
                 {c.storefront ? (
                     // A way to compare the two before linking, so it is quiet:
                     // the link, not the row's action.
-                    <Link
+                    <TextLink
                         href={customerHref(c.storefront.id, c.customerId)}
-                        className="shrink-0 rounded-sm text-[12.5px] text-foreground underline underline-offset-4 hover:decoration-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring active:text-muted-foreground coarse:flex coarse:min-h-11 coarse:items-center"
+                        className="shrink-0 text-[12.5px] coarse:flex coarse:min-h-11 coarse:items-center"
                     >
                         Open their record
-                    </Link>
+                    </TextLink>
                 ) : null}
             </div>
             <div className="mt-2.5 border-t border-border/60 pt-2.5 text-[12.5px]">
@@ -290,12 +290,9 @@ function UnlinkedItem({
                     <div className="flex flex-wrap items-center gap-2">
                         <p className="min-w-0 flex-[1_1_180px] text-muted-foreground">
                             Their email belongs to{" "}
-                            <Link
-                                href={personHref(holder.contactId)}
-                                className="font-medium text-foreground underline underline-offset-4 transition-colors hover:decoration-2 active:text-muted-foreground"
-                            >
+                            <TextLink href={personHref(holder.contactId)}>
                                 {holderName}
-                            </Link>
+                            </TextLink>
                             .
                         </p>
                         {canLink ? (

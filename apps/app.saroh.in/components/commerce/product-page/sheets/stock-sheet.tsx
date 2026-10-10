@@ -62,7 +62,7 @@ export function StockSheetButton({
                 onClick={() => setOpen(true)}
                 className="gap-[5px]"
             >
-                <Pencil className="size-3" strokeWidth={2} aria-hidden />
+                <Pencil className="size-3" aria-hidden />
                 {label}
             </Button>
             {open ? (
@@ -219,10 +219,7 @@ export function StockSheet({
         >
             <div
                 aria-hidden
-                className={cn(
-                    counts ? ROW : PRICE_ROW,
-                    "pb-1.5 text-[11px] font-semibold uppercase tracking-[0.06em] text-muted-foreground",
-                )}
+                className={cn(counts ? ROW : PRICE_ROW, "label pb-1.5")}
             >
                 <span>{product.option?.name ?? "Size"}</span>
                 <span>Price</span>
@@ -263,7 +260,7 @@ export function StockSheet({
                     href={productEditHref(storeId, product.id, "variants")}
                     className="mt-2.5 inline-flex h-8 items-center gap-1 rounded-lg border border-dashed border-border-strong px-3 text-[12.5px] font-semibold text-neutral-700 hover:bg-muted coarse:min-h-11 dark:text-muted-foreground"
                 >
-                    <Plus aria-hidden className="size-3.5" strokeWidth={2.2} />
+                    <Plus aria-hidden className="size-3.5" />
                     Add a size
                 </Link>
             ) : null}

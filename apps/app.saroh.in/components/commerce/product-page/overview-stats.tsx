@@ -99,7 +99,7 @@ export function AvailabilityCard({
                     scroll={false}
                     className={cn(
                         FOCUS,
-                        "mt-1.5 block text-pretty rounded-sm text-[11.5px] leading-[1.45] text-brand transition-colors hover:text-foreground active:text-muted-foreground",
+                        "mt-1.5 block text-pretty rounded-sm text-[11.5px] leading-[1.45] text-foreground underline decoration-border-strong underline-offset-4 transition-colors duration-fast hover:decoration-foreground active:text-muted-foreground",
                     )}
                 >
                     {held}
@@ -138,7 +138,7 @@ export function VariantsStat({
         <ProductStat
             className={
                 href
-                    ? "h-full transition-colors hover:border-border-strong"
+                    ? "h-full transition-colors duration-fast hover:border-border-strong"
                     : undefined
             }
             label="Variants"

@@ -149,11 +149,7 @@ export function DayPanel({
                             className="gap-1.5"
                         >
                             <Link href={s.href}>
-                                <Plus
-                                    aria-hidden
-                                    className="size-3"
-                                    strokeWidth={2.2}
-                                />
+                                <Plus aria-hidden className="size-3" />
                                 {s.label}
                             </Link>
                         </Button>
@@ -188,7 +184,7 @@ export function DayPanel({
                     cell.count - Math.min(cell.items.length, PER_GROUP);
                 return (
                     <section key={layer.key} className="mt-2">
-                        <h3 className="mb-1 flex items-center gap-[7px] text-[11px] font-semibold uppercase tracking-[0.1em] text-muted-foreground">
+                        <h3 className="label mb-1 flex items-center gap-[7px]">
                             <span
                                 aria-hidden
                                 className={cn(
@@ -246,13 +242,14 @@ export function DayPanel({
                                                             ? "error"
                                                             : "draft"
                                                     }
-                                                    className="shrink-0 px-2 py-0.5 text-[11px] font-semibold uppercase tracking-[0.04em]"
+                                                    size="sm"
+                                                    className="shrink-0"
                                                 >
                                                     {line.flag.label}
                                                 </Badge>
                                             ) : null}
                                             {action ? (
-                                                <span className="shrink-0 whitespace-nowrap text-[12px] font-semibold text-brand underline underline-offset-2">
+                                                <span className="shrink-0 whitespace-nowrap text-[12px] font-semibold text-foreground underline decoration-border-strong underline-offset-4">
                                                     {action}
                                                 </span>
                                             ) : null}
@@ -273,7 +270,7 @@ export function DayPanel({
                         {more > 0 ? (
                             <Link
                                 href={LAYER_HOME[layer.key]}
-                                className="mt-1 block text-[12px] font-medium text-brand transition-colors hover:text-foreground active:text-muted-foreground"
+                                className="mt-1 block text-[12px] font-medium text-foreground underline decoration-border-strong underline-offset-4 transition-colors duration-fast hover:decoration-foreground active:text-muted-foreground"
                             >
                                 {more} more — open {layer.label}
                             </Link>

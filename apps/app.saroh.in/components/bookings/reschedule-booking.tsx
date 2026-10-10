@@ -2,6 +2,7 @@
 
 import { FormDialog } from "@/components/shared/form-dialog";
 import { Button } from "@saroh/ui/button";
+import { cn } from "@saroh/ui/lib/utils";
 import { showError, showSuccess } from "@saroh/ui/toast";
 import { useRouter } from "next/navigation";
 import { useEffect, useState, useTransition } from "react";
@@ -134,22 +135,22 @@ export function RescheduleBooking({
                 <div className="grid gap-4">
                     {byDay.map(([day, daySlots]) => (
                         <div key={day}>
-                            <h3 className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
-                                {day}
-                            </h3>
+                            <h3 className="label">{day}</h3>
                             <div className="mt-2 flex flex-wrap gap-2">
                                 {daySlots.map((slot) => (
-                                    <Button
-                                        variant="outline"
-                                        size="sm"
+                                    <button
                                         key={slot.startAt}
                                         type="button"
                                         disabled={pending}
                                         onClick={() => move(slot.startAt)}
-                                        className="wk-press tabular-nums"
+                                        className={cn(
+                                            "wk-press rounded-md border border-border px-3 py-1.5 text-sm tabular-nums",
+                                            "hover:border-border-strong hover:bg-muted",
+                                            "disabled:pointer-events-none disabled:text-disabled-foreground",
+                                        )}
                                     >
                                         {clockTime(slot.startAt, timezone)}
-                                    </Button>
+                                    </button>
                                 ))}
                             </div>
                         </div>
@@ -163,7 +164,8 @@ export function RescheduleBooking({
                     variant="ghost"
                     size="sm"
                     className="justify-self-start"
-                    disabled={pending}
+                    busy={pending}
+                    busyLabel="Looking…"
                     onClick={() => setWeeks((w) => w + INITIAL_WEEKS)}
                 >
                     Look further ahead

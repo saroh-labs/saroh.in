@@ -5,11 +5,10 @@ import { cn } from "@saroh/ui/lib/utils";
 import Link from "next/link";
 import { useId } from "react";
 
-import { Pill } from "@/components/subscriptions/pill";
+import { StatusBadge } from "@/components/shared/status-badge";
 import type { CardNote } from "@/lib/class-packs/pack-card-notes";
 import type { PackCardView } from "@/lib/class-packs/pack-cards";
-const EYEBROW =
-    "text-[11px] font-semibold uppercase tracking-[0.1em] text-muted-foreground";
+const EYEBROW = "label";
 
 /**
  * One pack on the Packs list (round-2 E15, after "Saroh Packs"): its
@@ -49,7 +48,7 @@ export function PackCard({
                 {card.href ? (
                     <Link
                         href={card.href}
-                        className="min-w-0 flex-1 rounded-sm text-[15px] font-semibold text-foreground hover:text-brand focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 active:text-brand"
+                        className="min-w-0 flex-1 rounded-sm text-[15px] font-semibold text-foreground hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 active:text-foreground"
                     >
                         {card.name}
                     </Link>
@@ -59,9 +58,9 @@ export function PackCard({
                     </span>
                 )}
                 {card.badges.map((b) => (
-                    <Pill key={b.label} tone={b.tone}>
+                    <StatusBadge key={b.label} tone={b.tone}>
                         {b.label}
-                    </Pill>
+                    </StatusBadge>
                 ))}
             </div>
             <div className="mt-2 flex flex-wrap items-baseline gap-2">
@@ -106,7 +105,7 @@ export function PackCard({
                             key={n.text}
                             className={
                                 n.tone === "accent"
-                                    ? "font-semibold text-brand"
+                                    ? "font-semibold text-foreground"
                                     : "text-muted-foreground"
                             }
                         >

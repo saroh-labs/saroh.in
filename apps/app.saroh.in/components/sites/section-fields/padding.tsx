@@ -1,10 +1,10 @@
 "use client";
 
-import { Button } from "@saroh/ui/button";
 import { Label } from "@saroh/ui/label";
 
 import type { Section } from "@/lib/sites/service";
 
+import { TextLink } from "@saroh/ui/text-link";
 import { FIELD_LABEL } from "./constants";
 
 /**
@@ -80,15 +80,12 @@ export function SectionPadding({
                 className="w-full accent-foreground"
             />
             {!following && (
-                <Button
-                    variant="link"
-                    size="inline"
-                    type="button"
+                <TextLink
                     onClick={() => set(undefined)}
-                    className="text-left"
+                    className="text-left text-xs"
                 >
                     Follow the site setting
-                </Button>
+                </TextLink>
             )}
         </div>
     );

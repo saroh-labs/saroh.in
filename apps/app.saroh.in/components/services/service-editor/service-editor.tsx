@@ -8,7 +8,6 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 
-import { StatePill } from "@/components/bookings/calendar/parts";
 import type { ConfirmResult } from "@/components/shared/confirm-dialog";
 import { ConfirmDialog } from "@/components/shared/confirm-dialog";
 import { useLeaveGuard } from "@/components/shared/use-leave-guard";
@@ -41,6 +40,8 @@ import type { ServiceUsage } from "@/lib/services/usage";
 import { setStaffServices } from "@/lib/staff/actions";
 import type { BookingPaymentView, StaffView } from "@/lib/staff/types";
 
+import { StatusBadge } from "@/components/shared/status-badge";
+import { Notice } from "@saroh/ui/notice";
 import { AtAGlance } from "./at-a-glance";
 import {
     BookingPageCard,
@@ -246,14 +247,18 @@ export function ServiceEditor({
                         crumb,
                     ]}
                     title={title}
-                    badge={<StatePill label={pill.label} tone={pill.tone} />}
+                    badge={
+                        <StatusBadge tone={pill.tone} hint={pill.hint}>
+                            {pill.label}
+                        </StatusBadge>
+                    }
                     description={
                         <div
                             role="status"
                             className={cn(
                                 "text-[12.5px]",
                                 dirty && canEdit
-                                    ? "text-brand"
+                                    ? "text-foreground"
                                     : "text-muted-foreground",
                             )}
                         >
@@ -310,12 +315,9 @@ export function ServiceEditor({
                 />
             </div>
             {canEdit && bad && (dirty || isNew) && draft.name.trim() ? (
-                <div
-                    role="alert"
-                    className="bg-destructive-subtle px-4 py-[9px] text-[12.5px] text-destructive-subtle-foreground sm:px-[26px]"
-                >
+                <Notice tone="error" layout="banner">
                     {problems.join(" ")}
-                </div>
+                </Notice>
             ) : null}
 
             <fieldset

@@ -29,6 +29,7 @@ import { createSite } from "@/lib/sites/actions";
 import type { NewSiteDefaults, Template } from "@/lib/sites/service";
 import type { ModuleStates } from "@/lib/sites/template-picker";
 
+import { TextLink } from "@saroh/ui/text-link";
 import { TemplatePicker } from "./template-picker";
 
 /**
@@ -337,14 +338,11 @@ export function UseSuggestedAddress({
 }) {
     if (!suggestion || suggestion === current) return null;
     return (
-        <Button
-            variant="link"
-            size="inline"
-            type="button"
+        <TextLink
             onClick={() => onUse(suggestion)}
-            className="w-fit text-left"
+            className="w-fit text-left text-xs coarse:min-h-11"
         >
             Use {suggestion}.saroh.app
-        </Button>
+        </TextLink>
     );
 }

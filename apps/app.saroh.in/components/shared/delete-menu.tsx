@@ -1,6 +1,5 @@
 "use client";
 
-import { Button } from "@saroh/ui/button";
 import {
     DropdownMenu,
     DropdownMenuContent,
@@ -14,6 +13,7 @@ import { useState } from "react";
 
 import { ConfirmDialog } from "@/components/shared/confirm-dialog";
 import type { CrmResult } from "@/lib/api/http";
+import { IconButton } from "@saroh/ui/icon-button";
 
 /**
  * A record's "…" menu with one thing in it: delete, for good.
@@ -79,14 +79,12 @@ export function DeleteMenu<T>({
         <>
             <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                    <Button
+                    <IconButton
+                        label={`More actions for ${name}`}
+                        icon={<MoreHorizontal />}
                         variant="outline"
-                        size="icon"
                         disabled={busy}
-                        aria-label={`More actions for ${name}`}
-                    >
-                        <MoreHorizontal className="size-4" />
-                    </Button>
+                    />
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end" className="w-56">
                     {unavailable ? (

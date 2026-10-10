@@ -2,7 +2,6 @@
 
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Input } from "@saroh/ui/input";
-import { cn } from "@saroh/ui/lib/utils";
 import { Textarea } from "@saroh/ui/textarea";
 import { showError } from "@saroh/ui/toast";
 import { useState } from "react";
@@ -29,6 +28,7 @@ import type {
 } from "@/lib/products/service";
 import type { EffectiveDefaults } from "@/lib/products/settings";
 
+import { chipClass } from "@/components/shared/chip";
 import { useEditor, useSection } from "./editor-state";
 import { FieldHelp, FieldLabel } from "./fields";
 import { SectionCard } from "./section-card";
@@ -272,12 +272,7 @@ function FulfilmentChips({
                                         : inTableOrder([...picked, c.value]),
                                 )
                             }
-                            className={cn(
-                                "inline-flex h-[30px] items-center rounded-full border px-[11px] text-[12.5px] disabled:cursor-not-allowed coarse:h-11",
-                                on
-                                    ? "border-foreground bg-foreground font-semibold text-background"
-                                    : "border-border bg-card font-medium text-foreground/75 hover:bg-muted/50",
-                            )}
+                            className={chipClass(on)}
                         >
                             {c.label}
                         </button>
@@ -330,12 +325,7 @@ function Allergens({
                         aria-pressed={on}
                         disabled={disabled}
                         onClick={() => onChange(toggle(ids, a.id))}
-                        className={cn(
-                            "inline-flex h-[30px] items-center rounded-full border px-[11px] text-[12.5px] disabled:cursor-not-allowed coarse:h-11",
-                            on
-                                ? "border-foreground bg-foreground font-semibold text-background"
-                                : "border-border bg-card font-medium text-foreground/75 hover:bg-muted/50",
-                        )}
+                        className={chipClass(on)}
                     >
                         {a.name}
                     </button>

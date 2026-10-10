@@ -1,7 +1,6 @@
 "use client";
 
 import { Field } from "@saroh/ui/field";
-import Link from "next/link";
 import { useEffect, useState } from "react";
 
 import { Input } from "@saroh/ui/input";
@@ -19,6 +18,7 @@ import { listVisitPlacesForPicker } from "@/lib/sites/actions";
 import type { HoursContent } from "@/lib/sites/service";
 import type { VisitPlacesRead } from "@/lib/stores/storefronts";
 
+import { TextLink } from "@saroh/ui/text-link";
 import { OptionSwitch } from "./option-switch";
 import type { SectionFieldsProps } from "./props";
 
@@ -147,14 +147,9 @@ export function HoursFields({
 
             <p className="text-sm text-muted-foreground">
                 The hours are set in{" "}
-                <Link
-                    href={HOURS}
-                    target="_blank"
-                    rel="noopener"
-                    className="underline hover:text-foreground"
-                >
+                <TextLink href={HOURS} external>
                     Settings › Hours
-                </Link>
+                </TextLink>
                 . With none saved, this block shows nothing on your site.
             </p>
         </div>

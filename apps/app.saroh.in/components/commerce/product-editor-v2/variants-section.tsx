@@ -273,11 +273,7 @@ export function VariantsSection({
                         onClick={() => setAdding(true)}
                         className="gap-[7px]"
                     >
-                        <Plus
-                            aria-hidden
-                            className="size-3.5"
-                            strokeWidth={2.2}
-                        />
+                        <Plus aria-hidden className="size-3.5" />
                         Add variants
                     </Button>
                 </>
@@ -321,7 +317,7 @@ export function VariantsSection({
                             <div
                                 className={cn(
                                     VARIANT_GRID,
-                                    "pb-[5px] text-[11px] font-semibold uppercase tracking-[0.06em] text-muted-foreground/80",
+                                    "label pb-[5px] text-muted-foreground/80",
                                 )}
                             >
                                 <span>{optName}</span>

@@ -11,12 +11,11 @@ import type { CatalogueView, FieldView } from "@/lib/products/settings";
 import { removeField, restoreField } from "@/lib/products/settings-actions";
 
 import { ReadOnlyNote } from "@/components/shared/read-only-note";
+import { StatusBadge } from "@/components/shared/status-badge";
 import { FIELD_TYPES, FieldSheet } from "./field-sheet";
 import { TabIntro } from "./product-settings";
 
 const plural = (n: number) => `${n} ${n === 1 ? "product" : "products"}`;
-const PILL =
-    "rounded-full bg-muted px-2 py-0.5 text-[11px] font-semibold text-foreground/75";
 
 /**
  * Extra things a product records, for the categories picked — "Skin type"
@@ -94,10 +93,14 @@ export function FieldsTab({
                                     <span className="min-w-0 text-[14px] font-semibold [overflow-wrap:anywhere]">
                                         {f.name}
                                     </span>
-                                    <span className={PILL}>{typeLabel}</span>
-                                    <span className={PILL}>
+                                    <StatusBadge tone="tag">
+                                        {typeLabel}
+                                    </StatusBadge>
+                                    <StatusBadge
+                                        tone={f.onShop ? "success" : "neutral"}
+                                    >
                                         {f.onShop ? "On the shop" : "Team only"}
-                                    </span>
+                                    </StatusBadge>
                                     <span className="flex-[1_1_120px] text-[12px] text-muted-foreground">
                                         {cats.length
                                             ? plural(f.productCount)
@@ -173,7 +176,7 @@ export function FieldsTab({
                                 ) : (
                                     <p
                                         role="status"
-                                        className="mt-2 text-[12px] text-brand-subtle-foreground"
+                                        className="mt-2 text-[12px] text-foreground"
                                     >
                                         In no category, so no product asks for
                                         it

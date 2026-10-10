@@ -3,10 +3,9 @@
 import { Button } from "@saroh/ui/button";
 import { cn } from "@saroh/ui/lib/utils";
 import { Textarea } from "@saroh/ui/textarea";
-import { showError } from "@saroh/ui/toast";
 import Link from "next/link";
 import type { RefObject } from "react";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef } from "react";
 
 import {
     replyLabel,
@@ -16,6 +15,7 @@ import {
 } from "@/lib/home/inline-actions";
 import type { HomeInline, HomeNeed, HomeRowLink } from "@/lib/home/service";
 
+import { ShareLink } from "@saroh/ui/copy-button";
 import type { DoneRow, InlineActions } from "./use-inline-actions";
 
 /**
@@ -88,6 +88,7 @@ export function InlineDone({ row }: { row: DoneRow }) {
                     size="inline"
                     type="button"
                     onClick={row.undo}
+                    className="cursor-pointer rounded text-foreground underline decoration-border-strong underline-offset-4 transition-colors duration-fast hover:decoration-foreground active:opacity-70"
                 >
                     Undo
                 </Button>
@@ -98,24 +99,13 @@ export function InlineDone({ row }: { row: DoneRow }) {
 }
 
 function CopyLink({ url }: { url: string }) {
-    const [copied, setCopied] = useState(false);
     return (
-        <Button
+        <ShareLink
+            value={url}
             variant="link"
-            size="inline"
-            type="button"
-            onClick={() => {
-                void navigator.clipboard.writeText(url).then(
-                    () => setCopied(true),
-                    () =>
-                        showError(
-                            "Couldn't copy it. Open the subscription to copy the link by hand.",
-                        ),
-                );
-            }}
-        >
-            {copied ? "Copied" : "Copy link"}
-        </Button>
+            icon={false}
+            className="h-auto p-0"
+        />
     );
 }
 
@@ -179,9 +169,9 @@ export function InlineConfirm({
             <div
                 role="alertdialog"
                 aria-label={inline.confirm}
-                className="mt-2.5 flex flex-wrap items-center gap-2.5 rounded-[10px] border border-highlight bg-brand-subtle px-3 py-2.5"
+                className="mt-2.5 flex flex-wrap items-center gap-2.5 rounded-[10px] border border-border-strong bg-muted px-3 py-2.5"
             >
-                <span className="flex-[1_1_220px] text-pretty text-[13px] leading-[1.45] text-brand-subtle-foreground">
+                <span className="flex-[1_1_220px] text-pretty text-[13px] leading-[1.45] text-foreground">
                     {inline.confirm}
                 </span>
                 <Button

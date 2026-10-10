@@ -661,7 +661,8 @@ test.describe("the Service Editor on Northwind (E2)", () => {
                 page.getByRole("heading", { level: 1, name }),
             ).toBeVisible();
             await expect(
-                page.getByText("Taking bookings", { exact: true }),
+                // "Live", as every kind of thing says it.
+                page.getByText("Live", { exact: true }),
             ).toBeVisible();
 
             await page.goto("/services");

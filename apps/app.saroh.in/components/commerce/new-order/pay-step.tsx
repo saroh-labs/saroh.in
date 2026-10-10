@@ -9,6 +9,7 @@ import { useId, useState } from "react";
 import { Chip } from "@/components/shared/chip";
 import type { CashChange, NewOrderPay } from "@/lib/orders/new-order";
 
+import { Tip } from "@saroh/ui/tooltip";
 import { FIELD, StepCard } from "./parts";
 
 /**
@@ -64,16 +65,17 @@ export function PayStep({
                 className="flex flex-wrap gap-1.5"
             >
                 {options.map((o) => (
-                    <Chip
-                        key={o.key}
-                        on={pay === o.key}
-                        disabled={o.off !== null}
-                        title={o.off ?? undefined}
-                        onClick={() => onPay(o.key)}
-                        className="cursor-pointer active:scale-[0.97] disabled:cursor-not-allowed"
-                    >
-                        {o.label}
-                    </Chip>
+                    <Tip label={o.off ?? undefined}>
+                        <Chip
+                            key={o.key}
+                            on={pay === o.key}
+                            disabled={o.off !== null}
+                            onClick={() => onPay(o.key)}
+                            className="cursor-pointer active:scale-[0.97] disabled:cursor-not-allowed"
+                        >
+                            {o.label}
+                        </Chip>
+                    </Tip>
                 ))}
             </div>
             {pay === "CASH" ? (
@@ -172,7 +174,7 @@ export function PayStep({
                     size="inline"
                     type="button"
                     onClick={() => setDiscounting(true)}
-                    className="mt-1.5"
+                    className="mt-1.5 cursor-pointer px-0 py-1 text-foreground underline decoration-border-strong underline-offset-4 transition-colors duration-fast hover:decoration-foreground active:opacity-80"
                 >
                     + Add a discount
                 </Button>

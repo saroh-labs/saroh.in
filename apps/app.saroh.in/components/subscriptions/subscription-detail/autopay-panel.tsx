@@ -24,6 +24,8 @@ import type {
     AutopayMethod,
 } from "@/lib/subscriptions/service";
 import { dayText, money } from "@/lib/subscriptions/view";
+import { ShareLink } from "@saroh/ui/copy-button";
+import { Notice } from "@saroh/ui/notice";
 /**
  * Autopay under the Plan card's "Pays by" line (D14): how it came to be,
  * what needs attention, and — for someone with `subscription:write` —
@@ -61,17 +63,13 @@ export function AutopayActions({
                 </div>
             ) : null}
             {panel.notice ? (
-                <p
+                <Notice
+                    tone={panel.notice.tone === "warn" ? "error" : "neutral"}
                     role={panel.notice.tone === "warn" ? "alert" : "status"}
-                    className={cn(
-                        "mt-2 rounded-[8px] px-2.5 py-2 text-[12.5px] font-semibold",
-                        panel.notice.tone === "warn"
-                            ? "bg-destructive-subtle text-destructive-subtle-foreground"
-                            : "bg-muted text-foreground/80",
-                    )}
+                    className="mt-2"
                 >
                     {panel.notice.text}
-                </p>
+                </Notice>
             ) : null}
             {showsActions ? (
                 <div className="mt-2.5 flex flex-wrap gap-2">
@@ -286,27 +284,12 @@ function SendLinkDialog({
 
 /** The link, shown once: Saroh keeps no copy of it. */
 function LinkBox({ url }: { url: string }) {
-    const [copied, setCopied] = useState(false);
     return (
         <div className="mt-3 flex flex-wrap items-center gap-2">
             <span className="min-w-0 flex-[1_1_220px] truncate rounded-[8px] border border-border bg-card px-2.5 py-1.5 font-mono text-[12px]">
                 {url}
             </span>
-            <Button
-                size="sm"
-                variant="outline"
-                onClick={() => {
-                    void navigator.clipboard.writeText(url).then(
-                        () => setCopied(true),
-                        () =>
-                            showError(
-                                "Couldn't copy it. Select the link and copy it by hand.",
-                            ),
-                    );
-                }}
-            >
-                {copied ? "Copied" : "Copy link"}
-            </Button>
+            <ShareLink value={url} text="Your link to pay" />
             <span className="basis-full text-[12px] text-muted-foreground">
                 Shown once. Saroh doesn&apos;t keep it. Make another if
                 it&apos;s lost.

@@ -14,6 +14,7 @@ import { useEffect, useId, useRef, useState } from "react";
 import { mayNavigate } from "@/lib/nav/leave-request";
 import type { SettingsActor } from "@/lib/settings/search";
 import { searchSettings } from "@/lib/settings/search";
+import { Tip } from "@saroh/ui/tooltip";
 
 /**
  * Search settings ("Saroh Settings" design): on the settings screen the top
@@ -105,16 +106,17 @@ export function SettingsSearch({
         <Popover open={open} onOpenChange={toggle}>
             <PopoverAnchor virtualRef={edge} />
             <PopoverTrigger asChild>
-                <button
-                    ref={trigger}
-                    type="button"
-                    aria-label="Search settings"
-                    aria-keyshortcuts="/"
-                    title="Search settings  /"
-                    className={className}
-                >
-                    <Search className="size-4" />
-                </button>
+                <Tip label="Search settings  /">
+                    <button
+                        ref={trigger}
+                        type="button"
+                        aria-label="Search settings"
+                        aria-keyshortcuts="/"
+                        className={className}
+                    >
+                        <Search className="size-4" />
+                    </button>
+                </Tip>
             </PopoverTrigger>
             <PopoverContent
                 align="end"

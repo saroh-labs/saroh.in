@@ -142,7 +142,7 @@ export function FooterSheet({
                         onClick={() => setFormat(f)}
                         aria-pressed={format === f}
                         className={cn(
-                            "rounded px-2 py-0.5 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring coarse:min-h-11",
+                            "rounded px-2 py-0.5 transition-colors duration-fast focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring coarse:min-h-11",
                             format === f
                                 ? "bg-secondary text-secondary-foreground"
                                 : "hover:text-foreground active:bg-accent-active",

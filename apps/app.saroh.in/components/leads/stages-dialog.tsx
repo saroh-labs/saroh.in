@@ -9,6 +9,8 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 
 import { saveStages } from "@/lib/pipelines/actions";
+import { IconButton } from "@saroh/ui/icon-button";
+import { Tip } from "@saroh/ui/tooltip";
 
 interface Row {
     /** Absent for a stage added in this dialog. */
@@ -153,50 +155,47 @@ export function StagesDialog({
                                 )
                             }
                         />
-                        <Button
-                            type="button"
+                        <IconButton
+                            label={`Move ${r.name || "this stage"} left`}
+                            icon={<ArrowUp />}
                             variant="ghost"
-                            size="icon-sm"
-                            aria-label={`Move ${r.name || "this stage"} left`}
                             disabled={i === 0}
                             onClick={() => move(i, -1)}
-                        >
-                            <ArrowUp className="size-4" />
-                        </Button>
-                        <Button
-                            type="button"
+                        />
+                        <IconButton
+                            label={`Move ${r.name || "this stage"} right`}
+                            icon={<ArrowDown />}
                             variant="ghost"
-                            size="icon-sm"
-                            aria-label={`Move ${r.name || "this stage"} right`}
                             disabled={i === rows.length - 1}
                             onClick={() => move(i, 1)}
-                        >
-                            <ArrowDown className="size-4" />
-                        </Button>
-                        <Button
-                            type="button"
-                            variant="ghost"
-                            size="icon-sm"
-                            aria-label={
-                                r.leads > 0
-                                    ? `${r.name} has ${r.leads} lead${r.leads === 1 ? "" : "s"}; move them before removing it`
-                                    : `Remove ${r.name || "this stage"}`
-                            }
-                            title={
+                        />
+                        <Tip
+                            label={
                                 r.leads > 0
                                     ? `${r.leads} lead${r.leads === 1 ? "" : "s"} still here. Move them first.`
                                     : undefined
                             }
-                            disabled={r.leads > 0 || rows.length === 1}
-                            onClick={() => {
-                                setRows((all) =>
-                                    all.filter((x) => x.key !== r.key),
-                                );
-                                if (r.id) setRemoved((x) => [...x, r]);
-                            }}
                         >
-                            <X className="size-4" />
-                        </Button>
+                            <Button
+                                type="button"
+                                variant="ghost"
+                                size="icon-sm"
+                                aria-label={
+                                    r.leads > 0
+                                        ? `${r.name} has ${r.leads} lead${r.leads === 1 ? "" : "s"}; move them before removing it`
+                                        : `Remove ${r.name || "this stage"}`
+                                }
+                                disabled={r.leads > 0 || rows.length === 1}
+                                onClick={() => {
+                                    setRows((all) =>
+                                        all.filter((x) => x.key !== r.key),
+                                    );
+                                    if (r.id) setRemoved((x) => [...x, r]);
+                                }}
+                            >
+                                <X className="size-4" />
+                            </Button>
+                        </Tip>
                     </li>
                 ))}
             </ol>

@@ -351,7 +351,7 @@ function EditDraft({
                             empty || addressMissing
                                 ? "text-destructive-subtle-foreground"
                                 : diff !== 0
-                                  ? "text-brand-subtle-foreground"
+                                  ? "text-foreground"
                                   : "text-muted-foreground",
                         )}
                     >

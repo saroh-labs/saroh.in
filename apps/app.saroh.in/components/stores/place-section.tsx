@@ -22,6 +22,7 @@ import {
     placeEditId,
 } from "@/lib/stores/place-rows";
 
+import { Notice } from "@saroh/ui/notice";
 import { LocationDetailsSheet } from "./location-details-sheet";
 import type { SectionProps } from "./location-save";
 import {
@@ -146,25 +147,23 @@ export function PlaceSection({
                         // No counter, but Pick-up still on (just switched,
                         // or saved that way before): the way out, right
                         // here.
-                        <div
-                            role="status"
-                            className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-2 rounded-lg bg-muted px-3 py-2.5 text-[12.5px] leading-[1.5]"
-                        >
-                            <span className="min-w-0 flex-[1_1_220px]">
-                                Pick-up is still on, but with no counter nobody
-                                can collect from here.
-                            </span>
-                            <Button
-                                type="button"
-                                variant="outline"
-                                size="sm"
-                                busy={pending}
-                                busyLabel="Turning off…"
-                                onClick={turnPickupOff}
-                            >
-                                Turn Pick-up off
-                            </Button>
-                        </div>
+                        <Notice role="status" className="mt-2">
+                            <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
+                                <span className="min-w-0 flex-[1_1_220px]">
+                                    Pick-up is still on, but with no counter
+                                    nobody can collect from here.
+                                </span>
+                                <Button
+                                    type="button"
+                                    variant="outline"
+                                    size="sm"
+                                    disabled={pending}
+                                    onClick={turnPickupOff}
+                                >
+                                    Turn Pick-up off
+                                </Button>
+                            </div>
+                        </Notice>
                     ) : null}
                 </Row>
                 {/* Only a place customers visit has a door: where it is

@@ -114,7 +114,7 @@ export function CollectionsPanel({
                         onClick={() => setSheet({ id: null })}
                         className="gap-[5px]"
                     >
-                        <Plus className="size-3" strokeWidth={2} aria-hidden />
+                        <Plus className="size-3" aria-hidden />
                         New collection
                     </Button>
                 ) : null}
@@ -150,12 +150,11 @@ export function CollectionsPanel({
                                     variant="ghost"
                                     onClick={() => setSheet({ id: c.id })}
                                     aria-label={`${canWrite ? "Edit" : "Open"} ${c.name}`}
-                                    className="relative z-[1] gap-[5px] text-brand"
+                                    className="relative z-[1] gap-[5px] text-foreground"
                                 >
                                     {canWrite ? (
                                         <Pencil
                                             className="size-3"
-                                            strokeWidth={2}
                                             aria-hidden
                                         />
                                     ) : null}

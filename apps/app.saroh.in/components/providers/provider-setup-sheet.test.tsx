@@ -191,7 +191,8 @@ describe("Razorpay setup, as guided steps", () => {
             await Promise.resolve();
         });
         expect(writeText).toHaveBeenCalledWith(URL_RZP);
-        expect(showSuccess).toHaveBeenCalledWith("Webhook URL copied");
+        // The button says it, where the eye already is: no toast.
+        expect(button(/Copy webhook URL/).textContent).toBe("Copied");
     });
 
     it("connects nothing until the webhook secret is filled, and says what is missing", async () => {
@@ -230,7 +231,9 @@ describe("Razorpay setup, as guided steps", () => {
             await Promise.resolve();
         });
         expect(writeText).toHaveBeenCalledWith(field.value);
-        expect(showSuccess).toHaveBeenCalledWith("Webhook secret copied");
+        expect(button(/Copy webhook signing secret/).textContent).toBe(
+            "Copied",
+        );
 
         await act(async () => {
             save().click();

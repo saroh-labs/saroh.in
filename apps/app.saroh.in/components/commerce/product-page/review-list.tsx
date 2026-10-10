@@ -4,12 +4,13 @@ import { Button } from "@saroh/ui/button";
 import { Card } from "@saroh/ui/card";
 import { cn } from "@saroh/ui/lib/utils";
 import { Textarea } from "@saroh/ui/textarea";
-import Link from "next/link";
 
 import { ViewerDate } from "@/components/shared/viewer-date";
 import { customerHref } from "@/lib/customers/links";
 import type { OverviewReview } from "@/lib/products/overview-rules";
 
+import { StatusBadge } from "@/components/shared/status-badge";
+import { TextLink } from "@saroh/ui/text-link";
 import { REPLY_MAX, useReviewActions } from "./use-review-actions";
 
 /**
@@ -52,21 +53,21 @@ export function ReviewList({
                                 <span
                                     role="img"
                                     aria-label={`${r.rating} out of 5`}
-                                    className="tracking-[1px] text-highlight"
+                                    className="tracking-[1px] text-foreground"
                                 >
                                     {"★".repeat(r.rating)}
                                     {"☆".repeat(5 - r.rating)}
                                 </span>
                                 {r.customerId ? (
-                                    <Link
+                                    <TextLink
                                         href={customerHref(
                                             storeId,
                                             r.customerId,
                                         )}
-                                        className="text-[13px] font-semibold text-brand transition-colors hover:text-foreground active:text-muted-foreground"
+                                        className="text-[13px]"
                                     >
                                         {r.displayName}
-                                    </Link>
+                                    </TextLink>
                                 ) : (
                                     <span className="text-[13px] font-semibold">
                                         {r.displayName}
@@ -82,9 +83,9 @@ export function ReviewList({
                                     />
                                 </span>
                                 {hidden ? (
-                                    <span className="rounded-full bg-muted px-[7px] py-0.5 text-[11px] font-semibold uppercase tracking-[0.04em] text-foreground/75">
+                                    <StatusBadge tone="neutral">
                                         Hidden from the shop
-                                    </span>
+                                    </StatusBadge>
                                 ) : null}
                             </div>
                             {r.body ? (
@@ -155,15 +156,13 @@ export function ReviewList({
                             {canReply && replyingTo !== r.id ? (
                                 <div className="mt-[9px] flex gap-3.5">
                                     {r.reply ? null : (
-                                        <Button
-                                            variant="link"
-                                            size="inline"
-                                            type="button"
+                                        <TextLink
                                             onClick={() => startReply(r.id)}
                                             disabled={pending}
+                                            className="text-[12.5px] disabled:text-disabled-foreground coarse:min-h-11"
                                         >
                                             Reply
-                                        </Button>
+                                        </TextLink>
                                     )}
                                     <Button
                                         variant="link"

@@ -1,6 +1,5 @@
 "use client";
 
-import { Button } from "@saroh/ui/button";
 import { Input } from "@saroh/ui/input";
 import { cn } from "@saroh/ui/lib/utils";
 import { Popover, PopoverContent, PopoverTrigger } from "@saroh/ui/popover";
@@ -136,7 +135,7 @@ export function OrganizationSwitcher({
     const heading = (label: string, first: boolean) => (
         <p
             className={cn(
-                "px-[9px] pb-[5px] text-[11px] font-semibold uppercase tracking-[0.1em] text-muted-foreground",
+                "label px-[9px] pb-[5px]",
                 first ? "pt-1" : "mt-[5px] border-t border-muted pt-2.5",
             )}
         >
@@ -153,13 +152,11 @@ export function OrganizationSwitcher({
             }}
         >
             <PopoverTrigger asChild>
-                <Button
-                    variant="ghost"
-                    size="sm"
+                <button
                     type="button"
                     disabled={pending}
                     aria-label={`Change business — currently ${active.name}`}
-                    className="min-w-0 gap-[9px] text-left"
+                    className="flex min-w-0 items-center gap-[9px] rounded-lg px-[9px] py-1.5 text-left transition-colors duration-fast hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background active:bg-accent-active disabled:text-disabled-foreground coarse:min-h-11"
                 >
                     <BusinessTile name={active.name} active size={30} />
                     <span className="flex min-w-0 items-baseline gap-2">
@@ -174,7 +171,7 @@ export function OrganizationSwitcher({
                         aria-hidden
                         className="size-[13px] shrink-0 text-muted-foreground"
                     />
-                </Button>
+                </button>
             </PopoverTrigger>
             <PopoverContent
                 align="start"

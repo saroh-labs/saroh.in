@@ -11,6 +11,8 @@ import { lateAfterWords } from "@/lib/stores/late-after";
 import { storefrontHref } from "@/lib/stores/links";
 import { dismissLateRuleNotice } from "@/lib/stores/storefront-actions";
 import type { LateRuleNotice } from "@/lib/stores/storefronts";
+import { IconButton } from "@saroh/ui/icon-button";
+import { Notice } from "@saroh/ui/notice";
 
 /**
  * One storefront's one-time notice on Orders (plan B, B17): pick-up orders
@@ -43,48 +45,43 @@ export function LateRuleNoticeCard({
     };
 
     return (
-        <div
-            role="note"
-            className="mb-4 flex flex-wrap items-center gap-2 rounded-[10px] border border-highlight bg-brand-subtle px-[13px] py-2 sm:gap-2.5 sm:py-2.5"
-        >
-            <span className="flex-[1_1_260px] text-pretty text-[13px] text-brand-subtle-foreground">
-                <strong className="font-semibold">
-                    Pick-up orders at {notice.name} now count as late after{" "}
-                    {lateAfterWords(notice.pickupLateAfterMinutes)}.
-                </strong>{" "}
-                <span className="max-sm:hidden">
-                    Set it to what suits your counter.
+        <Notice tone="info" role="note" className="mb-4">
+            <div className="flex flex-wrap items-center gap-2">
+                <span className="flex-[1_1_260px] text-pretty text-[13px] text-foreground">
+                    <strong className="font-semibold">
+                        Pick-up orders at {notice.name} now count as late after{" "}
+                        {lateAfterWords(notice.pickupLateAfterMinutes)}.
+                    </strong>{" "}
+                    <span className="max-sm:hidden">
+                        Set it to what suits your counter.
+                    </span>
                 </span>
-            </span>
-            {canChange ? (
-                <Button
-                    size="sm"
-                    asChild
-                    variant="outline"
-                    className="border-highlight"
-                >
-                    <Link
-                        href={`${storefrontHref(notice.storeId, "delivery")}#${LATE_AFTER_ANCHOR}`}
+                {canChange ? (
+                    <Button
+                        size="sm"
+                        asChild
+                        variant="outline"
+                        className="border-border-strong"
                     >
-                        Change it
-                    </Link>
-                </Button>
-            ) : (
-                <span className="text-[12px] text-muted-foreground">
-                    An owner or admin can change it in Locations.
-                </span>
-            )}
-            <Button
-                type="button"
-                variant="ghost"
-                size="icon-sm"
-                disabled={pending}
-                onClick={dismiss}
-                aria-label={`Dismiss this notice for ${notice.name}`}
-                className="text-brand-subtle-foreground"
-            >
-                <X aria-hidden className="size-4" />
-            </Button>
-        </div>
+                        <Link
+                            href={`${storefrontHref(notice.storeId, "delivery")}#${LATE_AFTER_ANCHOR}`}
+                        >
+                            Change it
+                        </Link>
+                    </Button>
+                ) : (
+                    <span className="text-[12px] text-muted-foreground">
+                        An owner or admin can change it in Locations.
+                    </span>
+                )}
+                <IconButton
+                    label={`Dismiss this notice for ${notice.name}`}
+                    icon={<X />}
+                    variant="ghost"
+                    disabled={pending}
+                    onClick={dismiss}
+                />
+            </div>
+        </Notice>
     );
 }

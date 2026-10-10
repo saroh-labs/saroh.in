@@ -34,6 +34,7 @@ import {
 import { couldntLoad } from "@saroh/ui/lib/state-copy";
 import { OptionSelect } from "@saroh/ui/option-select";
 
+import { Notice } from "@saroh/ui/notice";
 import { InvitePersonSheet } from "./invite-person-sheet";
 import { Note, Section } from "./storefront-section";
 
@@ -186,14 +187,11 @@ export function PeopleSection({
                 ) : null}
                 <div className="grid min-w-0 gap-5 sm:col-span-2">
                     {canManage && !canInvite ? (
-                        <p
-                            role="note"
-                            className="text-pretty rounded-lg bg-muted px-3 py-2.5 text-[12.5px] leading-[1.5]"
-                        >
+                        <Notice>
                             Inviting someone here also adds them to your team,
                             and your role can&apos;t invite people to the team.
                             Ask an owner or admin to invite them.
-                        </p>
+                        </Notice>
                     ) : null}
 
                     {alone ? (

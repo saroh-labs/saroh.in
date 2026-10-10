@@ -41,7 +41,7 @@ export function ListCard({
             <div className="overflow-hidden rounded-[12px] border border-border">
                 <div
                     aria-hidden
-                    className="flex items-center gap-3 border-b border-border bg-muted/40 px-[18px] py-[9px] text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground"
+                    className="label flex items-center gap-3 border-b border-border bg-muted px-[18px] py-[9px]"
                 >
                     <span className="min-w-0 flex-1">{main}</span>
                     {middle ? <span className={MIDDLE}>{middle}</span> : null}

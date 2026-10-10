@@ -2,6 +2,7 @@ import { CircleHelp } from "lucide-react";
 
 import type { HelpTopic } from "@/lib/help/links";
 import { helpHomeUrl, helpUrl } from "@/lib/help/links";
+import { Tip } from "@saroh/ui/tooltip";
 
 /**
  * The way out of a stuck moment.
@@ -19,15 +20,16 @@ import { helpHomeUrl, helpUrl } from "@/lib/help/links";
  */
 export function HelpLink({ topic }: { topic?: HelpTopic }) {
     return (
-        <a
-            href={topic ? helpUrl(topic) : helpHomeUrl()}
-            target="_blank"
-            rel="noreferrer"
-            aria-label="Help centre (opens in a new tab)"
-            title="Help"
-            className="inline-flex size-8 items-center justify-center rounded-lg text-neutral-700 transition-colors duration-fast hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background coarse:size-11 dark:text-foreground"
-        >
-            <CircleHelp className="size-4" />
-        </a>
+        <Tip label="Help">
+            <a
+                href={topic ? helpUrl(topic) : helpHomeUrl()}
+                target="_blank"
+                rel="noreferrer"
+                aria-label="Help centre (opens in a new tab)"
+                className="inline-flex size-8 items-center justify-center rounded-lg text-neutral-700 transition-colors duration-fast hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background coarse:size-11 dark:text-foreground"
+            >
+                <CircleHelp className="size-4" />
+            </a>
+        </Tip>
     );
 }

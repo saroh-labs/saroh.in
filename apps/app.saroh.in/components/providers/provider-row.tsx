@@ -1,9 +1,8 @@
 "use client";
 
 import { Button } from "@saroh/ui/button";
-import { cn } from "@saroh/ui/lib/utils";
-import { showError, showSuccess } from "@saroh/ui/toast";
-import { ArrowUpRight, Unplug } from "lucide-react";
+import { showSuccess } from "@saroh/ui/toast";
+import { ExternalLink, Unplug } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useId, useState } from "react";
@@ -26,6 +25,9 @@ import type {
     PaymentWebhookSetup,
 } from "@/lib/providers/service";
 
+import type { StatusTone } from "@/components/shared/status-badge";
+import { StatusBadge } from "@/components/shared/status-badge";
+import { CopyButton } from "@saroh/ui/copy-button";
 import { ProviderSetupSheet } from "./provider-setup-sheet";
 
 /*
@@ -39,30 +41,30 @@ import { ProviderSetupSheet } from "./provider-setup-sheet";
  * domain that needs a person is the accent; disconnected is quiet — nothing
  * is broken about a provider someone chose to disconnect.
  */
-const PILL: Record<ProviderRowState, { label: string; tone: string }> = {
+const PILL: Record<ProviderRowState, { label: string; tone: StatusTone }> = {
     CONNECTED: {
         label: "Connected",
-        tone: "bg-success-subtle text-success-subtle-foreground",
+        tone: "success",
     },
     ATTENTION: {
         label: "Needs attention",
-        tone: "bg-highlight-subtle text-highlight-subtle-foreground",
+        tone: "warning",
     },
     PENDING: {
         label: "Waiting for DNS",
-        tone: "bg-highlight-subtle text-highlight-subtle-foreground",
+        tone: "warning",
     },
     FAILED: {
         label: "Action needed",
-        tone: "bg-highlight-subtle text-highlight-subtle-foreground",
+        tone: "warning",
     },
     DISCONNECTED: {
         label: "Disconnected",
-        tone: "bg-muted text-foreground/80",
+        tone: "neutral",
     },
     NOT_CONNECTED: {
         label: "Not connected",
-        tone: "bg-muted text-foreground/80",
+        tone: "neutral",
     },
 };
 
@@ -156,14 +158,9 @@ export function ProviderRowView({
                                 {entry.type}
                             </span>
                             {!available ? (
-                                <span
-                                    className={cn(
-                                        "whitespace-nowrap rounded-full px-2 py-0.5 text-[11px] font-semibold uppercase tracking-[0.04em]",
-                                        PILL[entry.state].tone,
-                                    )}
-                                >
+                                <StatusBadge tone={PILL[entry.state].tone}>
                                     {PILL[entry.state].label}
-                                </span>
+                                </StatusBadge>
                             ) : null}
                         </div>
                         {entry.note ? (
@@ -194,9 +191,9 @@ export function ProviderRowView({
                     {(available || entry.state === "DISCONNECTED") &&
                     entry.lock ? (
                         <>
-                            <span className="rounded-full bg-muted px-2 py-0.5 text-[11.5px] font-medium text-muted-foreground">
+                            <StatusBadge tone="neutral">
                                 {entry.lock.comesWith}
-                            </span>
+                            </StatusBadge>
                             <Button asChild variant="outline" size="sm">
                                 <Link href={entry.lock.href}>
                                     {entry.lock.cta}
@@ -220,7 +217,7 @@ export function ProviderRowView({
                                 aria-label={`Manage ${entry.name} — opens ${entry.name}'s dashboard`}
                             >
                                 Manage
-                                <ArrowUpRight aria-hidden className="size-4" />
+                                <ExternalLink aria-hidden className="size-4" />
                             </a>
                         </Button>
                     ) : null}
@@ -300,14 +297,7 @@ export function DomainsRowView({ row }: { row: DomainsRow }) {
                         <span className="text-[13.5px] font-semibold">
                             {row.label}
                         </span>
-                        <span
-                            className={cn(
-                                "whitespace-nowrap rounded-full px-2 py-0.5 text-[11px] font-semibold uppercase tracking-[0.04em]",
-                                pill.tone,
-                            )}
-                        >
-                            {pill.label}
-                        </span>
+                        <StatusBadge tone={pill.tone}>{pill.label}</StatusBadge>
                     </div>
                     <p className="mt-[3px] text-pretty text-[12px] leading-[1.45] text-muted-foreground">
                         {row.note}
@@ -359,20 +349,13 @@ function RefLine({ label, code }: ProviderRef) {
             <code className="break-all rounded-md bg-muted px-[7px] py-0.5 font-mono text-[12px] text-foreground">
                 {code}
             </code>
-            <Button
-                type="button"
-                variant="outline"
-                size="xs"
+            <CopyButton
+                value={code}
+                label="Copy"
+                thing={label.toLowerCase()}
+                icon={false}
                 aria-label={`Copy ${label.toLowerCase()}`}
-                onClick={() => {
-                    navigator.clipboard.writeText(code).then(
-                        () => showSuccess(`Copied ${code}`),
-                        () => showError("Could not copy — select it instead."),
-                    );
-                }}
-            >
-                Copy
-            </Button>
+            />
         </div>
     );
 }

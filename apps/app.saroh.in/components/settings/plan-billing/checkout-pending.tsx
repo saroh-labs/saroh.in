@@ -9,6 +9,7 @@ import { ViewerDate } from "@/components/shared/viewer-date";
 import type { PendingCheckout } from "@/lib/saroh-billing/plan-view";
 import { openRazorpayWindow } from "@/lib/saroh-billing/razorpay-window";
 
+import { Notice } from "@saroh/ui/notice";
 import { useCheckoutConfirm } from "./use-checkout-confirm";
 
 /**
@@ -47,61 +48,60 @@ export function CheckoutPending({ pending }: { pending: PendingCheckout }) {
 
     const checking = phase === "checking" || phase === "idle";
     return (
-        <div
-            role="status"
-            aria-live="polite"
-            className="flex flex-wrap items-center gap-x-3 gap-y-2 border-t border-border/70 bg-warning-subtle px-[18px] py-3 text-[13px] text-warning-subtle-foreground"
-        >
-            <p className="flex min-w-0 flex-[1_1_260px] items-start gap-2 text-pretty font-medium">
-                {checking ? (
-                    <LoaderCircle
-                        aria-hidden
-                        className="mt-px size-4 shrink-0 animate-spin motion-reduce:animate-none"
-                    />
-                ) : (
-                    <CircleAlert
-                        aria-hidden
-                        className="mt-px size-4 shrink-0"
-                    />
-                )}
-                {checking ? (
-                    <span>
-                        Checking your payment for {pending.planName} with
-                        Razorpay…
-                    </span>
-                ) : (
-                    <span>
-                        Your move to {pending.planName} is waiting for its
-                        payment. If you&apos;ve just paid, it can take a minute
-                        to reach us, and you don&apos;t need to pay again. It
-                        lapses on <ViewerDate iso={pending.expiresAt} />.
-                    </span>
-                )}
-            </p>
-            {checking ? null : (
-                <div className="flex flex-wrap gap-2">
-                    <Button
-                        type="button"
-                        size="sm"
-                        variant="outline"
-                        onClick={() => void confirm(3)}
-                    >
-                        Check again
-                    </Button>
-                    {pending.handoff ? (
+        <Notice tone="warning" layout="banner" aria-live="polite">
+            <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
+                <p className="flex min-w-0 flex-[1_1_260px] items-start gap-2 text-pretty font-medium">
+                    {checking ? (
+                        <LoaderCircle
+                            aria-hidden
+                            className="mt-px size-4 shrink-0 animate-spin motion-reduce:animate-none"
+                        />
+                    ) : (
+                        <CircleAlert
+                            aria-hidden
+                            className="mt-px size-4 shrink-0"
+                        />
+                    )}
+                    {checking ? (
+                        <span>
+                            Checking your payment for {pending.planName} with
+                            Razorpay…
+                        </span>
+                    ) : (
+                        <span>
+                            Your move to {pending.planName} is waiting for its
+                            payment. If you&apos;ve just paid, it can take a
+                            minute to reach us, and you don&apos;t need to pay
+                            again. It lapses on{" "}
+                            <ViewerDate iso={pending.expiresAt} />.
+                        </span>
+                    )}
+                </p>
+                {checking ? null : (
+                    <div className="flex flex-wrap gap-2">
                         <Button
                             type="button"
                             size="sm"
                             variant="outline"
-                            onClick={() => void resume()}
-                            busy={opening}
-                            busyLabel="Opening…"
+                            onClick={() => void confirm(3)}
                         >
-                            Continue payment
+                            Check again
                         </Button>
-                    ) : null}
-                </div>
-            )}
-        </div>
+                        {pending.handoff ? (
+                            <Button
+                                type="button"
+                                size="sm"
+                                variant="outline"
+                                onClick={() => void resume()}
+                                busy={opening}
+                                busyLabel="Opening…"
+                            >
+                                Continue payment
+                            </Button>
+                        ) : null}
+                    </div>
+                )}
+            </div>
+        </Notice>
     );
 }

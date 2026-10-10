@@ -27,6 +27,7 @@ import type {
     SiteDetail,
 } from "@/lib/sites/service";
 import type { TestRelease } from "@/lib/sites/test-releases";
+import { Notice } from "@saroh/ui/notice";
 
 /**
  * The test releases waiting on a reviewer (DEC-071, T12): the ones that can
@@ -112,18 +113,15 @@ export function SiteReviewView({
             <ReleasesToReview siteId={site.id} releases={releases} />
 
             <p className="flex items-baseline gap-2 border-b pb-2">
-                <span className="text-[11px] uppercase tracking-[0.08em] text-muted-foreground">
-                    Reviewing
-                </span>
+                <span className="label">Reviewing</span>
                 <span data-review-subject className="text-sm font-medium">
                     {reviewSubject(null)}
                 </span>
             </p>
 
             {review.latestApproval ? (
-                <p
+                <Notice
                     role="status"
-                    className="rounded-lg border bg-muted px-4 py-3 text-sm"
                     title={exactDate(review.latestApproval.at, zone)}
                 >
                     {review.latestApproval.outcome === "REQUESTED"
@@ -142,7 +140,7 @@ export function SiteReviewView({
                     {open > 0
                         ? ` ${open === 1 ? "1 note is" : `${open} notes are`} open.`
                         : ""}
-                </p>
+                </Notice>
             ) : null}
 
             {site.pages.length > 1 ? (
@@ -220,9 +218,7 @@ function ReleasesToReview({
     if (open.length === 0) return null;
     return (
         <section aria-label="Test releases" className="space-y-2">
-            <h3 className="text-[11px] uppercase tracking-[0.08em] text-muted-foreground">
-                Test releases
-            </h3>
+            <h3 className="label">Test releases</h3>
             <ul className="grid gap-2">
                 {open.map((release) => {
                     const approved =

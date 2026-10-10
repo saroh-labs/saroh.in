@@ -5,7 +5,6 @@ import {
     FormSheetBody,
     FormSheetFoot,
 } from "@/components/shared/form-sheet";
-import { Button } from "@saroh/ui/button";
 import { showError, showSuccess, showUndo } from "@saroh/ui/toast";
 import { useRouter } from "next/navigation";
 import { useEffect, useId, useState } from "react";
@@ -41,6 +40,7 @@ import type { Service } from "@/lib/services/service";
 import { addExtraHours, removeExtraHours } from "@/lib/staff/actions";
 import type { StaffView } from "@/lib/staff/types";
 
+import { TextLink } from "@saroh/ui/text-link";
 import { Chip, Eyebrow } from "./parts";
 
 export interface GapTarget {
@@ -375,23 +375,19 @@ function Form({
                 ) : null}
                 <div className="mt-4 flex flex-wrap gap-x-4 gap-y-1">
                     {extra ? (
-                        <Button
-                            variant="link"
-                            size="inline"
-                            type="button"
+                        <TextLink
                             onClick={() => void closeExtra()}
+                            className="text-[12.5px] coarse:min-h-11"
                         >
                             Close these extra hours
-                        </Button>
+                        </TextLink>
                     ) : null}
-                    <Button
-                        variant="link"
-                        size="inline"
-                        type="button"
+                    <TextLink
                         onClick={() => onBlock(target)}
+                        className="text-[12.5px] coarse:min-h-11"
                     >
                         Block this time instead
-                    </Button>
+                    </TextLink>
                 </div>
             </FormSheetBody>
             <FormSheetFoot

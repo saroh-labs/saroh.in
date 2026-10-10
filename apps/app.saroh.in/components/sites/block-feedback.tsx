@@ -10,6 +10,7 @@ import { createComment, setCommentResolved } from "@/lib/sites/actions";
 import { exactDate, shortDate } from "@/lib/sites/format-date";
 import type { SiteCommentView } from "@/lib/sites/service";
 import { EmptyState } from "@saroh/ui/data-state";
+import { Tip } from "@saroh/ui/tooltip";
 
 /** A character that is a letter: letters change case, digits and punctuation do not. */
 const isLetter = (ch: string) => ch.toUpperCase() !== ch.toLowerCase();
@@ -241,20 +242,23 @@ export function BlockFeedback({
                     onChange={(e) => setReply(e.target.value)}
                 />
                 <div>
-                    <Button
-                        type="submit"
-                        size="sm"
-                        disabled={reply.trim() === ""}
-                        title={
+                    <Tip
+                        label={
                             reply.trim() === ""
                                 ? "Write something first"
                                 : undefined
                         }
-                        busy={sending}
-                        busyLabel="Sending…"
                     >
-                        {open.length === 0 ? "Add note" : "Reply"}
-                    </Button>
+                        <Button
+                            type="submit"
+                            size="sm"
+                            disabled={reply.trim() === ""}
+                            busy={sending}
+                            busyLabel="Sending…"
+                        >
+                            {open.length === 0 ? "Add note" : "Reply"}
+                        </Button>
+                    </Tip>
                 </div>
             </form>
         </div>

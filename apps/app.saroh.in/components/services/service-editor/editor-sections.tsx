@@ -38,7 +38,7 @@ interface Edit {
     set: (patch: Partial<ServiceDraft>) => void;
 }
 
-const CHIP = "h-[34px] text-[13px]";
+const CHIP = "";
 
 /**
  * Name, what to tell customers, and Kind — one-to-one or a class — up

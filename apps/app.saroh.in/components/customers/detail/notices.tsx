@@ -9,6 +9,7 @@ import {
     duplicateLine,
 } from "@/lib/customer-workspace/merge";
 import type { DuplicateSuggestion } from "@/lib/customer-workspace/service";
+import { Notice } from "@saroh/ui/notice";
 
 /**
  * A store customer with exactly this email that nobody has linked. Saroh
@@ -35,31 +36,30 @@ export function PossibleMatch({
             ? `${first.name} at ${first.storefront.name} has the same email`
             : `${matches.length} customers at your locations have the same email`;
     return (
-        <div
-            role="note"
-            className="mb-4 flex flex-wrap items-center gap-2.5 rounded-[10px] border border-highlight bg-brand-subtle px-[13px] py-2.5"
-        >
-            <span className="min-w-0 flex-[1_1_240px] text-[13px] text-brand-subtle-foreground [overflow-wrap:anywhere]">
-                <strong className="font-semibold">
-                    Possible match — link?
-                </strong>{" "}
-                {who}. Their orders stay apart until someone links them.
-            </span>
-            {canLink ? (
-                <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={onLink}
-                    className="border-highlight"
-                >
-                    Review and link
-                </Button>
-            ) : (
-                <span className="text-[12px] text-muted-foreground">
-                    Your role can't link them.
+        <Notice tone="info" role="note" className="mb-4">
+            <div className="flex flex-wrap items-center gap-2.5">
+                <span className="min-w-0 flex-[1_1_240px] text-[13px] text-foreground [overflow-wrap:anywhere]">
+                    <strong className="font-semibold">
+                        Possible match — link?
+                    </strong>{" "}
+                    {who}. Their orders stay apart until someone links them.
                 </span>
-            )}
-        </div>
+                {canLink ? (
+                    <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={onLink}
+                        className="border-border-strong"
+                    >
+                        Review and link
+                    </Button>
+                ) : (
+                    <span className="text-[12px] text-muted-foreground">
+                        Your role can't link them.
+                    </span>
+                )}
+            </div>
+        </Notice>
     );
 }
 
@@ -84,31 +84,29 @@ export function DuplicateNotice({
     return (
         <div className={`${className} grid gap-1.5`}>
             {duplicates.slice(0, 3).map((dup) => (
-                <div
-                    key={dup.contactId}
-                    role="note"
-                    className="flex flex-wrap items-center gap-2.5 rounded-[10px] border border-border-strong bg-card px-[13px] py-2.5"
-                >
-                    <span className="min-w-0 flex-[1_1_240px] text-[13px] text-foreground/75 [overflow-wrap:anywhere]">
-                        <strong className="font-semibold text-foreground">
-                            {duplicateHeading(dup)}
-                        </strong>{" "}
-                        {duplicateLine(dup)}
-                    </span>
-                    {onMerge ? (
-                        <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => onMerge(dup)}
-                        >
-                            Merge…
-                        </Button>
-                    ) : (
-                        <span className="text-[12px] text-muted-foreground">
-                            Your role can't merge them.
+                <Notice key={dup.contactId}>
+                    <div className="flex flex-wrap items-center gap-2.5">
+                        <span className="min-w-0 flex-[1_1_240px] text-[13px] text-foreground/75 [overflow-wrap:anywhere]">
+                            <strong className="font-semibold text-foreground">
+                                {duplicateHeading(dup)}
+                            </strong>{" "}
+                            {duplicateLine(dup)}
                         </span>
-                    )}
-                </div>
+                        {onMerge ? (
+                            <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => onMerge(dup)}
+                            >
+                                Merge…
+                            </Button>
+                        ) : (
+                            <span className="text-[12px] text-muted-foreground">
+                                Your role can't merge them.
+                            </span>
+                        )}
+                    </div>
+                </Notice>
             ))}
         </div>
     );
@@ -129,26 +127,25 @@ export function PartialNotice({
     const [pending, start] = useTransition();
     if (!missing.length) return null;
     return (
-        <div
-            role="status"
-            className="mb-4 flex flex-wrap items-center gap-2.5 rounded-[10px] border border-border-strong bg-muted px-[13px] py-2.5"
-        >
-            <span className="min-w-0 flex-[1_1_240px] text-[13px] text-foreground/75 [overflow-wrap:anywhere]">
-                <strong className="font-semibold text-foreground">
-                    Some of {first}&apos;s record couldn&apos;t be read:
-                </strong>{" "}
-                {missing.join(", ")}. Everything else is below, and nothing has
-                changed.
-            </span>
-            <Button
-                size="sm"
-                variant="outline"
-                onClick={() => start(() => router.refresh())}
-                busy={pending}
-                busyLabel="Trying again…"
-            >
-                Try again
-            </Button>
-        </div>
+        <Notice role="status" className="mb-4">
+            <div className="flex flex-wrap items-center gap-2.5">
+                <span className="min-w-0 flex-[1_1_240px] text-[13px] text-foreground/75 [overflow-wrap:anywhere]">
+                    <strong className="font-semibold text-foreground">
+                        Some of {first}&apos;s record couldn&apos;t be read:
+                    </strong>{" "}
+                    {missing.join(", ")}. Everything else is below, and nothing
+                    has changed.
+                </span>
+                <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => start(() => router.refresh())}
+                    busy={pending}
+                    busyLabel="Trying…"
+                >
+                    Try again
+                </Button>
+            </div>
+        </Notice>
     );
 }

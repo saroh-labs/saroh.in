@@ -19,7 +19,7 @@ import {
 import { recordStockEntry, undoStock } from "@/lib/stock/screen-actions";
 import { OptionSelect } from "@saroh/ui/option-select";
 
-import { chipClass } from "./tones";
+import { chipClass } from "@/components/shared/chip";
 import { targetKey, targetOptions, useStockTargets } from "./use-stock-targets";
 
 /**

@@ -146,8 +146,8 @@ type ListInvoice = Pick<
     | "payment"
 >;
 
-/** A pill's colour role, after the design: ok, accent, bad, off. */
-export type PillVariant = "success" | "draft" | "error" | "neutral";
+/** A pill's tone: paid, owed (in play, yours to collect), late, quiet. */
+export type PillVariant = "success" | "active" | "error" | "neutral";
 
 /**
  * The word on an invoice's pill. Issued reads "Due" — the design's word for
@@ -167,7 +167,7 @@ export function invoicePill(
         case "DRAFT":
             return { label: "Draft", variant: "neutral" };
         case "ISSUED":
-            return { label: "Due", variant: "draft" };
+            return { label: "Due", variant: "active" };
         case "OVERDUE":
             return { label: "Overdue", variant: "error" };
         case "PAID":

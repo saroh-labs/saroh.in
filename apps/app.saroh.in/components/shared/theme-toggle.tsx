@@ -1,6 +1,7 @@
 "use client";
 
 import { Button } from "@saroh/ui/button";
+import { Tip } from "@saroh/ui/tooltip";
 import { Moon, Sun } from "lucide-react";
 import { useTheme } from "next-themes";
 import { useSyncExternalStore } from "react";
@@ -56,19 +57,20 @@ export function ThemeToggle() {
     const Icon = isDark ? Moon : Sun;
 
     return (
-        <Button
-            variant="ghost"
-            size="icon-sm"
-            type="button"
-            onClick={() => setTheme(isDark ? "light" : "dark")}
-            aria-label={
-                `${isDark ? "Dark" : "Light"}` +
-                `${following ? ", following your system" : ""}. ` +
-                `Switch to ${isDark ? "light" : "dark"}.`
-            }
-            title={`Switch to ${isDark ? "light" : "dark"}`}
-        >
-            <Icon className="size-4" />
-        </Button>
+        <Tip label={`Switch to ${isDark ? "light" : "dark"}`}>
+            <Button
+                variant="ghost"
+                size="icon-sm"
+                type="button"
+                onClick={() => setTheme(isDark ? "light" : "dark")}
+                aria-label={
+                    `${isDark ? "Dark" : "Light"}` +
+                    `${following ? ", following your system" : ""}. ` +
+                    `Switch to ${isDark ? "light" : "dark"}.`
+                }
+            >
+                <Icon className="size-4" />
+            </Button>
+        </Tip>
     );
 }

@@ -1,23 +1,16 @@
 "use client";
 
-import {
-    ArrowDown,
-    ArrowUp,
-    LayoutGrid,
-    List,
-    Search,
-    Table2,
-} from "lucide-react";
+import { ArrowDown, ArrowUp, LayoutGrid, List, Table2 } from "lucide-react";
 import Link from "next/link";
 import { useMemo, useState } from "react";
-import { useDebouncedCallback } from "use-debounce";
 import { cn } from "../../../lib/utils";
-import { Button } from "../button";
 import { Checkbox } from "../checkbox";
 import { EmptyState } from "../data-state";
-import { Input } from "../input";
+import { ListSearch } from "../list-search";
 import { ScrollX } from "../scroll-x";
+import { Segmented } from "../segmented";
 import { Skeleton } from "../skeleton";
+import { TabStrip } from "../tabs";
 
 import type {
     DataColumn,
@@ -26,15 +19,6 @@ import type {
     DataViewProps,
 } from "./types";
 import { useViewMode } from "./use-view-mode";
-
-/**
- * How long the table waits before re-filtering.
- *
- * The same 180ms the command palette uses for its search, so the product has
- * one answer to "how long after I stop typing". Short enough to read as
- * instant, long enough that a burst of keystrokes costs one render.
- */
-const SEARCH_DEBOUNCE_MS = 180;
 
 const MODE_META: Record<DataViewMode, { label: string; icon: typeof Table2 }> =
     {
@@ -76,7 +60,7 @@ export function DataView<TRow>({
     error = null,
     noun,
     showTotal = true,
-    searchPlaceholder = "Search…",
+    searchPlaceholder,
     toolbarExtra,
     countLabel,
     hideModeToggle = false,
@@ -94,7 +78,7 @@ export function DataView<TRow>({
     /*
      * The parent holds only the SETTLED term.
      *
-     * The keystroke never reaches this component: `SearchField` below owns the
+     * The keystroke never reaches this component: `ListSearch` owns the
      * text it shows and hands the term up once typing pauses. That is the
      * whole point — `DataView` renders every row, so a re-render here costs
      * ~31ms over 600 rows, and debouncing the FILTER alone would have saved
@@ -253,7 +237,7 @@ export function DataView<TRow>({
                     <thead>
                         {/* A faint head fill and a stronger rule, as the
                                 applied Products screen draws it. */}
-                        <tr className="h-10 border-b border-border bg-foreground/[0.03]">
+                        <tr className="h-10 border-b border-border bg-muted">
                             {selectable ? (
                                 <th
                                     scope="col"
@@ -301,7 +285,7 @@ export function DataView<TRow>({
                                                 : undefined
                                         }
                                         className={cn(
-                                            "whitespace-nowrap px-[14px] text-left text-[11px] font-semibold uppercase tracking-[0.1em] text-muted-foreground",
+                                            "label whitespace-nowrap px-[14px] text-left",
                                             col.numeric && "text-right",
                                         )}
                                     >
@@ -318,7 +302,7 @@ export function DataView<TRow>({
                                                     // harness found these;
                                                     // reading the filter row
                                                     // by hand did not.
-                                                    "inline-flex items-center gap-1 rounded-sm uppercase hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring active:text-foreground coarse:min-h-11",
+                                                    "inline-flex items-center gap-1 rounded-sm [font:inherit] [letter-spacing:inherit] [text-transform:inherit] hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring active:text-foreground coarse:min-h-11",
                                                     active && "text-foreground",
                                                 )}
                                             >
@@ -373,7 +357,7 @@ export function DataView<TRow>({
                                             : undefined
                                     }
                                     className={cn(
-                                        "wk-item border-b border-border transition-colors duration-fast last:border-b-0 hover:bg-foreground/[0.035] data-[state=selected]:bg-brand-subtle",
+                                        "wk-item border-b border-border transition-colors duration-fast last:border-b-0 hover:bg-foreground/[0.035] data-[state=selected]:bg-muted",
                                         onRowClick &&
                                             "cursor-pointer active:bg-foreground/[0.07]",
                                     )}
@@ -627,48 +611,23 @@ export function DataView<TRow>({
         <div className="space-y-[14px]">
             {/*
              * Header tabs, when they filter (brand file §13): sub-views of the
-             * same rows — All, Unfulfilled, Refunds — each with its count.
-             * They filter the list, they never navigate, so they carry
-             * `aria-pressed`, not `aria-current`; the page marker belongs to
-             * the rail and appears once per screen.
+             * same rows (All, Unfulfilled, Refunds), each with its count, on
+             * the one tab strip. They filter the list and never navigate, so
+             * they are tabs, not links; `?view=` keeps the choice in the
+             * address.
              */}
             {hasFilters && !segmented ? (
-                <div
-                    role="group"
-                    aria-label="Filter"
-                    className="-mt-2 flex flex-wrap gap-0.5 border-b border-border"
-                >
-                    {filters?.map((f) => {
-                        const on = f.id === filterId;
-                        const n = countOf(f);
-                        return (
-                            <button
-                                key={f.id}
-                                type="button"
-                                aria-pressed={on}
-                                onClick={() => chooseFilter(f.id)}
-                                className={cn(
-                                    "flex items-center gap-[7px] rounded-t-md px-[13px] py-[9px] text-[13.5px] transition-colors duration-fast focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring active:bg-accent-active coarse:min-h-11",
-                                    on
-                                        ? "font-semibold text-foreground shadow-[inset_0_-2px_0_hsl(var(--foreground))]"
-                                        : "font-medium text-muted-foreground hover:text-foreground",
-                                )}
-                            >
-                                {f.label}
-                                <span
-                                    className={cn(
-                                        "rounded-full px-[7px] py-0.5 text-[11px] font-semibold tabular-nums",
-                                        on
-                                            ? "bg-muted text-foreground"
-                                            : "bg-foreground/[0.04] text-muted-foreground",
-                                    )}
-                                >
-                                    {n}
-                                </span>
-                            </button>
-                        );
-                    })}
-                </div>
+                <TabStrip
+                    label="Filter"
+                    className="-mt-2"
+                    value={filterId ?? ""}
+                    onValueChange={chooseFilter}
+                    tabs={(filters ?? []).map((f) => ({
+                        value: f.id,
+                        label: f.label,
+                        count: countOf(f),
+                    }))}
+                />
             ) : null}
 
             {/* The toolbar: search, density, and how many rows are showing. */}
@@ -682,97 +641,49 @@ export function DataView<TRow>({
                      * choice, so nobody clicks into an empty view.
                      */}
                     {segmented ? (
-                        <div
-                            role="group"
-                            aria-label="Filter"
-                            className="flex max-w-full items-center overflow-x-auto rounded-md border border-border p-0.5"
-                        >
-                            {filters?.map((f) => {
-                                const on = f.id === filterId;
-                                return (
-                                    <button
-                                        key={f.id}
-                                        type="button"
-                                        aria-pressed={on}
-                                        onClick={() => chooseFilter(f.id)}
-                                        className={cn(
-                                            "flex h-[32px] shrink-0 items-center gap-1.5 rounded-sm px-2.5 text-[13px] transition-colors duration-fast focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring active:bg-accent-active coarse:h-11 coarse:px-3.5",
-                                            on
-                                                ? "bg-accent font-semibold text-accent-foreground"
-                                                : "font-medium text-muted-foreground hover:text-foreground",
-                                        )}
-                                    >
-                                        {f.label}
-                                        <span
-                                            className={cn(
-                                                "text-[11.5px] tabular-nums",
-                                                f.attention && countOf(f) > 0
-                                                    ? "font-semibold text-brand-subtle-foreground"
-                                                    : on
-                                                      ? "text-accent-foreground/70"
-                                                      : "text-muted-foreground/80",
-                                            )}
-                                        >
-                                            {countOf(f)}
-                                        </span>
-                                    </button>
-                                );
-                            })}
-                        </div>
+                        <Segmented
+                            label="Filter"
+                            value={filterId ?? ""}
+                            onValueChange={chooseFilter}
+                            className="overflow-x-auto"
+                            options={(filters ?? []).map((f) => ({
+                                value: f.id,
+                                label: f.label,
+                                count: countOf(f),
+                            }))}
+                        />
                     ) : null}
 
                     {searchable.length > 0 ? (
-                        <div className="relative min-w-[200px] max-w-[320px] flex-1">
-                            <Search
-                                aria-hidden
-                                className="pointer-events-none absolute left-[11px] top-1/2 size-4 -translate-y-1/2 text-muted-foreground"
-                            />
-                            <SearchField
-                                key={clearNonce}
-                                onSettled={setSearch}
-                                placeholder={searchPlaceholder}
-                                aria-label={searchPlaceholder.replace(/…$/, "")}
-                                className="h-[38px] pl-[34px] text-[13.5px] coarse:h-11"
-                            />
-                        </div>
+                        <ListSearch
+                            key={clearNonce}
+                            onSearch={setSearch}
+                            placeholder={
+                                searchPlaceholder ?? `Search ${noun.other}`
+                            }
+                        />
                     ) : null}
 
                     {toolbarExtra}
 
                     {showModes ? (
-                        <div
-                            role="group"
-                            aria-label="View density"
-                            // A desk's choice only (T8): below the table
-                            // boundary the phone always draws the list, so
-                            // a toggle there would change nothing.
-                            className="hidden items-center rounded-md border border-border p-0.5 min-[760px]:flex"
-                        >
-                            {modes.map((m) => {
+                        // A desk's choice only (T8): below the table
+                        // boundary the phone always draws the list, so a
+                        // switch there would change nothing.
+                        <Segmented
+                            label="View density"
+                            className="hidden min-[760px]:inline-flex"
+                            value={mode ?? deskMode}
+                            onValueChange={choose}
+                            options={modes.map((m) => {
                                 const Icon = MODE_META[m].icon;
-                                const on = m === (mode ?? deskMode);
-                                return (
-                                    <Button
-                                        key={m}
-                                        type="button"
-                                        size="sm"
-                                        variant="ghost"
-                                        aria-pressed={on}
-                                        onClick={() => choose(m)}
-                                        className={cn(
-                                            "h-7 gap-1.5 rounded-sm px-2.5 text-xs font-medium coarse:h-11 coarse:px-3.5",
-                                            on &&
-                                                "bg-accent text-accent-foreground",
-                                        )}
-                                    >
-                                        <Icon className="size-3.5" />
-                                        <span className="hidden sm:inline">
-                                            {MODE_META[m].label}
-                                        </span>
-                                    </Button>
-                                );
+                                return {
+                                    value: m,
+                                    label: MODE_META[m].label,
+                                    icon: <Icon />,
+                                };
                             })}
-                        </div>
+                        />
                     ) : null}
 
                     <p
@@ -934,51 +845,5 @@ export function DataView<TRow>({
                 </p>
             ) : null}
         </div>
-    );
-}
-
-/**
- * The search box, deliberately cut off from the table.
- *
- * It owns the text it displays, so typing re-renders THIS — one input — and
- * nothing else. The term reaches `DataView` only once typing pauses, and only
- * then does the table do its work.
- *
- * That separation is the fix, not the timer. Debouncing while the input still
- * lived in `DataView` moved the cheap half (filtering, 0.038ms over 600 rows)
- * off the keystroke and left the expensive half (rendering 600 rows, ~31ms) on
- * it — so every character still dropped two frames, and the results lagged as
- * well. Measured both ways before this shape was settled on.
- */
-function SearchField({
-    onSettled,
-    placeholder,
-    className,
-    "aria-label": ariaLabel,
-}: {
-    /** Called with the term once typing has paused. */
-    onSettled: (value: string) => void;
-    placeholder: string;
-    className?: string;
-    "aria-label": string;
-}) {
-    const [text, setText] = useState("");
-    const settle = useDebouncedCallback(onSettled, SEARCH_DEBOUNCE_MS);
-
-    return (
-        <Input
-            value={text}
-            onChange={(e) => {
-                setText(e.target.value);
-                settle(e.target.value);
-            }}
-            // A pause is what the timer waits for, and leaving the field is a
-            // longer pause than any timer. Without this, tabbing straight to
-            // the next control leaves the table showing the previous term.
-            onBlur={() => settle.flush()}
-            placeholder={placeholder}
-            aria-label={ariaLabel}
-            className={className}
-        />
     );
 }
