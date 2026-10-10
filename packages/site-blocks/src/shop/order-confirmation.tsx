@@ -219,6 +219,7 @@ export function OrderConfirmation({
     businessName,
     shopHref = "/shop",
     ordersHref = null,
+    signIn = null,
 }: {
     lookup: OrderConfirmationLookup;
     businessName: string;
@@ -226,31 +227,41 @@ export function OrderConfirmation({
     shopHref?: string;
     /** The account's Orders, only while the account area serves. */
     ordersHref?: string | null;
+    /**
+     * The way to sign in, drawn when the page was opened signed out: the
+     * site's own entry (`AccountEntry`, its "page" variant), which keeps
+     * the customer on this page, so signing in shows the order. It leads;
+     * "Back to the shop" is the other way out.
+     */
+    signIn?: ReactNode;
 }) {
     if (!lookup.ok) {
         const words =
             lookup.reason === "unavailable"
                 ? {
                       title: "We couldn't load your order",
-                      lead: `Something went wrong on our side. Your order is safe with ${businessName} — try again in a moment.`,
+                      lead: `Something went wrong on our side. Your order is safe with ${businessName}. Try again in a moment.`,
                   }
                 : lookup.reason === "signed-out"
                   ? {
                         title: "Sign in to see your order",
-                        lead: `Your order is shown to the person who placed it, while they're signed in on ${businessName}'s site.`,
+                        lead: `Your order is shown to the person who placed it. Sign in with the email you ordered with and it opens here.`,
                     }
                   : {
                         title: "We couldn't find that order",
                         lead: `It may still be being confirmed. If you paid, ${businessName} will be in touch.`,
                     };
+        // Only a signed-out read can be mended by signing in.
+        const entry = lookup.reason === "signed-out" ? signIn : null;
         return (
             <Frame>
                 <h1 className="font-site-heading text-site-fg text-[26px] font-semibold tracking-[-0.03em]">
                     {words.title}
                 </h1>
                 <p className="text-site-body mt-2 text-sm">{words.lead}</p>
-                <div className="mt-6 flex flex-wrap gap-3">
-                    <Link href={shopHref} className={linkButton(true)}>
+                <div className="mt-6 flex flex-wrap items-center gap-3">
+                    {entry}
+                    <Link href={shopHref} className={linkButton(!entry)}>
                         Back to the shop
                     </Link>
                 </div>
@@ -267,7 +278,7 @@ export function OrderConfirmation({
             <h1 className="font-site-heading text-site-fg mt-1 text-[26px] font-semibold tracking-[-0.03em] sm:text-[30px]">
                 {order.refunded
                     ? "This order was refunded"
-                    : "Thank you — your order is placed"}
+                    : "Thank you, your order is placed"}
             </h1>
             <p className="text-site-body mt-2 text-sm">
                 {order.refunded
@@ -292,7 +303,7 @@ export function OrderConfirmation({
     );
 }
 
-/** "You'll pay when you collect your order." — said where it is placed. */
+/** "You'll pay when you collect your order.", said where it is placed. */
 export function toPayLead(toPay: string): string {
     return toPay === "Pay on delivery"
         ? "You'll pay when your order is delivered."

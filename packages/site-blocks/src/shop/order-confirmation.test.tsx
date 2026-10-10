@@ -47,7 +47,7 @@ describe("OrderConfirmation (P4)", () => {
         expect(
             screen.getByRole("heading", {
                 level: 1,
-                name: "Thank you — your order is placed",
+                name: "Thank you, your order is placed",
             }),
         ).toBeTruthy();
         expect(
@@ -97,7 +97,7 @@ describe("OrderConfirmation (P4)", () => {
         expect(
             screen.getByRole("heading", {
                 level: 1,
-                name: "Thank you — your order is placed",
+                name: "Thank you, your order is placed",
             }),
         ).toBeTruthy();
         expect(screen.getByText("Order ORD-019")).toBeTruthy();
@@ -203,6 +203,49 @@ describe("OrderConfirmation (P4)", () => {
             screen.getByRole("link", { name: "Back to the shop" }),
         ).toHaveAttribute("href", "/shop");
     });
+
+    it("offers to sign in where the page was opened signed out, ahead of the way back", () => {
+        render(
+            <OrderConfirmation
+                lookup={{ ok: false, reason: "signed-out" }}
+                businessName="Rye & Co."
+                signIn={<button type="button">Sign in</button>}
+            />,
+        );
+        expect(
+            screen.getByText(
+                "Your order is shown to the person who placed it. Sign in with the email you ordered with and it opens here.",
+            ),
+        ).toBeTruthy();
+        const signIn = screen.getByRole("button", { name: "Sign in" });
+        const back = screen.getByRole("link", { name: "Back to the shop" });
+        // Sign in leads; the shop is the other way out.
+        expect(
+            signIn.compareDocumentPosition(back) &
+                Node.DOCUMENT_POSITION_FOLLOWING,
+        ).toBeTruthy();
+        expect(back.className).not.toContain("bg-site-accent");
+    });
+
+    it.each(["missing", "unavailable"] as const)(
+        "offers no sign-in when the order is %s: signing in wouldn't mend it",
+        (reason) => {
+            render(
+                <OrderConfirmation
+                    lookup={{ ok: false, reason }}
+                    businessName="Rye & Co."
+                    signIn={<button type="button">Sign in</button>}
+                />,
+            );
+            expect(screen.queryByRole("button", { name: "Sign in" })).toBe(
+                null,
+            );
+            expect(
+                screen.getByRole("link", { name: "Back to the shop" })
+                    .className,
+            ).toContain("bg-site-accent");
+        },
+    );
 
     it("keeps the customer on the business's own site", () => {
         expect(orderConfirmationHref("ord_1")).toBe("/shop/order/ord_1");
