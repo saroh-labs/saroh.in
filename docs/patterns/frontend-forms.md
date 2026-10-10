@@ -53,6 +53,17 @@ Editor's rules (problems, the save blocker, "When you publish" lines) are pure
 in `lib/subscriptions/plan-editor.ts`, and `plan-editor-adapter.ts` turns the
 typed form into the API's values and back.
 
+**Current** — **A settings row is read first and edited in a side sheet**
+(owner, 10 Oct): a location's tabs (`components/stores/`) draw `Row`s from
+`components/sites/settings-rows.tsx` — label, a sentence of what is saved,
+Edit — and each Edit opens its own `@saroh/ui/sheet` with one Save.
+`PlaceSheetFrame` in `place-sheets.tsx` is the frame to copy: the fields
+scroll, Save then Cancel sit at the foot, nothing saves until Save, a
+refusal keeps the sheet open with what was typed, Cancel, Escape and the
+close button drop the draft, it can't be dismissed while saving, each
+opening is a fresh draft (a `key` per opening) and the keyboard returns to
+the row's Edit. A link opens one with `?edit=` (`lib/stores/place-rows.ts`).
+
 ## Rules
 
 - **Current** — **Schema first.** A `z.object` at the top defines validation and
