@@ -6,7 +6,11 @@ import { useState } from "react";
 
 import { Absent, Row, Section as Rows } from "@/components/sites/settings-rows";
 import type { LocationDetails } from "@/lib/stores/location-details";
-import { detailsEmpty, detailsSummary } from "@/lib/stores/location-details";
+import {
+    detailsEmpty,
+    detailsSummary,
+    shownLogo,
+} from "@/lib/stores/location-details";
 import { LOCATION_SECTIONS } from "@/lib/stores/location-readiness";
 import { hoursSummary } from "@/lib/stores/opening-hours-summary";
 import type { PlaceSheet } from "@/lib/stores/place-rows";
@@ -33,7 +37,8 @@ import type { PlaceSheets } from "./use-place-sheets";
  * The place, read first (owner, 10 Oct, as Delivery, Payments and People
  * are): one card of rows in Website settings' "label · what is saved ·
  * Edit" pattern. Its name; whether customers come here; only for a place
- * they visit, its address and opening hours; and its description and logo.
+ * they visit, its address and opening hours; and its description and logo
+ * (its own, or the business's it uses until it has one, DEC-120).
  * Each Edit opens that row's own side sheet (`place-sheets.tsx`,
  * `location-details-sheet.tsx`) with one Save; nothing in this tab saves
  * on its own but "Turn Pick-up off". Read-only roles see the rows without
@@ -62,6 +67,7 @@ export function PlaceSection({
         null,
     );
     const about = savedDetails ?? details;
+    const logo = about ? shownLogo(about) : null;
     const shop = store.kind === "SHOP";
     const address = addressLine(store.address);
 
@@ -212,12 +218,27 @@ export function PlaceSection({
                             "Edit description and logo",
                         )}
                     >
-                        <span data-testid="location-details-summary">
-                            {detailsEmpty(about) ? (
-                                <Absent>{detailsSummary(about)}</Absent>
-                            ) : (
-                                detailsSummary(about)
-                            )}
+                        <span className="flex min-w-0 items-center gap-2.5">
+                            {logo ? (
+                                // The words beside it say whose it is.
+                                // eslint-disable-next-line @next/next/no-img-element -- a tenant's own image, outside next/image's allowlist
+                                <img
+                                    src={logo}
+                                    alt=""
+                                    data-testid="location-logo-thumb"
+                                    className="size-7 flex-none rounded-md border border-border bg-white object-cover"
+                                />
+                            ) : null}
+                            <span
+                                data-testid="location-details-summary"
+                                className="min-w-0 text-pretty"
+                            >
+                                {detailsEmpty(about) ? (
+                                    <Absent>{detailsSummary(about)}</Absent>
+                                ) : (
+                                    detailsSummary(about)
+                                )}
+                            </span>
                         </span>
                     </Row>
                 ) : null}

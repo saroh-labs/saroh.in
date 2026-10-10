@@ -12,7 +12,11 @@ export interface CreateStoreInput {
 export interface UpdateStoreInput {
     name: string;
     description?: string | null;
-    logo?: string | null;
+    /**
+     * The location's own logo: an image uploaded to the library, or `null`
+     * to use the business logo. Left out, the logo stays as it is.
+     */
+    logoMediaId?: string | null;
 }
 
 /** Discriminated result so callers/UI can show field errors inline. */

@@ -48,6 +48,8 @@ export function PlaceSheetFrame({
     description: string;
     open: boolean;
     pending: boolean;
+    /** Save waits on something in the sheet, such as an upload. */
+    saveOff?: boolean;
     onClose: () => void;
     onSubmit: FormEventHandler<HTMLFormElement>;
     children: ReactNode;

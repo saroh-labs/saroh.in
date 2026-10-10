@@ -54,7 +54,24 @@ export class UpdateStoreDto {
     @MaxLength(500)
     description?: string | null;
 
-    // Allow a valid URL or the empty string (cleared logo).
+    /**
+     * The location's own logo (DEC-120): an image the business uploaded to
+     * its library, or `null` to use the business logo. Left out, the logo
+     * stays as it is.
+     */
+    @IsOptional()
+    @Transform(trim)
+    @IsString()
+    @MinLength(1, { message: "logoMediaId is required" })
+    @MaxLength(64)
+    logoMediaId?: string | null;
+
+    /**
+     * The logo as a typed address, from before it could be uploaded. Kept
+     * for an older app that sends it with every save: repeating what is
+     * stored changes nothing, an empty one takes off a logo that was an
+     * address, and a new address is refused (`location-logo.ts`).
+     */
     @IsOptional()
     @Transform(trim)
     @ValidateIf((o: UpdateStoreDto) => o.logo != null && o.logo !== "")

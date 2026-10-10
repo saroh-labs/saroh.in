@@ -92,6 +92,9 @@ module.exports = {
         "<rootDir>/src/modules/stores/**/*.authorization.spec.ts",
         // ADR-006: one storefront per business, with a mocked Prisma.
         "<rootDir>/src/modules/stores/stores.service.create-cap.spec.ts",
+        // DEC-120 a location's logo: which one a read says and what a save
+        // writes, with a mocked Prisma and stubbed store and media services.
+        "<rootDir>/src/modules/stores/location-logo.spec.ts",
         // S2-008 media: MediaService specs with a jest-mocked Prisma AND a fake
         // ObjectStorage port (never touch a DB, R2, or the network).
         "<rootDir>/src/modules/media/**/*.spec.ts",

@@ -70,6 +70,7 @@ export function QrShare({
         initials: screen.business.initials,
         dataUrl: screen.business.logo,
         hasLogo: screen.business.hasLogo,
+        canSetLogo: screen.business.canSetLogo,
     };
     const viewing =
         codes.find((c) => c.id === viewingId && !c.retired) ??

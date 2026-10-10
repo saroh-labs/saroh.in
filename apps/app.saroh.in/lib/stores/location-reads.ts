@@ -2,14 +2,16 @@ import { apiFetch } from "@/lib/api/http";
 import { listInvitations, listMembers } from "@/lib/members/service";
 import type { Organization } from "@/lib/organizations/service";
 
-import type { LocationDetails } from "./location-details";
+import type { LocationDetails, StoreLogos } from "./location-details";
+import { detailsOf } from "./location-details";
 import type { LocationPeople } from "./people";
 import { peopleAccess } from "./people";
 
 /**
  * The two reads a location's page makes beside its settings: its
- * description and logo (a row in The place) and its people (the People
- * tab). Server-only.
+ * description and logo (a row in The place; the one read brings the
+ * business logo it uses when it has none of its own) and its people (the
+ * People tab). Server-only.
  *
  * Both are tolerant on purpose, as `readSiteSelling` is: they come from the
  * location's older owner-and-member routes, and its settings must not
@@ -29,11 +31,7 @@ export async function readLocationDetails(
     try {
         const res = await apiFetch(`/stores/${encodeURIComponent(storeId)}`);
         if (!res.ok) return undefined;
-        const store = (await res.json()) as Partial<LocationDetails>;
-        return {
-            description: store.description ?? null,
-            logo: store.logo ?? null,
-        };
+        return detailsOf((await res.json()) as StoreLogos);
     } catch {
         return undefined;
     }

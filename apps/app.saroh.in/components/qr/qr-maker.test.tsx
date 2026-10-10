@@ -5,7 +5,8 @@
  * is a file drawn, from the code's own short link. Choosing a target and
  * place that already have a code selects it. A colour too light to scan
  * stops the download; a plan without its own look keeps Plain; a refusal
- * is said beside the control it is about and nothing chosen is lost.
+ * is said beside the control it is about and nothing chosen is lost. A
+ * branded code with no logo yet takes one in a sheet, without leaving.
  *
  * `react-dom/client` + `act`, as the other component tests do.
  */
@@ -43,6 +44,21 @@ const showError = vi.fn();
 vi.mock("@saroh/ui/toast", () => ({
     showSuccess: (...args: unknown[]) => showSuccess(...args) as unknown,
     showError: (...args: unknown[]) => showError(...args) as unknown,
+}));
+const refresh = vi.fn();
+vi.mock("next/navigation", () => ({
+    useRouter: () => ({ refresh }),
+}));
+const saveBusinessLogo = vi.fn();
+vi.mock("@/lib/organizations/settings-actions", () => ({
+    saveBusinessLogo: (...args: unknown[]) =>
+        saveBusinessLogo(...args) as unknown,
+}));
+// The logo's sheet uploads through the media library: a picked file
+// becomes the picture this answers with.
+const upload = vi.fn();
+vi.mock("@/components/sites/media-picker", () => ({
+    useImageUpload: () => ({ upload, busy: false, error: null }),
 }));
 vi.mock("next/link", () => ({
     default: ({
@@ -99,6 +115,7 @@ async function draw(
         changing?: QrCodeView | null;
         origin?: string | null;
         logo?: string | null;
+        canSetLogo?: boolean;
     } = {},
 ) {
     await act(async () => {
@@ -116,6 +133,7 @@ async function draw(
                     initials: "GS",
                     dataUrl: over.logo ?? null,
                     hasLogo: Boolean(over.logo),
+                    canSetLogo: over.canSetLogo ?? true,
                 }}
                 changing={over.changing ?? null}
                 onChangingDone={onChangingDone}
@@ -442,18 +460,130 @@ describe("QrMaker — a plan without its own look", () => {
 });
 
 describe("QrMaker — branded", () => {
-    it("draws the initials and points at where the logo is set", async () => {
+    /** The logo's sheet, a portal on the page. */
+    const sheet = () => document.querySelector<HTMLElement>('[role="dialog"]');
+    const inSheet = (name: string) =>
+        Array.from(sheet()?.querySelectorAll("button") ?? []).find(
+            (b) => b.textContent === name,
+        );
+    const settle = async () => {
+        for (let i = 0; i < 2; i++) {
+            await act(async () => {
+                await new Promise((r) => setTimeout(r, 0));
+            });
+        }
+    };
+
+    it("draws the initials, and Add your logo opens the logo's sheet here", async () => {
         await draw();
         await click(radio("Logo + colour"));
         expect(q("[data-qr-logo-box] text")?.textContent).toBe("GS");
         expect(host.textContent).toContain(
             "No logo yet, so your initials stand in.",
         );
+        // A button that opens a sheet, never a link away from the maker.
         expect(
-            Array.from(host.querySelectorAll("a"))
-                .find((a) => a.textContent === "Add your logo")
-                ?.getAttribute("href"),
-        ).toBe("/settings/organization?section=identity&edit=logo");
+            Array.from(host.querySelectorAll("a")).some(
+                (a) => a.textContent === "Add your logo",
+            ),
+        ).toBe(false);
+        expect(sheet()).toBeNull();
+        await click(button("Add your logo"));
+        await settle();
+        expect(sheet()?.textContent).toContain("Logo");
+        expect(sheet()?.textContent).toContain(
+            "Goes on your invoices and receipts.",
+        );
+    });
+
+    it("uploads and saves the business logo in the sheet, then reads the page again", async () => {
+        upload.mockResolvedValue({
+            src: "https://cdn.example.com/glow.png",
+            mediaId: "m1",
+        });
+        saveBusinessLogo.mockResolvedValue({ ok: true, data: {} });
+        await draw();
+        await click(radio("Logo + colour"));
+        await click(button("Add your logo"));
+        await settle();
+
+        const picker =
+            sheet()?.querySelector<HTMLInputElement>('input[type="file"]');
+        await act(async () => {
+            if (!picker) throw new Error("No file field");
+            Object.defineProperty(picker, "files", {
+                value: [new File(["x"], "glow.png", { type: "image/png" })],
+                configurable: true,
+            });
+            picker.dispatchEvent(new Event("change", { bubbles: true }));
+            await Promise.resolve();
+        });
+        await settle();
+        // Uploaded, and nothing saved until Save.
+        expect(upload).toHaveBeenCalledTimes(1);
+        expect(saveBusinessLogo).not.toHaveBeenCalled();
+        expect(refresh).not.toHaveBeenCalled();
+
+        await click(inSheet("Save"));
+        await settle();
+        expect(saveBusinessLogo).toHaveBeenCalledWith("m1");
+        expect(showSuccess).toHaveBeenCalledWith(
+            "Logo saved. It prints on your invoices and receipts.",
+        );
+        expect(refresh).toHaveBeenCalledTimes(1);
+        expect(sheet()).toBeNull();
+        // Still on the maker, with what was chosen.
+        expect(radio("Logo + colour")?.getAttribute("aria-checked")).toBe(
+            "true",
+        );
+    });
+
+    it("a refusal stays in the sheet, and Cancel saves nothing", async () => {
+        upload.mockResolvedValue({
+            src: "https://cdn.example.com/glow.png",
+            mediaId: "m1",
+        });
+        saveBusinessLogo.mockResolvedValue({
+            ok: false,
+            error: "A logo is under 1 MB. Choose a smaller image.",
+        });
+        await draw();
+        await click(radio("Logo + colour"));
+        await click(button("Add your logo"));
+        await settle();
+        const picker =
+            sheet()?.querySelector<HTMLInputElement>('input[type="file"]');
+        await act(async () => {
+            if (!picker) throw new Error("No file field");
+            Object.defineProperty(picker, "files", {
+                value: [new File(["x"], "glow.png", { type: "image/png" })],
+                configurable: true,
+            });
+            picker.dispatchEvent(new Event("change", { bubbles: true }));
+            await Promise.resolve();
+        });
+        await settle();
+        await click(inSheet("Save"));
+        await settle();
+        expect(sheet()?.querySelector('[role="alert"]')?.textContent).toBe(
+            "A logo is under 1 MB. Choose a smaller image.",
+        );
+        expect(refresh).not.toHaveBeenCalled();
+
+        await click(inSheet("Cancel"));
+        await settle();
+        expect(sheet()).toBeNull();
+        expect(saveBusinessLogo).toHaveBeenCalledTimes(1);
+        expect(refresh).not.toHaveBeenCalled();
+    });
+
+    it("someone who may not set the logo reads where it is set, with nothing to press", async () => {
+        await draw({ canSetLogo: false });
+        await click(radio("Logo + colour"));
+        expect(host.textContent).toContain(
+            "No logo yet, so your initials stand in. The business logo is added in Settings › Business.",
+        );
+        expect(button("Add your logo")).toBeUndefined();
     });
 
     it("draws the logo, and puts it inside the downloaded file", async () => {

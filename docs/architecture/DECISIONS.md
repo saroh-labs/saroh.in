@@ -1356,3 +1356,14 @@ Also decided 9 Oct (#886): each admin console deploys only its own environment; 
 - Context: early access opens on 17 Oct and the public pages should say what is coming, without promising a day.
 - Decision: no separate roadmap page. The changelog has a "Coming next" list and `/integrations` lists what is planned, both from one source (`apps/saroh.in/content/coming.ts`). Each row carries "Not available yet" and sits under a period: the nearest as months ("Nov–Dec 2026"), the next as "Early 2027", the rest as "Later". Never a day.
 - Every row is a "Planned" line in the claims ledger (`docs/architecture/MARKETING_CLAIMS.md`); when it ships it moves to the dated changelog entry and its ledger status changes in the same batch.
+
+## DEC-120 A location uses the business logo unless it has its own
+
+**Status: Accepted — 2026-10-10** · owner
+
+- Context: a location's "Description and logo" sheet asked for a "Logo address", a web link to type. The business already uploads its logo in Settings › Business, and the owner asked that a location use it, that a logo be uploaded rather than linked, and that the task finish inside the sheet.
+- Decision: a location with no logo of its own shows the business logo, and says so ("Using your business logo"). It can have its own, uploaded in the same sheet (PNG, JPG or WebP, 1 MB at most, the business logo's rule); "Use your business logo" goes back. The typed web link is gone.
+- Data: `Store.logoMediaId` beside `Store.logo`, the business logo's shape (a library object and the address it is served from, taken when set). Both null is "use the business's". A location that already held a typed address keeps it as its own logo, with no library object, until it is replaced or given up.
+- API: `PUT /stores/:id` takes `logoMediaId` (an image in the location's own business's library, or `null` for the business logo; left out, the logo stays). One route, not a pair like the business logo's, because the sheet saves the description and the logo with one Save. `GET /stores/:id` returns `ownLogo`, `businessLogo` and `effectiveLogo` (own, else the business's, else none). The old `logo` address field is still accepted from an older app, but a new address is refused. The library won't delete an image while a location uses it.
+- Access is unchanged: whoever may edit the location may change its logo.
+- Consequences: nothing reads a location's logo yet beyond its own row and sheet. Invoices, receipts and QR codes keep the business logo (DEC-082). Where a location's logo should appear (the pick-up line of a checkout, a location's page) is still to decide.

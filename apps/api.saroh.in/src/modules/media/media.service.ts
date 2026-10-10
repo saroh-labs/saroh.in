@@ -286,6 +286,16 @@ export class MediaService {
             );
         }
 
+        // The same for a location that uses it as its own logo (DEC-120).
+        const asLocationLogo = await prisma.store.count({
+            where: { logoMediaId: media.id, deletedAt: null },
+        });
+        if (asLocationLogo > 0) {
+            throw new ConflictException(
+                "This image is a location's logo. Replace it there, or use your business logo, before deleting it.",
+            );
+        }
+
         await this.storage.deleteObject(media.key);
         await prisma.media.delete({ where: { id: media.id } });
 

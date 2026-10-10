@@ -651,6 +651,8 @@ model Media {
   productPosters ProductImage[]    @relation("ProductImagePoster")
   // The business whose logo it is (at most one: a logo is per business).
   businessLogos  BusinessProfile[] @relation("BusinessLogo")
+  // The locations whose own logo it is.
+  locationLogos  Store[]           @relation("LocationLogo")
 
   @@index([organizationId])
 }
@@ -669,7 +671,13 @@ model Store {
   // L15 drops the column (a later release).
   slug        String? @unique
   description String?
+  // The location's own logo (DEC-120): the address it is served from, and
+  // the library object it came from, taken when it was set (the business
+  // logo's pattern). Both null: the location uses the business logo. An
+  // address with no object is one typed in before a logo could be uploaded.
   logo        String?
+  logoMediaId String?
+  logoMedia   Media?  @relation("LocationLogo", fields: [logoMediaId], references: [id], onDelete: SetNull)
 
   // Ownership
   // ADR-001: Store is an Organization-owned commerce channel. The nullable

@@ -232,7 +232,7 @@ describe("StorefrontsScreen as a location's own page", () => {
                     closed: day === "SUN",
                 })),
             },
-            details: { description: null, logo: null },
+            details: { description: null, logo: null, businessLogo: null },
         });
         const t = text(panel(html));
         expect(t).toContain("Name Hill Road Edit");
@@ -242,7 +242,7 @@ describe("StorefrontsScreen as a location's own page", () => {
         expect(t).toContain("Address 12 Hill Road, Bandra Edit");
         expect(t).toContain("Opening hours Mon–Sat · 9:00 AM – 6:00 PM Edit");
         expect(t).toContain(
-            "Description and logo No description or logo yet Edit",
+            "Description and logo No description yet · no logo yet Edit",
         );
         // Nothing to type in until a row's Edit opens its sheet.
         expect(panel(html)).not.toContain("<input");
@@ -362,11 +362,19 @@ describe("StorefrontsScreen as a location's own page", () => {
 
     it("The place says what is saved of the description and logo, with Edit to their sheet", () => {
         const html = screen({
-            details: { description: "Sourdough since 2019", logo: null },
+            details: {
+                description: "Sourdough since 2019",
+                logo: null,
+                businessLogo: "https://cdn.example.com/rye.png",
+            },
         });
         const t = text(panel(html));
         expect(t).toContain(
-            "Description and logo Description added, no logo yet Edit",
+            "Description and logo Description added · using your business logo Edit",
+        );
+        // The logo it uses, small, beside the words.
+        expect(panel(html)).toMatch(
+            /<img[^>]*src="https:\/\/cdn\.example\.com\/rye\.png"[^>]*data-testid="location-logo-thumb"/,
         );
         // A button that opens a sheet, not a link away to a page.
         expect(html).not.toContain("/details");
@@ -375,8 +383,18 @@ describe("StorefrontsScreen as a location's own page", () => {
         );
         expect(t).not.toContain("Web address");
         expect(
-            text(panel(screen({ details: { description: null, logo: null } }))),
-        ).toContain("No description or logo yet");
+            text(
+                panel(
+                    screen({
+                        details: {
+                            description: null,
+                            logo: null,
+                            businessLogo: null,
+                        },
+                    }),
+                ),
+            ),
+        ).toContain("No description yet · no logo yet");
     });
 
     it("leaves the row out when they couldn't be read, rather than say none", () => {
@@ -387,7 +405,7 @@ describe("StorefrontsScreen as a location's own page", () => {
 
     it("has no loose buttons under The place: people are a tab (10 Oct)", () => {
         const html = screen({
-            details: { description: null, logo: null },
+            details: { description: null, logo: null, businessLogo: null },
         });
         expect(text(html)).not.toContain("People who work here");
         expect(html).not.toContain("/people");
@@ -736,7 +754,7 @@ describe("roles", () => {
             canEdit: false,
             canClose: false,
             selected: { ...hill, address: null },
-            details: { description: null, logo: null },
+            details: { description: null, logo: null, businessLogo: null },
         });
         const t = text(html);
         expect(t).toContain(
@@ -746,7 +764,9 @@ describe("roles", () => {
         expect(t).toContain("Name Hill Road");
         expect(t).toContain("Address No address yet");
         expect(t).toContain("Opening hours Not set yet");
-        expect(t).toContain("Description and logo No description or logo yet");
+        expect(t).toContain(
+            "Description and logo No description yet · no logo yet",
+        );
         expect(panel(html)).not.toContain("<button");
         expect(t).not.toContain("Add address");
         expect(t).not.toContain("Set hours");
