@@ -17,8 +17,11 @@
    its words from `@saroh/ui/lib/state-copy`
    (`.agents/skills/saroh-product-states/SKILL.md`).
 3. **Toasts**: the outcome of something the user just did.
-4. **Field messages**: validation, and server errors that name a field
-   (`frontend-forms.md`).
+4. **Field messages**: validation, and server errors that name a field,
+   drawn by `Field` / `FieldError` under the field as an alert
+   (`frontend-forms.md`). Gap: the service editor still joins its
+   problems into one strip under the header, a post with no title says so
+   in a toast, and the product editor draws its own help line.
 5. **`Notice`** (`@saroh/ui/notice`): something to know beside the content
    that is none of the above. A problem, a warning, a fact, a success that
    should stay on screen. One component, five tones (`info`, `warning`,
