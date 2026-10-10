@@ -183,8 +183,9 @@ export function PeopleSection({
                 phone the action sits under the roster, where the thumb is. */}
             <div className="grid gap-x-4 gap-y-5 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-start">
                 <Note>
-                    Who can work on {store.name}&apos;s catalogue, orders and
-                    customers. Everyone here is also on your team, under Team.
+                    Who can see {store.name}&apos;s products and orders, and
+                    move its orders along. Everyone here is also on your team,
+                    under Team.
                 </Note>
                 {invite && !alone ? (
                     <div className="order-last sm:order-none">{invite}</div>
@@ -341,7 +342,7 @@ export function PeopleSection({
                         if (!o) setRemoving(null);
                     }}
                     title={`Remove ${removing.name}?`}
-                    description="They lose access to this location's catalogue, orders and customers straight away. They stay on your team. Remove them there to take that away too. Bringing them back here means inviting them again. This cannot be undone."
+                    description="They lose access to this location's products and orders straight away. They stay on your team. Remove them there to take that away too. Bringing them back here means inviting them again. This cannot be undone."
                     confirmLabel="Remove person"
                     keepLabel="Keep person"
                     onConfirm={() => onRemove(removing.userId)}
