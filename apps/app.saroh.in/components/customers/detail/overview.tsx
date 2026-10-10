@@ -23,6 +23,7 @@ import {
 import { dayText } from "@/lib/subscriptions/view";
 
 import { TextLink } from "@saroh/ui/text-link";
+import { Tip } from "@saroh/ui/tooltip";
 import { Bar, CARD, Empty, LABEL } from "./parts";
 
 /**
@@ -158,19 +159,22 @@ export function Overview({
                         that.
                     </p>
                     {canStop ? (
-                        <Button
-                            variant="outline"
-                            disabled={!canConsent || stopping}
-                            title={
+                        <Tip
+                            label={
                                 canConsent
                                     ? undefined
                                     : "Your role can't change what they agreed to"
                             }
-                            onClick={onStop}
-                            className="mt-2.5 h-8 rounded-[9px] px-3 text-[12.5px] font-semibold coarse:h-11"
                         >
-                            They asked to stop
-                        </Button>
+                            <Button
+                                variant="outline"
+                                disabled={!canConsent || stopping}
+                                onClick={onStop}
+                                className="mt-2.5 h-8 rounded-[9px] px-3 text-[12.5px] font-semibold coarse:h-11"
+                            >
+                                They asked to stop
+                            </Button>
+                        </Tip>
                     ) : null}
                 </section>
             ) : null}

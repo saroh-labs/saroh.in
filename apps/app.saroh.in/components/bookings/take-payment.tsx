@@ -33,6 +33,7 @@ import {
     deskProblem,
     deskTakenText,
 } from "@/lib/services/desk-pay";
+import { Tip } from "@saroh/ui/tooltip";
 
 /**
  * "Take ₹X" at the desk for a booking (round-2 P2): the walk-in's ways to
@@ -183,19 +184,20 @@ export function TakePayment({
                                 className="flex flex-wrap gap-1.5"
                             >
                                 {choices.map((c) => (
-                                    <Chip
-                                        key={c.key}
-                                        on={choice === c.key}
-                                        disabled={c.off !== null}
-                                        title={c.off ?? undefined}
-                                        onClick={() => {
-                                            setChoice(c.key);
-                                            setError(null);
-                                        }}
-                                        className="cursor-pointer active:scale-[0.97] disabled:cursor-not-allowed"
-                                    >
-                                        {c.label}
-                                    </Chip>
+                                    <Tip label={c.off ?? undefined}>
+                                        <Chip
+                                            key={c.key}
+                                            on={choice === c.key}
+                                            disabled={c.off !== null}
+                                            onClick={() => {
+                                                setChoice(c.key);
+                                                setError(null);
+                                            }}
+                                            className="cursor-pointer active:scale-[0.97] disabled:cursor-not-allowed"
+                                        >
+                                            {c.label}
+                                        </Chip>
+                                    </Tip>
                                 ))}
                             </div>
                             {choice === "CASH" ? (

@@ -7,6 +7,7 @@ import type { OnlinePaymentWords } from "@/lib/orders/online-payment";
 import { uncollectedHeading } from "@/lib/orders/pay-on-handover";
 
 import { Notice } from "@saroh/ui/notice";
+import { Tip } from "@saroh/ui/tooltip";
 import { actionClass, Panel, PanelTitle } from "./parts";
 
 /**
@@ -76,61 +77,67 @@ export function ChangeCard({
                 Change this order
             </PanelTitle>
             <div className="flex flex-wrap items-center gap-2">
-                <Button
-                    type="button"
-                    variant="outline"
-                    className={actionClass("ghost")}
-                    disabled={!canEdit || !editable}
-                    title={
+                <Tip
+                    label={
                         editable
                             ? "Edit items or address"
                             : "Items are locked once preparing starts"
                     }
-                    id={CHANGE_BUTTON_ID.edit}
-                    onClick={onEdit}
                 >
-                    Edit items or address
-                </Button>
-                <Button
-                    type="button"
-                    variant="outline"
-                    className={actionClass("ghost")}
-                    disabled={canRefund !== null}
-                    title={canRefund ?? "Refund by line"}
-                    id={CHANGE_BUTTON_ID.refund}
-                    onClick={onRefund}
-                >
-                    Refund…
-                </Button>
-                {fulfilment !== undefined ? (
                     <Button
                         type="button"
                         variant="outline"
                         className={actionClass("ghost")}
-                        disabled={fulfilment !== null}
-                        title={fulfilment ?? undefined}
-                        id={CHANGE_BUTTON_ID.fulfilment}
-                        onClick={onFulfilment}
+                        disabled={!canEdit || !editable}
+                        id={CHANGE_BUTTON_ID.edit}
+                        onClick={onEdit}
                     >
-                        Change how it&apos;s fulfilled…
+                        Edit items or address
                     </Button>
-                ) : null}
-                {cancel !== undefined ? (
+                </Tip>
+                <Tip label={canRefund ?? "Refund by line"}>
                     <Button
                         type="button"
                         variant="outline"
-                        className={cn(
-                            actionClass("ghost"),
-                            cancel === null &&
-                                "text-destructive-subtle-foreground hover:text-destructive-subtle-foreground",
-                        )}
-                        disabled={cancel !== null}
-                        title={cancel ?? undefined}
-                        id={CHANGE_BUTTON_ID.cancel}
-                        onClick={onCancel}
+                        className={actionClass("ghost")}
+                        disabled={canRefund !== null}
+                        id={CHANGE_BUTTON_ID.refund}
+                        onClick={onRefund}
                     >
-                        Cancel order…
+                        Refund…
                     </Button>
+                </Tip>
+                {fulfilment !== undefined ? (
+                    <Tip label={fulfilment ?? undefined}>
+                        <Button
+                            type="button"
+                            variant="outline"
+                            className={actionClass("ghost")}
+                            disabled={fulfilment !== null}
+                            id={CHANGE_BUTTON_ID.fulfilment}
+                            onClick={onFulfilment}
+                        >
+                            Change how it&apos;s fulfilled…
+                        </Button>
+                    </Tip>
+                ) : null}
+                {cancel !== undefined ? (
+                    <Tip label={cancel ?? undefined}>
+                        <Button
+                            type="button"
+                            variant="outline"
+                            className={cn(
+                                actionClass("ghost"),
+                                cancel === null &&
+                                    "text-destructive-subtle-foreground hover:text-destructive-subtle-foreground",
+                            )}
+                            disabled={cancel !== null}
+                            id={CHANGE_BUTTON_ID.cancel}
+                            onClick={onCancel}
+                        >
+                            Cancel order…
+                        </Button>
+                    </Tip>
                 ) : null}
             </div>
             <p className="mt-[7px] text-pretty text-[11.5px] leading-[1.5] text-muted-foreground">

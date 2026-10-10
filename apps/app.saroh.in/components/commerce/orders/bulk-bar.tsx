@@ -27,6 +27,7 @@ import {
     printTicketsLabel,
     ticketsHref,
 } from "@/lib/orders/tickets";
+import { Tip } from "@saroh/ui/tooltip";
 
 /**
  * The Orders list's bulk bar and its held batch (plan B, B6), after the
@@ -214,38 +215,44 @@ export function BulkBar({
                     ) : null}
                     <div className="ml-auto flex flex-wrap gap-[7px]">
                         {actions.map((action) => (
-                            <button
-                                key={action.kind}
-                                type="button"
-                                onClick={() => run(action)}
-                                disabled={action.disabled !== null || busy}
-                                aria-disabled={action.disabled !== null}
-                                title={action.disabled ?? action.title}
-                                className={cn(
-                                    BAR_BUTTON,
-                                    "border border-primary-foreground/30 hover:bg-primary-foreground/10 active:bg-primary-foreground/15 disabled:cursor-not-allowed disabled:opacity-45 disabled:hover:bg-transparent disabled:active:scale-100",
-                                )}
-                            >
-                                {action.label}
-                            </button>
+                            <Tip label={action.disabled ?? action.title}>
+                                <button
+                                    key={action.kind}
+                                    type="button"
+                                    onClick={() => run(action)}
+                                    disabled={action.disabled !== null || busy}
+                                    aria-disabled={action.disabled !== null}
+                                    className={cn(
+                                        BAR_BUTTON,
+                                        "border border-primary-foreground/30 hover:bg-primary-foreground/10 active:bg-primary-foreground/15 disabled:cursor-not-allowed disabled:opacity-45 disabled:hover:bg-transparent disabled:active:scale-100",
+                                    )}
+                                >
+                                    {action.label}
+                                </button>
+                            </Tip>
                         ))}
                         {printable.length > 0 ? (
-                            <a
-                                href={ticketsHref(printable.map((r) => r.id))}
-                                target="_blank"
-                                rel="noopener"
-                                title={
+                            <Tip
+                                label={
                                     printable.length < selected.length
                                         ? `${selected.length - printable.length} of these have no ticket to print`
                                         : "Opens the tickets to print, oldest first"
                                 }
-                                className={cn(
-                                    BAR_BUTTON,
-                                    "inline-flex items-center border border-primary-foreground/30 hover:bg-primary-foreground/10 active:bg-primary-foreground/15",
-                                )}
                             >
-                                {printTicketsLabel(printable.length)}
-                            </a>
+                                <a
+                                    href={ticketsHref(
+                                        printable.map((r) => r.id),
+                                    )}
+                                    target="_blank"
+                                    rel="noopener"
+                                    className={cn(
+                                        BAR_BUTTON,
+                                        "inline-flex items-center border border-primary-foreground/30 hover:bg-primary-foreground/10 active:bg-primary-foreground/15",
+                                    )}
+                                >
+                                    {printTicketsLabel(printable.length)}
+                                </a>
+                            </Tip>
                         ) : null}
                         <button
                             type="button"

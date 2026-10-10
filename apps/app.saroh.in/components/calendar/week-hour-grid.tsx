@@ -6,6 +6,7 @@ import Link from "next/link";
 import { GRID_PX, hourLabels } from "@/lib/calendar/hour-layout";
 import type { HourDay } from "@/lib/calendar/week-hours";
 
+import { Tip } from "@saroh/ui/tooltip";
 import { TONE_BORDER, TONE_FILL } from "./tones";
 import { STRIPED } from "./week-columns";
 
@@ -135,22 +136,23 @@ export function WeekHourGrid({
                             )}
                         >
                             {allDay.map((chip) => (
-                                <Link
-                                    key={chip.key}
-                                    href={chip.href}
-                                    title={chip.full}
-                                    aria-label={chip.full}
-                                    className={cn(
-                                        "block truncate rounded-[4px] px-1.5 py-0.5 text-[11px] font-semibold text-layer-foreground transition-[filter] duration-fast hover:brightness-110 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1 active:brightness-90",
-                                        chip.bad
-                                            ? "bg-destructive-subtle-foreground"
-                                            : TONE_FILL[chip.tone],
-                                        // Quieter in colour, not see-through (4.5:1).
-                                        col.past && "saturate-50",
-                                    )}
-                                >
-                                    {chip.title}
-                                </Link>
+                                <Tip label={chip.full}>
+                                    <Link
+                                        key={chip.key}
+                                        href={chip.href}
+                                        aria-label={chip.full}
+                                        className={cn(
+                                            "block truncate rounded-[4px] px-1.5 py-0.5 text-[11px] font-semibold text-layer-foreground transition-[filter] duration-fast hover:brightness-110 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1 active:brightness-90",
+                                            chip.bad
+                                                ? "bg-destructive-subtle-foreground"
+                                                : TONE_FILL[chip.tone],
+                                            // Quieter in colour, not see-through (4.5:1).
+                                            col.past && "saturate-50",
+                                        )}
+                                    >
+                                        {chip.title}
+                                    </Link>
+                                </Tip>
                             ))}
                             {allDayMore > 0 ? (
                                 <button
@@ -210,43 +212,44 @@ export function WeekHourGrid({
                                 />
                             ))}
                             {blocks.map((b) => (
-                                <Link
-                                    key={b.key}
-                                    href={b.href}
-                                    title={b.full}
-                                    aria-label={b.full}
-                                    className={cn(
-                                        "absolute box-border block overflow-hidden rounded-md border-0 border-l-[3px] px-1.5 py-[3px] text-foreground shadow-[0_0_0_1px_hsl(var(--border))] transition-[filter,box-shadow] duration-fast hover:brightness-[0.97] focus-visible:z-10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring active:brightness-[0.93] dark:hover:brightness-110",
-                                        TONE_BORDER[b.tone],
-                                        b.bad
-                                            ? "bg-destructive-subtle"
-                                            : "bg-card",
-                                        col.past && "opacity-[0.85]",
-                                        b.struck && "line-through",
-                                        b.startsEarlier && "rounded-t-none",
-                                        b.endsLater && "rounded-b-none",
-                                    )}
-                                    style={{
-                                        top: b.top,
-                                        height: b.height,
-                                        left: `calc(${b.left}% + 2px)`,
-                                        width: `calc(${b.width}% - 4px)`,
-                                    }}
-                                >
-                                    <span className="block truncate text-[10.5px] tabular-nums opacity-[0.85]">
-                                        {b.startsEarlier ? (
-                                            <span aria-hidden>↑ </span>
-                                        ) : null}
-                                        {b.time}
-                                        {b.flag ? ` · ${b.flag.label}` : ""}
-                                        {b.endsLater ? (
-                                            <span aria-hidden> ↓</span>
-                                        ) : null}
-                                    </span>
-                                    <span className="block truncate text-[11.5px] font-semibold leading-[1.25]">
-                                        {b.title}
-                                    </span>
-                                </Link>
+                                <Tip label={b.full}>
+                                    <Link
+                                        key={b.key}
+                                        href={b.href}
+                                        aria-label={b.full}
+                                        className={cn(
+                                            "absolute box-border block overflow-hidden rounded-md border-0 border-l-[3px] px-1.5 py-[3px] text-foreground shadow-[0_0_0_1px_hsl(var(--border))] transition-[filter,box-shadow] duration-fast hover:brightness-[0.97] focus-visible:z-10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring active:brightness-[0.93] dark:hover:brightness-110",
+                                            TONE_BORDER[b.tone],
+                                            b.bad
+                                                ? "bg-destructive-subtle"
+                                                : "bg-card",
+                                            col.past && "opacity-[0.85]",
+                                            b.struck && "line-through",
+                                            b.startsEarlier && "rounded-t-none",
+                                            b.endsLater && "rounded-b-none",
+                                        )}
+                                        style={{
+                                            top: b.top,
+                                            height: b.height,
+                                            left: `calc(${b.left}% + 2px)`,
+                                            width: `calc(${b.width}% - 4px)`,
+                                        }}
+                                    >
+                                        <span className="block truncate text-[10.5px] tabular-nums opacity-[0.85]">
+                                            {b.startsEarlier ? (
+                                                <span aria-hidden>↑ </span>
+                                            ) : null}
+                                            {b.time}
+                                            {b.flag ? ` · ${b.flag.label}` : ""}
+                                            {b.endsLater ? (
+                                                <span aria-hidden> ↓</span>
+                                            ) : null}
+                                        </span>
+                                        <span className="block truncate text-[11.5px] font-semibold leading-[1.25]">
+                                            {b.title}
+                                        </span>
+                                    </Link>
+                                </Tip>
                             ))}
                         </div>
                     ))}

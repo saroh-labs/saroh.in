@@ -101,6 +101,7 @@ import {
 import { TEAM_TAB_PARAM } from "@/lib/settings/search";
 
 import { TabStrip } from "@saroh/ui/tabs";
+import { Tip } from "@saroh/ui/tooltip";
 import { InviteDiaryPerson } from "./invite-diary-person";
 import { LastActiveLine } from "./last-active-line";
 import {
@@ -817,22 +818,25 @@ function PendingInvites({
                                 {book.labelOf(role)}
                             </span>
                             <div className="flex gap-1.5">
-                                <Button
-                                    size="sm"
-                                    variant="outline"
-                                    disabled={!!busy || beyond}
-                                    title={
+                                <Tip
+                                    label={
                                         beyond
                                             ? "Can do more than you can"
                                             : undefined
                                     }
-                                    onClick={() => resend(invitation)}
-                                    aria-label={`Resend the invite to ${invitation.email}`}
                                 >
-                                    {mine && busy.action === "resend"
-                                        ? "Sending…"
-                                        : "Resend"}
-                                </Button>
+                                    <Button
+                                        size="sm"
+                                        variant="outline"
+                                        disabled={!!busy || beyond}
+                                        onClick={() => resend(invitation)}
+                                        aria-label={`Resend the invite to ${invitation.email}`}
+                                    >
+                                        {mine && busy.action === "resend"
+                                            ? "Sending…"
+                                            : "Resend"}
+                                    </Button>
+                                </Tip>
                                 <Button
                                     size="sm"
                                     variant="outline"

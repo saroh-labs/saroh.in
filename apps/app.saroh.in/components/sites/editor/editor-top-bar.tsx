@@ -32,6 +32,7 @@ import type {
     SiteFlags,
     SitePage,
 } from "@/lib/sites/service";
+import { Tip } from "@saroh/ui/tooltip";
 
 /**
  * The editor's top bar: where you are (Website, site, page, status), how the
@@ -220,15 +221,19 @@ export function EditorTopBar({
                  * the page menu. The business name is where you are, not a
                  * link; the way out is the Website crumb before it.
                  */}
-                <Link
-                    href={`/sites/${siteId}/pages`}
-                    aria-label="Back to Website"
-                    title={address ?? undefined}
-                    className="flex shrink-0 items-center gap-[7px] rounded-lg px-[9px] py-1.5 text-[0.78125rem] text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring coarse:min-h-11"
-                >
-                    <ChevronLeft aria-hidden className="size-[15px] shrink-0" />
-                    Website
-                </Link>
+                <Tip label={address ?? undefined}>
+                    <Link
+                        href={`/sites/${siteId}/pages`}
+                        aria-label="Back to Website"
+                        className="flex shrink-0 items-center gap-[7px] rounded-lg px-[9px] py-1.5 text-[0.78125rem] text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring coarse:min-h-11"
+                    >
+                        <ChevronLeft
+                            aria-hidden
+                            className="size-[15px] shrink-0"
+                        />
+                        Website
+                    </Link>
+                </Tip>
                 {/* A phone keeps the way out and the page; the name goes. */}
                 {phone ? null : (
                     <>

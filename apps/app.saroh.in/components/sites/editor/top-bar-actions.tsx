@@ -31,6 +31,7 @@ import { OptionSelect } from "@/components/shared/option-select";
 import { ThemeToggle } from "@/components/shared/theme-toggle";
 import type { Device, Zoom } from "@/components/sites/editor-constants";
 import { DEVICES, ZOOMS } from "@/components/sites/editor-constants";
+import { Tip } from "@saroh/ui/tooltip";
 
 /** What the bar's right-hand side can do: how the page is shown, and publish. */
 export interface TopBarActionProps {
@@ -142,22 +143,23 @@ export function TopBarActions({
                                   ? Tablet
                                   : Monitor;
                         return (
-                            <button
-                                key={d.key}
-                                type="button"
-                                onClick={() => p.setDevice(d.key)}
-                                aria-pressed={p.device === d.key}
-                                aria-label={`Show at ${d.label.toLowerCase()} width`}
-                                title={d.label}
-                                className={cn(
-                                    "flex h-full w-8 items-center justify-center rounded transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring coarse:w-11",
-                                    p.device === d.key
-                                        ? "bg-secondary text-foreground"
-                                        : "text-muted-foreground hover:text-foreground",
-                                )}
-                            >
-                                <Icon aria-hidden className="size-4" />
-                            </button>
+                            <Tip label={d.label}>
+                                <button
+                                    key={d.key}
+                                    type="button"
+                                    onClick={() => p.setDevice(d.key)}
+                                    aria-pressed={p.device === d.key}
+                                    aria-label={`Show at ${d.label.toLowerCase()} width`}
+                                    className={cn(
+                                        "flex h-full w-8 items-center justify-center rounded transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring coarse:w-11",
+                                        p.device === d.key
+                                            ? "bg-secondary text-foreground"
+                                            : "text-muted-foreground hover:text-foreground",
+                                    )}
+                                >
+                                    <Icon aria-hidden className="size-4" />
+                                </button>
+                            </Tip>
                         );
                     })}
                 </div>
@@ -244,40 +246,41 @@ export function TopBarActions({
              * design it stays pressable when nothing has changed:
              * publishing again is how a new version is made.
              */}
-            <Button
-                size="sm"
-                className={cn(
-                    "wk-press h-[34px] rounded-[9px] px-3.5 text-[0.78125rem] font-semibold",
-                    stacked && "h-11 w-full",
-                )}
-                title={p.publishHint}
-                onClick={p.onPublish}
-                // With "Publishing needs approval" on, only an owner can
-                // press it, and it says so rather than refusing on the press.
-                disabled={
-                    p.publishDisabled || (p.needsApproval && !p.canOverride)
-                }
-            >
-                {p.publishing
-                    ? "Publishing…"
-                    : p.needsApproval
-                      ? "Needs approval"
-                      : "Publish"}
-                {/*
-                 * Things worth a look before publishing, as a dot (UX-081):
-                 * a number here read as "changes to publish" when it
-                 * counted warnings. The check lists them on the press, so
-                 * the dot stays out of the button's name.
-                 */}
-                {!p.publishing && p.flagCount > 0 ? (
-                    <span
-                        aria-hidden
-                        data-flag-dot=""
-                        title={`${p.flagCount} ${p.flagCount === 1 ? "thing" : "things"} worth a look`}
-                        className="ml-1.5 inline-block size-1.5 rounded-full bg-background/80"
-                    />
-                ) : null}
-            </Button>
+            <Tip label={p.publishHint}>
+                <Button
+                    size="sm"
+                    className={cn(
+                        "wk-press h-[34px] rounded-[9px] px-3.5 text-[0.78125rem] font-semibold",
+                        stacked && "h-11 w-full",
+                    )}
+                    onClick={p.onPublish}
+                    // With "Publishing needs approval" on, only an owner can
+                    // press it, and it says so rather than refusing on the press.
+                    disabled={
+                        p.publishDisabled || (p.needsApproval && !p.canOverride)
+                    }
+                >
+                    {p.publishing
+                        ? "Publishing…"
+                        : p.needsApproval
+                          ? "Needs approval"
+                          : "Publish"}
+                    {/*
+                     * Things worth a look before publishing, as a dot (UX-081):
+                     * a number here read as "changes to publish" when it
+                     * counted warnings. The check lists them on the press, so
+                     * the dot stays out of the button's name.
+                     */}
+                    {!p.publishing && p.flagCount > 0 ? (
+                        <span
+                            aria-hidden
+                            data-flag-dot=""
+                            title={`${p.flagCount} ${p.flagCount === 1 ? "thing" : "things"} worth a look`}
+                            className="ml-1.5 inline-block size-1.5 rounded-full bg-background/80"
+                        />
+                    ) : null}
+                </Button>
+            </Tip>
             {/* A phone has no hover, so what Publish puts live is written out. */}
             {stacked && p.publishHint ? (
                 <p className="text-xs leading-relaxed text-muted-foreground">
@@ -492,20 +495,23 @@ function TestReleaseSplit({
     }
     return (
         <div role="group" aria-label="Test release" className="flex">
-            <Button
-                variant="outline"
-                size="sm"
-                className={cn(ACTION, "rounded-r-none")}
-                title={
+            <Tip
+                label={
                     actions.onMake
                         ? "Freeze the draft into a test release, to share and go live with later"
                         : "See this site's test releases"
                 }
-                onClick={actions.onMake ?? actions.onOpenList}
             >
-                <FlaskConical aria-hidden className="size-[15px]" />
-                Test release
-            </Button>
+                <Button
+                    variant="outline"
+                    size="sm"
+                    className={cn(ACTION, "rounded-r-none")}
+                    onClick={actions.onMake ?? actions.onOpenList}
+                >
+                    <FlaskConical aria-hidden className="size-[15px]" />
+                    Test release
+                </Button>
+            </Tip>
             <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                     <Button

@@ -22,6 +22,7 @@ import { productEditHref, productHref } from "@/lib/products/links";
 import { position } from "@/lib/products/quick-look";
 import type { ProductStatus } from "@/lib/products/service";
 
+import { Tip } from "@saroh/ui/tooltip";
 import { ProductThumb } from "./product-thumb";
 import { StockBlock } from "./quick-look-stock";
 import { STATUS_LABEL, STATUS_VARIANT } from "./tones";
@@ -123,26 +124,28 @@ export function QuickLook({
                                 {position(index, total)}
                             </span>
                             <div className="ml-auto flex gap-0.5">
-                                <Button
-                                    variant="ghost"
-                                    size="icon"
-                                    className="size-7 text-neutral-700 coarse:size-11 dark:text-foreground"
-                                    onClick={() => onStep(-1)}
-                                    aria-label="Previous product (K)"
-                                    title="Previous (K)"
-                                >
-                                    <ChevronUp className="size-4" />
-                                </Button>
-                                <Button
-                                    variant="ghost"
-                                    size="icon"
-                                    className="size-7 text-neutral-700 coarse:size-11 dark:text-foreground"
-                                    onClick={() => onStep(1)}
-                                    aria-label="Next product (J)"
-                                    title="Next (J)"
-                                >
-                                    <ChevronDown className="size-4" />
-                                </Button>
+                                <Tip label="Previous (K)">
+                                    <Button
+                                        variant="ghost"
+                                        size="icon"
+                                        className="size-7 text-neutral-700 coarse:size-11 dark:text-foreground"
+                                        onClick={() => onStep(-1)}
+                                        aria-label="Previous product (K)"
+                                    >
+                                        <ChevronUp className="size-4" />
+                                    </Button>
+                                </Tip>
+                                <Tip label="Next (J)">
+                                    <Button
+                                        variant="ghost"
+                                        size="icon"
+                                        className="size-7 text-neutral-700 coarse:size-11 dark:text-foreground"
+                                        onClick={() => onStep(1)}
+                                        aria-label="Next product (J)"
+                                    >
+                                        <ChevronDown className="size-4" />
+                                    </Button>
+                                </Tip>
                             </div>
                             <SheetClose asChild>
                                 <Button

@@ -52,7 +52,16 @@ export function Tip({ label, children, side = "top", align }: TipProps) {
     return (
         <TooltipProvider delayDuration={350} skipDelayDuration={150}>
             <Tooltip>
-                <TooltipTrigger asChild>{children}</TooltipTrigger>
+                {/* The hint is the control's description too, so a screen
+                    reader hears it without a hover, and a test can read it. */}
+                <TooltipTrigger
+                    asChild
+                    aria-description={
+                        typeof label === "string" ? label : undefined
+                    }
+                >
+                    {children}
+                </TooltipTrigger>
                 <TooltipContent side={side} align={align}>
                     {label}
                 </TooltipContent>

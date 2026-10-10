@@ -458,7 +458,7 @@ describe("SiteEditor shell", () => {
         click(button("Share"));
         // Nothing waiting, and it still publishes: that makes a new version.
         expect(button("Publish").disabled).toBe(false);
-        expect(button("Publish").title).toBe(
+        expect(button("Publish").getAttribute("aria-description")).toBe(
             "Nothing has changed since the last publish",
         );
 
@@ -505,7 +505,9 @@ describe("SiteEditor shell", () => {
             address: null,
         });
         // G2: the design's one word; the title says what it does.
-        expect(button("Publish").title).toBe("Put this site live");
+        expect(button("Publish").getAttribute("aria-description")).toBe(
+            "Put this site live",
+        );
         expect($("[role=status]")?.textContent).toBe("Not published yet");
         expect(host.textContent).toContain("Nothing’s live yet");
         expect(host.textContent).toContain("Not published yet");
@@ -524,7 +526,9 @@ describe("SiteEditor shell", () => {
         expect(
             $("nav[aria-label=Breadcrumb] span[title]:not([role=status])"),
         ).toBeNull();
-        expect(button("Publish").title).toBe("Put live: 2 blocks, footer");
+        expect(button("Publish").getAttribute("aria-description")).toBe(
+            "Put live: 2 blocks, footer",
+        );
     });
 
     it("never says Published when the count of what's changed is missing", () => {
@@ -535,7 +539,9 @@ describe("SiteEditor shell", () => {
         expect($("[role=status]")?.textContent).toBe(
             "Couldn't check what's changed",
         );
-        expect(button("Publish").title).toBe("Put this site live as it is now");
+        expect(button("Publish").getAttribute("aria-description")).toBe(
+            "Put this site live as it is now",
+        );
     });
 
     it("says what a save counted, and says so when a save comes back without a count", async () => {
@@ -1378,7 +1384,7 @@ describe("SiteEditor header and footer text (G6)", () => {
         // Still unsaved, so Publish still waits — and says why, not "in a
         // moment", and the pill says Not saved.
         expect(button("Publish").disabled).toBe(true);
-        expect(button("Publish").title).toBe(
+        expect(button("Publish").getAttribute("aria-description")).toBe(
             "Not saved — publish waits until your changes save",
         );
         expect($("[role=status]")?.textContent).toBe("Not saved");

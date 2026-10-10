@@ -19,6 +19,7 @@ import type {
 import { OVERRIDE_RECORD } from "@/lib/sites/test-releases";
 import { EmptyState } from "@saroh/ui/data-state";
 import { Notice } from "@saroh/ui/notice";
+import { Tip } from "@saroh/ui/tooltip";
 
 /**
  * The pre-publish check (spec §2, "Publish").
@@ -154,36 +155,39 @@ export function PrePublishCheck({
                     >
                         Back to editing
                     </Button>
-                    <Button
-                        type="button"
-                        size="sm"
-                        // An owner's override is the destructive kind of
-                        // publish: it goes past a rule the business set.
-                        variant={needsApproval ? "destructive" : "default"}
-                        disabled={
-                            publishing ||
-                            unsaved ||
-                            blocked ||
-                            (needsApproval && !canOverride)
-                        }
-                        title={
+                    <Tip
+                        label={
                             blocked
                                 ? "Choose a web address first"
                                 : unsaved
                                   ? "Saving your changes — publish is available in a moment"
                                   : undefined
                         }
-                        onClick={onPublish}
-                        className="h-8 px-3"
                     >
-                        {publishing
-                            ? "Publishing…"
-                            : needsApproval || review.outstanding
-                              ? "Publish without approval"
-                              : neverPublished
-                                ? "Publish site"
-                                : "Publish changes"}
-                    </Button>
+                        <Button
+                            type="button"
+                            size="sm"
+                            // An owner's override is the destructive kind of
+                            // publish: it goes past a rule the business set.
+                            variant={needsApproval ? "destructive" : "default"}
+                            disabled={
+                                publishing ||
+                                unsaved ||
+                                blocked ||
+                                (needsApproval && !canOverride)
+                            }
+                            onClick={onPublish}
+                            className="h-8 px-3"
+                        >
+                            {publishing
+                                ? "Publishing…"
+                                : needsApproval || review.outstanding
+                                  ? "Publish without approval"
+                                  : neverPublished
+                                    ? "Publish site"
+                                    : "Publish changes"}
+                        </Button>
+                    </Tip>
                 </div>
             </header>
 

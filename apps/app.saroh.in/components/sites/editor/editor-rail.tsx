@@ -19,6 +19,7 @@ import type { HeldBackSection } from "@/components/sites/saveable-sections";
 import { StylePanel } from "@/components/sites/style-panel";
 import type { Flag, Section, SectionType } from "@/lib/sites/service";
 import type { SiteStyle, SiteStyleOptions } from "@/lib/sites/style";
+import { Tip } from "@saroh/ui/tooltip";
 
 export type RailTab = "page" | "add" | "brand";
 
@@ -221,99 +222,110 @@ export function EditorRail({
                                             >
                                                 ⋮
                                             </span>
-                                            <button
-                                                type="button"
-                                                aria-current={
-                                                    selectedIndex === index
-                                                        ? "true"
-                                                        : undefined
-                                                }
-                                                title={
+                                            <Tip
+                                                label={
                                                     SECTION_LABELS[section.type]
                                                 }
-                                                aria-describedby={
-                                                    section.hidden
-                                                        ? `${railId}-hidden-${index}`
-                                                        : undefined
-                                                }
-                                                onClick={() =>
-                                                    setSelectedIndex(index)
-                                                }
-                                                className="flex min-w-0 flex-1 items-center justify-between gap-2 text-left"
                                             >
-                                                <span className="flex min-w-0 items-center gap-2.5">
-                                                    {(() => {
-                                                        const Icon =
-                                                            SECTION_ICONS[
-                                                                section.type
-                                                            ];
-                                                        return (
-                                                            <Icon
-                                                                aria-hidden="true"
-                                                                className="size-4 shrink-0 text-muted-foreground"
-                                                            />
-                                                        );
-                                                    })()}
-                                                    <span
-                                                        className={cn(
-                                                            "truncate",
-                                                            /*
-                                                             * A hidden block is
-                                                             * dimmed rather than
-                                                             * removed: it is still
-                                                             * part of the page the
-                                                             * merchant is building,
-                                                             * just not part of the
-                                                             * one visitors get.
-                                                             */
-                                                            section.hidden &&
-                                                                "text-muted-foreground line-through",
-                                                        )}
-                                                    >
-                                                        {sectionTitle(section)}
-                                                    </span>
-                                                </span>
-                                                <span className="flex shrink-0 items-center gap-1.5">
-                                                    {/*
-                                                     * The spec's flag dot: 4px,
-                                                     * amber #c99f6f (§7). It is
-                                                     * the ONLY thing flags draw
-                                                     * while editing — "quiet
-                                                     * until publish" — so it
-                                                     * carries a title rather
-                                                     * than expanding into the
-                                                     * row.
-                                                     */}
-                                                    {(flagsBySection.get(index)
-                                                        ?.length ?? 0) > 0 ||
-                                                    (section.key !==
-                                                        undefined &&
-                                                        notedKeys.has(
-                                                            section.key,
-                                                        )) ? (
+                                                <button
+                                                    type="button"
+                                                    aria-current={
+                                                        selectedIndex === index
+                                                            ? "true"
+                                                            : undefined
+                                                    }
+                                                    aria-describedby={
+                                                        section.hidden
+                                                            ? `${railId}-hidden-${index}`
+                                                            : undefined
+                                                    }
+                                                    onClick={() =>
+                                                        setSelectedIndex(index)
+                                                    }
+                                                    className="flex min-w-0 flex-1 items-center justify-between gap-2 text-left"
+                                                >
+                                                    <span className="flex min-w-0 items-center gap-2.5">
+                                                        {(() => {
+                                                            const Icon =
+                                                                SECTION_ICONS[
+                                                                    section.type
+                                                                ];
+                                                            return (
+                                                                <Icon
+                                                                    aria-hidden="true"
+                                                                    className="size-4 shrink-0 text-muted-foreground"
+                                                                />
+                                                            );
+                                                        })()}
                                                         <span
-                                                            className="size-1 shrink-0 rounded-full bg-foreground"
-                                                            title={[
-                                                                ...(flagsBySection
-                                                                    .get(index)
-                                                                    ?.map(
-                                                                        (f) =>
-                                                                            f.message,
-                                                                    ) ?? []),
-                                                                ...(section.key !==
-                                                                    undefined &&
-                                                                notedKeys.has(
-                                                                    section.key,
-                                                                )
-                                                                    ? [
-                                                                          "A reviewer has left a note on this section.",
-                                                                      ]
-                                                                    : []),
-                                                            ].join("\n")}
-                                                        />
-                                                    ) : null}
-                                                </span>
-                                            </button>
+                                                            className={cn(
+                                                                "truncate",
+                                                                /*
+                                                                 * A hidden block is
+                                                                 * dimmed rather than
+                                                                 * removed: it is still
+                                                                 * part of the page the
+                                                                 * merchant is building,
+                                                                 * just not part of the
+                                                                 * one visitors get.
+                                                                 */
+                                                                section.hidden &&
+                                                                    "text-muted-foreground line-through",
+                                                            )}
+                                                        >
+                                                            {sectionTitle(
+                                                                section,
+                                                            )}
+                                                        </span>
+                                                    </span>
+                                                    <span className="flex shrink-0 items-center gap-1.5">
+                                                        {/*
+                                                         * The spec's flag dot: 4px,
+                                                         * amber #c99f6f (§7). It is
+                                                         * the ONLY thing flags draw
+                                                         * while editing — "quiet
+                                                         * until publish" — so it
+                                                         * carries a title rather
+                                                         * than expanding into the
+                                                         * row.
+                                                         */}
+                                                        {(flagsBySection.get(
+                                                            index,
+                                                        )?.length ?? 0) > 0 ||
+                                                        (section.key !==
+                                                            undefined &&
+                                                            notedKeys.has(
+                                                                section.key,
+                                                            )) ? (
+                                                            <span
+                                                                className="size-1 shrink-0 rounded-full bg-foreground"
+                                                                title={[
+                                                                    ...(flagsBySection
+                                                                        .get(
+                                                                            index,
+                                                                        )
+                                                                        ?.map(
+                                                                            (
+                                                                                f,
+                                                                            ) =>
+                                                                                f.message,
+                                                                        ) ??
+                                                                        []),
+                                                                    ...(section.key !==
+                                                                        undefined &&
+                                                                    notedKeys.has(
+                                                                        section.key,
+                                                                    )
+                                                                        ? [
+                                                                              "A reviewer has left a note on this section.",
+                                                                          ]
+                                                                        : []),
+                                                                ].join("\n")}
+                                                            />
+                                                        ) : null}
+                                                    </span>
+                                                </button>
+                                            </Tip>
                                             {/*
                                              * Said, not only struck through
                                              * (G16): a hidden section stays

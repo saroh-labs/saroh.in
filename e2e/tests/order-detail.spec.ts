@@ -669,7 +669,7 @@ test.describe("change and cancel on order detail (B9)", () => {
         const cancel = page.getByRole("button", { name: "Cancel order…" });
         await expect(cancel).toBeDisabled();
         await expect(cancel).toHaveAttribute(
-            "title",
+            "aria-description",
             "It has been handed over, so it can't be cancelled. Refund it instead.",
         );
         await expect(

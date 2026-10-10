@@ -5,6 +5,7 @@ import Link from "next/link";
 
 import type { WeekColumn } from "@/lib/calendar/week-columns";
 
+import { Tip } from "@saroh/ui/tooltip";
 import { TONE_FILL } from "./tones";
 
 /** Closed, or the person picked is off: the month's stripes (E24). */
@@ -128,49 +129,50 @@ export function WeekColumns({
                                 </span>
                             ) : null}
                             {col.cards.map((card) => (
-                                <Link
-                                    key={card.key}
-                                    href={card.href}
-                                    title={card.full}
-                                    className={cn(
-                                        "grid min-w-0 grid-cols-[minmax(0,1fr)] gap-0.5 overflow-hidden rounded-[7px] border border-foreground/10 bg-card px-[7px] py-1.5 text-foreground transition-colors duration-fast hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring active:bg-muted/70",
-                                        col.past && "opacity-[0.85]",
-                                    )}
-                                >
-                                    <span className="flex min-w-0 items-baseline gap-[5px] text-[11px] tabular-nums text-muted-foreground">
-                                        <span
-                                            aria-hidden
-                                            className={cn(
-                                                "inline-block size-[7px] flex-none rounded-[2px]",
-                                                TONE_FILL[card.tone],
-                                            )}
-                                        />
-                                        <span className="min-w-0 truncate">
-                                            {card.at}
-                                        </span>
-                                        <span className="flex-1" />
-                                        {card.flag ? (
+                                <Tip label={card.full}>
+                                    <Link
+                                        key={card.key}
+                                        href={card.href}
+                                        className={cn(
+                                            "grid min-w-0 grid-cols-[minmax(0,1fr)] gap-0.5 overflow-hidden rounded-[7px] border border-foreground/10 bg-card px-[7px] py-1.5 text-foreground transition-colors duration-fast hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring active:bg-muted/70",
+                                            col.past && "opacity-[0.85]",
+                                        )}
+                                    >
+                                        <span className="flex min-w-0 items-baseline gap-[5px] text-[11px] tabular-nums text-muted-foreground">
                                             <span
+                                                aria-hidden
                                                 className={cn(
-                                                    "min-w-0 truncate font-bold",
-                                                    card.flag.tone === "bad"
-                                                        ? "text-destructive-subtle-foreground"
-                                                        : "text-foreground",
+                                                    "inline-block size-[7px] flex-none rounded-[2px]",
+                                                    TONE_FILL[card.tone],
                                                 )}
-                                            >
-                                                {card.flag.label}
+                                            />
+                                            <span className="min-w-0 truncate">
+                                                {card.at}
+                                            </span>
+                                            <span className="flex-1" />
+                                            {card.flag ? (
+                                                <span
+                                                    className={cn(
+                                                        "min-w-0 truncate font-bold",
+                                                        card.flag.tone === "bad"
+                                                            ? "text-destructive-subtle-foreground"
+                                                            : "text-foreground",
+                                                    )}
+                                                >
+                                                    {card.flag.label}
+                                                </span>
+                                            ) : null}
+                                        </span>
+                                        <span className="line-clamp-2 text-[12px] font-semibold leading-[1.3]">
+                                            {card.title}
+                                        </span>
+                                        {card.amount ? (
+                                            <span className="text-[11px] tabular-nums text-muted-foreground">
+                                                {card.amount}
                                             </span>
                                         ) : null}
-                                    </span>
-                                    <span className="line-clamp-2 text-[12px] font-semibold leading-[1.3]">
-                                        {card.title}
-                                    </span>
-                                    {card.amount ? (
-                                        <span className="text-[11px] tabular-nums text-muted-foreground">
-                                            {card.amount}
-                                        </span>
-                                    ) : null}
-                                </Link>
+                                    </Link>
+                                </Tip>
                             ))}
                             {col.more > 0 ? (
                                 <button

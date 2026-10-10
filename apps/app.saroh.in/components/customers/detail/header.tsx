@@ -16,6 +16,7 @@ import { StatusBadge } from "@/components/shared/status-badge";
 import type { MoreItem } from "@/lib/customer-workspace/more-menu";
 import type { Tab, TabKey, Tag } from "@/lib/customer-workspace/view";
 import { TabStrip } from "@saroh/ui/tabs";
+import { Tip } from "@saroh/ui/tooltip";
 
 /** The ⋯ button: the design's 34px square beside Edit details. */
 const MORE_BTN =
@@ -182,32 +183,36 @@ export function Header({
                                 </Link>
                             </Button>
                         ))}
-                        <Button
-                            variant="outline"
+                        <Tip label={canEdit ? undefined : EDIT_OFF}>
+                            <Button
+                                variant="outline"
 
-                            disabled={!canEdit}
-                            title={canEdit ? undefined : EDIT_OFF}
-                            onClick={onEdit}
-                        >
-                            Edit details
-                        </Button>
+                                disabled={!canEdit}
+                                onClick={onEdit}
+                            >
+                                Edit details
+                            </Button>
+                        </Tip>
                         {menu.length ? (
                             <DropdownMenu>
                                 <DropdownMenuTrigger asChild>
-                                    <Button
-                                        variant="outline"
-                                        className={MORE_BTN}
-                                        disabled={!canMore}
-                                        aria-label="More actions"
-                                        title={
+                                    <Tip
+                                        label={
                                             canMore ? "More actions" : MORE_OFF
                                         }
                                     >
-                                        <MoreHorizontal
-                                            aria-hidden
-                                            className="size-4"
-                                        />
-                                    </Button>
+                                        <Button
+                                            variant="outline"
+                                            className={MORE_BTN}
+                                            disabled={!canMore}
+                                            aria-label="More actions"
+                                        >
+                                            <MoreHorizontal
+                                                aria-hidden
+                                                className="size-4"
+                                            />
+                                        </Button>
+                                    </Tip>
                                 </DropdownMenuTrigger>
                                 <DropdownMenuContent
                                     align="end"

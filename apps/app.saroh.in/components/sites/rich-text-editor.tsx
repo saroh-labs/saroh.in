@@ -56,6 +56,7 @@ import { useEffect, useState } from "react";
 
 import { MediaPicker } from "@/components/sites/media-picker";
 import { editorKey } from "@/lib/tiptap/editor-key";
+import { Tip } from "@saroh/ui/tooltip";
 
 /**
  * Write copy without typing markup (#208).
@@ -674,18 +675,19 @@ function Tool({
     children: React.ReactNode;
 }) {
     return (
-        <Button
-            type="button"
-            variant="ghost"
-            size="sm"
-            className="h-7 w-7 p-0 [&>svg]:size-4"
-            aria-label={label}
-            title={label}
-            disabled={disabled}
-            onClick={onClick}
-        >
-            {children}
-        </Button>
+        <Tip label={label}>
+            <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                className="h-7 w-7 p-0 [&>svg]:size-4"
+                aria-label={label}
+                disabled={disabled}
+                onClick={onClick}
+            >
+                {children}
+            </Button>
+        </Tip>
     );
 }
 
@@ -730,16 +732,17 @@ function Swatches({
     return (
         <Popover>
             <PopoverTrigger asChild>
-                <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    className="h-7 w-7 p-0 [&>svg]:size-4"
-                    aria-label={label}
-                    title={label}
-                >
-                    {icon}
-                </Button>
+                <Tip label={label}>
+                    <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        className="h-7 w-7 p-0 [&>svg]:size-4"
+                        aria-label={label}
+                    >
+                        {icon}
+                    </Button>
+                </Tip>
             </PopoverTrigger>
             <PopoverContent align="start" className="w-auto p-2">
                 <div className="grid grid-cols-5 gap-1">

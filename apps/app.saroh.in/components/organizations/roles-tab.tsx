@@ -37,6 +37,7 @@ import type {
 import type { RolesLock } from "@/lib/organizations/roles-lock";
 import { Notice } from "@saroh/ui/notice";
 import { TextLink } from "@saroh/ui/text-link";
+import { Tip } from "@saroh/ui/tooltip";
 
 /** The built-ins a new role may start from. Owner is not offered: see below. */
 const START_FROM = [
@@ -534,20 +535,23 @@ function RoleDetail({
                     </>
                 ) : (
                     <>
-                        <Button
-                            type="button"
-                            variant="ghost"
-                            className="text-destructive hover:text-destructive"
-                            disabled={pending || held > 0}
-                            onClick={() => setConfirmRemove(true)}
-                            title={
+                        <Tip
+                            label={
                                 held > 0
                                     ? "Move the people who hold it to another role first."
                                     : undefined
                             }
                         >
-                            Remove role
-                        </Button>
+                            <Button
+                                type="button"
+                                variant="ghost"
+                                className="text-destructive hover:text-destructive"
+                                disabled={pending || held > 0}
+                                onClick={() => setConfirmRemove(true)}
+                            >
+                                Remove role
+                            </Button>
+                        </Tip>
                         {held > 0 ? (
                             <span className="text-[11.5px] text-muted-foreground">
                                 {held === 1

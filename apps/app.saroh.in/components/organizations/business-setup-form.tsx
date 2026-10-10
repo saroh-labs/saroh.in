@@ -42,6 +42,7 @@ import {
 } from "@/lib/saroh-billing/checkout-actions";
 
 import { chipClass } from "@/components/shared/chip";
+import { Tip } from "@saroh/ui/tooltip";
 import { SetupKindChoice } from "./setup-kind-choice";
 
 /**
@@ -542,22 +543,25 @@ export function BusinessSetupForm({
                             <Link href={backTo}>Back</Link>
                         </Button>
                     ) : null}
-                    <Button
-                        type="submit"
-                        className="wk-press h-10 flex-1 font-semibold"
-                        disabled={busy || taken}
-                        title={
+                    <Tip
+                        label={
                             taken && availability.reason
                                 ? availability.reason
                                 : undefined
                         }
                     >
-                        {busy
-                            ? "Setting up…"
-                            : kind === "BUSINESS"
-                              ? "Create the business"
-                              : "Set it up"}
-                    </Button>
+                        <Button
+                            type="submit"
+                            className="wk-press h-10 flex-1 font-semibold"
+                            disabled={busy || taken}
+                        >
+                            {busy
+                                ? "Setting up…"
+                                : kind === "BUSINESS"
+                                  ? "Create the business"
+                                  : "Set it up"}
+                        </Button>
+                    </Tip>
                 </div>
 
                 <p

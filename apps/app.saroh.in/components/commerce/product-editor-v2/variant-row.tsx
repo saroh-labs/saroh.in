@@ -12,6 +12,7 @@ import { isLegacy, legacyNote } from "@/lib/products/variant-rows";
 
 import { chipClass } from "@/components/shared/chip";
 import { TextLink } from "@saroh/ui/text-link";
+import { Tip } from "@saroh/ui/tooltip";
 import { boxClass, FieldHelp, MoneyBox } from "./fields";
 
 export const VARIANT_GRID =
@@ -119,20 +120,21 @@ export function VariantRowView({
                         )}
                     />
                 </MoneyBox>
-                <button
-                    type="button"
-                    disabled={locked}
-                    onClick={onRemove}
-                    aria-label={`Remove ${title || "this variant"}`}
-                    title={`Remove ${title || "this variant"}`}
-                    className="flex h-8 w-[30px] items-center justify-center rounded-[7px] text-muted-foreground hover:bg-destructive-subtle disabled:cursor-not-allowed coarse:size-11"
-                >
-                    <Trash2
-                        aria-hidden
-                        className="size-[15px]"
-                        strokeWidth={1.9}
-                    />
-                </button>
+                <Tip label={`Remove ${title || "this variant"}`}>
+                    <button
+                        type="button"
+                        disabled={locked}
+                        onClick={onRemove}
+                        aria-label={`Remove ${title || "this variant"}`}
+                        className="flex h-8 w-[30px] items-center justify-center rounded-[7px] text-muted-foreground hover:bg-destructive-subtle disabled:cursor-not-allowed coarse:size-11"
+                    >
+                        <Trash2
+                            aria-hidden
+                            className="size-[15px]"
+                            strokeWidth={1.9}
+                        />
+                    </button>
+                </Tip>
             </div>
             <div className="mt-[5px] flex flex-wrap items-center gap-2">
                 <TextLink

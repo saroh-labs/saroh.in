@@ -15,6 +15,7 @@ import type { useServicesForPicker } from "@/components/sites/use-services-for-p
 import type { Flag, Section, SitePage } from "@/lib/sites/service";
 import type { SiteStyle, SiteStyleOptions } from "@/lib/sites/style";
 import { TextLink } from "@saroh/ui/text-link";
+import { Tip } from "@saroh/ui/tooltip";
 
 /**
  * The inspector's Block tab (#340): what can be changed about the selected
@@ -99,27 +100,30 @@ export function BlockInspector({
                             {SECTION_LABELS[section.type]}
                         </span>
                     </h2>
-                    <Button
-                        type="button"
-                        variant="ghost"
-                        size="sm"
-                        aria-pressed={section.hidden === true}
-                        title={
+                    <Tip
+                        label={
                             section.hidden
                                 ? "Hidden — this block is left out when you publish"
                                 : "Visible — this block publishes with the page"
                         }
-                        onClick={onToggleHidden}
-                        className={cn(
-                            "h-7 shrink-0 gap-1.5 px-2 text-xs",
-                            section.hidden && "text-muted-foreground",
-                        )}
                     >
-                        <span aria-hidden="true">
-                            {section.hidden ? "○" : "●"}
-                        </span>
-                        {section.hidden ? "Hidden" : "Visible"}
-                    </Button>
+                        <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            aria-pressed={section.hidden === true}
+                            onClick={onToggleHidden}
+                            className={cn(
+                                "h-7 shrink-0 gap-1.5 px-2 text-xs",
+                                section.hidden && "text-muted-foreground",
+                            )}
+                        >
+                            <span aria-hidden="true">
+                                {section.hidden ? "○" : "●"}
+                            </span>
+                            {section.hidden ? "Hidden" : "Visible"}
+                        </Button>
+                    </Tip>
                 </div>
 
                 <p className="text-[0.8125rem] leading-relaxed text-muted-foreground">

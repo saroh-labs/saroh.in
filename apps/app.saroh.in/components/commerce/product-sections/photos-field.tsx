@@ -23,6 +23,7 @@ import {
     mediaFileProblem,
 } from "@/lib/products/editor-sections";
 import { EmptyState } from "@saroh/ui/data-state";
+import { Tip } from "@saroh/ui/tooltip";
 
 /**
  * A product's photos and videos, in the order customers see them (the
@@ -290,21 +291,22 @@ function IconButton({
     children: React.ReactNode;
 }) {
     return (
-        <button
-            type="button"
-            aria-label={label}
-            title={label}
-            disabled={disabled}
-            onClick={onClick}
-            className={cn(
-                "grid size-8 place-items-center rounded-md border border-border focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-40 coarse:size-11 [&_svg]:size-4",
-                danger
-                    ? "text-destructive hover:bg-destructive-subtle"
-                    : "hover:bg-muted",
-            )}
-        >
-            {children}
-        </button>
+        <Tip label={label}>
+            <button
+                type="button"
+                aria-label={label}
+                disabled={disabled}
+                onClick={onClick}
+                className={cn(
+                    "grid size-8 place-items-center rounded-md border border-border focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-40 coarse:size-11 [&_svg]:size-4",
+                    danger
+                        ? "text-destructive hover:bg-destructive-subtle"
+                        : "hover:bg-muted",
+                )}
+            >
+                {children}
+            </button>
+        </Tip>
     );
 }
 
