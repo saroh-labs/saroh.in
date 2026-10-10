@@ -1,5 +1,7 @@
 "use client";
 
+import { useCanChangePlan } from "@/components/billing/plan-way";
+import { planRow } from "@/components/settings/ready-rows";
 import { SetupChecklist } from "@/components/shared/setup-checklist";
 import type { ChecklistRow } from "@/lib/setup-checklist";
 import type {
@@ -36,6 +38,9 @@ export function LocationReadinessCard({
     storeId?: string;
 }) {
     const { heading, note, items, total } = readiness;
+    // Its plan row is a plan prompt: the link for someone who may change
+    // the plan, who can for anyone else.
+    const canChangePlan = useCanChangePlan();
     if (total === 0) return null;
     return (
         <SetupChecklist
@@ -44,7 +49,9 @@ export function LocationReadinessCard({
             title={`Get ${heading.charAt(0).toLowerCase()}${heading.slice(1)}`}
             doneTitle={`${heading}.`}
             note={note}
-            rows={items.map((item) => rowOf(item, canEdit, onJump))}
+            rows={items.map((item) =>
+                rowOf(item, canEdit, onJump, canChangePlan),
+            )}
             // The one link a done step carries (the live shop) stays
             // reachable from the quiet line.
             doneView={items.find((i) => i.view)?.view}
@@ -53,7 +60,12 @@ export function LocationReadinessCard({
     );
 }
 
-function rowOf(item: ReadyItem, canEdit: boolean, onJump: Jump): ChecklistRow {
+export function rowOf(
+    item: ReadyItem,
+    canEdit: boolean,
+    onJump: Jump,
+    canChangePlan = true,
+): ChecklistRow {
     const action =
         item.action && (canEdit || !item.action.inPage) ? item.action : null;
     return {
@@ -62,18 +74,21 @@ function rowOf(item: ReadyItem, canEdit: boolean, onJump: Jump): ChecklistRow {
         done: item.done,
         view: item.view,
         ...(action
-            ? {
-                  action: action.inPage
-                      ? {
-                            label: action.label,
-                            onPress: () => {
-                                if (action.tab) {
-                                    onJump(action.tab, action.focus);
-                                }
-                            },
-                        }
-                      : { label: action.label, href: action.href },
-              }
+            ? action.inPage
+                ? {
+                      action: {
+                          label: action.label,
+                          onPress: () => {
+                              if (action.tab) {
+                                  onJump(action.tab, action.focus);
+                              }
+                          },
+                      },
+                  }
+                : planRow(
+                      { label: action.label, href: action.href },
+                      canChangePlan,
+                  )
             : {}),
     };
 }

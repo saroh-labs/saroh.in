@@ -12,6 +12,7 @@ import {
     SettingsPanelHeader,
 } from "@/components/settings/settings-panel";
 import { SettingsColumns } from "@/components/shared/settings-columns";
+import { mayChangePlan } from "@/lib/billing/plan-access";
 import { kindWords } from "@/lib/organizations/kind";
 import { resolveActiveOrganization } from "@/lib/organizations/service";
 import { getOrganizationSettings } from "@/lib/organizations/settings-service";
@@ -105,6 +106,7 @@ export default async function OrganizationSettingsPage() {
                         <ReadyChecklist
                             list={ready}
                             businessId={organization?.id}
+                            canChangePlan={mayChangePlan(organization)}
                         />
                     ) : undefined
                 }
