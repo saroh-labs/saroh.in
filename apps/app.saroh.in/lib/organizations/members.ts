@@ -2,6 +2,7 @@ import type { ApiResult } from "@/lib/api/failure";
 import { toFailure } from "@/lib/api/failure";
 import type { CrmResult } from "@/lib/api/http";
 import { apiFetch, destroy, getList, mutate, orgBase } from "@/lib/api/http";
+import type { InvitationAccept } from "@/lib/invitations/outcome";
 
 import type { OrganizationRole } from "./service";
 
@@ -234,11 +235,18 @@ export interface AcceptedInvitation {
  */
 export async function acceptInvitation(
     token: string,
-): Promise<CrmResult<AcceptedInvitation>> {
-    const res = await apiFetch(
-        `/organization-invitations/${encodeURIComponent(token)}/accept`,
-        { method: "POST" },
-    );
+): Promise<InvitationAccept<AcceptedInvitation>> {
+    let res: Response;
+    try {
+        res = await apiFetch(
+            `/organization-invitations/${encodeURIComponent(token)}/accept`,
+            { method: "POST" },
+        );
+    } catch {
+        // The API never answered. That is not a verdict on the invitation,
+        // and the page says so (`lib/invitations/outcome.ts`).
+        return { ok: false, error: "", status: null };
+    }
     const data = (await res
         .json()
         .catch(() => null)) as AcceptedInvitation | null;
@@ -246,5 +254,24 @@ export async function acceptInvitation(
     return {
         ok: false,
         error: toFailure(data, "That invitation could not be accepted.").error,
+        status: res.status,
     };
+}
+
+/**
+ * The address a business's invitation was sent to, from the API's public
+ * preview: what the page names when someone is signed in as another person.
+ * Null whenever it cannot be read. The page then says "another email".
+ */
+export async function invitedEmail(token: string): Promise<string | null> {
+    try {
+        const res = await apiFetch(
+            `/public/organization-invitations/${encodeURIComponent(token)}`,
+        );
+        if (!res.ok) return null;
+        const data = (await res.json()) as { email?: unknown };
+        return typeof data.email === "string" ? data.email : null;
+    } catch {
+        return null;
+    }
 }
