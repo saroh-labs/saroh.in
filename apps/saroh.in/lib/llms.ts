@@ -4,7 +4,12 @@ import type { HelpFrontmatter } from "@/content/help";
 import { helpHref, liveArticles } from "@/content/help";
 import { integrationHref, liveIntegrations } from "@/content/integrations";
 import type { PublishContext } from "@/content/resources";
-import { linkShown, shownLegal, shownResources } from "@/content/resources";
+import {
+    linkShown,
+    shownLegal,
+    shownResources,
+    shownTools,
+} from "@/content/resources";
 import type { GalleryTemplate } from "@/content/templates";
 import { galleryTemplates, templateHref } from "@/content/templates";
 
@@ -47,6 +52,14 @@ export function llmsText(
     if (resources.length > 0) {
         out.push("", "## Resources", "");
         for (const page of resources) {
+            out.push(line(base, page.href, page.name, page.line));
+        }
+    }
+
+    const tools = shownTools(ctx);
+    if (tools.length > 0) {
+        out.push("", "## Tools", "");
+        for (const page of tools) {
             out.push(line(base, page.href, page.name, page.line));
         }
     }

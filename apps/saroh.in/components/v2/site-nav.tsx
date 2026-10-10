@@ -15,7 +15,7 @@ import { MobileMenu } from "./mobile-menu";
 import type { NavItem, NavSection } from "./nav-items";
 import { FEATURE_ITEMS, SOLUTION_ITEMS, sectionOf } from "./nav-items";
 
-type MenuId = "features" | "solutions" | "resources";
+type MenuId = "features" | "solutions" | "resources" | "tools";
 
 /** A top-level control: 36px, 9px corners, Paper-dark on hover. */
 const TOP =
@@ -29,7 +29,8 @@ const CURRENT =
  * The site's nav (Nav design, plan U19). From 760px: the logo, Features
  * (a two-column menu with lines), Solutions, Pricing (once the site's launch
  * switch is open; before that it would only bounce to the waitlist),
- * Resources (plan U1; only when some Resources page is live), then Sign in
+ * Resources (plan U1; only when some Resources page is live), Tools (the
+ * free tools, when one is live), then Sign in
  * (once the launch switch is open; until then accounts.saroh.in is closed)
  * and the start button. Below 760px: the logo, the start button and a Menu
  * button that opens `MobileMenu`.
@@ -43,14 +44,21 @@ const CURRENT =
  * returns to its button), on a click outside, and when focus leaves the nav;
  * arrow keys move within it.
  */
-export function SiteNav({ resources = [] }: { resources?: NavItem[] }) {
+export function SiteNav({
+    resources = [],
+    tools = [],
+}: {
+    resources?: NavItem[];
+    tools?: NavItem[];
+}) {
     const pathname = usePathname();
-    const section = sectionOf(pathname, resources);
+    const section = sectionOf(pathname, resources, tools);
     const [open, setOpen] = useState<MenuId | null>(null);
     const nav = useRef<HTMLElement>(null);
     const featuresButton = useRef<HTMLButtonElement>(null);
     const solutionsButton = useRef<HTMLButtonElement>(null);
     const resourcesButton = useRef<HTMLButtonElement>(null);
+    const toolsButton = useRef<HTMLButtonElement>(null);
 
     // A new page closes whatever menu was open (state adjusted while
     // rendering, not in an effect: https://react.dev/learn/you-might-not-need-an-effect).
@@ -73,6 +81,7 @@ export function SiteNav({ resources = [] }: { resources?: NavItem[] }) {
                 features: featuresButton,
                 solutions: solutionsButton,
                 resources: resourcesButton,
+                tools: toolsButton,
             }[open];
             setOpen(null);
             button.current?.focus();
@@ -158,6 +167,21 @@ export function SiteNav({ resources = [] }: { resources?: NavItem[] }) {
                         buttonRef={resourcesButton}
                     />
                 ) : null}
+                {tools.length > 0 ? (
+                    <Menu
+                        id="tools"
+                        label="Tools"
+                        items={tools}
+                        columns={1}
+                        current={section === "tools"}
+                        pathname={pathname}
+                        open={open === "tools"}
+                        onToggle={() =>
+                            setOpen(open === "tools" ? null : "tools")
+                        }
+                        buttonRef={toolsButton}
+                    />
+                ) : null}
             </div>
             {/* Sign in waits for early access, as Pricing does: until then
                 accounts.saroh.in is closed to anyone without the key. */}
@@ -186,6 +210,7 @@ export function SiteNav({ resources = [] }: { resources?: NavItem[] }) {
                 section={section}
                 pathname={pathname}
                 resources={resources}
+                tools={tools}
                 className="ml-auto min-[760px]:hidden"
             />
         </nav>

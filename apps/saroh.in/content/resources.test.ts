@@ -16,6 +16,7 @@ import {
     routeExists,
     shownLegal,
     shownResources,
+    shownTools,
 } from "./resources";
 
 /**
@@ -160,17 +161,17 @@ describe("an unpublished page is in neither the nav nor the sitemap", () => {
 
     it("the QR code maker joins the nav, footer and sitemap on 17 Oct, beside the link preview tool", () => {
         const names = (ctx: PublishContext) =>
-            resourceItems(shownResources(ctx)).map((i) => i.name);
-        expect(names(before)).not.toContain("QR code maker");
+            resourceItems(shownTools(ctx)).map((i) => i.name);
+        expect(names(before)).toEqual(["Link preview tool"]);
         expect(indexedPaths("waitlist", before)).not.toContain(
             "/tools/qr-code-maker",
         );
         expect(qrCodeMakerLive(before)).toBe(false);
-        // The tools sit together, last in the menu.
-        expect(names(after).slice(-2)).toEqual([
-            "Link preview tool",
-            "QR code maker",
-        ]);
+        // The tools have their own menu, and Resources never lists them.
+        expect(names(after)).toEqual(["Link preview tool", "QR code maker"]);
+        expect(
+            shownResources(after).filter((p) => p.href.startsWith("/tools/")),
+        ).toEqual([]);
         expect(indexedPaths("waitlist", after)).toContain(
             "/tools/qr-code-maker",
         );

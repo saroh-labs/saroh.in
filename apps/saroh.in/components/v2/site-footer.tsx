@@ -16,7 +16,7 @@ const LINK =
 
 /**
  * The footer (Footer design): Saroh and who it is for, then Features,
- * Solutions, Resources (plan U1, when any is live), Saroh (Pricing once the launch
+ * Solutions, Resources (plan U1, when any is live), Tools (the free tools, when any is live), Saroh (Pricing once the launch
  * switch is open, Questions, Contact, Sign in once it is open too) and Follow Saroh (Saroh's accounts and its public
  * code), in columns that wrap at 150px (180px before Resources made six). Under them, who makes Saroh and the
  * legal pages that are published (R6): Privacy from its date, and "Cookie
@@ -28,10 +28,12 @@ const LINK =
  */
 export function SiteFooter({
     resources = [],
+    tools = [],
     legal = [],
     cookieChoices = false,
 }: {
     resources?: NavItem[];
+    tools?: NavItem[];
     legal?: { name: string; href: string }[];
     /** Whether GA, and so the cookie notice, is on this deployment. */
     cookieChoices?: boolean;
@@ -67,6 +69,15 @@ export function SiteFooter({
             {resources.length > 0 ? (
                 <Column title="Resources">
                     {resources.map((item) => (
+                        <Link key={item.href} href={item.href} className={LINK}>
+                            {item.name}
+                        </Link>
+                    ))}
+                </Column>
+            ) : null}
+            {tools.length > 0 ? (
+                <Column title="Tools">
+                    {tools.map((item) => (
                         <Link key={item.href} href={item.href} className={LINK}>
                             {item.name}
                         </Link>

@@ -1,6 +1,8 @@
 /**
  * The Resources pages (plan U1): ONE list that drives the nav's Resources
- * menu, the footer's Resources column, the sitemap and the breadcrumbs.
+ * and Tools menus, the footer's Resources and Tools columns, the sitemap and
+ * the breadcrumbs. The free tools (`menu: "tools"`) are things to use, not
+ * things to read, so they sit in their own menu (owner, 10 Oct 2026).
  *
  * A page is shown — linked anywhere, or listed in the sitemap — only when
  * both hold:
@@ -30,6 +32,8 @@ export interface ResourcePage {
     href: string;
     /** The day it goes live, in India (Asia/Kolkata). */
     publishOn: IsoDay;
+    /** The menu and footer column it is listed in. Resources when unset. */
+    menu?: "tools";
     /**
      * Pages under it the sitemap lists with it, each shown only when its
      * route exists (`/integrations/razorpay` needs `/integrations/[provider]`).
@@ -37,7 +41,7 @@ export interface ResourcePage {
     children?: readonly string[];
 }
 
-/** In the plan's order: Help, Integrations, Changelog, Templates, then the free tools (Link preview, QR code maker). */
+/** In the plan's order: Help, Integrations, Changelog, Templates, then the Tools menu's free tools (Link preview, QR code maker). */
 export const RESOURCE_PAGES: readonly ResourcePage[] = [
     {
         id: "help",
@@ -80,6 +84,7 @@ export const RESOURCE_PAGES: readonly ResourcePage[] = [
         line: "See how your link looks when it's shared, and what to fix.",
         href: "/tools/link-preview",
         publishOn: "2026-10-05",
+        menu: "tools",
     },
     {
         id: "qr-code-maker",
@@ -88,6 +93,7 @@ export const RESOURCE_PAGES: readonly ResourcePage[] = [
         href: "/tools/qr-code-maker",
         // With early access, as Help and Templates (QR codes plan U9).
         publishOn: "2026-10-17",
+        menu: "tools",
     },
 ];
 
@@ -192,9 +198,14 @@ export function isShown(
     return isLive(page, ctx) && routeExists(page.href, ctx.routes);
 }
 
-/** The Resources pages the nav and footer list now. */
+/** The Resources pages the nav and footer list now, the free tools apart. */
 export function shownResources(ctx: PublishContext): ResourcePage[] {
-    return RESOURCE_PAGES.filter((p) => isShown(p, ctx));
+    return RESOURCE_PAGES.filter((p) => !p.menu && isShown(p, ctx));
+}
+
+/** The free tools the nav's and footer's Tools list now. */
+export function shownTools(ctx: PublishContext): ResourcePage[] {
+    return RESOURCE_PAGES.filter((p) => p.menu === "tools" && isShown(p, ctx));
 }
 
 /** The legal pages the footer links now. */

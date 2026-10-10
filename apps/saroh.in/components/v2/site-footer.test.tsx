@@ -63,4 +63,25 @@ describe("SiteFooter", () => {
         ).toBeTruthy();
         expect(screen.queryByRole("link", { name: /Terms/ })).toBeNull();
     });
+
+    it("lists the free tools in a Tools column of their own", () => {
+        render(
+            <SiteFooter
+                resources={[
+                    { name: "Changelog", line: "", href: "/changelog" },
+                ]}
+                tools={[
+                    {
+                        name: "QR code maker",
+                        line: "",
+                        href: "/tools/qr-code-maker",
+                    },
+                ]}
+            />,
+        );
+        const tool = screen.getByRole("link", { name: "QR code maker" });
+        expect(tool.parentElement?.firstElementChild?.textContent).toBe(
+            "Tools",
+        );
+    });
 });
