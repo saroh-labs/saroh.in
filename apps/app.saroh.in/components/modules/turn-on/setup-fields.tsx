@@ -161,10 +161,16 @@ export function WebsiteFields({
     suggestion = null,
     template = null,
     choices = [],
+    addressFixed = false,
 }: {
     draft: TurnOnDraft;
     update: Update;
     errors: FieldErrors;
+    /**
+     * The web address was chosen at setup and the API offered it back: it
+     * is a line to read, not a field. False once the API refuses it.
+     */
+    addressFixed?: boolean;
     /** A free address the API offered for a taken one (DEC-069). */
     suggestion?: string | null;
     /** The template a new site starts from; null says nothing. */
@@ -195,53 +201,67 @@ export function WebsiteFields({
                     className={INPUT}
                 />
             </Field>
-            <Field
-                id={`${id}-address`}
-                label="Web address"
-                error={errors.address}
-                note={
-                    w.address
-                        ? `Customers find you at ${w.address}.saroh.app`
-                        : "Letters, numbers and hyphens."
-                }
-            >
-                <div
-                    className={cn(
-                        "flex min-w-0 items-center rounded-[9px] border border-input bg-background focus-within:ring-2 focus-within:ring-ring",
-                        errors.address && "border-destructive",
-                    )}
+            {addressFixed ? (
+                // Chosen when the business was set up: said, not asked again.
+                <dl className="grid gap-1">
+                    <dt className="text-[12.5px] font-medium">Web address</dt>
+                    <dd className="break-all font-mono text-[13px]">
+                        {w.address}.saroh.app
+                    </dd>
+                    <dd className="text-pretty text-[11.5px] leading-normal text-muted-foreground">
+                        You chose it when you set up. It can be changed in
+                        Settings › Business.
+                    </dd>
+                </dl>
+            ) : (
+                <Field
+                    id={`${id}-address`}
+                    label="Web address"
+                    error={errors.address}
+                    note={
+                        w.address
+                            ? `Customers find you at ${w.address}.saroh.app`
+                            : "Letters, numbers and hyphens."
+                    }
                 >
-                    <Input
-                        id={`${id}-address`}
-                        value={w.address}
-                        maxLength={57}
-                        autoComplete="off"
-                        spellCheck={false}
-                        inputMode="url"
-                        aria-invalid={errors.address ? true : undefined}
-                        aria-describedby={`${id}-address-note ${id}-suffix`}
-                        onChange={(e) =>
-                            update((d) => ({
-                                ...d,
-                                WEBSITE: {
-                                    ...d.WEBSITE,
-                                    address: tidyAddress(e.target.value),
-                                },
-                            }))
-                        }
+                    <div
                         className={cn(
-                            INPUT,
-                            "min-w-0 flex-1 border-0 text-right shadow-none focus-visible:ring-0 focus-visible:ring-offset-0",
+                            "flex min-w-0 items-center rounded-[9px] border border-input bg-background focus-within:ring-2 focus-within:ring-ring",
+                            errors.address && "border-destructive",
                         )}
-                    />
-                    <span
-                        id={`${id}-suffix`}
-                        className="shrink-0 pr-3 text-[14px] text-muted-foreground"
                     >
-                        .saroh.app
-                    </span>
-                </div>
-            </Field>
+                        <Input
+                            id={`${id}-address`}
+                            value={w.address}
+                            maxLength={57}
+                            autoComplete="off"
+                            spellCheck={false}
+                            inputMode="url"
+                            aria-invalid={errors.address ? true : undefined}
+                            aria-describedby={`${id}-address-note ${id}-suffix`}
+                            onChange={(e) =>
+                                update((d) => ({
+                                    ...d,
+                                    WEBSITE: {
+                                        ...d.WEBSITE,
+                                        address: tidyAddress(e.target.value),
+                                    },
+                                }))
+                            }
+                            className={cn(
+                                INPUT,
+                                "min-w-0 flex-1 border-0 text-right shadow-none focus-visible:ring-0 focus-visible:ring-offset-0",
+                            )}
+                        />
+                        <span
+                            id={`${id}-suffix`}
+                            className="shrink-0 pr-3 text-[14px] text-muted-foreground"
+                        >
+                            .saroh.app
+                        </span>
+                    </div>
+                </Field>
+            )}
             {suggestion && suggestion !== w.address ? (
                 // The one asked for is taken: the API offers a free one.
                 <TextLink

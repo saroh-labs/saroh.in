@@ -123,6 +123,16 @@ export class OnboardingProfileDto extends BusinessProfileDto {
     registered?: boolean;
 }
 
+/** The goals setup offers: four modules, and invoicing, which needs none. */
+export const FIRST_GOALS = [
+    "COMMERCE",
+    "APPOINTMENTS",
+    "WEBSITE",
+    "CRM",
+    "INVOICE",
+] as const;
+export type FirstGoal = (typeof FIRST_GOALS)[number];
+
 /**
  * Payload for `POST /organizations` (S1-004). Carries only the business
  * identity — never the owner. Ownership is derived from the authenticated
@@ -165,6 +175,16 @@ export class OnboardOrganizationDto {
         message: "kind must be BUSINESS, SOLO or WORK",
     })
     kind?: OrganizationKind;
+
+    /**
+     * What they chose to do first on the setup screen (UX audit, 10 Oct):
+     * one of {@link FIRST_GOALS}. It turns nothing on (the app does that,
+     * module by module) and decides no access. The welcome email leads with
+     * its next step. Absent: they will decide later.
+     */
+    @IsOptional()
+    @IsIn(FIRST_GOALS, { message: "goal is not one Saroh offers" })
+    goal?: FirstGoal;
 }
 
 const DIGITS_MESSAGE = `The counter is ${MIN_COUNTER_DIGITS} to ${MAX_COUNTER_DIGITS} digits.`;
