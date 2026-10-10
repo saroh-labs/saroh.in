@@ -1,7 +1,6 @@
 "use client";
 
 import { Badge } from "@saroh/ui/badge";
-import { Button } from "@saroh/ui/button";
 import {
     DropdownMenu,
     DropdownMenuContent,
@@ -29,6 +28,7 @@ import type { ProductRating } from "@/lib/product-reviews/service";
 import type { CatalogueRow } from "@/lib/products/catalogue";
 import { rowFacts, stockWords } from "@/lib/products/catalogue";
 
+import { IconButton } from "@saroh/ui/icon-button";
 import { ProductThumb } from "./product-thumb";
 import { STATUS_LABEL, STATUS_VARIANT, TONE_TEXT } from "./tones";
 
@@ -190,14 +190,12 @@ export function RowMenu({
     return (
         <DropdownMenu>
             <DropdownMenuTrigger asChild>
-                <Button
+                <IconButton
+                    label={`More actions for ${row.name}`}
+                    icon={<MoreHorizontal />}
                     variant="ghost"
-                    size="icon"
-                    className="size-7 text-muted-foreground hover:text-foreground coarse:size-11"
-                    aria-label={`More actions for ${row.name}`}
-                >
-                    <MoreHorizontal className="size-4" />
-                </Button>
+                    className="text-muted-foreground"
+                />
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-44">
                 <DropdownMenuItem onSelect={onPreview}>

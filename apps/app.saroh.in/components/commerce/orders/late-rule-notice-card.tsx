@@ -11,6 +11,7 @@ import { lateAfterWords } from "@/lib/stores/late-after";
 import { storefrontHref } from "@/lib/stores/links";
 import { dismissLateRuleNotice } from "@/lib/stores/storefront-actions";
 import type { LateRuleNotice } from "@/lib/stores/storefronts";
+import { IconButton } from "@saroh/ui/icon-button";
 import { Notice } from "@saroh/ui/notice";
 
 /**
@@ -72,17 +73,13 @@ export function LateRuleNoticeCard({
                         An owner or admin can change it in Locations.
                     </span>
                 )}
-                <Button
-                    type="button"
+                <IconButton
+                    label={`Dismiss this notice for ${notice.name}`}
+                    icon={<X />}
                     variant="ghost"
-                    size="icon"
                     disabled={pending}
                     onClick={dismiss}
-                    aria-label={`Dismiss this notice for ${notice.name}`}
-                    className="size-[30px] text-foreground coarse:size-11"
-                >
-                    <X aria-hidden className="size-4" />
-                </Button>
+                />
             </div>
         </Notice>
     );

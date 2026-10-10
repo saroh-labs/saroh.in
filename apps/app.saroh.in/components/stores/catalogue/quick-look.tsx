@@ -22,6 +22,7 @@ import { productEditHref, productHref } from "@/lib/products/links";
 import { position } from "@/lib/products/quick-look";
 import type { ProductStatus } from "@/lib/products/service";
 
+import { IconButton } from "@saroh/ui/icon-button";
 import { Tip } from "@saroh/ui/tooltip";
 import { ProductThumb } from "./product-thumb";
 import { StockBlock } from "./quick-look-stock";
@@ -125,37 +126,28 @@ export function QuickLook({
                             </span>
                             <div className="ml-auto flex gap-0.5">
                                 <Tip label="Previous (K)">
-                                    <Button
+                                    <IconButton
+                                        label="Previous product (K)"
+                                        icon={<ChevronUp />}
                                         variant="ghost"
-                                        size="icon"
-                                        className="size-7 text-neutral-700 coarse:size-11 dark:text-foreground"
                                         onClick={() => onStep(-1)}
-                                        aria-label="Previous product (K)"
-                                    >
-                                        <ChevronUp className="size-4" />
-                                    </Button>
+                                    />
                                 </Tip>
                                 <Tip label="Next (J)">
-                                    <Button
+                                    <IconButton
+                                        label="Next product (J)"
+                                        icon={<ChevronDown />}
                                         variant="ghost"
-                                        size="icon"
-                                        className="size-7 text-neutral-700 coarse:size-11 dark:text-foreground"
                                         onClick={() => onStep(1)}
-                                        aria-label="Next product (J)"
-                                    >
-                                        <ChevronDown className="size-4" />
-                                    </Button>
+                                    />
                                 </Tip>
                             </div>
                             <SheetClose asChild>
-                                <Button
+                                <IconButton
+                                    label="Close (Esc)"
+                                    icon={<X strokeWidth={2.1} />}
                                     variant="ghost"
-                                    size="icon"
-                                    className="size-7 text-neutral-600 coarse:size-11 dark:text-foreground"
-                                    aria-label="Close (Esc)"
-                                >
-                                    <X className="size-4" strokeWidth={2.1} />
-                                </Button>
+                                />
                             </SheetClose>
                         </div>
                         <div className="flex-1 overflow-y-auto p-[18px]">

@@ -1,6 +1,5 @@
 "use client";
 
-import { Button } from "@saroh/ui/button";
 import { Checkbox } from "@saroh/ui/checkbox";
 import {
     FormControl,
@@ -36,6 +35,7 @@ import {
     RESTART_LABEL,
     SEPARATOR_LABEL,
 } from "@/lib/invoices/invoice-number";
+import { IconButton } from "@saroh/ui/icon-button";
 import { Segmented } from "@saroh/ui/segmented";
 
 /** The four form values the editor writes. */
@@ -192,32 +192,24 @@ export function InvoiceNumberFields({
                                                 )}
                                             </span>
                                         </label>
-                                        <Button
+                                        <IconButton
+                                            label={`Move ${PART_LABEL[row.part]} earlier`}
+                                            icon={<ArrowUp />}
                                             id={`number-part-${row.part}-up`}
-                                            type="button"
                                             variant="ghost"
-                                            size="icon"
-                                            className="size-8"
-                                            aria-label={`Move ${PART_LABEL[row.part]} earlier`}
                                             disabled={i === 0}
                                             onClick={() =>
                                                 move(row.part, i, -1)
                                             }
-                                        >
-                                            <ArrowUp className="size-4" />
-                                        </Button>
-                                        <Button
+                                        />
+                                        <IconButton
+                                            label={`Move ${PART_LABEL[row.part]} later`}
+                                            icon={<ArrowDown />}
                                             id={`number-part-${row.part}-down`}
-                                            type="button"
                                             variant="ghost"
-                                            size="icon"
-                                            className="size-8"
-                                            aria-label={`Move ${PART_LABEL[row.part]} later`}
                                             disabled={i === rows.length - 1}
                                             onClick={() => move(row.part, i, 1)}
-                                        >
-                                            <ArrowDown className="size-4" />
-                                        </Button>
+                                        />
                                     </li>
                                 ))}
                                 <li className="flex items-center gap-2.5 bg-muted/50 px-2.5 py-2 text-[13px] text-muted-foreground">

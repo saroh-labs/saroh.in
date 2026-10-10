@@ -38,6 +38,7 @@ import type { OrderRow } from "@/lib/orders/business-service";
 import type { OrderAbilities, RowMenuItem } from "@/lib/orders/row-menu";
 import { orderPageHref, payLinkAction, rowMenu } from "@/lib/orders/row-menu";
 
+import { IconButton } from "@saroh/ui/icon-button";
 import { useOrderStep } from "./use-order-step";
 
 /** Pointer, hover, focus and pressed on every item (the standing rule). */
@@ -213,15 +214,12 @@ export function OrderRowMenu({
         <>
             <DropdownMenu modal={false}>
                 <DropdownMenuTrigger asChild>
-                    <Button
-                        type="button"
+                    <IconButton
+                        label={`More actions for order ${ref}`}
+                        icon={<MoreHorizontal />}
                         variant="ghost"
-                        size="icon"
-                        aria-label={`More actions for order ${ref}`}
-                        className="relative z-[1] size-7 rounded-[7px] text-muted-foreground hover:bg-muted active:bg-secondary-hover data-[state=open]:bg-muted coarse:size-11"
-                    >
-                        <MoreHorizontal aria-hidden className="size-4" />
-                    </Button>
+                        className="relative z-[1] text-muted-foreground"
+                    />
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end" className="w-[208px] p-1.5">
                     {top.map(draw)}

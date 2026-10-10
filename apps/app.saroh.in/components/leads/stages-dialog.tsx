@@ -17,6 +17,7 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 
 import { saveStages } from "@/lib/pipelines/actions";
+import { IconButton } from "@saroh/ui/icon-button";
 import { Tip } from "@saroh/ui/tooltip";
 
 interface Row {
@@ -158,28 +159,20 @@ export function StagesDialog({
                                     )
                                 }
                             />
-                            <Button
-                                type="button"
+                            <IconButton
+                                label={`Move ${r.name || "this stage"} left`}
+                                icon={<ArrowUp />}
                                 variant="ghost"
-                                size="icon"
-                                className="size-8"
-                                aria-label={`Move ${r.name || "this stage"} left`}
                                 disabled={i === 0}
                                 onClick={() => move(i, -1)}
-                            >
-                                <ArrowUp className="size-4" />
-                            </Button>
-                            <Button
-                                type="button"
+                            />
+                            <IconButton
+                                label={`Move ${r.name || "this stage"} right`}
+                                icon={<ArrowDown />}
                                 variant="ghost"
-                                size="icon"
-                                className="size-8"
-                                aria-label={`Move ${r.name || "this stage"} right`}
                                 disabled={i === rows.length - 1}
                                 onClick={() => move(i, 1)}
-                            >
-                                <ArrowDown className="size-4" />
-                            </Button>
+                            />
                             <Tip
                                 label={
                                     r.leads > 0
