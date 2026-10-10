@@ -12,6 +12,8 @@ import {
     ORG_ACTIONS,
     outOfReach,
     resolveCapabilities,
+    ROLE_DENIED,
+    ROLE_DENIED_MESSAGE,
     withinReach,
 } from "./organization-policy";
 
@@ -180,10 +182,61 @@ describe("organization-policy: authorize()", () => {
         }
     });
 
-    it("names the role and action in the thrown message", () => {
-        expect(() => authorize(ctx("MEMBER"), "org:delete")).toThrow(
-            /MEMBER.*org:delete/,
+    /** What a refused `authorize` threw, as the exception filter reads it. */
+    function refused(run: () => void): {
+        status: number;
+        body: { message: string; details: unknown };
+    } {
+        try {
+            run();
+        } catch (error) {
+            if (error instanceof ForbiddenException) {
+                return {
+                    status: error.getStatus(),
+                    body: error.getResponse() as {
+                        message: string;
+                        details: unknown;
+                    },
+                };
+            }
+            throw error;
+        }
+        throw new Error("was not refused");
+    }
+
+    it("refuses in a sentence a person can read, never a role or a key", () => {
+        const { status, body } = refused(() =>
+            authorize(ctx("MEMBER"), "store:create"),
         );
+        expect(status).toBe(403);
+        expect(body.message).toBe(ROLE_DENIED_MESSAGE);
+        expect(body.message).toBe(
+            "Your role can't do this. An owner or admin can change that in Settings \u203a Team.",
+        );
+        expect(body.message).not.toMatch(/MEMBER|store:create|may not perform/);
+    });
+
+    it("says which permission was missing in details, for the app", () => {
+        expect(
+            refused(() => authorize(ctx("MEMBER"), "store:create")).body
+                .details,
+        ).toEqual({ code: ROLE_DENIED, action: "store:create" });
+        expect(ROLE_DENIED).toBe("ROLE_DENIED");
+    });
+
+    it("never names a role the business made up", () => {
+        const clerk: OrganizationContext = {
+            ...ctx("MEMBER"),
+            roleKey: "stock-clerk",
+            actions: new Set<OrgAction>(["order:read"]),
+        };
+        const { body } = refused(() => authorize(clerk, "order:refund"));
+        expect(body.message).toBe(ROLE_DENIED_MESSAGE);
+        expect(JSON.stringify(body)).not.toMatch(/stock-clerk/);
+        expect(body.details).toEqual({
+            code: "ROLE_DENIED",
+            action: "order:refund",
+        });
     });
 });
 

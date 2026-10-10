@@ -5,7 +5,7 @@ jest.mock("../../env", () => ({ env: {} }));
 
 import type { Prisma } from "@saroh/database";
 
-import { allows } from "../organizations/organization-policy";
+import { allows, roleDenial } from "../organizations/organization-policy";
 import { CommunicationsService } from "./communications.service";
 import {
     EMAIL_SETUP_MISSED,
@@ -113,8 +113,10 @@ describe("GET comms-providers/email-setup", () => {
     it("is refused to someone who can neither connect one nor see the plans", async () => {
         const c = ctx(["invoice:read"]);
         expect(allows(c, "comms:manage")).toBe(false);
-        await expect(new CommunicationsService().emailSetup(c)).rejects.toThrow(
-            /comms:manage/,
-        );
+        await expect(
+            new CommunicationsService().emailSetup(c),
+        ).rejects.toMatchObject({
+            response: roleDenial("comms:manage"),
+        });
     });
 });

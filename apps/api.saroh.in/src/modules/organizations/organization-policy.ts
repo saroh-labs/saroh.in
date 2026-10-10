@@ -181,17 +181,46 @@ export function can(role: OrgRole, action: OrgAction): boolean {
     return CAPABILITIES[role].has(action);
 }
 
+/** `details.code` of a refusal by role, which the app reads (`toFailure`). */
+export const ROLE_DENIED = "ROLE_DENIED";
+
+/**
+ * What a person refused by their role reads. Never the role's key or the
+ * permission's: the permission travels in `details`, for the app to pick a
+ * closer sentence from, and neither is ever the message.
+ */
+export const ROLE_DENIED_MESSAGE =
+    "Your role can't do this. An owner or admin can change that in Settings › Team.";
+
 /**
  * Enforce the policy for a resolved Organization context. Throws
  * `ForbiddenException` (mapped to 403 by the global filter) when the actor's
- * role does not permit `action`; returns silently when it does.
+ * role does not permit `action`. Returns silently when it does.
+ *
+ * The refusal is a sentence a person can read, with
+ * `details: { code: "ROLE_DENIED", action }` in the error envelope. An
+ * endpoint that says its own sentence (`requireBookingPower`,
+ * `customer-access.ts`) asks `allows` and throws its own.
  */
 export function authorize(ctx: OrganizationContext, action: OrgAction): void {
     if (!allows(ctx, action)) {
-        throw new ForbiddenException(
-            `Role "${ctx.roleKey ?? ctx.role}" may not perform "${action}"`,
-        );
+        throw new ForbiddenException(roleDenial(action));
     }
+}
+
+/**
+ * The body of a refusal by role, as the exception filter reads it. Exported
+ * so a spec can pin WHICH permission refused without reading the message:
+ * `rejects.toMatchObject({ response: roleDenial("site:update") })`.
+ */
+export function roleDenial(action: OrgAction): {
+    message: string;
+    details: { code: typeof ROLE_DENIED; action: OrgAction };
+} {
+    return {
+        message: ROLE_DENIED_MESSAGE,
+        details: { code: ROLE_DENIED, action },
+    };
 }
 
 /**

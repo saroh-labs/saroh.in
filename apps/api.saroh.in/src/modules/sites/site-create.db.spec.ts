@@ -13,6 +13,7 @@ import { prisma } from "@saroh/database";
 
 import type { OrganizationContext } from "../../common/types/organization-context";
 import type { EntitlementService } from "../billing/entitlement.service";
+import { roleDenial } from "../organizations/organization-policy";
 import { ADDRESS_MISSING_MESSAGE } from "./site-flags";
 import { SitesService } from "./sites.service";
 
@@ -193,7 +194,9 @@ describe("GET sites/new-defaults (L5)", () => {
         const { ctx } = await business();
         await expect(
             sites.newSiteDefaults({ ...ctx, role: "MEMBER" }),
-        ).rejects.toThrow(/site:create/);
+        ).rejects.toMatchObject({
+            response: roleDenial("site:create"),
+        });
     });
 });
 

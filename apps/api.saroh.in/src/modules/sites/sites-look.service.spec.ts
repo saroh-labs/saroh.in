@@ -17,6 +17,7 @@ import { BadRequestException } from "@nestjs/common";
 import { Prisma, prisma } from "@saroh/database";
 
 import type { OrganizationContext } from "../../common/types/organization-context";
+import { roleDenial } from "../organizations/organization-policy";
 import { defaultSiteStyle } from "./site-style";
 import { SitesService } from "./sites.service";
 
@@ -130,7 +131,9 @@ describe("SitesService.updateStyle", () => {
             service.updateStyle(ctx({ role: "MEMBER" }), "site_1", {
                 colours: { accent: "teal" },
             }),
-        ).rejects.toThrow(/MEMBER.*site:update/);
+        ).rejects.toMatchObject({
+            response: roleDenial("site:update"),
+        });
         expect(siteFindFirst).not.toHaveBeenCalled();
         expect(siteUpdate).not.toHaveBeenCalled();
     });
@@ -233,7 +236,9 @@ describe("SitesService.updateFooter", () => {
             service.updateFooter(ctx({ role: "MEMBER" }), "site_1", {
                 value: "Northwind Supply",
             }),
-        ).rejects.toThrow(/MEMBER.*site:update/);
+        ).rejects.toMatchObject({
+            response: roleDenial("site:update"),
+        });
         expect(siteFindFirst).not.toHaveBeenCalled();
         expect(siteUpdate).not.toHaveBeenCalled();
     });
@@ -319,7 +324,9 @@ describe("SitesService.updateNavigation", () => {
             service.updateNavigation(ctx({ role: "MEMBER" }), "site_1", {
                 items: [{ pageId: "page_1" }],
             }),
-        ).rejects.toThrow(/MEMBER.*site:update/);
+        ).rejects.toMatchObject({
+            response: roleDenial("site:update"),
+        });
         expect(siteFindFirst).not.toHaveBeenCalled();
         expect(siteUpdate).not.toHaveBeenCalled();
     });
