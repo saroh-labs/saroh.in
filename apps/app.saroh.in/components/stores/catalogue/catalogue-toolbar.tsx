@@ -89,7 +89,7 @@ export function CatalogueToolbar({
                     }}
                     placeholder="Search products"
                     aria-label="Search products"
-                    className="h-[38px] pl-[34px] text-[13.5px] coarse:h-11"
+                    className="pl-[34px]"
                 />
             </div>
             {many ? (

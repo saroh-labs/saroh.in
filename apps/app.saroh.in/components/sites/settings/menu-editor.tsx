@@ -63,7 +63,7 @@ export function MenuEditor({
                                     value={item.label ?? ""}
                                     placeholder={page?.title ?? "Page"}
                                     aria-label={`Menu label for ${title}`}
-                                    className="h-9 min-w-0 flex-1"
+                                    className="min-w-0 flex-1"
                                     onChange={(e) => rename(i, e.target.value)}
                                 />
                                 <span className="hidden shrink-0 font-mono text-[11px] text-muted-foreground sm:inline">

@@ -143,10 +143,11 @@ export function StagesDialog({
                                 {i + 1}
                             </span>
                             <Input
+                                dense
                                 aria-label={`Stage ${i + 1} name`}
                                 value={r.name}
                                 maxLength={60}
-                                className="h-8 min-w-0 flex-1"
+                                className="min-w-0 flex-1"
                                 onChange={(e) =>
                                     setRows((all) =>
                                         all.map((x) =>

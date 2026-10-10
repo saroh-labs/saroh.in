@@ -106,7 +106,7 @@ export function Details({
                 aria-invalid={errors.description ? true : undefined}
                 aria-describedby={errors.description ? ids.descErr : undefined}
                 onChange={(e) => set({ description: e.target.value })}
-                className="mt-[5px] rounded-[8px] text-[14px]"
+                className="mt-[5px]"
             />
             <FieldError id={ids.descErr} message={errors.description} />
 

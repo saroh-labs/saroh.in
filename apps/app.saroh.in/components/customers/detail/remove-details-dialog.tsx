@@ -163,7 +163,7 @@ export function RemoveDetailsDialog({
                     autoComplete="off"
                     spellCheck={false}
                     disabled={removing || refused.length > 0}
-                    className="mt-1.5 h-9 rounded-[8px] px-2.5 text-[13px]"
+                    className="mt-1.5 px-2.5"
                 />
 
                 {failure ? (

@@ -134,7 +134,6 @@ export function PhotosField({
                                         }
                                         placeholder="What it shows, for people who can't see it"
                                         aria-label={`Description of ${noun} ${i + 1}`}
-                                        className="h-9"
                                     />
                                 </div>
                                 <div className="flex shrink-0 gap-1">
@@ -444,7 +443,7 @@ export function AddressPanel({
                     setCheck("idle");
                 }}
                 placeholder="https://images.example.com/photo.jpg"
-                className="font-mono text-[12px]"
+                className="font-mono"
                 aria-invalid={problem ? true : undefined}
                 aria-describedby={`${id}-url-hint`}
             />

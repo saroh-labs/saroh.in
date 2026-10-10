@@ -292,6 +292,7 @@ export function PlanChooser({
                             }}
                         >
                             <Input
+                                dense
                                 value={couponIn}
                                 onChange={(e) => {
                                     setCouponIn(e.target.value);
@@ -305,7 +306,7 @@ export function PlanChooser({
                                 }
                                 maxLength={32}
                                 autoComplete="off"
-                                className="h-[34px] w-[180px] bg-muted/50 font-mono text-[13px] uppercase coarse:h-11"
+                                className="w-[180px] bg-muted/50 font-mono uppercase"
                             />
                             <Button
                                 type="submit"

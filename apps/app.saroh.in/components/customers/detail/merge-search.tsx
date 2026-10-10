@@ -77,7 +77,6 @@ export function MergeSearch({
                 autoComplete="off"
                 autoFocus
                 aria-describedby={`${id}-status`}
-                className="h-[38px] rounded-[9px] text-[14px]"
             />
             <p
                 id={`${id}-status`}

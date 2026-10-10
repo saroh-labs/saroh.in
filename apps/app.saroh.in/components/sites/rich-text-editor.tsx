@@ -364,7 +364,7 @@ function EditorSurface({
                     }}
                 >
                     <SelectTrigger
-                        className="h-7 w-[7.5rem] text-xs"
+                        className="h-7 w-[7.5rem]"
                         aria-label="Text style"
                     >
                         <SelectValue />
@@ -385,10 +385,7 @@ function EditorSurface({
                             : chain().setFontFamily(v).run()
                     }
                 >
-                    <SelectTrigger
-                        className="h-7 w-24 text-xs"
-                        aria-label="Font"
-                    >
+                    <SelectTrigger className="h-7 w-24" aria-label="Font">
                         <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
@@ -410,10 +407,7 @@ function EditorSurface({
                             : chain().setFontSize(v).run()
                     }
                 >
-                    <SelectTrigger
-                        className="h-7 w-24 text-xs"
-                        aria-label="Size"
-                    >
+                    <SelectTrigger className="h-7 w-24" aria-label="Size">
                         <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
@@ -643,7 +637,7 @@ function EditorSurface({
                     value={value}
                     onChange={(e) => onChange(e.target.value)}
                     rows={10}
-                    className="rounded-none border-0 font-mono text-xs focus-visible:ring-0"
+                    className="rounded-none border-0 font-mono focus-visible:ring-0"
                     aria-label="HTML source"
                 />
             ) : (
@@ -804,10 +798,10 @@ function LinkTool({
                     }}
                 >
                     <Input
+                        dense
                         value={href}
                         onChange={(e) => setHref(e.target.value)}
                         placeholder="https://… or /about"
-                        className="h-8"
                         aria-label="Link address"
                     />
                     <div className="flex gap-2">

@@ -184,11 +184,11 @@ export function OrganizationSwitcher({
             >
                 <div className="px-1 pb-[7px] pt-[3px]">
                     <Input
+                        dense
                         value={query}
                         onChange={(e) => setQuery(e.target.value)}
                         placeholder="Find a business"
                         aria-label="Find a business"
-                        className="h-8 text-[12.5px]"
                     />
                 </div>
                 {owned.length > 0 ? (

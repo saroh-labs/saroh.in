@@ -70,7 +70,7 @@ export function WhatItIs({ draft, set }: Edit) {
                 value={draft.description}
                 placeholder="e.g. One-to-one session built around your goals."
                 onChange={(e) => set({ description: e.target.value })}
-                className="mt-[5px] rounded-[8px] text-[14px]"
+                className="mt-[5px]"
             />
             <p className={HELP}>Shown on the booking page under the name.</p>
             <Eyebrow id={ids.kind} className="mt-3">

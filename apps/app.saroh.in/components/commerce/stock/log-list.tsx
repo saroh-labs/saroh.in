@@ -134,7 +134,7 @@ export function LogList({
                 <OptionSelect
                     size="sm"
                     aria-label="Product"
-                    className="h-[30px] w-auto min-w-[160px] max-w-[260px] rounded-[8px] text-[12.5px] coarse:h-11"
+                    className="w-auto min-w-[160px] max-w-[260px]"
                     value={filter.product}
                     options={[
                         { value: "", label: "All products" },

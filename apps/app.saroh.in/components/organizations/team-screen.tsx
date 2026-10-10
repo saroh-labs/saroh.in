@@ -1370,7 +1370,7 @@ function InviteDialog({
                                                 autoComplete="off"
                                                 placeholder="name@example.in"
                                                 disabled={sending}
-                                                className="h-[38px] rounded-[9px] text-[13.5px] aria-[invalid=true]:border-destructive-subtle-foreground"
+                                                className="aria-[invalid=true]:border-destructive-subtle-foreground"
                                                 {...field}
                                             />
                                         </FormControl>

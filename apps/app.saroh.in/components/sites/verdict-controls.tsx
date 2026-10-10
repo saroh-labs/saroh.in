@@ -72,7 +72,6 @@ export function VerdictControls({
                         if (problem) setProblem(null);
                     }}
                     placeholder="The opening hours on Home are last season's."
-                    className="text-sm"
                 />
                 {problem ? (
                     <p

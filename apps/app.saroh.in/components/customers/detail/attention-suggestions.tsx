@@ -295,6 +295,7 @@ function SuggestionCard({
                             Short label for the team
                         </Label>
                         <Input
+                            dense
                             id={`${id}-label`}
                             value={draft.label}
                             maxLength={SUGGESTION_LABEL_MAX}
@@ -306,7 +307,7 @@ function SuggestionCard({
                             onChange={(e) =>
                                 change({ ...draft, label: e.target.value })
                             }
-                            className="h-[34px] min-w-0 rounded-[8px] px-2.5 text-[13px]"
+                            className="min-w-0 px-2.5"
                         />
                     </div>
                 )}

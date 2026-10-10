@@ -108,13 +108,13 @@ export function PageSettings({
                         Title
                     </label>
                     <Input
+                        dense
                         id={`${id}-title`}
                         value={title}
                         maxLength={200}
                         disabled={readOnly}
                         onChange={(e) => setTitle(e.target.value)}
                         aria-describedby={`${id}-title-note`}
-                        className="h-8 text-xs"
                     />
                     <p
                         id={`${id}-title-note`}
@@ -145,13 +145,14 @@ export function PageSettings({
                                 </p>
                             ) : null}
                             <Input
+                                dense
                                 id={`${id}-path`}
                                 value={path}
                                 maxLength={200}
                                 disabled={readOnly}
                                 aria-invalid={unseen ? true : undefined}
                                 onChange={(e) => setPath(e.target.value)}
-                                className="h-8 font-mono text-xs"
+                                className="font-mono"
                             />
                         </>
                     )}

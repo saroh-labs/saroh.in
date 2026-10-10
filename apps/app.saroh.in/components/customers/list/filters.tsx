@@ -67,6 +67,7 @@ export function Filters({
                         className="pointer-events-none absolute left-[11px] top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground"
                     />
                     <Input
+                        dense
                         ref={field}
                         type="search"
                         value={text}
@@ -79,11 +80,12 @@ export function Filters({
                         }}
                         placeholder="Search by name, phone or email"
                         aria-label="Search by name, phone or email"
-                        className="h-[34px] rounded-[9px] pl-8 text-[13px] coarse:h-11"
+                        className="pl-8"
                     />
                 </div>
                 {storefronts.length > 1 ? (
                     <OptionSelect
+                        size="sm"
                         aria-label="Location"
                         value={query.store ?? ALL_STORES}
                         onValueChange={(v) =>
@@ -96,10 +98,11 @@ export function Filters({
                                 label: `Bought at ${s.name}`,
                             })),
                         ]}
-                        className="h-[34px] w-auto min-w-[150px] max-w-full rounded-[9px] text-[13px] coarse:h-11"
+                        className="w-auto min-w-[150px] max-w-full"
                     />
                 ) : null}
                 <OptionSelect<CustomerSort>
+                    size="sm"
                     aria-label="Sort"
                     value={query.sort ?? page.sort}
                     onValueChange={(sort) => go({ sort })}
@@ -107,7 +110,7 @@ export function Filters({
                         value: s,
                         label: SORT_LABEL[s],
                     }))}
-                    className="h-[34px] w-auto min-w-[150px] rounded-[9px] text-[13px] coarse:h-11"
+                    className="w-auto min-w-[150px]"
                 />
             </div>
             <div

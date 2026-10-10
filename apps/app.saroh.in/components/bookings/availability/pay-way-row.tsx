@@ -30,12 +30,13 @@ export function PayWayRow({
             <div className="flex items-center gap-2 py-1.5">
                 <span className="flex-1 text-[13px]">{PAY_WAY.label}</span>
                 <OptionSelect
+                    size="sm"
                     aria-label={PAY_WAY.label}
                     aria-describedby="pay-way-hint"
                     disabled={disabled}
                     value={way}
                     onValueChange={(v) => onChange(v)}
-                    className="h-8 w-auto rounded-[8px] text-[12.5px]"
+                    className="w-auto"
                     options={[...PAY_WAY.options]}
                 />
             </div>

@@ -100,7 +100,7 @@ export function CategoryPicker({
                         value={query}
                         onValueChange={setQuery}
                         placeholder="Search or create a category"
-                        className="h-8 text-[12.5px]"
+                        className="h-8"
                     />
                     <CommandList>
                         <CommandEmpty className="px-2 py-2 text-[12.5px] text-muted-foreground">

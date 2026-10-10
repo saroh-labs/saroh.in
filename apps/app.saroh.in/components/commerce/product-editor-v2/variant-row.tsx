@@ -74,6 +74,7 @@ export function VariantRowView({
         <li>
             <div className={cn(VARIANT_GRID, "items-center")}>
                 <OptionSelect
+                    size="sm"
                     value={r.valueId}
                     onValueChange={(id) =>
                         onChange({ valueId: id, legacyTitle: "" })
@@ -87,7 +88,6 @@ export function VariantRowView({
                     disabled={locked}
                     aria-label={`Variant ${i + 1} ${opt}`}
                     className={cn(
-                        "h-8 rounded-[8px] text-[13px]",
                         !r.valueId && !legacy && "border-destructive",
                     )}
                 />

@@ -269,7 +269,6 @@ export function EntrySheet({
                                 : "e.g. Half a tray"
                         }
                         onChange={(e) => setNote(e.target.value)}
-                        className="text-[13px]"
                     />
                 </div>
                 <div className="mt-auto flex justify-end gap-2 pt-2">

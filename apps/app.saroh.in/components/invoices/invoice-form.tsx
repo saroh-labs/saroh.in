@@ -485,7 +485,7 @@ export function InvoiceForm({
                                             maxLength={15}
                                             autoCapitalize="characters"
                                             placeholder="29AAGFL5531Q1ZO"
-                                            className="h-9 font-mono text-[13px] uppercase"
+                                            className="font-mono uppercase"
                                             aria-invalid={Boolean(
                                                 errors.billToGstin,
                                             )}
@@ -539,7 +539,6 @@ export function InvoiceForm({
                                             id={ids.address}
                                             rows={2}
                                             maxLength={500}
-                                            className="text-[13px]"
                                             disabled={isSubmitting}
                                             {...form.register("billToAddress")}
                                         />
@@ -589,7 +588,7 @@ export function InvoiceForm({
                                             <Input
                                                 aria-label={`Line ${i + 1}: what it's for`}
                                                 placeholder="What it's for"
-                                                className="col-span-2 h-9 rounded-[8px] text-[13px] sm:col-span-1"
+                                                className="col-span-2 sm:col-span-1"
                                                 disabled={isSubmitting}
                                                 aria-invalid={Boolean(
                                                     lineErr?.description,
@@ -615,7 +614,7 @@ export function InvoiceForm({
                                                     id={`${ids.lines}-${i}-qty`}
                                                     aria-label={`Line ${i + 1}: quantity`}
                                                     inputMode="numeric"
-                                                    className="h-9 rounded-[8px] text-[13px] tabular-nums"
+                                                    className="tabular-nums"
                                                     disabled={isSubmitting}
                                                     aria-invalid={Boolean(
                                                         lineErr?.quantity,
@@ -640,7 +639,7 @@ export function InvoiceForm({
                                                     aria-label={`Line ${i + 1}: price each, ${currency}`}
                                                     inputMode="decimal"
                                                     placeholder="₹ each"
-                                                    className="h-9 rounded-[8px] text-[13px] tabular-nums"
+                                                    className="tabular-nums"
                                                     disabled={isSubmitting}
                                                     aria-invalid={Boolean(
                                                         lineErr?.unitPrice,
@@ -683,10 +682,11 @@ export function InvoiceForm({
                                                     )}
                                                 />
                                                 <Input
+                                                    dense
                                                     aria-label={`Line ${i + 1}: HSN or SAC`}
                                                     placeholder="HSN / SAC"
                                                     inputMode="numeric"
-                                                    className="h-8 rounded-[8px] font-mono text-[12px]"
+                                                    className="font-mono"
                                                     disabled={isSubmitting}
                                                     aria-invalid={Boolean(
                                                         lineErr?.hsnSac,

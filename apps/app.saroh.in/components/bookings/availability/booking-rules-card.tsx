@@ -45,6 +45,7 @@ export function BookingRulesCard({
                 <div key={r.key} className="flex items-center gap-2 py-1.5">
                     <span className="flex-1 text-[13px]">{r.label}</span>
                     <OptionSelect
+                        size="sm"
                         aria-label={r.label}
                         disabled={!canEdit}
                         value={
@@ -55,7 +56,7 @@ export function BookingRulesCard({
                                 x[r.key] = v === "" ? null : Number(v);
                             })
                         }
-                        className="h-8 w-auto rounded-[8px] text-[12.5px]"
+                        className="w-auto"
                         options={r.options}
                     />
                 </div>
@@ -77,6 +78,7 @@ export function BookingRulesCard({
                     {REFUND_POLICY.label}
                 </span>
                 <OptionSelect
+                    size="sm"
                     aria-label={REFUND_POLICY.label}
                     aria-describedby="refund-policy-hint"
                     disabled={!canEdit}
@@ -86,7 +88,7 @@ export function BookingRulesCard({
                             x.refundInTimeCancels = v === "refund";
                         })
                     }
-                    className="h-8 w-auto rounded-[8px] text-[12.5px]"
+                    className="w-auto"
                     options={[...REFUND_POLICY.options]}
                 />
             </div>

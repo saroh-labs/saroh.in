@@ -118,19 +118,20 @@ export function AddPagePanel({
                     }}
                 >
                     <Input
+                        dense
                         autoFocus
                         value={title}
                         onChange={(e) => setTitle(e.target.value)}
                         placeholder="Page name"
                         aria-label="Page name"
-                        className="h-8 text-xs"
                     />
                     <Input
+                        dense
                         value={path}
                         onChange={(e) => setPath(e.target.value)}
                         placeholder="/about"
                         aria-label="Page address"
-                        className="h-8 font-mono text-xs"
+                        className="font-mono"
                     />
                     <div className="flex gap-1">
                         <Button

@@ -63,6 +63,7 @@ export function VariantAddRow({
             <p className="mb-2 text-[12px] font-semibold">Add a variant</p>
             <div className="grid grid-cols-[minmax(0,2fr)_minmax(0,1.4fr)_minmax(0,1fr)] gap-1.5">
                 <OptionSelect
+                    size="sm"
                     value={value}
                     onValueChange={onValue}
                     options={values.map((x) => ({
@@ -75,7 +76,6 @@ export function VariantAddRow({
                     placeholder={`Pick a ${opt}`}
                     disabled={locked || values.length === 0}
                     aria-label={`New variant ${opt}`}
-                    className="h-8 rounded-[8px] text-[13px]"
                 />
                 <Input
                     dense

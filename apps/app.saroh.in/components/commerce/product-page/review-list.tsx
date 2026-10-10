@@ -123,7 +123,7 @@ export function ReviewList({
                                         }
                                         placeholder="Shown under the review, on the shop"
                                         disabled={pending}
-                                        className="min-h-0 rounded-[8px] px-2.5 py-2 text-[13px] leading-[1.5]"
+                                        className="min-h-0 px-2.5 py-2 leading-[1.5]"
                                     />
                                     <div className="mt-1.5 flex items-center gap-[7px]">
                                         <Button

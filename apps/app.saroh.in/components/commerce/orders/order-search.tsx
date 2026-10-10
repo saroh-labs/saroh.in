@@ -58,7 +58,7 @@ export function SearchField({
                 }}
                 placeholder="Search orders"
                 aria-label="Search orders"
-                className="h-[38px] pl-[34px] text-[13.5px] coarse:h-11"
+                className="pl-[34px]"
             />
         </div>
     );

@@ -724,7 +724,7 @@ function SecretField({
                 autoComplete="off"
                 spellCheck={false}
                 value={value}
-                className="font-mono text-[12.5px]"
+                className="font-mono"
                 aria-invalid={invalid ? true : undefined}
                 aria-describedby={describedBy ?? (hint ? hintId : undefined)}
                 onChange={(e) => onChange(e.target.value)}

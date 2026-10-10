@@ -62,7 +62,6 @@ export function NameField({
                 disabled={disabled}
                 aria-invalid={!!error}
                 aria-describedby={error ? "collection-name-error" : undefined}
-                className="h-9 rounded-[8px] text-[13px]"
             />
             <FieldError id="collection-name-error">{error}</FieldError>
         </div>
@@ -96,7 +95,7 @@ export function DescriptionField({
                 disabled={disabled}
                 placeholder="What's in it, in a line."
                 aria-invalid={!!error}
-                className="rounded-[8px] text-[13px] leading-[1.55]"
+                className="leading-[1.55]"
             />
             <FieldError>{error}</FieldError>
         </div>
@@ -144,7 +143,6 @@ export function CategoryField({
                     placeholder="Pick a category"
                     disabled={disabled}
                     aria-invalid={!!error}
-                    className="h-9 rounded-[8px] text-[13px]"
                 />
             )}
             <p className="text-[11.5px] leading-[1.5] text-muted-foreground">

@@ -269,11 +269,12 @@ export function SubscriptionsScreen({
                                 className="pointer-events-none absolute left-2.5 size-3.5 text-muted-foreground"
                             />
                             <Input
+                                dense
                                 type="search"
                                 value={query}
                                 onChange={(e) => setQuery(e.target.value)}
                                 placeholder="Search by name or plan"
-                                className="h-8 rounded-[8px] pl-8 text-[12.5px]"
+                                className="pl-8"
                             />
                         </label>
                     ) : null}

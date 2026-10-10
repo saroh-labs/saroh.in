@@ -83,7 +83,6 @@ export function PayLinkPanel({
                             readOnly
                             value={link.url}
                             onFocus={(e) => e.currentTarget.select()}
-                            className="h-9 rounded-[9px] text-[12.5px]"
                         />
                     </div>
                     <p className="text-[12.5px] leading-[1.5] text-muted-foreground">

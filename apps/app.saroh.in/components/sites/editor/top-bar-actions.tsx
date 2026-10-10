@@ -173,7 +173,7 @@ export function TopBarActions({
                         value: String(z),
                         label: z === "fit" ? "Fit" : `${z}%`,
                     }))}
-                    className="h-8 w-[4.75rem] tabular-nums text-muted-foreground coarse:h-11"
+                    className="w-[4.75rem] tabular-nums text-muted-foreground"
                 />
             </div>
 

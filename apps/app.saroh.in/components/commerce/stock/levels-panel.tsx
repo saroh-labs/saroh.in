@@ -152,12 +152,13 @@ export function LevelsPanel({
                     ))}
                 </div>
                 <Input
+                    dense
                     type="search"
                     value={search}
                     onChange={(e) => setSearch(e.target.value)}
                     placeholder="Find a product or SKU"
                     aria-label="Find a product or SKU"
-                    className="ml-auto h-8 w-[220px] max-w-full rounded-[8px] bg-card px-[11px] text-[12.5px] coarse:h-11"
+                    className="ml-auto w-[220px] max-w-full bg-card px-[11px]"
                 />
             </div>
 

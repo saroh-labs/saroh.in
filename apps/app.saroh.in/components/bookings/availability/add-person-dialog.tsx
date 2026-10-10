@@ -117,7 +117,7 @@ export function AddPersonDialog({
                         id={ids.name}
                         value={name}
                         onChange={(e) => setName(e.target.value)}
-                        className="mt-1 h-9"
+                        className="mt-1"
                         aria-invalid={Boolean(error)}
                         autoComplete="off"
                     />
@@ -135,7 +135,7 @@ export function AddPersonDialog({
                         value={title}
                         placeholder="Trainer, Yoga teacher…"
                         onChange={(e) => setTitle(e.target.value)}
-                        className="mt-1 h-9"
+                        className="mt-1"
                         autoComplete="off"
                     />
                     {error ? (

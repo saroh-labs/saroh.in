@@ -239,7 +239,7 @@ export function PeopleSection({
                                                             options={
                                                                 ROLE_OPTIONS
                                                             }
-                                                            className="w-32 coarse:h-11"
+                                                            className="w-32"
                                                         />
                                                         <Button
                                                             type="button"

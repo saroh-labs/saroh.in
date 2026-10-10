@@ -103,7 +103,7 @@ export function WebhookAddressStep({
                                 id={urlId}
                                 readOnly
                                 value={url}
-                                className="min-w-0 flex-1 font-mono text-[12px]"
+                                className="min-w-0 flex-1 font-mono"
                                 onFocus={(e) => e.currentTarget.select()}
                             />
                             <Button
@@ -198,7 +198,7 @@ export function WebhookSecretStep({
                         aria-required
                         aria-describedby={hintId}
                         value={value}
-                        className="min-w-0 flex-[1_1_180px] font-mono text-[12.5px]"
+                        className="min-w-0 flex-[1_1_180px] font-mono"
                         onChange={(e) => onChange(e.target.value)}
                     />
                     <Button

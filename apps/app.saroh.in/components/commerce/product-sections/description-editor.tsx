@@ -394,7 +394,7 @@ function DescriptionSurface({
                     disabled={disabled}
                     rows={8}
                     aria-label="Description as HTML"
-                    className="min-h-[150px] rounded-none border-0 px-[13px] py-3 font-mono text-[12px] leading-[1.6] focus-visible:ring-0"
+                    className="min-h-[150px] rounded-none border-0 px-[13px] py-3 font-mono leading-[1.6] focus-visible:ring-0"
                 />
             ) : (
                 <EditorContent editor={editor} />
@@ -510,7 +510,7 @@ function LinkTool({
                         value={href}
                         onChange={(e) => setHref(e.target.value)}
                         placeholder="https://… or /about"
-                        className="font-mono text-[12px]"
+                        className="font-mono"
                     />
                     <div className="flex gap-2">
                         <Button type="submit" size="sm">
