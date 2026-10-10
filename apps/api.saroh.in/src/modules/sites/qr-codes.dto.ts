@@ -9,6 +9,8 @@ import {
     ValidateIf,
 } from "class-validator";
 
+import type { QrPrintFormat } from "./qr-print";
+import { QR_PRINT_FORMATS } from "./qr-print";
 import type { QrPlace, QrStyle, QrTargetKind } from "./qr-target";
 import { QR_PLACES, QR_STYLES, QR_TARGET_KINDS } from "./qr-target";
 
@@ -131,4 +133,13 @@ export class QrScanDto {
     @IsOptional()
     @IsBoolean()
     head?: boolean;
+}
+
+/** Which print file: `?format=standee|tent|sticker|card`. */
+export class QrPrintQueryDto {
+    @Transform(lower)
+    @IsIn(QR_PRINT_FORMATS, {
+        message: "Choose a print format: standee, tent, sticker or card",
+    })
+    format!: QrPrintFormat;
 }

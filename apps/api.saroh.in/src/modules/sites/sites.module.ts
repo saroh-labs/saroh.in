@@ -7,6 +7,7 @@ import { CapabilitiesModule } from "../capabilities/capabilities.module";
 import { FeatureFlagModule } from "../feature-flags/feature-flags.module";
 import { JobHandlerRegistry } from "../jobs/job-handler.registry";
 import { JobsModule } from "../jobs/jobs.module";
+import { MediaStorageModule } from "../media/media-storage.module";
 import { OrganizationsModule } from "../organizations/organizations.module";
 import { GoLiveHandler, SITE_GO_LIVE_TYPE } from "./go-live.handler";
 import { SITE_PAGES_REVALIDATE_TYPE } from "./page-cache-revalidate";
@@ -19,6 +20,7 @@ import { PublicSitesController } from "./public-sites.controller";
 import { PublicVisitService } from "./public-visit.service";
 import { QrCodesController } from "./qr-codes.controller";
 import { QrCodesService } from "./qr-codes.service";
+import { QrPrintService } from "./qr-print.service";
 import { SitePreviewLinksService } from "./site-preview-links.service";
 import { SiteTrackingController } from "./site-tracking.controller";
 import { SiteTrackingService } from "./site-tracking.service";
@@ -46,6 +48,8 @@ import { TestReleasesService } from "./test-releases.service";
         CapabilitiesModule,
         FeatureFlagModule,
         JobsModule,
+        // The business logo's bytes, for a QR print file.
+        MediaStorageModule,
     ],
     controllers: [
         SitesController,
@@ -64,6 +68,7 @@ import { TestReleasesService } from "./test-releases.service";
         PublicFooterService,
         PublicHeadService,
         QrCodesService,
+        QrPrintService,
         PublicQrService,
         GoLiveHandler,
         PageCacheRevalidateHandler,

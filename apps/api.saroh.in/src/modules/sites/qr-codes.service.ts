@@ -16,7 +16,7 @@ import type {
     QrCodeView,
     QrSiteRow,
 } from "./qr-codes.view";
-import { QR_CODE_SELECT, qrCodesView } from "./qr-codes.view";
+import { QR_CODE_SELECT, qrCodesView, qrShortLink } from "./qr-codes.view";
 import {
     newQrCode,
     QR_BRANDING_ROW,
@@ -216,6 +216,22 @@ export class QrCodesService {
             site,
             await this.code(organizationId, siteId, qrCodeId),
         );
+    }
+
+    /**
+     * One code as stored, with its short link, for a reader that draws it
+     * (`qr-print.service.ts`). Reading a code is reading the site:
+     * `site:read`; another business's site or code is a 404.
+     */
+    async stored(
+        ctx: OrganizationContext,
+        siteId: string,
+        qrCodeId: string,
+    ): Promise<{ row: QrCodeRow; link: string | null }> {
+        authorize(ctx, "site:read");
+        const site = await this.site(ctx, siteId);
+        const row = await this.code(ctx.organizationId, siteId, qrCodeId);
+        return { row, link: qrShortLink(site, row.code) };
     }
 
     /** The site, proved to be this business's; another's is a 404. */

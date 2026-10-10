@@ -101,6 +101,20 @@ export const QR_CODE_SELECT = {
     updatedAt: true,
 } as const;
 
+/**
+ * A code's short link, `https://<address>.saroh.app/q/<code>`: what its QR
+ * holds, on the screen and on paper. Always the Saroh address, never the
+ * custom domain (DEC-069). Null when the site has no address.
+ */
+export function qrShortLink(
+    site: { subdomain: string | null },
+    code: string,
+): string | null {
+    return site.subdomain
+        ? `${platformOrigin(site.subdomain)}/q/${code}`
+        : null;
+}
+
 /** The first day of the list's recent window: UTC midnight, six days back. */
 export function recentSince(now: Date): Date {
     const day = new Date(
@@ -184,7 +198,7 @@ export async function qrCodesView(
             return {
                 id: r.id,
                 code: r.code,
-                link: origin ? `${origin}/q/${r.code}` : null,
+                link: qrShortLink(site, r.code),
                 target: {
                     kind: r.targetKind as QrTargetKind,
                     ref: r.targetRef,
