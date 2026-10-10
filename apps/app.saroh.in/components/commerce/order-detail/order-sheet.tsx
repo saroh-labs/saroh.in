@@ -3,7 +3,14 @@
 import { cn } from "@saroh/ui/lib/utils";
 import { Sheet } from "@saroh/ui/sheet";
 import type { ReactNode } from "react";
-import { useCallback, useRef, useState } from "react";
+import {
+    createContext,
+    useCallback,
+    useContext,
+    useEffect,
+    useRef,
+    useState,
+} from "react";
 
 import {
     ACTION_SHEET_FORM,
@@ -63,10 +70,13 @@ export function useOrderPanel() {
  * what the change does to the money with the button that makes it
  * (`OrderSheetFoot`).
  *
- * Nothing is recorded until that button. Cancel, Escape, the close button
- * and a press outside drop what was typed, and none of them works while a
- * save is on its way (`busy`). A refusal leaves it open with what was
- * typed: the hook that saves closes it only on success.
+ * Nothing is recorded until that button. The way out (Cancel, or "Keep
+ * order" on the cancel sheet), Escape and the close button drop what was
+ * typed. A press outside does too until something is chosen or typed
+ * (`useOrderSheetDraft`), and after that it does nothing: a stray tap must
+ * not throw the change away. None of them works while a save is on its way
+ * (`busy`). A refusal leaves it open with what was typed: the hook that
+ * saves closes it only on success.
  */
 export function OrderSheet({
     open,
@@ -90,6 +100,8 @@ export function OrderSheet({
     returnFocus?: () => void;
     children: ReactNode;
 }) {
+    // Said by the draft inside (`useOrderSheetDraft`).
+    const [dirty, setDirty] = useState(false);
     return (
         <Sheet
             open={open}
@@ -100,6 +112,7 @@ export function OrderSheet({
             <ActionSheetContent
                 title={title}
                 description={description}
+                dirty={dirty || busy}
                 // Off the paper: "Packing slip" prints the page behind it.
                 className={cn("print:hidden", wide && "sm:max-w-lg")}
                 onCloseAutoFocus={(event) => {
@@ -107,10 +120,31 @@ export function OrderSheet({
                     returnFocus?.();
                 }}
             >
-                <div className={ACTION_SHEET_FORM}>{children}</div>
+                <SheetDirty.Provider value={setDirty}>
+                    <div className={ACTION_SHEET_FORM}>{children}</div>
+                </SheetDirty.Provider>
             </ActionSheetContent>
         </Sheet>
     );
+}
+
+const SheetDirty = createContext<(dirty: boolean) => void>(() => undefined);
+
+/**
+ * What is chosen and typed in an order sheet, told to the sheet: once it
+ * differs from what the sheet opened with, a press outside no longer
+ * closes it. Call it once in the sheet's draft, with every value the
+ * person can change.
+ */
+export function useOrderSheetDraft(draft: unknown) {
+    const setDirty = useContext(SheetDirty);
+    const now = JSON.stringify(draft);
+    const [first] = useState(now);
+    const dirty = now !== first;
+    useEffect(() => {
+        setDirty(dirty);
+        return () => setDirty(false);
+    }, [dirty, setDirty]);
 }
 
 /** The fields scroll; the inset keeps a focus ring from being clipped. */
@@ -123,23 +157,32 @@ export function OrderSheetBody({ children }: { children: ReactNode }) {
 }
 
 /**
- * Always on screen under the fields: what saving does (`note`), then
- * Cancel and the sheet's own button, which stack on a phone with the
+ * Always on screen under the fields: what saving does (`note`), then the
+ * way out and the sheet's own button, which stack on a phone with the
  * button on top.
+ *
+ * The way out reads "Cancel" unless the sheet's own button cancels
+ * something: beside "Cancel order" it is "Keep order" (`dismiss`), so the
+ * two never read as the same thing.
  */
 export function OrderSheetFoot({
     busy = false,
+    dismiss = "Cancel",
     note,
     children,
 }: {
     busy?: boolean;
+    /** The way out's label. */
+    dismiss?: string;
     note?: ReactNode;
     children: ReactNode;
 }) {
     return (
         <div className="border-t border-border pt-3">
             {note}
-            <ActionSheetFooter busy={busy}>{children}</ActionSheetFooter>
+            <ActionSheetFooter busy={busy} cancel={dismiss}>
+                {children}
+            </ActionSheetFooter>
         </div>
     );
 }

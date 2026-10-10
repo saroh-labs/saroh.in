@@ -10,7 +10,12 @@ import type { DeliveryAddress, OrderReadLine } from "@/lib/orders/read";
 import type { Sellable } from "@/lib/orders/sellables";
 import { addedLines } from "@/lib/orders/sellables";
 
-import { OrderSheet, OrderSheetBody, OrderSheetFoot } from "./order-sheet";
+import {
+    OrderSheet,
+    OrderSheetBody,
+    OrderSheetFoot,
+    useOrderSheetDraft,
+} from "./order-sheet";
 import { FOCUS } from "./parts";
 
 const FIELD =
@@ -102,6 +107,7 @@ function EditDraft({
     );
     const [addr, setAddr] = useState<AddressDraft>(() => draftOf(address));
     const [added, setAdded] = useState<Sellable[]>([]);
+    useOrderSheetDraft([qty, addr, added.map((a) => a.key)]);
 
     const was = draftOf(address);
     const addressChanged =
