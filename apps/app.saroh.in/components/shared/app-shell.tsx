@@ -9,6 +9,7 @@ import { AppHeader } from "@/components/shared/app-header";
 import { AppSidebar } from "@/components/shared/app-sidebar";
 import { BusinessZoneProvider } from "@/components/shared/business-zone";
 import { CommandMenu } from "@/components/shared/command-menu";
+import { LiveRefresh } from "@/components/shared/live-refresh";
 import type { NavCounts } from "@/components/shared/nav-items";
 import { NOTIFICATIONS_NAV, navCan } from "@/components/shared/nav-items";
 import {
@@ -234,6 +235,18 @@ export async function AppShell({ children }: { children: React.ReactNode }) {
              * both (#313). It comes off the resolved active organization, so
              * switching workspaces changes it with everything else.
              */}
+            {/*
+             * The page reads again by itself, the unread count sits in the
+             * tab's title, and "signed out" gets its Sign in button (10 Oct
+             * 2026). Draws nothing.
+             */}
+            <LiveRefresh
+                unread={
+                    navCan({ role, actions }, NOTIFICATIONS_NAV.action)
+                        ? unread
+                        : null
+                }
+            />
             <CommandMenu
                 moduleKeys={moduleKeys}
                 role={role}

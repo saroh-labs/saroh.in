@@ -31,6 +31,11 @@ describe("middleware matcher", () => {
         expect(images.filter(gated)).toEqual([]);
     });
 
+    it("lets the web app manifest through, so the app can be installed", () => {
+        // A browser fetches it without the visitor's cookies.
+        expect(gated("/manifest.webmanifest")).toBe(false);
+    });
+
     it("still gates the app's pages", () => {
         for (const page of [
             "/",

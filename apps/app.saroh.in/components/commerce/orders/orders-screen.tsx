@@ -7,6 +7,7 @@ import { useRouter } from "next/navigation";
 import { useCallback, useState, useTransition } from "react";
 
 import { SinceNotice } from "@/components/shared/since-notice";
+import { useArrivals } from "@/components/shared/use-arrivals";
 import { StorefrontFilter } from "@/components/stores/storefront-filter";
 import type { CustomerPick } from "@/lib/customers/picker";
 import { useNarrow } from "@/lib/hooks/use-narrow";
@@ -152,6 +153,13 @@ export function OrdersScreen({
     const peek = rows.find((r) => r.id === peekId) ?? null;
     // Bulk moves (B6): whoever moves kitchen steps; the API decides again.
     const pick = useOrderSelection(rows, ordersHref(query, {}));
+    // An order that came in while the list was open (live refresh): it
+    // enters, and wears an edge until touched. A change of tab, filter or
+    // page is the person's own doing, so nothing in it is new.
+    const arrivals = useArrivals(
+        rows.map((r) => r.id),
+        ordersHref(query, {}),
+    );
     const selectable = can.stage;
 
     const go = useCallback(
@@ -322,6 +330,8 @@ export function OrdersScreen({
                                         }
                                         open={row.id === peekId}
                                         onOpen={() => setPeekId(row.id)}
+                                        arrived={arrivals.isNew(row.id)}
+                                        onTouch={() => arrivals.touch(row.id)}
                                         menu={
                                             <OrderRowMenu row={row} can={can} />
                                         }
@@ -344,6 +354,8 @@ export function OrdersScreen({
                                     }
                                     open={row.id === peekId}
                                     onOpen={() => setPeekId(row.id)}
+                                    arrived={arrivals.isNew(row.id)}
+                                    onTouch={() => arrivals.touch(row.id)}
                                 />
                             ))}
                         </ul>

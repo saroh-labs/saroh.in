@@ -47,6 +47,18 @@
     animation-delay: calc(min(var(--wk-i, 0), 6) * 20ms);
 }
 
+/* ─── A row that arrived by itself ───────────────────────────────────────────
+   A list that reads again on its own (`useLiveRefresh`) may come back with a
+   row that wasn't there: a new order, a new thing that needs you. It enters
+   as `.wk-item` does and wears a 2px edge in Ink until it is touched
+   (`use-arrivals.ts`). Neutral on purpose: Saffron marks the current page,
+   and a warning colour would say something is wrong. The edge is drawn, not
+   animated, so it reads the same under reduced motion. */
+
+.wk-arrived {
+    box-shadow: inset 2px 0 0 hsl(var(--foreground));
+}
+
 /* ─── Interactive surfaces ───────────────────────────────────────────────────
    A card that can be clicked says so on hover with one step of its edge, from
    `--border` to `--border-strong`. It no longer lifts: a card that rises and
