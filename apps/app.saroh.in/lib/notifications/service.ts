@@ -41,6 +41,12 @@ export interface Notification {
     reviewId: string | null;
     /** A customer's message (UX-014): the customer whose thread it opens. */
     contactId?: string | null;
+    /**
+     * What the row opens (10 Oct 2026): the kind of thing and its id, or a
+     * kind alone for a page. Read through `notificationHref` (`href.ts`),
+     * which also reads an API that sends none yet.
+     */
+    target?: { kind: string; id: string | null } | null;
     readAt: string | null;
     createdAt: string;
 }
@@ -99,20 +105,55 @@ export async function markNotificationRead(
     return { ok: false, error: readError(data, "Could not mark as read") };
 }
 
-/** Mark every notification in the active org read. */
+/**
+ * Mark every notification in the active org read. `readAt` is the instant
+ * they were stamped with, which its Undo hands back; null from an API that
+ * can't undo it yet.
+ */
 export async function markAllNotificationsRead(): Promise<
-    NotificationsResult<{ updated: number }>
+    NotificationsResult<{ updated: number; readAt: string | null }>
 > {
     const base = await notificationsBase();
     if (!base) return { ok: false, error: "No active organization." };
     const res = await apiFetch(`${base}/read-all`, { method: "POST" });
     const data = (await res.json().catch(() => null)) as {
         updated?: number;
+        readAt?: string;
+        message?: string;
+        error?: string;
+    } | null;
+    if (res.ok) {
+        return {
+            ok: true,
+            data: {
+                updated: data?.updated ?? 0,
+                readAt: data?.readAt ?? null,
+            },
+        };
+    }
+    return { ok: false, error: readError(data, "Could not mark all as read") };
+}
+
+/** Undo that press: what it marked read, and only that, is unread again. */
+export async function undoMarkAllNotificationsRead(
+    readAt: string,
+): Promise<NotificationsResult<{ updated: number }>> {
+    const base = await notificationsBase();
+    if (!base) return { ok: false, error: "No active organization." };
+    const res = await apiFetch(`${base}/read-all/undo`, {
+        method: "POST",
+        body: JSON.stringify({ readAt }),
+    });
+    const data = (await res.json().catch(() => null)) as {
+        updated?: number;
         message?: string;
         error?: string;
     } | null;
     if (res.ok) return { ok: true, data: { updated: data?.updated ?? 0 } };
-    return { ok: false, error: readError(data, "Could not mark all as read") };
+    return {
+        ok: false,
+        error: readError(data, "Couldn't mark them unread again."),
+    };
 }
 
 // ---- Your alerts (round-2 F14) ---------------------------------------------
