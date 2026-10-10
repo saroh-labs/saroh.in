@@ -63,6 +63,12 @@ refusal keeps the sheet open with what was typed, Cancel, Escape and the
 close button drop the draft, it can't be dismissed while saving, each
 opening is a fresh draft (a `key` per opening) and the keyboard returns to
 the row's Edit. A link opens one with `?edit=` (`lib/stores/place-rows.ts`).
+Product settings' lists (`components/commerce/product-settings/`) are the
+same rule for a list you manage: `NameDialog` for a one-field add or rename,
+`SettingsSheet` for anything with more (an option's name and values, a
+field, a merge), each opened by its own trigger so the keyboard returns to
+it, and `ConfirmDialog` (`returnFocusTo`) before a delete. No row turns
+into a form, and the task finishes inside what opened.
 
 ## Rules
 
