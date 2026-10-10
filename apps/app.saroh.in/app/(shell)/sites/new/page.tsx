@@ -87,11 +87,12 @@ export default async function NewSitePage({
             <PageContainer width="form">
                 <PageHeader title="Create a site" />
                 <EmptyState
+                    data-ph-mask=""
                     icon={<Globe />}
                     title={`${name} is this business's website`}
                     description="A business has one website. Its pages, posts, look and address are all changed from Website."
                     action={
-                        <Button asChild variant="outline">
+                        <Button data-ph-mask="" asChild variant="outline">
                             <Link href={`/sites/${existing.id}/pages`}>
                                 Go to {name}
                             </Link>

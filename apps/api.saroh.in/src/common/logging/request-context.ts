@@ -11,6 +11,14 @@ export const RESPONSE_ID_HEADER = "X-Request-Id";
 
 export interface RequestContext {
     correlationId: string;
+    /** The request's method, for an error reported from outside Nest. */
+    method?: string;
+    /**
+     * The path asked for, without its query string. It can still hold a
+     * token (a password-reset link's), so it is reduced to a route's shape
+     * before it is logged or sent anywhere.
+     */
+    path?: string;
 }
 
 /**
@@ -23,4 +31,9 @@ export const correlationStorage = new AsyncLocalStorage<RequestContext>();
 /** Correlation id of the in-flight request, or undefined outside a request. */
 export function getCorrelationId(): string | undefined {
     return correlationStorage.getStore()?.correlationId;
+}
+
+/** The in-flight request's id, method and path, or undefined outside one. */
+export function getRequestContext(): RequestContext | undefined {
+    return correlationStorage.getStore();
 }

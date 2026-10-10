@@ -234,6 +234,7 @@ function ChangeForm({
                                 ) : null}
                                 {suggestion ? (
                                     <Button
+                                        data-ph-mask=""
                                         type="button"
                                         variant="link"
                                         size="sm"

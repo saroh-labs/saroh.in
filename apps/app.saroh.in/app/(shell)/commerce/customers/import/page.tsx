@@ -52,6 +52,7 @@ export default async function ImportCustomersPage({
     return (
         <PageContainer width="default">
             <PageHeader
+                holdsData="description"
                 breadcrumb={[
                     "Sell",
                     <Link

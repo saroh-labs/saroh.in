@@ -13,7 +13,8 @@ import {
 
 /**
  * "Help improve Saroh" (DEC-125), Settings › Your profile: whether this
- * person shares how they use the workspace as masked recordings. Shown only
+ * person shares how they use the workspace as recordings in which their
+ * customers' details and anything typed are hidden. Shown only
  * where recording is switched on at all; on unless they turn it off.
  *
  * Turning it off stops the recorder in this tab before the save is even
@@ -96,10 +97,12 @@ export function UsageSharingCard({ on }: { on: boolean }) {
                 </button>
             </div>
             <p className="text-pretty border-t border-border/70 bg-muted/50 px-[18px] py-3 text-[12.5px] text-foreground/80">
-                Saroh sometimes records how the workspace is used, to find what
-                is confusing or broken. Every word, number and field is hidden
-                in a recording, and pictures are left out. Only for you, on
-                every device; your team chooses for themselves.
+                Saroh records how the workspace is used, to find what is
+                confusing or broken. A recording shows Saroh&rsquo;s own
+                buttons, menus and labels. Your customers&rsquo; details, your
+                figures and anything you type are hidden, and pictures are left
+                out. Only for you, on every device; your team chooses for
+                themselves.
             </p>
         </section>
     );

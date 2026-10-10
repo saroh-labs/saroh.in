@@ -26,6 +26,7 @@ export default async function DiscountPage({
     return (
         <PageContainer width="form">
             <PageHeader
+                holdsData
                 breadcrumb={["Sell", "Discounts", discount.code]}
                 title={<span className="font-mono">{discount.code}</span>}
             />

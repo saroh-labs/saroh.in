@@ -179,6 +179,7 @@ export function WebsiteHeader({
     return (
         <div className="flex flex-col gap-5">
             <PageHeader
+                holdsData="description"
                 title="Website"
                 className="mb-0"
                 description={
@@ -436,6 +437,7 @@ function SitePicker({
         <DropdownMenu>
             <DropdownMenuTrigger asChild>
                 <Button
+                    data-ph-mask=""
                     variant="outline"
                     className="h-[38px] max-w-[260px] gap-[7px] px-[13px] text-[13px] font-medium text-neutral-600 dark:text-foreground"
                     aria-label={`Website: ${site.name}. Change it.`}

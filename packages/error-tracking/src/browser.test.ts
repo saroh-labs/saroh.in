@@ -1,15 +1,23 @@
 import { describe, expect, it, vi } from "vitest";
 
-import type { BrowserSdk, ReplayFacts } from "./browser";
+import type { BrowserSdk, ReplayFacts, SiteReplayFacts } from "./browser";
 import {
     createBrowserTracking,
     errorsBeforeSend,
     errorsConfig,
+    hideFigures,
+    maskWorkspaceAttribute,
+    maskWorkspaceText,
     REPLAY_BLOCK_SELECTOR,
     REPLAY_SAMPLE_RATE,
     replayBeforeSend,
     replayConfig,
     replayDecision,
+    replayReadable,
+    replaySampleRate,
+    SITE_REPLAY_BLOCK_SELECTOR,
+    siteReplayConfig,
+    siteReplayDecision,
 } from "./browser";
 import { MAX_BROWSER_EXCEPTIONS_PER_SESSION } from "./names";
 
@@ -57,6 +65,7 @@ const ALLOWED: ReplayFacts = {
     globalPrivacyControl: undefined,
     inWorkspaceShell: true,
     userId: "user_1",
+    noticeShown: true,
 };
 
 describe("createBrowserTracking without a key", () => {
@@ -256,6 +265,8 @@ describe("replayDecision", () => {
         [{ globalPrivacyControl: true }, "browser-signal"],
         [{ inWorkspaceShell: false }, "outside-shell"],
         [{ userId: undefined }, "no-user"],
+        // Nobody is recorded before the notice has been shown to them.
+        [{ noticeShown: false }, "not-told"],
         [{ app: "auth" as const }, "not-workspace"],
         [{ app: "admin" as const }, "not-workspace"],
         [{ app: "web" as const }, "not-workspace"],
@@ -290,6 +301,7 @@ describe("replay", () => {
         organizationId: "org_1",
         sharesUsage: true,
         inWorkspaceShell: true,
+        noticeShown: true,
         doNotTrack: null,
         globalPrivacyControl: false,
     };
@@ -318,7 +330,11 @@ describe("replay", () => {
             advanced_disable_feature_flags: true,
             disable_external_dependency_loading: true,
             session_recording: {
+                // Every text node goes to the function, which unmasks only
+                // what is marked as Saroh's own words.
                 maskTextSelector: "*",
+                maskTextFn: maskWorkspaceText,
+                maskAttributeFn: maskWorkspaceAttribute,
                 maskAllInputs: true,
                 blockSelector: REPLAY_BLOCK_SELECTOR,
                 blockClass: "ph-no-capture",
@@ -352,8 +368,23 @@ describe("replay", () => {
             "[data-ph-block]",
         ])
             expect(REPLAY_BLOCK_SELECTOR.split(", ")).toContain(part);
-        expect(REPLAY_SAMPLE_RATE).toBeGreaterThan(0);
-        expect(REPLAY_SAMPLE_RATE).toBeLessThanOrEqual(0.2);
+    });
+
+    it("records every allowed session unless the environment says a share", async () => {
+        expect(REPLAY_SAMPLE_RATE).toBe(1);
+        expect(replaySampleRate(undefined)).toBe(1);
+        expect(replaySampleRate("")).toBe(1);
+        expect(replaySampleRate("0.25")).toBe(0.25);
+        expect(replaySampleRate("0")).toBe(0);
+        // Not a share from 0 to 1: ignored, never guessed at.
+        for (const bad of ["2", "-0.1", "half", "NaN", "20%"])
+            expect(replaySampleRate(bad)).toBe(1);
+
+        const { tracking, instances } = workspace({ replaySample: "0.5" });
+        await tracking.startReplay(facts);
+        expect(instances[0].config.session_recording).toMatchObject({
+            sampleRate: 0.5,
+        });
     });
 
     it.each([
@@ -365,6 +396,7 @@ describe("replay", () => {
         ["Global Privacy Control is set", {}, { globalPrivacyControl: true }],
         ["it is outside the workspace shell", {}, { inWorkspaceShell: false }],
         ["nobody is signed in", {}, { userId: undefined }],
+        ["the notice has not been shown", {}, { noticeShown: false }],
         ["the app is accounts", { app: "auth" }, {}],
         ["the app is admin", { app: "admin" }, {}],
         ["the app is saroh.in", { app: "web" }, {}],
@@ -441,5 +473,306 @@ describe("replay", () => {
         expect(config.disable_session_recording).toBe(true);
         expect(config.advanced_disable_flags).toBe(false);
         expect(config.advanced_disable_feature_flags).toBe(true);
+    });
+});
+
+/** An element as the recorder hands it over: `closest`, and its tag. */
+function under(...marks: string[]) {
+    return {
+        tagName: "SPAN",
+        closest: (selector: string) =>
+            marks.some((mark) => selector === `[${mark}]`) ? {} : null,
+    };
+}
+
+describe("what a workspace recording can read (DEC-125, 10 Oct)", () => {
+    it("masks every character unless the words are marked as Saroh's own", () => {
+        expect(maskWorkspaceText("Asha Rao", under())).toBe("**** ***");
+        expect(maskWorkspaceText("Save changes", under("data-ph-unmask"))).toBe(
+            "Save changes",
+        );
+    });
+
+    it("a masked mark wins over an unmasked one, above or below it", () => {
+        const both = under("data-ph-unmask", "data-ph-mask");
+        expect(replayReadable(both)).toBe(false);
+        expect(maskWorkspaceText("Asha Rao", both)).toBe("**** ***");
+    });
+
+    it("masks what it can't place: no element, or one that can't be asked", () => {
+        expect(maskWorkspaceText("Asha", undefined)).toBe("****");
+        expect(maskWorkspaceText("Asha", null)).toBe("****");
+        expect(maskWorkspaceText("Asha", {})).toBe("****");
+        expect(
+            maskWorkspaceText("Asha", {
+                closest: () => {
+                    throw new Error("detached");
+                },
+            }),
+        ).toBe("****");
+    });
+
+    it("hides digits and emails even in readable words", () => {
+        const safe = under("data-ph-unmask");
+        expect(maskWorkspaceText("Take ₹1,250.00", safe)).toBe(
+            "Take ₹*,***.**",
+        );
+        expect(maskWorkspaceText("Step 2 of 4", safe)).toBe("Step * of *");
+        expect(maskWorkspaceText("Sent to asha@example.com today", safe)).toBe(
+            "Sent to **************** today",
+        );
+        expect(hideFigures("+91 98765 43210")).toBe("+** ***** *****");
+        // Other scripts' digits too.
+        expect(hideFigures("₹१२३")).toBe("₹***");
+    });
+
+    // CodeQL js/polynomial-redos (PR #927): this ran on every text node as
+    // one pattern around the `@`, which backtracked on a long run without one.
+    it("stays fast on a long run of text with no @ in it", () => {
+        const hostile = "!".repeat(200_000);
+        const started = performance.now();
+        expect(hideFigures(hostile)).toBe(hostile);
+        expect(performance.now() - started).toBeLessThan(500);
+        expect(hideFigures("mail a@b.co\tnow\nok")).toBe(
+            "mail ******\tnow\nok",
+        );
+    });
+
+    it("keeps whitespace, so the page keeps its shape", () => {
+        expect(maskWorkspaceText("  a b\n c ", under())).toBe("  * *\n * ");
+    });
+
+    it("masks the attributes that hold words, by the same rule", () => {
+        expect(maskWorkspaceAttribute("title", "Asha Rao", under())).toBe(
+            "**** ***",
+        );
+        expect(
+            maskWorkspaceAttribute("aria-label", "Open Asha Rao", under()),
+        ).toBe("**** **** ***");
+        expect(maskWorkspaceAttribute("placeholder", "Search", under())).toBe(
+            "******",
+        );
+        expect(
+            maskWorkspaceAttribute(
+                "aria-label",
+                "Close",
+                under("data-ph-unmask"),
+            ),
+        ).toBe("Close");
+        expect(maskWorkspaceAttribute("data-value", "asha rao", under())).toBe(
+            "**** ***",
+        );
+    });
+
+    it("keeps a link's path and nothing that could name a person", () => {
+        const a = { ...under(), tagName: "A" };
+        const href = (value: string) =>
+            maskWorkspaceAttribute("href", value, a);
+        expect(href("/customers?q=asha#x")).toBe("/customers");
+        expect(href("/customers/cus_1/orders")).toBe("/customers/cus_1/orders");
+        expect(href("mailto:asha@example.com")).toBe("#");
+        expect(href("tel:+919876543210")).toBe("#");
+        expect(href("https://rye.saroh.app/?ref=asha")).toBe("#");
+        expect(href("//evil.example/x")).toBe("#");
+        expect(href("#main-content")).toBe("#main-content");
+        expect(
+            maskWorkspaceAttribute("action", "/search?q=asha", {
+                ...under(),
+                tagName: "FORM",
+            }),
+        ).toBe("/search");
+    });
+
+    it("leaves a stylesheet's or a script's address alone: it draws the page", () => {
+        const sheet = "https://app.saroh.in/_next/static/css/app.css?dpl=1";
+        expect(
+            maskWorkspaceAttribute("href", sheet, {
+                ...under(),
+                tagName: "LINK",
+            }),
+        ).toBe(sheet);
+        expect(maskWorkspaceAttribute("href", sheet, undefined)).toBe(sheet);
+    });
+
+    it("leaves what draws the page alone", () => {
+        for (const [name, value] of [
+            ["class", "flex gap-2"],
+            ["data-state", "open"],
+            ["style", "width: 10px"],
+            ["role", "dialog"],
+            ["id", "usage-sharing-title"],
+        ])
+            expect(maskWorkspaceAttribute(name, value, under())).toBe(value);
+    });
+});
+
+const SITE_ALLOWED: SiteReplayFacts = {
+    app: "web",
+    replay: "on",
+    consent: "granted",
+    teamBrowser: false,
+    doNotTrack: null,
+    globalPrivacyControl: undefined,
+};
+
+describe("siteReplayDecision (saroh.in)", () => {
+    it("records only when every rule holds", () => {
+        expect(siteReplayDecision(SITE_ALLOWED)).toEqual({ record: true });
+    });
+
+    it.each([
+        [{ replay: undefined }, "switched-off"],
+        [{ replay: "off" }, "switched-off"],
+        [{ consent: null }, "no-consent"],
+        [{ consent: undefined }, "no-consent"],
+        [{ consent: "refused" as const }, "no-consent"],
+        [{ teamBrowser: true }, "team"],
+        [{ doNotTrack: "1" }, "browser-signal"],
+        [{ doNotTrack: "yes" }, "browser-signal"],
+        [{ globalPrivacyControl: true }, "browser-signal"],
+        [{ app: "application" as const }, "not-site"],
+        [{ app: "auth" as const }, "not-site"],
+        [{ app: "admin" as const }, "not-site"],
+        [{ app: "sites" as const }, "not-site"],
+    ])("refuses %j (%s)", (change, why) => {
+        expect(siteReplayDecision({ ...SITE_ALLOWED, ...change })).toEqual({
+            record: false,
+            why,
+        });
+    });
+});
+
+describe("saroh.in's replay", () => {
+    function site(overrides: Record<string, unknown> = {}) {
+        const fake = fakeSdk();
+        const loadRecorder = vi.fn(() => Promise.resolve({}));
+        const tracking = must(
+            createBrowserTracking({
+                key: "phc_test",
+                app: "web",
+                environment: "production",
+                load: fake.load,
+                loadRecorder,
+                replay: "on",
+                ...overrides,
+            }),
+        );
+        return { ...fake, loadRecorder, tracking };
+    }
+    const facts = {
+        consent: "granted" as const,
+        teamBrowser: false,
+        doNotTrack: null,
+        globalPrivacyControl: false,
+    };
+
+    it("starts after consent, about nobody, with the page's text readable", async () => {
+        const { tracking, instances, loadRecorder } = site();
+        expect(await tracking.startSiteReplay(facts)).toBe(true);
+        expect(loadRecorder).toHaveBeenCalledTimes(1);
+        expect(instances).toHaveLength(1);
+        const { config, instance } = instances[0];
+        expect(instance.startSessionRecording).toHaveBeenCalledWith();
+        // Nobody is identified, and nothing is stored in the browser.
+        expect(config.bootstrap).toBeUndefined();
+        expect(config).toMatchObject({
+            persistence: "memory",
+            person_profiles: "never",
+            autocapture: false,
+            capture_pageview: false,
+            capture_pageleave: false,
+            capture_exceptions: false,
+            capture_performance: false,
+            capture_heatmaps: false,
+            enable_recording_console_log: false,
+            advanced_disable_feature_flags: true,
+            disable_external_dependency_loading: true,
+            session_recording: {
+                // Only what a page marks is masked; the rest is Saroh's own.
+                maskTextSelector: "[data-ph-mask]",
+                maskAllInputs: true,
+                blockSelector: SITE_REPLAY_BLOCK_SELECTOR,
+                recordHeaders: false,
+                recordBody: false,
+                recordCrossOriginIframes: false,
+                captureCanvas: { recordCanvas: false },
+                sampleRate: 1,
+            },
+        });
+        const recording = config.session_recording as {
+            maskTextFn?: unknown;
+            maskCapturedNetworkRequestFn: (r: unknown) => unknown;
+        };
+        expect(recording.maskTextFn).toBeUndefined();
+        expect(
+            recording.maskCapturedNetworkRequestFn({ url: "/x" }),
+        ).toBeNull();
+        // Only the recording leaves: no pageview, no click, no identify.
+        expect(config.before_send).toBe(replayBeforeSend);
+    });
+
+    it.each([
+        ["the switch is off", { replay: undefined }, {}],
+        ["the visitor has not answered", {}, { consent: null }],
+        ["the visitor refused", {}, { consent: "refused" as const }],
+        ["it is a Saroh team browser", {}, { teamBrowser: true }],
+        ["Do Not Track is set", {}, { doNotTrack: "1" }],
+        ["Global Privacy Control is set", {}, { globalPrivacyControl: true }],
+        ["no recorder was handed in", { loadRecorder: undefined }, {}],
+        ["the app is the workspace", { app: "application" }, {}],
+        ["the app is accounts", { app: "auth" }, {}],
+        ["the app is admin", { app: "admin" }, {}],
+        ["the app is a merchant site", { app: "sites" }, {}],
+    ])("never loads or starts when %s", async (_why, options, change) => {
+        const { tracking, instances, load, loadRecorder } = site(options);
+        expect(await tracking.startSiteReplay({ ...facts, ...change })).toBe(
+            false,
+        );
+        expect(instances).toHaveLength(0);
+        expect(load).not.toHaveBeenCalled();
+        expect(loadRecorder).not.toHaveBeenCalled();
+    });
+
+    it("stops when consent is taken back, and starts again when it is given", async () => {
+        const { tracking, instances } = site();
+        await tracking.startSiteReplay(facts);
+        expect(
+            await tracking.startSiteReplay({ ...facts, consent: "refused" }),
+        ).toBe(false);
+        expect(
+            instances[0].instance.stopSessionRecording,
+        ).toHaveBeenCalledTimes(1);
+        // "Cookie choices" forgets the answer: still stopped.
+        expect(
+            await tracking.startSiteReplay({ ...facts, consent: null }),
+        ).toBe(false);
+        expect(await tracking.startSiteReplay(facts)).toBe(true);
+        // The same instance: one per page.
+        expect(instances).toHaveLength(1);
+        expect(
+            instances[0].instance.startSessionRecording,
+        ).toHaveBeenCalledTimes(2);
+    });
+
+    it("the workspace's way of starting never works on saroh.in", async () => {
+        const { tracking, instances } = site();
+        expect(
+            await tracking.startReplay({
+                userId: "user_1",
+                sharesUsage: true,
+                inWorkspaceShell: true,
+                noticeShown: true,
+            }),
+        ).toBe(false);
+        expect(instances).toHaveLength(0);
+    });
+
+    it("draws Saroh's own pictures, and leaves out frames and marked elements", () => {
+        const parts = SITE_REPLAY_BLOCK_SELECTOR.split(", ");
+        for (const part of ["iframe", "object", "embed", "[data-ph-block]"])
+            expect(parts).toContain(part);
+        expect(parts).not.toContain("img");
+        const config = siteReplayConfig("https://eu.i.posthog.com");
+        expect(config.disable_session_recording).toBe(true);
     });
 });

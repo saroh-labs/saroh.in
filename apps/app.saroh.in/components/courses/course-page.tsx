@@ -122,6 +122,7 @@ export function CoursePage({
     return (
         <div className="flex flex-col gap-6">
             <PageHeader
+                holdsData
                 className="mb-0"
                 breadcrumb={[
                     <Link
@@ -598,6 +599,7 @@ function CancelEnrolmentDialog({
                             className="mt-0.5"
                         />
                         <Label
+                            data-ph-unmask=""
                             htmlFor={voidId}
                             className="text-[13px] font-normal leading-[1.5]"
                         >

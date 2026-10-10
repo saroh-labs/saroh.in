@@ -73,6 +73,8 @@ export function TabBar({
     return (
         <nav
             aria-label="Main"
+            // Saroh's own words: a session recording may read them.
+            data-ph-unmask=""
             className={cn(
                 // Below the app's dialogs (z-50), so a dialog's scrim covers
                 // the bar as it covers the page; above the sticky header.

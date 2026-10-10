@@ -2,7 +2,7 @@
  * The Privacy Policy, as the owner agreed it (Claude Doc "Saroh Privacy
  * Policy and Terms", settled 4 Oct 2026, rev 32; email provider rev 42, 6 Oct;
  * merchants' own trackers, owner's wording 8 Oct, rev 44; Vercel removed,
- * 9 Oct, rev 45; aligned with India's DPDP Act, 10 Oct, rev 55 (rev 68: a business's duty for a child's data, under Age; rev 69: PostHog, for errors and setup steps): Data
+ * 9 Oct, rev 45; aligned with India's DPDP Act, 10 Oct, rev 55 (rev 68: a business's duty for a child's data, under Age; rev 69: PostHog, for errors and setup steps; rev 72: recordings of use): Data
  * Fiduciary and Data Processor named, security logs kept 1 year, 180 days
  * after closing, suspended accounts, and "If there's a breach"; the QR code
  * maker's email, 10 Oct, is NOT YET in the owner's doc: a minimal factual
@@ -47,6 +47,7 @@ If your website uses analytics or advertising tools that you connect (such as Go
 | Security logs | IP address, browser, sign-in times, errors | To keep accounts safe and fix problems. Kept 1 year |
 | Website visits | Pages visited on saroh.in, rough location, device, through Google Analytics cookies | To learn which pages help people. Only on saroh.in. Your customers' sites run only the tools you connect yourself |
 | Product usage | Which setup steps your business has completed (a first product, a first order), and errors that happen while you use Saroh. Never your customers' details | To fix problems and make Saroh easier to use |
+| Recordings of use | On saroh.in, only if you accept the cookie notice: what you click, scroll and open. In the workspace: how signed-in people use the screens. Saroh's own buttons, menus and labels show; your customers' details, your figures and anything you type are hidden, and pictures are left out | To find what is confusing or broken. You can turn workspace recording off in Settings › Your profile |
 
 ## Why we're allowed to
 
@@ -65,7 +66,7 @@ Only the companies that help us run Saroh, each for its own job, and only what t
 | Hostinger | Running our servers and database |
 | Cloudflare | Serving our websites and apps, network security and speed |
 | Google Analytics | Visits to saroh.in |
-| PostHog | Finding and fixing errors in Saroh, and seeing which setup steps businesses complete. Stored in the EU |
+| PostHog | Finding and fixing errors in Saroh, seeing which setup steps businesses complete, and keeping the recordings of use. Stored in the EU |
 
 We don't sell personal data. We share it with authorities only when the law requires it.
 
@@ -85,6 +86,7 @@ Our servers and database are in **India**. Some providers above may process data
 | An email given to the QR code maker | 12 months after you last used it |
 | Security logs | 1 year |
 | A suspended account under investigation | As long as the law requires, or while it's needed to prevent, detect or investigate an offence, even if deletion was requested |
+| Recordings of use | 30 days |
 
 ## Your rights
 
@@ -103,7 +105,7 @@ If a breach affects your personal data, we'll tell you and the Data Protection B
 
 ## Cookies
 
-Saroh's apps use only the cookies that keep you signed in. saroh.in also uses Google Analytics cookies to count visits; you can refuse them in the cookie notice, and the site works the same.
+Saroh's apps use only the cookies that keep you signed in. saroh.in also uses Google Analytics cookies to count visits and, if you accept the cookie notice, records how the site is used; recording sets no cookie. Refuse, and neither runs and the site works the same. You can change your answer at any time with "Cookie choices" at the foot of every page. We don't count or record a browser that sends Do Not Track or Global Privacy Control.
 
 ## How we protect it
 

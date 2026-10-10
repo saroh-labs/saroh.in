@@ -58,6 +58,7 @@ export function StorefrontFilter({
         <DropdownMenu>
             <DropdownMenuTrigger asChild>
                 <Button
+                    data-ph-mask=""
                     variant="outline"
                     className={cn(
                         "h-[38px] gap-[7px] px-[13px] text-[13px] font-medium text-neutral-600 dark:text-foreground",

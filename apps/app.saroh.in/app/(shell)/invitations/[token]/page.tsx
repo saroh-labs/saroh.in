@@ -29,6 +29,7 @@ export default async function AcceptInvitationPage({
     return (
         <main className="mx-auto flex min-h-[60vh] max-w-md items-center p-8">
             <EmptyState
+                data-ph-mask=""
                 className="w-full"
                 title="Invitation problem"
                 description={`${result.error} If this invitation was sent to a different email, sign in with that account and open the link again.`}

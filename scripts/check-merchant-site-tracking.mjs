@@ -26,6 +26,18 @@
  *   6. `apps/saroh.app` has an `instrumentation-client` file, the one place
  *      Next runs code in every visitor's browser before the page.
  *
+ * **Session replay is two apps and no other** (DEC-125, 10 Oct): the
+ * workspace (`apps/app.saroh.in`) and the marketing site (`apps/saroh.in`,
+ * behind its cookie notice). So it also fails when:
+ *
+ *   7. any other app, or `packages/site-blocks`, names Saroh's recorder
+ *      (`posthog-recorder`, `loadRecorder`, `startReplay`,
+ *      `startSiteReplay`, `startSessionRecording`, `…POSTHOG_REPLAY…`):
+ *      never a merchant site, never accounts (sign-in, sign-up,
+ *      passwords), never the admin console, never anything else;
+ *   8. in either of the two, the recorder is handed over anywhere but the
+ *      one file that makes the tracker (`lib/error-tracking-browser.ts`).
+ *
  * Every tracked file is read, tests and comments included: there is no
  * reason for any of these to be written there at all.
  *
@@ -36,13 +48,57 @@
  * the one file (with its test) allowed a PostHog address. It reads no
  * environment variable, so rule 5 keeps Saroh's key out of it.
  *
- * Run from the repo root. `problemsIn` is exported for the unit test
- * (`apps/saroh.app/lib/no-saroh-tracker.test.ts`).
+ * **Saroh's advertising tags live on saroh.in and nowhere else** (DEC-127).
+ * Saroh advertises its own business with Google Ads and the Meta Pixel, and
+ * those tags load on its marketing site alone (`apps/saroh.in/lib/tags.ts`).
+ * So this also fails when, anywhere under the merchant sites' roots, the
+ * workspace (`apps/app.saroh.in`), the console (`apps/admin.saroh.in`) or
+ * sign-in (`apps/accounts.saroh.in`):
+ *
+ *   9. one of Saroh's own ad ids or labels is named (`…GOOGLE_ADS_ID`,
+ *      `…GOOGLE_ADS_…_LABEL`, `…META_PIXEL_ID`), in code or in a config;
+ *  10. an ad tag's address appears (Google's tag, Google Ads, DoubleClick,
+ *      the Pixel's script or its `/tr` endpoint);
+ *  11. an ad tag is called or loaded (`gtag(…)`, `fbq(…)`, `gtag/js`,
+ *      `fbevents`).
+ *
+ * Rules 10 and 11 leave the merchant's OWN trackers alone (#889): a merchant
+ * adds their Google Analytics, Google Ads or Meta Pixel to their site by
+ * its public id, and that loader, its consent wiring and the settings
+ * screen's tests are the files in `MERCHANT_OWN_AD_TAGS`. Rule 9 has no
+ * exceptions: none of those files reads an id of Saroh's.
+ *
+ * Run from the repo root. `problemsIn` is exported for the unit tests
+ * (`apps/saroh.app/lib/no-saroh-tracker.test.ts`,
+ * `apps/saroh.in/lib/ad-tags-only-here.test.ts`).
  */
 import { execFileSync } from "node:child_process";
 import { readFileSync } from "node:fs";
 
 export const MERCHANT_SITE_ROOTS = ["apps/saroh.app", "packages/site-blocks"];
+
+/** The only two apps that may record sessions, and where each hands the recorder over. */
+export const RECORDING_APPS = ["apps/app.saroh.in", "apps/saroh.in"];
+const RECORDER_HANDOVER = "lib/error-tracking-browser.ts";
+
+/** Anything that could hand over, start or switch on Saroh's recorder. */
+const RECORDER =
+    /posthog-recorder|loadRecorder|startReplay|startSiteReplay|startSessionRecording|POSTHOG_REPLAY/u;
+
+/** Handing the recorder to the tracker: the bundle, or the option that takes it. */
+const HANDOVER = /posthog-recorder|loadRecorder\s*:/u;
+
+/** Source a browser or a server could run; prose and settings are not it. */
+const SOURCE = /\.(?:[cm]?[jt]sx?)$/u;
+const TEST = /\.(?:test|spec)\.[cm]?[jt]sx?$/u;
+
+/** Where none of Saroh's advertising tags may ever be (DEC-127). */
+export const AD_FREE_ROOTS = [
+    ...MERCHANT_SITE_ROOTS,
+    "apps/app.saroh.in",
+    "apps/admin.saroh.in",
+    "apps/accounts.saroh.in",
+];
 
 /** Text files worth reading; images, fonts and lockfiles are skipped. */
 const READABLE =
@@ -89,14 +145,52 @@ const RULES = [
 ];
 
 /**
+ * The merchant's own trackers (#889): the loader and its test, the
+ * component that tells them the visitor's consent, and the settings
+ * screen's test, which pastes a Google tag snippet to prove only its id is
+ * kept.
+ */
+const MERCHANT_OWN_AD_TAGS = new Set([
+    "apps/saroh.app/lib/trackers.ts",
+    "apps/saroh.app/lib/trackers.test.ts",
+    "apps/saroh.app/components/site-trackers.tsx",
+    "apps/app.saroh.in/components/sites/site-search-tracking.test.tsx",
+]);
+
+/** The same shape as RULES, for every root in AD_FREE_ROOTS. */
+const AD_RULES = [
+    [
+        /(?:GOOGLE_ADS|META_PIXEL)_(?:ID|[A-Z_]*LABEL)\b/u,
+        "names one of Saroh's own ad ids or labels (they belong to saroh.in alone)",
+        new Set(),
+    ],
+    [
+        /googletagmanager\.com|googleadservices\.com|doubleclick\.net|connect\.facebook\.net|facebook\.com\/tr\b/iu,
+        "holds an ad tag's address",
+        MERCHANT_OWN_AD_TAGS,
+    ],
+    [
+        /\b(?:gtag|fbq)\s*(?:\?\.)?\(|\bfbevents\b|\bgtag\/js\b/u,
+        "calls or loads an ad tag",
+        MERCHANT_OWN_AD_TAGS,
+    ],
+];
+
+const under = (roots, path) =>
+    roots.some((root) => path.startsWith(`${root}/`));
+
+/**
  * The problems in a set of files, as "path: what" lines.
  * @param {{ path: string, text: string }[]} files
  */
 export function problemsIn(files) {
     const problems = [];
     for (const { path, text } of files) {
-        if (!MERCHANT_SITE_ROOTS.some((root) => path.startsWith(`${root}/`)))
-            continue;
+        if (under(AD_FREE_ROOTS, path))
+            for (const [shape, what, allowed] of AD_RULES)
+                if (!allowed.has(path) && shape.test(text))
+                    problems.push(`${path}: ${what}`);
+        if (!under(MERCHANT_SITE_ROOTS, path)) continue;
         if (
             /^apps\/saroh\.app\/instrumentation-client\.[cm]?[jt]sx?$/u.test(
                 path,
@@ -112,8 +206,53 @@ export function problemsIn(files) {
     return problems;
 }
 
+/**
+ * Where Saroh's recorder is named outside the two apps that may record, or
+ * handed over outside their one tracker file, as "path: what" lines.
+ * @param {{ path: string, text: string }[]} files
+ */
+export function recorderProblemsIn(files) {
+    const problems = [];
+    for (const { path, text } of files) {
+        if (!SOURCE.test(path) || TEST.test(path)) continue;
+        const app = /^apps\/[^/]+/u.exec(path)?.[0];
+        const inBlocks = path.startsWith("packages/site-blocks/");
+        if (!app && !inBlocks) continue;
+        if (app && RECORDING_APPS.includes(app)) {
+            if (path !== `${app}/${RECORDER_HANDOVER}` && HANDOVER.test(text))
+                problems.push(
+                    `${path}: hands over the recorder; only ${app}/${RECORDER_HANDOVER} does`,
+                );
+            continue;
+        }
+        // The merchant's OWN tracker (#889): its loader stub names the
+        // method on their project's SDK. Saroh's recorder is never there.
+        if (MERCHANT_OWN_TRACKER.has(path)) continue;
+        if (RECORDER.test(text))
+            problems.push(
+                `${path}: names Saroh's session recorder; only ${RECORDING_APPS.join(" and ")} may record`,
+            );
+    }
+    return problems;
+}
+
+/** Every tracked source file of every app, and of the site blocks. */
+export function recorderScanFiles(cwd = process.cwd()) {
+    return filesUnder(["apps", "packages/site-blocks"], cwd);
+}
+
 /** Every tracked, readable file under the merchant sites' roots. */
 export function merchantSiteFiles(cwd = process.cwd()) {
+    return filesUnder(MERCHANT_SITE_ROOTS, cwd);
+}
+
+/** Every tracked, readable file the ad rules read: all of AD_FREE_ROOTS. */
+export function scannedFiles(cwd = process.cwd()) {
+    return filesUnder(AD_FREE_ROOTS, cwd);
+}
+
+/** @param {string[]} roots @param {string} cwd */
+function filesUnder(roots, cwd) {
     // Tracked and not-yet-tracked alike: a new file counts before its commit.
     const listed = execFileSync(
         "git",
@@ -123,7 +262,7 @@ export function merchantSiteFiles(cwd = process.cwd()) {
             "--others",
             "--exclude-standard",
             "--",
-            ...MERCHANT_SITE_ROOTS,
+            ...roots,
         ],
         { encoding: "utf8", cwd, maxBuffer: 64 * 1024 * 1024 },
     );
@@ -140,14 +279,18 @@ export function merchantSiteFiles(cwd = process.cwd()) {
 }
 
 if (import.meta.url === `file://${process.argv[1]}`) {
-    const files = merchantSiteFiles();
-    const problems = problemsIn(files);
+    // The ad-free roots take in the merchant sites' own.
+    const files = scannedFiles();
+    const scanned = recorderScanFiles();
+    const problems = [...problemsIn(files), ...recorderProblemsIn(scanned)];
     if (problems.length) {
         console.error(
-            "check:merchant-site-tracking: merchant sites never load a tracker of Saroh's (DEC-125):\n  " +
+            "check:merchant-site-tracking: merchant sites never load a tracker of Saroh's and only the workspace and saroh.in record (DEC-125), and Saroh's ad tags live on saroh.in alone (DEC-127):\n  " +
                 problems.join("\n  "),
         );
         process.exit(1);
     }
-    console.log(`check:merchant-site-tracking: ${files.length} files, ok`);
+    console.log(
+        `check:merchant-site-tracking: ${files.length} files for trackers and ad tags, ${scanned.length} app files for the recorder, ok`,
+    );
 }

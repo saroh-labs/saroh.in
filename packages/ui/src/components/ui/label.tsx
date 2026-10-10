@@ -17,6 +17,9 @@ const Label = React.forwardRef<
 >(({ className, ...props }, ref) => (
     <LabelPrimitive.Root
         ref={ref}
+        // A field's name is Saroh's own words: a session recording may
+        // read it. One that names a record adds `data-ph-mask`.
+        data-ph-unmask=""
         className={cn(labelVariants(), className)}
         {...props}
     />

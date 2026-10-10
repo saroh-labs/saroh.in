@@ -191,6 +191,9 @@ jobs:
       # Merchant sites never load a tracker of Saroh's: no PostHog SDK,
       # address or public key under apps/saroh.app or packages/site-blocks
       # (DEC-125). Their own server's errors are reported server-side only.
+      # And Saroh's ad tags (Google Ads, Meta Pixel) live on saroh.in alone:
+      # none in the merchant sites, the workspace, the console or accounts
+      # (DEC-127).
       - name: No Saroh tracker on merchant sites
         run: pnpm run check:merchant-site-tracking
 

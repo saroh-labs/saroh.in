@@ -60,6 +60,7 @@ export function ContactPicker({
         <Popover open={open} onOpenChange={setOpen} modal>
             <PopoverTrigger asChild>
                 <Button
+                    data-ph-mask=""
                     id={id}
                     type="button"
                     variant="outline"

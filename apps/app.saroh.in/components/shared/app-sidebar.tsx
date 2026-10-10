@@ -134,6 +134,9 @@ export function AppSidebar({
         // keeps that scroll from running on into the page.
         <aside
             aria-label="Workspace"
+            // The rail's words are Saroh's own, so a session recording may
+            // read them (DEC-125); a site's own name below is marked back.
+            data-ph-unmask=""
             // Collapsed by choice draws exactly what the narrow window does:
             // every `max-[1100px]:` below has a `group-data-[collapsed]`
             // twin keyed on this attribute.
@@ -541,7 +544,11 @@ function SiteTree({
                             key={child.label}
                             className="flex flex-col gap-0.5"
                         >
-                            <div className="truncate px-2.5 pt-1.5 text-[12.5px] font-medium text-foreground">
+                            <div
+                                // The site's own name: masked in a recording.
+                                data-ph-mask=""
+                                className="truncate px-2.5 pt-1.5 text-[12.5px] font-medium text-foreground"
+                            >
                                 {child.label}
                             </div>
                             {child.children?.length ? (

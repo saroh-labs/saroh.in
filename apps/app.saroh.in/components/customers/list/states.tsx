@@ -75,7 +75,7 @@ export function ListFirstRun({
             description="Customers are people who've paid, signed in on your website or been added here. Everyone else is in Contacts."
             action={
                 <div className="flex flex-wrap justify-center gap-2">
-                    <Button asChild variant="outline">
+                    <Button data-ph-unmask="" asChild variant="outline">
                         <Link href="/contacts">
                             {contacts && contacts > 0
                                 ? `Open Contacts (${contacts.toLocaleString(NUMBER_LOCALE)})`

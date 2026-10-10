@@ -37,6 +37,7 @@
         "NEXT_PUBLIC_POSTHOG_KEY",
         "NEXT_PUBLIC_POSTHOG_HOST",
         "NEXT_PUBLIC_POSTHOG_REPLAY",
+        "NEXT_PUBLIC_POSTHOG_REPLAY_SAMPLE",
         // saroh.in: shows Resources pages before their publish date on a
         // preview deployment; ignored on production (plan KTD-2). Hashed, not
         // passed through: a build without it pre-renders /help as a 404, and
@@ -95,6 +96,14 @@
         "DEV_REDIRECT_PATH",
         "VERCEL_GIT_COMMIT_REF",
         "NEXT_PUBLIC_GA_MEASUREMENT_ID",
+        // Ad conversions (DEC-127): saroh.in's public ad ids and labels, and
+        // accounts' hand-off to saroh.in's /welcome, are compiled into the
+        // browser bundle, so a build with them differs from one without.
+        "NEXT_PUBLIC_GOOGLE_ADS_ID",
+        "NEXT_PUBLIC_GOOGLE_ADS_WAITLIST_LABEL",
+        "NEXT_PUBLIC_GOOGLE_ADS_SIGNUP_LABEL",
+        "NEXT_PUBLIC_META_PIXEL_ID",
+        "NEXT_PUBLIC_SIGNUP_WELCOME_URL",
         // saroh.in's launch switch (plan KTD-16): Pricing, its links and the
         // plan sections appear once it is "open"; read at build.
         "NEXT_PUBLIC_LAUNCH_MODE",

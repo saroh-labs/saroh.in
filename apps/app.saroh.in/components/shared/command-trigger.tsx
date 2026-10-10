@@ -38,6 +38,7 @@ export function CommandTrigger({ actor }: { actor: SettingsActor }) {
             onClick={openCommandMenu}
             aria-label="Search Saroh (Command K)"
             title="Search  ⌘K"
+            data-ph-unmask=""
             className={BUTTON}
         >
             <Search className="size-4" />

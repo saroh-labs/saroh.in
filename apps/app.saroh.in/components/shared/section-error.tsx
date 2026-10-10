@@ -95,6 +95,7 @@ export function SectionError({
     return (
         <main className="mx-auto w-full max-w-md p-6 sm:p-12">
             <FailedState
+                data-ph-unmask=""
                 title={title}
                 description={description}
                 action={

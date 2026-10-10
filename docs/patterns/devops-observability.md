@@ -15,6 +15,9 @@
   `set-cookie`, API keys and sensitive fields never reach the sink.
 - **5xx errors** are logged server-side with the stack and redacted headers; the
   client gets a generic message.
+- **Better Auth's 5xx too.** It answers `/api/auth/*` itself, outside Nest's
+  filter, so `createAuth({ onServerError })` hands its server errors to
+  `reportAuthServerError` (`common/auth/report-auth-error.ts`). Never a 4xx.
 - **Health:** `GET /health`, `/health/live` and `/health/ready`. Readiness fails
   on an unreachable database, an unfinished migration and an unreadable job
   queue.
@@ -86,7 +89,9 @@ must keep:
 - **Errors go through the seam, never straight to an SDK.** The API:
   `reportError()` and `reportJobError()`
   (`src/common/observability/report-error.ts`); only `posthog.ts` beside it
-  imports `posthog-node`. The frontends: `reportError()` from
+  imports `posthog-node`. A handler mounted outside Nest (Better Auth's)
+  never reaches `AllExceptionsFilter`: give it its own way to the seam, for
+  5xx only, with a route's shape and no headers. The frontends: `reportError()` from
   `@saroh/ui/lib/report-error` in a boundary, and nothing else; each app's
   `instrumentation-client.ts`, `instrumentation.ts` and `worker.ts` do the
   rest.
@@ -100,18 +105,60 @@ must keep:
   ledger** (`modules/analytics/product-milestones.ts`). The list is nine
   events and is closed: a tenth is the owner's decision, not a call site's.
   Never capture a product event from a browser.
-- **Session replay is the workspace's signed-in shell only**, masked, and
-  off by default. Mark customer data that isn't text with `data-ph-block`
-  (`frontend-design-system.md` → Session recordings).
+- **Session replay is the signed-in workspace and saroh.in only**
+  (DEC-125, amended 10 Oct), on in production only. The workspace masks
+  everything but Saroh's own words and starts after its one-time notice;
+  saroh.in starts after the cookie notice is accepted, through
+  `startRecording` (`apps/saroh.in/lib/tags.ts`) alone, which cuts the
+  page's address back first. Never accounts, the
+  admin console or a merchant site (`check:merchant-site-tracking`). What a
+  screen marks, and how: `frontend-design-system.md` → Session recordings.
 - **Degraded paths it adds, and what volume means:**
   `posthog_send_failed` (WARN): PostHog refused a batch or couldn't be
   reached; a steady stream means the key or host is wrong, or PostHog is
   down. `error_sink_failed` (WARN): the forwarder itself threw; any at all
-  is a bug in it. `posthog_environment_missing` (ERROR, once at boot): the
+  is a bug in it. `auth_error_report_failed` (WARN): the same, for an
+  error inside Better Auth. `posthog_environment_missing` (ERROR, once at boot): the
   host has a key and no `POSTHOG_ENVIRONMENT`, and nothing is being sent.
   `product_milestone_not_sent` (WARN): the ledger has the milestone and
   PostHog's copy is missing. `job_failed_final` (ERROR): a job failed its
   last attempt; any at all is worth a look.
+
+## Ad tags: saroh.in only — **Current** (DEC-127)
+
+Saroh's own advertising tags (Google Ads, the Meta Pixel) and Google
+Analytics. What is sent and how to switch it on:
+`docs/architecture/ADS_TRACKING.md`. The rules a change must keep:
+
+- **One loader.** Only `apps/saroh.in/lib/tags.ts` adds a third party's
+  script or calls `gtag`/`fbq`. A new conversion is a name in its
+  `Conversion` type and one `fireConversion()` call; a Google Analytics
+  event is `track()` (`lib/analytics.ts`). Neither needs its own "is it
+  allowed" check.
+- **Nothing before consent, and advertising is its own answer**
+  (`lib/consent.ts`). The notice asks about two things: understanding the
+  site (Google Analytics' visit counts and the recorder, one answer) and
+  advertising. What an accept covered is kept with it, so one from before
+  the notice said it records is asked once about recording and is never
+  stretched. Every sentence the notice can show is in `question()`
+  (`app/site-tags.tsx`), with a test for each. The team's browser and one sending Do Not Track or
+  Global Privacy Control are never tagged. Off without an id, and off
+  everywhere but production.
+- **Only the fact.** Never an email, a phone number, a name or anything a
+  visitor typed, hashed or not: no enhanced conversions, no advanced
+  matching.
+- **A page reads its query through `readAddress()`**
+  (`lib/page-address.ts`), never `location.search`: before a tag loads the
+  address is cut back to one allow-list, so no tag reads a referral id, an
+  invitation, an email or a token from it. A new parameter is cut unless it
+  is added to that list, and only campaign data or the page's own choice
+  belongs there.
+- **Nowhere else.** No ad tag, ad id or ad host in the workspace, the
+  console, accounts, `apps/saroh.app` or `packages/site-blocks`:
+  `pnpm run check:merchant-site-tracking` fails the gate. A merchant's own
+  trackers on their own site (#889) are the files that check allows by name.
+  A conversion that happens on another host is counted the way sign-up is:
+  by passing through a page on saroh.in (`lib/welcome.ts`).
 
 ## Not in place yet
 

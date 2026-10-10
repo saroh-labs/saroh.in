@@ -315,6 +315,7 @@ function UnlinkedItem({
                         </p>
                         {canLink ? (
                             <Button
+                                data-ph-mask=""
                                 type="button"
                                 size="sm"
                                 disabled={pending}

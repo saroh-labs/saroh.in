@@ -41,7 +41,7 @@ export async function PlanLocked({
             description={`${line} Nothing it holds has been deleted; it's all here when you upgrade.`}
             action={
                 canManage ? (
-                    <Button asChild>
+                    <Button data-ph-unmask="" asChild>
                         <Link href={upgradeHref(row?.upgradeTo?.planId)}>
                             {row?.upgradeTo
                                 ? `See ${row.upgradeTo.name}`

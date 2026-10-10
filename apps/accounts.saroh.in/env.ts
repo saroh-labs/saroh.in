@@ -25,6 +25,13 @@ export const env = createEnv({
         // origins, so a fresh clone needs no extra config.
         NEXT_PUBLIC_APP_URL: z.string().url().optional(),
         /**
+         * saroh.in's `/welcome` (DEC-127). Set, a newly verified account
+         * passes through it on the way to onboarding, where saroh.in counts
+         * the sign-up for a visitor who accepted advertising cookies there.
+         * Unset, the account goes straight on. This app loads no ad tag.
+         */
+        NEXT_PUBLIC_SIGNUP_WELCOME_URL: z.string().url().optional(),
+        /**
          * PostHog (DEC-125): the project's PUBLIC key (`phc_…`) and its
          * address (the EU cloud when unset). Unset, nothing is loaded or
          * sent. The browser SDK is used for exceptions only.
@@ -44,6 +51,8 @@ export const env = createEnv({
         NEXT_PUBLIC_ACCOUNTS_URL: process.env.NEXT_PUBLIC_ACCOUNTS_URL,
         NEXT_PUBLIC_BETTER_AUTH_URL: process.env.NEXT_PUBLIC_BETTER_AUTH_URL,
         NEXT_PUBLIC_APP_URL: process.env.NEXT_PUBLIC_APP_URL,
+        NEXT_PUBLIC_SIGNUP_WELCOME_URL:
+            process.env.NEXT_PUBLIC_SIGNUP_WELCOME_URL,
         NEXT_PUBLIC_POSTHOG_KEY: process.env.NEXT_PUBLIC_POSTHOG_KEY,
         NEXT_PUBLIC_POSTHOG_HOST: process.env.NEXT_PUBLIC_POSTHOG_HOST,
         NEXT_PUBLIC_VERCEL_ENV: process.env.NEXT_PUBLIC_VERCEL_ENV,

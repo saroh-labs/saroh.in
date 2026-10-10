@@ -4,7 +4,7 @@ import {
     correlationIdMiddleware,
     type CorrelatedRequest,
 } from "./correlation-id.middleware";
-import { getCorrelationId } from "./request-context";
+import { getCorrelationId, getRequestContext } from "./request-context";
 
 function makeReq(headers: Record<string, unknown> = {}): Request {
     return { headers, method: "GET", originalUrl: "/x" } as unknown as Request;
@@ -32,6 +32,22 @@ describe("correlationIdMiddleware", () => {
         expect(res.setHeader).toHaveBeenCalledWith("X-Request-Id", id);
         expect(typeof (req as CorrelatedRequest).startTime).toBe("number");
         expect(next).toHaveBeenCalledTimes(1);
+    });
+
+    it("carries the method and the path, without the query string", () => {
+        const req = {
+            headers: {},
+            method: "POST",
+            originalUrl: "/api/auth/sign-in/email?callbackURL=/x",
+        } as unknown as Request;
+        let seen: ReturnType<typeof getRequestContext>;
+        correlationIdMiddleware(req, makeRes(), () => {
+            seen = getRequestContext();
+        });
+        expect(seen).toMatchObject({
+            method: "POST",
+            path: "/api/auth/sign-in/email",
+        });
     });
 
     it("reuses a safe inbound X-Request-Id", () => {

@@ -196,6 +196,7 @@ export function InviteReviewsSheet({
                         </Button>
                     ) : (
                         <Button
+                            data-ph-unmask=""
                             onClick={send}
                             disabled={pending || picked.size === 0}
                         >

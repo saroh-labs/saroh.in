@@ -1,4 +1,12 @@
-import { Body, Controller, Get, Patch, UseGuards } from "@nestjs/common";
+import {
+    Body,
+    Controller,
+    Get,
+    HttpCode,
+    Patch,
+    Post,
+    UseGuards,
+} from "@nestjs/common";
 
 import { OrgContext } from "../../common/decorators/org-context.decorator";
 import { BetterAuthGuard } from "../../common/guards/better-auth.guard";
@@ -33,5 +41,14 @@ export class UsageSharingController {
         @Body() dto: UpdateUsageSharingDto,
     ): Promise<UsageSharingView> {
         return this.usage.update(ctx, dto);
+    }
+
+    /** They dismissed the one-time notice that says the workspace is recorded. */
+    @Post("notice-seen")
+    @HttpCode(200)
+    noticeSeen(
+        @OrgContext() ctx: OrganizationContext,
+    ): Promise<UsageSharingView> {
+        return this.usage.noticeSeen(ctx);
     }
 }

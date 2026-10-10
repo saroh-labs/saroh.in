@@ -82,6 +82,7 @@ export function NotificationsInbox({
     if (notifications.length === 0) {
         return (
             <EmptyState
+                data-ph-mask=""
                 icon={<Bell />}
                 title="Nothing to catch up on"
                 description={`No notifications in ${businessName}. They arrive from the modules this business has on — turning one on gives it something to say here.`}

@@ -27,6 +27,7 @@ export function TakePaymentLocked({
     return (
         <div className={cn("flex flex-col items-start gap-1", className)}>
             <Button
+                data-ph-unmask=""
                 type="button"
                 variant={variant}
                 className={triggerClassName}

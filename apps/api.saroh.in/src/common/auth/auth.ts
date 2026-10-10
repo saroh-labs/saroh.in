@@ -8,6 +8,7 @@ import {
     sendPasswordResetEmail,
     sendVerificationOtpEmail,
 } from "../email";
+import { reportAuthServerError } from "./report-auth-error";
 
 /**
  * The Better Auth instance — api.saroh.in is now the auth SERVER (it hosts
@@ -32,4 +33,7 @@ export const auth: Auth = createAuth({
     // The `signed_up` product milestone (DEC-125): the user's id, nothing
     // else. A no-op unless PostHog is on.
     onUserCreated: ({ id }) => signedUp(id),
+    // A 5xx inside Better Auth, which answers /api/auth/* itself and so
+    // never reaches AllExceptionsFilter. Never a 4xx.
+    onServerError: reportAuthServerError,
 });

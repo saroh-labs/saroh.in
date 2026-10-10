@@ -44,14 +44,25 @@
         // PostHog (DEC-125): errors. Off until the
         // project's public key (phc_…, not a secret) is set here. The
         // host defaults to https://eu.i.posthog.com.
-        "NEXT_PUBLIC_POSTHOG_KEY": "phc_nXZeUYpc7a7qq5HDQM9DAwe7U9ZcvdcTiW6fLP6L5uxT", // gitleaks:allow — the project's PUBLIC key; it ships to browsers
-        "NEXT_PUBLIC_POSTHOG_HOST": "https://eu.i.posthog.com",
+        // Off on development (owner, 10 Oct): one free project, so only
+        // production sends. Rehearsed on dev once, then removed.
+        // "NEXT_PUBLIC_POSTHOG_KEY": "",
+        // "NEXT_PUBLIC_POSTHOG_HOST": "https://eu.i.posthog.com",
+        // Session replay on the marketing site: off here (production only).
+        "NEXT_PUBLIC_POSTHOG_REPLAY": "off",
         "VERCEL_GIT_COMMIT_REF": "development",
         "API_URL": "https://api.saroh.io",
         "DEV_ACCESS_COOKIE_DOMAIN": ".saroh.io",
         "DEV_REDIRECT_ORIGIN": "https://saroh.in",
         "NEXT_PUBLIC_ACCOUNTS_URL": "https://accounts.saroh.io",
         "RESOURCES_PREVIEW": "1",
+        // Ad conversions (DEC-127) are production's alone. Set here they
+        // would still load nothing: lib/ga.ts reads them only where
+        // VERCEL_ENV is "production".
+        // "NEXT_PUBLIC_GOOGLE_ADS_ID": "",
+        // "NEXT_PUBLIC_GOOGLE_ADS_WAITLIST_LABEL": "",
+        // "NEXT_PUBLIC_GOOGLE_ADS_SIGNUP_LABEL": "",
+        // "NEXT_PUBLIC_META_PIXEL_ID": "",
     },
     "env": {
         "production": {
@@ -70,10 +81,22 @@
                 // host defaults to https://eu.i.posthog.com.
                 "NEXT_PUBLIC_POSTHOG_KEY": "phc_nXZeUYpc7a7qq5HDQM9DAwe7U9ZcvdcTiW6fLP6L5uxT", // gitleaks:allow — the project's PUBLIC key; it ships to browsers
                 "NEXT_PUBLIC_POSTHOG_HOST": "https://eu.i.posthog.com",
+                // Session replay on the marketing site: on (owner, 10 Oct),
+                // and then only after a visitor accepts the cookie notice.
+                "NEXT_PUBLIC_POSTHOG_REPLAY": "on",
                 "VERCEL_GIT_COMMIT_REF": "main",
                 "API_URL": "https://api.saroh.in",
                 "NEXT_PUBLIC_ACCOUNTS_URL": "https://accounts.saroh.in",
                 "NEXT_PUBLIC_GA_MEASUREMENT_ID": "G-7KKPRQXCJX",
+                // Ad conversions (DEC-127): Google Ads and the Meta Pixel,
+                // each off until its PUBLIC id (not a secret) is set here.
+                // Even then a tag loads only after a visitor accepts
+                // advertising cookies. Where to find each value:
+                // docs/architecture/ADS_TRACKING.md, "Turning ads tracking on".
+                // "NEXT_PUBLIC_GOOGLE_ADS_ID": "AW-XXXXXXXXXX",
+                // "NEXT_PUBLIC_GOOGLE_ADS_WAITLIST_LABEL": "",
+                // "NEXT_PUBLIC_GOOGLE_ADS_SIGNUP_LABEL": "",
+                // "NEXT_PUBLIC_META_PIXEL_ID": "",
             },
             "services": [
                 {

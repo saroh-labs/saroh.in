@@ -48,8 +48,10 @@
         // PostHog (DEC-125): errors and, when switched on, masked session replay. Off until the
         // project's public key (phc_…, not a secret) is set here. The
         // host defaults to https://eu.i.posthog.com.
-        "NEXT_PUBLIC_POSTHOG_KEY": "phc_nXZeUYpc7a7qq5HDQM9DAwe7U9ZcvdcTiW6fLP6L5uxT", // gitleaks:allow — the project's PUBLIC key; it ships to browsers
-        "NEXT_PUBLIC_POSTHOG_HOST": "https://eu.i.posthog.com",
+        // Off on development (owner, 10 Oct): one free project, so only
+        // production sends. Rehearsed on dev once, then removed.
+        // "NEXT_PUBLIC_POSTHOG_KEY": "",
+        // "NEXT_PUBLIC_POSTHOG_HOST": "https://eu.i.posthog.com",
         // Session replay in the signed-in workspace: off unless "on",
         // and then only for people who have not opted out.
         "NEXT_PUBLIC_POSTHOG_REPLAY": "off",
@@ -83,9 +85,10 @@
                 // host defaults to https://eu.i.posthog.com.
                 "NEXT_PUBLIC_POSTHOG_KEY": "phc_nXZeUYpc7a7qq5HDQM9DAwe7U9ZcvdcTiW6fLP6L5uxT", // gitleaks:allow — the project's PUBLIC key; it ships to browsers
                 "NEXT_PUBLIC_POSTHOG_HOST": "https://eu.i.posthog.com",
-                // Session replay in the signed-in workspace: off unless "on",
-                // and then only for people who have not opted out.
-                "NEXT_PUBLIC_POSTHOG_REPLAY": "off",
+                // Session replay in the signed-in workspace: on in production
+                // (owner, 10 Oct), and then only for people who have not opted
+                // out and have been shown the notice.
+                "NEXT_PUBLIC_POSTHOG_REPLAY": "on",
                 "NEXT_PUBLIC_VERCEL_ENV": "production",
                 "VERCEL_GIT_COMMIT_REF": "main",
                 "API_URL": "https://api.saroh.in",

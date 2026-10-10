@@ -48,6 +48,9 @@ export function TabBarSheet({
                 />
                 <Dialog.Content
                     aria-modal="true"
+                    // The rest of the navigation: Saroh's own words, which
+                    // a session recording may read.
+                    data-ph-unmask=""
                     aria-describedby={undefined}
                     onOpenAutoFocus={(event) => {
                         event.preventDefault();

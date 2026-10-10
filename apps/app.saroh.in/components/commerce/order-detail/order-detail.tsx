@@ -260,6 +260,7 @@ export function OrderDetail({
         >
             {order.ticketName ? (
                 <Button
+                    data-ph-mask=""
                     type="button"
                     variant="outline"
                     className={actionClass("ghost")}

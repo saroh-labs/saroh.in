@@ -67,6 +67,9 @@ export function UserMenu({
             <DropdownMenuTrigger asChild>
                 <button
                     type="button"
+                    // Their name or email: masked in a session recording,
+                    // even where the bar around it is readable.
+                    data-ph-mask=""
                     aria-label={`Your account — ${displayName || email}`}
                     className="ml-0.5 flex items-center gap-2 rounded-full py-1 pl-1 pr-[9px] transition-colors duration-fast hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background active:bg-accent-active coarse:min-h-11"
                 >

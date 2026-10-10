@@ -12,8 +12,10 @@ import {
 
 /**
  * The browser half (DEC-125): exceptions from app, accounts, admin and
- * saroh.in, and the workspace's masked session replay. Merchant sites never
- * import this file (scripts/check-merchant-site-tracking.mjs).
+ * saroh.in, and session replay in two places: the workspace (Saroh's own
+ * words readable, business data masked) and saroh.in (behind the cookie
+ * notice). Merchant sites never import this file
+ * (scripts/check-merchant-site-tracking.mjs).
  *
  * The app hands the SDK in (`load: () => import("posthog-js/…")`), so this
  * package has no runtime dependency and the SDK is not even downloaded until
@@ -25,10 +27,15 @@ import {
  *  - **errors**: exceptions only. No request for flags or remote settings,
  *    no pageviews, no autocapture, nothing stored (`persistence: "memory"`),
  *    and `before_send` drops every event that is not an exception.
- *  - **replay** (workspace only, off unless every rule in
- *    {@link replayDecision} holds): the recorder with all text and inputs
- *    masked and images, media, frames and anything marked `data-ph-block`
- *    blocked; `before_send` drops every event that is not a recording.
+ *  - **replay** (the workspace and saroh.in only, off unless every rule in
+ *    {@link replayDecision} or {@link siteReplayDecision} holds): the
+ *    recorder, with every input masked and no network or console.
+ *    `before_send` drops every event that is not a recording.
+ *    - Workspace ({@link replayConfig}): all text is masked but what is
+ *      marked `data-ph-unmask` (Saroh's own fixed words); images, media,
+ *      frames and anything marked `data-ph-block` are left out.
+ *    - saroh.in ({@link siteReplayConfig}): the page's text is visible (it
+ *      is Saroh's own public content); nobody is identified.
  */
 
 /** What a boundary or the window hands over: structurally `@saroh/ui`'s report. */
@@ -70,11 +77,13 @@ export interface BrowserTrackingOptions {
     load: () => Promise<{ default: BrowserSdk } | BrowserSdk>;
     /**
      * `() => import("posthog-js/dist/posthog-recorder")`: the recorder, from
-     * the app's own bundle. Only the workspace passes it.
+     * the app's own bundle. Only the workspace and saroh.in pass it.
      */
     loadRecorder?: () => Promise<unknown>;
     /** `POSTHOG_REPLAY`: replay is possible only when this is "on". */
     replay?: string | undefined;
+    /** `POSTHOG_REPLAY_SAMPLE`: a share from 0 to 1, or unset for the default. */
+    replaySample?: string | undefined;
 }
 
 /* ------------------------------------------------------------------ *
@@ -82,11 +91,27 @@ export interface BrowserTrackingOptions {
  * ------------------------------------------------------------------ */
 
 /**
- * The share of allowed workspace sessions that are recorded. PostHog's free
- * plan keeps 5,000 recordings a month; at one in five, that is room for
- * about 25,000 workspace sessions a month before any is refused.
+ * The share of allowed sessions that are recorded: every one (owner, 10
+ * Oct). PostHog's free plan gives 5,000 recordings a month across the
+ * workspace and saroh.in together; past that it stops keeping new ones until
+ * the month turns. Lower it for an environment, without a release of this
+ * package, with `NEXT_PUBLIC_POSTHOG_REPLAY_SAMPLE` ({@link replaySampleRate}).
  */
-export const REPLAY_SAMPLE_RATE = 0.2;
+export const REPLAY_SAMPLE_RATE = 1;
+
+/**
+ * The sample rate to use: `POSTHOG_REPLAY_SAMPLE` when it is a number from 0
+ * to 1 ("0.25" is one session in four), otherwise {@link REPLAY_SAMPLE_RATE}.
+ * A value that isn't one never raises or guesses: it is ignored.
+ */
+export function replaySampleRate(override: string | undefined): number {
+    const text = override?.trim();
+    if (!text) return REPLAY_SAMPLE_RATE;
+    const rate = Number(text);
+    return Number.isFinite(rate) && rate >= 0 && rate <= 1
+        ? rate
+        : REPLAY_SAMPLE_RATE;
+}
 
 /**
  * What the recorder never draws: pictures, media, drawings, embedded pages,
@@ -96,6 +121,148 @@ export const REPLAY_SAMPLE_RATE = 0.2;
  */
 export const REPLAY_BLOCK_SELECTOR =
     "img, picture, video, audio, canvas, iframe, object, embed, [data-ph-block]";
+
+/**
+ * saroh.in's: its pictures and films are Saroh's own, so they are drawn.
+ * Left out: embedded pages, anything a page marks as holding what a
+ * visitor gave it (`data-ph-block`: a QR code made from their link, say),
+ * and a picture inside text marked `data-ph-mask` (the preview image of a
+ * link they checked).
+ */
+export const SITE_REPLAY_BLOCK_SELECTOR =
+    "canvas, iframe, object, embed, [data-ph-block], [data-ph-mask] img";
+
+/**
+ * The two marks a workspace screen can carry (DEC-125, 10 Oct).
+ *
+ * In the workspace every character is masked unless an ancestor says the
+ * words are Saroh's own, fixed ones: `data-ph-unmask` (a button's label, a
+ * form label, the navigation). `data-ph-mask` says the opposite, and it
+ * always wins: text under it is masked whatever stands above or below it
+ * (a table cell, a customer's name inside a button).
+ *
+ * On saroh.in everything is readable but what is marked `data-ph-mask`.
+ */
+export const REPLAY_UNMASK_ATTRIBUTE = "data-ph-unmask";
+export const REPLAY_MASK_ATTRIBUTE = "data-ph-mask";
+
+type MaybeElement =
+    | { closest?: (selector: string) => unknown; tagName?: string }
+    | null
+    | undefined;
+
+/**
+ * Whether the words inside `element` may be read in a workspace recording:
+ * some ancestor (or itself) is marked `data-ph-unmask`, and none is marked
+ * `data-ph-mask`. Anything it can't work out is masked.
+ */
+export function replayReadable(element: MaybeElement): boolean {
+    try {
+        if (!element || typeof element.closest !== "function") return false;
+        if (element.closest(`[${REPLAY_MASK_ATTRIBUTE}]`)) return false;
+        return Boolean(element.closest(`[${REPLAY_UNMASK_ATTRIBUTE}]`));
+    } catch {
+        return false;
+    }
+}
+
+const stars = (text: string) => text.replace(/\S/gu, "*");
+
+/**
+ * The second net under readable words: every digit, and any word around an
+ * `@`, is hidden even there. So an amount, a count, a date's numbers, a
+ * phone number or an email that reaches a button's label by mistake still
+ * can't be read ("Take ₹***", "Step * of *").
+ */
+export function hideFigures(text: string): string {
+    // Word by word, not with one pattern around the `@`: `\S*@\S*` backtracks
+    // polynomially on a long run without one (CodeQL js/polynomial-redos),
+    // and this runs on every text node of a recording.
+    let out = "";
+    let word = "";
+    const flush = () => {
+        if (word) out += word.includes("@") ? stars(word) : word;
+        word = "";
+    };
+    for (const ch of text) {
+        if (/\s/u.test(ch)) {
+            flush();
+            out += ch;
+        } else {
+            word += ch;
+        }
+    }
+    flush();
+    return out.replace(/\p{Nd}/gu, "*");
+}
+
+/** The workspace's `maskTextFn`: called by the recorder for every text node. */
+export function maskWorkspaceText(text: string, element?: MaybeElement) {
+    return replayReadable(element) ? hideFigures(text) : stars(text);
+}
+
+/** Attributes that hold words a person reads or hears, or a typed value. */
+const WORD_ATTRIBUTES = new Set([
+    "title",
+    "alt",
+    "placeholder",
+    "label",
+    "value",
+    "aria-label",
+    "aria-description",
+    "aria-valuetext",
+    "aria-placeholder",
+    "data-value",
+    "data-label",
+    "data-title",
+    "data-name",
+]);
+
+/** Where a person can be sent: `<a href>`, `<area href>`, `<form action>`. */
+const LINKS = new Set(["a", "area", "form"]);
+
+/**
+ * A link reduced to where it goes inside the workspace: its path, without
+ * the query string or fragment (a search lives there). One that leaves the
+ * workspace (a mail, a phone number, a business's own site) says nothing.
+ */
+function pathOnly(value: string): string {
+    if (value.startsWith("#")) return value;
+    try {
+        const here = typeof location === "undefined" ? null : location;
+        const relative = value.startsWith("/") && !value.startsWith("//");
+        const url = new URL(value, here?.href ?? "https://workspace.invalid");
+        if (relative) return url.pathname;
+        if (url.origin === here?.origin) return `${url.origin}${url.pathname}`;
+        return "#";
+    } catch {
+        return "#";
+    }
+}
+
+/**
+ * The workspace's `maskAttributeFn`. Text is not the only place a name
+ * lives: `title="Asha Rao"`, `aria-label="Open Asha Rao"`, a `mailto:`
+ * link, a search in a link's query string. Word attributes follow the same
+ * rule as text; a link a person can follow keeps its path and nothing
+ * else. What draws the page (`class`, `style`, `data-state`, a
+ * stylesheet's address) is left exactly as it is.
+ */
+export function maskWorkspaceAttribute(
+    name: string,
+    value: string,
+    element?: MaybeElement,
+): string {
+    const attribute = name.toLowerCase();
+    if (WORD_ATTRIBUTES.has(attribute))
+        return replayReadable(element) ? hideFigures(value) : stars(value);
+    if (
+        (attribute === "href" || attribute === "action") &&
+        LINKS.has((element?.tagName ?? "").toLowerCase())
+    )
+        return pathOnly(value);
+    return value;
+}
 
 export interface ReplayFacts {
     /** Which app is asking. Only the workspace ("application") may record. */
@@ -112,6 +279,12 @@ export interface ReplayFacts {
     inWorkspaceShell: boolean;
     /** The internal user id; a recording is never anonymous. */
     userId: string | undefined;
+    /**
+     * Whether this person has been shown the notice that says the workspace
+     * is recorded (on an earlier visit, or on this page a moment ago).
+     * Nobody is recorded before they have been told.
+     */
+    noticeShown: boolean;
 }
 
 /**
@@ -128,6 +301,7 @@ export function replayDecision(facts: ReplayFacts):
               | "outside-shell"
               | "no-user"
               | "opted-out"
+              | "not-told"
               | "browser-signal";
       } {
     if (facts.app !== "application")
@@ -136,11 +310,59 @@ export function replayDecision(facts: ReplayFacts):
     if (!facts.inWorkspaceShell) return { record: false, why: "outside-shell" };
     if (!facts.userId) return { record: false, why: "no-user" };
     if (facts.sharesUsage !== true) return { record: false, why: "opted-out" };
-    if (
+    if (facts.noticeShown !== true) return { record: false, why: "not-told" };
+    if (asksNotToBeTracked(facts))
+        return { record: false, why: "browser-signal" };
+    return { record: true };
+}
+
+function asksNotToBeTracked(
+    facts: Pick<ReplayFacts, "doNotTrack" | "globalPrivacyControl">,
+): boolean {
+    return (
         facts.globalPrivacyControl === true ||
         facts.doNotTrack === "1" ||
         facts.doNotTrack === "yes"
-    )
+    );
+}
+
+export interface SiteReplayFacts {
+    /** Which app is asking. Only saroh.in ("web") may record this way. */
+    app: TrackedApp;
+    /** `POSTHOG_REPLAY`. */
+    replay: string | undefined;
+    /**
+     * The visitor's answer to the cookie notice's analytics choice, the same
+     * one Google Analytics waits for. Anything but "granted" is no.
+     */
+    consent: "granted" | "refused" | null | undefined;
+    /** A Saroh team browser (`saroh_team=1`): our own visits aren't visitors. */
+    teamBrowser: boolean;
+    doNotTrack: string | null | undefined;
+    globalPrivacyControl: boolean | undefined;
+}
+
+/**
+ * Whether this visit to saroh.in may be recorded, and why not. Every rule
+ * must hold; the first that fails is named.
+ */
+export function siteReplayDecision(facts: SiteReplayFacts):
+    | { record: true }
+    | {
+          record: false;
+          why:
+              | "not-site"
+              | "switched-off"
+              | "team"
+              | "no-consent"
+              | "browser-signal";
+      } {
+    if (facts.app !== "web") return { record: false, why: "not-site" };
+    if (facts.replay !== "on") return { record: false, why: "switched-off" };
+    if (facts.teamBrowser) return { record: false, why: "team" };
+    if (facts.consent !== "granted")
+        return { record: false, why: "no-consent" };
+    if (asksNotToBeTracked(facts))
         return { record: false, why: "browser-signal" };
     return { record: true };
 }
@@ -322,14 +544,45 @@ export function errorsConfig(host: string): Record<string, unknown> {
     } satisfies Partial<PostHogConfig>;
 }
 
+/** What both recorders share: inputs masked, no network, no console. */
+function recorderBasics(sampleRate: number) {
+    return {
+        // Every input's, textarea's and select's value, of every type.
+        maskAllInputs: true,
+        maskInputOptions: { password: true },
+        blockClass: "ph-no-capture",
+        // No request or response of the page's own is ever recorded.
+        recordHeaders: false,
+        recordBody: false,
+        maskCapturedNetworkRequestFn: () => null,
+        recordCrossOriginIframes: false,
+        collectFonts: false,
+        captureCanvas: { recordCanvas: false },
+        // Uncompressed, so `replayBeforeSend` can strip query strings.
+        compress_events: false,
+        sampleRate,
+        // The project's minimum length counts recorded time, not the tab's.
+        strictMinimumDuration: true,
+    } satisfies NonNullable<PostHogConfig["session_recording"]>;
+}
+
 /**
- * The replay instance: the recorder, masked. It does ask PostHog for the
- * project's settings (a recording starts only if the project records at
- * all, and the minimum length kept is set there), but evaluates no flag.
+ * The workspace's replay instance. It does ask PostHog for the project's
+ * settings (a recording starts only if the project records at all, and the
+ * minimum length kept is set there), but evaluates no flag.
+ *
+ * **Masking.** `maskTextSelector: "*"` hands every text node to
+ * `maskTextFn` ({@link maskWorkspaceText}), which is the SDK's documented
+ * way to unmask selectively: a selector alone can't, because a mask on an
+ * element covers its children and `:not()` therefore never unmasks. The
+ * function leaves text readable only under `data-ph-unmask` and never under
+ * `data-ph-mask`; digits and emails are hidden even there. Attributes go
+ * through {@link maskWorkspaceAttribute}.
  */
 export function replayConfig(
     host: string,
     userId: string,
+    sampleRate: number = REPLAY_SAMPLE_RATE,
 ): Record<string, unknown> {
     return {
         ...everythingOff(host),
@@ -340,24 +593,38 @@ export function replayConfig(
         bootstrap: { distinctID: userId, isIdentifiedID: true },
         person_profiles: "identified_only",
         session_recording: {
-            // Every character of every text node, and every input's value.
+            ...recorderBasics(sampleRate),
             maskTextSelector: "*",
-            maskAllInputs: true,
-            maskInputOptions: { password: true },
-            blockClass: "ph-no-capture",
+            maskTextFn: maskWorkspaceText,
+            maskAttributeFn: maskWorkspaceAttribute,
             blockSelector: REPLAY_BLOCK_SELECTOR,
-            // No request or response of the page's own is ever recorded.
-            recordHeaders: false,
-            recordBody: false,
-            maskCapturedNetworkRequestFn: () => null,
-            recordCrossOriginIframes: false,
-            collectFonts: false,
-            captureCanvas: { recordCanvas: false },
-            // Uncompressed, so `replayBeforeSend` can strip query strings.
-            compress_events: false,
-            sampleRate: REPLAY_SAMPLE_RATE,
-            // The project's minimum length counts recorded time, not the tab's.
-            strictMinimumDuration: true,
+        },
+        before_send: replayBeforeSend as never,
+    } satisfies Partial<PostHogConfig>;
+}
+
+/**
+ * saroh.in's replay instance: the page as a visitor saw it. Its text is
+ * Saroh's own public content, so it is readable; every input is masked, and
+ * so is anything marked `data-ph-mask` (words a visitor typed, shown back).
+ * Nobody is identified: no id is handed in, none is stored
+ * (`persistence: "memory"`: no cookie, no localStorage), and no person
+ * profile is made. No pageview, click or other event leaves: only the
+ * recording (`before_send`).
+ */
+export function siteReplayConfig(
+    host: string,
+    sampleRate: number = REPLAY_SAMPLE_RATE,
+): Record<string, unknown> {
+    return {
+        ...everythingOff(host),
+        advanced_disable_flags: false,
+        disable_session_recording: true,
+        person_profiles: "never",
+        session_recording: {
+            ...recorderBasics(sampleRate),
+            maskTextSelector: `[${REPLAY_MASK_ATTRIBUTE}]`,
+            blockSelector: SITE_REPLAY_BLOCK_SELECTOR,
         },
         before_send: replayBeforeSend as never,
     } satisfies Partial<PostHogConfig>;
@@ -389,9 +656,26 @@ export interface BrowserTracking {
                 organizationId?: string;
             },
     ): Promise<boolean>;
-    /** Stop recording at once (the person opted out, or left the shell). */
+    /**
+     * saroh.in's: start recording if every rule holds
+     * ({@link siteReplayDecision}); resolves whether it started. Call again
+     * when the visitor's answer changes: anything but "granted" stops it.
+     */
+    startSiteReplay(
+        facts: Pick<SiteReplayFacts, "consent" | "teamBrowser"> &
+            Partial<
+                Pick<SiteReplayFacts, "doNotTrack" | "globalPrivacyControl">
+            >,
+    ): Promise<boolean>;
+    /**
+     * Stop recording at once (the person opted out, left the shell, or took
+     * their consent back).
+     */
     stopReplay(): void;
 }
+
+/** saroh.in's recorder is about nobody: one instance, whoever is visiting. */
+const ANONYMOUS = "";
 
 function sdkOf(loaded: { default: BrowserSdk } | BrowserSdk): BrowserSdk {
     return "default" in loaded ? loaded.default : loaded;
@@ -424,6 +708,35 @@ export function createBrowserTracking(
     // Bumped by every start and stop, so a start that was still loading the
     // recorder when the person opted out never begins.
     let replayTurn = 0;
+
+    /** Load the SDK and the recorder, make the instance once, and record. */
+    const begin = async (
+        who: string,
+        config: () => Record<string, unknown>,
+    ): Promise<boolean> => {
+        if (!options.loadRecorder) return false;
+        if (recording && replayUser === who) return true;
+        const turn = ++replayTurn;
+        try {
+            const [loaded] = await Promise.all([
+                loadSdk(),
+                options.loadRecorder(),
+            ]);
+            if (turn !== replayTurn) return false;
+            // One instance per page: who it is about is fixed when it is made.
+            if (!replay || replayUser !== who) {
+                replay = loaded.init(key, config(), `saroh_replay_${turn}`);
+                replayUser = who;
+            }
+            if (!replay) return false;
+            // No override: the sample rate decides whether this session is kept.
+            replay.startSessionRecording();
+            recording = true;
+            return true;
+        } catch {
+            return false;
+        }
+    };
 
     const tracking: BrowserTracking = {
         report(report) {
@@ -516,46 +829,41 @@ export function createBrowserTracking(
                 tracking.stopReplay();
                 return false;
             }
-            if (recording && replayUser === facts.userId) return true;
-            const turn = ++replayTurn;
-            try {
-                const [loaded] = await Promise.all([
-                    loadSdk(),
-                    options.loadRecorder(),
-                ]);
-                if (turn !== replayTurn) return false;
-                // One instance per page: its user is fixed when it is made.
-                if (!replay || replayUser !== facts.userId) {
-                    replay = loaded.init(
-                        key,
-                        {
-                            ...replayConfig(host, facts.userId),
-                            loaded: (instance: {
-                                register?: (p: Record<string, unknown>) => void;
-                            }) =>
-                                instance.register?.({
-                                    app,
-                                    environment,
-                                    ...(facts.organizationId
-                                        ? {
-                                              organization_id:
-                                                  facts.organizationId,
-                                          }
-                                        : {}),
-                                }),
-                        },
-                        `saroh_replay_${turn}`,
-                    );
-                    replayUser = facts.userId;
-                }
-                if (!replay) return false;
-                // No override: the sample rate decides whether this session is kept.
-                replay.startSessionRecording();
-                recording = true;
-                return true;
-            } catch {
+            const userId = facts.userId;
+            const sample = replaySampleRate(options.replaySample);
+            return begin(userId, () => ({
+                ...replayConfig(host, userId, sample),
+                loaded: (instance: {
+                    register?: (p: Record<string, unknown>) => void;
+                }) =>
+                    instance.register?.({
+                        app,
+                        environment,
+                        ...(facts.organizationId
+                            ? { organization_id: facts.organizationId }
+                            : {}),
+                    }),
+            }));
+        },
+
+        async startSiteReplay(facts) {
+            const decision = siteReplayDecision({
+                ...browserPrivacySignals(),
+                ...facts,
+                app,
+                replay: options.replay,
+            });
+            if (!decision.record || !options.loadRecorder) {
+                tracking.stopReplay();
                 return false;
             }
+            const sample = replaySampleRate(options.replaySample);
+            return begin(ANONYMOUS, () => ({
+                ...siteReplayConfig(host, sample),
+                loaded: (instance: {
+                    register?: (p: Record<string, unknown>) => void;
+                }) => instance.register?.({ app, environment }),
+            }));
         },
 
         stopReplay() {

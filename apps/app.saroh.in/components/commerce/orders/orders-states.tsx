@@ -310,6 +310,7 @@ export function OrdersEmpty({
                   : null;
     return (
         <EmptyState
+            data-ph-mask=""
             className="gap-[9px] rounded-[11px] border-border-strong"
             icon={<Icon />}
             title={copy.title}

@@ -127,6 +127,8 @@ const FormDescription = React.forwardRef<
             ref={ref}
             id={formDescriptionId}
             data-slot="form-description"
+            // Help text is Saroh's own words: a recording may read it.
+            data-ph-unmask=""
             className={cn("text-sm text-muted-foreground", className)}
             {...props}
         />
@@ -149,6 +151,10 @@ const FormMessage = React.forwardRef<
         <p
             ref={ref}
             id={formMessageId}
+            // What was wrong with a field, in the form's own words (the
+            // schema's message): a recording may read it. Digits and emails
+            // are hidden even here, and the field's value always is.
+            data-ph-unmask=""
             className={cn("text-sm font-medium text-destructive", className)}
             {...props}
         >

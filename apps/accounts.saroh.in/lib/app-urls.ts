@@ -1,4 +1,5 @@
 import { env } from "@/env";
+import { viaWelcome } from "@/lib/signup-welcome";
 
 /**
  * Where accounts sends a user once they are authenticated.
@@ -26,4 +27,20 @@ export function getAppUrl(): string {
  */
 export function getOnboardingUrl(): string {
     return `${getAppUrl()}/onboarding`;
+}
+
+/**
+ * Where a newly verified account's browser goes: `destination`, by way of
+ * saroh.in's `/welcome` when `NEXT_PUBLIC_SIGNUP_WELCOME_URL` is set
+ * (DEC-127, `lib/signup-welcome.ts`). Called in the browser, as the account
+ * leaves.
+ */
+export function afterSignUp(destination: string): string {
+    return viaWelcome({
+        welcomeUrl: env.NEXT_PUBLIC_SIGNUP_WELCOME_URL,
+        destination,
+        base: window.location.origin,
+        forwardable: [window.location.origin, new URL(getAppUrl()).origin],
+        now: Date.now(),
+    });
 }

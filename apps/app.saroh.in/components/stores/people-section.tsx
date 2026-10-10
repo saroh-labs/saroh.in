@@ -100,6 +100,7 @@ export function PeopleSection({
         // work here, and answers anyone else with none.
         return frame(
             <PermissionDeniedState
+                data-ph-mask=""
                 title="You can't see who works here"
                 description={`${store.name}'s people are shown to its owner and to the people who work here.`}
                 note="Its owner can invite you to this location."
@@ -185,6 +186,7 @@ export function PeopleSection({
 
                     {alone ? (
                         <EmptyState
+                            data-ph-mask=""
                             title="No one else works here yet"
                             description={onlyOwnerWords(people, store.name)}
                             action={invite ?? undefined}

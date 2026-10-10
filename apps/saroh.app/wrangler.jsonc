@@ -79,7 +79,9 @@
     "vars": {
         "VERCEL_ENV": "preview",
         "NEXT_PUBLIC_VERCEL_ENV": "preview",
-        "POSTHOG_KEY": "phc_nXZeUYpc7a7qq5HDQM9DAwe7U9ZcvdcTiW6fLP6L5uxT", // gitleaks:allow — the project's PUBLIC key; used server-side only here
+        // Off on development (owner, 10 Oct): one free project, so only
+        // production sends. Rehearsed on dev once, then removed.
+        // "POSTHOG_KEY": "",
         // "POSTHOG_HOST": unset, so reports go to the default (PostHog's EU cloud,
         // `packages/error-tracking`); no tracker address is written here.
         "VERCEL_GIT_COMMIT_REF": "development",

@@ -74,6 +74,7 @@ export function OrderExport({
     const busy = read !== null;
     return (
         <Button
+            data-ph-unmask=""
             variant="outline"
             disabled={total === 0 || busy}
             onClick={() => void run()}
