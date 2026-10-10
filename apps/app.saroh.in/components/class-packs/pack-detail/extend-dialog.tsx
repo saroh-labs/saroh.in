@@ -161,8 +161,13 @@ export function ExtendDialog({
                     <Button variant="outline" onClick={onClose}>
                         Cancel
                     </Button>
-                    <Button disabled={off} onClick={() => void save()}>
-                        {busy ? "Extending…" : "Extend"}
+                    <Button
+                        disabled={off}
+                        onClick={() => void save()}
+                        busy={busy}
+                        busyLabel="Extending…"
+                    >
+                        Extend
                     </Button>
                 </DialogFooter>
             </DialogContent>

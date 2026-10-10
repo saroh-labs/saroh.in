@@ -128,8 +128,8 @@ export function QuickLook({
                             <div className="ml-auto flex gap-0.5">
                                 <Button
                                     variant="ghost"
-                                    size="icon"
-                                    className="size-7 text-neutral-700 coarse:size-11 dark:text-foreground"
+                                    size="icon-xs"
+                                    className="text-neutral-700 dark:text-foreground"
                                     onClick={() => onStep(-1)}
                                     aria-label="Previous product (K)"
                                     title="Previous (K)"
@@ -138,8 +138,8 @@ export function QuickLook({
                                 </Button>
                                 <Button
                                     variant="ghost"
-                                    size="icon"
-                                    className="size-7 text-neutral-700 coarse:size-11 dark:text-foreground"
+                                    size="icon-xs"
+                                    className="text-neutral-700 dark:text-foreground"
                                     onClick={() => onStep(1)}
                                     aria-label="Next product (J)"
                                     title="Next (J)"
@@ -150,8 +150,8 @@ export function QuickLook({
                             <SheetClose asChild>
                                 <Button
                                     variant="ghost"
-                                    size="icon"
-                                    className="size-7 text-neutral-600 coarse:size-11 dark:text-foreground"
+                                    size="icon-xs"
+                                    className="text-neutral-600 dark:text-foreground"
                                     aria-label="Close (Esc)"
                                 >
                                     <X className="size-4" strokeWidth={2.1} />
@@ -259,7 +259,7 @@ function SellToggle({
         <Button
             variant="ghost"
             className={cn(
-                "ml-auto px-3",
+                "ml-auto",
                 selling
                     ? "text-destructive-subtle-foreground hover:text-destructive-subtle-foreground"
                     : "text-foreground",

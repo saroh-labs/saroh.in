@@ -100,7 +100,8 @@ export function NotificationsInbox({
                         variant="outline"
                         size="sm"
                         onClick={markAll}
-                        disabled={pending}
+                        busy={pending}
+                        busyLabel="Saving…"
                         className="wk-press"
                     >
                         Mark all as read

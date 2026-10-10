@@ -169,9 +169,11 @@ export function TaskForm({
                     <Button
                         type="submit"
                         className="wk-press"
-                        disabled={isSubmitting || !body.trim() || !dueDate}
+                        disabled={!body.trim() || !dueDate}
+                        busy={isSubmitting}
+                        busyLabel="Scheduling…"
                     >
-                        {isSubmitting ? "Scheduling…" : "Add follow-up"}
+                        Add follow-up
                     </Button>
                 </ActionSheetFooter>
             </form>

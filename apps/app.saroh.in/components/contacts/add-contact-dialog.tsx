@@ -188,8 +188,8 @@ export function AddContactDialog({
                         >
                             Cancel
                         </Button>
-                        <Button type="submit" disabled={saving}>
-                            {saving ? "Adding…" : "Add contact"}
+                        <Button type="submit" busy={saving} busyLabel="Adding…">
+                            Add contact
                         </Button>
                     </DialogFooter>
                 </form>

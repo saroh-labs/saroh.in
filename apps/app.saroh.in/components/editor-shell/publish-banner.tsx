@@ -12,9 +12,6 @@ import type {
     StatusLine,
 } from "@/lib/editor-shell/state";
 import { useBottomBarInset } from "@/lib/hooks/use-bottom-bar-inset";
-
-const BTN = "h-[38px] rounded-[9px] px-4 text-[14px] font-semibold";
-
 export interface BannerHandlers {
     onPublish: () => void;
     onDiscard: () => void;
@@ -82,8 +79,7 @@ export function PublishBanner({
                             <Button
                                 type="button"
                                 variant="outline"
-                                size="sm"
-                                className="h-7 rounded-[8px] px-2.5 text-[12.5px] font-semibold"
+                                size="xs"
                                 onClick={handlers.onRetry}
                             >
                                 Try again
@@ -93,8 +89,7 @@ export function PublishBanner({
                             <Button
                                 type="button"
                                 variant="outline"
-                                size="sm"
-                                className="h-7 rounded-[8px] px-2.5 text-[12.5px] font-semibold"
+                                size="xs"
                                 disabled={busy}
                                 onClick={handlers.onReload}
                             >
@@ -153,7 +148,7 @@ function ActionButtons({
                 <Button
                     type="button"
                     variant="outline"
-                    className={cn(BTN, "text-destructive")}
+                    className="text-destructive"
                     disabled={busy}
                     onClick={handlers.onDelete}
                 >
@@ -164,7 +159,6 @@ function ActionButtons({
                 <Button
                     type="button"
                     variant="outline"
-                    className={BTN}
                     disabled={busy}
                     onClick={handlers.onDiscard}
                 >
@@ -173,7 +167,7 @@ function ActionButtons({
             ) : null}
             <Button
                 type="button"
-                className={cn(BTN, phone && "flex-1")}
+                className={cn(phone && "flex-1")}
                 disabled={!actions.publishOn}
                 onClick={handlers.onPublish}
             >

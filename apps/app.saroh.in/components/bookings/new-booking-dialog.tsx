@@ -618,8 +618,10 @@ export function NewBookingDialog({
                                 type="button"
                                 disabled={!ready}
                                 onClick={() => void save()}
+                                busy={saving}
+                                busyLabel="Booking…"
                             >
-                                {saving ? "Booking…" : "Book it"}
+                                Book it
                             </Button>
                         </DialogFooter>
                     </>

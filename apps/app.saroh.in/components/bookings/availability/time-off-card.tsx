@@ -71,9 +71,10 @@ export function TimeOffCard({
                 </h2>
                 {canEdit ? (
                     <Button
+                        size="sm"
                         id={ADD_TIME_OFF_ID}
                         variant="outline"
-                        className="h-[30px] shrink-0 rounded-[8px] px-[11px] text-[12px] coarse:h-11"
+                        className="shrink-0"
                         onClick={() => {
                             setOpening((n) => n + 1);
                             setOpen(true);

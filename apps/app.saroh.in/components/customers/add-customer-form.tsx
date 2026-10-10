@@ -165,8 +165,12 @@ export function AddCustomerForm() {
                     )}
                 />
                 <div className="flex flex-wrap gap-2">
-                    <Button type="submit" disabled={isSubmitting}>
-                        {isSubmitting ? "Adding…" : "Add customer"}
+                    <Button
+                        type="submit"
+                        busy={isSubmitting}
+                        busyLabel="Adding…"
+                    >
+                        Add customer
                     </Button>
                     <Button asChild variant="outline">
                         <Link href="/commerce/customers">Cancel</Link>

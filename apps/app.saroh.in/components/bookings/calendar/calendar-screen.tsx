@@ -611,13 +611,14 @@ export function CalendarScreen({
                             ? "Customers book each service in its own hours, shown here as free time. Add the people who take bookings to give each their own column."
                             : "Nobody is on the diary and no service has hours of its own yet, so customers have no free times to book."}{" "}
                         {can.hours ? (
-                            <button
+                            <Button
+                                variant="link"
+                                size="inline"
                                 type="button"
                                 onClick={() => setAddingPerson(true)}
-                                className="rounded-sm font-semibold text-brand underline underline-offset-2 transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring active:text-muted-foreground coarse:min-h-11"
                             >
                                 Add who takes bookings
-                            </button>
+                            </Button>
                         ) : null}
                     </p>
                 ) : null}
@@ -883,10 +884,7 @@ function NoOneYet({
                 a column here with their free times to book.
             </p>
             {canHours ? (
-                <Button
-                    className="mt-3 h-[38px] rounded-[9px] px-4 text-[14px]"
-                    onClick={onAdd}
-                >
+                <Button className="mt-3" onClick={onAdd}>
                     Add someone
                 </Button>
             ) : null}

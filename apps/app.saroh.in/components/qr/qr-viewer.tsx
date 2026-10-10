@@ -77,7 +77,6 @@ export function QrViewer({
             <div className="flex flex-wrap gap-2">
                 <Button
                     type="button"
-                    className="h-10 rounded-[10px] px-4 text-sm"
                     disabled={busy || !code.link}
                     onClick={() => void download("png")}
                 >
@@ -86,7 +85,6 @@ export function QrViewer({
                 <Button
                     type="button"
                     variant="outline"
-                    className="h-10 rounded-[10px] px-4 text-sm"
                     disabled={busy || !code.link}
                     aria-label="Download SVG"
                     onClick={() => void download("svg")}
@@ -96,7 +94,6 @@ export function QrViewer({
                 <Button
                     type="button"
                     variant="outline"
-                    className="h-10 rounded-[10px] px-4 text-sm"
                     disabled={!code.link}
                     onClick={() => void copy()}
                 >

@@ -145,8 +145,8 @@ export function PreviewLinks({ siteId }: { siteId: string }) {
                                     <Button
                                         type="button"
                                         variant="outline"
-                                        size="sm"
-                                        className="h-6 shrink-0 px-1.5 text-[0.6875rem]"
+                                        size="xs"
+                                        className="shrink-0 px-1.5 text-[0.6875rem]"
                                         onClick={() =>
                                             void copy(
                                                 previewUrl(secrets[link.id]),
@@ -203,9 +203,9 @@ export function PreviewLinks({ siteId }: { siteId: string }) {
                                 <Button
                                     type="button"
                                     variant="ghost"
-                                    size="sm"
+                                    size="xs"
                                     disabled={busy === link.id}
-                                    className="h-6 px-1.5 text-[0.6875rem]"
+                                    className="px-1.5 text-[0.6875rem]"
                                     onClick={() => void revoke(link)}
                                 >
                                     Turn off
@@ -247,10 +247,10 @@ export function PreviewLinks({ siteId }: { siteId: string }) {
                 </div>
                 <Button
                     type="button"
-                    size="sm"
+                    size="xs"
                     variant="brand"
                     disabled={busy === "create"}
-                    className="ml-auto h-6 px-2 text-[0.6875rem]"
+                    className="ml-auto text-[0.6875rem]"
                     onClick={() => void create()}
                 >
                     {active.length > 0 ? "New link" : "Create link"}

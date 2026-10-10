@@ -216,9 +216,9 @@ export function OrderRowMenu({
                     <Button
                         type="button"
                         variant="ghost"
-                        size="icon"
+                        size="icon-xs"
                         aria-label={`More actions for order ${ref}`}
-                        className="relative z-[1] size-7 rounded-[7px] text-muted-foreground hover:bg-muted active:bg-secondary-hover data-[state=open]:bg-muted coarse:size-11"
+                        className="relative z-[1] text-muted-foreground hover:bg-muted active:bg-secondary-hover data-[state=open]:bg-muted"
                     >
                         <MoreHorizontal aria-hidden className="size-4" />
                     </Button>

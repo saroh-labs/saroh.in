@@ -22,11 +22,12 @@ export function TurnOnTracking() {
         <>
             <Button
                 type="button"
-                className="mt-1.5 rounded-[9px] px-4 text-[12.5px]"
-                disabled={pending}
+                className="mt-1.5"
                 onClick={() => setAsking(true)}
+                busy={pending}
+                busyLabel="Turning on…"
             >
-                {pending ? "Turning on…" : "Turn on Track stock"}
+                Turn on Track stock
             </Button>
             <ConfirmDialog
                 open={asking}

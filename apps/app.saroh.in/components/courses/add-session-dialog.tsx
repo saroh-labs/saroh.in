@@ -137,12 +137,13 @@ export function AddSessionDialog({
                     >
                         Cancel
                     </Button>
-                    <Button disabled={busy || !day} onClick={() => void add()}>
-                        {busy
-                            ? "Adding…"
-                            : on > 0
-                              ? `Add and book ${on}`
-                              : "Add session"}
+                    <Button
+                        disabled={!day}
+                        onClick={() => void add()}
+                        busy={busy}
+                        busyLabel="Adding…"
+                    >
+                        {on > 0 ? `Add and book ${on}` : "Add session"}
                     </Button>
                 </DialogFooter>
             </DialogContent>

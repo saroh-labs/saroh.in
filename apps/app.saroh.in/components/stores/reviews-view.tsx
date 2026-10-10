@@ -338,7 +338,13 @@ function ReviewSheet({
                                     <div className="flex flex-wrap gap-2">
                                         <Button
                                             type="submit"
-                                            disabled={pending || !reply.trim()}
+                                            disabled={!reply.trim()}
+                                            busy={pending}
+                                            busyLabel={
+                                                review.reply
+                                                    ? "Saving…"
+                                                    : "Posting…"
+                                            }
                                         >
                                             {review.reply
                                                 ? "Save reply"

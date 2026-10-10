@@ -141,29 +141,49 @@ describe("Button", () => {
     it("at rest the button already holds the busy label's width", () => {
         render(<Button busyLabel="Saving…">Save</Button>);
         const b = screen.getByRole("button");
-        // Named by what it does now, with the other label laid out unseen
-        // in the same cell, so the button never changes width.
+        // One label in the page's text: the one that is true now. The
+        // other is drawn unseen by CSS in the same cell, to hold its width.
         expect(b).toHaveAccessibleName("Save");
+        expect(b.textContent).toBe("Save");
         expect(b).not.toHaveAttribute("aria-busy");
-        const waiting = screen.getByText("Saving…");
-        expect(waiting).toHaveStyle({ visibility: "hidden" });
-        expect(waiting).toHaveAttribute("aria-hidden", "true");
-        expect(screen.getByText("Save")).not.toHaveStyle({
-            visibility: "hidden",
-        });
+        const stack = must(b.querySelector("[data-reserve]"));
+        expect(stack).toHaveAttribute("data-reserve", "Saving…");
+        has(
+            stack,
+            "inline-grid",
+            "after:invisible",
+            "after:h-0",
+            "after:content-[attr(data-reserve)]",
+        );
     });
 
-    it("flipping to busy swaps which label is seen, not the markup", () => {
+    it("busy keeps room for the label it had, so it does not shrink", () => {
         const { rerender } = render(<Button busyLabel="Saving…">Save</Button>);
         rerender(
             <Button busy busyLabel="Saving…">
-                Save
+                Save changes
             </Button>,
         );
-        expect(screen.getByText("Save")).toHaveStyle({ visibility: "hidden" });
-        expect(screen.getByText("Saving…")).not.toHaveStyle({
-            visibility: "hidden",
-        });
+        const b = screen.getByRole("button");
+        expect(b.textContent).toBe("Saving…");
+        expect(must(b.querySelector("[data-reserve]"))).toHaveAttribute(
+            "data-reserve",
+            "Save changes",
+        );
+    });
+
+    it("a label with an icon is kept as a hidden node while busy", () => {
+        render(
+            <Button busy busyLabel="Uploading…">
+                <svg data-testid="icon" />
+                Upload
+            </Button>,
+        );
+        const b = screen.getByRole("button");
+        expect(b).toHaveAccessibleName("Uploading…");
+        const kept = must(screen.getByTestId("icon").parentElement);
+        expect(kept).toHaveAttribute("aria-hidden", "true");
+        expect(kept).toHaveStyle({ visibility: "hidden" });
     });
 
     it("busy with no second label keeps its words and still says busy", () => {

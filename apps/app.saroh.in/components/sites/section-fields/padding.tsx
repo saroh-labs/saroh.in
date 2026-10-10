@@ -1,5 +1,6 @@
 "use client";
 
+import { Button } from "@saroh/ui/button";
 import { Label } from "@saroh/ui/label";
 
 import type { Section } from "@/lib/sites/service";
@@ -79,13 +80,15 @@ export function SectionPadding({
                 className="w-full accent-foreground"
             />
             {!following && (
-                <button
+                <Button
+                    variant="link"
+                    size="inline"
                     type="button"
                     onClick={() => set(undefined)}
-                    className="rounded text-left text-xs text-brand hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                    className="text-left"
                 >
                     Follow the site setting
-                </button>
+                </Button>
             )}
         </div>
     );

@@ -132,8 +132,12 @@ export function CategoryRow({
                                 >
                                     Cancel
                                 </Button>
-                                <Button type="submit" disabled={busy}>
-                                    {busy ? "Saving…" : "Save"}
+                                <Button
+                                    type="submit"
+                                    busy={busy}
+                                    busyLabel="Saving…"
+                                >
+                                    Save
                                 </Button>
                             </DialogFooter>
                         </form>

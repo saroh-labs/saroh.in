@@ -19,10 +19,6 @@ import { websiteSummary } from "@/lib/products/overview-words";
 
 import { CollectionSheet } from "./collection-sheet";
 import { ProductCollectionsSheet } from "./product-collections-sheet";
-
-const EDIT_BUTTON =
-    "h-[26px] gap-[5px] rounded-[7px] px-[9px] text-[12px] coarse:h-11";
-
 /**
  * The product's Collections tab (#524), after "Saroh Product Detail": the
  * collections it is in, each saying how many products it shows and why this
@@ -110,9 +106,9 @@ export function ProductCollectionsTab({
                 >
                     {canEdit && handPicked ? (
                         <Button
+                            size="sm"
                             type="button"
                             onClick={() => setEditing(true)}
-                            className="h-[34px] rounded-[9px] px-3.5 text-[12.5px] coarse:min-h-11"
                         >
                             Add to a collection
                         </Button>
@@ -138,11 +134,11 @@ export function ProductCollectionsTab({
                     </h2>
                     {canEdit ? (
                         <Button
+                            size="xs"
                             type="button"
                             variant="outline"
                             onClick={() => setEditing(true)}
                             aria-label="Edit collections"
-                            className={EDIT_BUTTON}
                         >
                             <Pencil
                                 className="size-3"
@@ -180,14 +176,16 @@ export function ProductCollectionsTab({
                                         <p className="min-w-0 flex-1 truncate text-[14px] font-semibold">
                                             {c.name}
                                         </p>
-                                        <button
+                                        <Button
+                                            variant="link"
+                                            size="inline"
                                             type="button"
                                             onClick={() => setOpened(c.id)}
                                             aria-label={`Open ${c.name}`}
-                                            className="shrink-0 text-[12px] text-brand hover:text-foreground coarse:min-h-11"
+                                            className="shrink-0"
                                         >
                                             Open
-                                        </button>
+                                        </Button>
                                     </div>
                                     <p className="mt-1 text-[12px] text-muted-foreground">
                                         {note}

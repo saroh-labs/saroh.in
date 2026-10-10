@@ -418,13 +418,14 @@ export function ChangePlanDialog({
                         <Button
                             type="button"
                             onClick={confirm}
-                            disabled={pending}
-                        >
-                            {pending
-                                ? summary.toPayment
+                            busy={pending}
+                            busyLabel={
+                                summary.toPayment
                                     ? "Opening the payment…"
                                     : "Changing…"
-                                : summary.confirm}
+                            }
+                        >
+                            {summary.confirm}
                         </Button>
                     ) : null}
                 </DialogFooter>

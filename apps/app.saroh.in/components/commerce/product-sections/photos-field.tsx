@@ -469,7 +469,7 @@ export function AddressPanel({
                 <Button
                     type="button"
                     size="sm"
-                    disabled={!valid || check === "checking"}
+                    disabled={!valid}
                     onClick={() => {
                         // What's stored is the address rebuilt behind https://,
                         // never the text as typed (release #772).
@@ -483,8 +483,10 @@ export function AddressPanel({
                         img.onerror = () => setCheck("broken");
                         img.src = safe;
                     }}
+                    busy={check === "checking"}
+                    busyLabel="Checking…"
                 >
-                    {check === "checking" ? "Checking…" : "Add photo"}
+                    Add photo
                 </Button>
                 {check === "broken" && safe?.startsWith("https://") ? (
                     <Button

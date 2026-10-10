@@ -175,9 +175,10 @@ export function MessagesTab({
                             size="sm"
                             disabled={off}
                             onClick={() => void reply()}
-                            className="h-8 rounded-[9px] px-3 text-[12.5px] font-semibold coarse:h-11"
+                            busy={busy}
+                            busyLabel="Sending…"
                         >
-                            {busy ? "Sending…" : "Send reply"}
+                            Send reply
                         </Button>
                     </div>
                 </div>

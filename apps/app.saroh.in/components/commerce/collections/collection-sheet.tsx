@@ -350,9 +350,10 @@ export function CollectionSheet({
                             <span className="flex-[1_1_120px]">
                                 {editing && canWrite && detail ? (
                                     <Button
+                                        size="sm"
                                         type="button"
                                         variant="ghost"
-                                        className="h-[34px] rounded-[9px] px-2.5 text-[12.5px] font-semibold text-destructive hover:text-destructive"
+                                        className="text-destructive hover:text-destructive"
                                         onClick={() => setAskDelete(true)}
                                         disabled={saving}
                                     >
@@ -361,9 +362,9 @@ export function CollectionSheet({
                                 ) : null}
                             </span>
                             <Button
+                                size="sm"
                                 type="button"
                                 variant="outline"
-                                className="h-[34px] rounded-[9px] px-3 text-[12.5px] font-semibold"
                                 onClick={() => requestClose(false)}
                                 disabled={saving}
                             >
@@ -371,15 +372,13 @@ export function CollectionSheet({
                             </Button>
                             {canWrite ? (
                                 <Button
+                                    size="sm"
                                     type="submit"
-                                    className="h-[34px] rounded-[9px] px-3.5 text-[12.5px] font-semibold"
-                                    disabled={saving || readOnly || !dirty}
+                                    disabled={readOnly || !dirty}
+                                    busy={saving}
+                                    busyLabel="Saving…"
                                 >
-                                    {saving
-                                        ? "Saving…"
-                                        : editing
-                                          ? "Save"
-                                          : "Create collection"}
+                                    {editing ? "Save" : "Create collection"}
                                 </Button>
                             ) : null}
                         </SheetFooter>

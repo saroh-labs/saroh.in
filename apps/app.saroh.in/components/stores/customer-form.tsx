@@ -226,13 +226,10 @@ export function CustomerForm({
                     <Button
                         type="submit"
                         className="wk-press"
-                        disabled={isSubmitting}
+                        busy={isSubmitting}
+                        busyLabel="Saving…"
                     >
-                        {isSubmitting
-                            ? "Saving…"
-                            : editing
-                              ? "Save changes"
-                              : "Create customer"}
+                        {editing ? "Save changes" : "Create customer"}
                     </Button>
                     {onCancel ? (
                         <Button

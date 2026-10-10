@@ -58,9 +58,10 @@ export function LateRuleNoticeCard({
             </span>
             {canChange ? (
                 <Button
+                    size="sm"
                     asChild
                     variant="outline"
-                    className="h-[30px] rounded-[8px] border-highlight px-[11px] text-[12.5px] font-semibold coarse:h-11"
+                    className="border-highlight"
                 >
                     <Link
                         href={`${storefrontHref(notice.storeId, "delivery")}#${LATE_AFTER_ANCHOR}`}
@@ -76,11 +77,11 @@ export function LateRuleNoticeCard({
             <Button
                 type="button"
                 variant="ghost"
-                size="icon"
+                size="icon-sm"
                 disabled={pending}
                 onClick={dismiss}
                 aria-label={`Dismiss this notice for ${notice.name}`}
-                className="size-[30px] text-brand-subtle-foreground coarse:size-11"
+                className="text-brand-subtle-foreground"
             >
                 <X aria-hidden className="size-4" />
             </Button>

@@ -214,18 +214,15 @@ export function DiscardBar({
                 You have changes that are not saved.
             </span>
             <Button
+                size="sm"
                 type="button"
                 variant="outline"
-                className="h-[30px] rounded-[8px] px-[11px] text-[12px] font-semibold text-destructive hover:text-destructive"
+                className="text-destructive hover:text-destructive"
                 onClick={onDiscard}
             >
                 Discard
             </Button>
-            <Button
-                type="button"
-                className="h-[30px] rounded-[8px] px-[11px] text-[12px] font-semibold"
-                onClick={onKeep}
-            >
+            <Button size="sm" type="button" onClick={onKeep}>
                 Keep editing
             </Button>
         </div>

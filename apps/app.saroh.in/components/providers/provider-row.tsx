@@ -240,7 +240,7 @@ export function ProviderRowView({
                             type="button"
                             variant="ghost"
                             size="sm"
-                            className="px-2.5 text-foreground/80"
+                            className="text-foreground/80"
                             aria-expanded={open}
                             aria-controls={open ? detailsId : undefined}
                             onClick={() => setOpen((o) => !o)}
@@ -322,7 +322,7 @@ export function DomainsRowView({ row }: { row: DomainsRow }) {
                             type="button"
                             variant="ghost"
                             size="sm"
-                            className="px-2.5 text-foreground/80"
+                            className="text-foreground/80"
                             aria-expanded={open}
                             aria-controls={open ? detailsId : undefined}
                             onClick={() => setOpen((o) => !o)}
@@ -359,8 +359,7 @@ function RefLine({ label, code }: ProviderRef) {
             <Button
                 type="button"
                 variant="outline"
-                size="sm"
-                className="h-7 px-2.5 text-[12px]"
+                size="xs"
                 aria-label={`Copy ${label.toLowerCase()}`}
                 onClick={() => {
                     navigator.clipboard.writeText(code).then(

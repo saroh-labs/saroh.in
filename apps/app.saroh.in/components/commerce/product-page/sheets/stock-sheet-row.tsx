@@ -90,10 +90,7 @@ export function SheetSizeRow({
                     ? `${s.title} has open orders, so it can't be removed`
                     : `Remove ${s.title || "this size"}`
             }
-            className={cn(
-                "rounded-md p-0 text-destructive-subtle-foreground",
-                className,
-            )}
+            className={cn("p-0 text-destructive-subtle-foreground", className)}
         >
             <X aria-hidden className="size-3" strokeWidth={2.2} />
         </Button>

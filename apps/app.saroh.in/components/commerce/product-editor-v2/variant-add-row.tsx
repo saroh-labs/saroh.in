@@ -1,5 +1,6 @@
 "use client";
 
+import { Button } from "@saroh/ui/button";
 import { cn } from "@saroh/ui/lib/utils";
 import Link from "next/link";
 
@@ -103,14 +104,15 @@ export function VariantAddRow({
                 </MoneyBox>
             </div>
             <div className="mt-[9px] flex flex-wrap items-center gap-2.5">
-                <button
+                <Button
+                    size="sm"
                     type="button"
                     disabled={addOff}
                     onClick={onAdd}
-                    className="h-8 shrink-0 rounded-[8px] bg-foreground px-[13px] text-[12.5px] font-semibold text-background hover:bg-foreground/90 disabled:bg-muted disabled:text-muted-foreground coarse:h-11"
+                    className="shrink-0"
                 >
                     Add to list
-                </button>
+                </Button>
                 <span
                     className={cn(
                         "min-w-0 flex-1 text-pretty text-[11.5px] leading-[1.45]",

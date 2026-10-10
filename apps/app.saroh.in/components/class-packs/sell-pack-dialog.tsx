@@ -269,7 +269,6 @@ export function SellPackDialog({
                     </Button>
                     <Button
                         disabled={
-                            busy ||
                             Boolean(nothingToSell) ||
                             nobody ||
                             missing ||
@@ -283,10 +282,10 @@ export function SellPackDialog({
                                   : undefined
                         }
                         onClick={() => void save()}
+                        busy={busy}
+                        busyLabel="Selling…"
                     >
-                        {busy
-                            ? "Selling…"
-                            : sellLabel(pack, paidBy, invoicesOnSale)}
+                        {sellLabel(pack, paidBy, invoicesOnSale)}
                     </Button>
                 </DialogFooter>
             </DialogContent>

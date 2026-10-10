@@ -1,7 +1,7 @@
 "use client";
 
+import { Button } from "@saroh/ui/button";
 import { Input } from "@saroh/ui/input";
-import { cn } from "@saroh/ui/lib/utils";
 import { useState } from "react";
 
 import { Chip } from "@/components/shared/chip";
@@ -14,7 +14,7 @@ import {
 } from "@/lib/orders/new-order";
 import type { NewOrderProduct } from "@/lib/orders/new-order-service";
 
-import { FIELD, SMALL_BUTTON } from "./parts";
+import { FIELD } from "./parts";
 
 /**
  * New order's Items (B13): the lines, each with − and +, its total and,
@@ -86,24 +86,24 @@ export function LinesStep({
                                     </div>
                                 ) : null}
                             </div>
-                            <button
+                            <Button
+                                variant="outline"
+                                size="icon-sm"
                                 type="button"
                                 onClick={() => onBump(line.key, -1)}
                                 aria-label={`One fewer ${title}`}
-                                className={cn(
-                                    SMALL_BUTTON,
-                                    "size-8 text-[15px] font-normal coarse:size-11",
-                                )}
                             >
                                 −
-                            </button>
+                            </Button>
                             <span
                                 aria-label={`${line.quantity} of ${title}`}
                                 className="min-w-[22px] text-center font-semibold tabular-nums"
                             >
                                 {line.quantity}
                             </span>
-                            <button
+                            <Button
+                                variant="outline"
+                                size="icon-sm"
                                 type="button"
                                 onClick={() => onBump(line.key, 1)}
                                 disabled={room === 0}
@@ -113,13 +113,9 @@ export function LinesStep({
                                         : undefined
                                 }
                                 aria-label={`One more ${title}`}
-                                className={cn(
-                                    SMALL_BUTTON,
-                                    "size-8 text-[15px] font-normal coarse:size-11",
-                                )}
                             >
                                 +
-                            </button>
+                            </Button>
                             <span className="min-w-[70px] text-right font-semibold tabular-nums">
                                 {format(s.priceCents * line.quantity)}
                             </span>

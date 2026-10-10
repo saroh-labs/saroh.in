@@ -277,7 +277,7 @@ export function OpeningHoursFields({
             <Button
                 type="button"
                 variant="link"
-                className="h-auto w-fit p-0 text-[12.5px] font-medium text-muted-foreground underline decoration-muted-foreground/40 underline-offset-4 hover:text-foreground hover:decoration-foreground"
+                className="h-auto w-fit p-0 font-medium text-muted-foreground underline decoration-muted-foreground/40 underline-offset-4 hover:text-foreground hover:decoration-foreground"
                 onClick={() => {
                     if (eachDay) {
                         // Back to one set of hours: every open day takes

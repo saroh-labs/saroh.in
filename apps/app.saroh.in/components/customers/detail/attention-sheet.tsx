@@ -395,17 +395,18 @@ export function AttentionSheet({
                             You have changes that are not saved.
                         </span>
                         <Button
+                            size="sm"
                             type="button"
                             variant="outline"
                             onClick={() => close(true)}
-                            className="h-[30px] rounded-[8px] px-[11px] text-[12px] font-semibold text-destructive-subtle-foreground coarse:h-11"
+                            className="text-destructive-subtle-foreground"
                         >
                             Discard
                         </Button>
                         <Button
+                            size="sm"
                             type="button"
                             onClick={() => setAsking(false)}
-                            className="h-[30px] rounded-[8px] px-[11px] text-[12px] font-semibold coarse:h-11"
                         >
                             Keep editing
                         </Button>
@@ -416,24 +417,22 @@ export function AttentionSheet({
                         {entry && !dirty ? "No changes yet" : ""}
                     </span>
                     <Button
+                        size="sm"
                         type="button"
                         variant="outline"
                         onClick={() => close()}
-                        className="h-8 rounded-[9px] px-3 text-[12.5px] font-semibold coarse:h-11"
                     >
                         Cancel
                     </Button>
                     <Button
+                        size="sm"
                         type="submit"
                         form={id}
-                        disabled={saving || (entry !== null && !dirty)}
-                        className="h-8 rounded-[9px] px-3 text-[12.5px] font-semibold coarse:h-11"
+                        disabled={entry !== null && !dirty}
+                        busy={saving}
+                        busyLabel="Saving…"
                     >
-                        {saving
-                            ? "Saving…"
-                            : entry
-                              ? "Save"
-                              : "Add to Needs attention"}
+                        {entry ? "Save" : "Add to Needs attention"}
                     </Button>
                 </div>
             </SheetContent>

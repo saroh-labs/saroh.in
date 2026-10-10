@@ -564,11 +564,11 @@ export function CsvImport({
                                 <Button
                                     variant="brand"
                                     onClick={() => onImport(fits ?? undefined)}
-                                    disabled={pending || willWrite === 0}
+                                    disabled={willWrite === 0}
+                                    busy={pending}
+                                    busyLabel="Importing…"
                                 >
-                                    {pending
-                                        ? "Working…"
-                                        : `Import ${willWrite} row${willWrite === 1 ? "" : "s"}`}
+                                    {`Import ${willWrite} row${willWrite === 1 ? "" : "s"}`}
                                 </Button>
                                 <Button
                                     variant="outline"

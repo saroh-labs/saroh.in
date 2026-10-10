@@ -546,13 +546,15 @@ export function InvoiceForm({
                                     </div>
                                 </div>
                             ) : (
-                                <button
+                                <Button
+                                    variant="link"
+                                    size="inline"
                                     type="button"
                                     onClick={() => setBuyerOpen(true)}
-                                    className="mt-2 py-1 text-[12.5px] font-semibold text-brand transition-colors hover:text-foreground active:text-muted-foreground"
+                                    className="mt-2"
                                 >
                                     + Their GSTIN, state and address
-                                </button>
+                                </Button>
                             )
                         ) : null}
                     </Card>
@@ -708,7 +710,9 @@ export function InvoiceForm({
                                 );
                             })}
                         </ul>
-                        <button
+                        <Button
+                            variant="link"
+                            size="inline"
                             type="button"
                             disabled={isSubmitting}
                             onClick={() =>
@@ -720,10 +724,10 @@ export function InvoiceForm({
                                     hsnSac: "",
                                 })
                             }
-                            className="mt-1 py-1.5 text-[12.5px] font-semibold text-brand transition-colors hover:text-foreground active:text-muted-foreground"
+                            className="mt-1"
                         >
                             + Add a line
-                        </button>
+                        </Button>
                         {registered ? (
                             <p className="mt-1 text-[12px] text-muted-foreground">
                                 Prices include GST. A line with no rate set is
@@ -800,25 +804,19 @@ export function InvoiceForm({
                                     onInvalid,
                                 )()
                             }
-                            className="h-10 rounded-[10px] text-[13.5px]"
+                            busy={isSubmitting && intent === "issue"}
+                            busyLabel="Issuing…"
                         >
-                            {isSubmitting && intent === "issue"
-                                ? "Issuing…"
-                                : withLink
-                                  ? "Issue with pay link"
-                                  : "Issue it"}
+                            {withLink ? "Issue with pay link" : "Issue it"}
                         </Button>
                         <Button
                             type="submit"
                             variant="outline"
                             disabled={isSubmitting || noLine}
-                            className="h-10 rounded-[10px] text-[13.5px]"
+                            busy={isSubmitting && intent === "draft"}
+                            busyLabel="Saving…"
                         >
-                            {isSubmitting && intent === "draft"
-                                ? "Saving…"
-                                : draft
-                                  ? "Save the draft"
-                                  : "Save as draft"}
+                            {draft ? "Save the draft" : "Save as draft"}
                         </Button>
                     </div>
                     {noLine && typed ? (
@@ -893,7 +891,7 @@ function NewContact({
                     type="button"
                     variant={solid ? "default" : "link"}
                     size="sm"
-                    className={solid ? undefined : "h-auto px-0 text-[12.5px]"}
+                    className={solid ? undefined : "h-auto px-0"}
                 >
                     New contact
                 </Button>

@@ -331,9 +331,11 @@ function SectionSlot({
                             <Button
                                 type="submit"
                                 size="sm"
-                                disabled={saving || body.trim().length === 0}
+                                disabled={body.trim().length === 0}
+                                busy={saving}
+                                busyLabel="Adding…"
                             >
-                                {saving ? "Adding…" : "Add note"}
+                                Add note
                             </Button>
                             <Button
                                 type="button"

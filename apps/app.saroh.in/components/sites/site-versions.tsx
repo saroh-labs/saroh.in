@@ -227,16 +227,14 @@ export function SiteVersions({
                                                         ? "destructive"
                                                         : "brand"
                                                 }
-                                                disabled={pending}
                                                 onClick={() => onRestore(p.id)}
+                                                busy={pending}
+                                                busyLabel="Restoring…"
                                             >
-                                                {pending
-                                                    ? "Restoring…"
-                                                    : gate.kind ===
-                                                            "override" ||
-                                                        changesRequested
-                                                      ? "Restore without approval"
-                                                      : "Yes, restore"}
+                                                {gate.kind === "override" ||
+                                                changesRequested
+                                                    ? "Restore without approval"
+                                                    : "Yes, restore"}
                                             </Button>
                                             <Button
                                                 size="sm"

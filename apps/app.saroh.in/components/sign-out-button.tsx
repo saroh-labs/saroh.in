@@ -1,14 +1,16 @@
 "use client";
 
 import { authClient } from "@saroh/auth/client";
+import { Button } from "@saroh/ui/button";
 
 import { accountsLoginUrl } from "@/lib/accounts";
 
 export function SignOutButton() {
     return (
-        <button
+        <Button
+            variant="link"
+            size="inline"
             type="button"
-            className="cursor-pointer text-sm underline hover:decoration-2 active:text-muted-foreground"
             onClick={() =>
                 authClient.signOut().then(() => {
                     window.location.href = accountsLoginUrl;
@@ -16,6 +18,6 @@ export function SignOutButton() {
             }
         >
             Sign out
-        </button>
+        </Button>
     );
 }

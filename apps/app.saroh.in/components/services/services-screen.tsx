@@ -26,9 +26,6 @@ import {
 } from "@/lib/services/service-cards";
 import type { ServiceUsage } from "@/lib/services/usage";
 import type { BookingPaymentView, StaffView } from "@/lib/staff/types";
-
-const btn = "h-[38px] rounded-[9px] px-4 text-[14px]";
-
 /**
  * Bookings › Services (U16, E2, the design's `?view=services`): what people
  * can book, as cards — kind, price, length and the gap after, where, places,
@@ -103,10 +100,7 @@ export function ServicesScreen({
                     {servicesSummary(services, hasPage)}
                 </span>
                 {canEdit ? (
-                    <Button
-                        asChild
-                        className="h-[38px] rounded-[9px] px-4 text-[13px]"
-                    >
+                    <Button asChild>
                         <Link href="/services/new">New service</Link>
                     </Button>
                 ) : null}
@@ -227,11 +221,7 @@ export function ServicesScreen({
                                     )}
                                 </div>
                                 <div className="mt-3 flex flex-wrap gap-2">
-                                    <Button
-                                        asChild
-                                        variant="outline"
-                                        className={btn}
-                                    >
+                                    <Button asChild variant="outline">
                                         <Link
                                             href={`/services/${s.id}`}
                                             aria-label={`${canEdit ? "Edit" : "View"} ${s.name}`}
@@ -242,7 +232,6 @@ export function ServicesScreen({
                                     {canEdit ? (
                                         <Button
                                             variant="outline"
-                                            className={btn}
                                             disabled={busy === s.id}
                                             onClick={() => void toggle(s)}
                                         >

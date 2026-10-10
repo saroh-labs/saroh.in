@@ -99,13 +99,15 @@ export function TakeMoneyChecklist({
     if (place === "hidden") {
         if (slot !== "late") return null;
         return (
-            <button
+            <Button
+                variant="link"
+                size="inline"
                 type="button"
                 onClick={() => setHidden(businessId, false)}
-                className="justify-self-start text-left text-[12.5px] font-semibold text-brand underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 active:text-muted-foreground coarse:min-h-11"
+                className="justify-self-start text-left"
             >
                 Show setup ({count})
-            </button>
+            </Button>
         );
     }
     if (place !== slot) return null;
@@ -139,7 +141,7 @@ export function TakeMoneyChecklist({
                     variant="outline"
                     size="sm"
                     onClick={hide}
-                    className="ml-auto px-2.5 text-[12.5px] font-medium text-neutral-600 dark:text-neutral-400"
+                    className="ml-auto font-medium text-neutral-600 dark:text-neutral-400"
                 >
                     Hide for now
                 </Button>

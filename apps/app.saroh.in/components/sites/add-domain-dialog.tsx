@@ -136,12 +136,11 @@ export function AddDomainDialog({
                             {added.view.checkLabel ? (
                                 <Button
                                     type="button"
-                                    disabled={checking}
                                     onClick={() => onCheck(added.domain)}
+                                    busy={checking}
+                                    busyLabel="Checking…"
                                 >
-                                    {checking
-                                        ? "Checking…"
-                                        : added.view.checkLabel}
+                                    {added.view.checkLabel}
                                 </Button>
                             ) : null}
                         </DialogFooter>
@@ -209,8 +208,12 @@ export function AddDomainDialog({
                                 >
                                     Cancel
                                 </Button>
-                                <Button type="submit" disabled={adding}>
-                                    {adding ? "Adding…" : "Add domain"}
+                                <Button
+                                    type="submit"
+                                    busy={adding}
+                                    busyLabel="Adding…"
+                                >
+                                    Add domain
                                 </Button>
                             </DialogFooter>
                         </form>

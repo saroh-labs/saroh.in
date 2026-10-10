@@ -343,10 +343,11 @@ export function LogList({
                         type="button"
                         variant="outline"
                         size="sm"
-                        disabled={pending}
                         onClick={more}
+                        busy={pending}
+                        busyLabel="Loading…"
                     >
-                        {pending ? "Loading…" : "Show older"}
+                        Show older
                     </Button>
                     {loadError ? (
                         <span

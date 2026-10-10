@@ -74,15 +74,16 @@ export function TestReleasesPanel({
                                 type="button"
                                 size="sm"
                                 variant="outline"
-                                disabled={retrying}
                                 onClick={() => {
                                     setRetrying(true);
                                     void state
                                         .refresh()
                                         .finally(() => setRetrying(false));
                                 }}
+                                busy={retrying}
+                                busyLabel="Trying again…"
                             >
-                                {retrying ? "Trying…" : "Try again"}
+                                Try again
                             </Button>
                         }
                     />

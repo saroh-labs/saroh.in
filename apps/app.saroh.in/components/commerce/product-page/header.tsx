@@ -124,9 +124,10 @@ export function ProductCrumbs({
                 {shopUrl ? (
                     // Live on the shop (UX-082): open it as customers see it.
                     <Button
+                        size="xs"
                         asChild
                         variant="ghost"
-                        className="h-7 gap-1.5 rounded-[7px] px-2 text-[12.5px] font-medium coarse:h-11"
+                        className="gap-1.5 font-medium"
                     >
                         <a
                             href={shopUrl}
@@ -144,11 +145,12 @@ export function ProductCrumbs({
                     </Button>
                 ) : (
                     <Button
+                        size="xs"
                         type="button"
                         variant="ghost"
                         disabled
                         aria-describedby="shop-link-why"
-                        className="h-7 gap-1.5 rounded-[7px] px-2 text-[12.5px] font-medium coarse:h-11"
+                        className="gap-1.5 font-medium"
                     >
                         {live
                             ? "View on the shop"
@@ -267,10 +269,7 @@ export function ProductHeader({
                 </p>
             </div>
             {overview.canWrite ? (
-                <Button
-                    asChild
-                    className="gap-[7px] rounded-[9px] px-4 text-[12.5px]"
-                >
+                <Button asChild className="gap-[7px]">
                     <Link href={productEditHref(storeId, product.id)}>
                         <Pencil
                             aria-hidden

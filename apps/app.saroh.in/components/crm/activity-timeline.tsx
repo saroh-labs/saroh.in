@@ -79,10 +79,11 @@ function CompleteTaskButton({
             size="sm"
             variant="outline"
             className="wk-press"
-            disabled={busy}
             onClick={onClick}
+            busy={busy}
+            busyLabel="Completing…"
         >
-            {busy ? "Completing…" : "Mark done"}
+            Mark done
         </Button>
     );
 }

@@ -176,10 +176,7 @@ export function InvoicesScreen({
                             {sums(owed)} owed to you · {overdueCount} overdue
                         </span>
                         {canWrite ? (
-                            <Button
-                                asChild
-                                className="h-[38px] px-4 text-[13px]"
-                            >
+                            <Button asChild>
                                 <Link href="/billing/invoices/new">
                                     New invoice
                                 </Link>
@@ -274,10 +271,11 @@ export function InvoicesScreen({
                             out from the due date.
                         </span>
                         <Button
+                            size="sm"
                             type="button"
                             variant="outline"
                             onClick={() => pick("overdue")}
-                            className="h-8 rounded-[8px] border-destructive-subtle-foreground px-3 text-[12.5px]"
+                            className="border-destructive-subtle-foreground"
                         >
                             Show them
                         </Button>

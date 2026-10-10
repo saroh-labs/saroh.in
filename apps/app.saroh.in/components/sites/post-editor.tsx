@@ -299,7 +299,7 @@ export function PostEditor({
     return (
         <div className="flex min-h-[calc(100dvh-var(--app-header-h,3.5rem))] flex-col">
             <header className="sticky top-0 z-20 flex flex-wrap items-center gap-x-3 gap-y-2 border-b bg-background px-4 py-2">
-                <Button variant="ghost" size="sm" asChild className="-ml-2 h-7">
+                <Button variant="ghost" size="xs" asChild className="-ml-2">
                     <Link href={`/sites/${siteId}/posts`}>← Posts</Link>
                 </Button>
 
@@ -334,8 +334,7 @@ export function PostEditor({
                 <div className="ml-auto flex items-center gap-2">
                     <Button
                         variant="outline"
-                        size="sm"
-                        className="h-7 text-xs"
+                        size="xs"
                         onClick={() => setDetailsOpen((v) => !v)}
                         aria-expanded={detailsOpen}
                     >
@@ -343,9 +342,10 @@ export function PostEditor({
                     </Button>
                     <Button
                         variant="ghost"
-                        size="sm"
-                        className="h-7 text-xs"
-                        disabled={paused || saving || !dirty}
+                        size="xs"
+                        disabled={paused || !dirty}
+                        busy={saving}
+                        busyLabel="Saving…"
                         onClick={() => void save()}
                     >
                         Save draft
@@ -353,8 +353,7 @@ export function PostEditor({
                     {live ? (
                         <Button
                             variant="outline"
-                            size="sm"
-                            className="h-7 text-xs"
+                            size="xs"
                             disabled={publishing}
                             onClick={() => void onUnpublish()}
                         >
@@ -362,17 +361,14 @@ export function PostEditor({
                         </Button>
                     ) : null}
                     <Button
-                        size="sm"
+                        size="xs"
                         variant="brand"
-                        className="h-7 text-xs"
-                        disabled={paused || publishing || !title.trim()}
+                        disabled={paused || !title.trim()}
                         onClick={() => void onPublish()}
+                        busy={publishing}
+                        busyLabel="Publishing…"
                     >
-                        {publishing
-                            ? "Publishing…"
-                            : live
-                              ? "Publish changes"
-                              : "Publish"}
+                        {live ? "Publish changes" : "Publish"}
                     </Button>
                 </div>
             </header>
@@ -416,8 +412,8 @@ export function PostEditor({
                             <h2 className="text-sm font-semibold">Details</h2>
                             <Button
                                 variant="ghost"
-                                size="sm"
-                                className="h-6 px-1.5 text-xs"
+                                size="xs"
+                                className="px-1.5"
                                 onClick={() => setDetailsOpen(false)}
                             >
                                 Close
@@ -527,9 +523,9 @@ export function PostEditor({
                                 </p>
                                 <Button
                                     variant="ghost"
-                                    size="sm"
+                                    size="xs"
                                     className={cn(
-                                        "mt-2 h-7 px-1.5 text-xs",
+                                        "mt-2 px-1.5",
                                         "text-destructive hover:text-destructive",
                                     )}
                                     onClick={() => setConfirmDelete(true)}

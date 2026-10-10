@@ -178,14 +178,12 @@ export function SubscribeDialog({
                         Cancel
                     </Button>
                     <Button
-                        disabled={busy || active.length === 0}
+                        disabled={active.length === 0}
                         onClick={() => void save()}
+                        busy={busy}
+                        busyLabel="Subscribing…"
                     >
-                        {busy
-                            ? "Subscribing…"
-                            : startsLater
-                              ? "Subscribe"
-                              : "Subscribe and invoice"}
+                        {startsLater ? "Subscribe" : "Subscribe and invoice"}
                     </Button>
                 </DialogFooter>
             </DialogContent>

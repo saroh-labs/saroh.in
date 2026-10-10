@@ -92,10 +92,11 @@ export function CancelBookingControl({
                 variant="outline"
                 size="sm"
                 onClick={onCancel}
-                disabled={busy}
                 className="wk-press"
+                busy={busy}
+                busyLabel="Cancelling…"
             >
-                {busy ? "Cancelling…" : "Cancel"}
+                Cancel
             </Button>
             <AlertDialog
                 open={plan !== null}

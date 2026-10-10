@@ -71,11 +71,11 @@ export function PlanHistory({
                 <div className="mt-3 flex flex-wrap items-center gap-3">
                     <Button
                         variant="outline"
-                        className="h-[38px] rounded-[9px] px-4 text-[14px] font-semibold coarse:h-11"
-                        disabled={loadingMore}
                         onClick={onMore}
+                        busy={loadingMore}
+                        busyLabel="Loading…"
                     >
-                        {loadingMore ? "Loading…" : "Show earlier changes"}
+                        Show earlier changes
                     </Button>
                     {moreFailed ? (
                         <p

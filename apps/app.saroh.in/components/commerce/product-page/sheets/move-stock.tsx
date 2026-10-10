@@ -156,12 +156,11 @@ export function MoveStock({
                     type="button"
                     variant="outline"
                     onClick={() => void move()}
-                    disabled={
-                        pending || Boolean(problem) || units.trim() === ""
-                    }
-                    className="h-9 rounded-lg text-[12.5px]"
+                    disabled={Boolean(problem) || units.trim() === ""}
+                    busy={pending}
+                    busyLabel="Moving…"
                 >
-                    {pending ? "Moving…" : "Move"}
+                    Move
                 </Button>
             </div>
             <p

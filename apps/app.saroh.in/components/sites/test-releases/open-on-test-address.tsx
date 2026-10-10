@@ -23,15 +23,16 @@ export function OpenOnTestAddress({
         <Button
             type="button"
             variant="outline"
-            disabled={opening}
             onClick={async () => {
                 setOpening(true);
                 await openReleaseInNewTab(siteId, releaseId);
                 setOpening(false);
             }}
+            busy={opening}
+            busyLabel="Opening…"
         >
             <ExternalLink aria-hidden className="size-4" />
-            {opening ? "Opening…" : "Open on the test address"}
+            Open on the test address
         </Button>
     );
 }

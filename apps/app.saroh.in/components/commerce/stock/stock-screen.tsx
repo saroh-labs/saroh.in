@@ -220,7 +220,6 @@ export function StockScreen({
                             <Button
                                 type="button"
                                 variant="outline"
-                                className="rounded-[9px] px-3.5 text-[12.5px]"
                                 onClick={() => setRecording(true)}
                             >
                                 Record stock
@@ -229,7 +228,6 @@ export function StockScreen({
                                 <Button
                                     type="button"
                                     variant="outline"
-                                    className="rounded-[9px] px-3.5 text-[12.5px]"
                                     onClick={() => setMoving(true)}
                                 >
                                     Move stock
@@ -237,7 +235,6 @@ export function StockScreen({
                             ) : null}
                             <Button
                                 type="button"
-                                className="rounded-[9px] px-4 text-[12.5px]"
                                 disabled={counting}
                                 onClick={startCount}
                             >

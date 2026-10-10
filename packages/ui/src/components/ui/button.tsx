@@ -91,6 +91,12 @@ const buttonVariants = cva(
                 icon: "h-[38px] w-[38px] coarse:h-11 coarse:w-11",
                 "icon-sm": "h-8 w-8 coarse:h-11 coarse:w-11",
                 "icon-xs": "h-7 w-7 coarse:h-11 coarse:w-11",
+                // A text action in a line of words ("Undo", "Show older"),
+                // with the `link` variant: no box, the size of the text
+                // around it, and wrapping like it. Under a finger an unseen
+                // area above and below takes the tap, so the line it sits
+                // in keeps its height.
+                inline: "relative h-auto justify-start whitespace-normal rounded-sm p-0 text-left text-[length:inherit] coarse:after:absolute coarse:after:inset-x-0 coarse:after:-inset-y-3 coarse:after:content-['']",
             },
         },
         defaultVariants: {
@@ -113,14 +119,65 @@ export interface ButtonProps
     busy?: boolean;
     /**
      * What the label reads while busy: the action's "-ing" form, one wording
-     * per action ("Saving…"). Both labels are laid out in the same cell, so
-     * the button is as wide as the longer one from the start and nothing
-     * beside it moves when it flips.
+     * per action ("Saving…"). The button is as wide as the longer of its two
+     * labels from the start, so nothing beside it moves when it flips.
      */
     busyLabel?: React.ReactNode;
 }
 
-const hidden: React.CSSProperties = { visibility: "hidden" };
+/** A label that is only words, as one string; otherwise null. */
+function plainText(node: React.ReactNode): string | null {
+    if (typeof node === "string" || typeof node === "number") {
+        return String(node);
+    }
+    if (Array.isArray(node)) {
+        const parts = node.map((part: React.ReactNode) => plainText(part));
+        return parts.every((part) => part !== null) ? parts.join("") : null;
+    }
+    return null;
+}
+
+/**
+ * The label on show, with room kept for the one that is not.
+ *
+ * The other label is laid out in the same grid cell, unseen and with no
+ * height, so the cell is as wide as the wider of the two. When it is only
+ * words it is drawn by CSS from an attribute and never enters the page's
+ * text: a test, a search or a screen reader finds one label, the one that
+ * is true now. A label with an icon in it is kept as a hidden node instead.
+ */
+function BusyStack({
+    shown,
+    reserved,
+}: {
+    shown: React.ReactNode;
+    reserved: React.ReactNode;
+}) {
+    const text = plainText(reserved);
+    return (
+        <span
+            data-reserve={text ?? undefined}
+            className={cn(
+                "inline-grid items-center justify-items-center gap-[inherit]",
+                text !== null &&
+                    "after:invisible after:col-start-1 after:row-start-1 after:h-0 after:overflow-hidden after:content-[attr(data-reserve)]",
+            )}
+        >
+            <span className="col-start-1 row-start-1 inline-flex items-center gap-[inherit]">
+                {shown}
+            </span>
+            {text === null ? (
+                <span
+                    aria-hidden
+                    className="invisible col-start-1 row-start-1 inline-flex h-0 items-center gap-[inherit] overflow-hidden"
+                    style={{ visibility: "hidden" }}
+                >
+                    {reserved}
+                </span>
+            ) : null}
+        </span>
+    );
+}
 
 const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
     (
@@ -151,7 +208,8 @@ const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
                   },
               } as const)
             : { onClick };
-        const stacked = !asChild && busyLabel !== undefined;
+        const stacked =
+            !asChild && busyLabel !== undefined && busyLabel !== null;
         return (
             <Comp
                 className={cn(buttonVariants({ variant, size, className }))}
@@ -160,22 +218,10 @@ const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
                 {...busyProps}
             >
                 {stacked ? (
-                    <span className="inline-grid items-center justify-items-center gap-[inherit]">
-                        <span
-                            className="col-start-1 row-start-1 inline-flex items-center gap-[inherit]"
-                            style={busy ? hidden : undefined}
-                            aria-hidden={busy || undefined}
-                        >
-                            {children}
-                        </span>
-                        <span
-                            className="col-start-1 row-start-1 inline-flex items-center"
-                            style={busy ? undefined : hidden}
-                            aria-hidden={!busy || undefined}
-                        >
-                            {busyLabel}
-                        </span>
-                    </span>
+                    <BusyStack
+                        shown={busy ? busyLabel : children}
+                        reserved={busy ? children : busyLabel}
+                    />
                 ) : (
                     children
                 )}

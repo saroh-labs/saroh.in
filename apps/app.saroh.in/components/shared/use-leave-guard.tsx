@@ -280,11 +280,12 @@ export function LeaveDialog({
                         <Button
                             type="button"
                             variant="outline"
-                            disabled={saving}
                             className={button}
                             onClick={onSaveAndLeave}
+                            busy={saving}
+                            busyLabel="Saving…"
                         >
-                            {saving ? "Saving…" : "Save and leave"}
+                            Save and leave
                         </Button>
                     ) : null}
                     <Button

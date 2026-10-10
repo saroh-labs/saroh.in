@@ -96,9 +96,11 @@ export function CreateStoreForm() {
                 <Button
                     type="submit"
                     className="wk-press justify-self-start"
-                    disabled={isSubmitting || !name.trim()}
+                    disabled={!name.trim()}
+                    busy={isSubmitting}
+                    busyLabel="Creating…"
                 >
-                    {isSubmitting ? "Creating…" : "Create location"}
+                    Create location
                 </Button>
             </form>
             {guard.dialog}

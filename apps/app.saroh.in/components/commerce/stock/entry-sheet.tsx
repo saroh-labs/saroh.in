@@ -276,7 +276,6 @@ export function EntrySheet({
                     <Button
                         type="button"
                         variant="outline"
-                        className="h-9 rounded-[9px] px-3.5 text-[12.5px] coarse:h-11"
                         onClick={() => {
                             reset();
                             onOpenChange(false);
@@ -286,11 +285,12 @@ export function EntrySheet({
                     </Button>
                     <Button
                         type="button"
-                        className="h-9 rounded-[9px] px-3.5 text-[12.5px] coarse:h-11"
-                        disabled={!!problem || saving}
+                        disabled={!!problem}
                         onClick={() => void save()}
+                        busy={saving}
+                        busyLabel="Recording…"
                     >
-                        {saving ? "Recording…" : "Record"}
+                        Record
                     </Button>
                 </div>
             </SheetContent>

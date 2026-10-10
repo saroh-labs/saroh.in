@@ -700,7 +700,7 @@ describe("states", () => {
         expect(host.querySelector('[role="alert"]')).not.toBe(null);
         expect(text()).toContain("Tracking couldn't be loaded");
         expect(host.querySelector("input, textarea")).toBe(null);
-        await click(buttonIn(host, "Retry"));
+        await click(buttonIn(host, "Try again"));
         expect(refresh).toHaveBeenCalled();
     });
 

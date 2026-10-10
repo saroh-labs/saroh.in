@@ -107,21 +107,12 @@ export function AvailabilityCard({
             ) : null}
             {a.short ? (
                 <div className="mt-2.5 flex flex-wrap gap-1.5">
-                    <Button
-                        asChild
-                        size="sm"
-                        className="h-[30px] rounded-lg px-[11px] text-[12.5px]"
-                    >
+                    <Button asChild size="sm">
                         <Link href={href("stock")} scroll={false}>
                             Add stock
                         </Link>
                     </Button>
-                    <Button
-                        asChild
-                        size="sm"
-                        variant="outline"
-                        className="h-[30px] rounded-lg px-[11px] text-[12.5px]"
-                    >
+                    <Button asChild size="sm" variant="outline">
                         <Link href={href("orders")} scroll={false}>
                             See the orders
                         </Link>

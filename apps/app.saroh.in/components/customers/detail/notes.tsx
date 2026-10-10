@@ -27,10 +27,6 @@ import { Empty } from "./parts";
 
 /** The design's limit: a note is a line or two, not a document. */
 const MAX = 500;
-
-/** The page's small button, as the tab's other actions are drawn. */
-const SMALL = "h-8 rounded-[9px] px-3 text-[12.5px] font-semibold coarse:h-11";
-
 /**
  * Notes the team keeps about a customer — never shown to them. Text only
  * (Z2a): an allergy goes on Needs attention, which Order Detail's banner
@@ -112,7 +108,7 @@ export function Notes({
                 </p>
                 {canWrite && !empty ? (
                     <SheetTrigger asChild>
-                        <Button ref={addRef} size="sm" className={SMALL}>
+                        <Button ref={addRef} size="sm">
                             Add note
                         </Button>
                     </SheetTrigger>
@@ -131,9 +127,7 @@ export function Notes({
                     {canWrite ? (
                         <div className="mt-3.5">
                             <SheetTrigger asChild>
-                                <Button size="sm" className={SMALL}>
-                                    Add note
-                                </Button>
+                                <Button size="sm">Add note</Button>
                             </SheetTrigger>
                         </div>
                     ) : null}
@@ -157,13 +151,15 @@ export function Notes({
                                 {dayText(n.createdAt, timeZone, now)}
                             </span>
                             {canWrite && n.createdByUserId === userId ? (
-                                <button
+                                <Button
+                                    variant="link"
+                                    size="inline"
                                     type="button"
                                     onClick={() => void remove(n)}
-                                    className="text-[12px] text-muted-foreground hover:text-destructive-subtle-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring active:bg-destructive-subtle coarse:min-h-11"
+                                    className="text-muted-foreground"
                                 >
                                     Delete
-                                </button>
+                                </Button>
                             ) : null}
                         </div>
                         <div className="mt-1 whitespace-pre-line text-[13.5px] leading-[1.55] text-foreground/75">
@@ -256,8 +252,13 @@ function NoteForm({
                 </div>
             </div>
             <ActionSheetFooter busy={busy}>
-                <Button type="submit" disabled={off}>
-                    {busy ? "Adding…" : "Add note"}
+                <Button
+                    type="submit"
+                    disabled={off}
+                    busy={busy}
+                    busyLabel="Adding…"
+                >
+                    Add note
                 </Button>
             </ActionSheetFooter>
         </form>

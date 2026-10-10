@@ -1,5 +1,6 @@
 "use client";
 
+import { Button } from "@saroh/ui/button";
 import { Search } from "lucide-react";
 import { usePathname } from "next/navigation";
 
@@ -33,14 +34,15 @@ export function CommandTrigger({ actor }: { actor: SettingsActor }) {
         return <SettingsSearch actor={actor} className={BUTTON} />;
     }
     return (
-        <button
+        <Button
+            variant="ghost"
+            size="icon-sm"
             type="button"
             onClick={openCommandMenu}
             aria-label="Search Saroh (Command K)"
             title="Search  ⌘K"
-            className={BUTTON}
         >
             <Search className="size-4" />
-        </button>
+        </Button>
     );
 }

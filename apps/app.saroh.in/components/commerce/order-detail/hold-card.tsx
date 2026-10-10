@@ -1,12 +1,11 @@
 "use client";
 
+import { Button } from "@saroh/ui/button";
 import { cn } from "@saroh/ui/lib/utils";
 import { useEffect } from "react";
 
 import { useClock } from "@/lib/hooks/use-clock";
 import { HOLD_MS } from "@/lib/orders/lifecycle";
-
-import { FOCUS } from "./parts";
 
 export interface Hold {
     kind: "ready" | "refund";
@@ -78,32 +77,27 @@ export function HoldCard({
                 >
                     {title(Math.ceil(left / 1000))}
                 </span>
-                <button
+                <Button
+                    variant="outline"
+                    size="sm"
                     type="button"
                     onClick={onUndo}
-                    className={cn(
-                        FOCUS,
-                        "h-[30px] rounded-lg border bg-card px-3 text-[12.5px] font-semibold transition-colors duration-fast hover:bg-accent active:bg-accent-active coarse:h-11",
-                        refund
-                            ? "border-destructive-subtle-foreground"
-                            : "border-highlight-border",
-                    )}
+                    className={cn(refund ? "" : "")}
                 >
                     {undoLabel}
-                </button>
-                <button
+                </Button>
+                <Button
+                    variant="link"
+                    size="sm"
                     type="button"
                     onClick={onNow}
                     className={cn(
-                        FOCUS,
-                        "h-[30px] rounded-lg px-3 text-[12.5px] font-semibold hover:underline active:bg-card/60 coarse:h-11",
-                        refund
-                            ? "text-destructive-subtle-foreground"
-                            : "text-brand-subtle-foreground",
+                        "text-destructive hover:text-destructive",
+                        refund ? "" : "",
                     )}
                 >
                     {nowLabel}
-                </button>
+                </Button>
             </div>
             {note ? (
                 <p className="mt-1 text-[11.5px] text-muted-foreground">

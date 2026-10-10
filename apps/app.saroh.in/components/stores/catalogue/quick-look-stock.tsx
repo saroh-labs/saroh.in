@@ -210,7 +210,6 @@ function ShelfRow({
                     />
                     <Button
                         size="sm"
-                        className="h-[30px] px-2.5 coarse:h-11"
                         disabled={off}
                         onClick={() => void add()}
                         aria-label={`Add to ${shelf.title}`}

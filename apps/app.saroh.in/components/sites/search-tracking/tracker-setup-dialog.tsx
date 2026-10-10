@@ -201,12 +201,13 @@ export function TrackerSetupDialog({
                         >
                             Cancel
                         </Button>
-                        <Button type="submit" disabled={!canSave}>
-                            {pending
-                                ? "Saving…"
-                                : existing
-                                  ? "Save changes"
-                                  : "Add to your site"}
+                        <Button
+                            type="submit"
+                            disabled={!canSave}
+                            busy={pending}
+                            busyLabel="Saving…"
+                        >
+                            {existing ? "Save changes" : "Add to your site"}
                         </Button>
                     </DialogFooter>
                 </form>

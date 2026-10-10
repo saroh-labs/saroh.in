@@ -269,17 +269,17 @@ export function TakePayment({
                             <Button
                                 type="button"
                                 className="cursor-pointer"
-                                disabled={busy || Boolean(problem)}
+                                disabled={Boolean(problem)}
                                 aria-describedby={
                                     problem || error ? ids.error : undefined
                                 }
                                 onClick={() => void save()}
+                                busy={busy}
+                                busyLabel={
+                                    choice === "LINK" ? "Making…" : "Recording…"
+                                }
                             >
-                                {busy
-                                    ? choice === "LINK"
-                                        ? "Making the link…"
-                                        : "Recording…"
-                                    : deskButton(choice, amount)}
+                                {deskButton(choice, amount)}
                             </Button>
                         </DialogFooter>
                     )}

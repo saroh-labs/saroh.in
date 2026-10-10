@@ -150,7 +150,6 @@ export function AddPersonDialog({
                         <Button
                             type="button"
                             variant="outline"
-                            className="h-[38px] rounded-[9px] px-4 text-[14px]"
                             disabled={saving}
                             onClick={close}
                         >
@@ -158,10 +157,11 @@ export function AddPersonDialog({
                         </Button>
                         <Button
                             type="submit"
-                            className="h-[38px] rounded-[9px] px-4 text-[14px]"
-                            disabled={!name.trim() || saving}
+                            disabled={!name.trim()}
+                            busy={saving}
+                            busyLabel="Adding…"
                         >
-                            {saving ? "Adding…" : "Add them"}
+                            Add them
                         </Button>
                     </div>
                 </form>

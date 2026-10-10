@@ -83,10 +83,6 @@ export interface TestReleaseActions {
     /** How many are ready or scheduled, for the menu's count. */
     count: number;
 }
-
-const ACTION =
-    "h-[34px] gap-[7px] rounded-[9px] px-3 text-[0.78125rem] font-semibold text-muted-foreground";
-
 /**
  * The bar's actions: theme, width, zoom and Preview, then Share and
  * Publish. Moved out of `editor-top-bar.tsx` (G4) so a phone can show the same
@@ -188,7 +184,10 @@ export function TopBarActions({
                             variant="outline"
                             size="sm"
                             aria-label="More: preview, feedback and test releases"
-                            className={cn(ACTION, "w-[34px] px-0")}
+                            className={cn(
+                                "text-[0.78125rem] text-muted-foreground",
+                                "w-[34px] px-0",
+                            )}
                         >
                             <Ellipsis aria-hidden className="size-[15px]" />
                         </Button>
@@ -247,8 +246,8 @@ export function TopBarActions({
             <Button
                 size="sm"
                 className={cn(
-                    "wk-press h-[34px] rounded-[9px] px-3.5 text-[0.78125rem] font-semibold",
-                    stacked && "h-11 w-full",
+                    "wk-press text-[0.78125rem]",
+                    stacked && "w-full",
                 )}
                 title={p.publishHint}
                 onClick={p.onPublish}
@@ -257,12 +256,10 @@ export function TopBarActions({
                 disabled={
                     p.publishDisabled || (p.needsApproval && !p.canOverride)
                 }
+                busy={p.publishing}
+                busyLabel="Publishing…"
             >
-                {p.publishing
-                    ? "Publishing…"
-                    : p.needsApproval
-                      ? "Needs approval"
-                      : "Publish"}
+                {p.needsApproval ? "Needs approval" : "Publish"}
                 {/*
                  * Things worth a look before publishing, as a dot (UX-081):
                  * a number here read as "changes to publish" when it
@@ -309,7 +306,11 @@ function SecondaryActions({
                 variant="outline"
                 size="sm"
                 aria-pressed={p.previewing}
-                className={cn(ACTION, p.previewing && "bg-secondary", touch)}
+                className={cn(
+                    "text-[0.78125rem] text-muted-foreground",
+                    p.previewing && "bg-secondary",
+                    touch,
+                )}
                 onClick={() => p.setPreviewing(!p.previewing)}
             >
                 <Eye aria-hidden className="size-[15px]" />
@@ -320,7 +321,10 @@ function SecondaryActions({
                 <Button
                     variant="outline"
                     size="sm"
-                    className={cn(ACTION, touch)}
+                    className={cn(
+                        "text-[0.78125rem] text-muted-foreground",
+                        touch,
+                    )}
                     onClick={p.onFeedback}
                 >
                     <MessageSquare aria-hidden className="size-[15px]" />
@@ -433,7 +437,7 @@ function ShareControl({
                     variant="outline"
                     size="sm"
                     aria-haspopup="dialog"
-                    className={ACTION}
+                    className="text-[0.78125rem] text-muted-foreground"
                 >
                     <Link2 aria-hidden className="size-[15px]" />
                     {p.inReview ? "In review" : "Share"}
@@ -469,9 +473,13 @@ function TestReleaseSplit({
             <>
                 {actions.onMake ? (
                     <Button
-                        variant="outline"
                         size="sm"
-                        className={cn(ACTION, "h-11 w-full justify-start")}
+                        variant="outline"
+
+                        className={cn(
+                            "text-[0.78125rem] text-muted-foreground",
+                            "w-full justify-start",
+                        )}
                         onClick={actions.onMake}
                     >
                         <Plus aria-hidden className="size-[15px]" />
@@ -479,9 +487,13 @@ function TestReleaseSplit({
                     </Button>
                 ) : null}
                 <Button
-                    variant="outline"
                     size="sm"
-                    className={cn(ACTION, "h-11 w-full justify-start")}
+                    variant="outline"
+
+                    className={cn(
+                        "text-[0.78125rem] text-muted-foreground",
+                        "w-full justify-start",
+                    )}
                     onClick={actions.onOpenList}
                 >
                     <FlaskConical aria-hidden className="size-[15px]" />
@@ -495,7 +507,10 @@ function TestReleaseSplit({
             <Button
                 variant="outline"
                 size="sm"
-                className={cn(ACTION, "rounded-r-none")}
+                className={cn(
+                    "text-[0.78125rem] text-muted-foreground",
+                    "rounded-r-none",
+                )}
                 title={
                     actions.onMake
                         ? "Freeze the draft into a test release, to share and go live with later"
@@ -512,7 +527,7 @@ function TestReleaseSplit({
                         variant="outline"
                         size="sm"
                         aria-label="More test release actions"
-                        className="h-[34px] w-8 rounded-l-none rounded-r-[9px] border-l-0 px-0 text-muted-foreground"
+                        className="w-8 rounded-l-none rounded-r-[9px] border-l-0 px-0 text-muted-foreground"
                     >
                         <ChevronDown aria-hidden className="size-[13px]" />
                     </Button>

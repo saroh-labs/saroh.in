@@ -134,10 +134,11 @@ export function NewCustomerForm({
                 <Button
                     type="button"
                     size="sm"
-                    disabled={checking}
                     onClick={() => void submit()}
+                    busy={checking}
+                    busyLabel="Checking…"
                 >
-                    {checking ? "Checking…" : "Add customer"}
+                    Add customer
                 </Button>
             </div>
         </div>

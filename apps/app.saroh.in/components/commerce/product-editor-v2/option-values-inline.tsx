@@ -1,5 +1,6 @@
 "use client";
 
+import { Button } from "@saroh/ui/button";
 import { showError, showSuccess } from "@saroh/ui/toast";
 import { useRouter } from "next/navigation";
 import { useId, useState, useTransition } from "react";
@@ -82,14 +83,17 @@ export function OptionValuesInline({
                 placeholder="S, M, L"
                 className="h-8 min-w-0 flex-[1_1_160px] rounded-[8px] border border-border bg-card px-2.5 text-[12.5px] coarse:h-11"
             />
-            <button
+            <Button
+                size="sm"
                 type="button"
-                disabled={locked || pending || values.length === 0}
+                disabled={locked || values.length === 0}
                 onClick={add}
-                className="h-8 shrink-0 rounded-[8px] bg-foreground px-[13px] text-[12.5px] font-semibold text-background hover:bg-foreground/90 disabled:bg-muted disabled:text-muted-foreground coarse:h-11"
+                className="shrink-0"
+                busy={pending}
+                busyLabel="Adding…"
             >
-                {pending ? "Adding…" : "Add"}
-            </button>
+                Add
+            </Button>
             <span className="w-full text-[11.5px] text-muted-foreground">
                 Separate them with commas. They join Settings › Options, so
                 every product spells them the same way.

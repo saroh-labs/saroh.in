@@ -23,9 +23,6 @@ import type { Plan, SubscriptionSettings } from "@/lib/subscriptions/service";
 import { AutopayTimingSetting } from "./autopay-timing-setting";
 import { MembersPauseRow } from "./members-pause-row";
 import { Pill } from "./pill";
-
-const BUTTON = "h-[38px] rounded-[9px] px-4 text-[14px] font-semibold";
-
 const NEW_PLAN_HREF = "/billing/plans/new";
 
 /**
@@ -137,7 +134,7 @@ export function PlansTab({
                     Everyone already on a plan keeps what they agreed to.
                 </p>
                 {canWrite && !locked ? (
-                    <Button asChild className={BUTTON}>
+                    <Button asChild>
                         <Link href={NEW_PLAN_HREF}>New plan</Link>
                     </Button>
                 ) : null}
@@ -243,11 +240,7 @@ function PlanCard({
             ))}
             {canWrite ? (
                 <div className="mt-3 flex flex-wrap gap-2">
-                    <Button
-                        asChild
-                        variant="outline"
-                        className={cn(BUTTON, "coarse:h-11")}
-                    >
+                    <Button asChild variant="outline">
                         <Link
                             href={editHref(card.id)}
                             aria-label={`Edit ${card.name}`}
@@ -258,7 +251,6 @@ function PlanCard({
                     {card.canArchive && (sellsAgain || !card.archived) ? (
                         <Button
                             variant="outline"
-                            className={cn(BUTTON, "coarse:h-11")}
                             disabled={busy}
                             onClick={onArchive}
                         >

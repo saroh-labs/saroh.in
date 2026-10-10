@@ -1,6 +1,7 @@
 "use client";
 
 import { Badge } from "@saroh/ui/badge";
+import { Button } from "@saroh/ui/button";
 import { cn } from "@saroh/ui/lib/utils";
 import { showError } from "@saroh/ui/toast";
 import Link from "next/link";
@@ -198,12 +199,8 @@ function MarkButton({
     children: ReactNode;
 }) {
     return (
-        <button
-            type="button"
-            onClick={onClick}
-            className="h-[34px] rounded-lg border border-border bg-card px-3 text-[12.5px] font-semibold text-neutral-700 transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 active:bg-accent-active coarse:min-h-11 dark:text-neutral-300"
-        >
+        <Button variant="outline" size="sm" type="button" onClick={onClick}>
             {children}
-        </button>
+        </Button>
     );
 }

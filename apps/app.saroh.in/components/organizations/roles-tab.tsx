@@ -571,12 +571,12 @@ function RoleDetail({
                                     </Button>
                                     <Button
                                         type="button"
-                                        disabled={
-                                            pending || label.trim().length === 0
-                                        }
+                                        disabled={label.trim().length === 0}
                                         onClick={save}
+                                        busy={pending}
+                                        busyLabel="Saving…"
                                     >
-                                        {pending ? "Saving…" : "Save changes"}
+                                        Save changes
                                     </Button>
                                 </>
                             ) : (
@@ -763,9 +763,11 @@ function NewRoleDialog({
                         </Button>
                         <Button
                             type="submit"
-                            disabled={pending || label.trim().length === 0}
+                            disabled={label.trim().length === 0}
+                            busy={pending}
+                            busyLabel="Creating…"
                         >
-                            {pending ? "Creating…" : "Create role"}
+                            Create role
                         </Button>
                     </DialogFooter>
                 </form>

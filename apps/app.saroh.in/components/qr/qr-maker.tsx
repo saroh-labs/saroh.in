@@ -12,10 +12,6 @@ import { QrPrintSlot } from "./qr-print-slot";
 import { QrTargetPicker } from "./qr-target-picker";
 import type { UseQrMakerInput } from "./use-qr-maker";
 import { useQrMaker } from "./use-qr-maker";
-
-/** The design's buttons: 40px, 10px corners, 14px 600. */
-const BUTTON = "h-10 rounded-[10px] px-4 text-sm";
-
 /**
  * The QR code maker ("Saroh QR Codes" design, "01 In-app Share"): three
  * columns that stack on a phone. What it opens and where it goes; the code
@@ -138,20 +134,20 @@ export function QrMaker({
                         {bound && !m.isChanging && !m.dirty ? (
                             <p className="text-[13px] text-foreground/80">
                                 You already have this code.{" "}
-                                <button
+                                <Button
+                                    variant="link"
+                                    size="inline"
                                     type="button"
                                     onClick={m.makeAnother}
-                                    className="cursor-pointer rounded-[4px] font-semibold text-brand underline underline-offset-2 transition-colors duration-fast hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 active:text-muted-foreground"
                                 >
                                     Make another
-                                </button>
+                                </Button>
                             </p>
                         ) : null}
                         <div className="flex flex-wrap gap-2">
                             {primary !== "png" ? (
                                 <Button
                                     type="button"
-                                    className={BUTTON}
                                     disabled={off}
                                     onClick={() => void m.make()}
                                 >
@@ -165,7 +161,6 @@ export function QrMaker({
                                 variant={
                                     primary === "png" ? "default" : "outline"
                                 }
-                                className={BUTTON}
                                 disabled={off}
                                 onClick={() => void m.download("png")}
                             >
@@ -174,7 +169,6 @@ export function QrMaker({
                             <Button
                                 type="button"
                                 variant="outline"
-                                className={BUTTON}
                                 disabled={off}
                                 aria-label="Download SVG"
                                 onClick={() => void m.download("svg")}
@@ -184,7 +178,6 @@ export function QrMaker({
                             <Button
                                 type="button"
                                 variant="outline"
-                                className={BUTTON}
                                 disabled={!bound?.link || m.busy !== null}
                                 onClick={() => void m.copy()}
                             >
@@ -196,7 +189,6 @@ export function QrMaker({
                                 <Button
                                     type="button"
                                     variant="ghost"
-                                    className={BUTTON}
                                     disabled={m.busy !== null}
                                     onClick={input.onChangingDone}
                                 >

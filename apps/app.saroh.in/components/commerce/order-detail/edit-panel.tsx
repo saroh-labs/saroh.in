@@ -169,34 +169,30 @@ function EditDraft({
                                 <span className="min-w-0 flex-1 text-[13px]">
                                     {name}
                                 </span>
-                                <button
+                                <Button
+                                    variant="outline"
+                                    size="icon-sm"
                                     type="button"
                                     onClick={() => step(l.id, -1)}
                                     aria-label={`One fewer ${name}`}
-                                    className={cn(
-                                        FOCUS,
-                                        "size-[30px] rounded-[7px] border border-border bg-card text-[15px] transition-colors duration-fast hover:border-border-strong hover:bg-accent active:bg-accent-active coarse:size-11",
-                                    )}
                                 >
                                     −
-                                </button>
+                                </Button>
                                 <span
                                     aria-live="polite"
                                     className="min-w-[22px] text-center text-[13.5px] font-semibold tabular-nums"
                                 >
                                     {qty[l.id]}
                                 </span>
-                                <button
+                                <Button
+                                    variant="outline"
+                                    size="icon-sm"
                                     type="button"
                                     onClick={() => step(l.id, 1)}
                                     aria-label={`One more ${name}`}
-                                    className={cn(
-                                        FOCUS,
-                                        "size-[30px] rounded-[7px] border border-border bg-card text-[15px] transition-colors duration-fast hover:border-border-strong hover:bg-accent active:bg-accent-active coarse:size-11",
-                                    )}
                                 >
                                     +
-                                </button>
+                                </Button>
                             </div>
                         );
                     })}
@@ -218,19 +214,18 @@ function EditDraft({
                             <span className="tabular-nums">
                                 {money(Number(s.price))}
                             </span>
-                            <button
+                            <Button
+                                variant="link"
+                                size="inline"
                                 type="button"
                                 onClick={() =>
                                     setAdded((a) => a.filter((_, j) => j !== i))
                                 }
                                 aria-label={`Remove ${name}`}
-                                className={cn(
-                                    FOCUS,
-                                    "rounded px-1 text-[12px] font-semibold text-destructive-subtle-foreground hover:underline active:bg-destructive-subtle coarse:min-h-11",
-                                )}
+                                className="text-destructive hover:text-destructive"
                             >
                                 Remove
-                            </button>
+                            </Button>
                         </div>
                     );
                 })}

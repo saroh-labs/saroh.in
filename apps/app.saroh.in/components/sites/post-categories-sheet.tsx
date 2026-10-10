@@ -223,8 +223,12 @@ export function PostCategoriesSheet({
                             >
                                 Cancel
                             </Button>
-                            <Button type="submit" disabled={busy}>
-                                {busy ? "Adding…" : "Add category"}
+                            <Button
+                                type="submit"
+                                busy={busy}
+                                busyLabel="Adding…"
+                            >
+                                Add category
                             </Button>
                         </SheetFooter>
                     </form>

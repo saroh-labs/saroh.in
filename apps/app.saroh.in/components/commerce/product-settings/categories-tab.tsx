@@ -1,7 +1,7 @@
 "use client";
 
+import { Button } from "@saroh/ui/button";
 import { EmptyState } from "@saroh/ui/data-state";
-import { cn } from "@saroh/ui/lib/utils";
 import { showError, showUndo } from "@saroh/ui/toast";
 import { Plus } from "lucide-react";
 import { useRouter } from "next/navigation";
@@ -20,7 +20,7 @@ import {
 
 import { CategoryMergeSheet } from "./category-merge-sheet";
 import { NameDialog } from "./name-dialog";
-import { bigBtn, rowBtn, TabIntro } from "./product-settings";
+import { TabIntro } from "./product-settings";
 
 const NAME_MAX = 40;
 const plural = (n: number) => `${n} ${n === 1 ? "product" : "products"}`;
@@ -121,10 +121,10 @@ export function CategoriesTab({ catalogue }: { catalogue: CatalogueView }) {
     const newCategory = canWrite ? (
         <NameDialog
             trigger={
-                <button type="button" className={bigBtn}>
+                <Button type="button" className="shrink-0">
                     <Plus aria-hidden className="-ml-0.5 mr-1.5 size-3.5" />
                     New category
-                </button>
+                </Button>
             }
             title="New category"
             note="Products can be put in it as soon as it is added."
@@ -190,13 +190,14 @@ export function CategoriesTab({ catalogue }: { catalogue: CatalogueView }) {
                             <div className="flex shrink-0 gap-1.5">
                                 <NameDialog
                                     trigger={
-                                        <button
+                                        <Button
+                                            variant="outline"
+                                            size="xs"
                                             type="button"
-                                            className={rowBtn}
                                             aria-label={`Rename ${c.name}`}
                                         >
                                             Rename
-                                        </button>
+                                        </Button>
                                     }
                                     title="Rename category"
                                     note="Products in it change with it. Nothing else to do."
@@ -216,13 +217,14 @@ export function CategoriesTab({ catalogue }: { catalogue: CatalogueView }) {
                                 />
                                 <CategoryMergeSheet
                                     trigger={
-                                        <button
+                                        <Button
+                                            variant="outline"
+                                            size="xs"
                                             type="button"
-                                            className={rowBtn}
                                             aria-label={`Merge ${c.name}`}
                                         >
                                             Merge
-                                        </button>
+                                        </Button>
                                     }
                                     category={c}
                                     others={categories.filter(
@@ -232,9 +234,11 @@ export function CategoriesTab({ catalogue }: { catalogue: CatalogueView }) {
                                         merge(c, intoId, into)
                                     }
                                 />
-                                <button
+                                <Button
+                                    variant="outline"
+                                    size="xs"
                                     type="button"
-                                    className={cn(rowBtn, "text-destructive")}
+                                    className="text-destructive hover:text-destructive"
                                     aria-label={`Delete ${c.name}`}
                                     onClick={(e) => {
                                         deleteFrom.current = e.currentTarget;
@@ -243,7 +247,7 @@ export function CategoriesTab({ catalogue }: { catalogue: CatalogueView }) {
                                     }}
                                 >
                                     Delete
-                                </button>
+                                </Button>
                             </div>
                         ) : null}
                     </li>

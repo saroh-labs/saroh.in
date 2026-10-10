@@ -195,7 +195,7 @@ describe("copyLinkLabel", () => {
     });
 
     it("says it is working while the link is made", () => {
-        expect(copyLinkLabel({ ...base, busy: true })).toBe("Making a link…");
+        expect(copyLinkLabel({ ...base, busy: true })).toBe("Making…");
     });
 });
 

@@ -135,8 +135,8 @@ export function EditLeadDialog({
                         >
                             Cancel
                         </Button>
-                        <Button type="submit" disabled={saving}>
-                            {saving ? "Saving…" : "Save"}
+                        <Button type="submit" busy={saving} busyLabel="Saving…">
+                            Save
                         </Button>
                     </DialogFooter>
                 </form>

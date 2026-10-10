@@ -76,9 +76,11 @@ export function ActivityComposer({
                 <Button
                     type="submit"
                     className="wk-press"
-                    disabled={busy || !body.trim()}
+                    disabled={!body.trim()}
+                    busy={busy}
+                    busyLabel="Saving…"
                 >
-                    {busy ? "Saving…" : "Add note"}
+                    Add note
                 </Button>
             </ActionSheetFooter>
         </form>

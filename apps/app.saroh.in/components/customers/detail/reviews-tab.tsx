@@ -2,7 +2,6 @@
 
 import { Button } from "@saroh/ui/button";
 import { Card } from "@saroh/ui/card";
-import { cn } from "@saroh/ui/lib/utils";
 import { Textarea } from "@saroh/ui/textarea";
 import Link from "next/link";
 
@@ -16,11 +15,6 @@ import type { Review } from "@/lib/product-reviews/service";
 import { productHref } from "@/lib/products/links";
 
 import { Empty } from "./parts";
-
-/** A text action under a review: pointer, hover, focus and pressed. */
-const TEXT_ACTION =
-    "cursor-pointer rounded-sm text-[12.5px] transition-colors duration-fast hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 active:bg-accent-active disabled:cursor-not-allowed disabled:opacity-50 coarse:min-h-11";
-
 /**
  * Customer Detail's Reviews tab (C6, after "Saroh Customer Detail"): what
  * this person said about what they bought, newest first — from every store
@@ -143,18 +137,20 @@ export function ReviewsTab({
                                     />
                                     <div className="mt-1.5 flex items-center gap-[7px]">
                                         <Button
+                                            size="sm"
                                             type="submit"
-                                            disabled={pending || !draft.trim()}
-                                            className="h-[30px] rounded-lg px-3 text-[12px] font-semibold"
+                                            disabled={!draft.trim()}
+                                            busy={pending}
+                                            busyLabel="Posting…"
                                         >
                                             Post reply
                                         </Button>
                                         <Button
+                                            size="sm"
                                             type="button"
                                             variant="outline"
                                             onClick={cancelReply}
                                             disabled={pending}
-                                            className="h-[30px] rounded-lg px-[11px] text-[12px] font-semibold"
                                         >
                                             Cancel
                                         </Button>
@@ -169,33 +165,30 @@ export function ReviewsTab({
                             {canReply ? (
                                 <div className="mt-[9px] flex gap-3.5">
                                     {r.reply || replying ? null : (
-                                        <button
+                                        <Button
+                                            variant="link"
+                                            size="inline"
                                             type="button"
                                             onClick={() => startReply(r.id)}
                                             disabled={pending}
-                                            className={cn(
-                                                TEXT_ACTION,
-                                                "font-semibold text-brand",
-                                            )}
                                         >
                                             Reply
-                                        </button>
+                                        </Button>
                                     )}
-                                    <button
+                                    <Button
+                                        variant="link"
+                                        size="inline"
                                         type="button"
                                         onClick={() =>
                                             toggleHidden(r.id, r.status)
                                         }
                                         disabled={pending}
-                                        className={cn(
-                                            TEXT_ACTION,
-                                            "text-muted-foreground",
-                                        )}
+                                        className="text-muted-foreground"
                                     >
                                         {hidden
                                             ? "Show on the shop"
                                             : "Hide from the shop"}
-                                    </button>
+                                    </Button>
                                 </div>
                             ) : null}
                         </Card>

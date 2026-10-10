@@ -406,13 +406,13 @@ function PaymentsForm({
                 <Button
                     type="submit"
                     className="cursor-pointer"
-                    disabled={saving || incomplete}
+                    disabled={incomplete}
+                    busy={saving}
+                    busyLabel="Connecting…"
                 >
-                    {saving
-                        ? "Connecting…"
-                        : current
-                          ? "Save keys"
-                          : `Connect ${labelOfPayment(provider)}`}
+                    {current
+                        ? "Save keys"
+                        : `Connect ${labelOfPayment(provider)}`}
                 </Button>
             </DialogFooter>
 
@@ -598,12 +598,15 @@ function MessagingForm({
                 <Button type="button" variant="outline" onClick={onDone}>
                     Cancel
                 </Button>
-                <Button type="submit" disabled={saving || missing}>
-                    {saving
-                        ? "Connecting…"
-                        : current
-                          ? "Save keys"
-                          : `Connect ${spec.label.toLowerCase()}`}
+                <Button
+                    type="submit"
+                    disabled={missing}
+                    busy={saving}
+                    busyLabel="Connecting…"
+                >
+                    {current
+                        ? "Save keys"
+                        : `Connect ${spec.label.toLowerCase()}`}
                 </Button>
             </DialogFooter>
 

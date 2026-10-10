@@ -197,8 +197,7 @@ export function InvoiceNumberFields({
                                             id={`number-part-${row.part}-up`}
                                             type="button"
                                             variant="ghost"
-                                            size="icon"
-                                            className="size-8"
+                                            size="icon-sm"
                                             aria-label={`Move ${PART_LABEL[row.part]} earlier`}
                                             disabled={i === 0}
                                             onClick={() =>
@@ -211,8 +210,7 @@ export function InvoiceNumberFields({
                                             id={`number-part-${row.part}-down`}
                                             type="button"
                                             variant="ghost"
-                                            size="icon"
-                                            className="size-8"
+                                            size="icon-sm"
                                             aria-label={`Move ${PART_LABEL[row.part]} later`}
                                             disabled={i === rows.length - 1}
                                             onClick={() => move(row.part, i, 1)}

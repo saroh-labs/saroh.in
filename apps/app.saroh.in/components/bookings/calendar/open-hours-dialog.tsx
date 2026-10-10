@@ -286,13 +286,11 @@ function Form({
                 <Button
                     type="submit"
                     className={btn.primary}
-                    disabled={Boolean(bad) || saving}
+                    disabled={Boolean(bad)}
+                    busy={saving}
+                    busyLabel="Saving…"
                 >
-                    {saving
-                        ? "Saving…"
-                        : block
-                          ? "Block it"
-                          : "Open for bookings"}
+                    {block ? "Block it" : "Open for bookings"}
                 </Button>
             </div>
         </form>

@@ -860,10 +860,10 @@ function PendingInvites({
                                     }
                                     onClick={() => resend(invitation)}
                                     aria-label={`Resend the invite to ${invitation.email}`}
+                                    busy={mine && busy.action === "resend"}
+                                    busyLabel="Sending…"
                                 >
-                                    {mine && busy.action === "resend"
-                                        ? "Sending…"
-                                        : "Resend"}
+                                    Resend
                                 </Button>
                                 <Button
                                     size="sm"
@@ -872,10 +872,10 @@ function PendingInvites({
                                     onClick={() => cancel(invitation)}
                                     aria-label={`Cancel the invite to ${invitation.email}`}
                                     className="text-destructive-subtle-foreground hover:text-destructive-subtle-foreground"
+                                    busy={mine && busy.action === "cancel"}
+                                    busyLabel="Cancelling…"
                                 >
-                                    {mine && busy.action === "cancel"
-                                        ? "Cancelling…"
-                                        : "Cancel invite"}
+                                    Cancel invite
                                 </Button>
                             </div>
                         </li>
@@ -1101,13 +1101,11 @@ function MemberDrawer({
                         <div className="flex flex-wrap items-center gap-[9px] border-t border-muted px-[18px] py-3.5">
                             <Button
                                 onClick={save}
-                                disabled={!changed || saving || outranks}
+                                disabled={!changed || outranks}
+                                busy={saving}
+                                busyLabel="Saving…"
                             >
-                                {saving
-                                    ? "Saving…"
-                                    : changed
-                                      ? "Save changes"
-                                      : "No changes yet"}
+                                {changed ? "Save changes" : "No changes yet"}
                             </Button>
                             <Button variant="outline" onClick={close}>
                                 Cancel
@@ -1118,7 +1116,9 @@ function MemberDrawer({
                                 second owner, or to leave. */}
                             {!locked &&
                             (current === "OWNER" || member.isSelf) ? (
-                                <button
+                                <Button
+                                    variant="link"
+                                    size="inline"
                                     type="button"
                                     onClick={() => {
                                         // A role picked and not saved must
@@ -1127,10 +1127,10 @@ function MemberDrawer({
                                         setDraft(null);
                                         onRemove(member);
                                     }}
-                                    className="ml-auto rounded-md text-[12.5px] font-semibold text-destructive-subtle-foreground hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring active:text-muted-foreground"
+                                    className="ml-auto text-destructive hover:text-destructive"
                                 >
                                     Remove from {organizationName}
-                                </button>
+                                </Button>
                             ) : null}
                         </div>
                     </>
@@ -1530,8 +1530,12 @@ function InviteDialog({
                             >
                                 Cancel
                             </Button>
-                            <Button type="submit" disabled={sending}>
-                                {sending ? "Sending…" : "Send invite"}
+                            <Button
+                                type="submit"
+                                busy={sending}
+                                busyLabel="Sending…"
+                            >
+                                Send invite
                             </Button>
                         </DialogFooter>
                     </form>

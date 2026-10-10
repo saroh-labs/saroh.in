@@ -20,10 +20,6 @@ import {
     removalBody,
 } from "@/lib/contacts/removal";
 import type { RemovalPreview } from "@/lib/contacts/service";
-
-const SMALL_BTN =
-    "h-8 rounded-[9px] px-3 text-[12.5px] font-semibold coarse:h-11";
-
 /**
  * "Remove their details (privacy request)…" (DEC-042, C11), after the
  * dialog in Saroh Customer Detail: what goes, that their orders stay, and
@@ -117,13 +113,13 @@ export function RemoveDetailsDialog({
                             {readFailed} Nothing has changed.
                         </span>
                         <Button
+                            size="sm"
                             type="button"
                             variant="outline"
                             onClick={() => {
                                 setReadFailed(null);
                                 setAttempt((n) => n + 1);
                             }}
-                            className="h-[30px] rounded-[8px] px-[11px] text-[12.5px] font-semibold coarse:h-11"
                         >
                             Try again
                         </Button>
@@ -181,22 +177,24 @@ export function RemoveDetailsDialog({
 
                 <div className="mt-4 flex flex-wrap justify-end gap-2">
                     <Button
+                        size="sm"
                         type="button"
                         variant="outline"
                         disabled={removing}
                         onClick={() => onOpenChange(false)}
-                        className={SMALL_BTN}
                     >
                         Keep them
                     </Button>
                     <Button
+                        size="sm"
                         type="button"
                         variant="destructive"
-                        disabled={!canRemove || removing}
+                        disabled={!canRemove}
                         onClick={() => void remove()}
-                        className={SMALL_BTN}
+                        busy={removing}
+                        busyLabel="Removing…"
                     >
-                        {removing ? "Removing…" : "Remove details"}
+                        Remove details
                     </Button>
                 </div>
             </AlertDialogContent>

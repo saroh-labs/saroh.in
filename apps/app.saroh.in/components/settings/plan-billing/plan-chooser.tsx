@@ -267,17 +267,18 @@ export function PlanChooser({
                                       } of ${checked.planName}, before GST. Used when you start a paid plan above.`
                                     : " · used with the plan you choose above"}
                             </span>
-                            <button
+                            <Button
+                                variant="link"
+                                size="inline"
                                 type="button"
                                 onClick={() => {
                                     setCoupon("");
                                     setChecked(null);
                                     setCouponErr("");
                                 }}
-                                className="rounded-sm text-[12.5px] font-semibold text-foreground/80 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring active:text-muted-foreground"
                             >
                                 Remove
-                            </button>
+                            </Button>
                         </div>
                     ) : null}
                     {!coupon || couponErr ? (
@@ -308,9 +309,10 @@ export function PlanChooser({
                                 type="submit"
                                 variant="outline"
                                 size="sm"
-                                disabled={checking}
+                                busy={checking}
+                                busyLabel="Checking…"
                             >
-                                {checking ? "Checking…" : "Apply"}
+                                Apply
                             </Button>
                             {couponErr ? (
                                 <span

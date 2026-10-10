@@ -151,17 +151,13 @@ function Body({
         onScheduled(res.data);
     }
 
-    const label = busy
+    const label = override
         ? now
-            ? "Going live…"
-            : "Scheduling…"
-        : override
-          ? now
-              ? "Go live without approval"
-              : "Schedule without approval"
-          : now
-            ? "Go live now"
-            : "Schedule go-live";
+            ? "Go live without approval"
+            : "Schedule without approval"
+        : now
+          ? "Go live now"
+          : "Schedule go-live";
 
     return (
         <>
@@ -287,7 +283,9 @@ function Body({
                 <Button
                     type="button"
                     variant={override ? "destructive" : "default"}
-                    disabled={busy || blocked}
+                    disabled={blocked}
+                    busy={busy}
+                    busyLabel={now ? "Going live…" : "Scheduling…"}
                     onClick={() => void confirm()}
                 >
                     {label}

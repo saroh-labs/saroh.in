@@ -88,10 +88,11 @@ export function SearchTrackingFailed() {
                 <Button
                     variant="outline"
                     size="sm"
-                    disabled={pending}
                     onClick={() => startTransition(() => router.refresh())}
+                    busy={pending}
+                    busyLabel="Trying again…"
                 >
-                    {pending ? "Trying…" : "Retry"}
+                    Try again
                 </Button>
             }
         />

@@ -260,7 +260,6 @@ export function MoveDialog({
                     <Button
                         type="button"
                         variant="outline"
-                        className="h-9 rounded-[9px] px-3.5 text-[12.5px] coarse:h-11"
                         onClick={() => {
                             reset();
                             onOpenChange(false);
@@ -270,11 +269,12 @@ export function MoveDialog({
                     </Button>
                     <Button
                         type="button"
-                        className="h-9 rounded-[9px] px-3.5 text-[12.5px] coarse:h-11"
-                        disabled={!!problem || saving}
+                        disabled={!!problem}
                         onClick={() => void save()}
+                        busy={saving}
+                        busyLabel="Moving…"
                     >
-                        {saving ? "Moving…" : "Move"}
+                        Move
                     </Button>
                 </div>
             </DialogContent>

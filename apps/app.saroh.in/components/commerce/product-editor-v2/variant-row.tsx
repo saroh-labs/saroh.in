@@ -1,5 +1,6 @@
 "use client";
 
+import { Button } from "@saroh/ui/button";
 import { cn } from "@saroh/ui/lib/utils";
 import { Trash2 } from "lucide-react";
 
@@ -117,20 +118,22 @@ export function VariantRowView({
                         )}
                     />
                 </MoneyBox>
-                <button
+                <Button
+                    variant="ghost"
+                    size="icon-sm"
                     type="button"
                     disabled={locked}
                     onClick={onRemove}
                     aria-label={`Remove ${title || "this variant"}`}
                     title={`Remove ${title || "this variant"}`}
-                    className="flex h-8 w-[30px] items-center justify-center rounded-[7px] text-muted-foreground hover:bg-destructive-subtle disabled:cursor-not-allowed coarse:size-11"
+                    className="text-muted-foreground"
                 >
                     <Trash2
                         aria-hidden
                         className="size-[15px]"
                         strokeWidth={1.9}
                     />
-                </button>
+                </Button>
             </div>
             <div className="mt-[5px] flex flex-wrap items-center gap-2">
                 <button

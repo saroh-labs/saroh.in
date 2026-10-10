@@ -351,7 +351,6 @@ function Sessions({
                                     <Button
                                         variant="ghost"
                                         size="sm"
-                                        className="coarse:size-11"
                                         aria-label="Remove this session"
                                         onClick={() => void remove(s.id)}
                                     >
@@ -514,12 +513,7 @@ function RosterRow({
                 </span>
             </span>
             {onCancel ? (
-                <Button
-                    variant="ghost"
-                    size="sm"
-                    className="coarse:h-11"
-                    onClick={onCancel}
-                >
+                <Button variant="ghost" size="sm" onClick={onCancel}>
                     Cancel
                 </Button>
             ) : null}
@@ -612,10 +606,11 @@ function CancelEnrolmentDialog({
                     </Button>
                     <Button
                         variant="destructive"
-                        disabled={busy}
                         onClick={() => void confirm()}
+                        busy={busy}
+                        busyLabel="Cancelling…"
                     >
-                        {busy ? "Cancelling…" : "Cancel enrolment"}
+                        Cancel enrolment
                     </Button>
                 </DialogFooter>
             </DialogContent>

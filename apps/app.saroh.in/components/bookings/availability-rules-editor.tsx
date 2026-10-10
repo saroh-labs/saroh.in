@@ -208,8 +208,10 @@ export function AvailabilityRulesEditor({
                     onClick={onSave}
                     disabled={saving}
                     className="wk-press"
+                    busy={busy}
+                    busyLabel="Saving…"
                 >
-                    {busy ? "Saving…" : "Save availability"}
+                    Save availability
                 </Button>
             </div>
         </div>

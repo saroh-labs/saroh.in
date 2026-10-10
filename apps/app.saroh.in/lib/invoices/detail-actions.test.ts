@@ -38,7 +38,7 @@ describe("detailActions' pay link after a reload (UX-048)", () => {
 
     it("still says it is working while the link is made", () => {
         expect(labels({ linkUnseen: true, linkBusy: true })).toContain(
-            "Making a link…",
+            "Making…",
         );
     });
 
@@ -125,7 +125,7 @@ describe("detailActions", () => {
             "Copy view link",
         );
         expect(labels({ payOnline: false, linkBusy: true })).toContain(
-            "Making a link…",
+            "Making…",
         );
     });
 

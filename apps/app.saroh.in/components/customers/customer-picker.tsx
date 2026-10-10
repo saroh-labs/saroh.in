@@ -1,5 +1,6 @@
 "use client";
 
+import { Button } from "@saroh/ui/button";
 import { Input } from "@saroh/ui/input";
 import { useEffect, useRef, useState } from "react";
 
@@ -228,13 +229,14 @@ export function CustomerPicker({
                     className="mb-2 text-[12.5px] text-destructive-subtle-foreground"
                 >
                     Couldn&apos;t search customers — try again.{" "}
-                    <button
+                    <Button
+                        variant="link"
+                        size="inline"
                         type="button"
                         onClick={() => setRetry((n) => n + 1)}
-                        className="font-semibold underline underline-offset-2 hover:decoration-2 active:text-muted-foreground"
                     >
                         Try again
-                    </button>
+                    </Button>
                 </p>
             ) : null}
             {forbidden && canSearch ? (

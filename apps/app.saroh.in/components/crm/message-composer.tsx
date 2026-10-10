@@ -171,9 +171,11 @@ export function MessageComposer({
                     <Button
                         type="submit"
                         className="wk-press"
-                        disabled={busy || !body.trim()}
+                        disabled={!body.trim()}
+                        busy={busy}
+                        busyLabel="Sending…"
                     >
-                        {busy ? "Sending…" : "Send message"}
+                        Send message
                     </Button>
                 </ActionSheetFooter>
             ) : (

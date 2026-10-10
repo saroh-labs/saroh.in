@@ -167,8 +167,8 @@ export function PageSettings({
                             <Button
                                 type="button"
                                 variant="outline"
-                                size="sm"
-                                className="h-7 justify-self-start px-2 text-xs text-foreground"
+                                size="xs"
+                                className="justify-self-start text-foreground"
                                 onClick={() => {
                                     if (refusal.suggestion) {
                                         setPath(refusal.suggestion);
@@ -186,10 +186,12 @@ export function PageSettings({
                     <Button
                         type="submit"
                         size="sm"
-                        className="h-8 justify-self-start px-3 text-xs"
-                        disabled={busy || !dirty}
+                        className="justify-self-start"
+                        disabled={!dirty}
+                        busy={busy}
+                        busyLabel="Saving…"
                     >
-                        {busy ? "Saving…" : "Save"}
+                        Save
                     </Button>
                 )}
             </form>
@@ -241,7 +243,7 @@ export function PageSettings({
                             type="button"
                             variant="ghost"
                             size="sm"
-                            className="h-8 justify-self-start px-2 text-xs text-destructive hover:bg-destructive/10 hover:text-destructive"
+                            className="justify-self-start text-destructive hover:bg-destructive/10 hover:text-destructive"
                             disabled={busy}
                             onClick={onDelete}
                         >

@@ -384,19 +384,22 @@ function SuggestionCard({
             ) : null}
             <div className="flex flex-wrap gap-2">
                 <Button
+                    size="sm"
                     type="button"
                     onClick={() => void add()}
-                    disabled={saving || problem !== null}
-                    className="h-[34px] rounded-[8px] px-3.5 text-[12.5px] font-semibold coarse:h-11"
+                    disabled={problem !== null}
+                    busy={saving}
+                    busyLabel="Adding…"
                 >
-                    {saving ? "Adding…" : "Add to Needs attention"}
+                    Add to Needs attention
                 </Button>
                 <Button
+                    size="sm"
                     type="button"
                     variant="outline"
                     onClick={onSetAside}
                     disabled={saving}
-                    className="h-[34px] rounded-[8px] px-3 text-[12.5px] font-semibold text-foreground/75 coarse:h-11"
+                    className="text-foreground/75"
                 >
                     Nothing to add
                 </Button>

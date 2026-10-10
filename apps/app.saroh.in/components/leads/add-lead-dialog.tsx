@@ -359,8 +359,8 @@ export function AddLeadDialog({
                         >
                             Cancel
                         </Button>
-                        <Button type="submit" disabled={saving}>
-                            {saving ? "Adding…" : "Add lead"}
+                        <Button type="submit" busy={saving} busyLabel="Adding…">
+                            Add lead
                         </Button>
                     </DialogFooter>
                 </form>

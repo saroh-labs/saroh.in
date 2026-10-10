@@ -192,11 +192,11 @@ export function MakeTestReleaseSheet({
                                     </Button>
                                     <Button
                                         type="submit"
-                                        disabled={isSubmitting || unsaved}
+                                        disabled={unsaved}
+                                        busy={isSubmitting}
+                                        busyLabel="Making…"
                                     >
-                                        {isSubmitting
-                                            ? "Making…"
-                                            : "Make test release"}
+                                        Make test release
                                     </Button>
                                 </DialogFooter>
                             </form>

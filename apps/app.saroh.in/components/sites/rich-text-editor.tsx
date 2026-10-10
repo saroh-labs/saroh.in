@@ -576,8 +576,7 @@ function EditorSurface({
                         <Button
                             type="button"
                             variant="ghost"
-                            size="sm"
-                            className="h-7 w-7 p-0"
+                            size="icon-xs"
                             aria-label="Insert image"
                         >
                             <ImagePlus className="size-4" />
@@ -677,8 +676,8 @@ function Tool({
         <Button
             type="button"
             variant="ghost"
-            size="sm"
-            className="h-7 w-7 p-0 [&>svg]:size-4"
+            size="icon-xs"
+            className="[&>svg]:size-4"
             aria-label={label}
             title={label}
             disabled={disabled}
@@ -733,8 +732,8 @@ function Swatches({
                 <Button
                     type="button"
                     variant="ghost"
-                    size="sm"
-                    className="h-7 w-7 p-0 [&>svg]:size-4"
+                    size="icon-xs"
+                    className="[&>svg]:size-4"
                     aria-label={label}
                     title={label}
                 >
@@ -762,8 +761,8 @@ function Swatches({
                 <Button
                     type="button"
                     variant="ghost"
-                    size="sm"
-                    className="mt-2 h-7 w-full text-xs"
+                    size="xs"
+                    className="mt-2 w-full"
                     onClick={() => onPick(null)}
                 >
                     None
@@ -812,15 +811,14 @@ function LinkTool({
                         aria-label="Link address"
                     />
                     <div className="flex gap-2">
-                        <Button type="submit" size="sm" className="h-7 text-xs">
+                        <Button type="submit" size="xs">
                             Apply
                         </Button>
                         {active ? (
                             <Button
                                 type="button"
-                                size="sm"
+                                size="xs"
                                 variant="ghost"
-                                className="h-7 text-xs"
                                 onClick={() => onSet("")}
                             >
                                 Remove

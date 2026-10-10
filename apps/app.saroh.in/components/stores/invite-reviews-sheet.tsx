@@ -197,13 +197,13 @@ export function InviteReviewsSheet({
                     ) : (
                         <Button
                             onClick={send}
-                            disabled={pending || picked.size === 0}
+                            disabled={picked.size === 0}
+                            busy={pending}
+                            busyLabel="Sending…"
                         >
-                            {pending
-                                ? "Sending…"
-                                : picked.size === 1
-                                  ? "Send 1 invitation"
-                                  : `Send ${picked.size} invitations`}
+                            {picked.size === 1
+                                ? "Send 1 invitation"
+                                : `Send ${picked.size} invitations`}
                         </Button>
                     )}
                 </SheetFooter>

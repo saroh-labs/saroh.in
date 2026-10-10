@@ -1,5 +1,6 @@
 "use client";
 
+import { Button } from "@saroh/ui/button";
 import { cn } from "@saroh/ui/lib/utils";
 import { showError, showUndo } from "@saroh/ui/toast";
 import { useRouter } from "next/navigation";
@@ -21,14 +22,7 @@ import {
 
 import { ReadOnlyNote } from "@/components/shared/read-only-note";
 import { useBottomBarInset } from "@/lib/hooks/use-bottom-bar-inset";
-import {
-    chipBtn,
-    primaryBtn,
-    smallBtn,
-    TabIntro,
-    textBox,
-    useUnsaved,
-} from "./product-settings";
+import { chipBtn, TabIntro, textBox, useUnsaved } from "./product-settings";
 
 /**
  * What a new product starts with — how to use it, when to warn about stock,
@@ -266,12 +260,9 @@ export function DefaultsTab({ catalogue }: { catalogue: CatalogueView }) {
                                           <span className="flex-[1_1_240px] text-pretty text-[12.5px] leading-[1.45] text-brand-subtle-foreground">
                                               {suggestionText(s, r.name)}
                                           </span>
-                                          <button
+                                          <Button
+                                              size="sm"
                                               type="button"
-                                              className={cn(
-                                                  primaryBtn,
-                                                  "h-7 px-2.5",
-                                              )}
                                               onClick={() =>
                                                   set(r.key, {
                                                       [s.field === "howToUse"
@@ -283,13 +274,11 @@ export function DefaultsTab({ catalogue }: { catalogue: CatalogueView }) {
                                               }
                                           >
                                               Use it
-                                          </button>
-                                          <button
+                                          </Button>
+                                          <Button
+                                              variant="outline"
+                                              size="sm"
                                               type="button"
-                                              className={cn(
-                                                  smallBtn,
-                                                  "h-7 px-2.5",
-                                              )}
                                               onClick={() =>
                                                   setDismissed({
                                                       ...dismissed,
@@ -298,7 +287,7 @@ export function DefaultsTab({ catalogue }: { catalogue: CatalogueView }) {
                                               }
                                           >
                                               Not now
-                                          </button>
+                                          </Button>
                                       </div>
                                   ))
                                 : null}
@@ -325,25 +314,28 @@ export function DefaultsTab({ catalogue }: { catalogue: CatalogueView }) {
                             {problem ||
                                 `New products start with this. ${changed.length} ${changed.length === 1 ? "value" : "values"} changed.`}
                         </span>
-                        <button
+                        <Button
+                            variant="outline"
+                            size="sm"
                             type="button"
                             disabled={pending}
                             onClick={() => {
                                 setRows(base);
                                 setApplyExisting(false);
                             }}
-                            className={smallBtn}
                         >
                             Discard
-                        </button>
-                        <button
+                        </Button>
+                        <Button
+                            size="sm"
                             type="button"
-                            disabled={!!problem || pending}
+                            disabled={!!problem}
                             onClick={save}
-                            className={primaryBtn}
+                            busy={pending}
+                            busyLabel="Saving…"
                         >
-                            {pending ? "Saving…" : "Save defaults"}
-                        </button>
+                            Save defaults
+                        </Button>
                     </div>
                     {hit.count > 0 ? (
                         <button

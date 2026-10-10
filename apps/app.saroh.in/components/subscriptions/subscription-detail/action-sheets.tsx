@@ -26,10 +26,6 @@ const TITLE: Record<Step, string> = {
 };
 
 const PER = { WEEK: "week", MONTH: "month", QUARTER: "quarter", YEAR: "year" };
-
-/** The footer buttons, at the design's 38px (44 on touch). */
-const BTN = "h-[38px] rounded-[9px] px-4 text-[14px] font-semibold";
-
 /**
  * The three steps Subscription Detail asks about before it acts, in the
  * design's centred sheet. Each one is a single API call the screen then
@@ -173,15 +169,15 @@ function PauseBody({
                 {note(picked)}
             </DialogDescription>
             <Footer>
-                <Button variant="outline" className={BTN} onClick={onClose}>
+                <Button variant="outline" onClick={onClose}>
                     Keep going
                 </Button>
                 <Button
-                    className={BTN}
-                    disabled={busy}
                     onClick={() => onPause(picked)}
+                    busy={busy}
+                    busyLabel="Pausing…"
                 >
-                    {busy ? "Pausing…" : "Pause"}
+                    Pause
                 </Button>
             </Footer>
         </>
@@ -248,11 +244,10 @@ function SwitchBody({
                 {note}
             </DialogDescription>
             <Footer>
-                <Button variant="outline" className={BTN} onClick={onClose}>
+                <Button variant="outline" onClick={onClose}>
                     Cancel
                 </Button>
                 <Button
-                    className={BTN}
                     disabled={!picked || busy}
                     onClick={() => (picked ? onSwitch(picked) : null)}
                 >
@@ -356,21 +351,21 @@ function CancelBody({
                 </div>
             ) : null}
             <Footer>
-                <Button variant="outline" className={BTN} onClick={onClose}>
+                <Button variant="outline" onClick={onClose}>
                     Keep subscription
                 </Button>
                 <Button
                     variant="destructive"
-                    className={BTN}
-                    disabled={busy}
                     onClick={() =>
                         onCancel(
                             when,
                             voidToo && unpaid ? unpaid.id : undefined,
                         )
                     }
+                    busy={busy}
+                    busyLabel="Cancelling…"
                 >
-                    {busy ? "Cancelling…" : "Cancel subscription"}
+                    Cancel subscription
                 </Button>
             </Footer>
         </>

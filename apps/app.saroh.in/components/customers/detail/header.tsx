@@ -16,14 +16,6 @@ import { Pill } from "@/components/subscriptions/pill";
 import type { MoreItem } from "@/lib/customer-workspace/more-menu";
 import { scrollToShow } from "@/lib/customer-workspace/tab-scroll";
 import type { Tab, TabKey, Tag } from "@/lib/customer-workspace/view";
-
-const HEAD_BTN =
-    "h-8 rounded-[9px] px-3 text-[12.5px] font-semibold coarse:h-11";
-
-/** The ⋯ button: the design's 34px square beside Edit details. */
-const MORE_BTN =
-    "h-8 w-[34px] rounded-[9px] p-0 data-[state=open]:border-border-strong data-[state=open]:bg-accent coarse:size-11";
-
 /** A menu row: the design's 8px by 10px, 7px corners. */
 const MENU_ITEM =
     "cursor-pointer items-start rounded-[7px] px-2.5 py-2 text-[13px] active:bg-accent-active data-[disabled]:cursor-not-allowed data-[disabled]:opacity-100";
@@ -173,9 +165,9 @@ export function Header({
                 <div className="flex min-w-0 flex-wrap gap-2">
                     {starts.map((s) => (
                         <Button
+                            size="sm"
                             key={s.href}
                             variant="outline"
-                            className={HEAD_BTN}
                             asChild
                         >
                             <Link href={s.href}>
@@ -185,8 +177,8 @@ export function Header({
                         </Button>
                     ))}
                     <Button
+                        size="sm"
                         variant="outline"
-                        className={HEAD_BTN}
                         disabled={!canEdit}
                         title={canEdit ? undefined : EDIT_OFF}
                         onClick={onEdit}
@@ -197,8 +189,9 @@ export function Header({
                         <DropdownMenu>
                             <DropdownMenuTrigger asChild>
                                 <Button
+                                    size="sm"
                                     variant="outline"
-                                    className={MORE_BTN}
+                                    className="w-[34px] p-0 data-[state=open]:border-border-strong data-[state=open]:bg-accent"
                                     disabled={!canMore}
                                     aria-label="More actions"
                                     title={canMore ? "More actions" : MORE_OFF}

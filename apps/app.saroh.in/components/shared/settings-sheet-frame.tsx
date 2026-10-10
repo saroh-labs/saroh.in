@@ -223,8 +223,14 @@ function Buttons({
 }) {
     const buttons = (
         <>
-            <Button type="submit" variant="brand" disabled={pending || saveOff}>
-                {pending ? savingLabel : saveLabel}
+            <Button
+                type="submit"
+                variant="brand"
+                disabled={saveOff}
+                busy={pending}
+                busyLabel={savingLabel}
+            >
+                {saveLabel}
             </Button>
             <Button
                 type="button"

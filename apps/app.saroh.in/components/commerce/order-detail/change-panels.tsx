@@ -6,7 +6,7 @@ import { sentenceStart } from "@/lib/format/sentence";
 import type { OnlinePaymentWords } from "@/lib/orders/online-payment";
 import { uncollectedHeading } from "@/lib/orders/pay-on-handover";
 
-import { actionClass, Panel, PanelTitle } from "./parts";
+import { Panel, PanelTitle } from "./parts";
 
 /**
  * The Change card's buttons, by the sheet each opens: where the keyboard
@@ -78,7 +78,6 @@ export function ChangeCard({
                 <Button
                     type="button"
                     variant="outline"
-                    className={actionClass("ghost")}
                     disabled={!canEdit || !editable}
                     title={
                         editable
@@ -93,7 +92,6 @@ export function ChangeCard({
                 <Button
                     type="button"
                     variant="outline"
-                    className={actionClass("ghost")}
                     disabled={canRefund !== null}
                     title={canRefund ?? "Refund by line"}
                     id={CHANGE_BUTTON_ID.refund}
@@ -105,7 +103,6 @@ export function ChangeCard({
                     <Button
                         type="button"
                         variant="outline"
-                        className={actionClass("ghost")}
                         disabled={fulfilment !== null}
                         title={fulfilment ?? undefined}
                         id={CHANGE_BUTTON_ID.fulfilment}
@@ -119,7 +116,6 @@ export function ChangeCard({
                         type="button"
                         variant="outline"
                         className={cn(
-                            actionClass("ghost"),
                             cancel === null &&
                                 "text-destructive-subtle-foreground hover:text-destructive-subtle-foreground",
                         )}
@@ -222,21 +218,12 @@ export function PaymentBanner({
                     </p>
                 </div>
                 {canRecord ? (
-                    <Button
-                        type="button"
-                        className={actionClass("primary")}
-                        onClick={onCash}
-                    >
+                    <Button type="button" onClick={onCash}>
                         Mark paid
                     </Button>
                 ) : (
                     // Shown, disabled, with why (FB-1, DEC-098).
-                    <Button
-                        type="button"
-                        className={actionClass("primary")}
-                        disabled
-                        aria-describedby={why}
-                    >
+                    <Button type="button" disabled aria-describedby={why}>
                         Mark paid
                     </Button>
                 )}
@@ -245,7 +232,6 @@ export function PaymentBanner({
                         type="button"
                         variant="outline"
                         className={cn(
-                            actionClass("ghost"),
                             "text-destructive-subtle-foreground hover:text-destructive-subtle-foreground",
                         )}
                         onClick={onCancel}
@@ -279,21 +265,12 @@ export function PaymentBanner({
                     </p>
                 </div>
                 {canRecord ? (
-                    <Button
-                        type="button"
-                        className={actionClass("primary")}
-                        onClick={onCash}
-                    >
+                    <Button type="button" onClick={onCash}>
                         Mark paid
                     </Button>
                 ) : (
                     // Shown, disabled, with why (FB-1, DEC-098).
-                    <Button
-                        type="button"
-                        className={actionClass("primary")}
-                        disabled
-                        aria-describedby={why}
-                    >
+                    <Button type="button" disabled aria-describedby={why}>
                         Mark paid
                     </Button>
                 )}
@@ -342,18 +319,17 @@ export function PaymentBanner({
             {link ? (
                 <Button
                     type="button"
-                    className={actionClass("primary")}
-                    disabled={sending}
                     onClick={onSendLink}
+                    busy={sending}
+                    busyLabel="Making…"
                 >
-                    {sending ? "Making a link…" : "Send a pay link"}
+                    Send a pay link
                 </Button>
             ) : null}
             {canRecord ? (
                 <Button
                     type="button"
                     variant={link ? "outline" : "default"}
-                    className={actionClass(link ? "ghost" : "primary")}
                     onClick={onCash}
                 >
                     Paid in cash
@@ -363,7 +339,6 @@ export function PaymentBanner({
                 <Button
                     type="button"
                     variant={link ? "outline" : "default"}
-                    className={actionClass(link ? "ghost" : "primary")}
                     disabled
                     aria-describedby={why}
                 >

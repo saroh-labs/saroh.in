@@ -135,8 +135,8 @@ export function NameDialog({
                         >
                             Cancel
                         </Button>
-                        <Button type="submit" disabled={busy}>
-                            {busy ? busyLabel : submitLabel}
+                        <Button type="submit" busy={busy} busyLabel={busyLabel}>
+                            {submitLabel}
                         </Button>
                     </DialogFooter>
                 </form>

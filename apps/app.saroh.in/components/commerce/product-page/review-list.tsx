@@ -127,18 +127,20 @@ export function ReviewList({
                                     />
                                     <div className="mt-1.5 flex items-center gap-[7px]">
                                         <Button
+                                            size="sm"
                                             type="submit"
-                                            disabled={pending || !draft.trim()}
-                                            className="h-[30px] rounded-[8px] px-3 text-[12px] font-semibold"
+                                            disabled={!draft.trim()}
+                                            busy={pending}
+                                            busyLabel="Posting…"
                                         >
                                             Post reply
                                         </Button>
                                         <Button
+                                            size="sm"
                                             type="button"
                                             variant="outline"
                                             onClick={cancelReply}
                                             disabled={pending}
-                                            className="h-[30px] rounded-[8px] px-[11px] text-[12px] font-semibold"
                                         >
                                             Cancel
                                         </Button>
@@ -153,27 +155,30 @@ export function ReviewList({
                             {canReply && replyingTo !== r.id ? (
                                 <div className="mt-[9px] flex gap-3.5">
                                     {r.reply ? null : (
-                                        <button
+                                        <Button
+                                            variant="link"
+                                            size="inline"
                                             type="button"
                                             onClick={() => startReply(r.id)}
                                             disabled={pending}
-                                            className="text-[12.5px] font-semibold text-brand hover:text-foreground disabled:opacity-50 coarse:min-h-11"
                                         >
                                             Reply
-                                        </button>
+                                        </Button>
                                     )}
-                                    <button
+                                    <Button
+                                        variant="link"
+                                        size="inline"
                                         type="button"
                                         onClick={() =>
                                             toggleHidden(r.id, r.status)
                                         }
                                         disabled={pending}
-                                        className="text-[12.5px] text-muted-foreground hover:text-foreground disabled:opacity-50 coarse:min-h-11"
+                                        className="text-muted-foreground"
                                     >
                                         {hidden
                                             ? "Show on the shop"
                                             : "Hide from the shop"}
-                                    </button>
+                                    </Button>
                                 </div>
                             ) : null}
                         </Card>

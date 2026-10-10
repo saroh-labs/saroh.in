@@ -8,9 +8,6 @@ import { Pill } from "@/components/subscriptions/pill";
 import type { DetailHeader } from "@/lib/class-packs/pack-detail";
 
 import { GUTTER } from "./detail-crumbs";
-
-const BUTTON = "h-[38px] rounded-[9px] px-4 text-[14px] font-semibold";
-
 export type Lens = "team" | "customer";
 
 const LENSES: { key: Lens; label: string }[] = [
@@ -110,7 +107,6 @@ export function PackDetailHeader({
                 {canSell ? (
                     <Button
                         variant="outline"
-                        className={cn(BUTTON, "coarse:h-11")}
                         disabled={!head.onSale}
                         aria-describedby={
                             head.note ? "pack-detail-note" : undefined
@@ -121,7 +117,7 @@ export function PackDetailHeader({
                     </Button>
                 ) : null}
                 {canWrite && head.editHref ? (
-                    <Button asChild className={cn(BUTTON, "coarse:h-11")}>
+                    <Button asChild>
                         <Link href={head.editHref}>
                             <svg
                                 aria-hidden

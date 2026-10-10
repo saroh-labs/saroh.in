@@ -1,5 +1,6 @@
 "use client";
 
+import { Button } from "@saroh/ui/button";
 import { cn } from "@saroh/ui/lib/utils";
 import { showError, showSuccess } from "@saroh/ui/toast";
 import { ChevronLeft } from "lucide-react";
@@ -282,7 +283,8 @@ function EditorBody({
                             {hint}
                         </span>
                         {showHeaderSave ? (
-                            <button
+                            <Button
+                                size="sm"
                                 type="button"
                                 disabled={headerOff}
                                 onClick={() =>
@@ -290,7 +292,6 @@ function EditorBody({
                                         ? void create()
                                         : void saveSections(savable)
                                 }
-                                className="h-[34px] rounded-[9px] bg-foreground px-3.5 text-[12.5px] font-semibold text-background hover:bg-foreground/90 disabled:cursor-not-allowed disabled:bg-muted disabled:text-muted-foreground coarse:h-11"
                             >
                                 {creating
                                     ? creatingNow
@@ -301,7 +302,7 @@ function EditorBody({
                                     : saving.length > 0
                                       ? "Saving…"
                                       : "Save all"}
-                            </button>
+                            </Button>
                         ) : null}
                     </div>
                 </div>

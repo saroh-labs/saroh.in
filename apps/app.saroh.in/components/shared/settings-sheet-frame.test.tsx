@@ -249,7 +249,7 @@ describe("SettingsSheetFrame: while a save is on its way", () => {
         expect(onClose).not.toHaveBeenCalled();
         expect(dialog()).not.toBe(null);
         expect(button("Cancel").disabled).toBe(true);
-        expect(button("Saving…").disabled).toBe(true);
+        expect(button("Saving…").getAttribute("aria-busy")).toBe("true");
     });
 });
 

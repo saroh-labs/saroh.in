@@ -1,5 +1,6 @@
 "use client";
 
+import { Button } from "@saroh/ui/button";
 import { EmptyState } from "@saroh/ui/data-state";
 import { cn } from "@saroh/ui/lib/utils";
 import { showError, showUndo } from "@saroh/ui/toast";
@@ -12,7 +13,7 @@ import { addAllergens, removeAllergen } from "@/lib/products/settings-actions";
 
 import { ReadOnlyNote } from "@/components/shared/read-only-note";
 import { NameDialog } from "./name-dialog";
-import { bigBtn, rowBtn, smallBtn, TabIntro } from "./product-settings";
+import { TabIntro } from "./product-settings";
 
 const MAX = 30;
 const COMMON = [
@@ -70,10 +71,10 @@ export function AllergensTab({
     const addOne = canWrite ? (
         <NameDialog
             trigger={
-                <button type="button" className={bigBtn}>
+                <Button type="button" className="shrink-0">
                     <Plus aria-hidden className="-ml-0.5 mr-1.5 size-3.5" />
                     Add allergen
-                </button>
+                </Button>
             }
             title="Add allergen"
             note="Customers see it as you name it here."
@@ -117,10 +118,11 @@ export function AllergensTab({
                     action={
                         canWrite ? (
                             <div className="flex flex-wrap items-center justify-center gap-2">
-                                <button
+                                <Button
+                                    variant="outline"
+                                    size="sm"
                                     type="button"
                                     disabled={pending}
-                                    className={cn(smallBtn, "h-9 px-3.5")}
                                     onClick={() =>
                                         start(async () => {
                                             await add(
@@ -131,7 +133,7 @@ export function AllergensTab({
                                     }
                                 >
                                     Add the common food allergens
-                                </button>
+                                </Button>
                                 {addOne}
                             </div>
                         ) : null
@@ -167,14 +169,16 @@ export function AllergensTab({
                                         : "Not on any product yet"}
                                 </span>
                                 {canWrite ? (
-                                    <button
+                                    <Button
+                                        variant="outline"
+                                        size="xs"
                                         type="button"
                                         disabled={used > 0 || pending}
                                         title={title}
                                         aria-label={title}
                                         className={cn(
-                                            rowBtn,
-                                            used === 0 && "text-destructive",
+                                            used === 0 &&
+                                                "text-destructive hover:text-destructive",
                                         )}
                                         onClick={() =>
                                             run(async () => {
@@ -200,7 +204,7 @@ export function AllergensTab({
                                         }
                                     >
                                         Remove
-                                    </button>
+                                    </Button>
                                 ) : null}
                             </li>
                         );

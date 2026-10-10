@@ -53,12 +53,13 @@ export function MoreSettings({
                 deleting it.
             </p>
             <Button
+                size="sm"
                 type="button"
                 variant="outline"
                 aria-expanded={open}
                 aria-controls={ids.body}
                 onClick={() => setOpen((o) => !o)}
-                className="mt-2.5 h-8 rounded-[8px] px-3 text-[13px]"
+                className="mt-2.5"
             >
                 {open ? "Hide more settings" : "Show more settings"}
                 <ChevronDown
@@ -161,7 +162,7 @@ export function MoreSettings({
                             type="button"
                             variant="outline"
                             onClick={onDelete}
-                            className="h-[38px] rounded-[9px] px-4 text-[14px] text-destructive hover:text-destructive"
+                            className="text-destructive hover:text-destructive"
                         >
                             Delete service
                         </Button>

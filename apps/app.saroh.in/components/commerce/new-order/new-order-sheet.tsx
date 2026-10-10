@@ -1,5 +1,6 @@
 "use client";
 
+import { Button } from "@saroh/ui/button";
 import { cn } from "@saroh/ui/lib/utils";
 import {
     Sheet,
@@ -284,16 +285,14 @@ function NewOrderBody({
                         className="rounded-xl border border-border bg-card px-3.5 py-[13px] text-[12.5px] text-destructive-subtle-foreground"
                     >
                         Couldn&apos;t read what {storeName} sells.{" "}
-                        <button
+                        <Button
+                            variant="link"
+                            size="inline"
                             type="button"
                             onClick={o.retryCatalogue}
-                            className={cn(
-                                FOCUS,
-                                "cursor-pointer rounded-sm font-semibold underline underline-offset-2 hover:text-foreground",
-                            )}
                         >
                             Try again
-                        </button>
+                        </Button>
                     </p>
                 ) : (
                     <LinesStep
@@ -353,20 +352,17 @@ function NewOrderBody({
                         {shownProblem}
                     </div>
                 ) : null}
-                <button
+                <Button
+                    size="lg"
                     type="button"
                     onClick={() => void create()}
-                    disabled={o.problem !== null || saving}
-                    aria-busy={saving}
-                    className={cn(
-                        FOCUS,
-                        "h-[46px] w-full cursor-pointer rounded-[10px] bg-primary text-[14.5px] font-semibold text-primary-foreground transition-[background-color,transform] duration-fast hover:bg-primary/90 active:scale-[0.99] disabled:cursor-not-allowed disabled:bg-muted disabled:text-muted-foreground disabled:active:scale-100 coarse:h-12",
-                    )}
+                    disabled={o.problem !== null}
+                    className="w-full"
+                    busy={saving}
+                    busyLabel="Creating…"
                 >
-                    {saving
-                        ? "Creating…"
-                        : createLabel(o.pay, total, o.lines.length > 0)}
-                </button>
+                    {createLabel(o.pay, total, o.lines.length > 0)}
+                </Button>
             </div>
         </>
     );

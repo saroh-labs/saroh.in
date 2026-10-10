@@ -147,7 +147,7 @@ export function OrderActions({
                         <Button
                             variant="outline"
                             size="icon"
-                            className="size-[38px] rounded-[9px] bg-card coarse:size-11 print:hidden"
+                            className="bg-card print:hidden"
                             aria-label={`More actions for ${orderRef}`}
                         >
                             <MoreHorizontal className="size-4" />

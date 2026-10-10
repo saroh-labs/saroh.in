@@ -285,8 +285,12 @@ export function RecordPaymentDialog({
                     >
                         Cancel
                     </Button>
-                    <Button disabled={busy} onClick={() => void save()}>
-                        {busy ? "Saving…" : "Mark it paid"}
+                    <Button
+                        onClick={() => void save()}
+                        busy={busy}
+                        busyLabel="Saving…"
+                    >
+                        Mark it paid
                     </Button>
                 </DialogFooter>
             </DialogContent>
@@ -406,12 +410,12 @@ export function CancelInvoiceDialog({
                             variant="destructive"
                             disabled={busy !== null}
                             onClick={() => void run("credit")}
+                            busy={busy === "credit"}
+                            busyLabel="Issuing…"
                         >
-                            {busy === "credit"
-                                ? "Issuing the credit note…"
-                                : refund
-                                  ? "Issue the credit note"
-                                  : "Cancel with a credit note"}
+                            {refund
+                                ? "Issue the credit note"
+                                : "Cancel with a credit note"}
                         </Button>
                     ) : (
                         <>
@@ -419,17 +423,19 @@ export function CancelInvoiceDialog({
                                 variant="outline"
                                 disabled={busy !== null}
                                 onClick={() => void run("void")}
+                                busy={busy === "void"}
+                                busyLabel="Voiding…"
                             >
-                                {busy === "void" ? "Voiding…" : "Void it"}
+                                Void it
                             </Button>
                             <Button
                                 variant="destructive"
                                 disabled={busy !== null}
                                 onClick={() => void run("reissue")}
+                                busy={busy === "reissue"}
+                                busyLabel="Voiding…"
                             >
-                                {busy === "reissue"
-                                    ? "Voiding…"
-                                    : "Void and write again"}
+                                Void and write again
                             </Button>
                         </>
                     )}

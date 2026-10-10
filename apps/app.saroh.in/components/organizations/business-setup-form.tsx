@@ -547,25 +547,25 @@ export function BusinessSetupForm({
 
                 <div data-setup-kept className="flex gap-2 pt-1">
                     {backTo ? (
-                        <Button asChild variant="outline" className="h-10">
+                        <Button asChild variant="outline">
                             <Link href={backTo}>Back</Link>
                         </Button>
                     ) : null}
                     <Button
                         type="submit"
-                        className="wk-press h-10 flex-1 font-semibold"
-                        disabled={busy || taken}
+                        className="wk-press flex-1"
+                        disabled={taken}
                         title={
                             taken && availability.reason
                                 ? availability.reason
                                 : undefined
                         }
+                        busy={busy}
+                        busyLabel="Setting up…"
                     >
-                        {busy
-                            ? "Setting up…"
-                            : kind === "BUSINESS"
-                              ? "Create the business"
-                              : "Set it up"}
+                        {kind === "BUSINESS"
+                            ? "Create the business"
+                            : "Set it up"}
                     </Button>
                 </div>
 
@@ -575,9 +575,10 @@ export function BusinessSetupForm({
                 >
                     Signed in as{" "}
                     <span className="text-foreground">{email}</span> ·{" "}
-                    <button
+                    <Button
+                        variant="link"
+                        size="inline"
                         type="button"
-                        className="text-foreground underline-offset-4 hover:underline active:text-muted-foreground"
                         onClick={() => {
                             void authClient.signOut().then(() => {
                                 window.location.href = accountsLoginUrl;
@@ -585,7 +586,7 @@ export function BusinessSetupForm({
                         }}
                     >
                         Sign out
-                    </button>
+                    </Button>
                 </p>
             </form>
         </Form>

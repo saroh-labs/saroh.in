@@ -136,16 +136,17 @@ export function AddPagePanel({
                         <Button
                             type="submit"
                             size="sm"
-                            className="h-8 flex-1 text-xs"
+                            className="flex-1"
                             disabled={busy !== null}
+                            busy={busy === "blank"}
+                            busyLabel="Adding…"
                         >
-                            {busy === "blank" ? "Adding…" : "Add page"}
+                            Add page
                         </Button>
                         <Button
                             type="button"
                             variant="ghost"
                             size="sm"
-                            className="h-8 text-xs"
                             onClick={onCancel}
                         >
                             Cancel
@@ -180,8 +181,8 @@ export function AddPagePanel({
                         <Button
                             type="button"
                             variant="outline"
-                            size="sm"
-                            className="h-7 justify-self-start px-2 text-xs text-foreground"
+                            size="xs"
+                            className="justify-self-start text-foreground"
                             disabled={busy !== null}
                             onClick={() => {
                                 const retry = refusal.retry;

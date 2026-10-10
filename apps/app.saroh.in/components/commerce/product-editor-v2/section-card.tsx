@@ -116,21 +116,25 @@ export function SectionCard({
                         {note}
                     </span>
                     <Button
+                        size="sm"
                         type="button"
                         variant="outline"
                         disabled={busy}
                         onClick={() => discard(k)}
-                        className="h-[30px] rounded-[8px] px-[11px] text-[12px] font-semibold text-foreground/75"
+                        className="text-foreground/75"
                     >
                         {state?.discardLabel ?? "Discard"}
                     </Button>
                     <Button
+                        size="sm"
                         type="button"
-                        disabled={busy || !!problem}
+                        disabled={!!problem}
                         onClick={() => void saveSections([k])}
-                        className="h-[30px] rounded-[8px] px-3 text-[12px] font-semibold disabled:bg-muted disabled:text-muted-foreground disabled:opacity-100"
+                        className="disabled:bg-muted disabled:text-muted-foreground disabled:opacity-100"
+                        busy={busy}
+                        busyLabel="Saving…"
                     >
-                        {busy ? "Saving…" : (state?.saveLabel ?? SAVE_LABEL[k])}
+                        {state?.saveLabel ?? SAVE_LABEL[k]}
                     </Button>
                 </div>
             ) : null}

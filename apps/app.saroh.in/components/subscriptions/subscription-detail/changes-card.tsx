@@ -1,5 +1,6 @@
 "use client";
 
+import { Button } from "@saroh/ui/button";
 import { cn } from "@saroh/ui/lib/utils";
 import { showError } from "@saroh/ui/toast";
 import { useState } from "react";
@@ -15,9 +16,6 @@ import type {
 
 const CARD = "rounded-xl border border-border bg-card";
 const TITLE = "font-display text-[15px] font-semibold tracking-[-0.02em]";
-const LINK =
-    "text-[12.5px] font-semibold text-brand hover:text-foreground active:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:text-muted-foreground coarse:min-h-11";
-
 /**
  * Changes: what was done to the subscription and by whom, from its log
  * (D9), newest first — the latest ten, then "See all", which reads older
@@ -91,23 +89,28 @@ export function ChangesCard({
                         </div>
                     ))}
                     {more ? (
-                        <button
+                        <Button
+                            variant="link"
+                            size="inline"
                             type="button"
                             onClick={() => setEverything(true)}
-                            className={cn(LINK, "mt-1.5")}
+                            className="mt-1.5"
                         >
                             See all
-                        </button>
+                        </Button>
                     ) : null}
                     {everything && cursor ? (
-                        <button
+                        <Button
+                            variant="link"
+                            size="inline"
                             type="button"
                             onClick={() => void older()}
-                            disabled={loading}
-                            className={cn(LINK, "mt-1.5")}
+                            className="mt-1.5"
+                            busy={loading}
+                            busyLabel="Loading…"
                         >
-                            {loading ? "Loading…" : "Show older changes"}
-                        </button>
+                            Show older changes
+                        </Button>
                     ) : null}
                     {/* Said once the oldest recorded change is on show. */}
                     {first?.earlierUnrecorded && !more && !cursor ? (

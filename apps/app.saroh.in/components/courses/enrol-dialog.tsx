@@ -180,10 +180,12 @@ export function EnrolDialog({
                         Cancel
                     </Button>
                     <Button
-                        disabled={busy || !contactId || !course}
+                        disabled={!contactId || !course}
                         onClick={() => void save()}
+                        busy={busy}
+                        busyLabel="Enrolling…"
                     >
-                        {busy ? "Enrolling…" : "Enrol and book"}
+                        Enrol and book
                     </Button>
                 </DialogFooter>
             </DialogContent>

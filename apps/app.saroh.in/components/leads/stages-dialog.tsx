@@ -160,8 +160,7 @@ export function StagesDialog({
                             <Button
                                 type="button"
                                 variant="ghost"
-                                size="icon"
-                                className="size-8"
+                                size="icon-sm"
                                 aria-label={`Move ${r.name || "this stage"} left`}
                                 disabled={i === 0}
                                 onClick={() => move(i, -1)}
@@ -171,8 +170,7 @@ export function StagesDialog({
                             <Button
                                 type="button"
                                 variant="ghost"
-                                size="icon"
-                                className="size-8"
+                                size="icon-sm"
                                 aria-label={`Move ${r.name || "this stage"} right`}
                                 disabled={i === rows.length - 1}
                                 onClick={() => move(i, 1)}
@@ -182,8 +180,7 @@ export function StagesDialog({
                             <Button
                                 type="button"
                                 variant="ghost"
-                                size="icon"
-                                className="size-8"
+                                size="icon-sm"
                                 aria-label={
                                     r.leads > 0
                                         ? `${r.name} has ${r.leads} lead${r.leads === 1 ? "" : "s"}; move them before removing it`
@@ -236,9 +233,10 @@ export function StagesDialog({
                     <p className="text-pretty text-[11.5px] leading-[1.5] text-muted-foreground">
                         Removing {removed.map((r) => r.name).join(", ")} when
                         you save.{" "}
-                        <button
+                        <Button
+                            variant="link"
+                            size="inline"
                             type="button"
-                            className="font-medium text-foreground underline-offset-4 hover:underline"
                             onClick={() => {
                                 setRows((all) =>
                                     [...all, ...removed].sort(
@@ -253,7 +251,7 @@ export function StagesDialog({
                             {removed.length === 1
                                 ? "Put it back"
                                 : "Put them back"}
-                        </button>
+                        </Button>
                     </p>
                 ) : null}
 
@@ -267,10 +265,12 @@ export function StagesDialog({
                     </Button>
                     <Button
                         type="button"
-                        disabled={saving || !dirty || blank}
+                        disabled={!dirty || blank}
                         onClick={() => void save()}
+                        busy={saving}
+                        busyLabel="Saving…"
                     >
-                        {saving ? "Saving…" : "Save stages"}
+                        Save stages
                     </Button>
                 </DialogFooter>
             </DialogContent>

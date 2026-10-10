@@ -311,19 +311,17 @@ function TurnOnBody({
                                 !t.ready || t.saving || t.hidden.length > 0
                             }
                             onClick={() => void submit(false)}
-                            className="h-[38px] rounded-[9px] px-3.5 text-[13px] font-semibold coarse:h-11"
                         >
                             Later
                         </Button>
                         <Button
                             type="button"
-                            disabled={
-                                !t.ready || t.saving || t.hidden.length > 0
-                            }
+                            disabled={!t.ready || t.hidden.length > 0}
                             onClick={() => void submit(true)}
-                            className="h-[38px] rounded-[9px] px-3.5 text-[13px] font-semibold coarse:h-11"
+                            busy={t.saving}
+                            busyLabel="Turning on…"
                         >
-                            {t.saving ? "Turning on…" : "Connect now"}
+                            Connect now
                         </Button>
                     </>
                 ) : (
@@ -333,19 +331,17 @@ function TurnOnBody({
                             variant="outline"
                             disabled={t.saving}
                             onClick={onClose}
-                            className="h-[38px] rounded-[9px] px-3.5 text-[13px] font-semibold coarse:h-11"
                         >
                             Cancel
                         </Button>
                         <Button
                             type="submit"
                             form="turn-on-form"
-                            disabled={
-                                !t.ready || t.saving || t.hidden.length > 0
-                            }
-                            className="h-[38px] rounded-[9px] px-3.5 text-[13px] font-semibold coarse:h-11"
+                            disabled={!t.ready || t.hidden.length > 0}
+                            busy={t.saving}
+                            busyLabel="Turning on…"
                         >
-                            {t.saving ? "Turning on…" : "Turn on"}
+                            Turn on
                         </Button>
                     </>
                 )}

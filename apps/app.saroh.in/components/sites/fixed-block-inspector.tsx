@@ -206,8 +206,7 @@ export function FixedBlockInspector({
                 <Button
                     type="button"
                     variant="outline"
-                    size="sm"
-                    className="h-8 w-8 p-0"
+                    size="icon-sm"
                     disabled
                     aria-label="Move up"
                     aria-describedby="fixed-lock-reason"
@@ -217,8 +216,7 @@ export function FixedBlockInspector({
                 <Button
                     type="button"
                     variant="outline"
-                    size="sm"
-                    className="h-8 w-8 p-0"
+                    size="icon-sm"
                     disabled
                     aria-label="Move down"
                     aria-describedby="fixed-lock-reason"
@@ -236,7 +234,7 @@ export function FixedBlockInspector({
                     type="button"
                     variant="outline"
                     size="sm"
-                    className="ml-auto h-8 px-3 text-xs"
+                    className="ml-auto"
                     disabled
                     aria-describedby="fixed-lock-reason"
                 >

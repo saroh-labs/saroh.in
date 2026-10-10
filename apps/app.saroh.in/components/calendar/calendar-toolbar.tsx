@@ -71,17 +71,12 @@ export function CalendarToolbar({
                         size="sm"
                         disabled
                         aria-current="date"
-                        className="px-[11px] text-[12.5px] disabled:text-muted-foreground disabled:opacity-100"
+                        className="disabled:text-muted-foreground disabled:opacity-100"
                     >
                         {current.label}
                     </Button>
                 ) : (
-                    <Button
-                        asChild
-                        variant="outline"
-                        size="sm"
-                        className="px-[11px] text-[12.5px]"
-                    >
+                    <Button asChild variant="outline" size="sm">
                         <Link href={current.href}>{current.label}</Link>
                     </Button>
                 )}

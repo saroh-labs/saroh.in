@@ -113,9 +113,10 @@ export function QuickSheet({
                                 You have changes that are not saved.
                             </span>
                             <Button
+                                size="sm"
                                 type="button"
                                 variant="outline"
-                                className="h-[30px] rounded-[8px] px-[11px] text-[12px] font-semibold text-destructive hover:text-destructive"
+                                className="text-destructive hover:text-destructive"
                                 onClick={() => {
                                     setConfirming(false);
                                     onOpenChange(false);
@@ -124,8 +125,8 @@ export function QuickSheet({
                                 Discard
                             </Button>
                             <Button
+                                size="sm"
                                 type="button"
-                                className="h-[30px] rounded-[8px] px-[11px] text-[12px] font-semibold"
                                 onClick={() => setConfirming(false)}
                             >
                                 Keep editing
@@ -154,22 +155,23 @@ export function QuickSheet({
                             </span>
                         ) : null}
                         <Button
+                            size="sm"
                             type="button"
                             variant="outline"
-                            className="h-[34px] rounded-[9px] px-3 text-[12.5px] font-semibold"
                             onClick={() => onOpenChange(false)}
                             disabled={saving}
                         >
                             Cancel
                         </Button>
                         <Button
+                            size="sm"
                             type="submit"
-                            className="h-[34px] rounded-[9px] px-3.5 text-[12.5px] font-semibold disabled:bg-muted disabled:text-muted-foreground disabled:opacity-100"
-                            disabled={
-                                saving || (saveDisabled ?? false) || !dirty
-                            }
+                            className="disabled:bg-muted disabled:text-muted-foreground disabled:opacity-100"
+                            disabled={(saveDisabled ?? false) || !dirty}
+                            busy={saving}
+                            busyLabel="Saving…"
                         >
-                            {saving ? "Saving…" : "Save"}
+                            Save
                         </Button>
                     </SheetFooter>
                 </form>

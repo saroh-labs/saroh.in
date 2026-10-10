@@ -27,11 +27,6 @@ import type {
     AutopayMethod,
 } from "@/lib/subscriptions/service";
 import { dayText, money } from "@/lib/subscriptions/view";
-
-const BTN = "h-[38px] rounded-[9px] px-4 text-[14px] font-semibold";
-/** The Plan card's own small actions, 44px on touch. */
-const SMALL = "h-8 rounded-[8px] px-3 text-[12.5px] font-semibold coarse:h-11";
-
 /**
  * Autopay under the Plan card's "Pays by" line (D14): how it came to be,
  * what needs attention, and — for someone with `subscription:write` —
@@ -85,12 +80,12 @@ export function AutopayActions({
                 <div className="mt-2.5 flex flex-wrap gap-2">
                     {panel.sendLabel ? (
                         <Button
+                            size="sm"
                             variant={
                                 panel.notice?.tone === "warn"
                                     ? "default"
                                     : "outline"
                             }
-                            className={SMALL}
                             onClick={() => setOpen("send")}
                         >
                             {panel.sendLabel}
@@ -98,11 +93,9 @@ export function AutopayActions({
                     ) : null}
                     {panel.canCancel ? (
                         <Button
+                            size="sm"
                             variant="outline"
-                            className={cn(
-                                SMALL,
-                                "text-destructive-subtle-foreground hover:text-destructive-subtle-foreground",
-                            )}
+                            className="text-destructive-subtle-foreground hover:text-destructive-subtle-foreground"
                             onClick={() => setOpen("cancel")}
                         >
                             Cancel autopay
@@ -219,9 +212,7 @@ function SendLinkBody({
                 ) : null}
                 <LinkBox url={made.url} />
                 <Footer>
-                    <Button className={BTN} onClick={onClose}>
-                        Done
-                    </Button>
+                    <Button onClick={onClose}>Done</Button>
                 </Footer>
             </>
         );
@@ -294,15 +285,16 @@ function SendLinkBody({
                 </p>
             )}
             <Footer>
-                <Button variant="outline" className={BTN} onClick={onClose}>
+                <Button variant="outline" onClick={onClose}>
                     Cancel
                 </Button>
                 <Button
-                    className={BTN}
-                    disabled={!method || busy}
+                    disabled={!method}
                     onClick={() => void make()}
+                    busy={busy}
+                    busyLabel="Making…"
                 >
-                    {busy ? "Making…" : "Make the link"}
+                    Make the link
                 </Button>
             </Footer>
         </>
@@ -318,8 +310,8 @@ function LinkBox({ url }: { url: string }) {
                 {url}
             </span>
             <Button
+                size="sm"
                 variant="outline"
-                className={SMALL}
                 onClick={() => {
                     void navigator.clipboard.writeText(url).then(
                         () => setCopied(true),
@@ -392,16 +384,16 @@ function CancelBody({
                     : ""}
             </DialogDescription>
             <Footer>
-                <Button variant="outline" className={BTN} onClick={onClose}>
+                <Button variant="outline" onClick={onClose}>
                     Keep autopay
                 </Button>
                 <Button
                     variant="destructive"
-                    className={BTN}
-                    disabled={busy}
                     onClick={() => void go()}
+                    busy={busy}
+                    busyLabel="Cancelling…"
                 >
-                    {busy ? "Cancelling…" : "Cancel autopay"}
+                    Cancel autopay
                 </Button>
             </Footer>
         </>

@@ -195,8 +195,8 @@ export function RowMenu({
             <DropdownMenuTrigger asChild>
                 <Button
                     variant="ghost"
-                    size="icon"
-                    className="size-7 text-muted-foreground hover:text-foreground coarse:size-11"
+                    size="icon-xs"
+                    className="text-muted-foreground hover:text-foreground"
                     aria-label={`More actions for ${row.name}`}
                 >
                     <MoreHorizontal className="size-4" />

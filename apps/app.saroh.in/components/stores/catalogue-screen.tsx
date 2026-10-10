@@ -405,9 +405,10 @@ export function CatalogueScreen({
                     <Button
                         variant="outline"
                         onClick={() => void loadMore()}
-                        disabled={loadingMore}
+                        busy={loadingMore}
+                        busyLabel="Loading…"
                     >
-                        {loadingMore ? "Loading…" : "Show more"}
+                        Show more
                     </Button>
                 </div>
             ) : null}

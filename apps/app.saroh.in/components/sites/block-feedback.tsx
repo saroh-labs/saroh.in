@@ -172,7 +172,7 @@ export function BlockFeedback({
                         type="button"
                         variant="ghost"
                         size="sm"
-                        className="h-8 px-2 text-xs text-muted-foreground"
+                        className="text-muted-foreground"
                         aria-expanded={showSettled}
                         onClick={() => setShowSettled((v) => !v)}
                     >
@@ -242,18 +242,16 @@ export function BlockFeedback({
                     <Button
                         type="submit"
                         size="sm"
-                        disabled={sending || reply.trim() === ""}
+                        disabled={reply.trim() === ""}
                         title={
                             reply.trim() === ""
                                 ? "Write something first"
                                 : undefined
                         }
+                        busy={sending}
+                        busyLabel="Sending…"
                     >
-                        {sending
-                            ? "Sending…"
-                            : open.length === 0
-                              ? "Add note"
-                              : "Reply"}
+                        {open.length === 0 ? "Add note" : "Reply"}
                     </Button>
                 </div>
             </form>

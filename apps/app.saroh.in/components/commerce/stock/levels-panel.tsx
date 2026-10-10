@@ -179,10 +179,11 @@ export function LevelsPanel({
                         type="button"
                         variant="outline"
                         size="sm"
-                        disabled={pending}
                         onClick={more}
+                        busy={pending}
+                        busyLabel="Loading…"
                     >
-                        {pending ? "Loading…" : "Show more"}
+                        Show more
                     </Button>
                     <span className="text-[12px] text-muted-foreground">
                         {`${new Set(loaded.rows.map((r) => r.productId)).size} products shown`}

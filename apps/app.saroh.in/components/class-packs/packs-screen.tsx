@@ -24,8 +24,6 @@ import { SellPackDialog } from "./sell-pack-dialog";
 
 /** An Undo toast lasts ten seconds (round-2 default 136). */
 const UNDO_MS = 10_000;
-const BUTTON = "h-[38px] rounded-[9px] px-4 text-[14px] font-semibold";
-
 /** Archived, with who keeps what: the toast Undo sits beside. */
 function archiveToast(pack: PackListItem, archived: boolean): string {
     if (!archived) return `${pack.name} is on sale again.`;
@@ -152,10 +150,10 @@ export function PacksScreen({
                 </p>
                 {canWrite ? (
                     <>
-                        <Button asChild className={BUTTON}>
+                        <Button asChild>
                             <Link href="/class-packs/new">New pack</Link>
                         </Button>
-                        <Button asChild variant="outline" className={BUTTON}>
+                        <Button asChild variant="outline">
                             <Link href="/class-packs/new?kind=one-to-one">
                                 New one-to-one pack
                             </Link>

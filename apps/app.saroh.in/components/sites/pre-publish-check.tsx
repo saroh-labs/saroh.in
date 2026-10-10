@@ -146,8 +146,7 @@ export function PrePublishCheck({
                     <Button
                         type="button"
                         variant="ghost"
-                        size="sm"
-                        className="h-7 text-xs"
+                        size="xs"
                         onClick={onClose}
                     >
                         Back to editing
@@ -159,7 +158,6 @@ export function PrePublishCheck({
                         // publish: it goes past a rule the business set.
                         variant={needsApproval ? "destructive" : "default"}
                         disabled={
-                            publishing ||
                             unsaved ||
                             blocked ||
                             (needsApproval && !canOverride)
@@ -172,15 +170,14 @@ export function PrePublishCheck({
                                   : undefined
                         }
                         onClick={onPublish}
-                        className="h-8 px-3"
+                        busy={publishing}
+                        busyLabel="Publishing…"
                     >
-                        {publishing
-                            ? "Publishing…"
-                            : needsApproval || review.outstanding
-                              ? "Publish without approval"
-                              : neverPublished
-                                ? "Publish site"
-                                : "Publish changes"}
+                        {needsApproval || review.outstanding
+                            ? "Publish without approval"
+                            : neverPublished
+                              ? "Publish site"
+                              : "Publish changes"}
                     </Button>
                 </div>
             </header>

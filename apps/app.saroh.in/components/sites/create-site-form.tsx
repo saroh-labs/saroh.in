@@ -270,9 +270,11 @@ export function CreateSiteForm({
                 <Button
                     type="submit"
                     className="wk-press w-fit"
-                    disabled={isSubmitting || !name.trim()}
+                    disabled={!name.trim()}
+                    busy={isSubmitting}
+                    busyLabel="Creating…"
                 >
-                    {isSubmitting ? "Creating…" : "Create site"}
+                    Create site
                 </Button>
             </form>
             {guard.dialog}
@@ -335,12 +337,14 @@ export function UseSuggestedAddress({
 }) {
     if (!suggestion || suggestion === current) return null;
     return (
-        <button
+        <Button
+            variant="link"
+            size="inline"
             type="button"
             onClick={() => onUse(suggestion)}
-            className="w-fit cursor-pointer rounded-sm text-left text-xs font-medium text-foreground underline underline-offset-2 hover:no-underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring active:text-muted-foreground coarse:min-h-11"
+            className="w-fit text-left"
         >
             Use {suggestion}.saroh.app
-        </button>
+        </Button>
     );
 }

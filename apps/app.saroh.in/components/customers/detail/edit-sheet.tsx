@@ -125,16 +125,17 @@ export function EditSheet({
             // The same person twice (C10): offer the merge, which lets them
             // pick this email for the record that stays. What was typed here
             // can't be saved as it stands, so the sheet makes way for it.
-            <button
+            <Button
+                variant="link"
+                size="inline"
                 type="button"
                 onClick={() => {
                     close(true);
                     onMerge(holder);
                 }}
-                className="cursor-pointer rounded-sm font-medium text-foreground underline underline-offset-2 hover:no-underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring active:opacity-70"
             >
                 Merge with {holder.name ?? "their record"}
-            </button>
+            </Button>
         ) : holder ? (
             <Link
                 href={personHref(holder.contactId)}
@@ -227,17 +228,18 @@ export function EditSheet({
                             You have changes that are not saved.
                         </span>
                         <Button
+                            size="sm"
                             type="button"
                             variant="outline"
                             onClick={() => close(true)}
-                            className="h-[30px] rounded-[8px] px-[11px] text-[12px] font-semibold text-destructive-subtle-foreground coarse:h-11"
+                            className="text-destructive-subtle-foreground"
                         >
                             Discard
                         </Button>
                         <Button
+                            size="sm"
                             type="button"
                             onClick={() => setAsking(false)}
-                            className="h-[30px] rounded-[8px] px-[11px] text-[12px] font-semibold coarse:h-11"
                         >
                             Keep editing
                         </Button>
@@ -248,20 +250,22 @@ export function EditSheet({
                         {dirty ? "" : "No changes yet"}
                     </span>
                     <Button
+                        size="sm"
                         type="button"
                         variant="outline"
                         onClick={() => close()}
-                        className="h-8 rounded-[9px] px-3 text-[12.5px] font-semibold coarse:h-11"
                     >
                         Cancel
                     </Button>
                     <Button
+                        size="sm"
                         type="submit"
                         form={id}
-                        disabled={!dirty || blocked || saving}
-                        className="h-8 rounded-[9px] px-3 text-[12.5px] font-semibold coarse:h-11"
+                        disabled={!dirty || blocked}
+                        busy={saving}
+                        busyLabel="Saving…"
                     >
-                        {saving ? "Saving…" : "Save"}
+                        Save
                     </Button>
                 </div>
             </SheetContent>

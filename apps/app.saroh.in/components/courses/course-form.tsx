@@ -340,16 +340,18 @@ export function CourseForm({
 
                 <div className="flex flex-wrap gap-2">
                     {course ? (
-                        <Button type="submit" disabled={busy}>
-                            {busy ? "Saving…" : "Save"}
+                        <Button type="submit" busy={busy} busyLabel="Saving…">
+                            Save
                         </Button>
                     ) : (
                         <>
                             <Button
                                 type="submit"
-                                disabled={busy || sessions.length === 0}
+                                disabled={sessions.length === 0}
+                                busy={busy}
+                                busyLabel="Saving…"
                             >
-                                {busy ? "Saving…" : "Save and open"}
+                                Save and open
                             </Button>
                             <Button
                                 type="button"
@@ -444,7 +446,6 @@ function SessionPicker({
                                 type="button"
                                 variant="ghost"
                                 size="sm"
-                                className="coarse:size-11"
                                 aria-label={`Remove session ${i + 1}`}
                                 onClick={() =>
                                     onChange(value.filter((v) => v !== iso))

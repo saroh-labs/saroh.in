@@ -1,3 +1,4 @@
+import { Button } from "@saroh/ui/button";
 import { cn } from "@saroh/ui/lib/utils";
 import Link from "next/link";
 
@@ -232,17 +233,15 @@ export function TrackingRow({
     const { courier, number, url, ownDriver, canChange } = shipment;
     const shown = number ?? (url ? url.replace(/^https?:\/\//, "") : null);
     const action = (label: string, name: string) => (
-        <button
+        <Button
+            variant="link"
+            size="inline"
             type="button"
             onClick={onChange}
             aria-label={name}
-            className={cn(
-                FOCUS,
-                "rounded-sm font-sans text-[12.5px] font-semibold text-foreground underline underline-offset-4 hover:decoration-2 active:text-muted-foreground coarse:min-h-11",
-            )}
         >
             {label}
-        </button>
+        </Button>
     );
     return (
         <div className="mt-2 flex min-w-0 flex-wrap items-baseline gap-x-1 text-[12.5px]">

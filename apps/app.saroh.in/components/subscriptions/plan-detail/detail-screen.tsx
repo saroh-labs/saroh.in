@@ -40,9 +40,6 @@ import { PlanHistory } from "./history";
 import { PlanOverview } from "./overview";
 import { PlanAutopayTiming } from "./plan-autopay-timing";
 import { PlanSubscribers } from "./subscribers";
-
-const BTN = "h-[38px] rounded-[9px] px-4 text-[14px] font-semibold";
-
 /**
  * Payments → Plans → one plan (D4), after "Saroh Plan Detail": the header
  * with Archive and Edit plan, then Overview, Subscribers and History.
@@ -204,7 +201,6 @@ export function PlanDetail({
                     <div className="flex flex-wrap gap-2">
                         <Button
                             variant="outline"
-                            className={cn(BTN, "coarse:h-11")}
                             disabled={busy}
                             onClick={archive}
                         >
@@ -213,17 +209,13 @@ export function PlanDetail({
                         {subscribeTo ? (
                             // From the plan itself (UX-080): the dialog,
                             // opened on this plan.
-                            <Button
-                                asChild
-                                variant="outline"
-                                className={cn(BTN, "coarse:h-11")}
-                            >
+                            <Button asChild variant="outline">
                                 <Link href={subscribeTo}>
                                     Subscribe someone
                                 </Link>
                             </Button>
                         ) : null}
-                        <Button asChild className={cn(BTN, "coarse:h-11")}>
+                        <Button asChild>
                             <Link href={editHref(plan.id)}>Edit plan</Link>
                         </Button>
                     </div>

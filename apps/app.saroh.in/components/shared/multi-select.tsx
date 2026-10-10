@@ -132,15 +132,16 @@ export function MultiSelect({
                         <li key={o.id}>
                             <Badge variant="neutral" className="gap-1 pr-1">
                                 {o.label}
-                                <button
+                                <Button
+                                    variant="ghost"
+                                    size="icon-xs"
                                     type="button"
                                     disabled={disabled}
                                     onClick={() => toggle(o.id)}
                                     aria-label={`Remove ${o.label}`}
-                                    className="rounded-full p-0.5 hover:bg-foreground/10 active:bg-foreground/[0.15]"
                                 >
                                     <X aria-hidden className="size-3" />
-                                </button>
+                                </Button>
                             </Badge>
                         </li>
                     ))}

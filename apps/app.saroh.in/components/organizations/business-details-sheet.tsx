@@ -156,10 +156,10 @@ function DetailsBody({
             </p>
             <div className="mt-auto flex justify-end border-t border-border pt-3">
                 <Button
+                    size="sm"
                     type="button"
                     variant="outline"
                     onClick={() => onDone(false)}
-                    className="h-8 rounded-[9px] px-3 text-[12.5px] font-semibold coarse:h-11"
                 >
                     Close
                 </Button>
@@ -311,19 +311,20 @@ function DetailsForm({
                 ) : null}
                 <div className="flex items-center justify-end gap-2 border-t border-border px-[18px] py-3">
                     <Button
+                        size="sm"
                         type="button"
                         variant="outline"
                         onClick={() => onDone(false)}
-                        className="h-8 rounded-[9px] px-3 text-[12.5px] font-semibold coarse:h-11"
                     >
                         Not now
                     </Button>
                     <Button
+                        size="sm"
                         type="submit"
-                        disabled={saving}
-                        className="h-8 rounded-[9px] px-3 text-[12.5px] font-semibold coarse:h-11"
+                        busy={saving}
+                        busyLabel="Saving…"
                     >
-                        {saving ? "Saving…" : continueLabel}
+                        {continueLabel}
                     </Button>
                 </div>
             </form>

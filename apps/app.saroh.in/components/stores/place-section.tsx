@@ -158,7 +158,8 @@ export function PlaceSection({
                                 type="button"
                                 variant="outline"
                                 size="sm"
-                                disabled={pending}
+                                busy={pending}
+                                busyLabel="Turning off…"
                                 onClick={turnPickupOff}
                             >
                                 Turn Pick-up off

@@ -76,14 +76,11 @@ export function ConsentToggle({
                                 size="sm"
                                 variant="outline"
                                 className="wk-press"
-                                disabled={busy === channel}
                                 onClick={() => toggle(channel, next)}
+                                busy={busy === channel}
+                                busyLabel="Saving…"
                             >
-                                {busy === channel
-                                    ? "Saving…"
-                                    : revoked
-                                      ? "Grant"
-                                      : "Revoke"}
+                                {revoked ? "Grant" : "Revoke"}
                             </Button>
                         ) : null}
                     </li>

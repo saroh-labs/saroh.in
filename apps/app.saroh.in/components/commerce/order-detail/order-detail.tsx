@@ -49,7 +49,6 @@ import { OrderCrumbs, OrderHeading } from "./order-header";
 import { useOrderPanel } from "./order-sheet";
 import { OrderSheets } from "./order-sheets";
 import type { PillTone } from "./parts";
-import { actionClass } from "./parts";
 import { PayLinkBlock, usePayLink } from "./pay-link";
 import { KitchenStepper } from "./stepper";
 import { OrderTimeline } from "./timeline";
@@ -259,12 +258,7 @@ export function OrderDetail({
             }
         >
             {order.ticketName ? (
-                <Button
-                    type="button"
-                    variant="outline"
-                    className={actionClass("ghost")}
-                    onClick={print}
-                >
+                <Button type="button" variant="outline" onClick={print}>
                     Print {order.ticketName.toLowerCase()}
                 </Button>
             ) : null}
@@ -293,12 +287,7 @@ export function OrderDetail({
                 />
             ) : null}
             {next && !hold ? (
-                <Button
-                    type="button"
-                    className={actionClass("primary")}
-                    disabled={busy}
-                    onClick={advance}
-                >
+                <Button type="button" disabled={busy} onClick={advance}>
                     {STEP_LABEL[next]}
                 </Button>
             ) : null}

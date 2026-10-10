@@ -69,15 +69,16 @@ export function CollectionsCard({
                     </span>
                     <Pill tone={u.tone}>{u.state}</Pill>
                     {canWrite && u.canSkip ? (
-                        <button
+                        <Button
+                            variant="outline"
+                            size="sm"
                             type="button"
                             onClick={() => onToggle(u)}
                             disabled={busyDate === u.date}
                             aria-label={`${u.skipped ? "Undo skip" : "Skip"} ${u.label}`}
-                            className="h-8 min-w-[76px] rounded-[8px] border border-border bg-card px-3 text-[12px] font-semibold hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring active:bg-accent-active disabled:bg-disabled disabled:text-disabled-foreground coarse:h-11"
                         >
                             {u.skipped ? "Undo skip" : "Skip"}
-                        </button>
+                        </Button>
                     ) : null}
                 </div>
             ))}
@@ -153,13 +154,14 @@ export function ChargesCard({
             )}
             {state === "ok" && all.length > rows.length ? (
                 <div className="border-t border-border/70 px-4 py-2">
-                    <button
+                    <Button
+                        variant="link"
+                        size="inline"
                         type="button"
                         onClick={() => setEverything(true)}
-                        className="text-[12.5px] font-semibold text-brand hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring active:bg-accent-active coarse:min-h-11"
                     >
                         Show all {all.length} charges
-                    </button>
+                    </Button>
                 </div>
             ) : null}
             {footer ? (
@@ -262,8 +264,8 @@ export function PayLinkRow({ url, name }: { url: string; name: string }) {
                 {url}
             </span>
             <Button
+                size="sm"
                 variant="outline"
-                className="h-8 rounded-[8px] px-3 text-[12.5px] font-semibold coarse:h-11"
                 onClick={() => {
                     void navigator.clipboard.writeText(url).then(
                         () => setCopied(true),

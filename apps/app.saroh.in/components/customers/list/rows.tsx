@@ -211,7 +211,7 @@ export function NoMatch({
                 variant="outline"
                 size="sm"
                 onClick={onClear}
-                className="mt-2.5 h-[30px] rounded-[8px] px-3 text-[12.5px]"
+                className="mt-2.5"
             >
                 Clear search and filters
             </Button>

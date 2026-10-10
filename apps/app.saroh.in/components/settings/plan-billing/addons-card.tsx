@@ -106,11 +106,10 @@ export function AddonsCard({
                                 <Button
                                     type="button"
                                     variant="outline"
-                                    size="icon"
+                                    size="icon-sm"
                                     aria-label={`Fewer: ${row.name}`}
                                     disabled={off || row.quantity === 0}
                                     onClick={() => set(row, row.quantity - 1)}
-                                    className="size-8 coarse:size-11"
                                 >
                                     −
                                 </Button>
@@ -120,7 +119,7 @@ export function AddonsCard({
                                 <Button
                                     type="button"
                                     variant="outline"
-                                    size="icon"
+                                    size="icon-sm"
                                     aria-label={`More: ${row.name}`}
                                     disabled={
                                         off ||
@@ -128,7 +127,6 @@ export function AddonsCard({
                                         row.quantity >= max
                                     }
                                     onClick={() => set(row, row.quantity + 1)}
-                                    className="size-8 coarse:size-11"
                                 >
                                     +
                                 </Button>

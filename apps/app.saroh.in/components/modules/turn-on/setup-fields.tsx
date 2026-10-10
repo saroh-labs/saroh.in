@@ -1,5 +1,6 @@
 "use client";
 
+import { Button } from "@saroh/ui/button";
 import { Checkbox } from "@saroh/ui/checkbox";
 import { Input } from "@saroh/ui/input";
 import { cn } from "@saroh/ui/lib/utils";
@@ -243,7 +244,9 @@ export function WebsiteFields({
             </Field>
             {suggestion && suggestion !== w.address ? (
                 // The one asked for is taken: the API offers a free one.
-                <button
+                <Button
+                    variant="link"
+                    size="inline"
                     type="button"
                     onClick={() =>
                         update((d) => ({
@@ -251,10 +254,10 @@ export function WebsiteFields({
                             WEBSITE: { ...d.WEBSITE, address: suggestion },
                         }))
                     }
-                    className="-mt-2 w-fit cursor-pointer rounded-sm text-left text-[12px] font-medium text-foreground underline underline-offset-2 hover:no-underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring active:text-muted-foreground coarse:min-h-11"
+                    className="-mt-2 w-fit text-left"
                 >
                     Use {suggestion}.saroh.app
-                </button>
+                </Button>
             ) : null}
             {template && choices.length > 1 ? (
                 <TemplateChoice

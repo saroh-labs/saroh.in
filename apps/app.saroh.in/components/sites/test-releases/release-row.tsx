@@ -182,9 +182,11 @@ export function ReleaseRow({
                             variant="outline"
                             disabled={busy !== null}
                             onClick={() => void open()}
+                            busy={busy === "open"}
+                            busyLabel="Opening…"
                         >
                             <ExternalLink aria-hidden className="size-4" />
-                            {busy === "open" ? "Opening…" : "Open"}
+                            Open
                         </Button>
                         <Button size="sm" variant="outline" asChild>
                             <Link
@@ -205,14 +207,14 @@ export function ReleaseRow({
                                     variant="outline"
                                     disabled={busy !== null}
                                     onClick={() => void cancelSchedule()}
+                                    busy={busy === "cancel"}
+                                    busyLabel="Cancelling…"
                                 >
                                     <CalendarClock
                                         aria-hidden
                                         className="size-4"
                                     />
-                                    {busy === "cancel"
-                                        ? "Cancelling…"
-                                        : "Cancel schedule"}
+                                    Cancel schedule
                                 </Button>
                             ) : null
                         ) : (

@@ -96,9 +96,9 @@ export function ReleaseLinks({
                             {canShare ? (
                                 <Button
                                     type="button"
-                                    size="sm"
+                                    size="xs"
                                     variant="ghost"
-                                    className="h-7 shrink-0 px-2 text-[12px]"
+                                    className="shrink-0"
                                     disabled={busy !== null}
                                     onClick={() => void revoke(link.id)}
                                 >
@@ -140,8 +140,10 @@ export function ReleaseLinks({
                         variant="outline"
                         disabled={busy !== null}
                         onClick={() => void create()}
+                        busy={busy === "create"}
+                        busyLabel="Making…"
                     >
-                        {busy === "create" ? "Making…" : "New link"}
+                        New link
                     </Button>
                 </div>
             ) : null}

@@ -108,27 +108,16 @@ export function PayLinkPanel({
                 </p>
             )}
             <div className="flex flex-wrap justify-end gap-2">
-                <Button
-                    type="button"
-                    variant="outline"
-                    className="h-[38px] rounded-[9px] px-4 text-[14px]"
-                    onClick={onDone}
-                >
+                <Button type="button" variant="outline" onClick={onDone}>
                     Done
                 </Button>
                 {link.ok ? (
-                    <Button
-                        type="button"
-                        className="h-[38px] rounded-[9px] px-4 text-[14px]"
-                        onClick={() => void copy(link.url)}
-                    >
+                    <Button type="button" onClick={() => void copy(link.url)}>
                         Copy link
                     </Button>
                 ) : link.plan ? null : (
                     <Button
                         type="button"
-                        disabled={trying}
-                        className="h-[38px] rounded-[9px] px-4 text-[14px]"
                         onClick={() => {
                             setTrying(true);
                             void makePayLink(bookingId).then((next) => {
@@ -136,8 +125,10 @@ export function PayLinkPanel({
                                 setTrying(false);
                             });
                         }}
+                        busy={trying}
+                        busyLabel="Trying again…"
                     >
-                        {trying ? "Trying…" : "Try again"}
+                        Try again
                     </Button>
                 )}
             </div>

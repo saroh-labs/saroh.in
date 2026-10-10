@@ -80,8 +80,7 @@ export function RepeatedItems<T>({
                                     <Button
                                         type="button"
                                         variant="outline"
-                                        size="sm"
-                                        className="h-8 w-8 p-0"
+                                        size="icon-sm"
                                         disabled={index === 0}
                                         aria-label={`Move ${itemNoun.toLowerCase()} ${index + 1} up`}
                                         onClick={() => move(index, -1)}
@@ -91,8 +90,7 @@ export function RepeatedItems<T>({
                                     <Button
                                         type="button"
                                         variant="outline"
-                                        size="sm"
-                                        className="h-8 w-8 p-0"
+                                        size="icon-sm"
                                         disabled={index === items.length - 1}
                                         aria-label={`Move ${itemNoun.toLowerCase()} ${index + 1} down`}
                                         onClick={() => move(index, 1)}

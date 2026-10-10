@@ -237,7 +237,7 @@ function ChangeForm({
                                         type="button"
                                         variant="link"
                                         size="sm"
-                                        className="h-auto p-0 text-[12px] font-medium"
+                                        className="h-auto p-0 font-medium"
                                         onClick={() => use(suggestion)}
                                     >
                                         Use {addressHost(suggestion, suffix)}
@@ -268,8 +268,13 @@ function ChangeForm({
                     >
                         Cancel
                     </Button>
-                    <Button type="submit" disabled={saveOff}>
-                        {isSubmitting ? "Changing…" : "Change web address"}
+                    <Button
+                        type="submit"
+                        disabled={saveOff}
+                        busy={isSubmitting}
+                        busyLabel="Changing…"
+                    >
+                        Change web address
                     </Button>
                 </DialogFooter>
             </form>

@@ -227,12 +227,11 @@ export function CustomDomain({
                                         type="button"
                                         size="sm"
                                         variant="outline"
-                                        disabled={busy === domain.id}
                                         onClick={() => void check(domain)}
+                                        busy={busy === domain.id}
+                                        busyLabel="Checking…"
                                     >
-                                        {busy === domain.id
-                                            ? "Checking…"
-                                            : view.checkLabel}
+                                        {view.checkLabel}
                                     </Button>
                                 ) : null}
                                 {confirmRemove === domain.id ? null : (
@@ -297,12 +296,11 @@ export function CustomDomain({
                                         type="button"
                                         size="sm"
                                         variant="destructive"
-                                        disabled={busy === domain.id}
                                         onClick={() => void remove(domain)}
+                                        busy={busy === domain.id}
+                                        busyLabel="Removing…"
                                     >
-                                        {busy === domain.id
-                                            ? "Removing…"
-                                            : `Remove ${domain.hostname}`}
+                                        {`Remove ${domain.hostname}`}
                                     </Button>
                                     <Button
                                         type="button"

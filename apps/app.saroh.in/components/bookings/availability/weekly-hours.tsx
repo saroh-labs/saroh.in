@@ -65,8 +65,8 @@ export function WeeklyHours({
                 </h2>
                 {canEdit ? (
                     <Button
+                        size="sm"
                         variant="outline"
-                        className="h-[30px] rounded-[8px] px-[11px] text-[12px] coarse:h-11"
                         onClick={() => {
                             const monday = dayRanges(hours, 1);
                             onChange([
@@ -251,8 +251,8 @@ export function WeeklyHours({
                                                     ) : null}
                                                     <div className="flex items-center gap-2">
                                                         <Button
+                                                            size="sm"
                                                             type="submit"
-                                                            className="h-8 rounded-[8px] px-3 text-[12.5px] coarse:h-11"
                                                             disabled={Boolean(
                                                                 bad,
                                                             )}
@@ -260,9 +260,9 @@ export function WeeklyHours({
                                                             Add hours
                                                         </Button>
                                                         <Button
+                                                            size="sm"
                                                             type="button"
                                                             variant="ghost"
-                                                            className="h-8 rounded-[8px] px-3 text-[12.5px] coarse:h-11"
                                                             onClick={() =>
                                                                 setAdding(null)
                                                             }

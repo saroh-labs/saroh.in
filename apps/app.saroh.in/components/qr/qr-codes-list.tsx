@@ -180,7 +180,7 @@ export function QrCodesList({
                                                     type="button"
                                                     variant="ghost"
                                                     size="sm"
-                                                    className="text-[13px] text-brand"
+                                                    className="text-brand"
                                                     aria-label={`Change the ${placeWords(code)} code`}
                                                     onClick={() =>
                                                         onChange(code)
@@ -192,7 +192,6 @@ export function QrCodesList({
                                                     type="button"
                                                     variant="ghost"
                                                     size="sm"
-                                                    className="text-[13px]"
                                                     aria-label={`Retire the ${placeWords(code)} code`}
                                                     onClick={() =>
                                                         onRetire(code)
@@ -206,7 +205,7 @@ export function QrCodesList({
                                                 type="button"
                                                 variant="ghost"
                                                 size="sm"
-                                                className="text-[13px] text-brand"
+                                                className="text-brand"
                                                 aria-label={`View the ${placeWords(code)} code`}
                                                 onClick={() => onView(code)}
                                             >

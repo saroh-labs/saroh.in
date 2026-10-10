@@ -81,11 +81,13 @@ export function OrderReviews({
                 <Button
                     variant="outline"
                     size="sm"
-                    disabled={pending || state.blocked !== null}
+                    disabled={state.blocked !== null}
                     title={state.blocked?.message}
                     onClick={invite}
+                    busy={pending}
+                    busyLabel="Sending…"
                 >
-                    {pending ? "Sending…" : verb}
+                    {verb}
                 </Button>
             ) : null}
         </section>

@@ -48,7 +48,7 @@ export function OrderFiltersSheet({
                 aria-label={on > 0 ? `Filters, ${on} on` : "Filters"}
                 onClick={() => setOpen(true)}
                 className={cn(
-                    "h-11 cursor-pointer gap-1.5 rounded-[9px] px-3 text-[13.5px] font-medium active:scale-[0.98]",
+                    "cursor-pointer gap-1.5 font-medium active:scale-[0.98]",
                     on > 0 && "border-foreground",
                     className,
                 )}
@@ -77,7 +77,7 @@ export function OrderFiltersSheet({
                                 type="button"
                                 variant="outline"
                                 onClick={() => go({ ...NO_FILTERS })}
-                                className="mr-auto h-11 cursor-pointer rounded-[9px] px-3.5 text-[13.5px] font-semibold active:scale-[0.98]"
+                                className="mr-auto cursor-pointer active:scale-[0.98]"
                             >
                                 Clear filters
                             </Button>
@@ -85,7 +85,7 @@ export function OrderFiltersSheet({
                         <Button
                             type="button"
                             onClick={() => setOpen(false)}
-                            className="ml-auto h-11 cursor-pointer rounded-[9px] px-5 text-[13.5px] font-semibold active:scale-[0.98]"
+                            className="ml-auto cursor-pointer active:scale-[0.98]"
                         >
                             Done
                         </Button>

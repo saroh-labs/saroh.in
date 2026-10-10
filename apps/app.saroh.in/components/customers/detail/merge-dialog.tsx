@@ -48,10 +48,6 @@ interface Loaded {
 }
 
 const COLUMNS: readonly MergeColumn[] = ["here", "there"];
-
-const SMALL_BTN =
-    "h-8 rounded-[9px] px-3 text-[12.5px] font-semibold coarse:h-11";
-
 /**
  * "Merge with a duplicate" (DEC-042, C10), after the dialog in Saroh
  * Customer Detail: this record and the other side by side, a pick per row
@@ -210,12 +206,12 @@ export function MergeDialog({
                             {readFailed} Nothing has changed.
                         </span>
                         <Button
+                            size="sm"
                             variant="outline"
                             onClick={() => {
                                 setReadFailed(null);
                                 setAttempt((n) => n + 1);
                             }}
-                            className="h-[30px] rounded-[8px] px-[11px] text-[12.5px] font-semibold coarse:h-11"
                         >
                             Try again
                         </Button>
@@ -351,22 +347,24 @@ export function MergeDialog({
                         </span>
                     ) : null}
                     <Button
+                        size="sm"
                         type="button"
                         variant="outline"
                         disabled={merging}
                         onClick={() => onOpenChange(false)}
-                        className={SMALL_BTN}
                     >
                         Cancel
                     </Button>
                     {other ? (
                         <Button
+                            size="sm"
                             type="button"
-                            disabled={!preview || !!block || merging}
+                            disabled={!preview || !!block}
                             onClick={() => void merge()}
-                            className={SMALL_BTN}
+                            busy={merging}
+                            busyLabel="Merging…"
                         >
-                            {merging ? "Merging…" : "Merge"}
+                            Merge
                         </Button>
                     ) : null}
                 </div>

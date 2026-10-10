@@ -559,14 +559,12 @@ export function DiscountForm({
                 <div className="flex flex-wrap items-center gap-2">
                     <Button
                         type="submit"
-                        disabled={isSubmitting || ending}
+                        disabled={ending}
                         className="wk-press"
+                        busy={isSubmitting}
+                        busyLabel="Saving…"
                     >
-                        {isSubmitting
-                            ? "Saving…"
-                            : discount
-                              ? "Save changes"
-                              : "Create code"}
+                        {discount ? "Save changes" : "Create code"}
                     </Button>
                     {discount?.state === "ACTIVE" ? (
                         <Button

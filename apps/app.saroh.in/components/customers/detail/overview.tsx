@@ -158,6 +158,7 @@ export function Overview({
                     </p>
                     {canStop ? (
                         <Button
+                            size="sm"
                             variant="outline"
                             disabled={!canConsent || stopping}
                             title={
@@ -166,7 +167,7 @@ export function Overview({
                                     : "Your role can't change what they agreed to"
                             }
                             onClick={onStop}
-                            className="mt-2.5 h-8 rounded-[9px] px-3 text-[12.5px] font-semibold coarse:h-11"
+                            className="mt-2.5"
                         >
                             They asked to stop
                         </Button>
@@ -236,13 +237,14 @@ function ClassesLeft({
                 <span className={cn(LABEL, "flex-1")}>Classes left</span>
                 {/* The sell dialog with them chosen (C7), not a trip away. */}
                 {onSell ? (
-                    <button
+                    <Button
+                        variant="link"
+                        size="inline"
                         type="button"
                         onClick={onSell}
-                        className="rounded-[4px] text-[12.5px] font-semibold text-brand transition-colors duration-fast hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 active:opacity-70"
                     >
                         Sell a pack
-                    </button>
+                    </Button>
                 ) : null}
             </div>
             {cl ? (
@@ -395,9 +397,10 @@ function NextBooking({
                 ))}
             </div>
             <Button
+                size="sm"
                 variant="outline"
                 onClick={onAll}
-                className="mt-3.5 h-8 rounded-[9px] px-3 text-[12.5px] font-semibold coarse:h-11"
+                className="mt-3.5"
             >
                 See all bookings
             </Button>

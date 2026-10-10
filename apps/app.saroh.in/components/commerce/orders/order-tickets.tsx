@@ -72,7 +72,7 @@ export function OrderTickets({
                 <Button
                     asChild
                     variant="outline"
-                    className="h-[38px] cursor-pointer gap-1.5 rounded-[9px] px-3.5 text-[13px] font-semibold active:scale-[0.98] coarse:h-11"
+                    className="cursor-pointer gap-1.5 active:scale-[0.98]"
                 >
                     <Link href="/commerce/orders">
                         <ChevronLeft aria-hidden className="size-4" />
@@ -83,7 +83,7 @@ export function OrderTickets({
                     <Button
                         type="button"
                         onClick={() => window.print()}
-                        className="h-[38px] cursor-pointer gap-1.5 rounded-[9px] px-3.5 text-[13px] font-semibold active:scale-[0.98] coarse:h-11"
+                        className="cursor-pointer gap-1.5 active:scale-[0.98]"
                     >
                         <Printer aria-hidden className="size-4" />
                         Print

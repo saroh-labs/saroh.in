@@ -1,5 +1,6 @@
 "use client";
 
+import { Button } from "@saroh/ui/button";
 import { cn } from "@saroh/ui/lib/utils";
 import { useEffect, useState } from "react";
 
@@ -42,13 +43,9 @@ export function LibraryPanel({
                 <span className="flex-1 text-[12.5px] font-semibold">
                     Your photos · tap to add or take off
                 </span>
-                <button
-                    type="button"
-                    onClick={onDone}
-                    className="h-7 rounded-[7px] bg-foreground px-[11px] text-[12px] font-semibold text-background hover:bg-foreground/90 coarse:h-11"
-                >
+                <Button size="xs" type="button" onClick={onDone}>
                     Done
-                </button>
+                </Button>
             </div>
             {items === "loading" ? (
                 <p role="status" className="text-[12px] text-muted-foreground">

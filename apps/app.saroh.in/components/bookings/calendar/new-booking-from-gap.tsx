@@ -371,21 +371,24 @@ function Form({
 
             <div className="mt-3.5 flex flex-wrap items-center justify-end gap-2">
                 {extra ? (
-                    <button
+                    <Button
+                        variant="link"
+                        size="inline"
                         type="button"
                         onClick={() => void closeExtra()}
-                        className="text-[12.5px] font-semibold text-foreground underline underline-offset-2 hover:decoration-2 active:text-muted-foreground"
                     >
                         Close these extra hours
-                    </button>
+                    </Button>
                 ) : null}
-                <button
+                <Button
+                    variant="link"
+                    size="inline"
                     type="button"
                     onClick={() => onBlock(target)}
-                    className="mr-auto text-[12.5px] font-semibold text-foreground underline underline-offset-2 hover:decoration-2 active:text-muted-foreground"
+                    className="mr-auto"
                 >
                     Block this time instead
-                </button>
+                </Button>
                 <Button
                     type="button"
                     variant="outline"
@@ -394,8 +397,14 @@ function Form({
                 >
                     Cancel
                 </Button>
-                <Button type="submit" className={btn.primary} disabled={!ready}>
-                    {saving ? "Booking…" : "Book it"}
+                <Button
+                    type="submit"
+                    className={btn.primary}
+                    disabled={!ready}
+                    busy={saving}
+                    busyLabel="Booking…"
+                >
+                    Book it
                 </Button>
             </div>
         </form>

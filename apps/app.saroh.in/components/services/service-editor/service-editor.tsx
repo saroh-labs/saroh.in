@@ -48,8 +48,6 @@ import {
     WhoTakesIt,
 } from "./editor-sections";
 import { MoreSettings } from "./more-settings";
-
-const BTN = "h-[38px] rounded-[9px] px-4 text-[14px]";
 const SERVICES_HREF = "/services";
 
 /**
@@ -286,7 +284,6 @@ export function ServiceEditor({
                             <Button
                                 type="button"
                                 variant="outline"
-                                className={BTN}
                                 disabled={saving}
                                 onClick={() => set({ taking: !draft.taking })}
                             >
@@ -297,7 +294,6 @@ export function ServiceEditor({
                             <Button
                                 type="button"
                                 variant="outline"
-                                className={BTN}
                                 disabled={saving}
                                 onClick={() => setDraft(saved)}
                             >
@@ -306,15 +302,12 @@ export function ServiceEditor({
                         ) : null}
                         <Button
                             type="button"
-                            className={BTN}
                             disabled={saveOff}
                             onClick={() => void save()}
+                            busy={saving}
+                            busyLabel="Saving…"
                         >
-                            {saving
-                                ? "Saving…"
-                                : isNew
-                                  ? "Add service"
-                                  : "Save changes"}
+                            {isNew ? "Add service" : "Save changes"}
                         </Button>
                     </div>
                 ) : (

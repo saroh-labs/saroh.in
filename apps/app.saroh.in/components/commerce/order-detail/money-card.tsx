@@ -12,7 +12,7 @@ import { refundLines } from "@/lib/orders/refund-line";
 import { providerName } from "@/lib/payments/providers";
 import type { OrderPaymentsSummary } from "@/lib/payments/service";
 
-import { actionClass, FOCUS, Panel, PanelTitle } from "./parts";
+import { FOCUS, Panel, PanelTitle } from "./parts";
 import { RecordPayment } from "./record-payment";
 
 const KIND_LABEL: Record<string, string> = {
@@ -208,7 +208,7 @@ export function MoneyCard({
                         <Button
                             type="button"
                             variant="outline"
-                            className={cn(actionClass("ghost"), "mt-2")}
+                            className="mt-2"
                             disabled={busy}
                             onClick={() => onRetryRefund(r.id)}
                         >

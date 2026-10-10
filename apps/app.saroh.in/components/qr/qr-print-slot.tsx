@@ -202,18 +202,12 @@ function PrintSection({
                                     type="button"
                                     variant="outline"
                                     size="sm"
-                                    disabled={busy}
-                                    aria-busy={busy || undefined}
                                     aria-describedby={nameId}
                                     onClick={() => void download(print.format)}
+                                    busy={busy}
+                                    busyLabel="Making…"
                                 >
-                                    <span aria-live="polite">
-                                        {busy
-                                            ? "Making the PDF…"
-                                            : failed
-                                              ? "Try again"
-                                              : "Download PDF"}
-                                    </span>
+                                    {failed ? "Try again" : "Download PDF"}
                                 </Button>
                             ) : null}
                             {failed ? (
