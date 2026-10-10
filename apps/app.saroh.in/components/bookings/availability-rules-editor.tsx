@@ -7,9 +7,9 @@ import { showError, showSuccess } from "@saroh/ui/toast";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 
-import { OptionSelect } from "@/components/shared/option-select";
 import { replaceRules } from "@/lib/services/actions";
 import type { AvailabilityRule } from "@/lib/services/service";
+import { OptionSelect } from "@saroh/ui/option-select";
 
 /**
  * Availability windows editor for a Service (S4-003). Each row is one recurring

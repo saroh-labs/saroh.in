@@ -24,7 +24,6 @@ import { useId, useState } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 
-import { OptionSelect } from "@/components/shared/option-select";
 import {
     lostChanges,
     lostNew,
@@ -34,6 +33,7 @@ import { createCourse, updateCourse } from "@/lib/courses/actions";
 import type { CourseDetail } from "@/lib/courses/service";
 import { wallClockToIso, ymd } from "@/lib/courses/sessions";
 import { formatDayLabel, formatTimeRange } from "@/lib/format/datetime";
+import { OptionSelect } from "@saroh/ui/option-select";
 
 const CURRENCIES = ["INR", "USD", "GBP", "EUR", "AED", "SGD", "AUD", "CAD"];
 

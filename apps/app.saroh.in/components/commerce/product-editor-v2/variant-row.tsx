@@ -3,12 +3,12 @@
 import { cn } from "@saroh/ui/lib/utils";
 import { Trash2 } from "lucide-react";
 
-import { OptionSelect } from "@/components/shared/option-select";
 import { isMoney } from "@/lib/products/editor-sections";
 import { soldAtSummary } from "@/lib/products/listing-changes";
 import type { ProductImage } from "@/lib/products/service";
 import type { VariantRow } from "@/lib/products/variant-rows";
 import { isLegacy, legacyNote } from "@/lib/products/variant-rows";
+import { OptionSelect } from "@saroh/ui/option-select";
 
 import { boxClass, FieldHelp, MoneyBox } from "./fields";
 

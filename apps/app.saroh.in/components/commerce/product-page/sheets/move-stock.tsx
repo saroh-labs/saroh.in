@@ -6,12 +6,12 @@ import { showError, showSuccess } from "@saroh/ui/toast";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 
-import { OptionSelect } from "@/components/shared/option-select";
 import type { ProductDetail } from "@/lib/products/service";
 import { moveProductStock } from "@/lib/products/stock-actions";
 import { movable } from "@/lib/products/stock-sheet";
 import { movedWords } from "@/lib/stock/levels";
 import type { ProductStock, SizeStock } from "@/lib/stock/product-stock";
+import { OptionSelect } from "@saroh/ui/option-select";
 
 /**
  * Move stock between locations, from the stock sheet (#523): only what

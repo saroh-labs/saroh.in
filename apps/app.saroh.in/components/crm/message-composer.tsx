@@ -13,12 +13,12 @@ import {
     ACTION_SHEET_FORM,
     ActionSheetFooter,
 } from "@/components/shared/action-sheet";
-import { OptionSelect } from "@/components/shared/option-select";
 import { sendMessage } from "@/lib/messages/actions";
 import type { ComposerGate } from "@/lib/messages/composer-gate";
 import { sendFailureWords } from "@/lib/messages/composer-gate";
 import type { ConsentStatus, MessageChannel } from "@/lib/messages/constants";
 import { CHANNEL_LABEL, MESSAGE_CHANNELS } from "@/lib/messages/constants";
+import { OptionSelect } from "@saroh/ui/option-select";
 
 import { ComposerNotice } from "./composer-notice";
 

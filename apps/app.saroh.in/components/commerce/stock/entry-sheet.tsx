@@ -20,7 +20,6 @@ import {
 import { useRouter } from "next/navigation";
 import { useRef, useState } from "react";
 
-import { OptionSelect } from "@/components/shared/option-select";
 import type { EntryKind } from "@/lib/stock/screen";
 import {
     ENTRY_KINDS,
@@ -29,6 +28,7 @@ import {
     STOCK_UNREACHABLE,
 } from "@/lib/stock/screen";
 import { recordStockEntry, undoStock } from "@/lib/stock/screen-actions";
+import { OptionSelect } from "@saroh/ui/option-select";
 
 import { chipClass } from "./tones";
 import { targetKey, targetOptions, useStockTargets } from "./use-stock-targets";

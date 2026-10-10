@@ -17,11 +17,11 @@ import { useId, useState } from "react";
 
 import type { ContactOption } from "@/components/shared/contact-picker";
 import { ContactPicker } from "@/components/shared/contact-picker";
-import { OptionSelect } from "@/components/shared/option-select";
 import { enrol } from "@/lib/courses/actions";
 import { booksLine, seatsLeftLine } from "@/lib/courses/seats";
 import type { Course } from "@/lib/courses/service";
 import { invoiceMoney } from "@/lib/invoices/money";
+import { OptionSelect } from "@saroh/ui/option-select";
 
 /** What the dialog reads of a course: a list row or a course page's detail. */
 export type EnrolCourse = Pick<

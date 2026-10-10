@@ -27,10 +27,10 @@ import {
 import type { ReactNode } from "react";
 import { useState } from "react";
 
-import { OptionSelect } from "@/components/shared/option-select";
 import { ThemeToggle } from "@/components/shared/theme-toggle";
 import type { Device, Zoom } from "@/components/sites/editor-constants";
 import { DEVICES, ZOOMS } from "@/components/sites/editor-constants";
+import { OptionSelect } from "@saroh/ui/option-select";
 
 /** What the bar's right-hand side can do: how the page is shown, and publish. */
 export interface TopBarActionProps {

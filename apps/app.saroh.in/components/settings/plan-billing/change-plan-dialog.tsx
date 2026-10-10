@@ -17,7 +17,6 @@ import { LoaderCircle } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useEffect, useState, useTransition } from "react";
 
-import { OptionSelect } from "@/components/shared/option-select";
 import { ViewerDate } from "@/components/shared/viewer-date";
 import { formatShortDate } from "@/lib/format/datetime";
 import { GST_STATES } from "@/lib/invoices/gst";
@@ -28,6 +27,7 @@ import {
 import type { ChangeQuote, Cycle } from "@/lib/saroh-billing/plan-view";
 import { quoteSummary } from "@/lib/saroh-billing/quote-words";
 import { openRazorpayWindow } from "@/lib/saroh-billing/razorpay-window";
+import { OptionSelect } from "@saroh/ui/option-select";
 
 import { useCheckoutConfirm } from "./use-checkout-confirm";
 

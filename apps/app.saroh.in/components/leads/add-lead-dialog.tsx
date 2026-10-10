@@ -19,12 +19,12 @@ import { Plus } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useId, useState } from "react";
 
-import { OptionSelect } from "@/components/shared/option-select";
 import {
     draftWatch,
     useDraftChanged,
 } from "@/components/shared/use-draft-changed";
 import { createLead } from "@/lib/leads/actions";
+import { OptionSelect } from "@saroh/ui/option-select";
 
 export interface LeadContactOption {
     id: string;

@@ -2,7 +2,6 @@
 
 import { cn } from "@saroh/ui/lib/utils";
 
-import { OptionSelect } from "@/components/shared/option-select";
 import {
     payWayOf,
     REFUND_POLICY,
@@ -10,6 +9,7 @@ import {
     ruleChoices,
 } from "@/lib/services/availability-rules";
 import type { BookingRules, OnlineBlocker } from "@/lib/staff/types";
+import { OptionSelect } from "@saroh/ui/option-select";
 
 import { PayWayRow } from "./pay-way-row";
 

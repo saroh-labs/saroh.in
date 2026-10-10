@@ -904,7 +904,7 @@ export function DataView<TRow>({
                                     action.run(selectedRows, clearSelection)
                                 }
                                 className={cn(
-                                    "h-8 rounded-lg px-3 text-[12.5px] font-semibold transition-colors duration-fast focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-foreground",
+                                    "h-8 cursor-pointer rounded-md px-3 text-[0.8125rem] font-semibold transition-colors duration-fast focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-foreground coarse:h-11 coarse:px-4 coarse:text-sm",
                                     action.tone === "destructive"
                                         ? "bg-[#B3261E] text-white hover:bg-[#8F1E18] active:bg-[#741812]"
                                         : "border border-primary-foreground/30 hover:bg-primary-foreground/10 active:bg-primary-foreground/20",
@@ -916,7 +916,7 @@ export function DataView<TRow>({
                         <button
                             type="button"
                             onClick={clearSelection}
-                            className="h-8 rounded-lg px-2.5 text-[12.5px] font-medium opacity-80 hover:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-foreground active:bg-primary-foreground/10 active:opacity-100"
+                            className="h-8 cursor-pointer rounded-md px-2.5 text-[0.8125rem] font-medium opacity-80 hover:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-foreground active:bg-primary-foreground/10 active:opacity-100 coarse:h-11 coarse:px-4 coarse:text-sm"
                         >
                             Clear
                         </button>

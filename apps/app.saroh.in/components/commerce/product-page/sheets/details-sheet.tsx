@@ -20,7 +20,6 @@ import {
     ChoicePills,
     ShopSwitch,
 } from "@/components/commerce/product-sections/shop-switch";
-import { OptionSelect } from "@/components/shared/option-select";
 import { patchProduct } from "@/lib/products/actions";
 import {
     LIMITS,
@@ -30,6 +29,7 @@ import {
 } from "@/lib/products/editor-sections";
 import { productEditHref } from "@/lib/products/links";
 import type { ProductDetail, ProductPatch } from "@/lib/products/service";
+import { OptionSelect } from "@saroh/ui/option-select";
 
 import { QuickSheet } from "../quick-sheet";
 

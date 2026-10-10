@@ -15,7 +15,6 @@ import { ToggleGroup, ToggleGroupItem } from "@saroh/ui/toggle-group";
 import { ArrowDown, ArrowUp, Check, Lock } from "lucide-react";
 import { useFormContext } from "react-hook-form";
 
-import { OptionSelect } from "@/components/shared/option-select";
 import { SEGMENT, SEGMENTED } from "@/components/shared/segmented";
 import type {
     NumberFormat,
@@ -38,6 +37,7 @@ import {
     RESTART_LABEL,
     SEPARATOR_LABEL,
 } from "@/lib/invoices/invoice-number";
+import { OptionSelect } from "@saroh/ui/option-select";
 
 /** The four form values the editor writes. */
 export interface NumberFieldValues {

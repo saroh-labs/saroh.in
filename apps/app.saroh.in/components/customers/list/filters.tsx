@@ -5,7 +5,6 @@ import { cn } from "@saroh/ui/lib/utils";
 import { Search } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 
-import { OptionSelect } from "@/components/shared/option-select";
 import type {
     CustomerChip,
     CustomerSort,
@@ -14,6 +13,7 @@ import type {
 } from "@/lib/customers/list";
 import { chipsFor, SORT_LABEL, sortsFor } from "@/lib/customers/list";
 import { NUMBER_LOCALE } from "@/lib/format/locale";
+import { OptionSelect } from "@saroh/ui/option-select";
 
 const ALL_STORES = "all";
 

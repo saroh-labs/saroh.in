@@ -29,7 +29,6 @@ import { useId, useState } from "react";
 
 import { useBusinessDetailsStep } from "@/components/organizations/use-business-details-step";
 import { ConfirmDialog } from "@/components/shared/confirm-dialog";
-import { OptionSelect } from "@/components/shared/option-select";
 import {
     creditInvoice,
     deleteInvoice,
@@ -41,6 +40,7 @@ import {
 import { sendLabel } from "@/lib/invoices/send";
 import type { InvoiceStanding, PaymentMethod } from "@/lib/invoices/service";
 import { PAID_HOW } from "@/lib/orders/paid-how";
+import { OptionSelect } from "@saroh/ui/option-select";
 
 // The ways an order's Record as paid offers too (#834).
 const METHODS = PAID_HOW;

@@ -5,13 +5,13 @@ import { Label } from "@saroh/ui/label";
 import { cn } from "@saroh/ui/lib/utils";
 import type { ReactNode } from "react";
 
-import { OptionSelect } from "@/components/shared/option-select";
 import type {
     DetailsDraft,
     DetailsKey,
 } from "@/lib/customer-workspace/details";
 import { countryOptions } from "@/lib/customer-workspace/details";
 import { GST_STATES } from "@/lib/invoices/gst";
+import { OptionSelect } from "@saroh/ui/option-select";
 
 const INPUT = "h-[38px] rounded-[9px] text-[14px]";
 

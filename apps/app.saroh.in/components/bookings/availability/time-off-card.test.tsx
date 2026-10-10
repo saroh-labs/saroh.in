@@ -29,7 +29,7 @@ vi.mock("@saroh/ui/date-picker", () => ({
         <output id={id}>{value ? value.getDate() : ""}</output>
     ),
 }));
-vi.mock("@/components/shared/option-select", () => ({
+vi.mock("@saroh/ui/option-select", () => ({
     OptionSelect: ({
         id,
         value,

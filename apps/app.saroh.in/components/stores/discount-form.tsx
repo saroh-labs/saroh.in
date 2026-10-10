@@ -23,7 +23,6 @@ import { z } from "zod";
 
 import type { MultiOption } from "@/components/shared/multi-select";
 import { MultiSelect } from "@/components/shared/multi-select";
-import { OptionSelect } from "@/components/shared/option-select";
 import { SEGMENT, SEGMENTED } from "@/components/shared/segmented";
 import {
     lostChanges,
@@ -45,6 +44,7 @@ import type {
     DiscountReach,
 } from "@/lib/discounts/service";
 import { amountProblem, percentProblem } from "@/lib/discounts/value";
+import { OptionSelect } from "@saroh/ui/option-select";
 
 const CURRENCIES = ["INR", "USD", "EUR", "GBP", "AUD", "CAD", "SGD", "AED"];
 

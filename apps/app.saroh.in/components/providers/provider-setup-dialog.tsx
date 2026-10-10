@@ -21,7 +21,6 @@ import { useId, useState } from "react";
 import { reportFailure } from "@/components/billing/plan-refusal";
 import { useBusinessDetailsStep } from "@/components/organizations/use-business-details-step";
 import { ConfirmDialog } from "@/components/shared/confirm-dialog";
-import { OptionSelect } from "@/components/shared/option-select";
 import {
     connectCommsProvider,
     connectPaymentProvider,
@@ -42,6 +41,7 @@ import type {
     PaymentWebhookSetup,
 } from "@/lib/providers/service";
 import { isTestKey, webhookFor } from "@/lib/providers/webhook";
+import { OptionSelect } from "@saroh/ui/option-select";
 
 import {
     StepHeading,

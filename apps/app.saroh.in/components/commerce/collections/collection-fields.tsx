@@ -5,7 +5,6 @@ import { Input } from "@saroh/ui/input";
 import { Textarea } from "@saroh/ui/textarea";
 import Link from "next/link";
 
-import { OptionSelect } from "@/components/shared/option-select";
 import type { CategoryNode } from "@/lib/collections/rules";
 import {
     categoryChoices,
@@ -13,6 +12,7 @@ import {
     ruleNote,
 } from "@/lib/collections/rules";
 import { productSettingsHref } from "@/lib/products/links";
+import { OptionSelect } from "@saroh/ui/option-select";
 
 /**
  * The collection sheet's fields (#524), at the product page sheets' scale:

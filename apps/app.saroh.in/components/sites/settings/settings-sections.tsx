@@ -3,7 +3,6 @@
 import { cn } from "@saroh/ui/lib/utils";
 import { useEffect, useId, useRef, useState } from "react";
 
-import { OptionSelect } from "@/components/shared/option-select";
 import { useTabParam } from "@/lib/hooks/use-tab-param";
 import type { SettingsSheet } from "@/lib/sites/settings-edit";
 import {
@@ -17,6 +16,7 @@ import type {
     ShareStepKey,
 } from "@/lib/sites/settings-page";
 import { groupOfStep, SETTINGS_TAB_PARAM } from "@/lib/sites/settings-page";
+import { OptionSelect } from "@saroh/ui/option-select";
 
 import { ShareChecklist } from "./share-checklist";
 

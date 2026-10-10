@@ -2,9 +2,9 @@
 
 import Link from "next/link";
 
-import { OptionSelect } from "@/components/shared/option-select";
 import { PAY_WAY, payWayHint } from "@/lib/services/availability-rules";
 import type { BookingPayment, OnlineBlocker } from "@/lib/staff/types";
+import { OptionSelect } from "@saroh/ui/option-select";
 
 /**
  * "How people pay when they book" on the Booking rules card (DEC-088):

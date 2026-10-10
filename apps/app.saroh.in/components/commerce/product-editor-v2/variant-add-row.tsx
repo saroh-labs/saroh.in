@@ -3,8 +3,8 @@
 import { cn } from "@saroh/ui/lib/utils";
 import Link from "next/link";
 
-import { OptionSelect } from "@/components/shared/option-select";
 import { productSettingsHref } from "@/lib/products/links";
+import { OptionSelect } from "@saroh/ui/option-select";
 
 import { boxClass, MoneyBox } from "./fields";
 

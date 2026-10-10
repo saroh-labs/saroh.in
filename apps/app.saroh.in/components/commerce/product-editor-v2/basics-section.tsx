@@ -5,7 +5,6 @@ import { showError } from "@saroh/ui/toast";
 import { useState } from "react";
 import { useForm } from "react-hook-form";
 
-import { OptionSelect } from "@/components/shared/option-select";
 import type { GstRateValue } from "@/lib/invoices/gst";
 import { GST_RATE_OPTIONS, isHsnSac } from "@/lib/invoices/gst";
 import { patchProduct } from "@/lib/products/actions";
@@ -22,6 +21,7 @@ import {
     slugify,
 } from "@/lib/products/editor-sections";
 import type { ProductDetail } from "@/lib/products/service";
+import { OptionSelect } from "@saroh/ui/option-select";
 
 import type { CategoryChoice } from "./category-picker";
 import { CategoryPicker } from "./category-picker";

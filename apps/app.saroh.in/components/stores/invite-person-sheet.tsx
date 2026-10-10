@@ -15,10 +15,10 @@ import { useRouter } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 
-import { OptionSelect } from "@/components/shared/option-select";
 import { SettingsSheetFrame } from "@/components/shared/settings-sheet-frame";
 import { inviteMember } from "@/lib/members/actions";
 import { LOCATION_ROLES, roleLabel } from "@/lib/stores/people";
+import { OptionSelect } from "@saroh/ui/option-select";
 
 const formSchema = z.object({
     email: z

@@ -12,7 +12,6 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 
 import { ConfirmDialog } from "@/components/shared/confirm-dialog";
-import { OptionSelect } from "@/components/shared/option-select";
 import { Section as Rows } from "@/components/sites/settings-rows";
 import {
     removeMember,
@@ -30,6 +29,7 @@ import {
     roleLabel,
     shownInvitations,
 } from "@/lib/stores/people";
+import { OptionSelect } from "@saroh/ui/option-select";
 
 import { InvitePersonSheet } from "./invite-person-sheet";
 import { Note, Section } from "./storefront-section";

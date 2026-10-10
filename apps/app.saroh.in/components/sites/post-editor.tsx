@@ -15,7 +15,6 @@ import { PausedNote } from "@/components/billing/paused-banner";
 import { showPlanRefusal } from "@/components/billing/plan-refusal";
 import { useBusinessZone } from "@/components/shared/business-zone";
 import { ConfirmDialog } from "@/components/shared/confirm-dialog";
-import { OptionSelect } from "@/components/shared/option-select";
 import { useLeaveGuard } from "@/components/shared/use-leave-guard";
 import { MediaPicker } from "@/components/sites/media-picker";
 import { accountSettingsUrl } from "@/lib/accounts";
@@ -29,6 +28,7 @@ import {
 } from "@/lib/content/actions";
 import type { PostCategory, PostDetail } from "@/lib/content/service";
 import { exactDate, shortDate } from "@/lib/sites/format-date";
+import { OptionSelect } from "@saroh/ui/option-select";
 
 /* On demand and browser-only, for the same reasons as everywhere else it is
    used: the editor is heavy, and it is created in the browser. */

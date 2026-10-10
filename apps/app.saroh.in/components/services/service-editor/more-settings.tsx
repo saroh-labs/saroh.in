@@ -7,12 +7,12 @@ import { ChevronDown } from "lucide-react";
 import { useId, useState } from "react";
 
 import { AvailabilityRulesEditor } from "@/components/bookings/availability-rules-editor";
-import { OptionSelect } from "@/components/shared/option-select";
 import { TimezoneSelect } from "@/components/shared/timezone-select";
 import type { GstRateValue } from "@/lib/invoices/gst";
 import { GST_RATE_OPTIONS } from "@/lib/invoices/gst";
 import type { AvailabilityRule } from "@/lib/services/service";
 import type { ServiceDraft } from "@/lib/services/service-editor";
+import { OptionSelect } from "@saroh/ui/option-select";
 
 import { FIELD, HELP, LABEL, NumberField, Section } from "./fields";
 

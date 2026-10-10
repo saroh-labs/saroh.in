@@ -7,7 +7,6 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 
-import { OptionSelect } from "@/components/shared/option-select";
 import { productHref } from "@/lib/products/links";
 import type { LogKindId } from "@/lib/stock/log";
 import {
@@ -24,6 +23,7 @@ import {
 } from "@/lib/stock/log";
 import { loadLogPage } from "@/lib/stock/screen-actions";
 import type { StockLog, StockLogEntry } from "@/lib/stock/service";
+import { OptionSelect } from "@saroh/ui/option-select";
 
 import { chipClass, pillClass, TEXT_TONE } from "./tones";
 

@@ -21,7 +21,6 @@ import type { AddedContact } from "@/components/contacts/add-contact-dialog";
 import { AddContactDialog } from "@/components/contacts/add-contact-dialog";
 import { useBusinessDetailsStep } from "@/components/organizations/use-business-details-step";
 import { ContactPicker } from "@/components/shared/contact-picker";
-import { OptionSelect } from "@/components/shared/option-select";
 import {
     lostChanges,
     lostNew,
@@ -45,6 +44,7 @@ import {
 import { newPayLink } from "@/lib/invoices/link-actions";
 import type { Invoice } from "@/lib/invoices/service";
 import type { DetailsOnFile } from "@/lib/organizations/business-details";
+import { OptionSelect } from "@saroh/ui/option-select";
 
 const MONEY = /^\d{1,9}(\.\d{1,2})?$/;
 

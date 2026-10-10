@@ -3,7 +3,6 @@
 import { Input } from "@saroh/ui/input";
 import { cn } from "@saroh/ui/lib/utils";
 
-import { OptionSelect } from "@/components/shared/option-select";
 import type { OrderFilterOptions } from "@/lib/orders/business-service";
 import type { OrdersDate, OrdersPayment } from "@/lib/orders/list-filters";
 import {
@@ -15,6 +14,7 @@ import {
 } from "@/lib/orders/list-filters";
 import type { OrdersQuery } from "@/lib/orders/list-query";
 import type { FulfilmentType } from "@/lib/orders/read";
+import { OptionSelect } from "@saroh/ui/option-select";
 
 import { ProductFilter } from "./product-filter";
 

@@ -5,11 +5,11 @@ import { showError, showSuccess } from "@saroh/ui/toast";
 import { useRouter } from "next/navigation";
 import { useId, useState } from "react";
 
-import { OptionSelect } from "@/components/shared/option-select";
 import {
     payBookingWithPack,
     takePackOffBooking,
 } from "@/lib/class-packs/actions";
+import { OptionSelect } from "@saroh/ui/option-select";
 
 /**
  * How a booking is paid, when a class pack is in it (ADR-007): "Paid with

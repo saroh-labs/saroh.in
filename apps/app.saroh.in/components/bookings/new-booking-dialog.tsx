@@ -26,7 +26,6 @@ import {
 } from "@/components/bookings/pay-link-panel";
 import { CustomerPicker } from "@/components/customers/customer-picker";
 import { Chip } from "@/components/shared/chip";
-import { OptionSelect } from "@/components/shared/option-select";
 import {
     draftWatch,
     useDraftChanged,
@@ -52,6 +51,7 @@ import {
 } from "@/lib/services/booking-pay";
 import type { Slot } from "@/lib/services/service";
 import type { VisitToBook } from "@/lib/services/treatment";
+import { OptionSelect } from "@saroh/ui/option-select";
 
 const WINDOW_DAYS = 14;
 
