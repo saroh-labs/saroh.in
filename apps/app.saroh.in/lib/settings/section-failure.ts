@@ -10,6 +10,7 @@ export type SettingsSection =
     | "people"
     | "modules"
     | "providers"
+    | "share"
     | "activity"
     | "billing"
     | "profile";
@@ -37,6 +38,11 @@ export const SECTION_FAILURE: Record<
         heading: "Providers",
         title: "Providers could not be loaded",
         body: "Every connection is as it was — this screen could not read them. Sites, email and payments keep working.",
+    },
+    share: {
+        heading: "Share",
+        title: "Your QR codes could not be loaded",
+        body: "Every code is as it was and the printed ones keep working — this screen could not read them. Try again in a moment.",
     },
     activity: {
         heading: "Activity",
