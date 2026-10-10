@@ -222,12 +222,12 @@ export function MergeDialog({
                             {readFailed} Nothing has changed.
                         </span>
                         <Button
+                            size="sm"
                             variant="outline"
                             onClick={() => {
                                 setReadFailed(null);
                                 setAttempt((n) => n + 1);
                             }}
-                            className="h-[30px] rounded-[8px] px-[11px] text-[12.5px] font-semibold coarse:h-11"
                         >
                             Try again
                         </Button>

@@ -1,5 +1,7 @@
 "use client";
 
+import { Field } from "@saroh/ui/field";
+
 import { resolveVariant } from "@saroh/block-contract";
 import { Button } from "@saroh/ui/button";
 import { Input } from "@saroh/ui/input";
@@ -25,7 +27,6 @@ import {
     unlessDefault,
     wordsOrAbsent,
 } from "./display-options";
-import { Field } from "./field";
 import { OptionSwitch } from "./option-switch";
 import type { SectionFieldsProps } from "./props";
 
@@ -194,7 +195,7 @@ export function ProductGridFieldsView({
                 }
                 note="Beside the title, counted from the products shown: “3 of 5 available”."
             />
-            <Field label="A line under the products">
+            <Field optional label="A line under the products">
                 <Textarea
                     value={c.note ?? ""}
                     onChange={(e) =>
@@ -202,7 +203,7 @@ export function ProductGridFieldsView({
                     }
                     rows={2}
                     maxLength={400}
-                    placeholder="Optional. Baked this morning; what is gone usually goes before ten."
+                    placeholder="Baked this morning; what is gone usually goes before ten."
                 />
             </Field>
         </div>

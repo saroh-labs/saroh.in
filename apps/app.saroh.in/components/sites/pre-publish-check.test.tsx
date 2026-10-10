@@ -54,9 +54,9 @@ const check = (flags: Flag[]) =>
         />,
     );
 
-/** The publish button's opening tag. */
+/** The publish button, from its opening tag to its label. */
 const publishButton = (html: string) =>
-    /<button[^>]*>Publish site<\/button>/.exec(html)?.[0] ?? "";
+    /<button[^>]*>(?:<span[^>]*>)*Publish site/.exec(html)?.[0] ?? "";
 
 describe("PrePublishCheck: a site with no web address (L5)", () => {
     it("holds Publish and sends the merchant to choose an address", () => {

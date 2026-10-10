@@ -140,7 +140,7 @@ export function TakeMoneyChecklist({
                     variant="outline"
                     size="sm"
                     onClick={hide}
-                    className="ml-auto px-2.5 text-[12.5px] font-medium text-neutral-600 dark:text-neutral-400"
+                    className="ml-auto font-medium text-neutral-600 dark:text-neutral-400"
                 >
                     Hide for now
                 </Button>

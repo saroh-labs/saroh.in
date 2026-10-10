@@ -270,8 +270,9 @@ export function SubscriptionsScreen({
                                         {failed === 1 ? "needs" : "need"} you.
                                     </span>
                                     <Button
+                                        size="sm"
                                         variant="outline"
-                                        className="h-8 rounded-[8px] border-destructive-subtle-foreground px-3 text-[12.5px] font-semibold coarse:h-11"
+                                        className="border-destructive-subtle-foreground"
                                         onClick={() => pick("failed")}
                                     >
                                         Show them

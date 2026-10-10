@@ -272,7 +272,6 @@ export function AttentionSheet({
                         onChange={(e) =>
                             change({ ...draft, label: e.target.value })
                         }
-                        className="h-[38px] rounded-[9px] text-[14px]"
                     />
                     <FieldNote id={`${id}-label-error`} error={labelError}>
                         It reads “{KIND_WORD[draft.kind]}:{" "}
@@ -302,7 +301,7 @@ export function AttentionSheet({
                     onChange={(e) =>
                         change({ ...draft, detail: e.target.value })
                     }
-                    className="resize-y rounded-[9px] text-[13.5px] leading-[1.5]"
+                    className="resize-y leading-[1.5]"
                 />
                 <FieldNote id={`${id}-detail-error`} error={detailError}>
                     {`${draft.detail.trim().length} / ${DETAIL_MAX}`}

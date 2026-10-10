@@ -215,7 +215,7 @@ export function TakePayment({
                                         aria-describedby={
                                             problem ? ids.error : undefined
                                         }
-                                        className="mt-[5px] h-[38px] rounded-lg bg-card px-2.5 text-[13.5px]"
+                                        className="mt-[5px] bg-card px-2.5"
                                     />
                                 </label>
                                 <div

@@ -183,12 +183,11 @@ export function ConfirmDialog({
                     <Button
                         type="button"
                         variant={destroys ? "destructive" : "default"}
-                        disabled={busy}
+                        busy={busy}
+                        busyLabel={busyLabel ?? busyOf(confirmLabel)}
                         onClick={() => void confirm()}
                     >
-                        {busy
-                            ? (busyLabel ?? busyOf(confirmLabel))
-                            : confirmLabel}
+                        {confirmLabel}
                     </Button>
                 </AlertDialogFooter>
             </AlertDialogContent>

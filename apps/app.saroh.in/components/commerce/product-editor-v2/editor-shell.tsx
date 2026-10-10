@@ -1,5 +1,7 @@
 "use client";
 
+import { useSaveShortcut } from "@/lib/hooks/keyboard-save";
+import { Button } from "@saroh/ui/button";
 import { planLabel } from "@saroh/ui/lib/state-copy";
 import { cn } from "@saroh/ui/lib/utils";
 import { showError, showSuccess } from "@saroh/ui/toast";
@@ -52,6 +54,8 @@ export interface ProductEditorProps {
     storeId: string;
     storeName: string;
     currency: string;
+    /** The business is GST-registered: Basics asks for a rate and HSN. */
+    gstRegistered: boolean;
     categories: CategoryChoice[];
     categoriesHref: string;
     options: ProductOptionView[];
@@ -117,6 +121,7 @@ function EditorBody({
     storeId,
     storeName,
     currency,
+    gstRegistered,
     categories,
     categoriesHref,
     options,
@@ -232,6 +237,12 @@ function EditorBody({
     const headerOff = creating
         ? createBad || creatingNow
         : savable.length === 0 || saving.length > 0;
+    // Cmd/Ctrl+S: what the header's button does, when it could be pressed.
+    useSaveShortcut(() => {
+        if (headerOff) return;
+        if (creating) void create();
+        else void saveSections(savable);
+    }, canWrite);
 
     const jumps = SECTION_ORDER.filter(
         (k) =>
@@ -286,7 +297,8 @@ function EditorBody({
                             {hint}
                         </span>
                         {showHeaderSave ? (
-                            <button
+                            <Button
+                                size="sm"
                                 type="button"
                                 disabled={headerOff}
                                 onClick={() =>
@@ -294,7 +306,6 @@ function EditorBody({
                                         ? void create()
                                         : void saveSections(savable)
                                 }
-                                className="h-[34px] rounded-[9px] bg-foreground px-3.5 text-[12.5px] font-semibold text-background hover:bg-foreground/90 disabled:cursor-not-allowed disabled:bg-muted disabled:text-muted-foreground coarse:h-11"
                             >
                                 {creating
                                     ? creatingNow
@@ -305,7 +316,7 @@ function EditorBody({
                                     : saving.length > 0
                                       ? "Saving…"
                                       : "Save all"}
-                            </button>
+                            </Button>
                         ) : null}
                     </div>
                 </div>
@@ -361,6 +372,7 @@ function EditorBody({
                         storeId={storeId}
                         currency={currency}
                         symbol={symbol}
+                        gstRegistered={gstRegistered}
                         categories={categories}
                         manageCategoriesHref={categoriesHref}
                         onCategoryChange={(id) => void categoryChanged(id)}

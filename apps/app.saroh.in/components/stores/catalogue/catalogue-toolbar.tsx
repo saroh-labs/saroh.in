@@ -115,7 +115,7 @@ function FilterMenu({
                 <Button
                     variant="outline"
                     className={cn(
-                        "h-[38px] gap-[7px] px-[13px] text-[13px] font-medium text-neutral-600 dark:text-foreground",
+                        "gap-[7px] font-medium text-neutral-600 dark:text-foreground",
                         on > 0 && "border-foreground",
                     )}
                     aria-label={

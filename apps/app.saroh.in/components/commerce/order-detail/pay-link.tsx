@@ -1,7 +1,6 @@
 "use client";
 
 import { Button } from "@saroh/ui/button";
-import { cn } from "@saroh/ui/lib/utils";
 import { showError, showSuccess } from "@saroh/ui/toast";
 import { Copy, Link2 } from "lucide-react";
 import { useRouter } from "next/navigation";
@@ -20,7 +19,6 @@ import { ProviderDisconnectedState } from "@saroh/ui/data-state";
 
 import { runAction } from "@/lib/api/run-action";
 import { copyText } from "@saroh/ui/copy-button";
-import { actionClass } from "./parts";
 
 /**
  * An order's pay link (B11), as the invoice's: the address is shown once,
@@ -179,7 +177,6 @@ export function PayLinkBlock({
                 <Button
                     type="button"
                     variant="outline"
-                    className={actionClass("ghost")}
                     disabled={link.busy}
                     onClick={link.replace}
                 >
@@ -192,11 +189,12 @@ export function PayLinkBlock({
         <Button
             type="button"
             variant="outline"
-            className={cn(actionClass("ghost"), "mt-2")}
-            disabled={link.busy}
+            className="mt-2"
             onClick={link.ask}
+            busy={link.busy}
+            busyLabel="Making…"
         >
-            {link.busy ? "Making a link…" : "Make a pay link"}
+            Make a pay link
         </Button>
     );
 }

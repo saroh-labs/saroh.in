@@ -1,7 +1,7 @@
 "use client";
 
+import { Button } from "@saroh/ui/button";
 import { EmptyState } from "@saroh/ui/data-state";
-import { cn } from "@saroh/ui/lib/utils";
 import { showError, showUndo } from "@saroh/ui/toast";
 import { Plus } from "lucide-react";
 import { useRouter } from "next/navigation";
@@ -14,7 +14,7 @@ import { ReadOnlyNote } from "@/components/shared/read-only-note";
 import { runAction } from "@/lib/api/run-action";
 import { Tip } from "@saroh/ui/tooltip";
 import { OptionSheet } from "./option-sheet";
-import { bigBtn, rowBtn, TabIntro } from "./product-settings";
+import { TabIntro } from "./product-settings";
 
 const plural = (n: number) => `${n} ${n === 1 ? "product" : "products"}`;
 
@@ -45,10 +45,10 @@ export function OptionsTab({ catalogue }: { catalogue: CatalogueView }) {
     const newOption = canWrite ? (
         <OptionSheet
             trigger={
-                <button type="button" className={bigBtn}>
+                <Button type="button" className="shrink-0">
                     <Plus aria-hidden className="-ml-0.5 mr-1.5 size-3.5" />
                     New option
-                </button>
+                </Button>
             }
             options={options}
         />
@@ -94,13 +94,14 @@ export function OptionsTab({ catalogue }: { catalogue: CatalogueView }) {
                                         <div className="flex shrink-0 gap-1.5">
                                             <OptionSheet
                                                 trigger={
-                                                    <button
+                                                    <Button
+                                                        variant="outline"
+                                                        size="xs"
                                                         type="button"
-                                                        className={rowBtn}
                                                         aria-label={`Edit ${o.name}`}
                                                     >
                                                         Edit
-                                                    </button>
+                                                    </Button>
                                                 }
                                                 option={o}
                                                 options={options}
@@ -112,15 +113,17 @@ export function OptionsTab({ catalogue }: { catalogue: CatalogueView }) {
                                                         : `Delete ${o.name}`
                                                 }
                                             >
-                                                <button
+                                                <Button
+                                                    variant="outline"
+                                                    size="xs"
                                                     type="button"
                                                     disabled={used || pending}
                                                     aria-label={`Delete ${o.name}`}
-                                                    className={cn(
-                                                        rowBtn,
-                                                        !used &&
-                                                            "text-destructive",
-                                                    )}
+                                                    className={
+                                                        used
+                                                            ? undefined
+                                                            : "text-destructive"
+                                                    }
                                                     onClick={() =>
                                                         run(async () => {
                                                             const res =
@@ -158,7 +161,7 @@ export function OptionsTab({ catalogue }: { catalogue: CatalogueView }) {
                                                     }
                                                 >
                                                     Delete
-                                                </button>
+                                                </Button>
                                             </Tip>
                                         </div>
                                     ) : null}

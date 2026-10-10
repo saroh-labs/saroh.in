@@ -22,7 +22,6 @@ import {
     FormSheetBody,
     FormSheetFoot,
 } from "@/components/shared/form-sheet";
-import { OptionSelect } from "@/components/shared/option-select";
 import {
     connectCommsProvider,
     connectPaymentProvider,
@@ -44,6 +43,7 @@ import type {
 } from "@/lib/providers/service";
 import { isTestKey, webhookFor } from "@/lib/providers/webhook";
 import { EmptyState } from "@saroh/ui/data-state";
+import { OptionSelect } from "@saroh/ui/option-select";
 
 import { runAction } from "@/lib/api/run-action";
 import {
@@ -752,7 +752,7 @@ function SecretField({
                 {label}{" "}
                 {optional ? (
                     <span className="font-normal text-muted-foreground">
-                        optional
+                        (optional)
                     </span>
                 ) : null}
             </Label>
@@ -762,7 +762,7 @@ function SecretField({
                 autoComplete="off"
                 spellCheck={false}
                 value={value}
-                className="font-mono text-[12.5px]"
+                className="font-mono"
                 aria-invalid={invalid ? true : undefined}
                 aria-describedby={describedBy ?? (hint ? hintId : undefined)}
                 onChange={(e) => onChange(e.target.value)}

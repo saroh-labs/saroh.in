@@ -62,9 +62,10 @@ export function LateRuleNoticeCard({
                 </span>
                 {canChange ? (
                     <Button
+                        size="sm"
                         asChild
                         variant="outline"
-                        className="h-[30px] rounded-[8px] border-border-strong px-[11px] text-[12.5px] font-semibold coarse:h-11"
+                        className="border-border-strong"
                     >
                         <Link
                             href={`${storefrontHref(notice.storeId, "delivery")}#${LATE_AFTER_ANCHOR}`}

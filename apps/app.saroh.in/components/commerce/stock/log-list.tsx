@@ -7,7 +7,6 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 
-import { OptionSelect } from "@/components/shared/option-select";
 import { productHref } from "@/lib/products/links";
 import type { LogKindId } from "@/lib/stock/log";
 import {
@@ -25,6 +24,7 @@ import {
 import { loadLogPage } from "@/lib/stock/screen-actions";
 import type { StockLog, StockLogEntry } from "@/lib/stock/service";
 import { couldntLoad, nothingChanged } from "@saroh/ui/lib/state-copy";
+import { OptionSelect } from "@saroh/ui/option-select";
 
 import { chipClass } from "@/components/shared/chip";
 import { StatusBadge } from "@/components/shared/status-badge";
@@ -138,7 +138,7 @@ export function LogList({
                 <OptionSelect
                     size="sm"
                     aria-label="Product"
-                    className="h-[30px] w-auto min-w-[160px] max-w-[260px] rounded-[8px] text-[12.5px] coarse:h-11"
+                    className="w-auto min-w-[160px] max-w-[260px]"
                     value={filter.product}
                     options={[
                         { value: "", label: "All products" },
@@ -363,10 +363,11 @@ export function LogList({
                         type="button"
                         variant="outline"
                         size="sm"
-                        disabled={pending}
                         onClick={more}
+                        busy={pending}
+                        busyLabel="Loading…"
                     >
-                        {pending ? "Loading…" : "Show older"}
+                        Show older
                     </Button>
                     {loadError ? (
                         <span

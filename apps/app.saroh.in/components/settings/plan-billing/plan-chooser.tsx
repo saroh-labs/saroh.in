@@ -1,5 +1,6 @@
 "use client";
 
+import { submitOnModEnter } from "@/lib/hooks/keyboard-save";
 import { formatInr } from "@saroh/pricing-catalog";
 import { Button } from "@saroh/ui/button";
 import { FailedState } from "@saroh/ui/data-state";
@@ -263,21 +264,23 @@ export function PlanChooser({
                                       } of ${checked.planName}, before GST. Used when you start a paid plan above.`
                                     : " · used with the plan you choose above"}
                             </span>
-                            <button
+                            <Button
+                                variant="link"
+                                size="inline"
                                 type="button"
                                 onClick={() => {
                                     setCoupon("");
                                     setChecked(null);
                                     setCouponErr("");
                                 }}
-                                className="rounded-sm text-[12.5px] font-semibold text-foreground/80 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring active:text-muted-foreground"
                             >
                                 Remove
-                            </button>
+                            </Button>
                         </div>
                     ) : null}
                     {!coupon || couponErr ? (
                         <form
+                            onKeyDown={submitOnModEnter}
                             className="flex flex-wrap items-center gap-2"
                             onSubmit={(e) => {
                                 e.preventDefault();
@@ -285,6 +288,7 @@ export function PlanChooser({
                             }}
                         >
                             <Input
+                                dense
                                 value={couponIn}
                                 onChange={(e) => {
                                     setCouponIn(e.target.value);
@@ -298,15 +302,16 @@ export function PlanChooser({
                                 }
                                 maxLength={32}
                                 autoComplete="off"
-                                className="h-[34px] w-[180px] bg-muted/50 font-mono text-[13px] uppercase coarse:h-11"
+                                className="w-[180px] bg-muted/50 font-mono uppercase"
                             />
                             <Button
                                 type="submit"
                                 variant="outline"
                                 size="sm"
-                                disabled={checking}
+                                busy={checking}
+                                busyLabel="Checking…"
                             >
-                                {checking ? "Checking…" : "Apply"}
+                                Apply
                             </Button>
                             {couponErr ? (
                                 <span

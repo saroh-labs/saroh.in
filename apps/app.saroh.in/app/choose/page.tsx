@@ -1,3 +1,4 @@
+import { submitOnModEnter } from "@/lib/hooks/keyboard-save";
 import { Badge } from "@saroh/ui/badge";
 import { SplitPanel, SplitShell } from "@saroh/ui/split-shell";
 import type { Metadata } from "next";
@@ -222,7 +223,10 @@ function Group({
             <ul className="flex flex-col gap-2">
                 {organizations.map((org) => (
                     <li key={org.id}>
-                        <form action={chooseOrganization}>
+                        <form
+                            onKeyDown={submitOnModEnter}
+                            action={chooseOrganization}
+                        >
                             <input
                                 type="hidden"
                                 name="organizationId"

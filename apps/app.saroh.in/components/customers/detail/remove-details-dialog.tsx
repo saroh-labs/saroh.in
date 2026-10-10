@@ -117,13 +117,13 @@ export function RemoveDetailsDialog({
                             {readFailed} Nothing has changed.
                         </span>
                         <Button
+                            size="sm"
                             type="button"
                             variant="outline"
                             onClick={() => {
                                 setReadFailed(null);
                                 setAttempt((n) => n + 1);
                             }}
-                            className="h-[30px] rounded-[8px] px-[11px] text-[12.5px] font-semibold coarse:h-11"
                         >
                             Try again
                         </Button>
@@ -160,7 +160,7 @@ export function RemoveDetailsDialog({
                 autoComplete="off"
                 spellCheck={false}
                 disabled={removing || refused.length > 0}
-                className="mt-1.5 h-9 rounded-[8px] px-2.5 text-[13px]"
+                className="mt-1.5 px-2.5"
             />
 
             {tried && !matches && refused.length === 0 ? (

@@ -1,7 +1,7 @@
 "use client";
 
 import { zodResolver } from "@hookform/resolvers/zod";
-import { cn } from "@saroh/ui/lib/utils";
+import { Textarea } from "@saroh/ui/textarea";
 import { showError } from "@saroh/ui/toast";
 import dynamic from "next/dynamic";
 import { useForm } from "react-hook-form";
@@ -21,7 +21,7 @@ import {
 import type { ProductDetail } from "@/lib/products/service";
 
 import { useEditor, useSection } from "./editor-state";
-import { boxClass, FieldHelp, FieldLabel } from "./fields";
+import { FieldHelp, FieldLabel } from "./fields";
 import { SectionCard } from "./section-card";
 
 // Tiptap has no server pass; the editor loads in the browser only.
@@ -138,7 +138,8 @@ export function DescriptionSection({
                 >
                     Key points — one per line
                 </FieldLabel>
-                <textarea
+                <Textarea
+                    aria-invalid={!!errors.keyPoints}
                     id="pe-points"
                     {...form.register("keyPoints")}
                     rows={4}
@@ -146,10 +147,7 @@ export function DescriptionSection({
                     placeholder={
                         "10% vitamin C, stable in the bottle\nFades dark spots in 6–8 weeks"
                     }
-                    className={cn(
-                        boxClass({ bad: !!errors.keyPoints }),
-                        "h-auto resize-y py-2 leading-[1.5]",
-                    )}
+                    className="resize-y"
                 />
                 <FieldHelp
                     className="mt-1.5"

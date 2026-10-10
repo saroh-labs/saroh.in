@@ -248,12 +248,11 @@ function Saved({
                 <div>
                     <Button
                         type="button"
-                        disabled={making}
                         onClick={() => void make(read)}
+                        busy={making}
+                        busyLabel="Making…"
                     >
-                        <span aria-live="polite">
-                            {making ? "Making the code…" : "Make this code"}
-                        </span>
+                        Make this code
                     </Button>
                 </div>
             </div>

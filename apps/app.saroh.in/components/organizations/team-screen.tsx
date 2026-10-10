@@ -825,11 +825,13 @@ function PendingInvites({
                                     <Button
                                         size="sm"
                                         variant="outline"
-                                        disabled={resending || beyond}
+                                        disabled={beyond}
                                         onClick={() => resend(invitation)}
                                         aria-label={`Resend the invite to ${invitation.email}`}
+                                        busy={resending}
+                                        busyLabel="Sending…"
                                     >
-                                        {resending ? "Sending…" : "Resend"}
+                                        Resend
                                     </Button>
                                 </Tip>
                                 <Button
@@ -1323,7 +1325,7 @@ function InviteSheet({
                                     autoComplete="off"
                                     placeholder="name@example.in"
                                     disabled={sending}
-                                    className="h-[38px] rounded-[9px] text-[13.5px] aria-[invalid=true]:border-destructive-subtle-foreground"
+                                    className="aria-[invalid=true]:border-destructive-subtle-foreground"
                                     {...field}
                                 />
                             </FormControl>

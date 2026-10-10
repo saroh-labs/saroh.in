@@ -1,5 +1,6 @@
 "use client";
 
+import { Button } from "@saroh/ui/button";
 import { cn } from "@saroh/ui/lib/utils";
 import { showError, showUndo } from "@saroh/ui/toast";
 import { useRouter } from "next/navigation";
@@ -16,7 +17,7 @@ import { ReadOnlyNote } from "@/components/shared/read-only-note";
 import { runAction } from "@/lib/api/run-action";
 import { useBottomBarInset } from "@/lib/hooks/use-bottom-bar-inset";
 import { Tip } from "@saroh/ui/tooltip";
-import { primaryBtn, smallBtn, TabIntro, useUnsaved } from "./product-settings";
+import { TabIntro, useUnsaved } from "./product-settings";
 
 const TOKENS = [
     { t: "{NAME3}", what: "first 3 letters of the name" },
@@ -264,25 +265,28 @@ export function SkuTab({
                                 ? `New products get SKUs like ${rows[0]?.next ?? "…"}.`
                                 : "The editor stops suggesting SKUs.")}
                     </span>
-                    <button
+                    <Button
+                        variant="outline"
+                        size="sm"
                         type="button"
                         disabled={pending}
                         onClick={() => {
                             setPattern(saved.pattern);
                             setSuggest(saved.suggest);
                         }}
-                        className={smallBtn}
                     >
                         Discard
-                    </button>
-                    <button
+                    </Button>
+                    <Button
+                        size="sm"
                         type="button"
-                        disabled={!!problem || pending}
+                        disabled={!!problem}
                         onClick={save}
-                        className={primaryBtn}
+                        busy={pending}
+                        busyLabel="Saving…"
                     >
-                        {pending ? "Saving…" : "Save pattern"}
-                    </button>
+                        Save pattern
+                    </Button>
                 </div>
             ) : null}
         </section>

@@ -584,7 +584,11 @@ test.describe("availability and services", () => {
         await page.getByRole("textbox", { name: /^Price/ }).fill("0");
         const who = page.getByRole("group", { name: "Who takes it" });
         if (await who.isVisible()) {
-            await who.getByRole("checkbox").first().click();
+            // With one person on the diary they are ticked already.
+            const first = who.getByRole("checkbox").first();
+            if ((await first.getAttribute("aria-checked")) !== "true") {
+                await first.click();
+            }
         }
         await page.getByLabel("Places").fill("1");
         await expect(page.getByRole("alert").first()).toHaveText(
@@ -651,7 +655,11 @@ test.describe("the Service Editor on Northwind (E2)", () => {
         await page.getByRole("textbox", { name: /^Price/ }).fill("500");
         const who = page.getByRole("group", { name: "Who takes it" });
         if (await who.isVisible()) {
-            await who.getByRole("checkbox").first().click();
+            // With one person on the diary they are ticked already.
+            const first = who.getByRole("checkbox").first();
+            if ((await first.getAttribute("aria-checked")) !== "true") {
+                await first.click();
+            }
         }
         await page.getByRole("button", { name: "Add service" }).click();
         await page.waitForURL(/\/services\/(?!new)[^/]+$/);

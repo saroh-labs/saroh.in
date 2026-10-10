@@ -15,7 +15,6 @@ import {
 } from "@/lib/orders/visits";
 
 import { runAction } from "@/lib/api/run-action";
-import { actionClass } from "./parts";
 
 /**
  * The header's next action for a treatment: "Mark visit N attended" (once
@@ -104,13 +103,7 @@ function NextButton({
                 router.refresh();
             });
         return (
-            <Button
-                type="button"
-                className={actionClass("primary")}
-                disabled={busy}
-                aria-busy={busy || undefined}
-                onClick={mark}
-            >
+            <Button type="button" busy={busy} onClick={mark}>
                 {label}
             </Button>
         );
@@ -136,7 +129,6 @@ function NextButton({
                     who: first,
                 }}
                 primaryTrigger
-                triggerClassName={actionClass("primary")}
             />
         );
     }

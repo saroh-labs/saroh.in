@@ -11,9 +11,9 @@ import { useRouter } from "next/navigation";
 import { useId, useState } from "react";
 
 import { FormSheet } from "@/components/shared/form-sheet";
-import { OptionSelect } from "@/components/shared/option-select";
 import { runAction } from "@/lib/api/run-action";
 import { createLead } from "@/lib/leads/actions";
+import { OptionSelect } from "@saroh/ui/option-select";
 
 export interface LeadContactOption {
     id: string;

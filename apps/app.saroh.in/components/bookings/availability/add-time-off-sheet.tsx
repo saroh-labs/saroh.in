@@ -7,12 +7,12 @@ import { cn } from "@saroh/ui/lib/utils";
 import { useEffect, useId, useState } from "react";
 
 import { FormSheet } from "@/components/shared/form-sheet";
-import { OptionSelect } from "@/components/shared/option-select";
 import type { NewOff } from "@/lib/services/availability-rules";
 import type { LocalDate } from "@/lib/services/diary";
 import { previewOff } from "@/lib/staff/actions";
 import { dayCount, offButtonLabel, offNote } from "@/lib/staff/time-off";
 import type { StaffView } from "@/lib/staff/types";
+import { OptionSelect } from "@saroh/ui/option-select";
 
 import { ClockSelect } from "./clock-select";
 

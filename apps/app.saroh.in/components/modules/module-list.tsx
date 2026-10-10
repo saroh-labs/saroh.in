@@ -2,6 +2,7 @@
 
 import { Button } from "@saroh/ui/button";
 import { cn } from "@saroh/ui/lib/utils";
+import { Switch } from "@saroh/ui/switch";
 import { showError, showUndo } from "@saroh/ui/toast";
 import Link from "next/link";
 import { useEffect, useId, useRef, useState, useTransition } from "react";
@@ -472,45 +473,28 @@ function ModuleSwitch({
 }) {
     const whyId = useId();
     return (
-        <button
-            type="button"
-            role="switch"
-            aria-checked={on}
-            aria-disabled={locked || busy}
-            aria-busy={busy || undefined}
-            aria-labelledby={why ? `${labelledBy} ${whyId}` : labelledBy}
-            aria-describedby={describedBy}
-            onClick={onFlip}
-            className={cn(
-                "shrink-0 rounded-full p-1 transition-colors duration-fast hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring active:bg-accent-active",
-                locked ? "cursor-not-allowed" : "cursor-pointer",
-                locked && !on && "opacity-50",
-                busy && "cursor-progress",
-            )}
-        >
+        <>
             {why ? (
                 <span id={whyId} className="sr-only">
                     , {why}
                 </span>
             ) : null}
-            <span
+            {/* Locked is said, not `disabled`: the switch stays reachable
+                so the reason beside it is read with it. */}
+            <Switch
+                checked={on}
+                aria-disabled={locked || busy}
+                aria-busy={busy || undefined}
+                aria-labelledby={why ? `${labelledBy} ${whyId}` : labelledBy}
+                aria-describedby={describedBy}
+                onCheckedChange={onFlip}
                 className={cn(
-                    "relative block h-6 w-[42px] rounded-full transition-colors duration-fast",
-                    on
-                        ? locked
-                            ? "bg-muted-foreground/50"
-                            : "bg-foreground"
-                        : "bg-border",
+                    locked &&
+                        "cursor-not-allowed !bg-disabled shadow-[inset_0_0_0_1px_hsl(var(--disabled-border))] [&>span]:bg-disabled-foreground",
+                    busy && "cursor-progress",
                 )}
-            >
-                <span
-                    className={cn(
-                        "absolute top-[3px] size-[18px] rounded-full bg-card transition-[left] duration-fast",
-                        on ? "left-[21px]" : "left-[3px]",
-                    )}
-                />
-            </span>
-        </button>
+            />
+        </>
     );
 }
 

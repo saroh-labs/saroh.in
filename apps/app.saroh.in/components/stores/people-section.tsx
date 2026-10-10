@@ -13,7 +13,6 @@ import { useState } from "react";
 
 import type { ConfirmResult } from "@/components/shared/confirm-dialog";
 import { ConfirmDialog } from "@/components/shared/confirm-dialog";
-import { OptionSelect } from "@/components/shared/option-select";
 import { useHold } from "@/components/shared/use-hold";
 import { Section as Rows } from "@/components/sites/settings-rows";
 import {
@@ -33,6 +32,7 @@ import {
     shownInvitations,
 } from "@/lib/stores/people";
 import { couldntLoad } from "@saroh/ui/lib/state-copy";
+import { OptionSelect } from "@saroh/ui/option-select";
 
 import { runAction } from "@/lib/api/run-action";
 import { Notice } from "@saroh/ui/notice";
@@ -257,7 +257,7 @@ export function PeopleSection({
                                                             options={
                                                                 ROLE_OPTIONS
                                                             }
-                                                            className="w-32 coarse:h-11"
+                                                            className="w-32"
                                                         />
                                                         <Button
                                                             type="button"

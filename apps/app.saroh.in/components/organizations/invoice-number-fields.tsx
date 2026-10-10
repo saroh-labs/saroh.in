@@ -13,7 +13,6 @@ import { cn } from "@saroh/ui/lib/utils";
 import { ArrowDown, ArrowUp, Check, Lock } from "lucide-react";
 import { useFormContext } from "react-hook-form";
 
-import { OptionSelect } from "@/components/shared/option-select";
 import type {
     NumberFormat,
     NumberPart,
@@ -36,6 +35,7 @@ import {
     SEPARATOR_LABEL,
 } from "@/lib/invoices/invoice-number";
 import { IconButton } from "@saroh/ui/icon-button";
+import { OptionSelect } from "@saroh/ui/option-select";
 import { Segmented } from "@saroh/ui/segmented";
 
 /** The four form values the editor writes. */

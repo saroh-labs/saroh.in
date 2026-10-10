@@ -56,10 +56,11 @@ export function StockSheetButton({
     return (
         <>
             <Button
+                size="xs"
                 type="button"
                 variant="outline"
                 onClick={() => setOpen(true)}
-                className="h-[26px] gap-[5px] rounded-[7px] px-[9px] text-[12px] coarse:h-11"
+                className="gap-[5px]"
             >
                 <Pencil className="size-3" aria-hidden />
                 {label}
@@ -279,27 +280,25 @@ export function StockSheet({
                         />
                     </label>
                     <label className="flex flex-col gap-1.5">
-                        <span>MRP</span>
+                        <span>MRP (optional)</span>
                         <Input
                             value={draft.mrp}
                             onChange={(e) =>
                                 setDraft((d) => ({ ...d, mrp: e.target.value }))
                             }
                             inputMode="decimal"
-                            placeholder="Optional"
                         />
                     </label>
                 </div>
             ) : may.canWrite ? (
                 <label className="mt-4 flex max-w-[50%] flex-col gap-1.5">
-                    <span>MRP</span>
+                    <span>MRP (optional)</span>
                     <Input
                         value={draft.mrp}
                         onChange={(e) =>
                             setDraft((d) => ({ ...d, mrp: e.target.value }))
                         }
                         inputMode="decimal"
-                        placeholder="Optional"
                     />
                 </label>
             ) : null}

@@ -1,5 +1,6 @@
 "use client";
 
+import { Button } from "@saroh/ui/button";
 import { cn } from "@saroh/ui/lib/utils";
 import { useEffect } from "react";
 
@@ -7,7 +8,6 @@ import { useClock } from "@/lib/hooks/use-clock";
 import { HOLD_MS } from "@/lib/orders/lifecycle";
 
 import { Notice } from "@saroh/ui/notice";
-import { FOCUS } from "./parts";
 
 export interface Hold {
     kind: "ready" | "refund";
@@ -64,32 +64,34 @@ export function HoldCard({
                 <span className="flex-[1_1_220px] font-semibold tabular-nums">
                     {title(Math.ceil(left / 1000))}
                 </span>
-                <button
+                <Button
+                    variant="outline"
+                    size="sm"
                     type="button"
                     onClick={onUndo}
                     className={cn(
-                        FOCUS,
-                        "h-[30px] rounded-lg border bg-card px-3 text-[12.5px] font-semibold transition-colors duration-fast hover:bg-accent active:bg-accent-active coarse:h-11",
+                        "border bg-card transition-colors duration-fast hover:bg-accent active:bg-accent-active",
                         refund
                             ? "border-destructive-subtle-foreground"
                             : "border-border-strong",
                     )}
                 >
                     {undoLabel}
-                </button>
-                <button
+                </Button>
+                <Button
+                    variant="link"
+                    size="sm"
                     type="button"
                     onClick={onNow}
                     className={cn(
-                        FOCUS,
-                        "h-[30px] rounded-lg px-3 text-[12.5px] font-semibold hover:underline active:bg-card/60 coarse:h-11",
+                        "hover:underline active:bg-card/60",
                         refund
                             ? "text-destructive-subtle-foreground"
                             : "text-foreground",
                     )}
                 >
                     {nowLabel}
-                </button>
+                </Button>
             </div>
             {note ? (
                 <p className="mt-1 text-[11.5px] text-muted-foreground">

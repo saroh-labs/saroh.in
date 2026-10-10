@@ -648,7 +648,7 @@ describe("a way's Edit sheet", () => {
         await press(labelled("Edit local delivery"));
         await press(chip("4 h"));
         await press(item("Save"));
-        expect(item("Saving…")?.disabled).toBe(true);
+        expect(item("Saving…")?.getAttribute("aria-busy")).toBe("true");
         await pressEscape();
         expect(sheetName()).toBe("Local delivery");
         await act(async () => {

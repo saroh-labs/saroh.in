@@ -83,11 +83,11 @@ export function StorefrontTeamNotice({
                 <Button
                     size="sm"
                     variant="outline"
-                    disabled={dismissing}
                     onClick={dismiss}
-                    className="text-[12.5px]"
+                    busy={dismissing}
+                    busyLabel="Dismissing…"
                 >
-                    {dismissing ? "Dismissing…" : "Dismiss"}
+                    Dismiss
                 </Button>
             </div>
             <ul>
@@ -116,7 +116,6 @@ export function StorefrontTeamNotice({
                                 variant="outline"
                                 onClick={() => onChangeRole(p.userId)}
                                 aria-label={`Change ${name}’s role`}
-                                className="text-[12.5px]"
                             >
                                 Change role
                             </Button>

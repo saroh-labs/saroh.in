@@ -60,15 +60,7 @@ export function SectionCard({
     const creating = mode === "create";
     const dirty = !creating && (state?.dirty ?? false);
     const problem = state?.problem ?? "";
-    const chip = creating
-        ? k === "basics" || k === "visibility"
-            ? null
-            : "optional"
-        : dirty
-          ? problem
-              ? "bad"
-              : "unsaved"
-          : null;
+    const chip = creating ? null : dirty ? (problem ? "bad" : "unsaved") : null;
     const busy = saving.includes(k);
     const note = problem || (state?.note ?? SAVES[k]);
     const noteBad = !!problem || !!state?.noteIsError;
@@ -117,21 +109,24 @@ export function SectionCard({
                         {note}
                     </span>
                     <Button
+                        size="sm"
                         type="button"
                         variant="outline"
                         disabled={busy}
                         onClick={() => discard(k)}
-                        className="h-[30px] rounded-[8px] px-[11px] text-[12px] font-semibold text-foreground/75"
+                        className="text-foreground/75"
                     >
                         {state?.discardLabel ?? "Discard"}
                     </Button>
                     <Button
+                        size="sm"
                         type="button"
-                        disabled={busy || !!problem}
+                        disabled={!!problem}
                         onClick={() => void saveSections([k])}
-                        className="h-[30px] rounded-[8px] px-3 text-[12px] font-semibold disabled:bg-muted disabled:text-muted-foreground disabled:opacity-100"
+                        busy={busy}
+                        busyLabel="Saving…"
                     >
-                        {busy ? "Saving…" : (state?.saveLabel ?? SAVE_LABEL[k])}
+                        {state?.saveLabel ?? SAVE_LABEL[k]}
                     </Button>
                 </div>
             ) : null}
@@ -139,26 +134,10 @@ export function SectionCard({
     );
 }
 
-export function SectionChip({
-    kind,
-}: {
-    kind: "unsaved" | "bad" | "optional";
-}) {
+export function SectionChip({ kind }: { kind: "unsaved" | "bad" }) {
     return (
-        <StatusBadge
-            tone={
-                kind === "optional"
-                    ? "draft"
-                    : kind === "bad"
-                      ? "error"
-                      : "active"
-            }
-        >
-            {kind === "optional"
-                ? "Optional"
-                : kind === "bad"
-                  ? "Needs a fix"
-                  : "Unsaved"}
+        <StatusBadge tone={kind === "bad" ? "error" : "active"}>
+            {kind === "bad" ? "Needs a fix" : "Unsaved"}
         </StatusBadge>
     );
 }

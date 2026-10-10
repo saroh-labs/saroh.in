@@ -22,7 +22,6 @@ import {
     FormSheetBody,
     FormSheetFoot,
 } from "@/components/shared/form-sheet";
-import { OptionSelect } from "@/components/shared/option-select";
 import { runAction } from "@/lib/api/run-action";
 import { packsFor } from "@/lib/class-packs/actions";
 import { classesLeft, packOffer, usablePacks } from "@/lib/class-packs/balance";
@@ -46,6 +45,7 @@ import {
 import type { Slot } from "@/lib/services/service";
 import type { VisitToBook } from "@/lib/services/treatment";
 import { Notice } from "@saroh/ui/notice";
+import { OptionSelect } from "@saroh/ui/option-select";
 
 const WINDOW_DAYS = 14;
 

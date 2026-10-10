@@ -15,7 +15,6 @@ import type { ConfirmResult } from "@/components/shared/confirm-dialog";
 import { ConfirmDialog } from "@/components/shared/confirm-dialog";
 import { FormDialog } from "@/components/shared/form-dialog";
 import { FormSheet } from "@/components/shared/form-sheet";
-import { OptionSelect } from "@/components/shared/option-select";
 import { runAction } from "@/lib/api/run-action";
 import {
     creditInvoice,
@@ -28,6 +27,7 @@ import {
 import { sendLabel } from "@/lib/invoices/send";
 import type { InvoiceStanding, PaymentMethod } from "@/lib/invoices/service";
 import { PAID_HOW } from "@/lib/orders/paid-how";
+import { OptionSelect } from "@saroh/ui/option-select";
 
 // The ways an order's Record as paid offers too (#834).
 const METHODS = PAID_HOW;

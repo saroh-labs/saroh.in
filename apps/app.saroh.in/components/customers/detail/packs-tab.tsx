@@ -88,11 +88,7 @@ export function PacksTab({
                     : ""}
             </p>
             {canSell ? (
-                <Button
-                    variant="outline"
-                    onClick={onSell}
-                    className={SMALL_BUTTON}
-                >
+                <Button size="sm" variant="outline" onClick={onSell}>
                     Sell a pack
                 </Button>
             ) : null}
@@ -195,12 +191,12 @@ function PackItem({
                 </div>
                 <div className="flex max-w-[200px] flex-col items-end gap-1">
                     <Button
+                        size="sm"
                         variant="outline"
                         disabled={why !== null}
                         aria-describedby={why ? ids.why : undefined}
                         aria-label={`Extend the ${row.name}`}
                         onClick={onExtend}
-                        className={SMALL_BUTTON}
                     >
                         Extend
                     </Button>

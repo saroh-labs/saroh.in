@@ -1,13 +1,13 @@
 "use client";
 
 import { PACKS_BUY } from "@saroh/site-blocks";
+import { Field } from "@saroh/ui/field";
 import { Input } from "@saroh/ui/input";
 import { Label } from "@saroh/ui/label";
 import { Switch } from "@saroh/ui/switch";
 
 import type { PacksContent } from "@/lib/sites/service";
 
-import { Field } from "./field";
 import type { SectionFieldsProps } from "./props";
 
 /**

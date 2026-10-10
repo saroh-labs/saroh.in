@@ -1,6 +1,6 @@
 "use client";
 
-import { cn } from "@saroh/ui/lib/utils";
+import { Button } from "@saroh/ui/button";
 import { showSuccess } from "@saroh/ui/toast";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
@@ -26,7 +26,6 @@ import { CustomerStep } from "./customer-step";
 import { LeavesStep } from "./leaves-step";
 import { LinesStep } from "./lines-step";
 import { LinkMade } from "./link-made";
-import { FOCUS } from "./parts";
 import { PayStep } from "./pay-step";
 import type { NewOrderState } from "./use-new-order";
 import { useNewOrder } from "./use-new-order";
@@ -242,16 +241,14 @@ function NewOrderBody({
                 ) : !o.data ? (
                     <Notice tone="error">
                         Couldn&apos;t read what {storeName} sells.{" "}
-                        <button
+                        <Button
+                            variant="link"
+                            size="inline"
                             type="button"
                             onClick={o.retryCatalogue}
-                            className={cn(
-                                FOCUS,
-                                "cursor-pointer rounded-sm font-semibold underline underline-offset-2 hover:text-foreground",
-                            )}
                         >
                             Try again
-                        </button>
+                        </Button>
                     </Notice>
                 ) : (
                     <LinesStep

@@ -274,8 +274,46 @@ preview under its fields, from the draft.
   stock count in progress) asks nothing and offers Undo (`useCountMode`).
 - **Current** — **Money stays a string** from input to API
   (`price: values.price.trim()`). The API computes in cents.
-- **Current** — **Disable submit while the action runs.** All nine forms and
-  the waitlist do.
+- **Current** — **The submit button is busy while the action runs:**
+  `<Button type="submit" busy={isSubmitting} busyLabel="Saving…">`, never
+  `disabled` with a swapped label (`frontend-design-system.md`). The
+  overlay frames' foot and `ConfirmDialog` do it for their own button.
+- **Current** — **One `Field`** (`@saroh/ui/field`):
+  `<Field label hint? error? optional?>` with the control as its child. The
+  label sits above at the one label size (`Label`'s default, 12.5px), the
+  hint under, and an error takes the hint's place as an alert (`FieldError`,
+  the same line `FormMessage` draws). The child gets its `id`,
+  `aria-describedby` and `aria-invalid`. A control inside a wrapper is wired
+  by hand: pass `htmlFor`, and the line under it is `${id}-note`. Several
+  controls under one label are a group. It needs no form library.
+- **Current** — **Only what is optional is marked,** as "(optional)" in the
+  label (`optional` on `Field`). Never the word "Required", an "Optional"
+  chip, an "Optional." hint or an "Optional" placeholder.
+- **Adopted** — **A page checks a field on leaving it and on submit, and
+  puts the keyboard on the first one in error** (`focusFirstError`). A
+  sheet checks when its Save is pressed. Gap: the product editor still
+  checks as you type, and most forms only on submit.
+- **Current** — **A main button is never off without saying why.** A short
+  form keeps it on and explains on submit (Create location, Create site,
+  Add service). Where it must wait for something, the reason is beside it
+  and named by `aria-describedby` (a new course's Save and open).
+- **Current** — **One money field:** `MoneyInput` (`@saroh/ui/money-input`),
+  `{ currency, value, onValueChange, allowDecimals? }`. The sign is a fixed
+  prefix inside the box (never "Price (₹)" in the label or a "₹" that
+  vanishes with the first digit), the keyboard is the decimal pad, and the
+  currency is the business's: a form never asks which. Gaps: the product
+  editor's own `MoneyBox`, and Order Detail's refund and delivery-charge
+  boxes, which are not told the order's currency.
+- **Current** — **Saving from the keyboard**
+  (`lib/hooks/keyboard-save.ts`): Cmd/Ctrl+Enter sends the form the
+  keyboard is in (`submitOnModEnter` on a `<form>`; the overlay frames
+  carry it), and Cmd/Ctrl+S saves in an editor (`useSaveShortcut`:
+  product, service, plan, pack, post). Both go through the form's own
+  submit, so neither reaches a step that can't be taken back.
+- **Current** — **Defaults instead of questions.** One person on the diary
+  takes a new service without being asked for. A product asks for a GST rate
+  and an HSN code only when the business is GST-registered. A course and a
+  discount code are priced in the business's currency.
 - **Adopted** — **Every field has a visible label; a placeholder is never the
   label** (13 §5). Not measured.
 - **Current** — **Anything that tells a customer waits ten seconds with
@@ -286,7 +324,7 @@ preview under its fields, from the draft.
   then "Sent to {name}.". The overlay closes keeping what was typed, and a
   refusal or an Undo opens it again with that. Money out stays as built.
 - **Current** — **shadcn controls, never native pickers.** A list is a
-  `Select` — `components/shared/option-select.tsx` wraps it for flat option
+  `Select` — `@saroh/ui/option-select` wraps it for flat option
   lists and maps a `""` "None" value, which Radix reserves. A time of day is
   `@saroh/ui/time-select` (fixed steps, value stays "HH:MM"); a date is
   `@saroh/ui/date-picker` (Popover + Calendar). No `<select>`,
@@ -294,10 +332,13 @@ preview under its fields, from the draft.
   an overlay in `app.saroh.in` (the Orders filter bar's two date boxes and
   two selects on pages are the gap); with react-hook-form, drive them through `Controller` or
   `FormField`, not `register`.
-- **Adopted** — **Form primitives, not raw inputs,** in application forms.
-  Raw `<input>` and `<textarea>` elements remain in some inline managers.
-- **Adopted** — **Controls meet the touch target on a phone.** `Button` does
-  (`coarse:`, `frontend-design-system.md`); inputs were not re-checked.
+- **Current** — **Form primitives, not raw inputs.** ESLint fails a raw
+  `<input>`, `<textarea>`, `<select>`, `<button>` or `<label>` in
+  `app.saroh.in` (`frontend-design-system.md`). No native `<select>` or
+  text `<textarea>` is left. Gap: 64 files still wrap a control in a raw
+  `<label>` instead of `Field`, on the lint's list.
+- **Current** — **Controls meet the touch target on a phone,** and fields
+  are 16px there (`frontend-design-system.md`).
 
 ## Elsewhere — all **Current**
 

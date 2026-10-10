@@ -58,11 +58,3 @@ export type PillTone = "brand" | "success" | "neutral" | "danger";
  */
 export const FOCUS =
     "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background";
-
-/** The design's 38px button, in its two looks. */
-export function actionClass(kind: "primary" | "ghost") {
-    return cn(
-        "h-[38px] rounded-[9px] px-4 text-[14px] font-semibold coarse:h-11",
-        kind === "ghost" && "bg-card",
-    );
-}

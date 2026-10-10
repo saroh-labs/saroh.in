@@ -1,5 +1,6 @@
 "use client";
 
+import { Button } from "@saroh/ui/button";
 import { cn } from "@saroh/ui/lib/utils";
 import Link from "next/link";
 import { useState } from "react";
@@ -68,15 +69,16 @@ export function CollectionsCard({
                     </span>
                     <StatusBadge tone={u.tone}>{u.state}</StatusBadge>
                     {canWrite && u.canSkip ? (
-                        <button
+                        <Button
+                            variant="outline"
+                            size="sm"
                             type="button"
                             onClick={() => onToggle(u)}
                             disabled={busyDate === u.date}
                             aria-label={`${u.skipped ? "Undo skip" : "Skip"} ${u.label}`}
-                            className="h-8 min-w-[76px] rounded-[8px] border border-border bg-card px-3 text-[12px] font-semibold hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring active:bg-accent-active disabled:bg-disabled disabled:text-disabled-foreground coarse:h-11"
                         >
                             {u.skipped ? "Undo skip" : "Skip"}
-                        </button>
+                        </Button>
                     ) : null}
                 </div>
             ))}

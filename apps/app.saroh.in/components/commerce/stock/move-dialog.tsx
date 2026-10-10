@@ -8,11 +8,11 @@ import { dismissToasts, showUndo } from "@saroh/ui/toast";
 import { useRouter } from "next/navigation";
 import { useRef, useState } from "react";
 
-import { OptionSelect } from "@/components/shared/option-select";
 import { movedWords } from "@/lib/stock/levels";
 import type { MoveShelf } from "@/lib/stock/screen";
 import { moveNote, moveProblem, STOCK_UNREACHABLE } from "@/lib/stock/screen";
 import { moveStock, undoStock } from "@/lib/stock/screen-actions";
+import { OptionSelect } from "@saroh/ui/option-select";
 
 import { targetKey, targetOptions, useStockTargets } from "./use-stock-targets";
 

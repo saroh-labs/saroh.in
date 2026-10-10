@@ -114,16 +114,15 @@ export function RestoreVersion({
                 <Button
                     size="sm"
                     variant={override ? "destructive" : "brand"}
-                    disabled={pending}
                     onClick={restore}
+                    busy={pending}
+                    busyLabel="Restoring…"
                 >
-                    {pending
-                        ? "Restoring…"
-                        : override
-                          ? "Restore without approval"
-                          : renderable
-                            ? "Yes, restore"
-                            : "Restore anyway"}
+                    {override
+                        ? "Restore without approval"
+                        : renderable
+                          ? "Yes, restore"
+                          : "Restore anyway"}
                 </Button>
                 <Button
                     size="sm"

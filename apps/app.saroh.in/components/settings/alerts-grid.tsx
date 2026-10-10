@@ -1,6 +1,7 @@
 "use client";
 
 import { cn } from "@saroh/ui/lib/utils";
+import { Switch } from "@saroh/ui/switch";
 import { showError } from "@saroh/ui/toast";
 import { useOptimistic, useTransition } from "react";
 
@@ -204,36 +205,14 @@ function AlertSwitch({
     onFlip: () => void;
 }) {
     return (
-        <button
-            type="button"
-            role="switch"
-            aria-checked={cell.on}
+        <Switch
+            checked={cell.on}
             aria-disabled={cell.disabled || busy || undefined}
+            aria-busy={busy || undefined}
             aria-label={cell.label}
             disabled={cell.disabled}
-            onClick={onFlip}
-            className={cn(
-                "wk-press shrink-0 rounded-full p-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
-                cell.disabled
-                    ? "cursor-not-allowed opacity-50"
-                    : busy
-                      ? "cursor-progress"
-                      : "cursor-pointer hover:bg-muted active:bg-border",
-            )}
-        >
-            <span
-                className={cn(
-                    "relative block h-6 w-[42px] rounded-full transition-colors duration-fast",
-                    cell.on ? "bg-foreground" : "bg-border",
-                )}
-            >
-                <span
-                    className={cn(
-                        "absolute top-[3px] size-[18px] rounded-full bg-card transition-[left] duration-fast",
-                        cell.on ? "left-[21px]" : "left-[3px]",
-                    )}
-                />
-            </span>
-        </button>
+            onCheckedChange={onFlip}
+            className="wk-press"
+        />
     );
 }

@@ -234,7 +234,6 @@ export function InvoiceQuickLook({
                             type="button"
                             variant="outline"
                             onClick={() => setShown(remembered)}
-                            className="h-[38px] px-4 text-[14px]"
                         >
                             Show link again
                         </Button>
@@ -246,7 +245,6 @@ export function InvoiceQuickLook({
                             onClick={() =>
                                 unseen ? setConfirming(true) : void copyLink()
                             }
-                            className="h-[38px] px-4 text-[14px]"
                         >
                             {copyLinkLabel({
                                 busy,
@@ -255,10 +253,7 @@ export function InvoiceQuickLook({
                             })}
                         </Button>
                     ) : null}
-                    <Button
-                        asChild
-                        className="h-[38px] min-w-[160px] flex-1 rounded-[10px] text-[13.5px]"
-                    >
+                    <Button asChild className="min-w-[160px] flex-1">
                         <Link href={invoiceHref(i.id)}>Open invoice</Link>
                     </Button>
                 </>

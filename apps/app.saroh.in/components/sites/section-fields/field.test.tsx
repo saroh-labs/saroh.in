@@ -1,7 +1,6 @@
+import { Field } from "@saroh/ui/field";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
-
-import { Field } from "./field";
 
 /**
  * A block field's label names its control (G4's phone sheet found it named

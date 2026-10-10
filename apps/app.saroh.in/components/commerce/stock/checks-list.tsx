@@ -19,7 +19,7 @@ import { couldntLoad, nothingChanged } from "@saroh/ui/lib/state-copy";
 
 import { StatusBadge } from "@/components/shared/status-badge";
 import { runAction } from "@/lib/api/run-action";
-import { PILL_TONE, SMALL_BUTTON } from "./tones";
+import { PILL_TONE } from "./tones";
 
 const newKey = () => crypto.randomUUID();
 
@@ -189,10 +189,11 @@ export function ChecksList({
                         type="button"
                         variant="outline"
                         size="sm"
-                        disabled={pending}
                         onClick={more}
+                        busy={pending}
+                        busyLabel="Loading…"
                     >
-                        {pending ? "Loading…" : "Show more"}
+                        Show more
                     </Button>
                     {loadError ? (
                         <span
@@ -223,7 +224,7 @@ function CheckActions({
     onUndoCount: () => void;
 }) {
     const orders = (
-        <Button asChild variant="outline" className={SMALL_BUTTON}>
+        <Button size="sm" asChild variant="outline">
             <Link href={productHref(c.storeId, c.productId, "orders")}>
                 See the orders
             </Link>
@@ -232,9 +233,9 @@ function CheckActions({
     const checked = (primary: boolean) =>
         canResolve ? (
             <Button
+                size="sm"
                 type="button"
                 variant={primary ? "default" : "outline"}
-                className={SMALL_BUTTON}
                 disabled={off}
                 onClick={onResolve}
             >
@@ -247,7 +248,7 @@ function CheckActions({
                 <>
                     {orders}
                     {canResolve ? (
-                        <Button asChild className={SMALL_BUTTON}>
+                        <Button size="sm" asChild>
                             <Link
                                 href={productHref(
                                     c.storeId,
@@ -267,9 +268,9 @@ function CheckActions({
                     {checked(true)}
                     {canResolve && c.entryId ? (
                         <Button
+                            size="sm"
                             type="button"
                             variant="outline"
-                            className={SMALL_BUTTON}
                             disabled={off}
                             onClick={onUndoCount}
                         >
@@ -283,11 +284,7 @@ function CheckActions({
                 <>
                     {checked(true)}
                     {c.order ? (
-                        <Button
-                            asChild
-                            variant="outline"
-                            className={SMALL_BUTTON}
-                        >
+                        <Button size="sm" asChild variant="outline">
                             <Link
                                 href={`/commerce/orders/${encodeURIComponent(c.order.id)}`}
                             >

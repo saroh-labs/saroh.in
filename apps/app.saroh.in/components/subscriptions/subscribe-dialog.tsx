@@ -10,13 +10,13 @@ import { reportFailure } from "@/components/billing/plan-refusal";
 import type { ContactOption } from "@/components/shared/contact-picker";
 import { ContactPicker } from "@/components/shared/contact-picker";
 import { FormSheet } from "@/components/shared/form-sheet";
-import { OptionSelect } from "@/components/shared/option-select";
 import { runAction } from "@/lib/api/run-action";
 import { invoiceMoney } from "@/lib/invoices/money";
 import { subscribe } from "@/lib/subscriptions/actions";
 import { renewalWords } from "@/lib/subscriptions/autopay";
 import { explainStart, intervalWords } from "@/lib/subscriptions/renewal";
 import type { Plan } from "@/lib/subscriptions/service";
+import { OptionSelect } from "@saroh/ui/option-select";
 
 /** A local calendar day as YYYY-MM-DD — the day the merchant picked. */
 function ymd(d: Date): string {

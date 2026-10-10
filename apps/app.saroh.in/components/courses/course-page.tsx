@@ -382,7 +382,6 @@ function Sessions({
                                     <Button
                                         variant="ghost"
                                         size="sm"
-                                        className="coarse:size-11"
                                         aria-label="Remove this session"
                                         onClick={() => remove(s.id)}
                                     >
@@ -541,12 +540,7 @@ function RosterRow({
                 </span>
             </span>
             {onCancel ? (
-                <Button
-                    variant="ghost"
-                    size="sm"
-                    className="coarse:h-11"
-                    onClick={onCancel}
-                >
+                <Button variant="ghost" size="sm" onClick={onCancel}>
                     Cancel
                 </Button>
             ) : null}

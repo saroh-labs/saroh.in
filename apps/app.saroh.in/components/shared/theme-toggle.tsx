@@ -1,5 +1,6 @@
 "use client";
 
+import { IconButton } from "@saroh/ui/icon-button";
 import { Tip } from "@saroh/ui/tooltip";
 import { Moon, Sun } from "lucide-react";
 import { useTheme } from "next-themes";
@@ -57,18 +58,15 @@ export function ThemeToggle() {
 
     return (
         <Tip label={`Switch to ${isDark ? "light" : "dark"}`}>
-            <button
-                type="button"
-                onClick={() => setTheme(isDark ? "light" : "dark")}
-                aria-label={
+            <IconButton
+                label={
                     `${isDark ? "Dark" : "Light"}` +
                     `${following ? ", following your system" : ""}. ` +
                     `Switch to ${isDark ? "light" : "dark"}.`
                 }
-                className="inline-flex size-8 items-center justify-center rounded-lg text-neutral-700 transition-colors duration-fast hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background active:bg-accent-active coarse:size-11 dark:text-foreground"
-            >
-                <Icon className="size-4" />
-            </button>
+                icon={<Icon className="size-4" />}
+                onClick={() => setTheme(isDark ? "light" : "dark")}
+            />
         </Tip>
     );
 }

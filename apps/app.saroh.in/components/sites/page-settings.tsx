@@ -1,5 +1,6 @@
 "use client";
 
+import { submitOnModEnter } from "@/lib/hooks/keyboard-save";
 import { Button } from "@saroh/ui/button";
 import { Input } from "@saroh/ui/input";
 import { showError, showSuccess } from "@saroh/ui/toast";
@@ -100,6 +101,7 @@ export function PageSettings({
             ) : null}
 
             <form
+                onKeyDown={submitOnModEnter}
                 className="grid gap-3"
                 onSubmit={(e) => {
                     e.preventDefault();
@@ -111,13 +113,13 @@ export function PageSettings({
                         Title
                     </label>
                     <Input
+                        dense
                         id={`${id}-title`}
                         value={title}
                         maxLength={200}
                         disabled={readOnly}
                         onChange={(e) => setTitle(e.target.value)}
                         aria-describedby={`${id}-title-note`}
-                        className="h-8 text-xs"
                     />
                     <p
                         id={`${id}-title-note`}
@@ -148,13 +150,14 @@ export function PageSettings({
                                 </p>
                             ) : null}
                             <Input
+                                dense
                                 id={`${id}-path`}
                                 value={path}
                                 maxLength={200}
                                 disabled={readOnly}
                                 aria-invalid={unseen ? true : undefined}
                                 onChange={(e) => setPath(e.target.value)}
-                                className="h-8 font-mono text-xs"
+                                className="font-mono"
                             />
                         </>
                     )}
@@ -168,8 +171,8 @@ export function PageSettings({
                                 <Button
                                     type="button"
                                     variant="outline"
-                                    size="sm"
-                                    className="h-7 justify-self-start px-2 text-xs text-foreground"
+                                    size="xs"
+                                    className="justify-self-start text-foreground"
                                     onClick={() => {
                                         if (refusal.suggestion) {
                                             setPath(refusal.suggestion);
@@ -188,10 +191,12 @@ export function PageSettings({
                     <Button
                         type="submit"
                         size="sm"
-                        className="h-8 justify-self-start px-3 text-xs"
-                        disabled={busy || !dirty}
+                        className="justify-self-start"
+                        disabled={!dirty}
+                        busy={busy}
+                        busyLabel="Saving…"
                     >
-                        {busy ? "Saving…" : "Save"}
+                        Save
                     </Button>
                 )}
             </form>
@@ -243,7 +248,7 @@ export function PageSettings({
                             type="button"
                             variant="ghost"
                             size="sm"
-                            className="h-8 justify-self-start px-2 text-xs text-destructive hover:bg-destructive/10 hover:text-destructive"
+                            className="justify-self-start text-destructive hover:bg-destructive/10 hover:text-destructive"
                             disabled={busy}
                             onClick={onDelete}
                         >

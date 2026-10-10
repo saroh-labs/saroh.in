@@ -1,5 +1,6 @@
 "use client";
 
+import { Button } from "@saroh/ui/button";
 import { cn } from "@saroh/ui/lib/utils";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -95,16 +96,14 @@ export function BusinessHoursSection({
             <>
                 Your locations&apos; hours couldn&apos;t be read, so they
                 can&apos;t be changed here right now.{" "}
-                <button
+                <Button
+                    variant="link"
+                    size="inline"
                     type="button"
                     onClick={() => router.refresh()}
-                    className={cn(
-                        LINK,
-                        "cursor-pointer rounded-sm hover:text-foreground/80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring active:opacity-70",
-                    )}
                 >
                     Try again
-                </button>
+                </Button>
             </>
         ) : !first ? (
             <>

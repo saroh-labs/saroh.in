@@ -5,6 +5,7 @@ import {
     anchorProblem,
     NAV_LABEL_MAX,
 } from "@saroh/block-contract";
+import { Field } from "@saroh/ui/field";
 import { Input } from "@saroh/ui/input";
 import {
     Select,
@@ -15,8 +16,6 @@ import {
 } from "@saroh/ui/select";
 
 import type { Section } from "@/lib/sites/service";
-
-import { Field } from "./field";
 
 /** The bands a block can sit on, in the words the inspector uses. */
 const BANDS = [

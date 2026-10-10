@@ -1,12 +1,13 @@
 "use client";
 
+import { FieldError } from "@saroh/ui/field";
 import { Input } from "@saroh/ui/input";
 import { cn } from "@saroh/ui/lib/utils";
 import { useId, useRef, useState } from "react";
 
 import { parseWhole, VALIDITY_CHIPS } from "@/lib/class-packs/pack-editor";
 
-import { FIELD, FieldError, LABEL, PackChip } from "./parts";
+import { FIELD, LABEL, PackChip } from "./parts";
 
 /**
  * "Use within" (E18): the design's day chips, then "Other…", which reveals
@@ -81,7 +82,7 @@ export function ValidityChips({
                     />
                 </div>
             ) : null}
-            <FieldError id={ids.error} message={error} />
+            <FieldError id={ids.error}>{error}</FieldError>
         </div>
     );
 }

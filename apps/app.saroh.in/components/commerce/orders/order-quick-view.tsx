@@ -156,7 +156,7 @@ export function OrderQuickView({
                     <Button
                         asChild
                         variant="outline"
-                        className="mr-auto h-[38px] cursor-pointer gap-[7px] rounded-[9px] px-3.5 text-[13px] font-semibold active:scale-[0.98] coarse:h-11"
+                        className="mr-auto cursor-pointer gap-[7px] active:scale-[0.98]"
                     >
                         <Link href={orderPageHref(row.store.id, row.id)}>
                             Open full page
@@ -167,7 +167,7 @@ export function OrderQuickView({
                         next.via === "page" ? (
                             <Button
                                 asChild
-                                className="h-[38px] cursor-pointer rounded-[9px] px-3.5 text-[13px] font-semibold active:scale-[0.98] coarse:h-11"
+                                className="cursor-pointer active:scale-[0.98]"
                             >
                                 <Link
                                     href={orderPageHref(
@@ -191,7 +191,7 @@ export function OrderQuickView({
                                         to: next.to,
                                     })
                                 }
-                                className="h-[38px] cursor-pointer rounded-[9px] px-3.5 text-[13px] font-semibold active:scale-[0.98] coarse:h-11"
+                                className="cursor-pointer active:scale-[0.98]"
                             >
                                 {next.label}
                             </Button>

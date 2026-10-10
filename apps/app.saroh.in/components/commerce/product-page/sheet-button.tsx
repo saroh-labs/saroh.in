@@ -39,11 +39,12 @@ export function SheetButton({
     return (
         <>
             <Button
+                size="xs"
                 type="button"
                 variant="outline"
                 onClick={() => setOpen(true)}
                 aria-label={ariaLabel ?? label}
-                className="h-[26px] gap-[5px] rounded-[7px] px-[9px] text-[12px] coarse:h-11"
+                className="gap-[5px]"
             >
                 <Pencil className="size-3" aria-hidden />
                 {label}

@@ -1,6 +1,7 @@
 "use client";
 
 import { Button } from "@saroh/ui/button";
+import { IconButton } from "@saroh/ui/icon-button";
 import { cn } from "@saroh/ui/lib/utils";
 import { showError, showSuccess } from "@saroh/ui/toast";
 import { useRouter } from "next/navigation";
@@ -107,35 +108,27 @@ export function AddonsCard({
                             </Button>
                         ) : (
                             <div className="flex items-center gap-1">
-                                <Button
-                                    type="button"
+                                <IconButton
+                                    label={`Fewer: ${row.name}`}
+                                    icon={<span>−</span>}
                                     variant="outline"
-                                    size="icon"
-                                    aria-label={`Fewer: ${row.name}`}
                                     disabled={off || row.quantity === 0}
                                     onClick={() => set(row, row.quantity - 1)}
-                                    className="size-8 coarse:size-11"
-                                >
-                                    −
-                                </Button>
+                                />
                                 <span className="min-w-6 text-center font-semibold tabular-nums">
                                     {row.quantity}
                                 </span>
-                                <Button
-                                    type="button"
+                                <IconButton
+                                    label={`More: ${row.name}`}
+                                    icon={<span>+</span>}
                                     variant="outline"
-                                    size="icon"
-                                    aria-label={`More: ${row.name}`}
                                     disabled={
                                         off ||
                                         !row.available ||
                                         row.quantity >= max
                                     }
                                     onClick={() => set(row, row.quantity + 1)}
-                                    className="size-8 coarse:size-11"
-                                >
-                                    +
-                                </Button>
+                                />
                             </div>
                         )}
                     </div>

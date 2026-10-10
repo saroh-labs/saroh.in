@@ -1,5 +1,6 @@
 "use client";
 
+import { Field } from "@saroh/ui/field";
 import { useEffect, useState } from "react";
 
 import { Input } from "@saroh/ui/input";
@@ -18,7 +19,6 @@ import type { HoursContent } from "@/lib/sites/service";
 import type { VisitPlacesRead } from "@/lib/stores/storefronts";
 
 import { TextLink } from "@saroh/ui/text-link";
-import { Field } from "./field";
 import { OptionSwitch } from "./option-switch";
 import type { SectionFieldsProps } from "./props";
 

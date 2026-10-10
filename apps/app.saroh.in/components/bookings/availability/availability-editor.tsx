@@ -323,18 +323,17 @@ export function AvailabilityEditor({
             </span>
             <Button
                 variant="outline"
-                className="h-[38px] rounded-[9px] px-4 text-[14px]"
                 disabled={saving}
                 onClick={() => setDraft(null)}
             >
                 Discard
             </Button>
             <Button
-                className="h-[38px] rounded-[9px] px-4 text-[14px]"
-                disabled={saving}
                 onClick={() => void save()}
+                busy={saving}
+                busyLabel="Saving…"
             >
-                {saving ? "Saving…" : "Save changes"}
+                Save changes
             </Button>
         </div>
     ) : null;

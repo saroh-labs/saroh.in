@@ -1,5 +1,6 @@
 "use client";
 
+import { Button } from "@saroh/ui/button";
 import { Search } from "lucide-react";
 import { usePathname } from "next/navigation";
 import { useSyncExternalStore } from "react";
@@ -50,14 +51,15 @@ export function CommandTrigger({ actor }: { actor: SettingsActor }) {
     }
     return (
         <Tip label={`Search  ${searchShortcut(apple)}`}>
-            <button
+            <Button
+                variant="ghost"
+                size="icon-sm"
                 type="button"
                 onClick={openCommandMenu}
                 aria-label={`Search Saroh (${searchShortcutSpoken(apple)})`}
-                className={BUTTON}
             >
                 <Search className="size-4" />
-            </button>
+            </Button>
         </Tip>
     );
 }

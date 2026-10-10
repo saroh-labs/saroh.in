@@ -164,7 +164,6 @@ export function InvoicesTab({
                                 <Button
                                     size="sm"
                                     variant="outline"
-                                    className="coarse:h-11"
                                     onClick={() =>
                                         setPaying({
                                             id: v.id,

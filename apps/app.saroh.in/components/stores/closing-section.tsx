@@ -85,7 +85,9 @@ export function ClosingSection({
                 {canEdit ? (
                     <Button
                         variant="outline"
-                        disabled={pending || closing}
+                        disabled={closing}
+                        busy={pending}
+                        busyLabel={paused ? "Resuming…" : "Pausing…"}
                         onClick={paused ? resume : pause}
                     >
                         {paused ? "Resume location" : "Pause location"}

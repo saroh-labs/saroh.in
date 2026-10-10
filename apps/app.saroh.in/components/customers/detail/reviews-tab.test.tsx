@@ -61,7 +61,7 @@ describe("the Reviews tab", () => {
         expect(html).toContain("Crust like a dream");
         // A real link and real buttons: pointer, hover, focus and pressed.
         expect(html).toMatch(
-            /cursor-pointer[^"]*hover:[^"]*focus-visible:ring-2[^"]*active:/,
+            /cursor-pointer[^"]*focus-visible:ring-2[^"]*hover:[^"]*active:/,
         );
         expect(html).not.toContain("Hidden from the shop</span>");
     });

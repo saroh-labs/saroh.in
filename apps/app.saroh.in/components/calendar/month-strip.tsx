@@ -99,7 +99,7 @@ export function MonthStrip({
                     variant="outline"
                     size="sm"
                     onClick={exportMonth}
-                    className="ml-auto self-center px-3 text-[12.5px]"
+                    className="ml-auto self-center"
                 >
                     Export the month
                 </Button>

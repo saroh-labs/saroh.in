@@ -9,7 +9,6 @@ import { dismissToasts, showUndo } from "@saroh/ui/toast";
 import { useRouter } from "next/navigation";
 import { useRef, useState } from "react";
 
-import { OptionSelect } from "@/components/shared/option-select";
 import type { EntryKind } from "@/lib/stock/screen";
 import {
     ENTRY_KINDS,
@@ -18,6 +17,7 @@ import {
     STOCK_UNREACHABLE,
 } from "@/lib/stock/screen";
 import { recordStockEntry, undoStock } from "@/lib/stock/screen-actions";
+import { OptionSelect } from "@saroh/ui/option-select";
 
 import { chipClass } from "@/components/shared/chip";
 import { targetKey, targetOptions, useStockTargets } from "./use-stock-targets";
@@ -242,7 +242,6 @@ export function EntrySheet({
                         kind === "WASTED" ? "e.g. Day-old" : "e.g. Half a tray"
                     }
                     onChange={(e) => setNote(e.target.value)}
-                    className="text-[13px]"
                 />
             </div>
         </FormSheet>

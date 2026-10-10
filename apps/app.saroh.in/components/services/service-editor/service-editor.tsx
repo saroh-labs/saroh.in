@@ -1,5 +1,6 @@
 "use client";
 
+import { useSaveShortcut } from "@/lib/hooks/keyboard-save";
 import { Button } from "@saroh/ui/button";
 import { cn } from "@saroh/ui/lib/utils";
 import { PageHeader } from "@saroh/ui/page-header";
@@ -111,7 +112,16 @@ export function ServiceEditor({
     const hasStaff = people.length > 0;
     const isNew = service === null;
     const [saved, setSaved] = useState(() =>
-        draftOf(service, service ? staffFor(service.id, people) : [], timezone),
+        draftOf(
+            service,
+            service
+                ? staffFor(service.id, people)
+                : // One person on the diary: they take it, unasked.
+                  people.length === 1 && people[0]
+                  ? [people[0].id]
+                  : [],
+            timezone,
+        ),
     );
     const [draft, setDraft] = useState(saved);
     const [saving, setSaving] = useState(false);
@@ -128,9 +138,15 @@ export function ServiceEditor({
     const noStorefront =
         !wasTreatment && (hasStorefront === false || refusedStorefront);
 
+    const [tried, setTried] = useState(false);
     const changed = changedSections(saved, draft);
     const dirty = changed.length > 0;
-    const problems = serviceProblems(draft, hasStaff, noStorefront);
+    const problems = serviceProblems(
+        draft,
+        hasStaff,
+        noStorefront,
+        people.length === 1,
+    );
     const bad = problems.length > 0;
     const comingUp = isNew ? 0 : usage ? usage.comingUp : null;
     const pill = statePill(isNew, draft.taking);
@@ -170,7 +186,12 @@ export function ServiceEditor({
     }
 
     async function save() {
-        if (!canEdit || bad || saving || (!dirty && !isNew)) return;
+        if (!canEdit || saving || (!dirty && !isNew)) return;
+        if (bad) {
+            // Say what is missing instead of a button that does nothing.
+            setTried(true);
+            return;
+        }
         setSaving(true);
         const input = serviceInput(draft, currency);
         const message = savedMessage({
@@ -242,7 +263,17 @@ export function ServiceEditor({
         router.push(SERVICES_HREF);
     }
 
-    const saveOff = bad || (!dirty && !isNew) || saving;
+    // What is wrong is said under the header once there is a name, or
+    // once Add service was pressed without one. The button is off only
+    // while that reason is on screen, never off with nothing said.
+    const problemsShown =
+        canEdit &&
+        bad &&
+        (dirty || isNew) &&
+        (draft.name.trim() !== "" || tried);
+    const saveOff = saving || (!dirty && !isNew) || problemsShown;
+    // Cmd/Ctrl+S: the page's one Save (it knows when there is nothing to).
+    useSaveShortcut(() => void save(), canEdit);
     const crumb = service ? service.name : "New service";
 
     return (
@@ -313,12 +344,10 @@ export function ServiceEditor({
                                     type="button"
                                     disabled={saveOff}
                                     onClick={() => void save()}
+                                    busy={saving}
+                                    busyLabel="Saving…"
                                 >
-                                    {saving
-                                        ? "Saving…"
-                                        : isNew
-                                          ? "Add service"
-                                          : "Save changes"}
+                                    {isNew ? "Add service" : "Save changes"}
                                 </Button>
                             </div>
                         ) : (
@@ -329,7 +358,7 @@ export function ServiceEditor({
                     }
                 />
             </div>
-            {canEdit && bad && (dirty || isNew) && draft.name.trim() ? (
+            {problemsShown ? (
                 <Notice tone="error" layout="banner">
                     {problems.join(" ")}
                 </Notice>

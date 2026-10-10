@@ -119,6 +119,8 @@ export function CancelBookingControl({
                 onClick={onCancel}
                 disabled={busy || held}
                 className="wk-press"
+                busy={busy}
+                busyLabel="Cancelling…"
             >
                 {busy || held ? "Cancelling…" : "Cancel"}
             </Button>

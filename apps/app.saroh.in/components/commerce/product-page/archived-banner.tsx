@@ -1,5 +1,6 @@
 "use client";
 
+import { Button } from "@saroh/ui/button";
 import { showError, showUndo } from "@saroh/ui/toast";
 import { useRouter } from "next/navigation";
 import { useTransition } from "react";
@@ -78,14 +79,15 @@ export function ArchivedBanner({
                     reviews and stock history are kept below.
                 </p>
                 {canWrite ? (
-                    <button
+                    <Button
+                        size="sm"
                         type="button"
-                        disabled={pending}
                         onClick={restore}
-                        className="h-8 rounded-[9px] bg-foreground px-3 text-[12.5px] font-semibold text-background hover:bg-foreground/90 disabled:opacity-60 coarse:h-11"
+                        busy={pending}
+                        busyLabel="Restoring…"
                     >
-                        {pending ? "Restoring…" : "Restore as a draft"}
-                    </button>
+                        Restore as a draft
+                    </Button>
                 ) : null}
             </div>
         </Notice>

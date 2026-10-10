@@ -27,10 +27,6 @@ import type {
 import { dayText, money } from "@/lib/subscriptions/view";
 import { ShareLink } from "@saroh/ui/copy-button";
 import { Notice } from "@saroh/ui/notice";
-
-/** The Plan card's own small actions, 44px on touch. */
-const SMALL = "h-8 rounded-[8px] px-3 text-[12.5px] font-semibold coarse:h-11";
-
 /**
  * Autopay under the Plan card's "Pays by" line (D14): how it came to be,
  * what needs attention, and — for someone with `subscription:write` —
@@ -80,12 +76,12 @@ export function AutopayActions({
                 <div className="mt-2.5 flex flex-wrap gap-2">
                     {panel.sendLabel ? (
                         <Button
+                            size="sm"
                             variant={
                                 panel.notice?.tone === "warn"
                                     ? "default"
                                     : "outline"
                             }
-                            className={SMALL}
                             onClick={() => setOpen("send")}
                         >
                             {panel.sendLabel}
@@ -93,11 +89,9 @@ export function AutopayActions({
                     ) : null}
                     {panel.canCancel ? (
                         <Button
+                            size="sm"
                             variant="outline"
-                            className={cn(
-                                SMALL,
-                                "text-destructive-subtle-foreground hover:text-destructive-subtle-foreground",
-                            )}
+                            className="text-destructive-subtle-foreground hover:text-destructive-subtle-foreground"
                             onClick={() => setOpen("cancel")}
                         >
                             Cancel autopay

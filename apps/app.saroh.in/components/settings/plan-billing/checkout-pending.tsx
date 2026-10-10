@@ -93,10 +93,11 @@ export function CheckoutPending({ pending }: { pending: PendingCheckout }) {
                                 type="button"
                                 size="sm"
                                 variant="outline"
-                                disabled={opening}
                                 onClick={() => void resume()}
+                                busy={opening}
+                                busyLabel="Opening…"
                             >
-                                {opening ? "Opening…" : "Continue payment"}
+                                Continue payment
                             </Button>
                         ) : null}
                     </div>

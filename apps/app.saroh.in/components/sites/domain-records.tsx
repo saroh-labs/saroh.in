@@ -35,8 +35,8 @@ function CopyField({ label, value }: { label: string; value: string }) {
             <Button
                 type="button"
                 variant="outline"
-                size="sm"
-                className="h-7 justify-self-start text-xs sm:justify-self-end"
+                size="xs"
+                className="justify-self-start sm:justify-self-end"
                 onClick={() =>
                     void copyText(value).then((ok) =>
                         ok

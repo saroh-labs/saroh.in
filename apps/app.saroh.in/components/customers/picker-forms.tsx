@@ -26,8 +26,7 @@ import { Notice } from "@saroh/ui/notice";
  * a nested form would submit the dialog's.
  */
 
-const FIELD = "mt-1 h-9 text-[13px]";
-const LABEL = "text-[12.5px]";
+const FIELD = "mt-1";
 const BOX = "mb-3 grid gap-2 rounded-[10px] border border-border px-3 py-2.5";
 
 /** Name, phone and email for someone new; the email is needed. */
@@ -69,9 +68,7 @@ export function NewCustomerForm({
             }}
         >
             <div>
-                <Label htmlFor={ids.name} className={LABEL}>
-                    Name
-                </Label>
+                <Label htmlFor={ids.name}>Name</Label>
                 <Input
                     id={ids.name}
                     value={draft.name}
@@ -82,9 +79,7 @@ export function NewCustomerForm({
             </div>
             <div className="grid gap-2 sm:grid-cols-2">
                 <div>
-                    <Label htmlFor={ids.phone} className={LABEL}>
-                        Phone
-                    </Label>
+                    <Label htmlFor={ids.phone}>Phone</Label>
                     <Input
                         id={ids.phone}
                         type="tel"
@@ -95,9 +90,7 @@ export function NewCustomerForm({
                     />
                 </div>
                 <div>
-                    <Label htmlFor={ids.email} className={LABEL}>
-                        Email
-                    </Label>
+                    <Label htmlFor={ids.email}>Email</Label>
                     <Input
                         id={ids.email}
                         type="email"
@@ -134,10 +127,11 @@ export function NewCustomerForm({
                 <Button
                     type="button"
                     size="sm"
-                    disabled={checking}
                     onClick={() => void submit()}
+                    busy={checking}
+                    busyLabel="Checking…"
                 >
-                    {checking ? "Checking…" : "Add customer"}
+                    Add customer
                 </Button>
             </div>
         </div>
@@ -189,9 +183,7 @@ export function WalkInForm({
         >
             <div className="grid gap-2 sm:grid-cols-2">
                 <div>
-                    <Label htmlFor={ids.name} className={LABEL}>
-                        Name
-                    </Label>
+                    <Label htmlFor={ids.name}>Name</Label>
                     <Input
                         id={ids.name}
                         value={name}
@@ -201,9 +193,7 @@ export function WalkInForm({
                     />
                 </div>
                 <div>
-                    <Label htmlFor={ids.phone} className={LABEL}>
-                        Phone (if they give one)
-                    </Label>
+                    <Label htmlFor={ids.phone}>Phone (if they give one)</Label>
                     <Input
                         id={ids.phone}
                         type="tel"

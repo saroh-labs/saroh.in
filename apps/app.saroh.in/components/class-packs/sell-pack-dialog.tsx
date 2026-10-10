@@ -10,7 +10,6 @@ import { useId, useState } from "react";
 import { Chip } from "@/components/shared/chip";
 import type { ContactOption } from "@/components/shared/contact-picker";
 import { ContactPicker } from "@/components/shared/contact-picker";
-import { OptionSelect } from "@/components/shared/option-select";
 import { runAction } from "@/lib/api/run-action";
 import { sellPack } from "@/lib/class-packs/actions";
 import type { PackKind } from "@/lib/class-packs/pack-cards";
@@ -30,6 +29,7 @@ import {
     sellTerms,
     soldMessage,
 } from "@/lib/class-packs/sell-words";
+import { OptionSelect } from "@saroh/ui/option-select";
 
 /** "Vinyasa, Hatha and Yin". */
 export function usableOn(services: readonly { name: string }[]): string {

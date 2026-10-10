@@ -130,9 +130,10 @@ export function ActivityTab({
                         variant="outline"
                         size="sm"
                         onClick={older}
-                        disabled={loading}
+                        busy={loading}
+                        busyLabel="Loading…"
                     >
-                        {loading ? "Loading…" : "Show older"}
+                        Show older
                     </Button>
                 </div>
             ) : first.earlierUnrecorded ? (

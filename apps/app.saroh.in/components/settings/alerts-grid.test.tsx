@@ -223,8 +223,10 @@ describe("AlertsGrid", () => {
         render(prefs());
         const bell = switchFor("New order by Bell");
         expect(bell.className).toContain("cursor-pointer");
-        expect(bell.className).toContain("hover:bg-muted");
-        expect(bell.className).toContain("active:bg-border");
+        expect(bell.className).toMatch(/hover:data-\[state=(un)?checked\]:bg-/);
+        expect(bell.className).toMatch(
+            /active:data-\[state=checked\]:bg-primary-active/,
+        );
         expect(bell.className).toContain("focus-visible:ring-2");
     });
 });

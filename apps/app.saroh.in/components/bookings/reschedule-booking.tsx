@@ -168,7 +168,8 @@ export function RescheduleBooking({
                     variant="ghost"
                     size="sm"
                     className="justify-self-start"
-                    disabled={pending}
+                    busy={pending}
+                    busyLabel="Looking…"
                     onClick={() => setWeeks((w) => w + INITIAL_WEEKS)}
                 >
                     Look further ahead

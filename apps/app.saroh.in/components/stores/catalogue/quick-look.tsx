@@ -251,7 +251,7 @@ function SellToggle({
         <Button
             variant="ghost"
             className={cn(
-                "ml-auto px-3",
+                "ml-auto",
                 selling
                     ? "text-destructive-subtle-foreground hover:text-destructive-subtle-foreground"
                     : "text-foreground",

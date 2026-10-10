@@ -35,7 +35,7 @@ const CONFIRMS: [what: string, file: string, verb: string, keep: string][] = [
     [
         "an enrolment",
         "components/courses/course-page.tsx",
-        '"Cancel enrolment"',
+        "Cancel enrolment",
         "Keep enrolment",
     ],
     [

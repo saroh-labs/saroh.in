@@ -36,7 +36,7 @@ export function ClockSelect({
         >
             <SelectTrigger
                 aria-label={label}
-                className="h-8 w-[5.5rem] rounded-[8px] px-2 text-[12.5px] tabular-nums coarse:h-11"
+                className="h-8 w-[5.5rem] px-2 tabular-nums"
             >
                 <SelectValue>{clock(value)}</SelectValue>
             </SelectTrigger>

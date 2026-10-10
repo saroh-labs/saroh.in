@@ -1,5 +1,6 @@
 "use client";
 
+import { submitOnModEnter } from "@/lib/hooks/keyboard-save";
 import { Button } from "@saroh/ui/button";
 import { Input } from "@saroh/ui/input";
 import { cn } from "@saroh/ui/lib/utils";
@@ -84,7 +85,7 @@ export function DescriptionEditor({
         editable: !disabled,
         editorProps: {
             attributes: {
-                class: "prose prose-sm min-h-[150px] max-w-none px-[13px] py-3 text-[13.5px] leading-[1.6] focus:outline-none dark:prose-invert",
+                class: "prose prose-sm min-h-[150px] max-w-none px-[13px] py-3 text-[13.5px] leading-[1.6] outline-none dark:prose-invert",
                 ...(id ? { id } : {}),
                 "aria-label": "Description",
                 "aria-multiline": "true",
@@ -276,14 +277,16 @@ function DescriptionSurface({
                     }
                 />
                 <Gap />
-                <button
+                <Button
+                    variant="outline"
+                    size="xs"
                     type="button"
                     aria-expanded={more}
                     onClick={() => setMore((m) => !m)}
-                    className="mr-1 h-7 rounded-[7px] border border-border bg-card px-[9px] text-[11.5px] font-semibold text-foreground/75 hover:bg-muted coarse:h-11"
+                    className="mr-1"
                 >
                     {more ? "Fewer" : "More"}
-                </button>
+                </Button>
                 {more ? (
                     <>
                         <Gap />
@@ -358,7 +361,7 @@ function DescriptionSurface({
                                           .run()
                             }
                             className={cn(
-                                "h-7 rounded-[7px] border px-2 text-[11.5px] font-semibold text-foreground/75 disabled:opacity-60 coarse:h-11",
+                                "h-7 rounded-[7px] border px-2 text-[11.5px] font-semibold text-foreground/75 disabled:text-disabled-foreground coarse:h-11",
                                 state.style === s
                                     ? "border-foreground bg-muted"
                                     : "border-border bg-card hover:bg-muted",
@@ -376,7 +379,7 @@ function DescriptionSurface({
                     disabled={disabled}
                     onClick={() => setSource((v) => !v)}
                     className={cn(
-                        "h-7 rounded-[7px] border px-[9px] text-[11.5px] font-semibold disabled:opacity-60 coarse:h-11",
+                        "h-7 rounded-[7px] border px-[9px] text-[11.5px] font-semibold disabled:text-disabled-foreground coarse:h-11",
                         source
                             ? "border-foreground bg-foreground text-background"
                             : "border-border bg-card text-foreground/75 hover:bg-muted",
@@ -392,7 +395,7 @@ function DescriptionSurface({
                     disabled={disabled}
                     rows={8}
                     aria-label="Description as HTML"
-                    className="min-h-[150px] rounded-none border-0 px-[13px] py-3 font-mono text-[12px] leading-[1.6] focus-visible:ring-0"
+                    className="min-h-[150px] rounded-none border-0 px-[13px] py-3 font-mono leading-[1.6] focus-visible:ring-0"
                 />
             ) : (
                 <EditorContent editor={editor} />
@@ -442,7 +445,7 @@ function Tool({
             onMouseDown={(e) => e.preventDefault()}
             onClick={onClick}
             className={cn(
-                "grid size-7 place-items-center rounded-[7px] border disabled:opacity-60 coarse:size-11 [&_svg]:size-[15px] [&_svg]:stroke-[1.9]",
+                "grid size-7 place-items-center rounded-[7px] border disabled:text-disabled-foreground coarse:size-11 [&_svg]:size-[15px] [&_svg]:stroke-[1.9]",
                 pressed
                     ? "border-foreground bg-muted text-foreground"
                     : "border-transparent text-foreground/75 hover:bg-muted",
@@ -482,7 +485,7 @@ function LinkTool({
                     disabled={disabled}
                     onMouseDown={(e) => e.preventDefault()}
                     className={cn(
-                        "grid size-7 place-items-center rounded-[7px] border disabled:opacity-60 coarse:size-11 [&_svg]:size-[15px] [&_svg]:stroke-[1.9]",
+                        "grid size-7 place-items-center rounded-[7px] border disabled:text-disabled-foreground coarse:size-11 [&_svg]:size-[15px] [&_svg]:stroke-[1.9]",
                         active
                             ? "border-foreground bg-muted text-foreground"
                             : "border-transparent text-foreground/75 hover:bg-muted",
@@ -493,6 +496,7 @@ function LinkTool({
             </PopoverTrigger>
             <PopoverContent className="w-72">
                 <form
+                    onKeyDown={submitOnModEnter}
                     className="flex flex-col gap-2"
                     onSubmit={(e) => {
                         e.preventDefault();
@@ -508,7 +512,7 @@ function LinkTool({
                         value={href}
                         onChange={(e) => setHref(e.target.value)}
                         placeholder="https://… or /about"
-                        className="font-mono text-[12px]"
+                        className="font-mono"
                     />
                     <div className="flex gap-2">
                         <Button type="submit" size="sm">

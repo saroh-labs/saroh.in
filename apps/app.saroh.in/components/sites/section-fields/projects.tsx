@@ -6,6 +6,7 @@ import {
     resolveVariant,
 } from "@saroh/block-contract";
 import { Button } from "@saroh/ui/button";
+import { Field } from "@saroh/ui/field";
 import { Input } from "@saroh/ui/input";
 import { Textarea } from "@saroh/ui/textarea";
 import { useId } from "react";
@@ -13,7 +14,6 @@ import { useId } from "react";
 import { MediaPicker } from "@/components/sites/media-picker";
 import type { ProjectItem, ProjectsContent } from "@/lib/sites/service";
 
-import { Field } from "./field";
 import { ImageBrief } from "./image-brief";
 import { OptionSwitch } from "./option-switch";
 import type { SectionFieldsProps } from "./props";
@@ -124,22 +124,22 @@ function ProjectFields({
                     placeholder="What the project was"
                 />
             </Field>
-            <Field label="About it">
+            <Field optional label="About it">
                 <Textarea
                     value={item.summary ?? ""}
                     onChange={(e) =>
                         set({ summary: e.target.value || undefined })
                     }
                     rows={2}
-                    placeholder="A line or two: who it was for, what came of it. Optional."
+                    placeholder="A line or two: who it was for, what came of it."
                 />
             </Field>
-            <Field label="Details">
+            <Field optional label="Details">
                 <Input
                     value={item.meta ?? ""}
                     onChange={(e) => set({ meta: e.target.value || undefined })}
                     maxLength={160}
-                    placeholder="Optional. A short line of facts, like the tools used."
+                    placeholder="A short line of facts, like the tools used."
                 />
             </Field>
             <div className="grid gap-1">
@@ -258,13 +258,13 @@ function ProjectPhoto({
                 </div>
             ) : null}
             {image ? (
-                <Field label="Caption">
+                <Field optional label="Caption">
                     <Input
                         value={item.caption ?? ""}
                         onChange={(e) =>
                             set({ caption: e.target.value || undefined })
                         }
-                        placeholder="A line under the photo, like who took it. Optional."
+                        placeholder="A line under the photo, like who took it."
                     />
                 </Field>
             ) : null}

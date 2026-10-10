@@ -202,7 +202,7 @@ function VerificationSheet({
                 placeholder="Paste the tag or the code"
                 aria-invalid={problem ? true : undefined}
                 aria-describedby={`${id}-said`}
-                className="font-mono text-sm"
+                className="font-mono"
             />
             <div id={`${id}-said`} aria-live="polite">
                 {problem ? (

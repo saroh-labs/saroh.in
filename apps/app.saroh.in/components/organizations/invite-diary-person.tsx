@@ -1,7 +1,7 @@
 "use client";
 
-import { OptionSelect } from "@/components/shared/option-select";
 import type { DiaryPerson } from "@/lib/organizations/calendar-only";
+import { OptionSelect } from "@saroh/ui/option-select";
 
 /**
  * "Who on the diary is this?" in the invite (#868). Someone who takes

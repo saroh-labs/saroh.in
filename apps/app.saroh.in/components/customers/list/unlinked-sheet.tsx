@@ -300,10 +300,11 @@ function UnlinkedItem({
                             <Button
                                 type="button"
                                 size="sm"
-                                disabled={pending}
                                 onClick={link}
+                                busy={pending}
+                                busyLabel="Linking…"
                             >
-                                {pending ? "Linking…" : `Link to ${holderName}`}
+                                {`Link to ${holderName}`}
                             </Button>
                         ) : (
                             <p className="w-full text-muted-foreground">
