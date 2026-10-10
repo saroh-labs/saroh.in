@@ -3,7 +3,6 @@
 import { zodResolver } from "@hookform/resolvers/zod";
 import { DatePicker } from "@saroh/ui/date-picker";
 import { Input } from "@saroh/ui/input";
-import { cn } from "@saroh/ui/lib/utils";
 import { showError } from "@saroh/ui/toast";
 import { useState } from "react";
 import { useForm } from "react-hook-form";
@@ -24,6 +23,7 @@ import { productSettingsHref } from "@/lib/products/links";
 import type { ProductCustomField, ProductDetail } from "@/lib/products/service";
 import type { EffectiveDefaults } from "@/lib/products/settings";
 
+import { RadioCards } from "@/components/shared/choice-group";
 import { StatusBadge } from "@/components/shared/status-badge";
 import { TextLink } from "@saroh/ui/text-link";
 import { useEditor, useSection } from "./editor-state";
@@ -258,50 +258,26 @@ export function MadeBySection({
             <FieldLabel aside={toggle("showReturns", "Returns")}>
                 Returns
             </FieldLabel>
-            <div
-                role="radiogroup"
-                aria-label="Returns rule"
-                className="flex flex-col gap-1.5"
-            >
-                {(
-                    [
-                        ["STOREFRONT", "Use the location's rule"],
-                        ["OWN", "Its own rule"],
-                    ] as const
-                ).map(([mode, label]) => {
-                    const on = v.returnsMode === mode;
-                    return (
-                        <button
-                            key={mode}
-                            type="button"
-                            role="radio"
-                            aria-checked={on}
-                            disabled={ro}
-                            onClick={() =>
-                                form.setValue("returnsMode", mode, {
-                                    shouldDirty: true,
-                                    shouldValidate: true,
-                                })
-                            }
-                            className={cn(
-                                "flex w-full items-center gap-[9px] rounded-[8px] border bg-card px-[11px] py-2 text-left text-[12.5px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed coarse:min-h-11",
-                                on ? "border-foreground" : "border-border",
-                            )}
-                        >
-                            <span
-                                aria-hidden
-                                className={cn(
-                                    "size-3.5 shrink-0 rounded-full bg-card",
-                                    on
-                                        ? "border-4 border-foreground"
-                                        : "border-[1.5px] border-border-strong",
-                                )}
-                            />
-                            <span className="flex-1">{label}</span>
-                        </button>
-                    );
-                })}
-            </div>
+            <RadioCards
+                label="Returns rule"
+                className="gap-1.5"
+                rowClassName="gap-[9px] rounded-[8px] px-[11px] text-[12.5px] font-normal"
+                value={v.returnsMode}
+                disabled={ro}
+                onChange={(mode) =>
+                    form.setValue("returnsMode", mode, {
+                        shouldDirty: true,
+                        shouldValidate: true,
+                    })
+                }
+                options={[
+                    {
+                        value: "STOREFRONT",
+                        label: "Use the location's rule",
+                    },
+                    { value: "OWN", label: "Its own rule" },
+                ]}
+            />
             {v.returnsMode === "OWN" ? (
                 <>
                     <Input

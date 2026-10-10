@@ -11,10 +11,14 @@ import { QR_PLACE_NOTE_MAX } from "@/lib/qr/types";
 import { QR_PLACES } from "@/lib/qr/words";
 import { noMatchLine } from "@saroh/ui/lib/state-copy";
 
+import type { Choice } from "@/components/shared/choice-group";
+import {
+    ChoiceGroup,
+    Eyebrow,
+    pillClass,
+} from "@/components/shared/choice-group";
 import { Notice } from "@saroh/ui/notice";
 import { TextLink } from "@saroh/ui/text-link";
-import type { Choice } from "./choice-group";
-import { ChoiceGroup, Eyebrow, pillClass } from "./choice-group";
 
 /** From this many products and pages, "More…" gets a search box. */
 const SEARCH_FROM = 7;

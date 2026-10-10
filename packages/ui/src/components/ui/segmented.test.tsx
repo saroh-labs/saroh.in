@@ -132,6 +132,40 @@ describe("Segmented, button mode", () => {
         );
         expect(screen.getByRole("radio", { name: "Table" })).toBeChecked();
     });
+
+    it("is a block as wide as its words, so it sits under a label and never fills a grid", () => {
+        render(<View />);
+        const track = classes(screen.getByRole("radiogroup"));
+        // Inline, it shared the label's line; without a width of its own a
+        // grid or a stacked form stretched it.
+        expect(track).toContain("flex");
+        expect(track).toContain("w-fit");
+        expect(track).not.toContain("inline-flex");
+        // No wider than its parent, and its options wrap on a phone.
+        expect(track).toContain("max-w-full");
+        expect(track).toContain("flex-wrap");
+    });
+
+    it("`block` is the one way to fill the row, each option the same width", () => {
+        render(
+            <Segmented
+                label="Who"
+                block
+                value="a"
+                onValueChange={noop}
+                options={[
+                    { value: "a", label: "A" },
+                    { value: "b", label: "B" },
+                ]}
+            />,
+        );
+        const track = classes(screen.getByRole("radiogroup"));
+        expect(track).toContain("w-full");
+        expect(track).not.toContain("w-fit");
+        for (const r of screen.getAllByRole("radio")) {
+            expect(classes(r)).toContain("flex-1");
+        }
+    });
 });
 
 describe("Segmented, link mode", () => {

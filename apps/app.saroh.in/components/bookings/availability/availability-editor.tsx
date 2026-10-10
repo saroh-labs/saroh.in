@@ -46,7 +46,7 @@ import type {
 import { EmptyState } from "@saroh/ui/data-state";
 import { Users } from "lucide-react";
 
-import { chipClass } from "@/components/shared/chip";
+import { ChipGroup } from "@/components/shared/choice-group";
 import { runAction } from "@/lib/api/run-action";
 import { UNREACHED } from "@/lib/api/unreached";
 import { TextLink } from "@saroh/ui/text-link";
@@ -421,44 +421,39 @@ export function AvailabilityEditor({
                     Your role can see these hours but not change them.
                 </ReadOnlyNote>
             )}
-            <div
-                role="radiogroup"
-                aria-label="Team member"
-                className="mb-3.5 flex flex-wrap gap-1.5"
-            >
-                {people.map((p) => {
-                    const on = p.id === me.id;
-                    return (
-                        <button
-                            key={p.id}
-                            type="button"
-                            role="radio"
-                            aria-checked={on}
-                            onClick={() => setWho(p.id)}
-                            className={chipClass(on)}
-                        >
-                            <span
-                                aria-hidden
-                                className={cn(
-                                    "mr-[7px] inline-block size-2 rounded-full",
-                                    takesClasses.includes(p.id)
-                                        ? "bg-diary-class"
-                                        : "bg-diary-one",
-                                )}
-                            />
-                            {p.name}
-                            {p.title ? ` · ${p.title}` : ""}
-                        </button>
-                    );
-                })}
+            <div className="mb-3.5 flex flex-wrap gap-1.5">
+                <ChipGroup
+                    label="Team member"
+                    value={me.id}
+                    onChange={setWho}
+                    choices={people.map((p) => ({
+                        value: p.id,
+                        label: (
+                            <>
+                                <span
+                                    aria-hidden
+                                    className={cn(
+                                        "mr-[7px] inline-block size-2 rounded-full",
+                                        takesClasses.includes(p.id)
+                                            ? "bg-diary-class"
+                                            : "bg-diary-one",
+                                    )}
+                                />
+                                {p.name}
+                                {p.title ? ` · ${p.title}` : ""}
+                            </>
+                        ),
+                    }))}
+                />
                 {canEdit ? (
-                    <button
+                    <Button
                         type="button"
+                        variant="outline"
                         onClick={() => setAdding(true)}
-                        className="h-8 rounded-full border border-dashed border-border-strong px-3 text-[12.5px] font-semibold hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring coarse:h-11"
+                        className="h-8 rounded-full border-dashed border-border-strong px-3 text-[12.5px] font-semibold"
                     >
                         + Add someone
-                    </button>
+                    </Button>
                 ) : null}
             </div>
 

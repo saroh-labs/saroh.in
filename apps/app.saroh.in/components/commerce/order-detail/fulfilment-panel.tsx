@@ -15,7 +15,7 @@ import {
 import type { ChangeFulfilmentInput } from "@/lib/orders/kitchen-service";
 import type { DeliveryAddress, FulfilmentType } from "@/lib/orders/read";
 
-import { chipClass } from "@/components/shared/chip";
+import { ChipGroup } from "@/components/shared/choice-group";
 import {
     OrderSheet,
     OrderSheetBody,
@@ -151,27 +151,15 @@ function FulfilmentDraft({
     return (
         <>
             <OrderSheetBody>
-                <div
-                    role="radiogroup"
-                    aria-label="Fulfilment"
-                    className="flex flex-wrap gap-1.5"
-                >
-                    {options.map((o) => {
-                        const on = pick === o.type;
-                        return (
-                            <button
-                                key={o.type}
-                                type="button"
-                                role="radio"
-                                aria-checked={on}
-                                onClick={() => choose(o.type)}
-                                className={chipClass(on)}
-                            >
-                                {o.label}
-                            </button>
-                        );
-                    })}
-                </div>
+                <ChipGroup
+                    label="Fulfilment"
+                    value={pick}
+                    onChange={choose}
+                    choices={options.map((o) => ({
+                        value: o.type,
+                        label: o.label,
+                    }))}
+                />
                 {moved && delivery ? (
                     <fieldset className="mt-2.5">
                         <legend className="text-[12px] font-medium">

@@ -18,6 +18,7 @@ import {
 } from "@/components/bookings/pay-link-panel";
 import { CustomerPicker } from "@/components/customers/customer-picker";
 import { Chip } from "@/components/shared/chip";
+import { ChoiceGroup } from "@/components/shared/choice-group";
 import {
     FormSheet,
     FormSheetBody,
@@ -443,48 +444,41 @@ export function NewBookingDialog({
                                     under Services, adds times here.
                                 </p>
                             ) : (
-                                <div
-                                    role="radiogroup"
-                                    aria-label="Time"
+                                <ChoiceGroup
+                                    label="Time"
                                     className="grid max-h-[220px] gap-3 overflow-y-auto pr-1"
-                                >
-                                    {byDay.map(([day, daySlots]) => (
-                                        <div key={day}>
-                                            <div className="label">{day}</div>
-                                            <div className="mt-1.5 flex flex-wrap gap-1.5">
-                                                {daySlots.map((slot) => (
-                                                    <button
-                                                        key={slot.startAt}
-                                                        type="button"
-                                                        role="radio"
-                                                        aria-checked={
-                                                            picked ===
-                                                            slot.startAt
-                                                        }
-                                                        onClick={() =>
-                                                            setPicked(
-                                                                slot.startAt,
-                                                            )
-                                                        }
-                                                        className={cn(
-                                                            "rounded-md border px-2.5 py-1 text-[12.5px] tabular-nums transition-colors duration-fast",
-                                                            picked ===
-                                                                slot.startAt
-                                                                ? "border-foreground bg-foreground text-background"
-                                                                : "border-border hover:border-border-strong hover:bg-accent",
-                                                        )}
-                                                    >
-                                                        {formatTime(
-                                                            slot.startAt,
-                                                            service?.timezone ??
-                                                                "UTC",
-                                                        )}
-                                                    </button>
-                                                ))}
+                                    value={picked}
+                                    onChange={setPicked}
+                                    choices={(slots ?? []).map((slot) => ({
+                                        value: slot.startAt,
+                                        label: formatTime(
+                                            slot.startAt,
+                                            service?.timezone ?? "UTC",
+                                        ),
+                                    }))}
+                                    itemClassName={(on) =>
+                                        cn(
+                                            "rounded-md border px-2.5 py-1 text-[12.5px] tabular-nums coarse:min-h-11",
+                                            on
+                                                ? "border-foreground bg-foreground text-background"
+                                                : "border-border hover:border-border-strong hover:bg-accent",
+                                        )
+                                    }
+                                    layout={(item) =>
+                                        byDay.map(([day, daySlots]) => (
+                                            <div key={day}>
+                                                <div className="label">
+                                                    {day}
+                                                </div>
+                                                <div className="mt-1.5 flex flex-wrap gap-1.5">
+                                                    {daySlots.map((slot) =>
+                                                        item(slot.startAt),
+                                                    )}
+                                                </div>
                                             </div>
-                                        </div>
-                                    ))}
-                                </div>
+                                        ))
+                                    }
+                                />
                             )}
                             {service ? (
                                 <p className="text-[11.5px] text-muted-foreground">

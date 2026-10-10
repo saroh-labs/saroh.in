@@ -5,11 +5,11 @@ import { formatMoneyMajor } from "@/lib/format/money";
 import { Button } from "@saroh/ui/button";
 import { Checkbox } from "@saroh/ui/checkbox";
 import { Label } from "@saroh/ui/label";
-import { cn } from "@saroh/ui/lib/utils";
 import { showError, showSuccess } from "@saroh/ui/toast";
 import { useRouter } from "next/navigation";
 import { useId, useState } from "react";
 
+import { RadioCards } from "@/components/shared/choice-group";
 import type { ConfirmResult } from "@/components/shared/confirm-dialog";
 import { ConfirmDialog } from "@/components/shared/confirm-dialog";
 import { FormDialog } from "@/components/shared/form-dialog";
@@ -219,35 +219,17 @@ function SendLinkDialog({
             onClose={onClose}
             onSubmit={make}
         >
-            <div
-                role="radiogroup"
-                aria-label="Way to pay"
-                className="flex flex-col gap-1.5"
-            >
-                {card.methods.map((m) => {
-                    const on = method === m;
-                    return (
-                        <button
-                            key={m}
-                            type="button"
-                            role="radio"
-                            aria-checked={on}
-                            onClick={() => setMethod(m)}
-                            className={cn(
-                                "flex w-full cursor-pointer flex-col rounded-[9px] px-3 py-2.5 text-left text-[13px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring active:bg-muted coarse:min-h-11",
-                                on
-                                    ? "border-[1.5px] border-foreground bg-muted/50 font-semibold"
-                                    : "border border-border bg-card font-medium hover:border-border-strong",
-                            )}
-                        >
-                            {AUTOPAY_METHOD_LABEL[m]}
-                            <span className="text-[12px] font-normal text-muted-foreground">
-                                {methodNote(card, m)}
-                            </span>
-                        </button>
-                    );
-                })}
-            </div>
+            <RadioCards
+                label="Way to pay"
+                className="gap-1.5"
+                value={method}
+                onChange={setMethod}
+                options={card.methods.map((m) => ({
+                    value: m,
+                    label: AUTOPAY_METHOD_LABEL[m],
+                    note: methodNote(card, m),
+                }))}
+            />
             {tried && !method ? (
                 <p
                     role="alert"

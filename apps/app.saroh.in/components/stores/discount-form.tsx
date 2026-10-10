@@ -298,7 +298,7 @@ export function DiscountForm({
                         control={form.control}
                         name="kind"
                         render={({ field }) => (
-                            <FormItem className="grid justify-items-start gap-2 space-y-0">
+                            <FormItem>
                                 <FormLabel>What it takes off</FormLabel>
                                 <Segmented
                                     label="What it takes off"
@@ -392,7 +392,6 @@ export function DiscountForm({
                         <Segmented
                             label="What it applies to"
                             aria-labelledby="discount-reach"
-                            className="max-w-full justify-self-start"
                             value={mode}
                             onValueChange={(v) => {
                                 setMode(v);

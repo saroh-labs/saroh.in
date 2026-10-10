@@ -22,7 +22,7 @@ import { reportFailure } from "@/components/billing/plan-refusal";
 import type { AddedContact } from "@/components/contacts/add-contact-dialog";
 import { AddContactDialog } from "@/components/contacts/add-contact-dialog";
 import { useBusinessDetailsStep } from "@/components/organizations/use-business-details-step";
-import { chipClass } from "@/components/shared/chip";
+import { ChipGroup } from "@/components/shared/choice-group";
 import { ContactPicker } from "@/components/shared/contact-picker";
 import {
     lostChanges,
@@ -732,38 +732,36 @@ export function InvoiceForm({
                     </Card>
 
                     <Card label="Due">
-                        <div
-                            role="radiogroup"
-                            aria-label="Due"
-                            className="flex flex-wrap items-center gap-1.5"
-                        >
-                            {draft?.dueAt ? (
-                                <button
-                                    type="button"
-                                    role="radio"
-                                    aria-checked={due === "kept"}
-                                    onClick={() => form.setValue("due", "kept")}
-                                    className={chipClass(due === "kept")}
-                                >
-                                    <ViewerDate
-                                        iso={draft.dueAt}
-                                        variant="dayMonth"
-                                    />
-                                </button>
-                            ) : null}
-                            {DUES.map((d) => (
-                                <button
-                                    key={d.days}
-                                    type="button"
-                                    role="radio"
-                                    aria-checked={due === d.days}
-                                    onClick={() => form.setValue("due", d.days)}
-                                    className={chipClass(due === d.days)}
-                                >
-                                    {d.label}
-                                </button>
-                            ))}
-                        </div>
+                        <ChipGroup
+                            label="Due"
+                            className="items-center"
+                            value={String(due)}
+                            onChange={(v) =>
+                                form.setValue(
+                                    "due",
+                                    v === "kept" ? "kept" : Number(v),
+                                )
+                            }
+                            choices={[
+                                ...(draft?.dueAt
+                                    ? [
+                                          {
+                                              value: "kept",
+                                              label: (
+                                                  <ViewerDate
+                                                      iso={draft.dueAt}
+                                                      variant="dayMonth"
+                                                  />
+                                              ),
+                                          },
+                                      ]
+                                    : []),
+                                ...DUES.map((d) => ({
+                                    value: String(d.days),
+                                    label: d.label,
+                                })),
+                            ]}
+                        />
                     </Card>
                 </div>
 

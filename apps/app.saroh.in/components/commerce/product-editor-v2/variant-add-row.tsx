@@ -7,7 +7,7 @@ import { cn } from "@saroh/ui/lib/utils";
 import { productSettingsHref } from "@/lib/products/links";
 import { OptionSelect } from "@saroh/ui/option-select";
 
-import { chipClass } from "@/components/shared/chip";
+import { ChipGroup } from "@/components/shared/choice-group";
 import { TextLink } from "@saroh/ui/text-link";
 import { MoneyBox } from "./fields";
 
@@ -144,30 +144,17 @@ export function OptionChoice({
     return (
         <div className="mb-2.5 flex flex-wrap items-center gap-2">
             <span className="text-[12px] font-medium">Customers choose by</span>
-            <div
-                role="radiogroup"
-                aria-label="Option name"
-                className="flex flex-wrap gap-[5px]"
-            >
-                {options.map((o) => {
-                    const on = o.id === optionId;
-                    return (
-                        <button
-                            key={o.id}
-                            type="button"
-                            role="radio"
-                            aria-checked={on}
-                            disabled={locked}
-                            onClick={() => {
-                                if (!on) onPick(o);
-                            }}
-                            className={chipClass(on)}
-                        >
-                            {o.name}
-                        </button>
-                    );
-                })}
-            </div>
+            <ChipGroup
+                label="Option name"
+                className="gap-[5px]"
+                value={optionId}
+                onChange={(id) => {
+                    const option = options.find((o) => o.id === id);
+                    if (option) onPick(option);
+                }}
+                disabled={locked}
+                choices={options.map((o) => ({ value: o.id, label: o.name }))}
+            />
             <TextLink
                 href={productSettingsHref("options")}
                 className="text-[12px]"

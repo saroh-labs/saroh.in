@@ -17,7 +17,7 @@ import {
     OWN_DRIVER,
 } from "@/lib/orders/courier";
 
-import { chipClass } from "@/components/shared/chip";
+import { ChipGroup } from "@/components/shared/choice-group";
 import {
     OrderSheet,
     OrderSheetBody,
@@ -125,27 +125,12 @@ function CourierDraft({
                 >
                     Courier
                 </div>
-                <div
-                    role="radiogroup"
-                    aria-labelledby={`${ids}-courier`}
-                    className="flex flex-wrap gap-1.5"
-                >
-                    {choices.map((c) => {
-                        const on = c === courier;
-                        return (
-                            <button
-                                key={c}
-                                type="button"
-                                role="radio"
-                                aria-checked={on}
-                                onClick={() => pickChip(c)}
-                                className={chipClass(on)}
-                            >
-                                {c}
-                            </button>
-                        );
-                    })}
-                </div>
+                <ChipGroup
+                    labelledBy={`${ids}-courier`}
+                    value={courier}
+                    onChange={pickChip}
+                    choices={choices.map((c) => ({ value: c, label: c }))}
+                />
                 {other ? (
                     <label className="mt-3 block text-[12px] font-medium">
                         Courier&apos;s name

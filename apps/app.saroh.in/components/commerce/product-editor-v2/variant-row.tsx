@@ -13,6 +13,7 @@ import { isLegacy, legacyNote } from "@/lib/products/variant-rows";
 import { OptionSelect } from "@saroh/ui/option-select";
 
 import { chipClass } from "@/components/shared/chip";
+import { ChoiceGroup } from "@/components/shared/choice-group";
 import { TextLink } from "@saroh/ui/text-link";
 import { Tip } from "@saroh/ui/tooltip";
 import { FieldHelp, MoneyBox } from "./fields";
@@ -206,28 +207,16 @@ function PhotoChoice({
             <p className="mb-[7px] text-[12px] font-semibold">
                 Photo shown when someone picks it
             </p>
-            <div
-                role="radiogroup"
-                aria-label={`Photo for ${title || "this variant"}`}
+            <ChoiceGroup
+                label={`Photo for ${title || "this variant"}`}
                 className="flex flex-wrap gap-1.5"
-            >
-                {choices.map((p) => {
-                    const on = imageId === p.id;
-                    return (
-                        <button
-                            key={p.id || "cover"}
-                            type="button"
-                            role="radio"
-                            aria-checked={on}
-                            disabled={locked}
-                            onClick={() => onPick(p.id)}
-                            className={cn(
-                                "inline-flex h-[30px] items-center gap-1.5 rounded-[8px] bg-card pl-1 pr-2.5 disabled:cursor-not-allowed coarse:h-11",
-                                on
-                                    ? "border-[1.5px] border-foreground"
-                                    : "border border-border",
-                            )}
-                        >
+                value={imageId}
+                onChange={onPick}
+                disabled={locked}
+                choices={choices.map((p) => ({
+                    value: p.id,
+                    label: (
+                        <>
                             {p.url ? (
                                 // eslint-disable-next-line @next/next/no-img-element -- a tenant's own photos
                                 <img
@@ -241,10 +230,18 @@ function PhotoChoice({
                             <span className="max-w-[110px] truncate text-[11.5px]">
                                 {p.label}
                             </span>
-                        </button>
-                    );
-                })}
-            </div>
+                        </>
+                    ),
+                }))}
+                itemClassName={(on) =>
+                    cn(
+                        "inline-flex h-[30px] items-center gap-1.5 rounded-[8px] bg-card pl-1 pr-2.5 coarse:h-11",
+                        on
+                            ? "border-[1.5px] border-foreground"
+                            : "border border-border",
+                    )
+                }
+            />
             <FieldHelp className="mt-1.5">
                 Chosen from this product&apos;s photos — nothing new to upload.
             </FieldHelp>

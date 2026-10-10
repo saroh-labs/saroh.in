@@ -10,9 +10,13 @@ import type { QrStyle } from "@/lib/qr/types";
 import { QR_LABEL_MAX } from "@/lib/qr/types";
 import { QR_LABELS } from "@/lib/qr/words";
 
+import {
+    ChoiceGroup,
+    Eyebrow,
+    pillClass,
+} from "@/components/shared/choice-group";
 import { FailedRead } from "@/components/shared/failed-read";
 import { Notice } from "@saroh/ui/notice";
-import { ChoiceGroup, Eyebrow, pillClass } from "./choice-group";
 import { QrAddLogo } from "./qr-add-logo";
 import type { QrStyleLock } from "./qr-style-lock";
 

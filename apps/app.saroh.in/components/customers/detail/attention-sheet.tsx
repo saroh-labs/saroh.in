@@ -10,6 +10,7 @@ import { showSuccess } from "@saroh/ui/toast";
 import { useRouter } from "next/navigation";
 import { useId, useState } from "react";
 
+import { ChoiceGroup } from "@/components/shared/choice-group";
 import { UNREACHED } from "@/lib/api/unreached";
 import {
     addAttentionAction,
@@ -163,35 +164,25 @@ export function AttentionSheet({
                 <span id={`${id}-kind`} className="text-[12.5px] font-medium">
                     Kind
                 </span>
-                <div
-                    role="radiogroup"
-                    aria-labelledby={`${id}-kind`}
+                <ChoiceGroup
+                    labelledBy={`${id}-kind`}
                     className="flex flex-wrap gap-1"
-                >
-                    {EDITOR_KINDS.map((k) => {
-                        const on = draft.kind === k;
-                        return (
-                            <button
-                                key={k}
-                                type="button"
-                                role="radio"
-                                aria-checked={on}
-                                disabled={saving}
-                                onClick={() =>
-                                    change(pickKind(draft, k, canSensitive))
-                                }
-                                className={cn(
-                                    CHOICE,
-                                    on
-                                        ? "border-foreground bg-muted font-semibold"
-                                        : "border-border bg-card font-medium hover:bg-muted active:bg-accent-active",
-                                )}
-                            >
-                                {KIND_WORD[k]}
-                            </button>
-                        );
-                    })}
-                </div>
+                    value={draft.kind}
+                    onChange={(k) => change(pickKind(draft, k, canSensitive))}
+                    disabled={saving}
+                    choices={EDITOR_KINDS.map((k) => ({
+                        value: k,
+                        label: KIND_WORD[k],
+                    }))}
+                    itemClassName={(on) =>
+                        cn(
+                            CHOICE,
+                            on
+                                ? "border-foreground bg-muted font-semibold"
+                                : "border-border bg-card font-medium hover:bg-muted active:bg-accent-active",
+                        )
+                    }
+                />
             </div>
 
             {fromList ? (
@@ -202,41 +193,30 @@ export function AttentionSheet({
                     >
                         What they&apos;re allergic to
                     </span>
-                    <div
-                        role="radiogroup"
-                        aria-labelledby={`${id}-allergen`}
-                        aria-describedby={
+                    <ChoiceGroup
+                        labelledBy={`${id}-allergen`}
+                        describedBy={
                             allergenError ? `${id}-allergen-error` : undefined
                         }
                         className="flex flex-wrap gap-1.5"
-                    >
-                        {choices.map((a) => {
-                            const on = draft.allergenId === a.id;
-                            return (
-                                <button
-                                    key={a.id}
-                                    type="button"
-                                    role="radio"
-                                    aria-checked={on}
-                                    disabled={saving}
-                                    onClick={() =>
-                                        change({
-                                            ...draft,
-                                            allergenId: a.id,
-                                        })
-                                    }
-                                    className={cn(
-                                        "h-7 rounded-full border px-2.5 text-[12px] transition-colors duration-fast focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring coarse:h-11",
-                                        on
-                                            ? "border-destructive-subtle-foreground bg-destructive-subtle font-semibold text-destructive-subtle-foreground"
-                                            : "border-border bg-card text-foreground/75 hover:bg-muted active:bg-accent-active",
-                                    )}
-                                >
-                                    {a.name}
-                                </button>
-                            );
-                        })}
-                    </div>
+                        value={draft.allergenId ?? null}
+                        onChange={(allergenId) =>
+                            change({ ...draft, allergenId })
+                        }
+                        disabled={saving}
+                        choices={choices.map((a) => ({
+                            value: a.id,
+                            label: a.name,
+                        }))}
+                        itemClassName={(on) =>
+                            cn(
+                                "h-7 rounded-full border px-2.5 text-[12px] coarse:h-11",
+                                on
+                                    ? "border-destructive-subtle-foreground bg-destructive-subtle font-semibold text-destructive-subtle-foreground"
+                                    : "border-border bg-card text-foreground/75 hover:bg-muted active:bg-accent-active",
+                            )
+                        }
+                    />
                     <FieldNote
                         id={`${id}-allergen-error`}
                         error={allergenError}

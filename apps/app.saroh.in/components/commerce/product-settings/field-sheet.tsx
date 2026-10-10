@@ -19,6 +19,7 @@ import {
 } from "@/lib/products/settings-actions";
 
 import { chipClass } from "@/components/shared/chip";
+import { ChipGroup } from "@/components/shared/choice-group";
 import { FormSheet } from "@/components/shared/form-sheet";
 import { Segmented } from "@saroh/ui/segmented";
 import { PROBLEM } from "./product-settings";
@@ -211,25 +212,16 @@ export function FieldSheet({
                         added.
                     </p>
                 ) : (
-                    <div
-                        role="radiogroup"
-                        aria-labelledby={`${id}-type`}
-                        className="flex flex-wrap gap-[5px]"
-                    >
-                        {FIELD_TYPES.map((t) => (
-                            <button
-                                key={t.type}
-                                type="button"
-                                role="radio"
-                                aria-checked={type === t.type}
-                                disabled={busy}
-                                onClick={() => setType(t.type)}
-                                className={chipClass(type === t.type)}
-                            >
-                                {t.label}
-                            </button>
-                        ))}
-                    </div>
+                    <ChipGroup
+                        labelledBy={`${id}-type`}
+                        value={type}
+                        onChange={setType}
+                        disabled={busy}
+                        choices={FIELD_TYPES.map((t) => ({
+                            value: t.type,
+                            label: t.label,
+                        }))}
+                    />
                 )}
             </div>
 
