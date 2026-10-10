@@ -1330,6 +1330,7 @@ export default function BookingFlow({
                         <DoneCard
                             phase={phase}
                             soldBy={soldBy}
+                            email={customer?.email ?? null}
                             headingRef={headingRef}
                             business={page.businessName}
                             where={

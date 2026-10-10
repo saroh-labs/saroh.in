@@ -31,6 +31,11 @@ export interface BookingNoticeVars {
     timeZone: string;
     /** The customer did it themselves, from their account or the site. */
     byCustomer: boolean;
+    /**
+     * Their bookings on the business's own site, where they can move or
+     * cancel it (`notice-link.ts`); null or absent: the email has no link.
+     */
+    link?: string | null;
 }
 
 /** The order steps a customer is told about. */
@@ -58,6 +63,11 @@ export interface PlacedOrderVars {
     fulfilment: string;
     /** Paid when it is handed over, not online. */
     payOnHandover: boolean;
+    /**
+     * The order's own page on the business's site (`notice-link.ts`); null
+     * or absent: the email has no link.
+     */
+    link?: string | null;
 }
 
 export interface WaitlistNoticeVars {
@@ -262,6 +272,24 @@ function safeLink(url: string | null): string | null {
     }
 }
 
+/**
+ * The link back from an email to what it is about, with the words above
+ * it; null for a notice that has none, or whose address isn't a web one.
+ */
+export function backLink(
+    vars: NoticeVars,
+): { lead: string; url: string } | null {
+    if (vars.kind === "ORDER_PLACED") {
+        const url = safeLink(vars.placed.link ?? null);
+        return url ? { lead: "See your order:", url } : null;
+    }
+    if (vars.kind === "BOOKING_CONFIRMED" || vars.kind === "BOOKING_MOVED") {
+        const url = safeLink(vars.booking.link ?? null);
+        return url ? { lead: "See, move or cancel your booking:", url } : null;
+    }
+    return null;
+}
+
 /** The email: subject and HTML body, everything typed escaped. */
 export function renderNotice(vars: NoticeVars): RenderedMessage {
     const firstName = firstNameOf(vars);
@@ -271,11 +299,17 @@ export function renderNotice(vars: NoticeVars): RenderedMessage {
         vars.order.stage === "HANDED_TO_COURIER"
             ? safeLink(vars.order.trackingUrl)
             : null;
+    // The way back to it on the business's own site: the order's page, or
+    // their bookings.
+    const back = backLink(vars);
     const body = [
         `<p>${greeting}</p>`,
         `<p>${escapeHtml(noticeSentence(vars))}</p>`,
         link
             ? `<p>Track it here:<br><a href="${escapeHtml(link)}">${escapeHtml(link)}</a></p>`
+            : "",
+        back
+            ? `<p>${escapeHtml(back.lead)}<br><a href="${escapeHtml(back.url)}">${escapeHtml(back.url)}</a></p>`
             : "",
         `<p>${escapeHtml(businessOf(vars))}</p>`,
     ]

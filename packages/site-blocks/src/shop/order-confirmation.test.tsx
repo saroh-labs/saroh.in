@@ -266,3 +266,60 @@ describe("OrderConfirmation (P4)", () => {
         expect(orderConfirmationHref("a/b")).toBe("/shop/order/a%2Fb");
     });
 });
+
+describe("the order page says whether a message is coming", () => {
+    it("says the address it emailed when the business's email sends the notice", () => {
+        render(
+            <OrderConfirmation
+                lookup={{
+                    ok: true,
+                    order: {
+                        ...ORDER,
+                        reach: "EMAIL_AND_ACCOUNT",
+                        email: "asha@example.com",
+                    },
+                }}
+                businessName="Rye & Co."
+            />,
+        );
+        expect(
+            screen.getByText("We've emailed asha@example.com."),
+        ).toBeVisible();
+    });
+
+    it("says it is saved in their account otherwise, and claims no email", () => {
+        render(
+            <OrderConfirmation
+                lookup={{
+                    ok: true,
+                    order: {
+                        ...ORDER,
+                        reach: "NONE",
+                        email: "asha@example.com",
+                    },
+                }}
+                businessName="Rye & Co."
+            />,
+        );
+        expect(screen.getByText("It's saved in your account.")).toBeVisible();
+        expect(document.body.textContent).not.toMatch(/emailed/);
+    });
+
+    it("says neither about an order that was refunded", () => {
+        render(
+            <OrderConfirmation
+                lookup={{
+                    ok: true,
+                    order: {
+                        ...ORDER,
+                        refunded: true,
+                        reach: "EMAIL",
+                        email: "asha@example.com",
+                    },
+                }}
+                businessName="Rye & Co."
+            />,
+        );
+        expect(document.body.textContent).not.toMatch(/emailed|saved in/);
+    });
+});

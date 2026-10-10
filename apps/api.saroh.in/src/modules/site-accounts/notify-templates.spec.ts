@@ -203,6 +203,53 @@ describe("the notice email (A14)", () => {
         expect(mail.body).toContain("Cut &amp; &quot;Style&quot;");
     });
 
+    it("carries the way back to the order, and to their bookings, when there is one", () => {
+        const placed = renderNotice({
+            kind: "ORDER_PLACED",
+            placed: {
+                business: "Rye & Co.",
+                firstName: "Asha",
+                number: "ORD-1019",
+                fulfilment: "PICKUP",
+                payOnHandover: false,
+                link: "https://rye.saroh.app/shop/order/ord_1?a=1&b=2",
+            },
+        });
+        expect(placed.body).toContain(
+            '<p>See your order:<br><a href="https://rye.saroh.app/shop/order/ord_1?a=1&amp;b=2">https://rye.saroh.app/shop/order/ord_1?a=1&amp;b=2</a></p>',
+        );
+        const booked = renderNotice({
+            kind: "BOOKING_CONFIRMED",
+            booking: booking({
+                link: "https://kavidental.example/account/bookings",
+            }),
+        });
+        expect(booked.body).toContain(
+            '<p>See, move or cancel your booking:<br><a href="https://kavidental.example/account/bookings">',
+        );
+    });
+
+    it("has no link without one, for a cancelled booking, or for an address that isn't a web one", () => {
+        expect(
+            renderNotice({ kind: "BOOKING_CONFIRMED", booking: booking() })
+                .body,
+        ).not.toContain("<a ");
+        expect(
+            renderNotice({
+                kind: "BOOKING_CANCELLED",
+                booking: booking({
+                    link: "https://kavidental.example/account/bookings",
+                }),
+            }).body,
+        ).not.toContain("<a ");
+        expect(
+            renderNotice({
+                kind: "BOOKING_CONFIRMED",
+                booking: booking({ link: "javascript:alert(1)" }),
+            }).body,
+        ).not.toContain("javascript");
+    });
+
     it("links a courier's tracking page only when it is a web address", () => {
         const withLink = renderNotice({
             kind: "ORDER_HANDED_OVER",

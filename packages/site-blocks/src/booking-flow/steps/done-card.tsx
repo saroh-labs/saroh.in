@@ -1,4 +1,5 @@
 import { BOOKINGS_HREF } from "../../account/bookings-model";
+import { reachOrNull, toldText } from "../../lib/told";
 import { cn } from "../../lib/utils";
 import { payInstructionsOf, payWaysText } from "../../pay-instructions/model";
 import { PayInstructionsCard } from "../../pay-instructions/pay-instructions";
@@ -23,6 +24,7 @@ export function DoneCard({
     rules,
     visits = 1,
     soldBy = null,
+    email = null,
     onAgain,
 }: {
     phase: Extract<Phase, { kind: "done" }>;
@@ -38,6 +40,8 @@ export function DoneCard({
     visits?: number;
     /** "Run by ‹legal name›" (DEC-121); null draws none. */
     soldBy?: string | null;
+    /** The signed-in customer's address, for "We've emailed ‹address›". */
+    email?: string | null;
     onAgain: () => void;
 }) {
     const { booking } = phase;
@@ -119,9 +123,11 @@ export function DoneCard({
                     className="mt-4"
                 />
             ) : null}
-            {/* Where the booking lives until the account area (A5) shows it. */}
-            <p className="text-site-body mt-2 text-[13.5px] leading-[1.55]">
-                We&apos;ve saved this to your details with {business}.
+            {/* What happens next: an email, when one goes (the API says),
+                else where the booking is kept. Never a promised message
+                that isn't sent. */}
+            <p className="text-site-body mt-2 text-sm leading-[1.55] [overflow-wrap:anywhere]">
+                {toldText(reachOrNull(booking.reach), email)}
             </p>
             {booking.meetingUrl ? (
                 <p className="text-site-body mt-2 text-[13.5px]">

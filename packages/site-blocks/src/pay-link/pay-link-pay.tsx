@@ -312,7 +312,7 @@ export function PayLinkHelp({
     if (!contact || (!contact.phone && !contact.email)) return null;
     const link = "text-site-fg underline underline-offset-2";
     return (
-        <p className="text-site-muted text-center text-sm">
+        <p className="text-site-body text-center text-sm">
             Need help? Reach {businessName}
             {contact.phone ? (
                 <>

@@ -5,6 +5,7 @@
  */
 
 import { siteMoney } from "../lib/money";
+import type { NoticeReach } from "../lib/told";
 import type { PayInstructions } from "../pay-instructions/model";
 
 /** Where a service happens (E7): the customer chooses for EITHER. */
@@ -178,6 +179,12 @@ export interface BookResult {
      * a desk booking.
      */
     payInstructions?: PayInstructions | null;
+    /**
+     * How they hear it is booked (the API's notice reach): the booked card
+     * says "We've emailed ‹address›" only when an email goes. Absent from
+     * an older API, which promises nothing.
+     */
+    reach?: NoticeReach | null;
 }
 
 /** Where a pay-now hold stands: `GET /public/services/holds/:token`. */

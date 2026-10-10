@@ -159,6 +159,9 @@ export function OrderPay({
                         businessName={order.businessName}
                         description={`Order #${order.orderNumber}`}
                         payerName={order.firstName}
+                        // A phone and an email under Pay, for a question
+                        // before paying.
+                        contact={order.businessContact}
                         apiUrl={apiUrl}
                         openCheckout={openCheckout}
                     />

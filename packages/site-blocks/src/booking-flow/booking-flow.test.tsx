@@ -1650,9 +1650,8 @@ describe("sign-in at the last step (A9)", () => {
             }),
         ).toBeInTheDocument();
         expect(
-            screen.getByText(
-                "We've saved this to your details with Pulse Fitness.",
-            ),
+            // No email is said to go: the API said none does.
+            screen.getByText("It's saved in your account."),
         ).toBeInTheDocument();
         const [body] = bookCalls();
         expect(body).toMatchObject({

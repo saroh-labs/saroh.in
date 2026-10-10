@@ -272,11 +272,20 @@ test.describe("the booking page", () => {
         await expect(
             page.getByText(/at the front desk when you arrive/),
         ).toBeVisible();
+        // What happens next: an email when the business's own provider
+        // sends one, else where the booking is kept. One or the other.
         await expect(
             page.getByText(
-                /We've saved this to your details with Northwind Supply\./,
+                /^(We've emailed \S+@\S+\.|It's saved in your account\.)$/,
             ),
         ).toBeVisible();
+        // Google Calendar, beside the calendar file.
+        await expect(
+            page.getByRole("link", { name: "Add to Google Calendar" }),
+        ).toHaveAttribute(
+            "href",
+            /^https:\/\/calendar\.google\.com\/calendar\/render\?action=TEMPLATE/,
+        );
         await expect(
             page.getByRole("button", { name: "Add to calendar" }),
         ).toBeVisible();

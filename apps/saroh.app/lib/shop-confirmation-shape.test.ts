@@ -28,6 +28,9 @@ const BODY = {
     },
     refunded: false,
     toPay: null,
+    // How they hear about it (the API's notice reach), and where.
+    reach: "NONE",
+    email: "asha@example.com",
 };
 
 describe("confirmationOf", () => {
@@ -164,5 +167,21 @@ describe("isOrderRef", () => {
         expect(isOrderRef("../account")).toBe(false);
         expect(isOrderRef("")).toBe(false);
         expect(isOrderRef("a".repeat(65))).toBe(false);
+    });
+});
+
+describe("what happens next", () => {
+    it("keeps a reach it knows and the account's address, and reads anything else as nothing promised", () => {
+        expect(confirmationOf({ ...BODY, reach: "EMAIL" })).toMatchObject({
+            reach: "EMAIL",
+            email: "asha@example.com",
+        });
+        expect(confirmationOf({ ...BODY, reach: "SMS" })?.reach).toBeNull();
+        const { reach: _r, email: _e, ...older } = BODY;
+        expect(confirmationOf(older)).toMatchObject({
+            reach: null,
+            email: null,
+        });
+        expect(confirmationOf({ ...BODY, email: 7 })?.email).toBeNull();
     });
 });
