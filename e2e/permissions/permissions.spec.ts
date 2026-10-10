@@ -427,13 +427,13 @@ test("a Member who types Add customer's address is told before any form", async 
     await page.goto("/commerce/customers/new");
     await expect(
         page.getByRole("heading", {
-            name: "You can't open Add customer",
+            name: "You can't open New customer",
             exact: true,
         }),
     ).toBeVisible();
     await expect(
         page.getByText(
-            "Your role in Permission tests is Member. It doesn't include Add customer.",
+            "Your role in Permission tests is Member. It doesn't include New customer.",
         ),
     ).toBeVisible();
     await expect(page.getByText(WHO_CAN_CHANGE)).toBeVisible();
@@ -459,8 +459,7 @@ test("a failed Orders read says so, and is never an empty list", async ({
     // Announced as an alert, not drawn as an empty list.
     await expect(
         page.getByRole("alert").filter({
-            hasText:
-                "Orders that were placed are still there and nothing has been changed",
+            hasText: "Orders that were placed are still there.",
         }),
     ).toBeVisible();
     await expect(
@@ -481,31 +480,41 @@ test("a Manager who edits roles can give only what they hold (F19)", async ({
     await scenario(context, "MANAGER");
     await page.goto("/settings/people?tab=roles");
 
-    // Counter is within reach: what the Manager holds can be ticked, and
-    // what they don't is locked with the reason beside it.
+    // Counter is within reach. The panel shows the role as it is saved, and
+    // "Edit role" opens it in the sheet: what the Manager holds can be
+    // ticked there, and what they don't is locked with the reason beside it.
     await expect(
         page.getByRole("heading", { name: "Counter", exact: true }),
     ).toBeVisible();
+    await page.getByRole("button", { name: "Edit role", exact: true }).click();
+    const counter = page.getByRole("dialog", { name: "Edit Counter" });
     await expect(
-        page.getByRole("switch", { name: "Change locations, not allowed" }),
+        counter.getByRole("switch", { name: "Change locations, not allowed" }),
     ).toBeEnabled();
     await expect(
-        page.getByRole("switch", { name: "Manage payments, not allowed" }),
+        counter.getByRole("switch", { name: "Manage payments, not allowed" }),
     ).toBeDisabled();
     await expect(
-        page.getByText("You don't have this yourself, so you can't give it.", {
-            exact: true,
-        }),
+        counter.getByText(
+            "You don't have this yourself, so you can't give it.",
+            { exact: true },
+        ),
     ).toHaveCount(1);
+    await counter.getByRole("button", { name: "Cancel", exact: true }).click();
+    await expect(counter).toBeHidden();
 
     // Their own role follows the same rule: nothing they lack can be added.
     await page.getByRole("button", { name: /^Manager/ }).click();
     await expect(
         page.getByRole("heading", { name: "Manager", exact: true }),
     ).toBeVisible();
+    await page.getByRole("button", { name: "Edit role", exact: true }).click();
+    const own = page.getByRole("dialog", { name: "Edit Manager" });
     await expect(
-        page.getByRole("switch", { name: "Manage payments, not allowed" }),
+        own.getByRole("switch", { name: "Manage payments, not allowed" }),
     ).toBeDisabled();
+    await own.getByRole("button", { name: "Cancel", exact: true }).click();
+    await expect(own).toBeHidden();
 
     // Senior holds payments, so it is above them: read-only, and it says why.
     await page.getByRole("button", { name: /^Senior/ }).click();
@@ -522,6 +531,9 @@ test("a Manager who edits roles can give only what they hold (F19)", async ({
     ).toBeDisabled();
     await expect(page.getByLabel("Name", { exact: true })).toHaveCount(0);
     await expect(page.getByRole("button", { name: "Remove role" })).toHaveCount(
+        0,
+    );
+    await expect(page.getByRole("button", { name: "Edit role" })).toHaveCount(
         0,
     );
 });
@@ -556,7 +568,7 @@ test("a person's extra permissions show on Team, and a Manager gives only what t
         page.getByRole("switch", {
             name: "See locations, on, included in the role",
         }),
-    ).toHaveAttribute("aria-disabled", "true");
+    ).toBeDisabled();
     // Nothing the Manager lacks is offered.
     await expect(
         page.getByRole("switch", { name: /^Manage payments/ }),

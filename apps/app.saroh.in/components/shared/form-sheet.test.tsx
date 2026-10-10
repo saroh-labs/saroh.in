@@ -261,7 +261,11 @@ describe.each([
             await open(<Settings as={As} invalid />);
             await press(button("Save"));
             expect(onSubmit).toHaveBeenCalledTimes(1);
-            expect(document.activeElement).toBe(input("Phone"));
+            // The focus moves a frame after Save answers: wait for it, or a
+            // busy machine reads the button still focused.
+            await vi.waitFor(() =>
+                expect(document.activeElement).toBe(input("Phone")),
+            );
             // A refusal keeps it open with what was there.
             expect(dialog()).not.toBe(null);
         });
