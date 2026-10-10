@@ -3,16 +3,13 @@ import { PageHeader } from "@saroh/ui/page-header";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 
-import { ActivityComposer } from "@/components/crm/activity-composer";
 import { ActivityTimeline } from "@/components/crm/activity-timeline";
-import { ComposerNotice } from "@/components/crm/composer-notice";
 import { ConsentToggle } from "@/components/crm/consent-toggle";
 import { EnquiryCard } from "@/components/crm/enquiry-card";
+import { LeadActions } from "@/components/crm/lead-actions";
 import { LeadStatusControl } from "@/components/crm/lead-status-control";
-import { MessageComposer } from "@/components/crm/message-composer";
 import { MessageHistory } from "@/components/crm/message-history";
 import { MoveStageControl } from "@/components/crm/move-stage-control";
-import { TaskForm } from "@/components/crm/task-form";
 import { DeleteLeadMenu } from "@/components/leads/delete-lead-menu";
 import { EditLeadDialog } from "@/components/leads/edit-lead-dialog";
 import { PageContainer } from "@/components/shared/page-container";
@@ -52,6 +49,11 @@ export const metadata = { title: "Lead" };
  * letting the owner write into a refusal (`composerGate`). The modules,
  * providers and plan are aids, read best-effort: unread, the composer shows
  * as before.
+ *
+ * Read first (owner, 10 Oct): the page shows the lead and its history, and
+ * the note, follow-up and message forms open in side sheets from one row of
+ * buttons under the header (`LeadActions`). Consent is a readout with its
+ * own switches, so it stays on the page, under the history.
  */
 export default async function LeadDetailPage({
     params,
@@ -150,6 +152,13 @@ export default async function LeadDetailPage({
                 }
             />
 
+            <LeadActions
+                leadId={lead.id}
+                contactId={contactId}
+                consent={consentByChannel}
+                gates={gates}
+            />
+
             {lead.enquiries && lead.enquiries.length > 0 ? (
                 <div className="mb-8">
                     <EnquiryCard
@@ -170,67 +179,29 @@ export default async function LeadDetailPage({
                 <LeadStatusControl leadId={lead.id} status={lead.status} />
             </div>
 
-            <div className="mb-8 grid gap-4 rounded-lg border p-4">
-                <div className="grid gap-2">
-                    <h2 className="text-sm font-medium">Add a note</h2>
-                    <ActivityComposer leadId={lead.id} />
-                </div>
-                <div className="grid gap-2 border-t pt-4">
-                    <h2 className="text-sm font-medium">
-                        Schedule a follow-up
-                    </h2>
-                    <TaskForm leadId={lead.id} />
-                </div>
-            </div>
-
-            {gates.EMAIL.kind === "off" ? (
-                // Communications off: nothing can be sent or consented to
-                // here. Someone who may turn it on is told where; anyone
-                // else sees no composer at all.
-                gates.EMAIL.canManage ? (
-                    <div className="mb-8 grid gap-2 rounded-lg border p-4">
-                        <h2 className="text-sm font-medium">Send a message</h2>
-                        <ComposerNotice gate={gates.EMAIL} />
-                    </div>
-                ) : null
-            ) : (
-                <div className="mb-8 grid gap-4 rounded-lg border p-4">
-                    <div className="grid gap-2">
-                        <h2 className="text-sm font-medium">Send a message</h2>
-                        {contactId ? (
-                            <MessageComposer
-                                leadId={lead.id}
-                                contactId={contactId}
-                                consent={consentByChannel}
-                                gates={gates}
-                            />
-                        ) : (
-                            <p className="text-sm text-muted-foreground">
-                                Link a contact to this lead to send a message.
-                            </p>
-                        )}
-                    </div>
-                    {contactId && (
-                        <div className="grid gap-2 border-t pt-4">
-                            <h2 className="text-sm font-medium">
-                                Consent &amp; unsubscribe
-                            </h2>
-                            <ConsentToggle
-                                contactId={contactId}
-                                consent={consentByChannel}
-                            />
-                        </div>
-                    )}
-                </div>
-            )}
-
             <h2 className="mb-3 text-lg font-semibold">Messages</h2>
             <div className="mb-8">
                 <MessageHistory messages={messages} />
             </div>
 
             <h2 className="mb-3 text-lg font-semibold">Activity</h2>
-            <ActivityTimeline leadId={lead.id} activities={timeline} />
+            <div className="mb-8">
+                <ActivityTimeline leadId={lead.id} activities={timeline} />
+            </div>
+
+            {/* Communications off: nothing can be sent or consented to
+                here, so there is no consent to show. */}
+            {contactId && gates.EMAIL.kind !== "off" ? (
+                <div className="grid gap-2 rounded-lg border p-4">
+                    <h2 className="text-sm font-medium">
+                        Consent and unsubscribe
+                    </h2>
+                    <ConsentToggle
+                        contactId={contactId}
+                        consent={consentByChannel}
+                    />
+                </div>
+            ) : null}
         </PageContainer>
     );
 }
