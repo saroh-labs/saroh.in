@@ -320,7 +320,15 @@ function detailRows(
             };
         case "membership.remove":
             return {
-                rows: [row("Role", role(meta.role), "Removed from the team")],
+                rows: [
+                    row(
+                        "Role",
+                        role(meta.role),
+                        meta.left === true
+                            ? "Left the team"
+                            : "Removed from the team",
+                    ),
+                ],
                 withoutValues: false,
             };
         case "product.sold-out.mark":

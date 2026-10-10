@@ -3,6 +3,7 @@ import { toFailure } from "@/lib/api/failure";
 import type { CrmResult } from "@/lib/api/http";
 import { apiFetch, destroy, getList, mutate, orgBase } from "@/lib/api/http";
 import type { InvitationAccept } from "@/lib/invitations/outcome";
+import { LEAVE_FAILED } from "@/lib/organizations/leave-business";
 
 import type { OrganizationRole } from "./service";
 
@@ -208,6 +209,16 @@ export async function removeMember(
     userId: string,
 ): Promise<CrmResult<{ removed: boolean; revokedLinks: number }>> {
     return destroy(`/members/${userId}`, "Could not remove that person.");
+}
+
+/**
+ * Leave the active business: the caller's own membership. Asks no
+ * permission; the API refuses only the last owner, in its own sentence.
+ */
+export async function leaveBusiness(): Promise<
+    CrmResult<{ left: boolean; revokedLinks: number; storefrontRoles: number }>
+> {
+    return mutate("/leave", "POST", {}, LEAVE_FAILED);
 }
 
 export async function revokeInvitation(

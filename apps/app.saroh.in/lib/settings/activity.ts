@@ -338,6 +338,9 @@ export function activityLine(
             // A person's extra permissions (F17), in the owner's words.
             return line(extrasWhat(target ?? "someone", meta), TEAM());
         case "membership.remove":
+            // Someone who left did it themselves (`leave`): nobody removed
+            // them, and the line says so.
+            if (meta.left === true) return line("left the team", TEAM());
             return line(`removed ${target ?? "someone"} from the team`, TEAM());
         case "product.sold-out.mark":
         case "product.sold-out.clear": {
