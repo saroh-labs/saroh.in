@@ -21,6 +21,7 @@ import { OptionSelect } from "@/components/shared/option-select";
 import { useLeaveGuard } from "@/components/shared/use-leave-guard";
 import { MediaPicker } from "@/components/sites/media-picker";
 import { accountSettingsUrl } from "@/lib/accounts";
+import { runAction } from "@/lib/api/run-action";
 import { pausedWords } from "@/lib/billing/paused";
 import {
     createPost,
@@ -158,13 +159,19 @@ export function PostEditor({
                 // What is being sent, so edits made WHILE it is in flight are
                 // not marked saved when it returns.
                 const sent = JSON.stringify(body);
-                const res = postId
-                    ? await updatePost(siteId, postId, {
-                          ...body,
-                          slug: v.slug.trim() || slugFrom(v.title),
-                      })
-                    : await createPost(siteId, body);
-                setSaving(false);
+                const res = await runAction(
+                    () =>
+                        postId
+                            ? updatePost(siteId, postId, {
+                                  ...body,
+                                  slug: v.slug.trim() || slugFrom(v.title),
+                              })
+                            : createPost(siteId, body),
+                    // An autosave that didn't get there says nothing: the
+                    // next one, or Save, tries again.
+                    { setBusy: setSaving, quiet: opts.silent },
+                );
+                if (!res) return null;
                 if (!res.ok) {
                     showError(res.error);
                     return null;
@@ -251,13 +258,18 @@ export function PostEditor({
         setPublishing(true);
         // Publish what is on screen, not what was last saved — the merchant
         // pressed publish looking at this.
-        const id = dirty || !postId ? await save({ silent: true }) : postId;
+        const id =
+            dirty || !postId
+                ? await runAction(() => save({ silent: true }))
+                : postId;
         if (!id) {
             setPublishing(false);
             return;
         }
-        const res = await publishPost(siteId, id);
-        setPublishing(false);
+        const res = await runAction(() => publishPost(siteId, id), {
+            setBusy: setPublishing,
+        });
+        if (!res) return;
         if (!res.ok) {
             // At the plan's blog-posts limit (U13): its notice, not a toast.
             if (res.plan) showPlanRefusal(res.plan);
@@ -272,9 +284,10 @@ export function PostEditor({
 
     async function onUnpublish() {
         if (!postId) return;
-        setPublishing(true);
-        const res = await unpublishPost(siteId, postId);
-        setPublishing(false);
+        const res = await runAction(() => unpublishPost(siteId, postId), {
+            setBusy: setPublishing,
+        });
+        if (!res) return;
         if (!res.ok) {
             showError(res.error);
             return;

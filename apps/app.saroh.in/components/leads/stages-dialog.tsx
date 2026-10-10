@@ -8,6 +8,7 @@ import { ArrowDown, ArrowUp, Plus, Settings2, X } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 
+import { runAction } from "@/lib/api/run-action";
 import { saveStages } from "@/lib/pipelines/actions";
 import { IconButton } from "@saroh/ui/icon-button";
 import { Tip } from "@saroh/ui/tooltip";
@@ -84,18 +85,21 @@ export function StagesDialog({
     async function save() {
         setTried(true);
         if (blank) return;
-        setSaving(true);
-        const res = await saveStages(
-            pipelineId,
-            rows.map((r, i) => ({
-                id: r.id,
-                name: r.name.trim(),
-                order: i,
-                was: r.was,
-            })),
-            removed.flatMap((r) => (r.id ? [r.id] : [])),
+        const res = await runAction(
+            () =>
+                saveStages(
+                    pipelineId,
+                    rows.map((r, i) => ({
+                        id: r.id,
+                        name: r.name.trim(),
+                        order: i,
+                        was: r.was,
+                    })),
+                    removed.flatMap((r) => (r.id ? [r.id] : [])),
+                ),
+            { setBusy: setSaving },
         );
-        setSaving(false);
+        if (!res) return;
         if (!res.ok) {
             showError("Some of the stage changes were not saved.", res.error);
             router.refresh();

@@ -8,6 +8,7 @@ import { useState, useTransition } from "react";
 
 import type { ConfirmResult } from "@/components/shared/confirm-dialog";
 import { ConfirmDialog } from "@/components/shared/confirm-dialog";
+import { runAction } from "@/lib/api/run-action";
 import { setProductStockTracking } from "@/lib/products/actions";
 import type { TrackingControl } from "@/lib/products/tracking";
 import {
@@ -50,7 +51,10 @@ export function TrackStockSwitch({
 
     function turnOn() {
         start(async () => {
-            const res = await setProductStockTracking(productId, true);
+            const res = await runAction(() =>
+                setProductStockTracking(productId, true),
+            );
+            if (!res) return;
             if (!res.ok) {
                 showError(res.error);
                 return;

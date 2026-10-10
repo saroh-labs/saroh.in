@@ -5,6 +5,7 @@ import { Input } from "@saroh/ui/input";
 import { Label } from "@saroh/ui/label";
 import { useId, useState } from "react";
 
+import { runAction } from "@/lib/api/run-action";
 import type {
     CustomerSearchResult,
     NewCustomerDraft,
@@ -52,9 +53,7 @@ export function NewCustomerForm({
             return;
         }
         setError(null);
-        setChecking(true);
-        await onAdd(draft);
-        setChecking(false);
+        await runAction(() => onAdd(draft), { setBusy: setChecking });
     }
 
     return (

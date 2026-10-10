@@ -14,6 +14,7 @@ import { Check, ChevronDown } from "lucide-react";
 import Link from "next/link";
 import { useState, useTransition } from "react";
 
+import { runAction } from "@/lib/api/run-action";
 import { createCategory } from "@/lib/products/actions";
 import { noMatchLine } from "@saroh/ui/lib/state-copy";
 
@@ -55,7 +56,8 @@ export function CategoryPicker({
 
     function create() {
         start(async () => {
-            const res = await createCategory({ name: q });
+            const res = await runAction(() => createCategory({ name: q }));
+            if (!res) return;
             if (!res.ok) {
                 showError(res.error);
                 return;

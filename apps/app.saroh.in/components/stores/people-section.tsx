@@ -34,6 +34,7 @@ import {
 } from "@/lib/stores/people";
 import { couldntLoad } from "@saroh/ui/lib/state-copy";
 
+import { runAction } from "@/lib/api/run-action";
 import { Notice } from "@saroh/ui/notice";
 import { InvitePersonSheet } from "./invite-person-sheet";
 import { Note, Section } from "./storefront-section";
@@ -118,9 +119,11 @@ export function PeopleSection({
     const alone = onlyOwnerHere(people);
 
     async function onChangeRole(userId: string, next: MemberRole) {
-        setBusy(userId);
-        const res = await updateMemberRole(store.id, userId, next);
-        setBusy(null);
+        const res = await runAction(
+            () => updateMemberRole(store.id, userId, next),
+            { setBusy: (on) => setBusy(on ? userId : null) },
+        );
+        if (!res) return;
         if (!res.ok) {
             showError(res.error);
             return;
@@ -130,9 +133,10 @@ export function PeopleSection({
     }
 
     async function onRemove(userId: string): Promise<ConfirmResult> {
-        setBusy(userId);
-        const res = await removeMember(store.id, userId);
-        setBusy(null);
+        const res = await runAction(() => removeMember(store.id, userId), {
+            setBusy: (on) => setBusy(on ? userId : null),
+        });
+        if (!res) return;
         if (!res.ok) return { ok: false, error: res.error };
         showSuccess("Person removed.");
         router.refresh();

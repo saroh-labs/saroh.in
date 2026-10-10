@@ -19,6 +19,7 @@ import {
     verificationSavedLine,
 } from "@/lib/sites/search-tracking";
 
+import { runAction } from "@/lib/api/run-action";
 import { TextLink } from "@saroh/ui/text-link";
 import type { SaveSection } from "./parts";
 import { LineRow } from "./parts";
@@ -60,7 +61,10 @@ export function VerificationField({
 
     function submit(code: string | null) {
         startTransition(async () => {
-            const res = await save({ verifications: { [service]: code } });
+            const res = await runAction(() =>
+                save({ verifications: { [service]: code } }),
+            );
+            if (!res) return;
             if (!res.ok) {
                 if (res.field === `verifications.${service}`) {
                     setServerError(res.error);

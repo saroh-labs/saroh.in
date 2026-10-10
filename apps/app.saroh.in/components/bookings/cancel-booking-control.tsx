@@ -7,6 +7,7 @@ import { useState } from "react";
 
 import { FormDialog } from "@/components/shared/form-dialog";
 import { useHold } from "@/components/shared/use-hold";
+import { runAction } from "@/lib/api/run-action";
 import { cancelBooking } from "@/lib/services/actions";
 import type { BookingMoney, CancelPlan } from "@/lib/services/booking-money";
 import { cancelledMessage, cancelPlan } from "@/lib/services/booking-money";
@@ -56,12 +57,12 @@ export function CancelBookingControl({
 
     /** Asked first, in the dialog: made at once, and said. */
     async function cancel(returnCredit: boolean) {
-        setBusy(true);
-        const res = await cancelBooking(
-            bookingId,
-            returnCredit ? { returnCredit } : {},
+        const res = await runAction(
+            () =>
+                cancelBooking(bookingId, returnCredit ? { returnCredit } : {}),
+            { setBusy },
         );
-        setBusy(false);
+        if (!res) return;
         if (!res.ok) {
             showError(res.error);
             return;

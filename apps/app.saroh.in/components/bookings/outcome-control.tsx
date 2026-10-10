@@ -5,6 +5,7 @@ import { showError, showSuccess } from "@saroh/ui/toast";
 import { useRouter } from "next/navigation";
 import { useTransition } from "react";
 
+import { runAction } from "@/lib/api/run-action";
 import { recordBookingOutcome } from "@/lib/services/actions";
 import type { BookingOutcome } from "@/lib/services/service";
 
@@ -32,7 +33,10 @@ export function OutcomeControl({
 
     const record = (next: BookingOutcome) => {
         startTransition(async () => {
-            const res = await recordBookingOutcome(bookingId, next);
+            const res = await runAction(() =>
+                recordBookingOutcome(bookingId, next),
+            );
+            if (!res) return;
             if (!res.ok) {
                 showError(res.error);
                 return;

@@ -13,6 +13,7 @@ import { useState } from "react";
 
 import { ConfirmDialog } from "@/components/shared/confirm-dialog";
 import type { CrmResult } from "@/lib/api/http";
+import { runAction } from "@/lib/api/run-action";
 import { IconButton } from "@saroh/ui/icon-button";
 
 /**
@@ -65,7 +66,11 @@ export function DeleteMenu<T>({
     /** From the confirm, which waits and says a refusal itself. */
     async function commit() {
         setBusy(true);
-        const res = await onDelete();
+        const res = await runAction(onDelete);
+        if (!res) {
+            setBusy(false);
+            return;
+        }
         if (!res.ok) {
             setBusy(false);
             return { ok: false, error: res.error };

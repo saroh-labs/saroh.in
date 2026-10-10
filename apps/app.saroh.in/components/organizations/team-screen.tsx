@@ -85,6 +85,7 @@ import {
 } from "@/lib/organizations/storefront-team";
 import { TEAM_TAB_PARAM } from "@/lib/settings/search";
 
+import { runAction } from "@/lib/api/run-action";
 import { TabStrip } from "@saroh/ui/tabs";
 import { Tip } from "@saroh/ui/tooltip";
 import { InviteDiaryPerson } from "./invite-diary-person";
@@ -922,20 +923,28 @@ function MemberDrawer({
             );
             return;
         }
-        setSaving(true);
-        // The role first: the extras are judged against the role they'll
-        // sit on top of.
-        const res = roleChanged
-            ? await updateMemberRole(member.userId, {
-                  role,
-                  ...(role === "REVIEWER" ? { siteIds: member.siteIds } : {}),
-              })
-            : null;
-        const extrasRes =
-            (res === null || res.ok) && extras.changed
-                ? await setMemberExtraActions(member.userId, extras.chosen)
-                : null;
-        setSaving(false);
+        const userId = member.userId;
+        const siteIds = member.siteIds;
+        const saved = await runAction(
+            async () => {
+                // The role first: the extras are judged against the role
+                // they'll sit on top of.
+                const res = roleChanged
+                    ? await updateMemberRole(userId, {
+                          role,
+                          ...(role === "REVIEWER" ? { siteIds } : {}),
+                      })
+                    : null;
+                const extrasRes =
+                    (res === null || res.ok) && extras.changed
+                        ? await setMemberExtraActions(userId, extras.chosen)
+                        : null;
+                return { res, extrasRes };
+            },
+            { setBusy: setSaving },
+        );
+        if (!saved) return;
+        const { res, extrasRes } = saved;
         const failed = [res, extrasRes].find((r) => r && !r.ok);
         if (failed && !failed.ok) {
             showError(failed.error);

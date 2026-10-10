@@ -28,6 +28,7 @@ import {
     lostNew,
     useLeaveGuard,
 } from "@/components/shared/use-leave-guard";
+import { runAction } from "@/lib/api/run-action";
 import { createDiscount, updateDiscount } from "@/lib/discounts/actions";
 import type { Selections } from "@/lib/discounts/reach";
 import {
@@ -214,9 +215,12 @@ export function DiscountForm({
     function endNow() {
         if (!discount) return;
         startEnding(async () => {
-            const res = await updateDiscount(discount.id, {
-                endsAt: new Date().toISOString(),
-            });
+            const res = await runAction(() =>
+                updateDiscount(discount.id, {
+                    endsAt: new Date().toISOString(),
+                }),
+            );
+            if (!res) return;
             if (!res.ok) {
                 showError(res.error);
                 return;

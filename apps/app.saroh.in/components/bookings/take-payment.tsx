@@ -14,6 +14,8 @@ import {
     PayLinkPanel,
 } from "@/components/bookings/pay-link-panel";
 import { Chip } from "@/components/shared/chip";
+import { runAction } from "@/lib/api/run-action";
+import { UNREACHED } from "@/lib/api/unreached";
 import { formatMoney } from "@/lib/format/money";
 import { takeDeskPayment } from "@/lib/services/actions";
 import type { DeskChoice, DeskTake } from "@/lib/services/desk-pay";
@@ -106,8 +108,10 @@ export function TakePayment({
         setBusy(true);
         setError(null);
         if (choice === "LINK") {
-            setLink(await makePayLink(bookingId));
-            setBusy(false);
+            const made = await runAction(() => makePayLink(bookingId), {
+                setBusy,
+            });
+            if (made) setLink(made);
             return;
         }
         try {
@@ -123,9 +127,7 @@ export function TakePayment({
             showSuccess(deskTakenText(res.data, format));
             close();
         } catch {
-            setError(
-                "Couldn't record the payment. Nothing was taken. Try again.",
-            );
+            setError(UNREACHED);
             setBusy(false);
         }
     }

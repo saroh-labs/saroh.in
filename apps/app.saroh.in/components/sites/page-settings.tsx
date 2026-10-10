@@ -8,6 +8,7 @@ import { useId, useState } from "react";
 import { ReadOnlyNote } from "@/components/shared/read-only-note";
 import { ChoiceField, SHOW_HIDE } from "@/components/sites/choice-field";
 import { FIELD_LABEL } from "@/components/sites/section-fields/constants";
+import { runAction } from "@/lib/api/run-action";
 import { updatePage } from "@/lib/sites/actions";
 import { fixedAddress } from "@/lib/sites/page-menu";
 import type { SitePage, UpdatePageInput } from "@/lib/sites/service";
@@ -72,10 +73,11 @@ export function PageSettings({
     const dirty = Object.keys(changes).length > 0;
 
     async function save(input: UpdatePageInput, done?: string) {
-        setBusy(true);
         setRefusal(null);
-        const res = await updatePage(siteId, page.id, input);
-        setBusy(false);
+        const res = await runAction(() => updatePage(siteId, page.id, input), {
+            setBusy,
+        });
+        if (!res) return;
         if (!res.ok) {
             if (input.title !== undefined || input.path !== undefined) {
                 setRefusal({ message: res.error, suggestion: res.suggestion });

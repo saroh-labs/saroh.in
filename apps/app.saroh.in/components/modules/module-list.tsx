@@ -9,6 +9,7 @@ import { useEffect, useId, useRef, useState, useTransition } from "react";
 import { TurnOnSheet } from "@/components/modules/turn-on/turn-on-sheet";
 import { navRowsForModule } from "@/components/shared/nav-items";
 import { StatusBadge } from "@/components/shared/status-badge";
+import { runAction } from "@/lib/api/run-action";
 import {
     readModuleImpactAction,
     setModuleStatusAction,
@@ -234,7 +235,10 @@ function ModuleRow({
     ) => {
         startTransition(async () => {
             for (const [key, status] of changes) {
-                const result = await setModuleStatusAction(key, status);
+                const result = await runAction(() =>
+                    setModuleStatusAction(key, status),
+                );
+                if (!result) return;
                 if (!result.ok) {
                     // A refusal is the safe-guard talking (open orders, say).
                     // Say what it said — the switch springing back with no
@@ -274,7 +278,11 @@ function ModuleRow({
      */
     const askFirst = () => {
         startTransition(async () => {
-            const read = await readModuleImpactAction(module.key);
+            const answer = await runAction(async () => ({
+                read: await readModuleImpactAction(module.key),
+            }));
+            if (!answer) return;
+            const read = answer.read;
             const text = offImpact({
                 rows: leaving,
                 dependents: dependentLabels,

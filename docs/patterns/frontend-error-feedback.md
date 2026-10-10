@@ -82,6 +82,55 @@
   which waits for the action and says a refusal inside itself. No way back
   in the API, but not final yet: hold it (`useHold`).
 
+### A save that got no answer — **Current** (10 Oct 2026)
+
+Two sentences, in `lib/api/unreached.ts`, and no screen words its own:
+
+- **`UNREACHED`**: "That didn't reach Saroh. Check your connection and try
+  again. Nothing was changed."
+- **`SIGNED_OUT`**: "You've been signed out. Sign in again and what you
+  typed stays here."
+
+How they are reached:
+
+- **A write never throws, and has 20 seconds.** `apiFetch` gives every
+  request that isn't a GET or HEAD a 20-second limit. A network failure
+  or the limit answers as an ordinary error response carrying
+  `UNREACHED`, and a 401 carrying `SIGNED_OUT`. So `mutate`, `destroy`
+  and every service that reads its own response say the same thing
+  through `readError`; `mutate` and `destroy` also mark the result
+  `unreached` or `expired`. Reads are untouched: a failed read still
+  rejects into the page's failed state or boundary.
+- **Signed out is one toast that stays, with a way back.** The shell
+  registers the sentence with `setErrorAction` (`@saroh/ui/toast`), so
+  every `showError(res.error)` that says it draws the same toast with a
+  "Sign in" button. It opens accounts in a new tab: the page and what
+  was typed on it are still there to send again.
+- **A client calls a server action through `runAction`**
+  (`lib/api/run-action.ts`), never `setBusy(true); await save();
+setBusy(false)`:
+
+    ```ts
+    const res = await runAction(() => saveService(id, values), { setBusy });
+    if (!res) return; // it never got there, and has been said
+    if (!res.ok) …
+    ```
+
+    It clears the busy state in a `finally`, says `UNREACHED` once when the
+    action throws (the browser couldn't reach this app) and answers
+    `undefined`. `quiet` with `onUnreached` puts the sentence in the
+    sheet's own error line instead. An `await` inside
+    `startTransition(async () => …)` goes through it too: a server action
+    that throws there reaches the error boundary and replaces the form
+    being typed with an error page.
+
+- **After the guard, undo what was drawn early.** A switch flipped before
+  its save is put back (`if (!res) return setOn(!next)`), a promise a
+  hold is waiting on is resolved, and anything about money is read again,
+  since a reply that was lost may still have gone through.
+- `run-action.test.ts` scans the app: between a busy setter going on and
+  off, and inside a transition, every `await` is one that can't throw.
+
 ### An unreachable API is not a signed-out user — **Current**
 
 Use `requireSession()`, built on `resolveServerSession()` in

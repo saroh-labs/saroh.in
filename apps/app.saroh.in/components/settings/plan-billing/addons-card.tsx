@@ -9,6 +9,7 @@ import { useState, useTransition } from "react";
 import { setAddonAction } from "@/lib/saroh-billing/billing-actions";
 import type { AddonRow } from "@/lib/saroh-billing/plan-view";
 
+import { runAction } from "@/lib/api/run-action";
 import { card } from "./styles";
 
 /**
@@ -36,8 +37,11 @@ export function AddonsCard({
     function set(row: AddonRow, quantity: number) {
         setBusy(row.id);
         start(async () => {
-            const res = await setAddonAction(row.id, quantity);
-            setBusy(null);
+            const res = await runAction(
+                () => setAddonAction(row.id, quantity),
+                { setBusy: (on) => setBusy(on ? row.id : null) },
+            );
+            if (!res) return;
             if (!res.ok) {
                 showError(res.error);
                 return;

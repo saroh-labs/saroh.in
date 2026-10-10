@@ -16,6 +16,7 @@ import { checkCouponAction } from "@/lib/saroh-billing/billing-actions";
 import type { Cycle, PickerRow } from "@/lib/saroh-billing/plan-view";
 import { couldntLoad, nothingChanged } from "@saroh/ui/lib/state-copy";
 
+import { runAction } from "@/lib/api/run-action";
 import { Segmented } from "@saroh/ui/segmented";
 import type { PickedPlan } from "./change-plan-dialog";
 import { ChangePlanDialog } from "./change-plan-dialog";
@@ -105,7 +106,10 @@ export function PlanChooser({
             .filter((r) => r.cta !== null && r.price !== "₹0")
             .map((r) => r.planId);
         startCheck(async () => {
-            const res = await checkCouponAction({ code, cycle, plans });
+            const res = await runAction(() =>
+                checkCouponAction({ code, cycle, plans }),
+            );
+            if (!res) return;
             if (!res.ok) {
                 setCouponErr(res.error);
                 return;

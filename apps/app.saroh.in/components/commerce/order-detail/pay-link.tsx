@@ -18,6 +18,7 @@ import { ConfirmDialog } from "@/components/shared/confirm-dialog";
 import { makeOrderPayLink } from "@/lib/orders/actions";
 import { ProviderDisconnectedState } from "@saroh/ui/data-state";
 
+import { runAction } from "@/lib/api/run-action";
 import { copyText } from "@saroh/ui/copy-button";
 import { actionClass } from "./parts";
 
@@ -61,7 +62,8 @@ export function usePayLink({
     };
     const make = () => {
         startTransition(async () => {
-            const res = await makeOrderPayLink(orderId);
+            const res = await runAction(() => makeOrderPayLink(orderId));
+            if (!res) return;
             if (!res.ok) {
                 reportFailure(res);
                 return;

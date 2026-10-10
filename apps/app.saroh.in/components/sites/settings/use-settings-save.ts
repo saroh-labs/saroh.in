@@ -11,6 +11,7 @@ import {
     settingsSheetFromParam,
 } from "@/lib/sites/settings-edit";
 
+import { runAction } from "@/lib/api/run-action";
 import type { SheetControl } from "./settings-sheet";
 
 /**
@@ -69,7 +70,8 @@ export function useSettingsSave(
         onSaved?: () => void,
     ) {
         startTransition(async () => {
-            const res = await call();
+            const res = await runAction(() => call());
+            if (!res) return;
             if (!res.ok) {
                 showError(res.error);
                 return;

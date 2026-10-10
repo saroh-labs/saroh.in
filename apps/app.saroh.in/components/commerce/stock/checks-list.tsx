@@ -18,6 +18,7 @@ import type { StockCheck, StockChecks } from "@/lib/stock/service";
 import { couldntLoad, nothingChanged } from "@saroh/ui/lib/state-copy";
 
 import { StatusBadge } from "@/components/shared/status-badge";
+import { runAction } from "@/lib/api/run-action";
 import { PILL_TONE, SMALL_BUTTON } from "./tones";
 
 const newKey = () => crypto.randomUUID();
@@ -78,11 +79,14 @@ export function ChecksList({
     const canResolve = checks.canResolve;
 
     const resolve = async (c: StockCheck) => {
-        setBusy(c.key);
-        const res = await resolveStockCheck(c.key, {
-            idempotencyKey: newKey(),
-        });
-        setBusy(null);
+        const res = await runAction(
+            () =>
+                resolveStockCheck(c.key, {
+                    idempotencyKey: newKey(),
+                }),
+            { setBusy: (on) => setBusy(on ? c.key : null) },
+        );
+        if (!res) return;
         if (!res.ok) {
             showError(res.error);
             return;
@@ -92,13 +96,17 @@ export function ChecksList({
     };
 
     const undoCount = async (c: StockCheck) => {
-        if (!c.entryId) return;
-        setBusy(c.key);
-        const res = await undoStock({
-            entryIds: [c.entryId],
-            idempotencyKey: newKey(),
-        });
-        setBusy(null);
+        const entryId = c.entryId;
+        if (!entryId) return;
+        const res = await runAction(
+            () =>
+                undoStock({
+                    entryIds: [entryId],
+                    idempotencyKey: newKey(),
+                }),
+            { setBusy: (on) => setBusy(on ? c.key : null) },
+        );
+        if (!res) return;
         if (!res.ok) {
             showError(res.error);
             return;
@@ -112,12 +120,14 @@ export function ChecksList({
 
     const more = () =>
         start(async () => {
-            if (!loaded.next) return;
+            const cursor = loaded.next;
             setLoadError(null);
-            const res = await loadChecksPage({
-                cursor: loaded.next,
-                limit: pageSize,
-            });
+            if (!cursor) return;
+            const res = await runAction(
+                () => loadChecksPage({ cursor, limit: pageSize }),
+                { quiet: true, onUnreached: setLoadError },
+            );
+            if (!res) return;
             if (!res.ok) {
                 setLoadError(res.error);
                 return;

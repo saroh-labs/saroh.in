@@ -12,6 +12,7 @@ import { addAllergens, removeAllergen } from "@/lib/products/settings-actions";
 
 import { NameDialog } from "@/components/shared/name-dialog";
 import { ReadOnlyNote } from "@/components/shared/read-only-note";
+import { runAction } from "@/lib/api/run-action";
 import { Tip } from "@saroh/ui/tooltip";
 import { bigBtn, rowBtn, smallBtn, TabIntro } from "./product-settings";
 
@@ -45,7 +46,11 @@ export function AllergensTab({
 
     function run(work: () => Promise<void>) {
         start(async () => {
-            await work();
+            const reached = await runAction(async () => {
+                await work();
+                return true;
+            });
+            if (!reached) return;
             router.refresh();
         });
     }
@@ -125,10 +130,16 @@ export function AllergensTab({
                                     className={cn(smallBtn, "h-9 px-3.5")}
                                     onClick={() =>
                                         start(async () => {
-                                            await add(
-                                                COMMON,
-                                                "The common food allergens are on the list.",
+                                            const reached = await runAction(
+                                                async () => {
+                                                    await add(
+                                                        COMMON,
+                                                        "The common food allergens are on the list.",
+                                                    );
+                                                    return true;
+                                                },
                                             );
+                                            if (!reached) return;
                                         })
                                     }
                                 >

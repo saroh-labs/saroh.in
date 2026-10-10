@@ -3,6 +3,7 @@ import { useCallback, useRef, useState } from "react";
 
 import { unfinishedPhrase } from "@/components/sites/held-back-copy";
 import type { HeldBackSection } from "@/components/sites/saveable-sections";
+import { runAction } from "@/lib/api/run-action";
 import { getSiteFlags, publishSite } from "@/lib/sites/actions";
 import type { SiteChangeKind } from "@/lib/sites/pending";
 import {
@@ -187,7 +188,13 @@ export function usePublish({
         setChecking(true);
         // Re-read rather than trusting what was loaded: the merchant may have
         // been editing for an hour, and a stale check is worse than none.
-        await refreshFlags();
+        const read = await runAction(async () => {
+            await refreshFlags();
+            return true;
+        });
+        // The check stays open on what was loaded; a read that never got
+        // there has been said.
+        if (!read) setChecking(false);
     }
 
     /** `siteName` is the name as it is now: the inspector can change it (G6). */
@@ -196,8 +203,10 @@ export function usePublish({
         // With the setting on, only an owner's Publish goes through, and it
         // is sent as the override it is, so the record is written (T9).
         const override = needsApproval && canOverride;
-        const res = await publishSite(siteId, override);
-        setPublishing(false);
+        const res = await runAction(() => publishSite(siteId, override), {
+            setBusy: setPublishing,
+        });
+        if (!res) return;
         if (!res.ok) {
             if (res.code === "APPROVAL_REQUIRED") {
                 // Turned on since the editor loaded: the bar says so now,

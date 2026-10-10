@@ -14,6 +14,7 @@ import {
     visitsNextNote,
 } from "@/lib/orders/visits";
 
+import { runAction } from "@/lib/api/run-action";
 import { actionClass } from "./parts";
 
 /**
@@ -91,7 +92,10 @@ function NextButton({
     if (attend !== null && canMark) {
         const mark = () =>
             startTransition(async () => {
-                const res = await markVisitAttended(orderId, attend);
+                const res = await runAction(() =>
+                    markVisitAttended(orderId, attend),
+                );
+                if (!res) return;
                 if (!res.ok) {
                     showError(res.error);
                 } else {

@@ -6,6 +6,7 @@ import { showError, showSuccess } from "@saroh/ui/toast";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 
+import { runAction } from "@/lib/api/run-action";
 import { DISPLAY_LOCALE } from "@/lib/format/locale";
 import { completeTask } from "@/lib/leads/actions";
 import type { LeadActivity } from "@/lib/leads/service";
@@ -63,9 +64,10 @@ function CompleteTaskButton({
     const [busy, setBusy] = useState(false);
 
     async function onClick() {
-        setBusy(true);
-        const res = await completeTask(leadId, activityId);
-        setBusy(false);
+        const res = await runAction(() => completeTask(leadId, activityId), {
+            setBusy,
+        });
+        if (!res) return;
         if (!res.ok) {
             showError(res.error);
             return;

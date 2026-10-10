@@ -30,6 +30,9 @@ export default async function NotificationsPage() {
             <NotificationsInbox
                 notifications={notifications}
                 businessName={organization?.name ?? "this business"}
+                // The instant "5 min ago" is counted from, the same on the
+                // server and in the browser's first paint.
+                now={new Date().toISOString()}
             />
         </PageContainer>
     );

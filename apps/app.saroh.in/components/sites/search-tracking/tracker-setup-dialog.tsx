@@ -16,6 +16,7 @@ import {
     trackerHelpHref,
 } from "@/lib/sites/search-tracking";
 
+import { runAction } from "@/lib/api/run-action";
 import { TextLink } from "@saroh/ui/text-link";
 import type { SaveOutcome } from "./parts";
 
@@ -75,10 +76,13 @@ export function TrackerSetupDialog({
         setTried(true);
         if (!value || !ready || pending) return;
         startTransition(async () => {
-            const res = await onSave(kind, {
-                id: value,
-                ...(kind === "posthog" && region ? { region } : {}),
-            });
+            const res = await runAction(() =>
+                onSave(kind, {
+                    id: value,
+                    ...(kind === "posthog" && region ? { region } : {}),
+                }),
+            );
+            if (!res) return;
             if (res.ok) {
                 onClose();
                 return;

@@ -34,6 +34,7 @@ import type { ConfirmResult } from "@/components/shared/confirm-dialog";
 import { ConfirmDialog } from "@/components/shared/confirm-dialog";
 import { useHold } from "@/components/shared/use-hold";
 
+import { runAction } from "@/lib/api/run-action";
 import { AddSessionDialog } from "./add-session-dialog";
 import { EnrolDialog } from "./enrol-dialog";
 
@@ -79,9 +80,10 @@ export function CoursePage({
     const tab = courseTab({ ...course, sessions: course.sessions });
 
     async function setStatus(status: CourseDetail["status"], done: string) {
-        setBusy(true);
-        const res = await updateCourse(course.id, { status });
-        setBusy(false);
+        const res = await runAction(() => updateCourse(course.id, { status }), {
+            setBusy,
+        });
+        if (!res) return;
         if (!res.ok) return showError(res.error);
         showSuccess(done);
         router.refresh();
