@@ -95,12 +95,11 @@ describe("an unpublished page is in neither the nav nor the sitemap", () => {
     it("the legal pages are out of the footer and sitemap until their day in India", () => {
         const legalBefore = at("2026-10-04T18:29:00Z");
         const refundsAfter = at("2026-10-04T18:31:00Z");
-        // The Terms' date moved to 9 Oct with the business's responsibility
-        // for its sales and fair use (rev 46), the day Privacy's did when
-        // Vercel left its processors (DEC-107): until that day only the
+        // The Terms' and Privacy's date moved to 10 Oct when both were
+        // aligned with India's DPDP Act (rev 55): until that day only the
         // Refunds page shows.
-        const termsBefore = at("2026-10-07T18:31:00Z");
-        const privacyAfter = at("2026-10-08T18:31:00Z");
+        const termsBefore = at("2026-10-08T18:31:00Z");
+        const privacyAfter = at("2026-10-09T18:31:00Z");
         expect(shownLegal(legalBefore).map((p) => p.href)).toEqual([]);
         for (const href of ["/privacy", "/terms", "/refunds"]) {
             expect(indexedPaths("waitlist", legalBefore)).not.toContain(href);

@@ -6,7 +6,11 @@
  * DEC-100; the 8 Oct paragraph on merchants' own trackers, DEC-108; and
  * the 9 Oct additions, rev 46: "Your customers and your business", suspending
  * at once for illegal use or fraud, "Fair use", and the line in "Liability"
- * on businesses' goods and disputes). Published VERBATIM at /terms: do not reword it here. A change comes from the owner's
+ * on businesses' goods and disputes; and the 10 Oct alignment with India's
+ * DPDP Act, rev 55: downloading your data in Settings, the business as Data
+ * Fiduciary and Saroh as its Data Processor, and suspending at once for what
+ * the law prohibits, with what is kept of a suspended account). Published
+ * VERBATIM at /terms: do not reword it here. A change comes from the owner's
  * text, and moves `publishOn` (`content/resources.ts`), which is the "Last
  * updated" date the page shows.
  *
@@ -62,9 +66,9 @@ Saroh is software a business uses to run its shop, bookings and website. Each bu
 
 ## Your data and content
 
-What you put into Saroh stays yours: your products, photos, bookings, customer records and website. You let us store, process and show it only to run Saroh for you. You can download your orders yourself, and we'll send you a copy of everything else if you ask at contact@saroh.in. When you close your account we delete it as the Privacy Policy says, except invoices the law makes us keep.
+What you put into Saroh stays yours: your products, photos, bookings, customer records and website. You let us store, process and show it only to run Saroh for you. You can download your data yourself in Settings. When you close your account we remove it as the Privacy Policy says, keeping only what the law makes us keep.
 
-For your customers' personal data, your business is responsible for having the right to collect and use it, and we process it only for you.
+For your customers' personal data, India's Digital Personal Data Protection Act, 2023 (the DPDP Act) makes your business the Data Fiduciary and Saroh your Data Processor. You decide what is collected and why; we process it only for you, on your instructions, to run Saroh. You're responsible for telling your customers what you collect, getting their consent where the Act needs it, answering their requests to see, correct or delete their data, and not collecting a child's data without a parent's verifiable consent. Saroh gives you the tools for this and helps when you ask. If we learn of a breach that affects your customers' data, we'll tell you without delay.
 
 ## What you can't do
 
@@ -78,7 +82,7 @@ Don't use Saroh to:
 
 We may remove content or suspend an account that does these things. Where we can, we'll tell you first and give you a chance to fix it.
 
-We may suspend or close an account at once, without notice, and stop the people behind it from using Saroh again, if we reasonably believe it's used for something illegal, for fraud or to harm customers, or if the law or a payment provider requires it. We may report it to the authorities.
+If we find that an account is used for something the law prohibits, we'll suspend it at once, without notice. We may also suspend or close an account, and stop the people behind it from using Saroh again, if we reasonably believe it's used for fraud or to harm customers, or if the law or a payment provider requires it. We keep a suspended account's data for as long as the law requires, or while it's needed to prevent, detect or investigate an offence, and we give it to courts, the police or other authorities when the law requires us to.
 
 ## Fair use
 

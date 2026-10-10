@@ -99,7 +99,7 @@ describe("the Terms' 9 Oct additions (rev 46)", () => {
     it("carries the owner's words verbatim", () => {
         for (const words of [
             "Saroh is software a business uses to run its shop, bookings and website. Each business sells its own goods and services, sets its own prices and policies, and deals with its own customers. Saroh isn't a party to those sales. We don't check or guarantee any business, what it sells or what it says, and we don't verify a business's identity, licences or registrations. You're responsible for your orders, bookings, refunds and complaints, and for the laws that apply to your business. We're responsible for Saroh itself.",
-            "We may suspend or close an account at once, without notice, and stop the people behind it from using Saroh again, if we reasonably believe it's used for something illegal, for fraud or to harm customers, or if the law or a payment provider requires it. We may report it to the authorities.",
+            "If we find that an account is used for something the law prohibits, we'll suspend it at once, without notice. We may also suspend or close an account, and stop the people behind it from using Saroh again, if we reasonably believe it's used for fraud or to harm customers, or if the law or a payment provider requires it. We keep a suspended account's data for as long as the law requires, or while it's needed to prevent, detect or investigate an offence, and we give it to courts, the police or other authorities when the law requires us to.",
             "Plans with \"no limit\", or with large allowances, are for the normal running of one business. Don't resell Saroh, run several businesses' worth of traffic or storage on one account, send automated bulk messages, or use Saroh as file hosting. If an account uses far more than a typical business on its plan, or puts Saroh at risk for others, we'll contact you to agree a way forward before limiting anything, unless we need to act at once to keep Saroh running.",
             "We're not responsible for the goods, services, conduct or content of any business that uses Saroh, or for disputes between a business and its customers.",
         ]) {
@@ -109,9 +109,9 @@ describe("the Terms' 9 Oct additions (rev 46)", () => {
         }
     });
 
-    it("moves the page's Last updated to 9 Oct", () => {
+    it("moves the page's Last updated to 10 Oct", () => {
         expect(LEGAL_PAGES.find((p) => p.id === "terms")?.publishOn).toBe(
-            "2026-10-09",
+            "2026-10-10",
         );
     });
 });

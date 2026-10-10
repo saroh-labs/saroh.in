@@ -95,7 +95,8 @@ export const LEGAL_PAGES: readonly ResourcePage[] = [
         href: "/privacy",
         // 8 Oct: merchants' own trackers (DEC-108). 9 Oct: Vercel removed
         // from the processors; Cloudflare serves every site (DEC-107).
-        publishOn: "2026-10-09",
+        // 10 Oct: aligned with India's DPDP Act (rev 55).
+        publishOn: "2026-10-10",
     },
     {
         id: "terms",
@@ -105,7 +106,8 @@ export const LEGAL_PAGES: readonly ResourcePage[] = [
         // 7 Oct: the term ends with a request to pay (DEC-100). 8 Oct:
         // merchants' own trackers (DEC-108). 9 Oct: the business is
         // responsible for its sales, suspending at once, fair use (rev 46).
-        publishOn: "2026-10-09",
+        // 10 Oct: aligned with India's DPDP Act (rev 55).
+        publishOn: "2026-10-10",
     },
     {
         id: "refunds",
