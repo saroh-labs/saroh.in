@@ -12,6 +12,8 @@ import { RescheduleBooking } from "@/components/bookings/reschedule-booking";
 import { TakePayment } from "@/components/bookings/take-payment";
 import { TakePaymentLocked } from "@/components/bookings/take-payment-locked";
 import { TreatmentVisits } from "@/components/bookings/treatment-visits";
+import { ReadOnlyNote } from "@/components/shared/read-only-note";
+import { readOnlyLine } from "@/components/shared/who-can-change";
 import { personHref } from "@/lib/contacts/person-href";
 import { formatDayLabel, formatTimeRange } from "@/lib/format/datetime";
 import { formatMoney } from "@/lib/format/money";
@@ -40,12 +42,22 @@ export function BookingDetailView({
     booking,
     past,
     packs,
+    canWrite = false,
     canRefund = false,
     canReadOrder = false,
     desk,
     waitlist,
 }: {
     booking: BookingDetail;
+    /**
+     * `booking:write`: may move, cancel or say how it went. A Member reads
+     * bookings without it, and was shown all three as live buttons the API
+     * then refused. Without it none is drawn and the page says it is
+     * read-only. A calendar-only person holds it, and the API sends them
+     * only their own bookings (`own-diary.ts`), so every booking they can
+     * open here is one they may change.
+     */
+    canWrite?: boolean;
     /** `payment:manage`: may refund money a late cancel keeps (E8). */
     canRefund?: boolean;
     /** `order:read`: a treatment's visit links to its order (E9). */
@@ -137,7 +149,7 @@ export function BookingDetailView({
                         <Button asChild variant="ghost" size="sm">
                             <Link href="/bookings">All bookings</Link>
                         </Button>
-                        {cancelled ? null : past ? (
+                        {cancelled || !canWrite ? null : past ? (
                             // A past appointment cannot be moved and does not
                             // need cancelling — the only thing left to say
                             // about it is how it went.
@@ -172,6 +184,12 @@ export function BookingDetailView({
                     </div>
                 }
             />
+
+            {canWrite ? null : (
+                <ReadOnlyNote className="mb-0 mt-6">
+                    {readOnlyLine("this booking")}
+                </ReadOnlyNote>
+            )}
 
             <div className="mt-6 grid gap-6 sm:grid-cols-2">
                 <section className="rounded-lg border border-border p-5">
@@ -273,7 +291,7 @@ export function BookingDetailView({
                             {policy}
                         </p>
                     ) : null}
-                    {retired && !cancelled && !past ? (
+                    {retired && !cancelled && !past && canWrite ? (
                         // A missing button with no explanation reads as a bug.
                         <p className="mt-3 text-sm text-muted-foreground">
                             {service.name} is archived, so this booking cannot
