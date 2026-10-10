@@ -606,7 +606,7 @@ describe("the address on the website", () => {
             ),
         ).toBeNull();
         expect(sheet()?.querySelector('[role="note"]')?.textContent).toContain(
-            "Your role can read these addresses but not change them. An owner or admin can change what your role reaches in Team.",
+            "Your role can read these addresses but not change them. An owner or admin can change this in Settings › Team.",
         );
     });
 
