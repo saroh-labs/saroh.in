@@ -130,7 +130,6 @@ export function SectionCard({
                         type="button"
                         disabled={!!problem}
                         onClick={() => void saveSections([k])}
-                        className="disabled:bg-muted disabled:text-muted-foreground disabled:opacity-100"
                         busy={busy}
                         busyLabel="Saving…"
                     >

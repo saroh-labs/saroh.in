@@ -16,7 +16,7 @@ export const FIELD = "h-[38px] rounded-lg bg-card px-2.5 text-[13.5px]";
 /** A small bordered button: "Change", "−", "+". */
 export const SMALL_BUTTON = cn(
     FOCUS,
-    "cursor-pointer rounded-lg border border-border bg-card font-semibold text-foreground transition-colors duration-fast hover:border-border-strong hover:bg-muted active:bg-muted/70 disabled:cursor-not-allowed disabled:opacity-50",
+    "cursor-pointer rounded-lg border border-border bg-card font-semibold text-foreground transition-colors duration-fast hover:border-border-strong hover:bg-muted active:bg-muted/70 disabled:cursor-not-allowed disabled:text-disabled-foreground",
 );
 
 export function StepCard({

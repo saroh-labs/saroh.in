@@ -109,7 +109,7 @@ export function LateAfterField({
             >
                 <SelectTrigger
                     aria-label={`${way} late after, unit`}
-                    className="h-full min-w-0 flex-1 gap-1.5 rounded-none border-0 bg-transparent px-2.5 hover:border-0 focus:ring-0 focus:ring-offset-0 disabled:bg-transparent coarse:h-full"
+                    className="h-full min-w-0 flex-1 gap-1.5 rounded-none border-0 bg-transparent px-2.5 hover:border-0 focus-visible:ring-0 focus-visible:ring-offset-0 disabled:bg-transparent coarse:h-full"
                 >
                     <SelectValue />
                 </SelectTrigger>

@@ -184,7 +184,7 @@ export function RichTextEditor({
             attributes: {
                 // The merchant's own prose styles, so what they write here
                 // reads like it will on the page.
-                class: "prose prose-sm max-w-none min-h-40 px-3 py-2 focus:outline-none dark:prose-invert",
+                class: "prose prose-sm max-w-none min-h-40 px-3 py-2 outline-none dark:prose-invert",
             },
         },
         onUpdate: ({ editor }) => onChange(editor.getHTML()),

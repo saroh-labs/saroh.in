@@ -57,7 +57,7 @@ export function StartTrackingButton({
             disabled={pending}
             aria-busy={pending}
             className={cn(
-                "rounded-sm text-[12px] font-semibold text-brand hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-wait disabled:opacity-70 coarse:min-h-11",
+                "rounded-sm text-[12px] font-semibold text-brand hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-wait disabled:text-disabled-foreground coarse:min-h-11",
                 className,
             )}
         >
@@ -106,7 +106,7 @@ export function StopTrackingButton({
                 disabled={pending}
                 aria-busy={pending}
                 className={cn(
-                    "rounded-sm px-1 text-[12px] text-muted-foreground hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-wait disabled:opacity-70 coarse:min-h-11",
+                    "rounded-sm px-1 text-[12px] text-muted-foreground hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-wait disabled:text-disabled-foreground coarse:min-h-11",
                     className,
                 )}
             >

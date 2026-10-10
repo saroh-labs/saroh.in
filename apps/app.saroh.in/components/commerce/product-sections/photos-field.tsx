@@ -297,7 +297,7 @@ function IconButton({
             disabled={disabled}
             onClick={onClick}
             className={cn(
-                "grid size-8 place-items-center rounded-md border border-border focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-40 coarse:size-11 [&_svg]:size-4",
+                "grid size-8 place-items-center rounded-md border border-border focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:text-disabled-foreground coarse:size-11 [&_svg]:size-4",
                 danger
                     ? "text-destructive hover:bg-destructive-subtle"
                     : "hover:bg-muted",

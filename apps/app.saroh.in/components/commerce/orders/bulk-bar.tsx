@@ -223,7 +223,7 @@ export function BulkBar({
                                 title={action.disabled ?? action.title}
                                 className={cn(
                                     BAR_BUTTON,
-                                    "border border-primary-foreground/30 hover:bg-primary-foreground/10 active:bg-primary-foreground/15 disabled:cursor-not-allowed disabled:opacity-45 disabled:hover:bg-transparent disabled:active:scale-100",
+                                    "border border-primary-foreground/30 hover:bg-primary-foreground/10 active:bg-primary-foreground/15 disabled:cursor-not-allowed disabled:text-disabled-foreground disabled:hover:bg-transparent disabled:active:scale-100",
                                 )}
                             >
                                 {action.label}

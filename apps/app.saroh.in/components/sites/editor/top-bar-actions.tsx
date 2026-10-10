@@ -363,7 +363,7 @@ function ShareChoice({
             type="button"
             disabled={disabled}
             onClick={onSelect}
-            className="flex w-full gap-2.5 rounded-md px-2.5 py-2 text-left transition-colors hover:bg-secondary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50 coarse:min-h-11"
+            className="flex w-full gap-2.5 rounded-md px-2.5 py-2 text-left transition-colors hover:bg-secondary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:text-disabled-foreground coarse:min-h-11"
         >
             <span aria-hidden className="mt-0.5 text-muted-foreground">
                 {icon}

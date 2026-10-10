@@ -71,7 +71,6 @@ export function CalendarToolbar({
                         size="sm"
                         disabled
                         aria-current="date"
-                        className="disabled:text-muted-foreground disabled:opacity-100"
                     >
                         {current.label}
                     </Button>

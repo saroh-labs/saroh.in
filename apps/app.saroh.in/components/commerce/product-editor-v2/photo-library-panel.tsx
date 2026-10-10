@@ -80,7 +80,7 @@ export function LibraryPanel({
                                     onClick={() => onToggle(item)}
                                     aria-label={`${item.filename}${on ? ", on this product. Take it off." : ". Add it."}`}
                                     className={cn(
-                                        "w-full overflow-hidden rounded-[8px] bg-card text-left disabled:cursor-not-allowed disabled:opacity-50",
+                                        "w-full overflow-hidden rounded-[8px] bg-card text-left disabled:cursor-not-allowed disabled:text-disabled-foreground",
                                         on
                                             ? "border-[1.5px] border-foreground"
                                             : "border border-border",

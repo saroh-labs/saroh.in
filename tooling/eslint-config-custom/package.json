@@ -11,6 +11,8 @@
     },
     "exports": {
         "./base": "./base.js",
+        "./controls": "./controls.js",
+        "./controls-allowlist": "./controls-allowlist.js",
         "./nextjs": "./nextjs.js",
         "./react": "./react.js"
     },

@@ -66,7 +66,7 @@ export function QuickSheet({
     return (
         <Sheet open={open} onOpenChange={requestClose}>
             <SheetContent
-                className="flex w-full flex-col gap-0 p-0 focus:outline-none sm:max-w-[460px]"
+                className="flex w-full flex-col gap-0 p-0 outline-none sm:max-w-[460px]"
                 // Focus lands on the sheet, not its first control, so
                 // nothing opens already ringed; Tab moves in from there.
                 onOpenAutoFocus={(e) => {
@@ -166,7 +166,6 @@ export function QuickSheet({
                         <Button
                             size="sm"
                             type="submit"
-                            className="disabled:bg-muted disabled:text-muted-foreground disabled:opacity-100"
                             disabled={(saveDisabled ?? false) || !dirty}
                             busy={saving}
                             busyLabel="Saving…"

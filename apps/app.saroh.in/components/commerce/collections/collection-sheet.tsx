@@ -240,7 +240,7 @@ export function CollectionSheet({
         <>
             <Sheet open={open} onOpenChange={requestClose}>
                 <SheetContent
-                    className="flex w-full flex-col gap-0 p-0 focus:outline-none sm:max-w-[460px]"
+                    className="flex w-full flex-col gap-0 p-0 outline-none sm:max-w-[460px]"
                     onOpenAutoFocus={(e) => {
                         e.preventDefault();
                         (e.currentTarget as HTMLElement | null)?.focus();

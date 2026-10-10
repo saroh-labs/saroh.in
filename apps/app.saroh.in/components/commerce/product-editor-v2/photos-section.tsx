@@ -197,7 +197,7 @@ export function PhotosSection({ product }: { product: ProductDetail | null }) {
     }
 
     const tileBtn =
-        "inline-flex h-6 min-w-6 items-center justify-center rounded-[6px] border border-border bg-card px-1.5 text-[12px] text-foreground/75 hover:bg-muted disabled:cursor-not-allowed disabled:opacity-45 coarse:h-11 coarse:min-w-11";
+        "inline-flex h-6 min-w-6 items-center justify-center rounded-[6px] border border-border bg-card px-1.5 text-[12px] text-foreground/75 hover:bg-muted disabled:cursor-not-allowed disabled:text-disabled-foreground coarse:h-11 coarse:min-w-11";
     const addTile =
         "flex min-h-[134px] flex-col items-center justify-center gap-1.5 rounded-[10px] border border-dashed border-border-strong p-2 text-center text-[12px] font-semibold disabled:cursor-not-allowed";
 

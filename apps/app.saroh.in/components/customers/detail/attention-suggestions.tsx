@@ -50,7 +50,7 @@ interface Choice {
 }
 
 const CHOICE =
-    "h-[34px] cursor-pointer rounded-[8px] border px-2.5 text-[12.5px] text-foreground transition-colors duration-fast focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring active:bg-muted disabled:cursor-not-allowed disabled:opacity-60 coarse:h-11";
+    "h-[34px] cursor-pointer rounded-[8px] border px-2.5 text-[12.5px] text-foreground transition-colors duration-fast focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring active:bg-muted disabled:cursor-not-allowed disabled:text-disabled-foreground coarse:h-11";
 
 /**
  * Notes from the customer (C12, "Saroh Customer Detail" › patient notes):

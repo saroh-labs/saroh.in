@@ -84,7 +84,7 @@ export function DescriptionEditor({
         editable: !disabled,
         editorProps: {
             attributes: {
-                class: "prose prose-sm min-h-[150px] max-w-none px-[13px] py-3 text-[13.5px] leading-[1.6] focus:outline-none dark:prose-invert",
+                class: "prose prose-sm min-h-[150px] max-w-none px-[13px] py-3 text-[13.5px] leading-[1.6] outline-none dark:prose-invert",
                 ...(id ? { id } : {}),
                 "aria-label": "Description",
                 "aria-multiline": "true",
@@ -360,7 +360,7 @@ function DescriptionSurface({
                                           .run()
                             }
                             className={cn(
-                                "h-7 rounded-[7px] border px-2 text-[11.5px] font-semibold text-foreground/75 disabled:opacity-60 coarse:h-11",
+                                "h-7 rounded-[7px] border px-2 text-[11.5px] font-semibold text-foreground/75 disabled:text-disabled-foreground coarse:h-11",
                                 state.style === s
                                     ? "border-foreground bg-muted"
                                     : "border-border bg-card hover:bg-muted",
@@ -378,7 +378,7 @@ function DescriptionSurface({
                     disabled={disabled}
                     onClick={() => setSource((v) => !v)}
                     className={cn(
-                        "h-7 rounded-[7px] border px-[9px] text-[11.5px] font-semibold disabled:opacity-60 coarse:h-11",
+                        "h-7 rounded-[7px] border px-[9px] text-[11.5px] font-semibold disabled:text-disabled-foreground coarse:h-11",
                         source
                             ? "border-foreground bg-foreground text-background"
                             : "border-border bg-card text-foreground/75 hover:bg-muted",
@@ -444,7 +444,7 @@ function Tool({
             onMouseDown={(e) => e.preventDefault()}
             onClick={onClick}
             className={cn(
-                "grid size-7 place-items-center rounded-[7px] border disabled:opacity-60 coarse:size-11 [&_svg]:size-[15px] [&_svg]:stroke-[1.9]",
+                "grid size-7 place-items-center rounded-[7px] border disabled:text-disabled-foreground coarse:size-11 [&_svg]:size-[15px] [&_svg]:stroke-[1.9]",
                 pressed
                     ? "border-foreground bg-muted text-foreground"
                     : "border-transparent text-foreground/75 hover:bg-muted",
@@ -484,7 +484,7 @@ function LinkTool({
                     disabled={disabled}
                     onMouseDown={(e) => e.preventDefault()}
                     className={cn(
-                        "grid size-7 place-items-center rounded-[7px] border disabled:opacity-60 coarse:size-11 [&_svg]:size-[15px] [&_svg]:stroke-[1.9]",
+                        "grid size-7 place-items-center rounded-[7px] border disabled:text-disabled-foreground coarse:size-11 [&_svg]:size-[15px] [&_svg]:stroke-[1.9]",
                         active
                             ? "border-foreground bg-muted text-foreground"
                             : "border-transparent text-foreground/75 hover:bg-muted",
